@@ -271,9 +271,8 @@ public sealed class AttributionAnalysis
 
     /// <summary>
     /// Access log entries that contributed to this attribution.
-    /// Note: This will reference AccessLogEntry when that type is available.
     /// </summary>
-    public List<object>? RelatedAccessLogs { get; init; }
+    public List<AccessLogEntry>? RelatedAccessLogs { get; init; }
 
     /// <summary>
     /// Estimated earliest time the tampering could have occurred.

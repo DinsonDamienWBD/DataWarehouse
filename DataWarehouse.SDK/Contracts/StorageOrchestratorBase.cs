@@ -332,7 +332,7 @@ namespace DataWarehouse.SDK.Contracts
                     bool exists = false;
                     foreach (var provider in Providers)
                     {
-                        if (await provider.ExistsAsync(uri, ct))
+                        if (await provider.ExistsAsync(uri))
                         {
                             exists = true;
                             break;
