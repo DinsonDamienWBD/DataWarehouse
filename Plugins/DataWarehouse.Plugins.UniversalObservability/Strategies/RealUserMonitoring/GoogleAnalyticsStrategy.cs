@@ -157,8 +157,10 @@ public sealed class GoogleAnalyticsStrategy : ObservabilityStrategyBase
     private static string SanitizeEventName(string name)
     {
         // GA4 event names must start with a letter, contain only letters, numbers, and underscores
+        if (string.IsNullOrEmpty(name))
+            return "metric_unknown";
         var sanitized = new string(name.Select(c => char.IsLetterOrDigit(c) ? c : '_').ToArray());
-        if (!char.IsLetter(sanitized[0]))
+        if (sanitized.Length == 0 || !char.IsLetter(sanitized[0]))
         {
             sanitized = "metric_" + sanitized;
         }

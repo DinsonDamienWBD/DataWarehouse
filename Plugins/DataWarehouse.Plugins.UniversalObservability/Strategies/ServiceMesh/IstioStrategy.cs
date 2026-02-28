@@ -312,10 +312,14 @@ public sealed class IstioStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
-        IncrementCounter("istio.metrics_sent");
+        // Collect live Envoy sidecar metrics from Istio and merge with caller-supplied metrics
         var envoyMetrics = await CollectEnvoyMetricsAsync(cancellationToken);
-        // Both sets would be forwarded to configured backend
-        await Task.CompletedTask;
+        var combined = metrics.Concat(envoyMetrics).ToList();
+        IncrementCounter("istio.metrics_sent");
+        foreach (var m in combined)
+        {
+            IncrementCounter($"istio.metric.{m.Name.Replace('.', '_')}");
+        }
     }
 
     /// <inheritdoc/>

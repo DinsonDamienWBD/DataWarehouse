@@ -187,10 +187,21 @@ public sealed class RustWasmStrategy : SDKPortStrategyBase
 
         foreach (var method in _registeredMethods.Values)
         {
+            var snakeName = ToSnakeCase(method.MethodName);
             sb.AppendLine("    #[wasm_bindgen]");
-            sb.AppendLine($"    pub async fn {ToSnakeCase(method.MethodName)}(&self, params: JsValue) -> Result<JsValue, JsValue> {{");
-            sb.AppendLine("        // WASM binding implementation");
-            sb.AppendLine("        Ok(JsValue::NULL)");
+            sb.AppendLine($"    pub async fn {snakeName}(&self, params: JsValue) -> Result<JsValue, JsValue> {{");
+            sb.AppendLine($"        let url = format!(\"{{}}/{snakeName}\", self.base_url);");
+            sb.AppendLine("        let body = js_sys::JSON::stringify(&params).map_err(|e| e)?;");
+            sb.AppendLine("        let body_str: String = body.into();");
+            sb.AppendLine("        let opts = web_sys::RequestInit::new();");
+            sb.AppendLine("        opts.set_method(\"POST\");");
+            sb.AppendLine("        opts.set_body(&wasm_bindgen::JsValue::from_str(&body_str));");
+            sb.AppendLine("        let request = web_sys::Request::new_with_str_and_init(&url, &opts).map_err(|e| e)?;");
+            sb.AppendLine("        let window = web_sys::window().ok_or_else(|| wasm_bindgen::JsValue::from_str(\"no window\"))?;");
+            sb.AppendLine("        let resp_value = wasm_bindgen_futures::JsFuture::from(window.fetch_with_request(&request)).await.map_err(|e| e)?;");
+            sb.AppendLine("        let resp: web_sys::Response = resp_value.dyn_into().map_err(|e| e)?;");
+            sb.AppendLine("        let json = wasm_bindgen_futures::JsFuture::from(resp.json().map_err(|e| e)?).await.map_err(|e| e)?;");
+            sb.AppendLine("        Ok(json)");
             sb.AppendLine("    }");
         }
         sb.AppendLine("}");

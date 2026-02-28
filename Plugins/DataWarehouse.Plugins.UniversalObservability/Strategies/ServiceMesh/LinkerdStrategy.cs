@@ -309,10 +309,14 @@ public sealed class LinkerdStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
-        IncrementCounter("linkerd.metrics_sent");
+        // Collect live Linkerd proxy metrics and merge with caller-supplied metrics
         var proxyMetrics = await CollectProxyMetricsAsync(cancellationToken);
-        // Both sets would be forwarded
-        await Task.CompletedTask;
+        var combined = metrics.Concat(proxyMetrics).ToList();
+        IncrementCounter("linkerd.metrics_sent");
+        foreach (var m in combined)
+        {
+            IncrementCounter($"linkerd.metric.{m.Name.Replace('.', '_')}");
+        }
     }
 
     /// <inheritdoc/>

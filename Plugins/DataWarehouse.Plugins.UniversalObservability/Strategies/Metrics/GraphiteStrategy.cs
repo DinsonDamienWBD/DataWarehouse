@@ -19,7 +19,8 @@ public sealed class GraphiteStrategy : ObservabilityStrategyBase
     private string _prefix = "datawarehouse";
     private TcpClient? _tcpClient;
     private NetworkStream? _stream;
-    private readonly object _connectionLock = new();
+    private volatile bool _disposed = false;
+    private readonly SemaphoreSlim _connectionLock = new(1, 1);
 
     /// <inheritdoc/>
     public override string StrategyId => "graphite";
@@ -57,28 +58,31 @@ public sealed class GraphiteStrategy : ObservabilityStrategyBase
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
         IncrementCounter("graphite.metrics_sent");
-        await EnsureConnectedAsync(cancellationToken);
 
         var sb = new StringBuilder();
-
         foreach (var metric in metrics)
         {
             // Graphite format: metric.path value timestamp\n
             var path = BuildMetricPath(metric);
             var timestamp = metric.Timestamp.ToUnixTimeSeconds();
-
             sb.AppendLine($"{path} {metric.Value} {timestamp}");
         }
-
         var data = Encoding.UTF8.GetBytes(sb.ToString());
 
-        lock (_connectionLock)
+        await _connectionLock.WaitAsync(cancellationToken);
+        try
         {
+            if (_disposed) return;
+            await EnsureConnectedUnderLockAsync(cancellationToken);
             if (_stream != null && _stream.CanWrite)
             {
-                _stream.Write(data, 0, data.Length);
-                _stream.Flush();
+                await _stream.WriteAsync(data, 0, data.Length, cancellationToken);
+                await _stream.FlushAsync(cancellationToken);
             }
+        }
+        finally
+        {
+            _connectionLock.Release();
         }
     }
 
@@ -121,23 +125,27 @@ public sealed class GraphiteStrategy : ObservabilityStrategyBase
             .ToLowerInvariant();
     }
 
-    private async Task EnsureConnectedAsync(CancellationToken ct)
+    // Must be called while holding _connectionLock
+    private async Task EnsureConnectedUnderLockAsync(CancellationToken ct)
     {
-        lock (_connectionLock)
-        {
-            if (_tcpClient?.Connected == true)
-                return;
-        }
+        if (_tcpClient?.Connected == true)
+            return;
 
         var client = new TcpClient();
-        await client.ConnectAsync(_host, _port, ct);
-
-        lock (_connectionLock)
+        try
         {
-            _tcpClient?.Dispose();
-            _tcpClient = client;
-            _stream = client.GetStream();
+            await client.ConnectAsync(_host, _port, ct);
         }
+        catch
+        {
+            client.Dispose();
+            throw;
+        }
+
+        _stream?.Dispose();
+        _tcpClient?.Dispose();
+        _tcpClient = client;
+        _stream = client.GetStream();
     }
 
     /// <inheritdoc/>
@@ -157,7 +165,16 @@ public sealed class GraphiteStrategy : ObservabilityStrategyBase
     {
         try
         {
-            await EnsureConnectedAsync(cancellationToken);
+            await _connectionLock.WaitAsync(cancellationToken);
+            try
+            {
+                if (!_disposed)
+                    await EnsureConnectedUnderLockAsync(cancellationToken);
+            }
+            finally
+            {
+                _connectionLock.Release();
+            }
 
             return new HealthCheckResult(
                 IsHealthy: _tcpClient?.Connected == true,
@@ -200,13 +217,20 @@ public sealed class GraphiteStrategy : ObservabilityStrategyBase
     {
         if (disposing)
         {
-            lock (_connectionLock)
+            _connectionLock.Wait();
+            try
             {
+                _disposed = true;
                 _stream?.Dispose();
                 _tcpClient?.Dispose();
                 _stream = null;
                 _tcpClient = null;
             }
+            finally
+            {
+                _connectionLock.Release();
+            }
+            _connectionLock.Dispose();
         }
         base.Dispose(disposing);
     }

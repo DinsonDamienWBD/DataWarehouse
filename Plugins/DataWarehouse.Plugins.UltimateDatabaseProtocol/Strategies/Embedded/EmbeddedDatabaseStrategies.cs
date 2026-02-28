@@ -778,6 +778,12 @@ public sealed class RocksDbProtocolStrategy : DatabaseProtocolStrategyBase
     private bool _createIfMissing = true;
     private bool _isOpen;
 
+    /// <summary>
+    /// Transactions and compaction are not yet wired to native RocksDB APIs.
+    /// File I/O-based key-value operations are functional.
+    /// </summary>
+    public override bool IsProductionReady => false;
+
     /// <inheritdoc/>
     public override string StrategyId => "rocksdb-native";
 
@@ -794,7 +800,9 @@ public sealed class RocksDbProtocolStrategy : DatabaseProtocolStrategyBase
         MaxPacketSize = int.MaxValue,
         Capabilities = new ProtocolCapabilities
         {
-            SupportsTransactions = true, // OptimisticTransaction
+            // RocksDb transaction support is not yet wired (Begin/Commit/Rollback are no-ops).
+            // Set false to prevent callers from relying on transaction semantics. (finding 2689)
+            SupportsTransactions = false,
             SupportsPreparedStatements = false,
             SupportsCursors = true,
             SupportsStreaming = true,
@@ -943,10 +951,17 @@ public sealed class RocksDbProtocolStrategy : DatabaseProtocolStrategyBase
     {
         var filePath = GetKeyFilePath(key);
 
-        if (File.Exists(filePath))
+        try
         {
-            File.Delete(filePath);
-            return new QueryResult { Success = true, RowsAffected = 1 };
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+                return new QueryResult { Success = true, RowsAffected = 1 };
+            }
+        }
+        catch (IOException ex)
+        {
+            return new QueryResult { Success = false, ErrorMessage = $"I/O error deleting key '{key}': {ex.Message}" };
         }
 
         return new QueryResult { Success = true, RowsAffected = 0 };
@@ -998,19 +1013,26 @@ public sealed class RocksDbProtocolStrategy : DatabaseProtocolStrategyBase
             return new QueryResult { Success = true, RowsAffected = 0, Rows = rows };
         }
 
-        foreach (var file in Directory.GetFiles(dataDir, "*.dat").OrderBy(f => f).Take(limit))
+        try
         {
-            var key = Encoding.UTF8.GetString(Convert.FromHexString(Path.GetFileNameWithoutExtension(file)));
-            if (string.Compare(key, startKey, StringComparison.Ordinal) >= 0 &&
-                string.Compare(key, endKey, StringComparison.Ordinal) <= 0)
+            foreach (var file in Directory.GetFiles(dataDir, "*.dat").OrderBy(f => f).Take(limit))
             {
-                var value = File.ReadAllText(file);
-                rows.Add(new Dictionary<string, object?>
+                var key = Encoding.UTF8.GetString(Convert.FromHexString(Path.GetFileNameWithoutExtension(file)));
+                if (string.Compare(key, startKey, StringComparison.Ordinal) >= 0 &&
+                    string.Compare(key, endKey, StringComparison.Ordinal) <= 0)
                 {
-                    ["key"] = key,
-                    ["value"] = value
-                });
+                    var value = File.ReadAllText(file);
+                    rows.Add(new Dictionary<string, object?>
+                    {
+                        ["key"] = key,
+                        ["value"] = value
+                    });
+                }
             }
+        }
+        catch (IOException ex)
+        {
+            return new QueryResult { Success = false, ErrorMessage = $"I/O error scanning range: {ex.Message}" };
         }
 
         return new QueryResult
@@ -1111,7 +1133,9 @@ public sealed class BerkeleyDbProtocolStrategy : DatabaseProtocolStrategyBase
         MaxPacketSize = int.MaxValue,
         Capabilities = new ProtocolCapabilities
         {
-            SupportsTransactions = true,
+            // BerkeleyDb transaction support is not yet wired (Begin/Commit/Rollback are no-ops).
+            // Set false to prevent callers from relying on transaction semantics. (finding 2689)
+            SupportsTransactions = false,
             SupportsPreparedStatements = false,
             SupportsCursors = true,
             SupportsStreaming = true,

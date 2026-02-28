@@ -23,8 +23,9 @@ public sealed class PrometheusStrategy : ObservabilityStrategyBase
     private string _jobName = "datawarehouse";
     private int _circuitBreakerFailures = 0;
     private const int CircuitBreakerThreshold = 5;
-    private bool _circuitOpen = false;
-    private DateTimeOffset _circuitOpenedAt = DateTimeOffset.MinValue;
+    private volatile bool _circuitOpen = false;
+    private long _circuitOpenedAtTicks = DateTimeOffset.MinValue.UtcTicks;
+    private readonly object _circuitLock = new();
 
     /// <inheritdoc/>
     public override string StrategyId => "prometheus";
@@ -134,7 +135,8 @@ public sealed class PrometheusStrategy : ObservabilityStrategyBase
 
     private async Task PushMetricsAsync(string metricsText, CancellationToken ct)
     {
-        if (_circuitOpen && DateTimeOffset.UtcNow - _circuitOpenedAt < TimeSpan.FromMinutes(1))
+        if (_circuitOpen &&
+            DateTimeOffset.UtcNow.UtcTicks - Interlocked.Read(ref _circuitOpenedAtTicks) < TimeSpan.FromMinutes(1).Ticks)
             return; // Circuit open
 
         await SendWithRetryAsync(async () =>
@@ -156,8 +158,11 @@ public sealed class PrometheusStrategy : ObservabilityStrategyBase
             try
             {
                 await action();
-                _circuitBreakerFailures = 0;
-                _circuitOpen = false;
+                lock (_circuitLock)
+                {
+                    _circuitBreakerFailures = 0;
+                    _circuitOpen = false;
+                }
                 return;
             }
             catch (HttpRequestException) when (attempt < maxRetries - 1)
@@ -167,11 +172,14 @@ public sealed class PrometheusStrategy : ObservabilityStrategyBase
             }
             catch (HttpRequestException)
             {
-                _circuitBreakerFailures++;
-                if (_circuitBreakerFailures >= CircuitBreakerThreshold)
+                lock (_circuitLock)
                 {
-                    _circuitOpen = true;
-                    _circuitOpenedAt = DateTimeOffset.UtcNow;
+                    _circuitBreakerFailures++;
+                    if (_circuitBreakerFailures >= CircuitBreakerThreshold)
+                    {
+                        _circuitOpen = true;
+                        Interlocked.Exchange(ref _circuitOpenedAtTicks, DateTimeOffset.UtcNow.UtcTicks);
+                    }
                 }
                 // Swallow - metrics stored locally in dictionaries
             }

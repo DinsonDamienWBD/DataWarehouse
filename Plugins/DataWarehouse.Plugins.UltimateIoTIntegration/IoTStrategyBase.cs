@@ -48,7 +48,7 @@ public abstract class IoTStrategyBase : StrategyBase, IIoTStrategyBase
 {
     private long _totalOperations;
     private long _failedOperations;
-    private DateTimeOffset? _lastActivity;
+    private long _lastActivityTicks; // Written/read via Interlocked; 0 = never
 
     /// <inheritdoc/>
     public abstract override string StrategyId { get; }
@@ -90,7 +90,9 @@ public abstract class IoTStrategyBase : StrategyBase, IIoTStrategyBase
             StrategyId = StrategyId,
             TotalOperations = total,
             FailedOperations = failed,
-            LastActivity = _lastActivity
+            LastActivity = Interlocked.Read(ref _lastActivityTicks) == 0
+                ? null
+                : new DateTimeOffset(Interlocked.Read(ref _lastActivityTicks), TimeSpan.Zero)
         };
     }
 
@@ -100,7 +102,7 @@ public abstract class IoTStrategyBase : StrategyBase, IIoTStrategyBase
     protected void RecordOperation()
     {
         Interlocked.Increment(ref _totalOperations);
-        _lastActivity = DateTimeOffset.UtcNow;
+        Interlocked.Exchange(ref _lastActivityTicks, DateTimeOffset.UtcNow.UtcTicks);
     }
 
     /// <summary>
@@ -110,7 +112,7 @@ public abstract class IoTStrategyBase : StrategyBase, IIoTStrategyBase
     {
         Interlocked.Increment(ref _totalOperations);
         Interlocked.Increment(ref _failedOperations);
-        _lastActivity = DateTimeOffset.UtcNow;
+        Interlocked.Exchange(ref _lastActivityTicks, DateTimeOffset.UtcNow.UtcTicks);
     }
 
     /// <summary>

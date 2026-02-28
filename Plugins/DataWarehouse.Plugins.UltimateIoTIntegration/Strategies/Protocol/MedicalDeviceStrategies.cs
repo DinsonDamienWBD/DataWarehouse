@@ -289,6 +289,8 @@ public sealed class DicomNetworkStrategy : ProtocolStrategyBase
     public override string StrategyName => "DICOM Network Service";
     public override string Description => "DICOM network service for medical imaging (C-STORE/C-FIND/C-MOVE/C-ECHO)";
     public override string[] Tags => new[] { "iot", "protocol", "medical", "dicom", "imaging", "pacs" };
+    // C-FIND/C-MOVE return fabricated results; real DICOM requires a PACS connection (IEC 62304 / HIPAA scope).
+    public override bool IsProductionReady => false;
     public override string ProtocolName => "DICOM";
     public override int DefaultPort => 104;
     public override Task<CommandResult> SendCommandAsync(DeviceCommand command, CancellationToken ct = default)

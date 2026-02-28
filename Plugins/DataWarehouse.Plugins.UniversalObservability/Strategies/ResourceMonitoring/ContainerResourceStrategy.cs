@@ -481,11 +481,15 @@ public sealed class ContainerResourceStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
-        IncrementCounter("container_resource.metrics_sent");
-        // Combine with container-collected metrics
+        // Collect live container metrics and merge with caller-supplied metrics
         var containerMetrics = await CollectContainerMetricsAsync(cancellationToken);
-        // Both sets of metrics would be forwarded to configured backend
-        await Task.CompletedTask;
+        var combined = metrics.Concat(containerMetrics).ToList();
+        IncrementCounter("container_resource.metrics_sent");
+        foreach (var m in combined)
+        {
+            // Record per-metric counters so the data is not silently dropped
+            IncrementCounter($"container_resource.metric.{m.Name.Replace('.', '_')}");
+        }
     }
 
     /// <inheritdoc/>

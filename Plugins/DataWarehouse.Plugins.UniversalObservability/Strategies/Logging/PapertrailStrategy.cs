@@ -85,7 +85,7 @@ public sealed class PapertrailStrategy : ObservabilityStrategyBase
             var syslogMessage = FormatSyslogMessage(log);
             var bytes = Encoding.UTF8.GetBytes(syslogMessage);
 
-            await _udpClient.SendAsync(bytes, bytes.Length);
+            await _udpClient.SendAsync(new ReadOnlyMemory<byte>(bytes), cancellationToken);
         }
     }
 

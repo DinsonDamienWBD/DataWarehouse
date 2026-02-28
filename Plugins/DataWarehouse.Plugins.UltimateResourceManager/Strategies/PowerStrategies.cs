@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
@@ -9,8 +10,8 @@ namespace DataWarehouse.Plugins.UltimateResourceManager.Strategies;
 /// </summary>
 public sealed class DvfsCpuStrategy : ResourceStrategyBase
 {
-    private readonly Dictionary<string, (int frequency, double voltage)> _pStates = new();
-    private int _currentPState;
+    private readonly ConcurrentDictionary<string, (int frequency, double voltage)> _pStates = new();
+    private volatile int _currentPState;
     private readonly int _maxFrequencyMhz = 4000; // 4 GHz max
     private readonly int _minFrequencyMhz = 800;  // 800 MHz min
 
@@ -69,12 +70,13 @@ public sealed class DvfsCpuStrategy : ResourceStrategyBase
     {
         if (allocation.AllocationHandle != null)
         {
-            _pStates.Remove(allocation.AllocationHandle);
+            _pStates.TryRemove(allocation.AllocationHandle, out _);
 
             // Recalculate P-state based on remaining allocations
-            if (_pStates.Count > 0)
+            var snapshot = _pStates.Values.ToList();
+            if (snapshot.Count > 0)
             {
-                var maxFreq = _pStates.Values.Max(p => p.frequency);
+                var maxFreq = snapshot.Max(p => p.frequency);
                 _currentPState = (int)((maxFreq - _minFrequencyMhz) * 10.0 / (_maxFrequencyMhz - _minFrequencyMhz));
             }
             else
@@ -92,8 +94,8 @@ public sealed class DvfsCpuStrategy : ResourceStrategyBase
 /// </summary>
 public sealed class CStateStrategy : ResourceStrategyBase
 {
-    private readonly Dictionary<string, int> _wakeLatencyBudgets = new();
-    private int _currentCState; // C0=active, C1-C10=progressively deeper sleep
+    private readonly ConcurrentDictionary<string, int> _wakeLatencyBudgets = new();
+    private volatile int _currentCState; // C0=active, C1-C10=progressively deeper sleep
 
     public override string StrategyId => "power-cstate";
     public override string DisplayName => "C-State Power Manager";
@@ -136,7 +138,7 @@ public sealed class CStateStrategy : ResourceStrategyBase
         };
 
         _wakeLatencyBudgets[handle] = maxCState;
-        _currentCState = _wakeLatencyBudgets.Values.Min(); // Most restrictive wins
+        _currentCState = _wakeLatencyBudgets.Values.ToList() is { Count: > 0 } vals ? vals.Min() : 10; // Most restrictive wins
 
         return Task.FromResult(new ResourceAllocation
         {
@@ -151,8 +153,9 @@ public sealed class CStateStrategy : ResourceStrategyBase
     {
         if (allocation.AllocationHandle != null)
         {
-            _wakeLatencyBudgets.Remove(allocation.AllocationHandle);
-            _currentCState = _wakeLatencyBudgets.Count > 0 ? _wakeLatencyBudgets.Values.Min() : 10;
+            _wakeLatencyBudgets.TryRemove(allocation.AllocationHandle, out _);
+            var remaining = _wakeLatencyBudgets.Values.ToList();
+            _currentCState = remaining.Count > 0 ? remaining.Min() : 10;
         }
         return Task.FromResult(true);
     }
@@ -164,7 +167,7 @@ public sealed class CStateStrategy : ResourceStrategyBase
 /// </summary>
 public sealed class IntelRaplStrategy : ResourceStrategyBase
 {
-    private readonly Dictionary<string, PowerDomain> _allocations = new();
+    private readonly ConcurrentDictionary<string, PowerDomain> _allocations = new();
     private long _packagePowerBudgetMw = 65000;  // 65W TDP
     private long _currentPackagePowerMw;
 
@@ -230,7 +233,7 @@ public sealed class IntelRaplStrategy : ResourceStrategyBase
 
     protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct)
     {
-        if (allocation.AllocationHandle != null && _allocations.Remove(allocation.AllocationHandle))
+        if (allocation.AllocationHandle != null && _allocations.TryRemove(allocation.AllocationHandle, out _))
         {
             var releasedPowerMw = (long)(allocation.AllocatedCpuCores * (_packagePowerBudgetMw / Environment.ProcessorCount));
             Interlocked.Add(ref _currentPackagePowerMw, -releasedPowerMw);

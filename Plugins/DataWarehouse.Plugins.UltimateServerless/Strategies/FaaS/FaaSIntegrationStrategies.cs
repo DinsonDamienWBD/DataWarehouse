@@ -17,6 +17,7 @@ public sealed class AwsLambdaFaaSStrategy : ServerlessStrategyBase
     public override string DisplayName => "AWS Lambda";
     public override ServerlessCategory Category => ServerlessCategory.FaaS;
     public override ServerlessPlatform? TargetPlatform => ServerlessPlatform.AwsLambda;
+    public override bool IsProductionReady => false; // Requires AWS Lambda runtime
 
     public override ServerlessStrategyCapabilities Capabilities => new()
     {
@@ -140,6 +141,7 @@ public sealed class AzureFunctionsFaaSStrategy : ServerlessStrategyBase
     public override string DisplayName => "Azure Functions";
     public override ServerlessCategory Category => ServerlessCategory.FaaS;
     public override ServerlessPlatform? TargetPlatform => ServerlessPlatform.AzureFunctions;
+    public override bool IsProductionReady => false; // Requires Azure Functions runtime
 
     public override ServerlessStrategyCapabilities Capabilities => new()
     {
@@ -238,6 +240,7 @@ public sealed class GoogleCloudFunctionsFaaSStrategy : ServerlessStrategyBase
     public override string DisplayName => "Google Cloud Functions";
     public override ServerlessCategory Category => ServerlessCategory.FaaS;
     public override ServerlessPlatform? TargetPlatform => ServerlessPlatform.GoogleCloudFunctions;
+    public override bool IsProductionReady => false; // Requires GCP Functions runtime
 
     public override ServerlessStrategyCapabilities Capabilities => new()
     {
@@ -313,6 +316,7 @@ public sealed class CloudflareWorkersFaaSStrategy : ServerlessStrategyBase
     public override string DisplayName => "Cloudflare Workers";
     public override ServerlessCategory Category => ServerlessCategory.FaaS;
     public override ServerlessPlatform? TargetPlatform => ServerlessPlatform.CloudflareWorkers;
+    public override bool IsProductionReady => false; // Requires Cloudflare Workers runtime
 
     public override ServerlessStrategyCapabilities Capabilities => new()
     {

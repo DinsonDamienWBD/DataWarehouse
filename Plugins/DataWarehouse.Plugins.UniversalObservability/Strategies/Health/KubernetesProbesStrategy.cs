@@ -38,10 +38,12 @@ public sealed class KubernetesProbesStrategy : ObservabilityStrategyBase
     }
 
     /// <summary>
-    /// Starts the HTTP listener for probes.
+    /// Starts the HTTP listener for probes. Idempotent — calling when already started is a no-op.
     /// </summary>
     public void StartProbeServer()
     {
+        if (_isStarted) return; // Idempotency guard — prevent listener and CTS leak
+
         _cts = new CancellationTokenSource();
         _listener = new HttpListener();
         _listener.Prefixes.Add(_prefix);
@@ -56,8 +58,17 @@ public sealed class KubernetesProbesStrategy : ObservabilityStrategyBase
                     var context = await _listener.GetContextAsync();
                     await HandleRequestAsync(context);
                 }
-                catch (Exception) when (_cts.Token.IsCancellationRequested) { break; }
-                catch { /* Continue */ }
+                catch (Exception ex) when (_cts.Token.IsCancellationRequested)
+                {
+                    _ = ex; // Expected on shutdown
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    // Log unexpected errors from GetContextAsync but keep the probe server alive
+                    System.Diagnostics.Trace.TraceWarning(
+                        "[KubernetesProbes] GetContextAsync error: {0}", ex.Message);
+                }
             }
         });
 

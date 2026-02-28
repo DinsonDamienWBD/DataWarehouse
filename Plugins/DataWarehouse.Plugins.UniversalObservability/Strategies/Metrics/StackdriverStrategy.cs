@@ -28,8 +28,9 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
     private int _flushIntervalSeconds = 10;
     private int _circuitBreakerFailures = 0;
     private const int CircuitBreakerThreshold = 5;
-    private bool _circuitOpen = false;
-    private DateTimeOffset _circuitOpenedAt = DateTimeOffset.MinValue;
+    private volatile bool _circuitOpen = false;
+    private long _circuitOpenedAtTicks = DateTimeOffset.MinValue.UtcTicks;
+    private readonly object _circuitLock = new();
     private int _exportIntervalMs = 60000; // Default 60 seconds
 
     /// <inheritdoc/>
@@ -151,7 +152,7 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
 
     private async Task FlushBatchesAsync(CancellationToken ct)
     {
-        if (_circuitOpen && DateTimeOffset.UtcNow - _circuitOpenedAt < TimeSpan.FromMinutes(1))
+        if (_circuitOpen && DateTimeOffset.UtcNow.UtcTicks - Interlocked.Read(ref _circuitOpenedAtTicks) < TimeSpan.FromMinutes(1).Ticks)
             return; // Circuit open, skip flush
 
         await _flushLock.WaitAsync(ct);
@@ -228,8 +229,11 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
             try
             {
                 await action();
-                _circuitBreakerFailures = 0; // Reset on success
-                _circuitOpen = false;
+                lock (_circuitLock)
+                {
+                    _circuitBreakerFailures = 0; // Reset on success
+                    _circuitOpen = false;
+                }
                 return;
             }
             catch (HttpRequestException ex) when (attempt < maxRetries - 1)
@@ -266,11 +270,14 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
             }
             catch (Exception)
             {
-                _circuitBreakerFailures++;
-                if (_circuitBreakerFailures >= CircuitBreakerThreshold)
+                lock (_circuitLock)
                 {
-                    _circuitOpen = true;
-                    _circuitOpenedAt = DateTimeOffset.UtcNow;
+                    _circuitBreakerFailures++;
+                    if (_circuitBreakerFailures >= CircuitBreakerThreshold)
+                    {
+                        _circuitOpen = true;
+                        Interlocked.Exchange(ref _circuitOpenedAtTicks, DateTimeOffset.UtcNow.UtcTicks);
+                    }
                 }
                 throw;
             }
@@ -280,7 +287,7 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
-        if (_circuitOpen && DateTimeOffset.UtcNow - _circuitOpenedAt < TimeSpan.FromMinutes(1))
+        if (_circuitOpen && DateTimeOffset.UtcNow.UtcTicks - Interlocked.Read(ref _circuitOpenedAtTicks) < TimeSpan.FromMinutes(1).Ticks)
             return; // Circuit open, drop metrics
 
         foreach (var metric in metrics)
@@ -405,7 +412,7 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken)
     {
-        if (_circuitOpen && DateTimeOffset.UtcNow - _circuitOpenedAt < TimeSpan.FromMinutes(1))
+        if (_circuitOpen && DateTimeOffset.UtcNow.UtcTicks - Interlocked.Read(ref _circuitOpenedAtTicks) < TimeSpan.FromMinutes(1).Ticks)
             return; // Circuit open, drop logs
 
         foreach (var entry in logEntries)
@@ -497,15 +504,19 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
         {
             _flushTimer?.Stop();
             _flushTimer?.Dispose();
-            _flushLock.Wait();
-            try
+            // Bounded flush: acquire lock, flush both queues, release
+            if (_flushLock.Wait(TimeSpan.FromSeconds(5)))
             {
-                Task.Run(() => FlushMetricsAsync(CancellationToken.None)).Wait(TimeSpan.FromSeconds(5));
-                Task.Run(() => FlushLogsAsync(CancellationToken.None)).Wait(TimeSpan.FromSeconds(5));
-            }
-            finally
-            {
-                _flushLock.Release();
+                try
+                {
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
+                    try { FlushMetricsAsync(cts.Token).GetAwaiter().GetResult(); } catch { /* Best-effort */ }
+                    try { FlushLogsAsync(cts.Token).GetAwaiter().GetResult(); } catch { /* Best-effort */ }
+                }
+                finally
+                {
+                    _flushLock.Release();
+                }
             }
             _flushLock.Dispose();
             _httpClient.Dispose();

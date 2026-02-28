@@ -215,10 +215,12 @@ public class I2cControllerStrategy : HardwareBusStrategyBase
         // 9. Read bytes, send ACK after each except last (send NACK)
         // 10. STOP
 
-        await Task.Delay(1, ct); // Simulate I2C timing
-        var data = new byte[byteCount];
-        Random.Shared.NextBytes(data); // Simulated register data
-        return data;
+        // Hardware I2C read requires platform-specific driver access.
+        // On Linux: use /dev/i2c-* via ioctl I2C_RDWR.
+        // On Windows IoT: use Windows.Devices.I2c.I2cDevice.
+        // This base strategy cannot perform real I2C without platform APIs; subclass for hardware targets.
+        throw new PlatformNotSupportedException(
+            "I2C register read requires a platform-specific subclass targeting /dev/i2c-* (Linux) or Windows.Devices.I2c (WinIoT).");
     }
 
     /// <summary>
@@ -320,13 +322,12 @@ public class SpiControllerStrategy : HardwareBusStrategyBase
         //    - Apply CPOL/CPHA timing based on mode
         // 3. Deassert chip select (pull CS pin high)
 
-        // Simulate timing based on clock frequency
-        var byteTransferTime = 8.0 / _clockFrequency * 1000000; // microseconds
-        await Task.Delay((int)(byteTransferTime * transferLength / 1000), ct);
-
-        // Simulated read data
-        Random.Shared.NextBytes(readData);
-        return readData;
+        // Hardware SPI transfer requires platform-specific driver access.
+        // On Linux: use /dev/spidev* via ioctl SPI_IOC_MESSAGE.
+        // On Windows IoT: use Windows.Devices.Spi.SpiDevice.
+        // This base strategy cannot perform real SPI without platform APIs; subclass for hardware targets.
+        throw new PlatformNotSupportedException(
+            "SPI transfer requires a platform-specific subclass targeting /dev/spidev* (Linux) or Windows.Devices.Spi (WinIoT).");
     }
 
     /// <summary>

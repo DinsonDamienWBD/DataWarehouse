@@ -47,20 +47,23 @@ public sealed class DurableEntitiesStrategy : ServerlessStrategyBase
         return Task.FromResult(entity);
     }
 
-    /// <summary>Signals an entity with an operation.</summary>
+    /// <summary>Signals an entity with an operation (thread-safe via monitor lock on entity).</summary>
     public Task SignalEntityAsync(string entityId, string operation, object? input = null, CancellationToken ct = default)
     {
         if (_entities.TryGetValue(entityId, out var entity))
         {
-            entity.PendingOperations.Enqueue(new EntityOperation
+            lock (entity)
             {
-                OperationId = Guid.NewGuid().ToString(),
-                OperationType = operation,
-                Input = input,
-                Timestamp = DateTimeOffset.UtcNow
-            });
-            entity.Version++;
-            entity.LastModified = DateTimeOffset.UtcNow;
+                entity.PendingOperations.Enqueue(new EntityOperation
+                {
+                    OperationId = Guid.NewGuid().ToString(),
+                    OperationType = operation,
+                    Input = input,
+                    Timestamp = DateTimeOffset.UtcNow
+                });
+                entity.Version++;
+                entity.LastModified = DateTimeOffset.UtcNow;
+            }
         }
 
         RecordOperation("SignalEntity");
@@ -480,6 +483,7 @@ public sealed class DurableObjectsStateStrategy : ServerlessStrategyBase
     public override string DisplayName => "Cloudflare Durable Objects";
     public override ServerlessCategory Category => ServerlessCategory.StateManagement;
     public override ServerlessPlatform? TargetPlatform => ServerlessPlatform.CloudflareWorkers;
+    public override bool IsProductionReady => false; // Requires Cloudflare Workers runtime
 
     public override ServerlessStrategyCapabilities Capabilities => new() { SupportsSyncInvocation = true, SupportsAsyncInvocation = false };
 
@@ -511,6 +515,7 @@ public sealed class FirestoreStateStrategy : ServerlessStrategyBase
     public override string DisplayName => "Firestore State";
     public override ServerlessCategory Category => ServerlessCategory.StateManagement;
     public override ServerlessPlatform? TargetPlatform => ServerlessPlatform.GoogleCloudFunctions;
+    public override bool IsProductionReady => false; // Requires Google Cloud Firestore SDK
 
     public override ServerlessStrategyCapabilities Capabilities => new() { SupportsSyncInvocation = true, SupportsEventTriggers = true };
 
@@ -542,6 +547,7 @@ public sealed class VercelKvStateStrategy : ServerlessStrategyBase
     public override string DisplayName => "Vercel KV";
     public override ServerlessCategory Category => ServerlessCategory.StateManagement;
     public override ServerlessPlatform? TargetPlatform => ServerlessPlatform.VercelFunctions;
+    public override bool IsProductionReady => false; // Requires Vercel KV SDK
 
     public override ServerlessStrategyCapabilities Capabilities => new() { SupportsSyncInvocation = true };
 

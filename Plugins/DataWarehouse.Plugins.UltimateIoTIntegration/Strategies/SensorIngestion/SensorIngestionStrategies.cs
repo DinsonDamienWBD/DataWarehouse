@@ -413,18 +413,45 @@ public class AggregatingIngestionStrategy : SensorIngestionStrategyBase
         {
             await Task.Delay(60000, ct); // Emit aggregated data every minute
 
-            // Yield aggregated telemetry
-            yield return new TelemetryMessage
+            // Snapshot all current windows and yield as aggregated messages
+            var windowKeys = _windows.Keys.ToList();
+            foreach (var windowKey in windowKeys)
             {
-                DeviceId = subscription.DeviceId ?? "*",
-                MessageId = Guid.NewGuid().ToString(),
-                Timestamp = DateTimeOffset.UtcNow,
-                Data = new Dictionary<string, object>
+                if (!_windows.TryGetValue(windowKey, out var window)) continue;
+
+                // Apply device filter if provided
+                var parts = windowKey.Split(':');
+                var deviceId = parts.Length > 0 ? parts[0] : windowKey;
+                if (subscription.DeviceId != null && subscription.DeviceId != "*" &&
+                    subscription.DeviceId != deviceId)
+                    continue;
+
+                var data = new Dictionary<string, object>
                 {
                     ["aggregation_type"] = "minute",
-                    ["window_count"] = 1
+                    ["window_count"] = window.Count
+                };
+
+                foreach (var key in window.Sum.Keys)
+                {
+                    if (window.Sum.TryGetValue(key, out var sum))
+                        data[$"{key}_sum"] = sum;
+                    if (window.Min.TryGetValue(key, out var min))
+                        data[$"{key}_min"] = min;
+                    if (window.Max.TryGetValue(key, out var max))
+                        data[$"{key}_max"] = max;
+                    if (window.Count > 0 && window.Sum.TryGetValue(key, out var s))
+                        data[$"{key}_avg"] = s / window.Count;
                 }
-            };
+
+                yield return new TelemetryMessage
+                {
+                    DeviceId = deviceId,
+                    MessageId = Guid.NewGuid().ToString(),
+                    Timestamp = DateTimeOffset.UtcNow,
+                    Data = data
+                };
+            }
         }
     }
 

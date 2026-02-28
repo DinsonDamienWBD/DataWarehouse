@@ -177,11 +177,14 @@ public sealed class PingdomStrategy : ObservabilityStrategyBase
         }
     }
 
-    private async Task TriggerAlertAsync(string message, CancellationToken ct)
+    private Task TriggerAlertAsync(string message, CancellationToken ct)
     {
-        // Pingdom handles alerts automatically based on check configurations
-        // This is a no-op placeholder for custom alert logic
-        await Task.CompletedTask;
+        // Pingdom handles alerts automatically based on check configurations.
+        // The Pingdom API v3.1 does not expose a manual alert-trigger endpoint;
+        // alerts fire when checks breach their configured thresholds on Pingdom's side.
+        // Log the condition locally so operators can act if needed.
+        System.Diagnostics.Trace.TraceWarning("[Pingdom] Alert condition: {0}", message);
+        return Task.CompletedTask;
     }
 
     /// <inheritdoc/>

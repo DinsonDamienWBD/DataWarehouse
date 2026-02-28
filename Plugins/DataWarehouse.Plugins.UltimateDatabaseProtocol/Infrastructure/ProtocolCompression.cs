@@ -669,91 +669,64 @@ internal sealed class BrotliCompressionProvider : ICompressionProvider
 }
 
 /// <summary>
-/// LZ4 compression provider (simulated - uses deflate as fallback).
-/// For production, integrate with K4os.Compression.LZ4 package.
+/// LZ4 compression provider stub.
+/// Native LZ4 requires K4os.Compression.LZ4 package (not yet referenced).
+/// Throws NotSupportedException to prevent silently sending Deflate-encoded data
+/// labeled as LZ4 — which real LZ4-speaking servers cannot decompress.
+/// Negotiate a different codec (GZip/Deflate/Brotli) until the package is wired.
 /// </summary>
 internal sealed class LZ4CompressionProvider : ICompressionProvider
 {
-    // Note: In production, this would use K4os.Compression.LZ4 or similar
-    private readonly DeflateCompressionProvider _fallback = new();
-
-    public byte[] Compress(ReadOnlySpan<byte> data, CompressionLevel level) =>
-        _fallback.Compress(data, CompressionLevel.Fastest); // LZ4 prioritizes speed
-
-    public byte[] Decompress(ReadOnlySpan<byte> data) =>
-        _fallback.Decompress(data);
-
-    public Stream CreateCompressionStream(Stream output, CompressionLevel level, bool leaveOpen) =>
-        _fallback.CreateCompressionStream(output, CompressionLevel.Fastest, leaveOpen);
-
-    public Stream CreateDecompressionStream(Stream input, bool leaveOpen) =>
-        _fallback.CreateDecompressionStream(input, leaveOpen);
+    private const string Msg = "LZ4 codec is not yet available. Add K4os.Compression.LZ4 package and implement the provider. Negotiate GZip, Deflate, or Brotli instead.";
+    public byte[] Compress(ReadOnlySpan<byte> data, CompressionLevel level) => throw new NotSupportedException(Msg);
+    public byte[] Decompress(ReadOnlySpan<byte> data) => throw new NotSupportedException(Msg);
+    public Stream CreateCompressionStream(Stream output, CompressionLevel level, bool leaveOpen) => throw new NotSupportedException(Msg);
+    public Stream CreateDecompressionStream(Stream input, bool leaveOpen) => throw new NotSupportedException(Msg);
 }
 
 /// <summary>
-/// Zstandard compression provider (simulated - uses brotli as fallback).
-/// For production, integrate with ZstdNet or ZstdSharp package.
+/// Zstandard compression provider stub.
+/// Native Zstd requires ZstdSharp or ZstdNet package (not yet referenced).
+/// Throws NotSupportedException to prevent silently sending Brotli-encoded data
+/// labeled as Zstd — which real Zstd-speaking servers cannot decompress.
 /// </summary>
 internal sealed class ZstdCompressionProvider : ICompressionProvider
 {
-    // Note: In production, this would use ZstdSharp or similar
-    private readonly BrotliCompressionProvider _fallback = new();
-
-    public byte[] Compress(ReadOnlySpan<byte> data, CompressionLevel level) =>
-        _fallback.Compress(data, level);
-
-    public byte[] Decompress(ReadOnlySpan<byte> data) =>
-        _fallback.Decompress(data);
-
-    public Stream CreateCompressionStream(Stream output, CompressionLevel level, bool leaveOpen) =>
-        _fallback.CreateCompressionStream(output, level, leaveOpen);
-
-    public Stream CreateDecompressionStream(Stream input, bool leaveOpen) =>
-        _fallback.CreateDecompressionStream(input, leaveOpen);
+    private const string Msg = "Zstd codec is not yet available. Add ZstdSharp package and implement the provider. Negotiate GZip, Deflate, or Brotli instead.";
+    public byte[] Compress(ReadOnlySpan<byte> data, CompressionLevel level) => throw new NotSupportedException(Msg);
+    public byte[] Decompress(ReadOnlySpan<byte> data) => throw new NotSupportedException(Msg);
+    public Stream CreateCompressionStream(Stream output, CompressionLevel level, bool leaveOpen) => throw new NotSupportedException(Msg);
+    public Stream CreateDecompressionStream(Stream input, bool leaveOpen) => throw new NotSupportedException(Msg);
 }
 
 /// <summary>
-/// Snappy compression provider (simulated - uses deflate as fallback).
-/// For production, integrate with Snappy.NET or IronSnappy package.
+/// Snappy compression provider stub.
+/// Native Snappy requires IronSnappy or Snappy.Sharp package (not yet referenced).
+/// Throws NotSupportedException to prevent silently sending Deflate-encoded data
+/// labeled as Snappy — which real Snappy-speaking servers cannot decompress.
 /// </summary>
 internal sealed class SnappyCompressionProvider : ICompressionProvider
 {
-    // Note: In production, this would use IronSnappy or similar
-    private readonly DeflateCompressionProvider _fallback = new();
-
-    public byte[] Compress(ReadOnlySpan<byte> data, CompressionLevel level) =>
-        _fallback.Compress(data, CompressionLevel.Fastest); // Snappy prioritizes speed
-
-    public byte[] Decompress(ReadOnlySpan<byte> data) =>
-        _fallback.Decompress(data);
-
-    public Stream CreateCompressionStream(Stream output, CompressionLevel level, bool leaveOpen) =>
-        _fallback.CreateCompressionStream(output, CompressionLevel.Fastest, leaveOpen);
-
-    public Stream CreateDecompressionStream(Stream input, bool leaveOpen) =>
-        _fallback.CreateDecompressionStream(input, leaveOpen);
+    private const string Msg = "Snappy codec is not yet available. Add IronSnappy package and implement the provider. Negotiate GZip, Deflate, or Brotli instead.";
+    public byte[] Compress(ReadOnlySpan<byte> data, CompressionLevel level) => throw new NotSupportedException(Msg);
+    public byte[] Decompress(ReadOnlySpan<byte> data) => throw new NotSupportedException(Msg);
+    public Stream CreateCompressionStream(Stream output, CompressionLevel level, bool leaveOpen) => throw new NotSupportedException(Msg);
+    public Stream CreateDecompressionStream(Stream input, bool leaveOpen) => throw new NotSupportedException(Msg);
 }
 
 /// <summary>
-/// LZO compression provider (simulated - uses deflate as fallback).
-/// For production, integrate with lzo.net package.
+/// LZO compression provider stub.
+/// Native LZO requires lzo.net or compatible package (not yet referenced).
+/// Throws NotSupportedException to prevent silently sending Deflate-encoded data
+/// labeled as LZO — which real LZO-speaking servers cannot decompress.
 /// </summary>
 internal sealed class LZOCompressionProvider : ICompressionProvider
 {
-    // Note: In production, this would use lzo.net or similar
-    private readonly DeflateCompressionProvider _fallback = new();
-
-    public byte[] Compress(ReadOnlySpan<byte> data, CompressionLevel level) =>
-        _fallback.Compress(data, CompressionLevel.Fastest);
-
-    public byte[] Decompress(ReadOnlySpan<byte> data) =>
-        _fallback.Decompress(data);
-
-    public Stream CreateCompressionStream(Stream output, CompressionLevel level, bool leaveOpen) =>
-        _fallback.CreateCompressionStream(output, CompressionLevel.Fastest, leaveOpen);
-
-    public Stream CreateDecompressionStream(Stream input, bool leaveOpen) =>
-        _fallback.CreateDecompressionStream(input, leaveOpen);
+    private const string Msg = "LZO codec is not yet available. Add lzo.net package and implement the provider. Negotiate GZip, Deflate, or Brotli instead.";
+    public byte[] Compress(ReadOnlySpan<byte> data, CompressionLevel level) => throw new NotSupportedException(Msg);
+    public byte[] Decompress(ReadOnlySpan<byte> data) => throw new NotSupportedException(Msg);
+    public Stream CreateCompressionStream(Stream output, CompressionLevel level, bool leaveOpen) => throw new NotSupportedException(Msg);
+    public Stream CreateDecompressionStream(Stream input, bool leaveOpen) => throw new NotSupportedException(Msg);
 }
 
 /// <summary>

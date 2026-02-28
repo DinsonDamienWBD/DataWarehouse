@@ -113,6 +113,13 @@ public sealed class AppDynamicsStrategy : ObservabilityStrategyBase
                 $"{_controllerUrl}/controller/rest/applications/{_applicationName}/metric-data",
                 content, cancellationToken);
             using var resp = await _httpClient.SendAsync(request, cancellationToken);
+            if (!resp.IsSuccessStatusCode)
+            {
+                var body = await resp.Content.ReadAsStringAsync(cancellationToken);
+                IncrementCounter("app_dynamics.metrics_error");
+                System.Diagnostics.Trace.TraceWarning(
+                    "[AppDynamics] Metrics POST returned {0}: {1}", (int)resp.StatusCode, body);
+            }
         }
     }
 
@@ -145,6 +152,13 @@ public sealed class AppDynamicsStrategy : ObservabilityStrategyBase
                 $"{_controllerUrl}/controller/rest/applications/{_applicationName}/events",
                 content, cancellationToken);
             using var resp = await _httpClient.SendAsync(request, cancellationToken);
+            if (!resp.IsSuccessStatusCode)
+            {
+                var body = await resp.Content.ReadAsStringAsync(cancellationToken);
+                IncrementCounter("app_dynamics.traces_error");
+                System.Diagnostics.Trace.TraceWarning(
+                    "[AppDynamics] Traces POST returned {0}: {1}", (int)resp.StatusCode, body);
+            }
         }
     }
 

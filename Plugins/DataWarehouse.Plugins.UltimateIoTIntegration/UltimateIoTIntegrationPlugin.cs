@@ -913,9 +913,23 @@ public sealed class UltimateIoTIntegrationPlugin : StreamingPluginBase, IDisposa
 
     private static T DeserializeRequest<T>(Dictionary<string, object> payload) where T : new()
     {
-        // Simple property mapping - in production use proper serialization
         var result = new T();
-        // Property mapping would go here
+        var type = typeof(T);
+        foreach (var kvp in payload)
+        {
+            var prop = type.GetProperty(kvp.Key,
+                BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+            if (prop == null || !prop.CanWrite) continue;
+            try
+            {
+                var targetType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
+                var value = kvp.Value == null ? null
+                    : targetType.IsInstanceOfType(kvp.Value) ? kvp.Value
+                    : Convert.ChangeType(kvp.Value, targetType);
+                prop.SetValue(result, value);
+            }
+            catch { /* Skip incompatible fields */ }
+        }
         return result;
     }
 

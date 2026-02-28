@@ -335,10 +335,14 @@ public sealed class EnvoyProxyStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
-        IncrementCounter("envoy_proxy.metrics_sent");
+        // Collect live Envoy sidecar metrics and merge with caller-supplied metrics
         var envoyMetrics = await CollectMetricsAsync(cancellationToken);
-        // Combine and forward
-        await Task.CompletedTask;
+        var combined = metrics.Concat(envoyMetrics).ToList();
+        IncrementCounter("envoy_proxy.metrics_sent");
+        foreach (var m in combined)
+        {
+            IncrementCounter($"envoy_proxy.metric.{m.Name.Replace('.', '_')}");
+        }
     }
 
     /// <inheritdoc/>

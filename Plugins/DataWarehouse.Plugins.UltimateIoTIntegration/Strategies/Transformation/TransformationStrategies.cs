@@ -44,19 +44,31 @@ public class FormatConversionStrategy : DataTransformationStrategyBase
     {
         byte[] output;
 
+        // Parse input as UTF-8 text payload (common IoT transport encoding)
+        var inputText = Encoding.UTF8.GetString(request.InputData);
+
         if (request.TargetFormat.Equals("json", StringComparison.OrdinalIgnoreCase))
         {
-            // Convert to JSON
-            var data = new { converted = true, sourceFormat = request.SourceFormat, timestamp = DateTimeOffset.UtcNow };
-            output = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(data));
+            // Wrap the raw payload in a JSON envelope preserving original data
+            var envelope = new
+            {
+                sourceFormat = request.SourceFormat,
+                timestamp = DateTimeOffset.UtcNow,
+                payload = inputText
+            };
+            output = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(envelope));
         }
         else if (request.TargetFormat.Equals("xml", StringComparison.OrdinalIgnoreCase))
         {
-            output = Encoding.UTF8.GetBytes($"<data><converted>true</converted><sourceFormat>{request.SourceFormat}</sourceFormat></data>");
+            var safePayload = System.Security.SecurityElement.Escape(inputText) ?? string.Empty;
+            output = Encoding.UTF8.GetBytes(
+                $"<data><sourceFormat>{request.SourceFormat}</sourceFormat><payload>{safePayload}</payload></data>");
         }
         else if (request.TargetFormat.Equals("csv", StringComparison.OrdinalIgnoreCase))
         {
-            output = Encoding.UTF8.GetBytes("converted,sourceFormat,timestamp\ntrue," + request.SourceFormat + "," + DateTimeOffset.UtcNow);
+            var escapedPayload = inputText.Replace("\"", "\"\"");
+            output = Encoding.UTF8.GetBytes(
+                $"sourceFormat,timestamp,payload\n{request.SourceFormat},{DateTimeOffset.UtcNow:O},\"{escapedPayload}\"");
         }
         else
         {
@@ -242,17 +254,28 @@ public class DataEnrichmentStrategy : DataTransformationStrategyBase
         enriched.Data["_enriched_at"] = DateTimeOffset.UtcNow;
         addedFields["_enriched_at"] = DateTimeOffset.UtcNow;
 
-        enriched.Data["_device_type"] = "sensor";
-        addedFields["_device_type"] = "sensor";
+        // Enrich from message metadata when present; caller supplies context via TelemetryMessage.Metadata
+        var deviceType = request.Message.Properties.TryGetValue("deviceType", out var dt) ? dt : "sensor";
+        enriched.Data["_device_type"] = deviceType;
+        addedFields["_device_type"] = deviceType;
 
-        enriched.Data["_region"] = "us-east-1";
-        addedFields["_region"] = "us-east-1";
+        if (request.Message.Properties.TryGetValue("region", out var msgRegion))
+        {
+            enriched.Data["_region"] = msgRegion;
+            addedFields["_region"] = msgRegion;
+        }
 
-        enriched.Data["_building"] = "HQ-Building-A";
-        addedFields["_building"] = "HQ-Building-A";
+        if (request.Message.Properties.TryGetValue("building", out var building))
+        {
+            enriched.Data["_building"] = building;
+            addedFields["_building"] = building;
+        }
 
-        enriched.Data["_floor"] = 3;
-        addedFields["_floor"] = 3;
+        if (request.Message.Properties.TryGetValue("floor", out var floor))
+        {
+            enriched.Data["_floor"] = floor;
+            addedFields["_floor"] = floor;
+        }
 
         // Add source context
         foreach (var source in request.EnrichmentSources)

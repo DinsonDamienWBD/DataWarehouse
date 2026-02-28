@@ -43,7 +43,7 @@ public sealed class FabricScalingManager : IScalableSubsystem, IDisposable
     private const int DefaultHeartbeatIntervalMs = 15_000;
     private const int DefaultMissedHeartbeatsThreshold = 3;
     private const int DefaultStarToMeshThreshold = 800;
-    private const int DefaultMeshToFederatedThreshold = 400;
+    private const int DefaultMeshToFederatedThreshold = 1600;
 
     // ---- Configuration ----
     private volatile ScalingLimits _currentLimits;

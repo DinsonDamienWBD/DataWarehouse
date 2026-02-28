@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
@@ -9,9 +10,9 @@ namespace DataWarehouse.Plugins.UltimateResourceManager.Strategies;
 /// </summary>
 public sealed class CgroupV2Strategy : ResourceStrategyBase
 {
-    private readonly Dictionary<string, CgroupLimits> _cgroupLimits = new();
+    private readonly ConcurrentDictionary<string, CgroupLimits> _cgroupLimits = new();
     private long _totalMemoryLimit;
-    private double _totalCpuQuota;
+    private long _totalCpuQuotaMillicores; // Stored as integer millicores for Interlocked safety
 
     private sealed record CgroupLimits(long MemoryBytes, double CpuCores, long IoBytesPerSec);
 
@@ -31,11 +32,11 @@ public sealed class CgroupV2Strategy : ResourceStrategyBase
 
     public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default)
     {
-        var info = GC.GetGCMemoryInfo();
+        var cpuCores = Interlocked.Read(ref _totalCpuQuotaMillicores) / 1000.0;
         return Task.FromResult(new ResourceMetrics
         {
-            CpuPercent = (_totalCpuQuota / Environment.ProcessorCount) * 100,
-            MemoryBytes = _totalMemoryLimit,
+            CpuPercent = (cpuCores / Environment.ProcessorCount) * 100,
+            MemoryBytes = Interlocked.Read(ref _totalMemoryLimit),
             IoBandwidth = _cgroupLimits.Values.Sum(l => l.IoBytesPerSec),
             Timestamp = DateTime.UtcNow
         });
@@ -65,7 +66,7 @@ public sealed class CgroupV2Strategy : ResourceStrategyBase
 
         _cgroupLimits[handle] = limits;
         Interlocked.Add(ref _totalMemoryLimit, request.MemoryBytes);
-        _totalCpuQuota += request.CpuCores;
+        Interlocked.Add(ref _totalCpuQuotaMillicores, (long)(request.CpuCores * 1000));
 
         return Task.FromResult(new ResourceAllocation
         {
@@ -80,10 +81,10 @@ public sealed class CgroupV2Strategy : ResourceStrategyBase
 
     protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct)
     {
-        if (allocation.AllocationHandle != null && _cgroupLimits.Remove(allocation.AllocationHandle, out var limits))
+        if (allocation.AllocationHandle != null && _cgroupLimits.TryRemove(allocation.AllocationHandle, out var limits))
         {
             Interlocked.Add(ref _totalMemoryLimit, -limits.MemoryBytes);
-            _totalCpuQuota -= limits.CpuCores;
+            Interlocked.Add(ref _totalCpuQuotaMillicores, -(long)(limits.CpuCores * 1000));
         }
         return Task.FromResult(true);
     }
@@ -95,7 +96,7 @@ public sealed class CgroupV2Strategy : ResourceStrategyBase
 /// </summary>
 public sealed class DockerResourceStrategy : ResourceStrategyBase
 {
-    private readonly Dictionary<string, DockerLimits> _containerLimits = new();
+    private readonly ConcurrentDictionary<string, DockerLimits> _containerLimits = new();
     private int _containerCount;
 
     private sealed record DockerLimits(
@@ -167,7 +168,7 @@ public sealed class DockerResourceStrategy : ResourceStrategyBase
     {
         if (allocation.AllocationHandle != null)
         {
-            _containerLimits.Remove(allocation.AllocationHandle);
+            _containerLimits.TryRemove(allocation.AllocationHandle, out _);
         }
         return Task.FromResult(true);
     }
@@ -179,7 +180,7 @@ public sealed class DockerResourceStrategy : ResourceStrategyBase
 /// </summary>
 public sealed class KubernetesResourceStrategy : ResourceStrategyBase
 {
-    private readonly Dictionary<string, PodResources> _podResources = new();
+    private readonly ConcurrentDictionary<string, PodResources> _podResources = new();
 
     private enum QosClass { Guaranteed, Burstable, BestEffort }
 
@@ -261,7 +262,7 @@ public sealed class KubernetesResourceStrategy : ResourceStrategyBase
     {
         if (allocation.AllocationHandle != null)
         {
-            _podResources.Remove(allocation.AllocationHandle);
+            _podResources.TryRemove(allocation.AllocationHandle, out _);
         }
         return Task.FromResult(true);
     }
@@ -273,7 +274,7 @@ public sealed class KubernetesResourceStrategy : ResourceStrategyBase
 /// </summary>
 public sealed class PodmanResourceStrategy : ResourceStrategyBase
 {
-    private readonly Dictionary<string, PodmanContainer> _containers = new();
+    private readonly ConcurrentDictionary<string, PodmanContainer> _containers = new();
     private int _containerSequence;
 
     private sealed record PodmanContainer(string Id, double CpuShares, long MemoryBytes, bool Rootless);
@@ -336,7 +337,7 @@ public sealed class PodmanResourceStrategy : ResourceStrategyBase
     {
         if (allocation.AllocationHandle != null)
         {
-            _containers.Remove(allocation.AllocationHandle);
+            _containers.TryRemove(allocation.AllocationHandle, out _);
         }
         return Task.FromResult(true);
     }
@@ -347,7 +348,7 @@ public sealed class PodmanResourceStrategy : ResourceStrategyBase
 /// </summary>
 public sealed class WindowsJobObjectStrategy : ResourceStrategyBase
 {
-    private readonly Dictionary<string, JobObjectLimits> _jobObjects = new();
+    private readonly ConcurrentDictionary<string, JobObjectLimits> _jobObjects = new();
 
     private sealed record JobObjectLimits(
         string JobName,
@@ -414,7 +415,7 @@ public sealed class WindowsJobObjectStrategy : ResourceStrategyBase
     {
         if (allocation.AllocationHandle != null)
         {
-            _jobObjects.Remove(allocation.AllocationHandle);
+            _jobObjects.TryRemove(allocation.AllocationHandle, out _);
         }
         return Task.FromResult(true);
     }
@@ -426,7 +427,7 @@ public sealed class WindowsJobObjectStrategy : ResourceStrategyBase
 /// </summary>
 public sealed class WindowsContainerStrategy : ResourceStrategyBase
 {
-    private readonly Dictionary<string, WindowsContainerConfig> _containers = new();
+    private readonly ConcurrentDictionary<string, WindowsContainerConfig> _containers = new();
 
     private enum IsolationMode { Process, HyperV }
 
@@ -500,7 +501,7 @@ public sealed class WindowsContainerStrategy : ResourceStrategyBase
     {
         if (allocation.AllocationHandle != null)
         {
-            _containers.Remove(allocation.AllocationHandle);
+            _containers.TryRemove(allocation.AllocationHandle, out _);
         }
         return Task.FromResult(true);
     }
@@ -512,7 +513,7 @@ public sealed class WindowsContainerStrategy : ResourceStrategyBase
 /// </summary>
 public sealed class ProcessGroupStrategy : ResourceStrategyBase
 {
-    private readonly Dictionary<string, ProcessGroupConfig> _processGroups = new();
+    private readonly ConcurrentDictionary<string, ProcessGroupConfig> _processGroups = new();
 
     private sealed record ProcessGroupConfig(int Pgid, int NiceValue, int IoniceClass, int CpuLimitPercent);
 
@@ -584,7 +585,7 @@ public sealed class ProcessGroupStrategy : ResourceStrategyBase
     {
         if (allocation.AllocationHandle != null)
         {
-            _processGroups.Remove(allocation.AllocationHandle);
+            _processGroups.TryRemove(allocation.AllocationHandle, out _);
         }
         return Task.FromResult(true);
     }
@@ -596,7 +597,7 @@ public sealed class ProcessGroupStrategy : ResourceStrategyBase
 /// </summary>
 public sealed class NamespaceIsolationStrategy : ResourceStrategyBase
 {
-    private readonly Dictionary<string, NamespaceConfig> _namespaces = new();
+    private readonly ConcurrentDictionary<string, NamespaceConfig> _namespaces = new();
 
     private sealed record NamespaceConfig(
         string NsId,
@@ -663,7 +664,7 @@ public sealed class NamespaceIsolationStrategy : ResourceStrategyBase
     {
         if (allocation.AllocationHandle != null)
         {
-            _namespaces.Remove(allocation.AllocationHandle);
+            _namespaces.TryRemove(allocation.AllocationHandle, out _);
         }
         return Task.FromResult(true);
     }

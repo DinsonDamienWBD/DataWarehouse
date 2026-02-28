@@ -212,8 +212,15 @@ public sealed class OfflineSyncStrategy : EdgeIntegrationStrategyBase
         while (_operationLog.TryDequeue(out var op))
             pending.Add(op);
 
-        // Sort by vector clock for causal ordering
-        pending.Sort((a, b) => a.Timestamp.CompareTo(b.Timestamp));
+        // Sort by vector clock sum for causal ordering, falling back to wall-clock timestamp.
+        // A lower total vector-clock sum indicates the operation happened causally earlier.
+        pending.Sort((a, b) =>
+        {
+            var sumA = a.VectorClock?.Values.Sum() ?? 0;
+            var sumB = b.VectorClock?.Values.Sum() ?? 0;
+            var cmp = sumA.CompareTo(sumB);
+            return cmp != 0 ? cmp : a.Timestamp.CompareTo(b.Timestamp);
+        });
 
         foreach (var op in pending)
         {

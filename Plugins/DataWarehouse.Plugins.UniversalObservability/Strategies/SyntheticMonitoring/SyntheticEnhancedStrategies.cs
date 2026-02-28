@@ -9,17 +9,18 @@ namespace DataWarehouse.Plugins.UniversalObservability.Strategies.SyntheticMonit
 /// SSL certificate monitoring service for synthetic monitoring strategies.
 /// Tracks certificate expiration, chain validity, and protocol compliance.
 /// </summary>
-public sealed class SslCertificateMonitorService
+public sealed class SslCertificateMonitorService : IDisposable
 {
     private readonly BoundedDictionary<string, SslCertificateInfo> _certificateCache = new BoundedDictionary<string, SslCertificateInfo>(1000);
     private readonly BoundedDictionary<string, List<SslAlert>> _alerts = new BoundedDictionary<string, List<SslAlert>>(1000);
+    private readonly HttpClientHandler _handler;
     private readonly HttpClient _httpClient;
     private readonly int _expirationWarningDays;
 
     public SslCertificateMonitorService(int expirationWarningDays = 30)
     {
         _expirationWarningDays = expirationWarningDays;
-        var handler = new HttpClientHandler
+        _handler = new HttpClientHandler
         {
             ServerCertificateCustomValidationCallback = (message, cert, chain, errors) =>
             {
@@ -30,7 +31,14 @@ public sealed class SslCertificateMonitorService
                 return true; // We monitor; we don't block
             }
         };
-        _httpClient = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(15) };
+        _httpClient = new HttpClient(_handler) { Timeout = TimeSpan.FromSeconds(15) };
+    }
+
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        _httpClient.Dispose();
+        _handler.Dispose();
     }
 
     /// <summary>

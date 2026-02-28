@@ -37,6 +37,7 @@ public class EdgeDeploymentStrategy : EdgeIntegrationStrategyBase
     public override string StrategyName => "Edge Module Deployment";
     public override string Description => "Deploys and manages containerized modules on edge devices";
     public override string[] Tags => new[] { "iot", "edge", "deployment", "container", "module" };
+    public override bool IsProductionReady => false;
 
     public override Task<EdgeDeploymentResult> DeployModuleAsync(EdgeDeploymentRequest request, CancellationToken ct = default)
     {
@@ -116,6 +117,7 @@ public class EdgeSyncStrategy : EdgeIntegrationStrategyBase
     public override string StrategyName => "Edge Data Sync";
     public override string Description => "Synchronizes data between edge devices and cloud with offline support";
     public override string[] Tags => new[] { "iot", "edge", "sync", "offline", "replication" };
+    public override bool IsProductionReady => false;
 
     public override Task<EdgeDeploymentResult> DeployModuleAsync(EdgeDeploymentRequest request, CancellationToken ct = default)
     {
@@ -175,6 +177,7 @@ public class EdgeComputeStrategy : EdgeIntegrationStrategyBase
     public override string StrategyName => "Edge Compute";
     public override string Description => "Executes computations locally on edge devices";
     public override string[] Tags => new[] { "iot", "edge", "compute", "local", "processing" };
+    public override bool IsProductionReady => false;
 
     public override Task<EdgeDeploymentResult> DeployModuleAsync(EdgeDeploymentRequest request, CancellationToken ct = default)
     {
@@ -251,6 +254,7 @@ public class EdgeMonitoringStrategy : EdgeIntegrationStrategyBase
     public override string StrategyName => "Edge Monitoring";
     public override string Description => "Monitors edge device health, performance, and connectivity";
     public override string[] Tags => new[] { "iot", "edge", "monitoring", "health", "performance" };
+    public override bool IsProductionReady => false;
 
     public override Task<EdgeDeploymentResult> DeployModuleAsync(EdgeDeploymentRequest request, CancellationToken ct = default)
     {
@@ -321,6 +325,7 @@ public class FogComputingStrategy : EdgeIntegrationStrategyBase
     public override string StrategyName => "Fog Computing";
     public override string Description => "Distributed computing across fog layer between edge and cloud";
     public override string[] Tags => new[] { "iot", "edge", "fog", "distributed", "computing" };
+    public override bool IsProductionReady => false;
 
     public override Task<EdgeDeploymentResult> DeployModuleAsync(EdgeDeploymentRequest request, CancellationToken ct = default)
     {

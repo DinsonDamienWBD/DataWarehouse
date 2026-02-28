@@ -127,10 +127,7 @@ public sealed class StatsDStrategy : ObservabilityStrategyBase
     /// <param name="name">Counter name.</param>
     /// <param name="tags">Optional tags.</param>
     public void Increment(string name, IReadOnlyList<MetricLabel>? tags = null)
-    {
-        var metric = MetricValue.Counter(name, 1, tags);
-        Task.Run(() => MetricsAsyncCore(new[] { metric }, CancellationToken.None)).ConfigureAwait(false).GetAwaiter().GetResult();
-    }
+        => SendStatsDMessage(MetricValue.Counter(name, 1, tags));
 
     /// <summary>
     /// Decrements a counter by 1.
@@ -138,10 +135,7 @@ public sealed class StatsDStrategy : ObservabilityStrategyBase
     /// <param name="name">Counter name.</param>
     /// <param name="tags">Optional tags.</param>
     public void Decrement(string name, IReadOnlyList<MetricLabel>? tags = null)
-    {
-        var metric = MetricValue.Counter(name, -1, tags);
-        Task.Run(() => MetricsAsyncCore(new[] { metric }, CancellationToken.None)).ConfigureAwait(false).GetAwaiter().GetResult();
-    }
+        => SendStatsDMessage(MetricValue.Counter(name, -1, tags));
 
     /// <summary>
     /// Sets a gauge value.
@@ -150,10 +144,7 @@ public sealed class StatsDStrategy : ObservabilityStrategyBase
     /// <param name="value">Gauge value.</param>
     /// <param name="tags">Optional tags.</param>
     public void Gauge(string name, double value, IReadOnlyList<MetricLabel>? tags = null)
-    {
-        var metric = MetricValue.Gauge(name, value, tags);
-        Task.Run(() => MetricsAsyncCore(new[] { metric }, CancellationToken.None)).ConfigureAwait(false).GetAwaiter().GetResult();
-    }
+        => SendStatsDMessage(MetricValue.Gauge(name, value, tags));
 
     /// <summary>
     /// Records a timing value.
@@ -162,9 +153,23 @@ public sealed class StatsDStrategy : ObservabilityStrategyBase
     /// <param name="milliseconds">Duration in milliseconds.</param>
     /// <param name="tags">Optional tags.</param>
     public void Timing(string name, double milliseconds, IReadOnlyList<MetricLabel>? tags = null)
+        => SendStatsDMessage(MetricValue.Histogram(name, milliseconds, tags, "milliseconds"));
+
+    /// <summary>
+    /// Sends a single StatsD message synchronously (UDP is fire-and-forget).
+    /// </summary>
+    private void SendStatsDMessage(MetricValue metric)
     {
-        var metric = MetricValue.Histogram(name, milliseconds, tags, "milliseconds");
-        Task.Run(() => MetricsAsyncCore(new[] { metric }, CancellationToken.None)).ConfigureAwait(false).GetAwaiter().GetResult();
+        EnsureConfigured();
+        if (_sampleRate < 1.0 && Random.Shared.NextDouble() > _sampleRate)
+            return;
+        var statsdMessage = FormatStatsDMessage(metric);
+        var data = Encoding.UTF8.GetBytes(statsdMessage);
+        try { _udpClient!.Send(data, data.Length, _endpoint); }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.TraceWarning("[StatsD] Send error: {0}", ex.Message);
+        }
     }
 
     private void EnsureConfigured()

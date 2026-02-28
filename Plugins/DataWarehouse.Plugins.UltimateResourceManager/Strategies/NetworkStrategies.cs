@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+
 namespace DataWarehouse.Plugins.UltimateResourceManager.Strategies;
 
 /// <summary>
@@ -70,6 +72,9 @@ public sealed class TokenBucketNetworkStrategy : ResourceStrategyBase
 /// </summary>
 public sealed class QosNetworkStrategy : ResourceStrategyBase
 {
+    private long _allocatedBandwidth;
+    private readonly ConcurrentDictionary<string, long> _handleBandwidth = new();
+
     public override string StrategyId => "network-qos";
     public override string DisplayName => "QoS Network Manager";
     public override ResourceCategory Category => ResourceCategory.Network;
@@ -88,7 +93,7 @@ public sealed class QosNetworkStrategy : ResourceStrategyBase
     {
         return Task.FromResult(new ResourceMetrics
         {
-            NetworkBandwidth = 1L * 1024 * 1024 * 1024, // 1 Gbps
+            NetworkBandwidth = Interlocked.Read(ref _allocatedBandwidth),
             Timestamp = DateTime.UtcNow
         });
     }
@@ -97,6 +102,9 @@ public sealed class QosNetworkStrategy : ResourceStrategyBase
     {
         var handle = Guid.NewGuid().ToString("N");
         var qosClass = request.Priority > 80 ? "EF" : (request.Priority > 50 ? "AF" : "BE");
+        _ = qosClass; // DSCP class for future tagging
+        _handleBandwidth[handle] = request.IoBandwidth;
+        Interlocked.Add(ref _allocatedBandwidth, request.IoBandwidth);
 
         return Task.FromResult(new ResourceAllocation
         {
@@ -106,6 +114,13 @@ public sealed class QosNetworkStrategy : ResourceStrategyBase
             AllocatedIoBandwidth = request.IoBandwidth
         });
     }
+
+    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct)
+    {
+        if (allocation.AllocationHandle != null && _handleBandwidth.TryRemove(allocation.AllocationHandle, out var bw))
+            Interlocked.Add(ref _allocatedBandwidth, -bw);
+        return Task.FromResult(true);
+    }
 }
 
 /// <summary>
@@ -113,6 +128,22 @@ public sealed class QosNetworkStrategy : ResourceStrategyBase
 /// </summary>
 public sealed class CompositeResourceStrategy : ResourceStrategyBase
 {
+    private long _allocatedCoresMilliunits;
+    private long _allocatedMemoryBytes;
+    private long _allocatedIops;
+    private long _allocatedIoBandwidth;
+    private long _allocatedGpuPercentMilliunits;
+    private readonly ConcurrentDictionary<string, CompositeAlloc> _handleAllocs = new();
+
+    private sealed class CompositeAlloc
+    {
+        public long CoreMilliunits;
+        public long MemoryBytes;
+        public long Iops;
+        public long IoBandwidth;
+        public long GpuPercentMilliunits;
+    }
+
     public override string StrategyId => "composite-all";
     public override string DisplayName => "Composite Resource Manager";
     public override ResourceCategory Category => ResourceCategory.Composite;
@@ -129,13 +160,17 @@ public sealed class CompositeResourceStrategy : ResourceStrategyBase
 
     public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default)
     {
+        var allocatedCores = Interlocked.Read(ref _allocatedCoresMilliunits) / 1000.0;
+        var cpuPercent = Environment.ProcessorCount > 0
+            ? (allocatedCores / Environment.ProcessorCount) * 100.0
+            : 0.0;
         return Task.FromResult(new ResourceMetrics
         {
-            CpuPercent = 40.0,
-            MemoryBytes = GC.GetTotalMemory(false),
-            IopsRate = 10000,
-            GpuPercent = 30.0,
-            NetworkBandwidth = 500 * 1024 * 1024,
+            CpuPercent = cpuPercent,
+            MemoryBytes = Interlocked.Read(ref _allocatedMemoryBytes),
+            IopsRate = Interlocked.Read(ref _allocatedIops),
+            GpuPercent = Interlocked.Read(ref _allocatedGpuPercentMilliunits) / 1000.0,
+            NetworkBandwidth = Interlocked.Read(ref _allocatedIoBandwidth),
             Timestamp = DateTime.UtcNow
         });
     }
@@ -143,6 +178,22 @@ public sealed class CompositeResourceStrategy : ResourceStrategyBase
     protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct)
     {
         var handle = Guid.NewGuid().ToString("N");
+        var coreMilliunits = (long)(request.CpuCores * 1000);
+        var gpuMilliunits = (long)(request.GpuPercent * 1000);
+        var alloc = new CompositeAlloc
+        {
+            CoreMilliunits = coreMilliunits,
+            MemoryBytes = request.MemoryBytes,
+            Iops = request.Iops,
+            IoBandwidth = request.IoBandwidth,
+            GpuPercentMilliunits = gpuMilliunits
+        };
+        _handleAllocs[handle] = alloc;
+        Interlocked.Add(ref _allocatedCoresMilliunits, coreMilliunits);
+        Interlocked.Add(ref _allocatedMemoryBytes, request.MemoryBytes);
+        Interlocked.Add(ref _allocatedIops, request.Iops);
+        Interlocked.Add(ref _allocatedIoBandwidth, request.IoBandwidth);
+        Interlocked.Add(ref _allocatedGpuPercentMilliunits, gpuMilliunits);
 
         return Task.FromResult(new ResourceAllocation
         {
@@ -155,6 +206,19 @@ public sealed class CompositeResourceStrategy : ResourceStrategyBase
             AllocatedIoBandwidth = request.IoBandwidth,
             AllocatedGpuPercent = request.GpuPercent
         });
+    }
+
+    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct)
+    {
+        if (allocation.AllocationHandle != null && _handleAllocs.TryRemove(allocation.AllocationHandle, out var alloc))
+        {
+            Interlocked.Add(ref _allocatedCoresMilliunits, -alloc.CoreMilliunits);
+            Interlocked.Add(ref _allocatedMemoryBytes, -alloc.MemoryBytes);
+            Interlocked.Add(ref _allocatedIops, -alloc.Iops);
+            Interlocked.Add(ref _allocatedIoBandwidth, -alloc.IoBandwidth);
+            Interlocked.Add(ref _allocatedGpuPercentMilliunits, -alloc.GpuPercentMilliunits);
+        }
+        return Task.FromResult(true);
     }
 }
 

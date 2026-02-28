@@ -26,6 +26,7 @@ public sealed class SystemResourceStrategy : ObservabilityStrategyBase
     private Timer? _collectionTimer;
     private int _collectionIntervalMs = 5000;
     private volatile bool _isCollecting;
+    private readonly object _collectionStartLock = new(); // guards StartCollection/StopCollection CAS
     private readonly List<MetricValue> _collectedMetrics = new();
     private readonly object _metricsLock = new();
     private DateTimeOffset _lastCpuTime = DateTimeOffset.UtcNow;
@@ -73,23 +74,30 @@ public sealed class SystemResourceStrategy : ObservabilityStrategyBase
     }
 
     /// <summary>
-    /// Starts automatic resource collection.
+    /// Starts automatic resource collection. Idempotent — safe to call from multiple threads.
     /// </summary>
     public void StartCollection()
     {
-        if (_isCollecting) return;
-        _isCollecting = true;
-        _collectionTimer = new Timer(CollectResourceMetrics, null, 0, _collectionIntervalMs);
+        lock (_collectionStartLock)
+        {
+            if (_isCollecting) return;
+            _isCollecting = true;
+            _collectionTimer = new Timer(CollectResourceMetrics, null, 0, _collectionIntervalMs);
+        }
     }
 
     /// <summary>
-    /// Stops automatic resource collection.
+    /// Stops automatic resource collection. Idempotent.
     /// </summary>
     public void StopCollection()
     {
-        _isCollecting = false;
-        _collectionTimer?.Dispose();
-        _collectionTimer = null;
+        lock (_collectionStartLock)
+        {
+            if (!_isCollecting) return;
+            _isCollecting = false;
+            _collectionTimer?.Dispose();
+            _collectionTimer = null;
+        }
     }
 
     /// <summary>

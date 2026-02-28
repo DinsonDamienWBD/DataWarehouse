@@ -15,6 +15,7 @@ public sealed class UsageAnalyticsStrategy : ServerlessStrategyBase
     public override string StrategyId => "cost-usage-analytics";
     public override string DisplayName => "Usage Analytics";
     public override ServerlessCategory Category => ServerlessCategory.CostTracking;
+    public override bool IsProductionReady => false; // Usage data is fabricated
 
     public override ServerlessStrategyCapabilities Capabilities => new() { SupportsSyncInvocation = true };
 
@@ -247,6 +248,7 @@ public sealed class CostOptimizationStrategy : ServerlessStrategyBase
     public override string StrategyId => "cost-optimization";
     public override string DisplayName => "Cost Optimization";
     public override ServerlessCategory Category => ServerlessCategory.CostTracking;
+    public override bool IsProductionReady => false; // Optimization data is fabricated
 
     public override ServerlessStrategyCapabilities Capabilities => new() { SupportsSyncInvocation = true };
 

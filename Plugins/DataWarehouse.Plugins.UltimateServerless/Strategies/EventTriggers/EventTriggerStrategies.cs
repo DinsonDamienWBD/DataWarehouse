@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateServerless.Strategies.EventTriggers;
@@ -177,22 +179,60 @@ public sealed class ScheduleTriggerStrategy : ServerlessStrategyBase
         return Task.CompletedTask;
     }
 
-    /// <summary>Gets next N scheduled executions.</summary>
+    /// <summary>Gets next N scheduled executions based on rate or cron expression.</summary>
     public Task<IReadOnlyList<DateTimeOffset>> GetNextExecutionsAsync(string triggerId, int count = 5, CancellationToken ct = default)
     {
-        var executions = new List<DateTimeOffset>();
-        var next = DateTimeOffset.UtcNow;
+        RecordOperation("GetNextExecutions");
+        if (!_triggers.TryGetValue(triggerId, out var config))
+            return Task.FromResult<IReadOnlyList<DateTimeOffset>>(Array.Empty<DateTimeOffset>());
+
+        var executions = new List<DateTimeOffset>(count);
+        var next = CalculateNextExecution(config.ScheduleExpression);
+        var interval = ParseInterval(config.ScheduleExpression);
         for (int i = 0; i < count; i++)
         {
-            next = next.AddMinutes(Random.Shared.Next(1, 60));
             executions.Add(next);
+            next = next.Add(interval);
         }
-        RecordOperation("GetNextExecutions");
         return Task.FromResult<IReadOnlyList<DateTimeOffset>>(executions);
     }
 
-    private static DateTimeOffset CalculateNextExecution(string expression) =>
-        DateTimeOffset.UtcNow.AddMinutes(Random.Shared.Next(1, 60));
+    private static DateTimeOffset CalculateNextExecution(string expression)
+    {
+        var interval = ParseInterval(expression);
+        return DateTimeOffset.UtcNow.Add(interval);
+    }
+
+    /// <summary>
+    /// Parses rate expressions ("rate(5 minutes)", "rate(1 hour)") and falls
+    /// back to 1-minute for unrecognised cron expressions.
+    /// </summary>
+    private static TimeSpan ParseInterval(string expression)
+    {
+        if (string.IsNullOrWhiteSpace(expression))
+            return TimeSpan.FromMinutes(1);
+
+        // Rate expression: rate(value unit)
+        var rateMatch = System.Text.RegularExpressions.Regex.Match(
+            expression, @"rate\((\d+)\s+(minute|minutes|hour|hours|day|days)\)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (rateMatch.Success && int.TryParse(rateMatch.Groups[1].Value, out var value))
+        {
+            return rateMatch.Groups[2].Value.ToLowerInvariant() switch
+            {
+                "minute" or "minutes" => TimeSpan.FromMinutes(value),
+                "hour" or "hours" => TimeSpan.FromHours(value),
+                "day" or "days" => TimeSpan.FromDays(value),
+                _ => TimeSpan.FromMinutes(value)
+            };
+        }
+
+        // Cron expression fallback: attempt to derive period from minute field
+        var parts = expression.Trim().Split(' ');
+        if (parts.Length >= 2 && parts[0].StartsWith("*/") && int.TryParse(parts[0][2..], out var everyMin))
+            return TimeSpan.FromMinutes(everyMin);
+
+        return TimeSpan.FromMinutes(1); // Safe default for unparseable expressions
+    }
 }
 
 #endregion
@@ -377,6 +417,8 @@ public sealed class DatabaseTriggerStrategy : ServerlessStrategyBase
 /// </summary>
 public sealed class WebhookTriggerStrategy : ServerlessStrategyBase
 {
+    private readonly BoundedDictionary<string, string> _webhookSecrets = new BoundedDictionary<string, string>(1000);
+
     public override string StrategyId => "trigger-webhook";
     public override string DisplayName => "Webhook Trigger";
     public override ServerlessCategory Category => ServerlessCategory.EventTriggers;
@@ -398,20 +440,37 @@ public sealed class WebhookTriggerStrategy : ServerlessStrategyBase
     public Task<WebhookResult> CreateWebhookAsync(WebhookConfig config, CancellationToken ct = default)
     {
         RecordOperation("CreateWebhook");
+        var secret = Guid.NewGuid().ToString("N");
+        _webhookSecrets[config.WebhookId] = secret;
         return Task.FromResult(new WebhookResult
         {
             Success = true,
             WebhookId = config.WebhookId,
             Endpoint = $"https://webhooks.example.com/{config.WebhookId}",
-            Secret = Guid.NewGuid().ToString("N")
+            Secret = secret
         });
     }
 
-    /// <summary>Validates webhook signature.</summary>
+    /// <summary>Validates webhook HMAC-SHA256 signature.</summary>
     public Task<bool> ValidateSignatureAsync(string webhookId, string payload, string signature, CancellationToken ct = default)
     {
         RecordOperation("ValidateSignature");
-        return Task.FromResult(true);
+
+        if (!_webhookSecrets.TryGetValue(webhookId, out var secret))
+            return Task.FromResult(false); // Unknown webhook — deny
+
+        // Compute HMAC-SHA256 of payload with the webhook secret
+        var keyBytes = Encoding.UTF8.GetBytes(secret);
+        var payloadBytes = Encoding.UTF8.GetBytes(payload);
+        using var hmac = new HMACSHA256(keyBytes);
+        var expectedBytes = hmac.ComputeHash(payloadBytes);
+        var expected = Convert.ToHexString(expectedBytes).ToLowerInvariant();
+
+        // Compare provided signature (strip optional "sha256=" prefix for GitHub-style)
+        var provided = signature.StartsWith("sha256=", StringComparison.OrdinalIgnoreCase)
+            ? signature[7..] : signature;
+
+        return Task.FromResult(string.Equals(expected, provided, StringComparison.OrdinalIgnoreCase));
     }
 }
 

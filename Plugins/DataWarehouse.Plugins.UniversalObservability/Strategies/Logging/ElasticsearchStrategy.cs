@@ -30,8 +30,9 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
     private int _flushIntervalMs = 5000; // Default 5 seconds
     private int _circuitBreakerFailures = 0;
     private const int CircuitBreakerThreshold = 5;
-    private bool _circuitOpen = false;
+    private volatile bool _circuitOpen = false;
     private DateTimeOffset _circuitOpenedAt = DateTimeOffset.MinValue;
+    private readonly object _circuitLock = new();
     private int _flushIntervalSeconds = 5;
 
     /// <inheritdoc/>
@@ -539,20 +540,24 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
-                _apiKey = string.Empty;
-                _password = string.Empty;
+        _apiKey = string.Empty;
+        _password = string.Empty;
         if (disposing)
         {
             _flushTimer?.Stop();
             _flushTimer?.Dispose();
-            _flushLock.Wait();
-            try
+            // Flush pending logs with a bounded wait; use GetAwaiter to avoid deadlock.
+            if (_flushLock.Wait(TimeSpan.FromSeconds(1)))
             {
-                Task.Run(() => FlushLogsAsync(CancellationToken.None)).Wait(TimeSpan.FromSeconds(5));
-            }
-            finally
-            {
-                _flushLock.Release();
+                try
+                {
+                    FlushLogsAsync(CancellationToken.None).GetAwaiter().GetResult();
+                }
+                catch { /* Best-effort flush on dispose */ }
+                finally
+                {
+                    _flushLock.Release();
+                }
             }
             _flushLock.Dispose();
             _httpClient.Dispose();

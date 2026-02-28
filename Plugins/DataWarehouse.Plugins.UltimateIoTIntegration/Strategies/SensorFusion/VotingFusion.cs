@@ -2,6 +2,7 @@
 // Copyright (c) DataWarehouse. All rights reserved.
 // </copyright>
 
+using System.Collections.Concurrent;
 using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIoTIntegration.Strategies.SensorFusion;
@@ -13,7 +14,7 @@ namespace DataWarehouse.Plugins.UltimateIoTIntegration.Strategies.SensorFusion;
 public sealed class VotingFusion
 {
     private readonly BoundedDictionary<string, int> _faultCounts = new BoundedDictionary<string, int>(1000);
-    private readonly HashSet<string> _faultySensors = new();
+    private readonly ConcurrentDictionary<string, byte> _faultySensors = new();
 
     /// <summary>
     /// Fuses sensor readings using majority voting.
@@ -65,7 +66,7 @@ public sealed class VotingFusion
     /// <returns>Array of faulty sensor IDs.</returns>
     public string[] GetFaultySensors()
     {
-        return _faultySensors.ToArray();
+        return _faultySensors.Keys.ToArray();
     }
 
     /// <summary>
@@ -159,7 +160,7 @@ public sealed class VotingFusion
                 // Mark as faulty if it has disagreed 3+ times
                 if (newCount >= 3)
                 {
-                    _faultySensors.Add(reading.SensorId);
+                    _faultySensors.TryAdd(reading.SensorId, 0);
                 }
             }
             else
@@ -173,7 +174,7 @@ public sealed class VotingFusion
                 // Remove from faulty set if count drops to 0
                 if (_faultCounts.TryGetValue(reading.SensorId, out int count) && count == 0)
                 {
-                    _faultySensors.Remove(reading.SensorId);
+                    _faultySensors.TryRemove(reading.SensorId, out _);
                 }
             }
         }
