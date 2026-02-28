@@ -1514,7 +1514,7 @@ public class WorkdayConnectionStrategy : SaaSConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
+    protected override async Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
 }
 ```
@@ -1720,7 +1720,7 @@ public class JiraConnectionStrategy : SaaSConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
+    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
     public async Task<JiraSearchResult> SearchIssuesAsync(IConnectionHandle handle, string jql, int startAt = 0, int maxResults = 50, string[]? fields = null, CancellationToken ct = default);
     public async Task<JiraIssueResult> CreateIssueAsync(IConnectionHandle handle, string projectKey, string issueType, string summary, string? description = null, string? assignee = null, string? priority = null, Dictionary<string, object>? customFields = null, CancellationToken ct = default);
@@ -1871,7 +1871,7 @@ public class ZuoraConnectionStrategy : SaaSConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
+    protected override async Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
 }
 ```
@@ -1913,7 +1913,7 @@ public class ServiceNowConnectionStrategy : SaaSConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
+    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
     public async Task<ServiceNowQueryResult> QueryTableAsync(IConnectionHandle handle, string tableName, string? query = null, int limit = 100, int offset = 0, string[]? fields = null, CancellationToken ct = default);
     public async Task<ServiceNowRecordResult> CreateRecordAsync(IConnectionHandle handle, string tableName, Dictionary<string, string> fields, CancellationToken ct = default);
@@ -1959,7 +1959,7 @@ public class SapConnectionStrategy : SaaSConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
+    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
     public async Task<string> FetchCsrfTokenAsync(IConnectionHandle handle, CancellationToken ct = default);
     public async Task<SapODataResult> ReadEntitySetAsync(IConnectionHandle handle, string servicePath, string entitySet, string? filter = null, string? select = null, int? top = null, int? skip = null, CancellationToken ct = default);
@@ -2073,7 +2073,7 @@ public class SuccessFactorsConnectionStrategy : SaaSConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
+    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
 }
 ```
@@ -2226,7 +2226,7 @@ public class ZendeskConnectionStrategy : SaaSConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
+    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
 }
 ```
@@ -2268,7 +2268,7 @@ public class ShopifyConnectionStrategy : SaaSConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
+    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
 }
 ```
