@@ -254,6 +254,14 @@ public abstract class LineageStrategyBase : StrategyBase, ILineageStrategy
         return Task.CompletedTask;
     }
 
+    /// <summary>Returns all provenance records for a data object.</summary>
+    public IReadOnlyList<ProvenanceRecord> GetProvenance(string dataObjectId)
+    {
+        if (!_provenance.TryGetValue(dataObjectId, out var list))
+            return Array.Empty<ProvenanceRecord>();
+        lock (list) { return list.ToArray(); }
+    }
+
     /// <inheritdoc/>
     public virtual Task<LineageGraph> GetUpstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default)
     {
