@@ -17,8 +17,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
     /// </summary>
     public class TwilioConnectionStrategy : SaaSConnectionStrategyBase
     {
-        private string _accountSid = "";
-        private string _authToken = "";
+        private volatile string _accountSid = "";
+        private volatile string _authToken = "";
 
         public override string StrategyId => "twilio";
         public override string DisplayName => "Twilio";

@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
 {
     public class EventStoreDbConnectionStrategy : DatabaseConnectionStrategyBase
     {
-        private HttpClient? _httpClient;
+        private volatile HttpClient? _httpClient;
         public override string StrategyId => "eventstoredb";
         public override string DisplayName => "EventStoreDB";
         public override string SemanticDescription => "Event-native database built for event sourcing with strong consistency guarantees";

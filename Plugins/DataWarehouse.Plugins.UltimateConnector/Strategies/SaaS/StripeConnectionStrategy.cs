@@ -19,8 +19,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
     /// </summary>
     public class StripeConnectionStrategy : SaaSConnectionStrategyBase
     {
-        private string _secretKey = "";
-        private string _webhookSecret = "";
+        private volatile string _secretKey = "";
+        private volatile string _webhookSecret = "";
 
         public override string StrategyId => "stripe";
         public override string DisplayName => "Stripe";

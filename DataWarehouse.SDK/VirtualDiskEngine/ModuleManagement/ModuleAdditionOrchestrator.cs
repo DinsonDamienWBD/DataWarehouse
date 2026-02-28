@@ -321,6 +321,7 @@ public sealed class ModuleAdditionOrchestrator
     public async Task<IReadOnlyList<ModuleAdditionAnalysis>> AnalyzeMultipleAsync(
         IEnumerable<ModuleId> modules, CancellationToken ct)
     {
+        ArgumentNullException.ThrowIfNull(modules);
         var results = new List<ModuleAdditionAnalysis>();
         var superblock = await ReadSuperblockAsync(ct);
         uint cumulativeManifest = superblock.ModuleManifest;

@@ -334,11 +334,21 @@ public sealed class BTree : IBTreeIndex, IAsyncDisposable
             await _device.ReadBlockAsync(blockNumber, buffer.AsMemory(0, _blockSize), ct).ConfigureAwait(false);
             var node = BTreeNode.Deserialize(buffer.AsSpan(0, _blockSize), _blockSize, blockNumber);
 
-            // Add to cache (evict old entries if needed)
+            // Add to cache (evict old entries if needed) — single-pass O(n) min-find, not O(n log n) sort
             if (_nodeCache.Count >= MaxCachedNodes)
             {
-                var oldest = _nodeCache.OrderBy(kv => kv.Value.AccessTime).FirstOrDefault();
-                _nodeCache.TryRemove(oldest.Key, out _);
+                long oldestKey = -1;
+                DateTime oldestTime = DateTime.MaxValue;
+                foreach (var kv in _nodeCache)
+                {
+                    if (kv.Value.AccessTime < oldestTime)
+                    {
+                        oldestTime = kv.Value.AccessTime;
+                        oldestKey = kv.Key;
+                    }
+                }
+                if (oldestKey >= 0)
+                    _nodeCache.TryRemove(oldestKey, out _);
             }
 
             _nodeCache[blockNumber] = (node, DateTime.UtcNow);
@@ -360,6 +370,26 @@ public sealed class BTree : IBTreeIndex, IAsyncDisposable
         {
             node.Serialize(buffer.AsSpan(0, _blockSize), _blockSize);
 
+            // Capture before-image for undo-based WAL recovery
+            byte[]? beforeImage = null;
+            try
+            {
+                var beforeBuffer = ArrayPool<byte>.Shared.Rent(_blockSize);
+                try
+                {
+                    await _device.ReadBlockAsync(node.BlockNumber, beforeBuffer.AsMemory(0, _blockSize), ct).ConfigureAwait(false);
+                    beforeImage = beforeBuffer.AsSpan(0, _blockSize).ToArray();
+                }
+                finally
+                {
+                    ArrayPool<byte>.Shared.Return(beforeBuffer);
+                }
+            }
+            catch
+            {
+                // Before-image capture is best-effort; proceed without it for new blocks
+            }
+
             // WAL-log the write
             var entry = new JournalEntry
             {
@@ -367,7 +397,7 @@ public sealed class BTree : IBTreeIndex, IAsyncDisposable
                 SequenceNumber = _wal.CurrentSequenceNumber + 1,
                 Type = JournalEntryType.BlockWrite,
                 TargetBlockNumber = node.BlockNumber,
-                BeforeImage = null, // For B-Tree nodes, we typically don't store before image during normal operation
+                BeforeImage = beforeImage,
                 AfterImage = buffer.AsMemory(0, _blockSize).ToArray()
             };
             await _wal.AppendEntryAsync(entry, ct).ConfigureAwait(false);

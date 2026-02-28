@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
 {
     public class NuoDbConnectionStrategy : DatabaseConnectionStrategyBase
     {
-        private TcpClient? _tcpClient;
+        private volatile TcpClient? _tcpClient;
         public override string StrategyId => "nuodb";
         public override string DisplayName => "NuoDB";
         public override string SemanticDescription => "Elastic SQL database with distributed architecture for cloud-native applications";

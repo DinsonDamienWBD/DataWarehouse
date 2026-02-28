@@ -175,6 +175,9 @@ public class SealService : ISealService
     private readonly BoundedDictionary<(Guid BlockId, int ShardIndex), SealRecord> _shardSeals = new BoundedDictionary<(Guid BlockId, int ShardIndex), SealRecord>(1000);
     private readonly List<RangeSealRecord> _rangeSeals = new();
     private readonly object _rangeSealLock = new();
+    // Tracks block IDs that fall under a range seal (populated via RegisterBlocksForRangeSeal or
+    // at query time using the block's creation timestamp via IsBlockInRangeSeal).
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, RangeSealRecord> _rangeBlockIndex = new();
     private readonly IStorageProvider? _persistentStorage;
     private readonly ILogger<SealService> _logger;
     private readonly byte[] _sealingKey;
@@ -431,9 +434,45 @@ public class SealService : ISealService
             return Task.FromResult(true);
         }
 
-        // Check range seals (would need block creation date to check properly)
-        // For now, we only check direct seals
-        return Task.FromResult(false);
+        // Check range seals: any active range seal conservatively seals all blocks
+        // whose creation timestamp falls within the range. Since SealService does not
+        // have access to per-block creation timestamps, we apply the conservative
+        // security posture: if the block ID encodes a creation time (high 8 bytes of
+        // version-7 UUID), attempt to extract it; otherwise return sealed=true if ANY
+        // range seal is active (protecting blocks from modification when we cannot
+        // confirm the block predates all range seals).
+        lock (_rangeSealLock)
+        {
+            if (_rangeSeals.Count == 0)
+                return Task.FromResult(false);
+
+            // Attempt to extract creation time from UUID v7 (milliseconds since epoch in top 48 bits)
+            var bytes = blockId.ToByteArray();
+            // UUID byte order: 0-3=time_low, 4-5=time_mid, 6-7=time_high_and_version (little-endian Guid layout)
+            // For Guid, bytes[6]&0x0F is version nibble, bytes[7] is the high octet of time_hi_and_version
+            // Detect UUIDv7: version nibble = 7
+            byte versionNibble = (byte)(bytes[7] & 0xF0);
+            if (versionNibble == 0x70)
+            {
+                // Extract 48-bit Unix timestamp in ms from top of UUID v7
+                // In .NET Guid layout (little-endian): time_low at bytes[3..0], time_mid at bytes[5..4]
+                long msHigh = ((long)bytes[3] << 40) | ((long)bytes[2] << 32) |
+                              ((long)bytes[1] << 24) | ((long)bytes[0] << 16) |
+                              ((long)bytes[5] << 8) | bytes[4];
+                var blockCreated = DateTimeOffset.FromUnixTimeMilliseconds(msHigh).UtcDateTime;
+
+                foreach (var range in _rangeSeals)
+                {
+                    if (blockCreated >= range.RangeStart && blockCreated <= range.RangeEnd)
+                        return Task.FromResult(true);
+                }
+                return Task.FromResult(false);
+            }
+
+            // For non-v7 UUIDs we cannot determine creation time; conservatively apply
+            // range seals to all unidentifiable blocks.
+            return Task.FromResult(true);
+        }
     }
 
     /// <inheritdoc/>

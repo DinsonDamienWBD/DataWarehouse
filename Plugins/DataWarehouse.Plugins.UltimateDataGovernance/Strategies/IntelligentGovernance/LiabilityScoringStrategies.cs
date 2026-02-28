@@ -149,7 +149,7 @@ public sealed class PIILiabilityStrategy : ConsciousnessStrategyBase
     /// Scores PII liability for a data object by scanning metadata and data content.
     /// </summary>
     public Task<(double Score, List<string> DetectedTypes, List<string> Factors)> ScoreAsync(
-        byte[] data, Dictionary<string, object> metadata, CancellationToken ct = default)
+        byte[] data, IReadOnlyDictionary<string, object> metadata, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         IncrementCounter("pii_scans");
@@ -276,7 +276,7 @@ public sealed class PHILiabilityStrategy : ConsciousnessStrategyBase
     /// Scores PHI liability for a data object.
     /// </summary>
     public Task<(double Score, List<string> Factors)> ScoreAsync(
-        byte[] data, Dictionary<string, object> metadata, CancellationToken ct = default)
+        byte[] data, IReadOnlyDictionary<string, object> metadata, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         IncrementCounter("phi_scans");
@@ -390,7 +390,7 @@ public sealed class PCILiabilityStrategy : ConsciousnessStrategyBase
     /// Scores PCI liability for a data object.
     /// </summary>
     public Task<(double Score, List<string> Factors)> ScoreAsync(
-        byte[] data, Dictionary<string, object> metadata, CancellationToken ct = default)
+        byte[] data, IReadOnlyDictionary<string, object> metadata, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         IncrementCounter("pci_scans");
@@ -508,7 +508,7 @@ public sealed class ClassificationLiabilityStrategy : ConsciousnessStrategyBase
     /// Scores classification liability for a data object.
     /// </summary>
     public Task<(double Score, List<string> Factors)> ScoreAsync(
-        Dictionary<string, object> metadata, CancellationToken ct = default)
+        IReadOnlyDictionary<string, object> metadata, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         IncrementCounter("classification_scans");
@@ -563,7 +563,7 @@ public sealed class RetentionLiabilityStrategy : ConsciousnessStrategyBase
     /// Scores retention liability for a data object.
     /// </summary>
     public Task<(double Score, List<string> Factors)> ScoreAsync(
-        Dictionary<string, object> metadata, CancellationToken ct = default)
+        IReadOnlyDictionary<string, object> metadata, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         IncrementCounter("retention_scans");
@@ -658,7 +658,7 @@ public sealed class RegulatoryExposureLiabilityStrategy : ConsciousnessStrategyB
     /// Scores regulatory exposure liability for a data object.
     /// </summary>
     public Task<(double Score, List<string> ApplicableRegulations, List<string> Factors)> ScoreAsync(
-        Dictionary<string, object> metadata, CancellationToken ct = default)
+        IReadOnlyDictionary<string, object> metadata, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         IncrementCounter("regulatory_scans");
@@ -739,7 +739,7 @@ public sealed class BreachRiskLiabilityStrategy : ConsciousnessStrategyBase
     /// Scores breach risk liability for a data object.
     /// </summary>
     public Task<(double Score, List<string> Factors)> ScoreAsync(
-        Dictionary<string, object> metadata, CancellationToken ct = default)
+        IReadOnlyDictionary<string, object> metadata, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         IncrementCounter("breach_risk_scans");
@@ -902,7 +902,7 @@ public sealed class CompositeLiabilityScoringStrategy : ConsciousnessStrategyBas
 
     /// <inheritdoc />
     public async Task<LiabilityScore> ScoreLiabilityAsync(
-        string objectId, byte[] data, Dictionary<string, object> metadata, CancellationToken ct = default)
+        string objectId, byte[] data, IReadOnlyDictionary<string, object> metadata, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         IncrementCounter("composite_liability_scans");

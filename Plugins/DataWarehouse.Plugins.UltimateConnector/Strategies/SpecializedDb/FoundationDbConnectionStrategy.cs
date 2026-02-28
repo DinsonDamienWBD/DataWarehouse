@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
 {
     public class FoundationDbConnectionStrategy : DatabaseConnectionStrategyBase
     {
-        private TcpClient? _tcpClient;
+        private volatile TcpClient? _tcpClient;
         public override string StrategyId => "foundationdb";
         public override string DisplayName => "FoundationDB";
         public override string SemanticDescription => "Distributed database providing scalability and fault tolerance with ACID guarantees";

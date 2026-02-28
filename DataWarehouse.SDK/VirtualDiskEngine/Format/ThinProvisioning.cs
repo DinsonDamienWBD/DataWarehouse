@@ -210,16 +210,33 @@ public static class ThinProvisioning
 
     private static long GetPhysicalSizeUnix(string path)
     {
-        // On Unix, ideally we would use stat().st_blocks * 512 to get actual disk usage.
-        // FileInfo.Length returns logical size, not physical. For a robust implementation,
-        // we use a process-based approach to call 'du' or 'stat'.
+        // Use 'du -k' to get actual disk usage (includes holes/sparse accounting).
+        // stat().st_blocks * 512 is the gold standard, but requires P/Invoke.
+        // 'du -k' is universally available on Linux/macOS and returns 1K-block counts.
         try
         {
-            var info = new FileInfo(path);
-            // On Linux/macOS, .NET FileInfo.Length returns logical size.
-            // We check if the file is likely sparse by comparing with a basic heuristic:
-            // sparse files on Unix are handled at the filesystem level.
-            return info.Length;
+            using var process = new System.Diagnostics.Process
+            {
+                StartInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "du",
+                    ArgumentList = { "-k", "--", path },
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+            };
+
+            process.Start();
+            string output = process.StandardOutput.ReadToEnd();
+            process.WaitForExit(5000);
+
+            // du output format: "<1K-blocks>\t<path>"
+            var tab = output.IndexOf('\t');
+            if (tab > 0 && long.TryParse(output.AsSpan(0, tab).Trim(), out long kiloBlocks))
+                return kiloBlocks * 1024L;
+
+            return new FileInfo(path).Length;
         }
         catch
         {

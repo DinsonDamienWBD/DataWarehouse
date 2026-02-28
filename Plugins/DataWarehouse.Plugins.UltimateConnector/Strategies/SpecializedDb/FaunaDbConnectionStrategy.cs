@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
 {
     public class FaunaDbConnectionStrategy : DatabaseConnectionStrategyBase
     {
-        private HttpClient? _httpClient;
+        private volatile HttpClient? _httpClient;
         public override string StrategyId => "faunadb";
         public override string DisplayName => "FaunaDB";
         public override string SemanticDescription => "Serverless distributed document-relational database with native GraphQL support";

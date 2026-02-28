@@ -34,10 +34,16 @@ public sealed class MvccManager
     private readonly ConcurrentDictionary<long, MvccTransaction> _activeTransactions = new();
 
     /// <summary>
-    /// Tracks which inodes were modified by which committed transactions (transactionId -> set of inode numbers).
+    /// Tracks which inodes were modified by which committed transactions (WAL-commit-sequence -> inode numbers).
     /// Used for Serializable conflict detection. Entries are pruned when no active transaction can observe them.
     /// </summary>
     private readonly ConcurrentDictionary<long, long[]> _committedWriteSets = new();
+
+    /// <summary>
+    /// Tracks version chain entries for snapshot-visible reads.
+    /// Maps inodeNumber -> list of (WAL-commit-sequence, version-block-number) entries.
+    /// </summary>
+    private readonly ConcurrentDictionary<long, System.Collections.Generic.List<(long CommitSeq, long VersionBlock)>> _committedVersionChains = new();
 
     /// <summary>
     /// Default isolation level for new transactions when none is specified.
@@ -127,10 +133,10 @@ public sealed class MvccManager
         {
             foreach (var kvp in _committedWriteSets)
             {
-                long committedTxId = kvp.Key;
-                if (committedTxId > tx.SnapshotSequence)
+                long commitWalSequence = kvp.Key; // WAL sequence number at commit time
+                if (commitWalSequence > tx.SnapshotSequence)
                 {
-                    // This transaction committed after our snapshot
+                    // This transaction committed after our snapshot (both are WAL sequence numbers)
                     long[] modifiedInodes = kvp.Value;
                     foreach (long modifiedInode in modifiedInodes)
                     {
@@ -139,8 +145,8 @@ public sealed class MvccManager
                             tx.State = TransactionState.Aborted;
                             _activeTransactions.TryRemove(tx.TransactionId, out _);
                             throw new InvalidOperationException(
-                                $"Serializable conflict: inode {modifiedInode} was modified by transaction {committedTxId} " +
-                                $"after snapshot {tx.SnapshotSequence}.");
+                                $"Serializable conflict: inode {modifiedInode} was modified by a transaction " +
+                                $"that committed at WAL sequence {commitWalSequence} after our snapshot {tx.SnapshotSequence}.");
                         }
                     }
                 }
@@ -181,10 +187,22 @@ public sealed class MvccManager
         await _wal.AppendEntryAsync(commitEntry, ct);
         await _wal.FlushAsync(ct);
 
-        // Record committed write set for Serializable conflict detection
+        // Record committed write set for Serializable conflict detection.
+        // Key is the WAL commit sequence number (same unit as SnapshotSequence),
+        // enabling correct ordering comparison in Serializable conflict detection.
         if (tx.WriteSet.Count > 0)
         {
-            _committedWriteSets.TryAdd(tx.TransactionId, tx.WriteSet.Keys.ToArray());
+            long commitSequence = _wal.CurrentSequenceNumber;
+            _committedWriteSets.TryAdd(commitSequence, tx.WriteSet.Keys.ToArray());
+
+            // Record version chain entries so snapshot reads can find historical versions
+            foreach (var (inodeNum, versionBlock) in tx.VersionChainEntries)
+            {
+                _committedVersionChains.AddOrUpdate(
+                    inodeNum,
+                    _ => new System.Collections.Generic.List<(long, long)> { (commitSequence, versionBlock) },
+                    (_, list) => { lock (list) { list.Add((commitSequence, versionBlock)); } return list; });
+            }
         }
 
         // Remove from active set and mark committed
@@ -245,19 +263,55 @@ public sealed class MvccManager
         }
 
         // For SnapshotIsolation and Serializable:
-        // Read the current on-disk data. If the current version's transaction ID
-        // is <= our snapshot, it's visible. Otherwise, walk the version chain
-        // to find the appropriate visible version.
+        // Check if any transaction committed after our snapshot has written to this inode.
+        // If so, find the most-recent old-version block saved before our snapshot.
         var currentBuffer = new byte[_blockSize];
         await _device.ReadBlockAsync(inodeNumber, currentBuffer, ct);
 
-        // Check if current version is visible to this snapshot.
-        // If no concurrent writes happened after our snapshot, the current data is valid.
-        // The version chain is walked only when we detect a newer version.
-        // In practice, the caller determines visibility by checking version chain metadata.
-        // For simplicity: current data is returned if no write-set conflict exists,
-        // otherwise the version store provides historical data.
+        // Find the most-recent version block recorded for this inode by a transaction
+        // that committed AFTER our snapshot (meaning current data is too new for us).
+        // We search through all active transactions' VersionChainEntries for an older version.
+        long bestVersionBlock = -1;
+        long bestCommitSeq = -1;
+        bool newerVersionExists = false;
 
+        foreach (var kvp in _committedWriteSets)
+        {
+            long commitSeq = kvp.Key;
+            if (commitSeq > tx.SnapshotSequence && kvp.Value.Contains(inodeNumber))
+            {
+                newerVersionExists = true;
+                break;
+            }
+        }
+
+        if (!newerVersionExists)
+            return currentBuffer;
+
+        // Search version chain entries from recently committed transactions to find
+        // the correct historical snapshot. Iterate _committedVersionChains (if tracked)
+        // or fall back to returning currentBuffer when version chain lookup is unavailable.
+        // The version store read path uses inodeNumber -> version block recorded at commit.
+        if (_committedVersionChains.TryGetValue(inodeNumber, out var chainEntries))
+        {
+            foreach (var (commitSeq, versionBlock) in chainEntries)
+            {
+                if (commitSeq <= tx.SnapshotSequence && commitSeq > bestCommitSeq)
+                {
+                    bestCommitSeq = commitSeq;
+                    bestVersionBlock = versionBlock;
+                }
+            }
+        }
+
+        if (bestVersionBlock > 0)
+        {
+            var versionRecord = await _versionStore.ReadVersionAsync(bestVersionBlock, ct);
+            if (versionRecord.HasValue)
+                return versionRecord.Value.Data;
+        }
+
+        // Fallback: current data (best effort when version chain unavailable)
         return currentBuffer;
     }
 

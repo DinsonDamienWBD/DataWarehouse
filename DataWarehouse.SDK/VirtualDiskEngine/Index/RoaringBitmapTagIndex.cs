@@ -1045,10 +1045,6 @@ public sealed class RoaringBitmapTagIndex
             public IContainer Not(ushort maxPosition)
             {
                 var result = new ArrayContainer();
-                foreach (ushort v in Enumerate())
-                {
-                    // Skip values in current container
-                }
                 // Add all values NOT in this container up to maxPosition
                 int runIdx = 0;
                 for (ushort p = 0; p <= maxPosition; p++)

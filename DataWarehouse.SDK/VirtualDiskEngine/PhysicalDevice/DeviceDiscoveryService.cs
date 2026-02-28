@@ -366,6 +366,10 @@ public sealed class DeviceDiscoveryService
             if (!File.Exists(path)) return null;
             return await File.ReadAllTextAsync(path, ct).ConfigureAwait(false);
         }
+        catch (OperationCanceledException)
+        {
+            throw; // Propagate cancellation so callers can honor the token
+        }
         catch
         {
             return null;

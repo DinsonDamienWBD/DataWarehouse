@@ -200,19 +200,42 @@ public sealed class SoftwareTimeLockProvider : TimeLockProviderPluginBase
                 break;
 
             case UnlockConditionType.MultiPartyApproval:
-                // Check if required approvals are met from condition parameters
+                // Validate submitted approver IDs against the authorized approver list stored in the condition.
+                // "ApproverIds" = IDs submitted by callers claiming approval.
+                // "AuthorizedApprovers" = the allowlist of IDs that are permitted to grant approval (set at lock time).
+                // Only approvers present in both sets count toward the quorum.
                 var requiredApprovals = condition.RequiredApprovals;
                 var approvalCount = 0;
+
+                IReadOnlySet<string> authorizedApprovers = new HashSet<string>(StringComparer.Ordinal);
+                if (condition.Parameters.TryGetValue("AuthorizedApprovers", out var authorizedObj))
+                {
+                    if (authorizedObj is IEnumerable<string> authList)
+                        authorizedApprovers = new HashSet<string>(authList, StringComparer.Ordinal);
+                    else if (authorizedObj is IEnumerable<object> authObjList)
+                        authorizedApprovers = new HashSet<string>(authObjList.OfType<string>(), StringComparer.Ordinal);
+                }
+
                 if (condition.Parameters.TryGetValue("ApproverIds", out var approverIdsObj))
                 {
-                    if (approverIdsObj is string[] approverIds)
+                    IEnumerable<string> submittedIds = approverIdsObj switch
                     {
-                        approvalCount = approverIds.Length;
-                    }
-                    else if (approverIdsObj is IEnumerable<object> approverList)
+                        string[] arr => arr,
+                        IEnumerable<string> strEnum => strEnum,
+                        IEnumerable<object> objEnum => objEnum.OfType<string>(),
+                        _ => Enumerable.Empty<string>()
+                    };
+
+                    // Count distinct submitted approvers that appear in the authorized set.
+                    // If no authorized approver list is configured, deny all (fail-closed security posture).
+                    if (authorizedApprovers.Count > 0)
                     {
-                        approvalCount = approverList.Count();
+                        approvalCount = submittedIds
+                            .Where(id => !string.IsNullOrWhiteSpace(id) && authorizedApprovers.Contains(id))
+                            .Distinct(StringComparer.Ordinal)
+                            .Count();
                     }
+                    // else: approvalCount stays 0 — no authorized approvers configured means unlock is denied
                 }
                 unlocked = approvalCount >= requiredApprovals;
                 break;

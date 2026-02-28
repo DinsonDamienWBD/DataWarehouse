@@ -92,7 +92,7 @@ public sealed class ConsciousnessScoringEngine : ConsciousnessStrategyBase, ICon
     public async Task<ConsciousnessScore> ScoreAsync(
         string objectId,
         byte[] data,
-        Dictionary<string, object> metadata,
+        IReadOnlyDictionary<string, object> metadata,
         CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(objectId);

@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
 {
     public class MemgraphConnectionStrategy : DatabaseConnectionStrategyBase
     {
-        private TcpClient? _tcpClient;
+        private volatile TcpClient? _tcpClient;
 
         public override string StrategyId => "memgraph";
         public override string DisplayName => "Memgraph";

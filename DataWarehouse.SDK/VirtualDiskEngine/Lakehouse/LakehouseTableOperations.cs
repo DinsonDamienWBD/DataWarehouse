@@ -486,9 +486,16 @@ public sealed class LakehouseTableOperations
             compactedFile, sourceFiles.Count, tableId);
     }
 
-    private static readonly JsonSerializerOptions _jsonOptions = new()
+    private static readonly JsonSerializerOptions _jsonOptions = CreateJsonOptions();
+
+    private static JsonSerializerOptions CreateJsonOptions()
     {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = false
-    };
+        var opts = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = false
+        };
+        opts.MakeReadOnly(); // Freeze to prevent concurrent-initialization races in .NET 8+
+        return opts;
+    }
 }

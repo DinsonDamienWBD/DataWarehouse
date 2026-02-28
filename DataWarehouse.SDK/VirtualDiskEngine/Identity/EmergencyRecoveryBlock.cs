@@ -277,6 +277,8 @@ public readonly struct EmergencyRecoveryBlock : IEquatable<EmergencyRecoveryBloc
     public static EmergencyRecoveryBlock ReadFromStream(Stream stream, int blockSize)
     {
         if (stream is null) throw new ArgumentNullException(nameof(stream));
+        if (blockSize <= 0 || blockSize > 65536)
+            throw new ArgumentOutOfRangeException(nameof(blockSize), "Block size must be between 1 and 65536 bytes.");
 
         long position = (long)FixedBlockNumber * blockSize;
         stream.Seek(position, SeekOrigin.Begin);

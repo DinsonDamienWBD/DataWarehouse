@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
 {
     public class SingleStoreConnectionStrategy : DatabaseConnectionStrategyBase
     {
-        private TcpClient? _tcpClient;
+        private volatile TcpClient? _tcpClient;
         public override string StrategyId => "singlestore";
         public override string DisplayName => "SingleStore";
         public override string SemanticDescription => "Distributed SQL database combining transactions and analytics with MySQL compatibility";

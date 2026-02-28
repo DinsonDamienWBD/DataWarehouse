@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
 {
     public class RethinkDbConnectionStrategy : DatabaseConnectionStrategyBase
     {
-        private TcpClient? _tcpClient;
+        private volatile TcpClient? _tcpClient;
         public override string StrategyId => "rethinkdb";
         public override string DisplayName => "RethinkDB";
         public override string SemanticDescription => "Real-time push database with live query updates and changefeeds";

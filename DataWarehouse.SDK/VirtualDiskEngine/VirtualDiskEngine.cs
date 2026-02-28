@@ -6,6 +6,7 @@ using DataWarehouse.SDK.VirtualDiskEngine.CopyOnWrite;
 using DataWarehouse.SDK.VirtualDiskEngine.Index;
 using DataWarehouse.SDK.VirtualDiskEngine.Integrity;
 using DataWarehouse.SDK.VirtualDiskEngine.Concurrency;
+using System.Linq;
 using DataWarehouse.SDK.VirtualDiskEngine.Journal;
 using DataWarehouse.SDK.VirtualDiskEngine.Metadata;
 using System;
@@ -219,6 +220,12 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
         ThrowIfNotInitialized();
 
         ArgumentNullException.ThrowIfNull(key);
+        if (key.Length == 0)
+            throw new ArgumentException("Key cannot be empty.", nameof(key));
+        if (key.Length > 4096)
+            throw new ArgumentException("Key exceeds maximum length of 4096 bytes.", nameof(key));
+        if (key.Contains('\0'))
+            throw new ArgumentException("Key must not contain null bytes.", nameof(key));
         ArgumentNullException.ThrowIfNull(data);
 
         await using var writeRegion = await _stripedLock.AcquireAsync(key, ct);
@@ -277,6 +284,9 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
             // Update inode with block pointers
             if (blockPointers.Count > Inode.DirectBlockCount)
             {
+                // Free all allocated blocks before throwing to prevent leaks
+                foreach (var blk in blockPointers)
+                    _allocator!.FreeBlock(blk);
                 throw new NotSupportedException($"Files exceeding direct block limit require indirect block support. Current limit: {Inode.DirectBlockCount} blocks ({Inode.DirectBlockCount * _options.BlockSize} bytes).");
             }
 
@@ -516,7 +526,9 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
             Inode? inode = await _inodeTable!.GetInodeAsync(inodeNumber, ct);
             if (inode == null)
             {
-                continue; // Skip if inode is missing
+                // Index inconsistency: key in B-Tree but inode missing — log for operator visibility
+                System.Diagnostics.Trace.TraceWarning($"[VirtualDiskEngine] Index inconsistency: key '{key}' references missing inode {inodeNumber}. Skipping.");
+                continue;
             }
 
             yield return new StorageObjectMetadata
@@ -645,7 +657,9 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
             TotalBlocks = totalBlocks,
             FreeBlocks = freeBlocks,
             UsedBlocks = usedBlocks,
-            TotalInodes = 65536, // Fixed for now; InodeTable should expose this
+            TotalInodes = _container != null && _container.Layout.InodeTableBlockCount > 0
+                ? _container.Layout.InodeTableBlockCount * (_options.BlockSize / 256)
+                : 65536,
             AllocatedInodes = _inodeTable!.AllocatedInodeCount,
             WalUtilizationPercent = walUtilization,
             ChecksumErrorCount = checksumErrorCount,
@@ -668,7 +682,7 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
         ThrowIfNotInitialized();
 
         var scanResult = await _corruptionDetector!.ScanAllBlocksAsync(progress, ct);
-        return scanResult.Events.Select(e => e.BlockNumber).ToList();
+        return (scanResult.Events ?? Enumerable.Empty<CorruptionEvent>()).Select(e => e.BlockNumber).ToList();
     }
 
     #endregion

@@ -350,7 +350,7 @@ public sealed class DeltaIcebergTransactionLog : IDisposable
     /// <param name="toVersion">End version (inclusive).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>List of commits in the specified range.</returns>
-    public ValueTask<IReadOnlyList<TransactionCommit>> GetHistoryAsync(
+    public async ValueTask<IReadOnlyList<TransactionCommit>> GetHistoryAsync(
         string tableId,
         long fromVersion,
         long toVersion,
@@ -360,24 +360,33 @@ public sealed class DeltaIcebergTransactionLog : IDisposable
 
         if (!_tables.TryGetValue(tableId, out var table))
         {
-            return new ValueTask<IReadOnlyList<TransactionCommit>>(
-                Array.Empty<TransactionCommit>());
+            return Array.Empty<TransactionCommit>();
         }
 
-        var results = new List<TransactionCommit>();
-        foreach (var kvp in table)
+        // Acquire per-table semaphore to prevent InvalidOperationException from concurrent CommitAsync
+        var tableLock = GetOrCreateTableLock(tableId);
+        await tableLock.WaitAsync(ct).ConfigureAwait(false);
+        try
         {
-            if (kvp.Key >= fromVersion && kvp.Key <= toVersion)
+            var results = new List<TransactionCommit>();
+            foreach (var kvp in table)
             {
-                results.Add(kvp.Value);
+                if (kvp.Key >= fromVersion && kvp.Key <= toVersion)
+                {
+                    results.Add(kvp.Value);
+                }
+                else if (kvp.Key > toVersion)
+                {
+                    break;
+                }
             }
-            else if (kvp.Key > toVersion)
-            {
-                break;
-            }
-        }
 
-        return new ValueTask<IReadOnlyList<TransactionCommit>>(results);
+            return results;
+        }
+        finally
+        {
+            tableLock.Release();
+        }
     }
 
     /// <summary>

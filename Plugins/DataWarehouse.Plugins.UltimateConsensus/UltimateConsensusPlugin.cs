@@ -195,9 +195,9 @@ public sealed class UltimateConsensusPlugin : ConsensusPluginBase, IDisposable
     #region ConsensusPluginBase Implementation
 
     /// <inheritdoc/>
-    public override async Task<bool> ProposeAsync(Proposal proposal)
+    public override async Task<bool> ProposeAsync(Proposal proposal, CancellationToken cancellationToken = default)
     {
-        var result = await ProposeAsync(proposal.Payload, CancellationToken.None).ConfigureAwait(false);
+        var result = await ProposeAsync(proposal.Payload, cancellationToken).ConfigureAwait(false);
         if (result.Success)
         {
             NotifyCommitHandlers(proposal);
@@ -206,11 +206,38 @@ public sealed class UltimateConsensusPlugin : ConsensusPluginBase, IDisposable
     }
 
     /// <inheritdoc/>
-    public override void OnCommit(Action<Proposal> handler)
+    public override IDisposable OnCommit(Action<Proposal> handler)
     {
         lock (_handlerLock)
         {
             _commitHandlers.Add(handler);
+        }
+        return new CommitHandlerRegistration(_commitHandlers, _handlerLock, handler);
+    }
+
+    private sealed class CommitHandlerRegistration : IDisposable
+    {
+        private readonly List<Action<Proposal>> _handlers;
+        private readonly object _lock;
+        private readonly Action<Proposal> _handler;
+        private int _disposed;
+
+        public CommitHandlerRegistration(List<Action<Proposal>> handlers, object handlerLock, Action<Proposal> handler)
+        {
+            _handlers = handlers;
+            _lock = handlerLock;
+            _handler = handler;
+        }
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) == 0)
+            {
+                lock (_lock)
+                {
+                    _handlers.Remove(_handler);
+                }
+            }
         }
     }
 
