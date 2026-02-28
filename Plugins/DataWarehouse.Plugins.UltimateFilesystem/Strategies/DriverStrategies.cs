@@ -27,6 +27,7 @@ public sealed class PosixDriverStrategy : FilesystemStrategyBase
 
     public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default)
     {
+        ValidatePath(path);
         var fileOptions = options?.AsyncIo == true ? FileOptions.Asynchronous : FileOptions.None;
         await using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, options?.BufferSize ?? 4096, fileOptions);
         fs.Seek(offset, SeekOrigin.Begin);
@@ -41,6 +42,7 @@ public sealed class PosixDriverStrategy : FilesystemStrategyBase
 
     public override async Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default)
     {
+        ValidatePath(path);
         var fileOptions = options?.AsyncIo == true ? FileOptions.Asynchronous : FileOptions.None;
         if (options?.WriteThrough == true) fileOptions |= FileOptions.WriteThrough;
         await using var fs = new FileStream(path, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None, options?.BufferSize ?? 4096, fileOptions);
@@ -117,22 +119,25 @@ public sealed class IoUringDriverStrategy : FilesystemStrategyBase
     public override FilesystemStrategyCategory Category => FilesystemStrategyCategory.Driver;
     public override FilesystemStrategyCapabilities Capabilities => new()
     {
+        // SupportsKernelBypass is false: current implementation uses managed FileStream with
+        // FileOptions.Asynchronous. True io_uring (P/Invoke to io_uring_setup/enter) requires
+        // native interop not yet wired. Mark false so callers do not assume bypass semantics.
         SupportsDirectIo = true, SupportsAsyncIo = true, SupportsMmap = true,
-        SupportsKernelBypass = true, SupportsVectoredIo = true, SupportsSparse = true,
+        SupportsKernelBypass = false, SupportsVectoredIo = true, SupportsSparse = true,
         SupportsAutoDetect = false
     };
     public override string SemanticDescription =>
-        "Linux io_uring driver providing kernel-bypass async I/O with minimal syscall overhead, " +
-        "ideal for high-IOPS NVMe workloads.";
-    public override string[] Tags => ["io-uring", "linux", "kernel-bypass", "async", "nvme"];
+        "Linux io_uring-style async I/O driver using FileOptions.Asynchronous for overlapped I/O. " +
+        "Native io_uring kernel bypass (SupportsKernelBypass) is not yet active; " +
+        "upgrade to P/Invoke io_uring_setup/io_uring_enter for true zero-syscall paths.";
+    public override string[] Tags => ["io-uring", "linux", "async", "nvme"];
 
     public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default) =>
         Task.FromResult<FilesystemMetadata?>(null);
 
     public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default)
     {
-        // In production, would use io_uring syscalls
-        // Fallback to async file I/O
+        // Uses FileOptions.Asynchronous for OS-level async I/O completion (IOCP on Windows, epoll on Linux)
         await using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.Asynchronous);
         fs.Seek(offset, SeekOrigin.Begin);
         var buffer = new byte[length];
@@ -142,7 +147,7 @@ public sealed class IoUringDriverStrategy : FilesystemStrategyBase
 
     public override async Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default)
     {
-        await using var fs = new FileStream(path, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None, 4096, FileOptions.Asynchronous);
+        await using var fs = new FileStream(path, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None, 4096, FileOptions.Asynchronous | FileOptions.WriteThrough);
         fs.Seek(offset, SeekOrigin.Begin);
         await fs.WriteAsync(data, 0, data.Length, ct);
     }

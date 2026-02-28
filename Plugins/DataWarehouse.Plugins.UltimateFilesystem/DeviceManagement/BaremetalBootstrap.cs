@@ -279,16 +279,16 @@ public sealed class BaremetalBootstrap
             }
         }
 
-        // Initialize journal areas on all devices (write empty journal area)
+        // Initialize journal areas on all devices (write empty/zero journal area to blocks 1-8)
         foreach (var device in devices)
         {
             ct.ThrowIfCancellationRequested();
 
             try
             {
-                // Journal area is blocks 1-8 on 4K devices, already zero-initialized
-                // by the pool creation metadata write. This step ensures the journal
-                // area exists and is valid.
+                // Journal area occupies blocks 1-8 (reserved after block 0 which holds pool metadata).
+                // Write zero-initialized journal header to mark the area as initialized.
+                await _journal.InitializeJournalAreaAsync(device, ct).ConfigureAwait(false);
                 _logger.LogDebug("Bare-metal bootstrap: journal area initialized on device {DeviceId}.",
                     device.DeviceInfo.DeviceId);
             }

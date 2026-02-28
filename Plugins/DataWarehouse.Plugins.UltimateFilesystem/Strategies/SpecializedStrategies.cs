@@ -96,6 +96,7 @@ public sealed class OverlayFsStrategy : FilesystemStrategyBase
 public sealed class BlockCacheStrategy : FilesystemStrategyBase
 {
     private readonly Dictionary<(string, long), byte[]> _cache = new();
+    private readonly object _cacheLock = new();
     private readonly int _cacheSize = 1000;
 
     public override string StrategyId => "cache-block";
@@ -117,10 +118,12 @@ public sealed class BlockCacheStrategy : FilesystemStrategyBase
 
     public override Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default)
     {
+        ValidatePath(path);
         var key = (path, offset);
-        if (_cache.TryGetValue(key, out var cached) && cached.Length >= length)
+        lock (_cacheLock)
         {
-            return Task.FromResult(cached[..length]);
+            if (_cache.TryGetValue(key, out var cached) && cached.Length >= length)
+                return Task.FromResult(cached[..length]);
         }
 
         using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
@@ -128,9 +131,10 @@ public sealed class BlockCacheStrategy : FilesystemStrategyBase
         var buffer = new byte[length];
         fs.ReadExactly(buffer, 0, length);
 
-        if (_cache.Count < _cacheSize)
+        lock (_cacheLock)
         {
-            _cache[key] = buffer;
+            if (_cache.Count < _cacheSize)
+                _cache[key] = buffer;
         }
 
         return Task.FromResult(buffer);
@@ -139,7 +143,10 @@ public sealed class BlockCacheStrategy : FilesystemStrategyBase
     public override Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default)
     {
         // Invalidate cache on write
-        _cache.Remove((path, offset));
+        lock (_cacheLock)
+        {
+            _cache.Remove((path, offset));
+        }
 
         using var fs = new FileStream(path, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None);
         fs.Seek(offset, SeekOrigin.Begin);
@@ -158,6 +165,7 @@ public sealed class BlockCacheStrategy : FilesystemStrategyBase
 public sealed class QuotaEnforcementStrategy : FilesystemStrategyBase
 {
     private readonly Dictionary<string, (long used, long limit)> _quotas = new();
+    private readonly object _quotasLock = new();
 
     public override string StrategyId => "quota-enforcement";
     public override string DisplayName => "Quota Enforcement";
@@ -178,6 +186,7 @@ public sealed class QuotaEnforcementStrategy : FilesystemStrategyBase
 
     public override Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default)
     {
+        ValidatePath(path);
         using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         fs.Seek(offset, SeekOrigin.Begin);
         var buffer = new byte[length];
@@ -187,23 +196,27 @@ public sealed class QuotaEnforcementStrategy : FilesystemStrategyBase
 
     public override Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default)
     {
-        // Check quota before write
+        ValidatePath(path);
+        // Check quota before write (under lock for TOCTOU safety)
         var root = Path.GetPathRoot(path) ?? path;
-        if (_quotas.TryGetValue(root, out var quota) && quota.used + data.Length > quota.limit)
+        lock (_quotasLock)
         {
-            throw new IOException($"Quota exceeded for {root}");
+            if (_quotas.TryGetValue(root, out var quota))
+            {
+                if (quota.used + data.Length > quota.limit)
+                    throw new IOException($"Quota exceeded for {root}");
+
+                using var fs = new FileStream(path, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None);
+                fs.Seek(offset, SeekOrigin.Begin);
+                fs.Write(data, 0, data.Length);
+                _quotas[root] = (quota.used + data.Length, quota.limit);
+                return Task.CompletedTask;
+            }
         }
 
-        using var fs = new FileStream(path, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None);
-        fs.Seek(offset, SeekOrigin.Begin);
-        fs.Write(data, 0, data.Length);
-
-        // Update usage
-        if (_quotas.ContainsKey(root))
-        {
-            _quotas[root] = (quota.used + data.Length, quota.limit);
-        }
-
+        using var fs2 = new FileStream(path, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None);
+        fs2.Seek(offset, SeekOrigin.Begin);
+        fs2.Write(data, 0, data.Length);
         return Task.CompletedTask;
     }
 
@@ -214,7 +227,10 @@ public sealed class QuotaEnforcementStrategy : FilesystemStrategyBase
     public void SetQuota(string path, long limitBytes)
     {
         var root = Path.GetPathRoot(path) ?? path;
-        _quotas[root] = (0, limitBytes);
+        lock (_quotasLock)
+        {
+            _quotas[root] = (0, limitBytes);
+        }
     }
 }
 

@@ -183,6 +183,22 @@ public abstract class FilesystemStrategyBase : StrategyBase, IFilesystemStrategy
     public abstract Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
     /// <inheritdoc/>
     public abstract Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);
+
+    /// <summary>
+    /// Validates that a user-supplied path does not contain path traversal sequences
+    /// ("../", "..\\", null bytes) or UNC prefix that could escape the expected root.
+    /// Throws <see cref="ArgumentException"/> if the path is invalid.
+    /// </summary>
+    protected static void ValidatePath(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        if (path.Contains('\0'))
+            throw new ArgumentException("Path must not contain null bytes.", nameof(path));
+        if (path.Contains("..") && (path.Contains("../") || path.Contains("..\\") || path.EndsWith("..")))
+            throw new ArgumentException($"Path traversal sequences ('..') are not allowed: {path}", nameof(path));
+        if (path.StartsWith("\\\\") || path.StartsWith("//"))
+            throw new ArgumentException($"UNC paths are not permitted: {path}", nameof(path));
+    }
 }
 
 /// <summary>

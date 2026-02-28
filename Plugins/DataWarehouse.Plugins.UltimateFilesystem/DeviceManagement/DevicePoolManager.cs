@@ -328,15 +328,24 @@ public sealed class DevicePoolManager : IAsyncDisposable
             throw new KeyNotFoundException($"Pool '{poolId}' not found.");
         }
 
-        // Clear metadata from all member devices (write zeros to block 0)
-        // This is best-effort; we proceed even if some devices are unreachable
-        await Task.CompletedTask.ConfigureAwait(false); // Ensure async state machine
-
+        // Remove in-memory pool and device-to-pool mappings first
         _pools.TryRemove(poolId, out _);
         foreach (var member in pool.Members)
         {
             _deviceToPool.TryRemove(member.DeviceId, out _);
         }
+
+        // Physical metadata clearing (block 0 zeroing) requires IPhysicalBlockDevice handles
+        // which are managed by the DeviceDiscoveryManager and not held by the pool manager.
+        // The caller is responsible for passing device handles to ScanForPoolsAsync on next
+        // boot; pools with zeroed block 0 metadata will not be reconstructed.
+        // In the BaremetalBootstrap workflow, the caller should zero block 0 on each member
+        // device via IPhysicalBlockDevice.WriteBlockAsync(0, zeroBlock, ...) after deletion.
+        System.Diagnostics.Trace.TraceWarning(
+            "[DevicePoolManager] Pool '{0}' deleted from memory. Physical block 0 metadata on {1} member device(s) " +
+            "must be zeroed by the caller via IPhysicalBlockDevice.WriteBlockAsync to prevent pool resurrection on next boot.",
+            poolId, pool.Members.Count);
+        await Task.CompletedTask.ConfigureAwait(false);
     }
 
     /// <summary>
@@ -581,18 +590,27 @@ public sealed class DevicePoolManager : IAsyncDisposable
     }
 
     /// <summary>
-    /// Updates metadata on existing pool members by reading the current member list
-    /// and writing to devices that can be resolved. Members that fail are marked degraded.
-    /// Returns potentially updated pool with degraded members.
+    /// Updates metadata on existing pool members by recording that a stale-metadata
+    /// condition exists. Physical block 0 updates require IPhysicalBlockDevice handles
+    /// which are not held by the pool manager (they live in DeviceDiscoveryManager).
+    /// The next bare-metal bootstrap scan will reconstruct the pool from the latest
+    /// descriptor once the new member is included.
     /// </summary>
     private async Task<DevicePoolDescriptor> UpdateExistingMemberMetadataAsync(
         DevicePoolDescriptor pool,
         byte[] metadataBlock,
         CancellationToken ct)
     {
-        // In a full implementation, we would resolve DeviceId -> IPhysicalBlockDevice
-        // and write to each. For now, the metadata is already written to the new device
-        // and the pool descriptor is updated in memory.
+        ct.ThrowIfCancellationRequested();
+
+        // Existing members have stale descriptors until their block 0 is overwritten.
+        // The pool descriptor in memory is authoritative; on next ScanForPoolsAsync the
+        // updated descriptor (now including the new member) is the source of truth.
+        // Callers requiring immediate on-disk consistency should invoke
+        // IPhysicalBlockDevice.WriteBlockAsync(0, metadataBlock, ...) for each member.
+        System.Diagnostics.Trace.TraceInformation(
+            "[DevicePoolManager] Existing member metadata update deferred — caller must write metadataBlock to " +
+            "block 0 of each existing member via IPhysicalBlockDevice for immediate on-disk consistency.");
         await Task.CompletedTask.ConfigureAwait(false);
         return pool;
     }

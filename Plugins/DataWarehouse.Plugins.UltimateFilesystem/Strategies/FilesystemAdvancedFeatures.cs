@@ -51,21 +51,22 @@ public sealed class ContentAddressableStorageLayer
 
         if (_blockStore.TryGetValue(contentHash, out var existing))
         {
-            // Block already exists — increment reference count
-            existing.ReferenceCount++;
+            // Block already exists — increment reference count atomically
+            Interlocked.Increment(ref existing._referenceCount);
             Interlocked.Add(ref _deduplicatedBytes, data.Length);
         }
         else
         {
             // New unique block
-            _blockStore[contentHash] = new CasBlock
+            var newBlock = new CasBlock
             {
                 ContentHash = contentHash,
                 Data = data,
                 Size = data.Length,
-                ReferenceCount = 1,
                 StoredAt = DateTime.UtcNow
             };
+            Interlocked.Exchange(ref newBlock._referenceCount, 1);
+            _blockStore[contentHash] = newBlock;
             Interlocked.Increment(ref _totalBlocks);
             Interlocked.Add(ref _storedBytes, data.Length);
         }
@@ -95,7 +96,7 @@ public sealed class ContentAddressableStorageLayer
         _referenceMap.TryRemove(refKey, out _);
 
         if (_blockStore.TryGetValue(contentHash, out var block))
-            block.ReferenceCount--;
+            Interlocked.Decrement(ref block._referenceCount);
     }
 
     /// <summary>
@@ -107,7 +108,7 @@ public sealed class ContentAddressableStorageLayer
         var reclaimedBlocks = 0;
         var reclaimedBytes = 0L;
 
-        var toRemove = _blockStore.Where(kv => kv.Value.ReferenceCount <= 0).ToList();
+        var toRemove = _blockStore.Where(kv => kv.Value.ReferenceCount <= 0).ToList(); // ReferenceCount read is volatile via Interlocked
         foreach (var kv in toRemove)
         {
             if (_blockStore.TryRemove(kv.Key, out var block))
@@ -242,7 +243,9 @@ public sealed class CasBlock
     public required string ContentHash { get; init; }
     public required byte[] Data { get; init; }
     public int Size { get; init; }
-    public int ReferenceCount { get; set; }
+    // Use Interlocked for thread-safe reference counting
+    internal int _referenceCount;
+    public int ReferenceCount => Volatile.Read(ref _referenceCount);
     public DateTime StoredAt { get; init; }
 }
 
@@ -605,6 +608,7 @@ public sealed class DistributedHaFilesystemManager
     private long _currentTerm;
     private string? _votedForInCurrentTerm;
     private readonly object _electionLock = new();
+    private readonly object _nodeLock = new(); // Protects node state mutations (IsHealthy, UsedBytes, LastHeartbeat)
 
     /// <summary>Registers a filesystem node.</summary>
     public void RegisterNode(string nodeId, long capacityBytes, string region)
@@ -660,7 +664,9 @@ public sealed class DistributedHaFilesystemManager
                 _votedForInCurrentTerm = null;
             }
 
-            var healthyNodes = _nodes.Values.Where(n => n.IsHealthy).ToList();
+            // Snapshot healthy nodes under _nodeLock to avoid race with UpdateHeartbeat (finding 3017).
+            List<FilesystemNode> healthyNodes;
+            lock (_nodeLock) { healthyNodes = _nodes.Values.Where(n => n.IsHealthy).ToList(); }
             var majority = healthyNodes.Count / 2 + 1;
 
             // Raft voting: each node grants vote if:
@@ -741,9 +747,12 @@ public sealed class DistributedHaFilesystemManager
     {
         if (_nodes.TryGetValue(nodeId, out var node))
         {
-            node.IsHealthy = true;
-            node.UsedBytes = usedBytes;
-            node.LastHeartbeat = DateTime.UtcNow;
+            lock (_nodeLock)
+            {
+                node.IsHealthy = true;
+                node.UsedBytes = usedBytes;
+                node.LastHeartbeat = DateTime.UtcNow;
+            }
         }
     }
 
@@ -752,12 +761,15 @@ public sealed class DistributedHaFilesystemManager
     {
         var cutoff = DateTime.UtcNow - threshold;
         var unhealthy = new List<string>();
-        foreach (var node in _nodes.Values)
+        lock (_nodeLock)
         {
-            if (node.LastHeartbeat < cutoff)
+            foreach (var node in _nodes.Values)
             {
-                node.IsHealthy = false;
-                unhealthy.Add(node.NodeId);
+                if (node.LastHeartbeat < cutoff)
+                {
+                    node.IsHealthy = false;
+                    unhealthy.Add(node.NodeId);
+                }
             }
         }
         return unhealthy;
@@ -769,7 +781,12 @@ public sealed class DistributedHaFilesystemManager
     /// </summary>
     public IReadOnlyList<RebalanceMovement> Rebalance()
     {
-        var healthy = _nodes.Values.Where(n => n.IsHealthy).OrderBy(n => n.Utilization).ToList();
+        // Take snapshot of node state under _nodeLock to avoid races with UpdateHeartbeat/DetectUnhealthyNodes (finding 3017).
+        List<FilesystemNode> healthy;
+        lock (_nodeLock)
+        {
+            healthy = _nodes.Values.Where(n => n.IsHealthy).OrderBy(n => n.Utilization).ToList();
+        }
         if (healthy.Count < 2) return [];
 
         var avgUtilization = healthy.Average(n => n.Utilization);
@@ -799,15 +816,22 @@ public sealed class DistributedHaFilesystemManager
     public string? CurrentLeader => _leaderId;
 
     /// <summary>Gets cluster health summary.</summary>
-    public ClusterHealth GetClusterHealth() => new()
+    public ClusterHealth GetClusterHealth()
     {
-        TotalNodes = _nodes.Count,
-        HealthyNodes = _nodes.Values.Count(n => n.IsHealthy),
-        LeaderId = _leaderId,
-        CurrentTerm = _currentTerm,
-        TotalCapacityBytes = _nodes.Values.Sum(n => n.CapacityBytes),
-        TotalUsedBytes = _nodes.Values.Sum(n => n.UsedBytes)
-    };
+        // Snapshot under _nodeLock to read IsHealthy, UsedBytes safely (finding 3017).
+        lock (_nodeLock)
+        {
+            return new ClusterHealth
+            {
+                TotalNodes = _nodes.Count,
+                HealthyNodes = _nodes.Values.Count(n => n.IsHealthy),
+                LeaderId = _leaderId,
+                CurrentTerm = _currentTerm,
+                TotalCapacityBytes = _nodes.Values.Sum(n => n.CapacityBytes),
+                TotalUsedBytes = _nodes.Values.Sum(n => n.UsedBytes)
+            };
+        }
+    }
 }
 
 /// <summary>A filesystem cluster node with Raft consensus state.</summary>

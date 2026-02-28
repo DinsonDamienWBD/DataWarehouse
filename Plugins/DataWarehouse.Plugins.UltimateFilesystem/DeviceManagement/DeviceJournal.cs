@@ -284,6 +284,18 @@ public sealed class DeviceJournal : IAsyncDisposable
     }
 
     /// <inheritdoc/>
+    /// <summary>
+    /// Initializes the journal area on a device by writing a zeroed 32KB block
+    /// (blocks 1-8). This marks the journal as empty and valid for use.
+    /// Called during first-time pool creation to ensure a clean journal state.
+    /// </summary>
+    public async Task InitializeJournalAreaAsync(IPhysicalBlockDevice device, CancellationToken ct)
+    {
+        ThrowIfDisposed();
+        var zeroedJournal = new byte[JournalAreaSize]; // zero-initialized by CLR
+        await WriteJournalAreaAsync(zeroedJournal, device, ct).ConfigureAwait(false);
+    }
+
     public ValueTask DisposeAsync()
     {
         if (!_disposed)

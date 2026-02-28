@@ -494,11 +494,18 @@ public sealed class FilesystemScalingManager : IScalableSubsystem, IDisposable
             }
 
             // Assume available if on Linux 5.1+ (check /proc/version)
+            // io_uring was introduced in 5.1; we must not match 5.0 or older minor versions.
             if (System.IO.File.Exists("/proc/version"))
             {
                 var version = System.IO.File.ReadAllText("/proc/version");
-                // Simple heuristic -- not the only check in production
-                return version.Contains("Linux version 5.") || version.Contains("Linux version 6.");
+                // Parse major.minor from "Linux version X.Y..." to correctly handle 5.1+, 6.x, 7.x, etc.
+                var match = System.Text.RegularExpressions.Regex.Match(version, @"Linux version (\d+)\.(\d+)");
+                if (match.Success
+                    && int.TryParse(match.Groups[1].Value, out var major)
+                    && int.TryParse(match.Groups[2].Value, out var minor))
+                {
+                    return major > 5 || (major == 5 && minor >= 1);
+                }
             }
 
             return false;
@@ -604,15 +611,27 @@ public sealed class FilesystemScalingManager : IScalableSubsystem, IDisposable
         _disposed = true;
 
         _dispatchCts.Cancel();
+
+        // Complete the queues before waiting to unblock the dispatch task
+        _highPriorityQueue.Writer.TryComplete();
+        _normalPriorityQueue.Writer.TryComplete();
+        _lowPriorityQueue.Writer.TryComplete();
+
+        // Wait for the dispatch task to finish so in-flight operations don't reference disposed objects
+        try
+        {
+            _dispatchTask.Wait(TimeSpan.FromSeconds(5));
+        }
+        catch (AggregateException)
+        {
+            // Ignore cancellation/timeout from shutdown
+        }
+
         _dispatchCts.Dispose();
         _kernelBypassRedetectTimer.Dispose();
         _strategyQueueDepths.Dispose();
         _callerQuotas.Dispose();
         _ioConcurrencySemaphore.Dispose();
-
-        _highPriorityQueue.Writer.TryComplete();
-        _normalPriorityQueue.Writer.TryComplete();
-        _lowPriorityQueue.Writer.TryComplete();
     }
 
     // ---------------------------------------------------------------

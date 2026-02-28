@@ -32,6 +32,7 @@ public sealed class UltimateFilesystemPlugin : DataWarehouse.SDK.Contracts.Hiera
     private readonly FilesystemStrategyRegistry _registry;
     private readonly BoundedDictionary<string, FilesystemMetadata> _mountCache = new BoundedDictionary<string, FilesystemMetadata>(1000);
     private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
+    private readonly Strategies.QuotaEnforcementStrategy _quotaStrategy = new();
     private bool _disposed;
 
     // Configuration
@@ -459,8 +460,31 @@ public sealed class UltimateFilesystemPlugin : DataWarehouse.SDK.Contracts.Hiera
 
     private Task HandleQuotaAsync(PluginMessage message)
     {
-        // Delegate to ResourceManager via message bus in production
-        message.Payload["success"] = true;
+        // Extract quota parameters from the message
+        var path = message.Payload.TryGetValue("path", out var p) ? p?.ToString() : null;
+        var limitBytesRaw = message.Payload.TryGetValue("limitBytes", out var l) ? l : null;
+
+        if (string.IsNullOrEmpty(path))
+        {
+            message.Payload["success"] = false;
+            message.Payload["error"] = "path is required";
+            return Task.CompletedTask;
+        }
+
+        if (limitBytesRaw is not null && long.TryParse(limitBytesRaw.ToString(), out var limitBytes))
+        {
+            // Set quota in the enforcement strategy
+            _quotaStrategy.SetQuota(path, limitBytes);
+            message.Payload["success"] = true;
+            message.Payload["path"] = path;
+            message.Payload["limitBytes"] = limitBytes;
+        }
+        else
+        {
+            message.Payload["success"] = false;
+            message.Payload["error"] = "limitBytes is required and must be a valid long integer";
+        }
+
         return Task.CompletedTask;
     }
 
