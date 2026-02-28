@@ -119,10 +119,28 @@ public class MigrationJob
     public required string DestinationBackendId { get; init; }
     public string? SourcePrefix { get; init; }
     public MigrationMode Mode { get; init; };
-    public MigrationJobStatus Status { get; private set; };
+    public MigrationJobStatus Status { get => (MigrationJobStatus)_statusValue; private set => _statusValue = (int)value; }
     public DateTime CreatedAt { get; };
-    public DateTime? StartedAt { get; private set; }
-    public DateTime? CompletedAt { get; private set; }
+    public DateTime? StartedAt
+{
+    get
+    {
+        var ticks = Interlocked.Read(ref _startedAtTicks);
+        return ticks == 0 ? null : new DateTime(ticks, DateTimeKind.Utc);
+    }
+
+    private set => Interlocked.Exchange(ref _startedAtTicks, value?.Ticks ?? 0);
+}
+    public DateTime? CompletedAt
+{
+    get
+    {
+        var ticks = Interlocked.Read(ref _completedAtTicks);
+        return ticks == 0 ? null : new DateTime(ticks, DateTimeKind.Utc);
+    }
+
+    private set => Interlocked.Exchange(ref _completedAtTicks, value?.Ticks ?? 0);
+}
     public string? ErrorMessage { get; private set; }
     public long TotalObjects;;
     public long MigratedObjects;;

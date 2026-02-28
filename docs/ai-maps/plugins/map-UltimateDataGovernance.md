@@ -43,6 +43,7 @@ public abstract class DataGovernanceStrategyBase : StrategyBase, IDataGovernance
     protected override async Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
     public HealthStatus GetHealth();
+    public async Task<HealthStatus> GetHealthAsync(CancellationToken ct = default);
     public IReadOnlyDictionary<string, long> GetCounters();;
 }
 ```
