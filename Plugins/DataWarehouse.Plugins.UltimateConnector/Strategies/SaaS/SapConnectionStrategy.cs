@@ -22,6 +22,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
         private volatile string _host = "";
         private volatile string _client = "100";
         private volatile string _csrfToken = "";
+        private volatile string _username = "";
+        private volatile string _password = "";
 
         public override string StrategyId => "sap";
         public override string DisplayName => "SAP";
@@ -37,8 +39,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             _host = GetConfiguration<string>(config, "Host", "");
             if (string.IsNullOrEmpty(_host)) throw new ArgumentException("SAP host is required in Properties[Host]");
             _client = GetConfiguration<string>(config, "SapClient", "100");
-            var username = GetConfiguration<string>(config, "Username", "");
-            var password = GetConfiguration<string>(config, "Password", "");
+            _username = GetConfiguration<string>(config, "Username", "");
+            _password = GetConfiguration<string>(config, "Password", "");
+            var username = _username;
+            var password = _password;
 
             var endpoint = _host.Contains("://") ? _host : $"https://{_host}";
             var httpClient = new HttpClient
@@ -92,8 +96,16 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
         }
 
         protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(
-            IConnectionHandle handle, CancellationToken ct = default) =>
-            Task.FromResult((Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow.AddHours(8)));
+            IConnectionHandle handle, CancellationToken ct = default)
+        {
+            // SAP uses HTTP Basic auth (username:password). Return the encoded Basic credential.
+            if (!string.IsNullOrEmpty(_username))
+            {
+                var encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_username}:{_password}"));
+                return Task.FromResult((encoded, DateTimeOffset.UtcNow.AddHours(8)));
+            }
+            return Task.FromResult((string.Empty, DateTimeOffset.UtcNow));
+        }
 
         protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(
             IConnectionHandle handle, string currentToken, CancellationToken ct = default) =>

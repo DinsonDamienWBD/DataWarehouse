@@ -28,8 +28,17 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var (host, port) = ParseHostPort(config.ConnectionString, 9000);
-            _httpClient = new HttpClient { BaseAddress = new Uri($"http://{host}:{port}"), Timeout = config.Timeout };
+            var useSsl = GetConfiguration<bool>(config, "UseSsl", false);
+            var scheme = useSsl ? "https" : "http";
+            var (host, port) = ParseHostPort(config.ConnectionString, useSsl ? 9443 : 9000);
+            _httpClient = new HttpClient { BaseAddress = new Uri($"{scheme}://{host}:{port}"), Timeout = config.Timeout };
+            if (config.AuthMethod == "bearer" && !string.IsNullOrEmpty(config.AuthCredential))
+                _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", config.AuthCredential);
+            else if (!string.IsNullOrEmpty(config.AuthCredential))
+            {
+                var creds = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{config.AuthSecondary ?? ""}:{config.AuthCredential}"));
+                _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", creds);
+            }
             using var response = await _httpClient.GetAsync("/health", ct);
             response.EnsureSuccessStatusCode();
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object> { ["host"] = host, ["port"] = port });
@@ -127,7 +136,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
 
         private (string host, int port) ParseHostPort(string connectionString, int defaultPort)
         {
-            var clean = connectionString.Replace("http://", "").Split('/')[0];
+            var clean = connectionString.Replace("https://", "").Replace("http://", "").Split('/')[0];
             var parts = clean.Split(':');
             return (parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : defaultPort);
         }

@@ -38,10 +38,13 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var (host, port) = ParseHostPort(config.ConnectionString, 8123);
+            var useSsl = GetConfiguration<bool>(config, "UseSsl", false)
+                || config.ConnectionString.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+            var scheme = useSsl ? "https" : "http";
+            var (host, port) = ParseHostPort(config.ConnectionString, useSsl ? 8443 : 8123);
             _httpClient = new HttpClient
             {
-                BaseAddress = new Uri($"http://{host}:{port}"),
+                BaseAddress = new Uri($"{scheme}://{host}:{port}"),
                 Timeout = config.Timeout
             };
 

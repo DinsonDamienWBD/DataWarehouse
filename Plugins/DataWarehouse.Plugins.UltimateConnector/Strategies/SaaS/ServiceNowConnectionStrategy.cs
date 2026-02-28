@@ -88,8 +88,16 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
         }
 
         protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(
-            IConnectionHandle handle, CancellationToken ct = default) =>
-            Task.FromResult((Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow.AddHours(24)));
+            IConnectionHandle handle, CancellationToken ct = default)
+        {
+            // ServiceNow uses HTTP Basic auth. Return encoded Basic credential as the token.
+            if (!string.IsNullOrEmpty(_username))
+            {
+                var encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_username}:{_password}"));
+                return Task.FromResult((encoded, DateTimeOffset.UtcNow.AddHours(24)));
+            }
+            return Task.FromResult((string.Empty, DateTimeOffset.UtcNow));
+        }
 
         protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(
             IConnectionHandle handle, string currentToken, CancellationToken ct = default) =>

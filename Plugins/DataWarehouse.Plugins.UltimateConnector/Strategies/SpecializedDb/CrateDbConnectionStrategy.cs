@@ -20,8 +20,15 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
         public CrateDbConnectionStrategy(ILogger<CrateDbConnectionStrategy>? logger = null) : base(logger) { }
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var (host, port) = ParseHostPort(config.ConnectionString, 4200);
-            _httpClient = new HttpClient { BaseAddress = new Uri($"http://{host}:{port}"), Timeout = config.Timeout };
+            var useSsl = GetConfiguration<bool>(config, "UseSsl", false);
+            var scheme = useSsl ? "https" : "http";
+            var (host, port) = ParseHostPort(config.ConnectionString, useSsl ? 4201 : 4200);
+            _httpClient = new HttpClient { BaseAddress = new Uri($"{scheme}://{host}:{port}"), Timeout = config.Timeout };
+            if (!string.IsNullOrEmpty(config.AuthCredential))
+            {
+                var creds = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{config.AuthSecondary ?? "crate"}:{config.AuthCredential}"));
+                _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", creds);
+            }
             using var response = await _httpClient.PostAsync("/_sql", new StringContent("{\"stmt\":\"SELECT 1\"}", System.Text.Encoding.UTF8, "application/json"), ct);
             response.EnsureSuccessStatusCode();
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object> { ["host"] = host, ["port"] = port });
@@ -105,6 +112,6 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             }
             catch { return new List<DataSchema>(); /* Schema query failed - return empty */ }
         }
-        private (string host, int port) ParseHostPort(string connectionString, int defaultPort) { var clean = connectionString.Replace("http://", "").Split('/')[0]; var parts = clean.Split(':'); return (parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : defaultPort); }
+        private (string host, int port) ParseHostPort(string connectionString, int defaultPort) { var clean = connectionString.Replace("https://", "").Replace("http://", "").Split('/')[0]; var parts = clean.Split(':'); return (parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : defaultPort); }
     }
 }

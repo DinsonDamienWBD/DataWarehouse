@@ -86,8 +86,18 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
         }
 
         protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(
-            IConnectionHandle handle, CancellationToken ct = default) =>
-            Task.FromResult((Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow.AddHours(24)));
+            IConnectionHandle handle, CancellationToken ct = default)
+        {
+            // Jira uses HTTP Basic auth (email:apiToken). Return the encoded Basic credential as the token
+            // so callers that cache the return value can pass it as Authorization header value.
+            if (!string.IsNullOrEmpty(_email) && !string.IsNullOrEmpty(_apiToken))
+            {
+                var encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{_email}:{_apiToken}"));
+                return Task.FromResult((encoded, DateTimeOffset.UtcNow.AddDays(365)));
+            }
+            // Unauthenticated — return empty token; caller will get 401 from Jira
+            return Task.FromResult((string.Empty, DateTimeOffset.UtcNow));
+        }
 
         protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(
             IConnectionHandle handle, string currentToken, CancellationToken ct = default) =>

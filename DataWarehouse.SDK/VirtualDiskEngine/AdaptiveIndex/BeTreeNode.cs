@@ -128,9 +128,13 @@ public sealed class BeTreeNode
                 var (key, value) = Entries[i];
                 if (offset + 4 + key.Length + 8 > blockSize)
                 {
-                    System.Diagnostics.Debug.WriteLine(
-                        $"[BeTreeNode.Serialize] WARNING: Truncating {Entries.Count - i} entries at block {BlockNumber} (block full at entry {i}/{Entries.Count})");
-                    break;
+                    // Finding 699: Silent truncation causes permanent data loss.
+                    // Throw instead of dropping entries — the caller (BeTree.InsertAsync) must
+                    // split the node before serializing to ensure all entries fit.
+                    throw new InvalidOperationException(
+                        $"[BeTreeNode.Serialize] Cannot serialize entry {i}/{Entries.Count} at block {BlockNumber}: " +
+                        $"required {4 + key.Length + 8} bytes but only {blockSize - offset} bytes remain in block. " +
+                        "Node must be split before serialization.");
                 }
                 BinaryPrimitives.WriteInt32BigEndian(buffer.AsSpan(offset), key.Length);
                 offset += 4;

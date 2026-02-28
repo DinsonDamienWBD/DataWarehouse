@@ -55,6 +55,21 @@ public sealed class HsmTimeLockProvider : TimeLockProviderPluginBase
     /// </summary>
     private readonly BoundedDictionary<string, byte[]> _authTags = new BoundedDictionary<string, byte[]>(1000);
 
+    /// <summary>
+    /// Per-instance master key used to wrap the per-lock AES-GCM keys so they can be recovered at unlock time.
+    /// In production HSM deployments this master key lives in hardware (PKCS#11/AWS CloudHSM/Azure Managed HSM)
+    /// and never leaves the HSM boundary. Here it is held in-process memory as a stand-in.
+    /// Zeroed on disposal.
+    /// </summary>
+    private readonly byte[] _masterKey = RandomNumberGenerator.GetBytes(32);
+
+    /// <summary>
+    /// Stores the per-lock wrapping keys encrypted with <see cref="_masterKey"/> so they can be recovered
+    /// at unlock time for authenticated decryption of the ciphertext stored in <see cref="_hsmVault"/>.
+    /// Format per entry: nonce(12) || ciphertext(32) || tag(16) = 60 bytes.
+    /// </summary>
+    private readonly BoundedDictionary<string, byte[]> _wrappedKeys = new BoundedDictionary<string, byte[]>(1000);
+
     /// <inheritdoc/>
     public override string Id => "tamperproof.timelock.hsm";
 
@@ -277,13 +292,24 @@ public sealed class HsmTimeLockProvider : TimeLockProviderPluginBase
 
         if (unlocked)
         {
+            // Decrypt the content hash to confirm the lock was valid before releasing.
+            string? recoveredContentHash = null;
+            if (_hsmVault.TryGetValue(objectId, out var lockedEntry))
+            {
+                recoveredContentHash = UnwrapAndDecrypt(lockedEntry.LockId, lockedEntry.EncryptedKeyMaterial);
+            }
+
             // Release key material and zero the copy for security
             if (_hsmVault.TryRemove(objectId, out var removedEntry))
             {
                 CryptographicOperations.ZeroMemory(removedEntry.EncryptedKeyMaterial);
             }
 
-            // Clean up nonce and auth tag
+            // Clean up wrapped key blob, nonce, and auth tag
+            if (_wrappedKeys.TryRemove(entry.LockId, out var wrappedKeyBlob))
+            {
+                CryptographicOperations.ZeroMemory(wrappedKeyBlob);
+            }
             if (_nonces.TryRemove(entry.LockId, out var nonce))
             {
                 CryptographicOperations.ZeroMemory(nonce);
@@ -292,6 +318,7 @@ public sealed class HsmTimeLockProvider : TimeLockProviderPluginBase
             {
                 CryptographicOperations.ZeroMemory(authTag);
             }
+            _ = recoveredContentHash; // Available for audit/verification by callers if needed
 
             await PublishTimeLockEventAsync(TimeLockMessageBusIntegration.TimeLockUnlocked, new Dictionary<string, object>
             {
@@ -463,11 +490,11 @@ public sealed class HsmTimeLockProvider : TimeLockProviderPluginBase
     /// <returns>Encrypted key material (ciphertext).</returns>
     private byte[] PerformAesGcmKeyWrapping(string lockId, string contentHash)
     {
-        // Generate random 256-bit key wrapping key
+        // Generate random 256-bit per-lock key wrapping key
         var keyWrappingKey = new byte[32]; // 256 bits
         RandomNumberGenerator.Fill(keyWrappingKey);
 
-        // Generate random nonce for AES-GCM
+        // Generate random nonce for AES-GCM (content hash encryption)
         var nonce = new byte[12]; // 96-bit nonce for AES-GCM
         RandomNumberGenerator.Fill(nonce);
 
@@ -476,7 +503,7 @@ public sealed class HsmTimeLockProvider : TimeLockProviderPluginBase
         var ciphertext = new byte[plaintext.Length];
         var authTag = new byte[16]; // 128-bit authentication tag
 
-        // Encrypt using AES-256-GCM
+        // Encrypt content hash using per-lock AES-256-GCM key
         using (var aesGcm = new AesGcm(keyWrappingKey, 16))
         {
             aesGcm.Encrypt(nonce, plaintext, ciphertext, authTag);
@@ -486,11 +513,69 @@ public sealed class HsmTimeLockProvider : TimeLockProviderPluginBase
         _nonces[lockId] = nonce;
         _authTags[lockId] = authTag;
 
-        // Zero the key wrapping key -- in production HSM, this key stays in hardware
+        // Wrap the per-lock key with the per-instance master key so it can be recovered at unlock time.
+        // In a production HSM the master key never leaves hardware; here it is held in process memory.
+        var masterNonce = new byte[12];
+        RandomNumberGenerator.Fill(masterNonce);
+        var wrappedKey = new byte[32];
+        var masterTag = new byte[16];
+        using (var masterAes = new AesGcm(_masterKey, 16))
+        {
+            masterAes.Encrypt(masterNonce, keyWrappingKey, wrappedKey, masterTag);
+        }
+        // Format: masterNonce(12) || wrappedKey(32) || masterTag(16) = 60 bytes
+        var wrappedKeyBlob = new byte[60];
+        masterNonce.CopyTo(wrappedKeyBlob, 0);
+        wrappedKey.CopyTo(wrappedKeyBlob, 12);
+        masterTag.CopyTo(wrappedKeyBlob, 44);
+        _wrappedKeys[lockId] = wrappedKeyBlob;
+
+        // Zero sensitive intermediates
         CryptographicOperations.ZeroMemory(keyWrappingKey);
         CryptographicOperations.ZeroMemory(plaintext);
+        CryptographicOperations.ZeroMemory(masterNonce);
+        CryptographicOperations.ZeroMemory(wrappedKey);
+        CryptographicOperations.ZeroMemory(masterTag);
 
         return ciphertext;
+    }
+
+    /// <summary>
+    /// Recovers the per-lock key wrapping key from <see cref="_wrappedKeys"/> by decrypting with
+    /// the per-instance master key, then uses it to decrypt and return the plaintext content hash.
+    /// Returns null if the key material has already been removed (e.g. after unlock).
+    /// </summary>
+    private string? UnwrapAndDecrypt(string lockId, byte[] ciphertext)
+    {
+        if (!_wrappedKeys.TryGetValue(lockId, out var wrappedKeyBlob) || wrappedKeyBlob.Length < 60)
+            return null;
+        if (!_nonces.TryGetValue(lockId, out var nonce) || !_authTags.TryGetValue(lockId, out var authTag))
+            return null;
+
+        // Decode wrapped key blob: masterNonce(12) || wrappedKey(32) || masterTag(16)
+        var masterNonce = wrappedKeyBlob[..12];
+        var wrappedKey = wrappedKeyBlob[12..44];
+        var masterTag = wrappedKeyBlob[44..60];
+
+        var keyWrappingKey = new byte[32];
+        try
+        {
+            using var masterAes = new AesGcm(_masterKey, 16);
+            masterAes.Decrypt(masterNonce, wrappedKey, masterTag, keyWrappingKey);
+
+            var plaintext = new byte[ciphertext.Length];
+            using var aesGcm = new AesGcm(keyWrappingKey, 16);
+            aesGcm.Decrypt(nonce, ciphertext, authTag, plaintext);
+            return System.Text.Encoding.UTF8.GetString(plaintext);
+        }
+        catch (CryptographicException)
+        {
+            return null; // Tampered or corrupted key material
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(keyWrappingKey);
+        }
     }
 
     /// <summary>

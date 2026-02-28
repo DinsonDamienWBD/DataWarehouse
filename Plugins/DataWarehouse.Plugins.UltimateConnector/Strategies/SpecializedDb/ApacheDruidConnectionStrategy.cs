@@ -37,12 +37,20 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var (host, port) = ParseHostPort(config.ConnectionString, 8082);
+            var useSsl = GetConfiguration<bool>(config, "UseSsl", false);
+            var scheme = useSsl ? "https" : "http";
+            var (host, port) = ParseHostPort(config.ConnectionString, useSsl ? 8443 : 8082);
             _httpClient = new HttpClient
             {
-                BaseAddress = new Uri($"http://{host}:{port}"),
+                BaseAddress = new Uri($"{scheme}://{host}:{port}"),
                 Timeout = config.Timeout
             };
+
+            if (!string.IsNullOrEmpty(config.AuthCredential))
+            {
+                var creds = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{config.AuthSecondary ?? ""}:{config.AuthCredential}"));
+                _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", creds);
+            }
 
             using var response = await _httpClient.GetAsync("/status", ct);
             response.EnsureSuccessStatusCode();
@@ -145,7 +153,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
 
         private (string host, int port) ParseHostPort(string connectionString, int defaultPort)
         {
-            var clean = connectionString.Replace("http://", "").Split('/')[0];
+            var clean = connectionString.Replace("https://", "").Replace("http://", "").Split('/')[0];
             var parts = clean.Split(':');
             return (parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : defaultPort);
         }
