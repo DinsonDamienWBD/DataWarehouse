@@ -4839,6 +4839,7 @@ public class CephFsStrategy : UltimateStorageStrategyBase
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
+    public override bool IsProductionReady;;
     public override StorageCapabilities Capabilities;;
     protected override async Task InitializeCoreAsync(CancellationToken ct);
     protected override async Task<StorageObjectMetadata> StoreAsyncCore(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct);
@@ -5012,6 +5013,7 @@ public class BeeGfsStrategy : UltimateStorageStrategyBase
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
+    public override bool IsProductionReady;;
     public override StorageCapabilities Capabilities;;
     protected override async Task InitializeCoreAsync(CancellationToken ct);
     protected override async Task<StorageObjectMetadata> StoreAsyncCore(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct);
