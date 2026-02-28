@@ -235,6 +235,20 @@ public sealed class ProductQuantizer
         int k = reader.ReadInt32();
         int subDim = reader.ReadInt32();
 
+        // Validate bounds before allocating to prevent OOM on crafted/corrupt input.
+        const int MaxDimension = 65536;
+        const int MaxM = 512;
+        const int MaxK = 65536;
+        const int MaxSubDim = 65536;
+        if (dimension < 1 || dimension > MaxDimension)
+            throw new InvalidDataException($"ProductQuantizer.Deserialize: invalid dimension {dimension} (max {MaxDimension}).");
+        if (m < 1 || m > MaxM)
+            throw new InvalidDataException($"ProductQuantizer.Deserialize: invalid m {m} (max {MaxM}).");
+        if (k < 1 || k > MaxK)
+            throw new InvalidDataException($"ProductQuantizer.Deserialize: invalid k {k} (max {MaxK}).");
+        if (subDim < 1 || subDim > MaxSubDim)
+            throw new InvalidDataException($"ProductQuantizer.Deserialize: invalid subDim {subDim} (max {MaxSubDim}).");
+
         var pq = new ProductQuantizer(dimension, m, k);
         pq._codebook = new float[m][][];
 

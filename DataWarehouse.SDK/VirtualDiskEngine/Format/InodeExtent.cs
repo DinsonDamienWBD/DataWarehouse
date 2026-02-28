@@ -63,8 +63,18 @@ public readonly struct InodeExtent : IEquatable<InodeExtent>
     public long LogicalOffset { get; }
 
     /// <summary>Creates a new extent descriptor.</summary>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="startBlock"/>, <paramref name="blockCount"/>, or
+    /// <paramref name="logicalOffset"/> are negative.
+    /// </exception>
     public InodeExtent(long startBlock, int blockCount, ExtentFlags flags, long logicalOffset)
     {
+        if (startBlock < 0)
+            throw new ArgumentOutOfRangeException(nameof(startBlock), startBlock, "startBlock must be non-negative.");
+        if (blockCount < 0)
+            throw new ArgumentOutOfRangeException(nameof(blockCount), blockCount, "blockCount must be non-negative.");
+        if (logicalOffset < 0)
+            throw new ArgumentOutOfRangeException(nameof(logicalOffset), logicalOffset, "logicalOffset must be non-negative.");
         StartBlock = startBlock;
         BlockCount = blockCount;
         Flags = flags;

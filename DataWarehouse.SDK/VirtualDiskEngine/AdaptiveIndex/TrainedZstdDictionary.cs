@@ -886,5 +886,6 @@ public sealed class DictionaryRetrainer : IDisposable
     public void Dispose()
     {
         _checkTimer.Dispose();
+        _currentCompressor?.Dispose();
     }
 }

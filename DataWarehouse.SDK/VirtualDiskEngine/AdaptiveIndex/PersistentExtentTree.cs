@@ -457,8 +457,11 @@ public sealed class PersistentExtentTree : IAsyncDisposable
             // WAL-protect
             await using var tx = await _wal.BeginTransactionAsync(ct).ConfigureAwait(false);
 
-            // Allocate a block for the delta
+            // Allocate a block for the delta — validate the result before use.
             long deltaBlock = _allocator.AllocateBlock(ct);
+            if (deltaBlock <= 0)
+                throw new InvalidOperationException($"PersistentExtentTree: block allocator returned invalid block {deltaBlock} — out of space or corrupt allocator.");
+
 
             byte[] buffer = new byte[_blockSize];
             int pos = 0;
