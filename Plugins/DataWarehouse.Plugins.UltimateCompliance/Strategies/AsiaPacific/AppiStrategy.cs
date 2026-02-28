@@ -54,7 +54,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.AsiaPacific
             }
 
             // Check opt-out for third-party provision (Article 27)
-            if (context.OperationType.Equals("transfer", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("transfer", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("OptOutOffered", out var optOutObj) || optOutObj is not true)
                 {

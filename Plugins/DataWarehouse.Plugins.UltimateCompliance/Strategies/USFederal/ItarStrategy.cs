@@ -55,8 +55,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckExportLicense(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.DataClassification.Equals("itar", StringComparison.OrdinalIgnoreCase) ||
-                context.DataSubjectCategories.Contains("defense-article", StringComparer.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("itar", StringComparison.OrdinalIgnoreCase) ||
+                (context.DataSubjectCategories != null && context.DataSubjectCategories.Contains("defense-article", StringComparer.OrdinalIgnoreCase)))
             {
                 if (!string.IsNullOrEmpty(context.DestinationLocation) &&
                     !context.DestinationLocation.Equals("US", StringComparison.OrdinalIgnoreCase))
@@ -90,7 +90,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckTechnicalData(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.DataSubjectCategories.Contains("technical-data", StringComparer.OrdinalIgnoreCase))
+            if (context.DataSubjectCategories != null && context.DataSubjectCategories.Contains("technical-data", StringComparer.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("UsmlCategory", out var categoryObj) ||
                     categoryObj is not string category ||

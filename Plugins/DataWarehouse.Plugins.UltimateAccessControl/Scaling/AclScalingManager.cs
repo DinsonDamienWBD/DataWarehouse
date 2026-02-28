@@ -89,7 +89,7 @@ public sealed class AclScalingManager : IScalableSubsystem, IDisposable
     // Parallel strategy evaluation
     // -------------------------------------------------------------------
 
-    private readonly SemaphoreSlim _evaluationThrottle;
+    private SemaphoreSlim _evaluationThrottle;
     private int _maxConcurrentEvaluations;
 
     // -------------------------------------------------------------------
@@ -546,11 +546,23 @@ public sealed class AclScalingManager : IScalableSubsystem, IDisposable
     {
         ct.ThrowIfCancellationRequested();
 
+        SemaphoreSlim? oldThrottle = null;
         lock (_configLock)
         {
             _currentLimits = limits;
-            _maxConcurrentEvaluations = limits.MaxConcurrentOperations;
+            var newMax = limits.MaxConcurrentOperations;
+            if (newMax != _maxConcurrentEvaluations)
+            {
+                // Replace the semaphore so the new concurrency limit takes effect immediately.
+                // In-flight waiters continue against the old semaphore; new waiters use the new one.
+                oldThrottle = _evaluationThrottle;
+                _evaluationThrottle = new SemaphoreSlim(newMax, newMax);
+                _maxConcurrentEvaluations = newMax;
+            }
         }
+
+        // Dispose the old semaphore outside the lock to avoid blocking
+        oldThrottle?.Dispose();
 
         return Task.CompletedTask;
     }

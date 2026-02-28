@@ -53,9 +53,11 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
                 _blockchainMode = blockchain;
             }
 
-            // Configure auto-flush interval
+            // Configure auto-flush interval — enforce minimum of 1 second to prevent continuous firing
             var flushIntervalSeconds = configuration.TryGetValue("FlushIntervalSeconds", out var intervalObj) && intervalObj is int interval
                 ? interval : 60; // Default 1 minute
+            if (flushIntervalSeconds < 1)
+                flushIntervalSeconds = 60; // Guard: 0 or negative causes timer to fire continuously
 
             _flushTimer = new Timer(
                 async _ => { try { await FlushAuditQueueAsync(cancellationToken); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } },
@@ -161,7 +163,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
             var sequenceNumber = Interlocked.Increment(ref _sequenceNumber);
             var timestamp = DateTime.UtcNow;
 
-            var entry = new AuditEntry
+            // Build initial entry without hash fields
+            var entryBase = new AuditEntry
             {
                 EntryId = $"AUDIT-{timestamp:yyyyMMdd}-{sequenceNumber:D10}",
                 SequenceNumber = sequenceNumber,
@@ -177,15 +180,41 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
                 ComplianceFrameworks = DetermineFrameworks(context)
             };
 
+            AuditEntry entry;
             // Generate cryptographic hash if immutable mode; lock to make read-update atomic
             if (_immutableMode || _blockchainMode)
             {
+                string? previousHash;
+                string computedHash;
                 lock (_hashLock)
                 {
-                    entry.PreviousHash = _previousHash;
-                    entry.Hash = GenerateHash(entry);
-                    _previousHash = entry.Hash;
+                    previousHash = _previousHash;
+                    // Compute hash with the previous hash included
+                    computedHash = GenerateHashWithPrevious(entryBase, previousHash);
+                    _previousHash = computedHash;
                 }
+                // Re-create as immutable entry with hash fields set via init
+                entry = new AuditEntry
+                {
+                    EntryId = entryBase.EntryId,
+                    SequenceNumber = entryBase.SequenceNumber,
+                    Timestamp = entryBase.Timestamp,
+                    Actor = entryBase.Actor,
+                    Action = entryBase.Action,
+                    Resource = entryBase.Resource,
+                    DataClassification = entryBase.DataClassification,
+                    SourceLocation = entryBase.SourceLocation,
+                    DestinationLocation = entryBase.DestinationLocation,
+                    ProcessingPurposes = entryBase.ProcessingPurposes,
+                    Attributes = entryBase.Attributes,
+                    ComplianceFrameworks = entryBase.ComplianceFrameworks,
+                    PreviousHash = previousHash,
+                    Hash = computedHash
+                };
+            }
+            else
+            {
+                entry = entryBase;
             }
 
             return entry;
@@ -243,6 +272,11 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
 
         private string GenerateHash(AuditEntry entry)
         {
+            return GenerateHashWithPrevious(entry, entry.PreviousHash);
+        }
+
+        private string GenerateHashWithPrevious(AuditEntry entry, string? previousHash)
+        {
             var data = new
             {
                 entry.EntryId,
@@ -252,7 +286,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
                 entry.Action,
                 entry.Resource,
                 entry.DataClassification,
-                entry.PreviousHash
+                PreviousHash = previousHash
             };
 
             var json = JsonSerializer.Serialize(data);
@@ -265,6 +299,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
 
         private bool IsAuditRequired(ComplianceContext context)
         {
+            if (string.IsNullOrEmpty(context.DataClassification))
+                return false;
+
             var sensitiveClassifications = new[]
             {
                 "personal", "sensitive", "health", "financial", "pii", "phi", "pci"
@@ -277,14 +314,17 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
         {
             var frameworks = new List<string>();
 
-            if (context.DataClassification.Contains("personal", StringComparison.OrdinalIgnoreCase))
-                frameworks.Add("GDPR");
-            if (context.DataClassification.Contains("health", StringComparison.OrdinalIgnoreCase))
-                frameworks.Add("HIPAA");
-            if (context.DataClassification.Contains("financial", StringComparison.OrdinalIgnoreCase))
-                frameworks.Add("SOX");
-            if (context.DataClassification.Contains("card", StringComparison.OrdinalIgnoreCase))
-                frameworks.Add("PCI-DSS");
+            if (!string.IsNullOrEmpty(context.DataClassification))
+            {
+                if (context.DataClassification.Contains("personal", StringComparison.OrdinalIgnoreCase))
+                    frameworks.Add("GDPR");
+                if (context.DataClassification.Contains("health", StringComparison.OrdinalIgnoreCase))
+                    frameworks.Add("HIPAA");
+                if (context.DataClassification.Contains("financial", StringComparison.OrdinalIgnoreCase))
+                    frameworks.Add("SOX");
+                if (context.DataClassification.Contains("card", StringComparison.OrdinalIgnoreCase))
+                    frameworks.Add("PCI-DSS");
+            }
 
             return frameworks;
         }
@@ -327,8 +367,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
             public List<string>? ProcessingPurposes { get; init; }
             public Dictionary<string, object>? Attributes { get; init; }
             public List<string>? ComplianceFrameworks { get; init; }
-            public string? Hash { get; set; }
-            public string? PreviousHash { get; set; }
+            public string? Hash { get; init; }
+            public string? PreviousHash { get; init; }
         }
 
         /// <summary>

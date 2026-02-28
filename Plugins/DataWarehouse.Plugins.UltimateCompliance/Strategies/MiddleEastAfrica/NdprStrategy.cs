@@ -31,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.MiddleEastAfrica
                 violations.Add(new ComplianceViolation { Code = "NDPR-002", Description = "Mandatory data audit not completed", Severity = ViolationSeverity.High, Remediation = "Conduct annual data audit", RegulatoryReference = "NDPR Section 3.1" });
             }
 
-            if (context.OperationType.Equals("data-breach", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("data-breach", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("NitdaNotified", out var notifyObj) || notifyObj is not true)
                 {

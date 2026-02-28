@@ -124,14 +124,17 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
 
         private async Task<bool> IsTpmAvailableAsync()
         {
-            // Check for TPM on Windows
+            // Check for TPM on Windows — tpm.sys is a FILE not a directory, use File.Exists
             if (OperatingSystem.IsWindows())
             {
                 try
                 {
-                    // Check if TPM device exists
-                    var tpmExists = System.IO.File.Exists("C:\\Windows\\System32\\tpm.sys");
-                    return await Task.FromResult(tpmExists);
+                    // tpm.sys is the TPM driver file in System32\drivers — use File.Exists (not Directory.Exists)
+                    var tpmSysExists = System.IO.File.Exists(@"C:\Windows\System32\drivers\tpm.sys");
+                    if (tpmSysExists)
+                        return true;
+                    // Additional heuristic: check if System32\tpm.msc exists (TPM management console)
+                    return await Task.FromResult(System.IO.File.Exists(@"C:\Windows\System32\tpm.msc"));
                 }
                 catch
                 {

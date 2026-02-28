@@ -54,7 +54,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.AsiaPacific
             }
 
             // Check children's data (Section 9)
-            if (context.DataSubjectCategories.Contains("children", StringComparer.OrdinalIgnoreCase))
+            if (context.DataSubjectCategories != null && context.DataSubjectCategories.Contains("children", StringComparer.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("VerifiableParentalConsent", out var parentalObj) || parentalObj is not true)
                 {

@@ -50,8 +50,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckSafeguardsRule(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.DataClassification.Equals("financial", StringComparison.OrdinalIgnoreCase) ||
-                context.DataSubjectCategories.Contains("customer-financial-info", StringComparer.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("financial", StringComparison.OrdinalIgnoreCase) ||
+                (context.DataSubjectCategories != null && context.DataSubjectCategories.Contains("customer-financial-info", StringComparer.OrdinalIgnoreCase)))
             {
                 if (!context.Attributes.TryGetValue("InformationSecurityProgram", out var ispObj) || ispObj is not true)
                 {
@@ -93,7 +93,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckPrivacyNotices(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.OperationType.Equals("customer-onboarding", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("customer-onboarding", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("InitialPrivacyNotice", out var initialObj) || initialObj is not true)
                 {
@@ -138,7 +138,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
                 });
             }
 
-            if (context.OperationType.Equals("information-request", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("information-request", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("CallerIdentityVerified", out var verifyObj) || verifyObj is not true)
                 {
@@ -149,7 +149,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckOptOutRights(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.OperationType.Equals("third-party-sharing", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("third-party-sharing", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("OptOutNotice", out var noticeObj) || noticeObj is not true)
                 {

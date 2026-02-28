@@ -27,7 +27,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
         private readonly BoundedDictionary<string, StorageNodeInfo> _storageNodes = new BoundedDictionary<string, StorageNodeInfo>(1000);
         private readonly BoundedDictionary<string, WritePolicy> _writePolicies = new BoundedDictionary<string, WritePolicy>(1000);
         private readonly BoundedDictionary<string, WriteInterceptionStats> _stats = new BoundedDictionary<string, WriteInterceptionStats>(1000);
-        private readonly ConcurrentBag<WriteInterceptionEvent> _auditLog = new();
+        private readonly System.Collections.Concurrent.ConcurrentQueue<WriteInterceptionEvent> _auditLog = new();
 
         private bool _enforceMode = true;
         private int _maxAuditLogSize = 10000;
@@ -110,6 +110,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
         public WriteInterceptionResult ValidateWrite(WriteRequest request)
         {
             ArgumentNullException.ThrowIfNull(request, nameof(request));
+            if (string.IsNullOrEmpty(request.DataClassification))
+                throw new ArgumentException("DataClassification is required.", nameof(request));
 
             var startTime = DateTime.UtcNow;
 
@@ -251,7 +253,11 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
         /// </summary>
         public IReadOnlyList<WriteInterceptionEvent> GetRecentEvents(int count = 100)
         {
-            return _auditLog.Take(count).ToList();
+            // Return the most recent events in chronological order.
+            // ConcurrentQueue iteration is FIFO so we take from the tail.
+            var all = _auditLog.ToArray();
+            var start = Math.Max(0, all.Length - count);
+            return new ArraySegment<WriteInterceptionEvent>(all, start, all.Length - start).ToList();
         }
 
         /// <inheritdoc/>
@@ -451,19 +457,23 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
         private WriteInterceptionResult CreateRejection(WriteRequest request, string reason, DateTime startTime,
             IReadOnlyList<StorageNodeInfo>? suggestedNodes = null)
         {
+            // In audit mode (_enforceMode=false) the write is allowed but flagged; in enforce mode it is rejected.
+            bool isAllowed = !_enforceMode;
             var result = new WriteInterceptionResult
             {
-                IsAllowed = _enforceMode ? false : true, // Allow in audit mode
+                IsAllowed = isAllowed,
                 RequestId = request.RequestId,
                 TargetNodeId = request.TargetNodeId,
                 RejectionReason = reason,
                 ValidationTimeMs = (DateTime.UtcNow - startTime).TotalMilliseconds,
                 SuggestedNodes = suggestedNodes,
-                RejectedAt = DateTime.UtcNow,
+                RejectedAt = isAllowed ? null : DateTime.UtcNow,
+                ApprovedAt = isAllowed ? DateTime.UtcNow : null,
                 IsAuditOnly = !_enforceMode
             };
 
-            UpdateStats(request.TargetNodeId, false);
+            // Record as approved when audit mode allows the write, rejected only when actually blocked
+            UpdateStats(request.TargetNodeId, isAllowed);
             LogEvent(request, result, _enforceMode ? "REJECTED" : "AUDIT_REJECT");
 
             return result;
@@ -495,11 +505,11 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
         {
             if (_auditLog.Count >= _maxAuditLogSize)
             {
-                // Remove oldest entries (simplified cleanup)
-                while (_auditLog.Count >= _maxAuditLogSize && _auditLog.TryTake(out _)) { }
+                // Dequeue oldest entries (FIFO — removes chronologically oldest, not random)
+                while (_auditLog.Count >= _maxAuditLogSize && _auditLog.TryDequeue(out _)) { }
             }
 
-            _auditLog.Add(new WriteInterceptionEvent
+            _auditLog.Enqueue(new WriteInterceptionEvent
             {
                 EventId = Guid.NewGuid().ToString(),
                 Timestamp = DateTime.UtcNow,

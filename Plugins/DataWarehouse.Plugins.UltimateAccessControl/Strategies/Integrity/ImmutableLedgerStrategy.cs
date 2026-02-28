@@ -147,10 +147,13 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
 
                 newEntry = newEntry with { EntryHash = ComputeEntryHash(newEntry) };
 
-                // Create updated ledger with new entry
+                // Create updated ledger with new entry — use capacity-aware List to avoid O(N²) Concat+ToList
+                var newEntries = new List<LedgerEntry>(ledger.Entries.Count + 1);
+                newEntries.AddRange(ledger.Entries);
+                newEntries.Add(newEntry);
                 var updatedLedger = ledger with
                 {
-                    Entries = ledger.Entries.Concat(new[] { newEntry }).ToList()
+                    Entries = newEntries
                 };
 
                 _ledgers[ledgerId] = updatedLedger;

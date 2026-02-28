@@ -57,7 +57,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.ISO
             }
 
             // Check return and deletion of PII (A.9)
-            if (context.OperationType.Equals("delete", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("delete", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("SecureDeletionMethod", out var deletionObj) || deletionObj is not true)
                 {

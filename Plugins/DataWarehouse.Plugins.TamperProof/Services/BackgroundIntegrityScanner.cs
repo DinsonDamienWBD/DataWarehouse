@@ -323,7 +323,9 @@ public class BackgroundIntegrityScanner : IBackgroundIntegrityScanner, IDisposab
             _scanProgressPercent = 0;
         }
 
+        // Lock-protected list so parallel-scan refactors remain safe
         var corruptedBlockDetails = new List<ScanResult>();
+        var corruptedBlockDetailsLock = new object();
         long totalBlocks = 0;
         long validBlocks = 0;
         long corruptedBlocks = 0;
@@ -362,7 +364,7 @@ public class BackgroundIntegrityScanner : IBackgroundIntegrityScanner, IDisposab
                     else
                     {
                         corruptedBlocks++;
-                        corruptedBlockDetails.Add(result);
+                        lock (corruptedBlockDetailsLock) { corruptedBlockDetails.Add(result); }
                     }
 
                     // Update progress
@@ -500,10 +502,11 @@ public class BackgroundIntegrityScanner : IBackgroundIntegrityScanner, IDisposab
             // For now, we'll use the scanned blocks dictionary as a source
             blockIds.AddRange(_scannedBlocks.Keys);
 
-            // Also check pending blocks queue
+            // Also check pending blocks queue — use HashSet for O(1) Contains instead of O(n)
+            var blockIdSet = new HashSet<Guid>(blockIds);
             while (_pendingBlocks.TryDequeue(out var pendingId))
             {
-                if (!blockIds.Contains(pendingId))
+                if (blockIdSet.Add(pendingId))
                 {
                     blockIds.Add(pendingId);
                 }

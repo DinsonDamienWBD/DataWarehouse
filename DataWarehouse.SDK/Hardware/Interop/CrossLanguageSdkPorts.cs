@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -522,7 +523,8 @@ public sealed class AppToken
 public sealed class AppPlatformRegistry
 {
     private readonly BoundedDictionary<string, AppRegistration> _apps = new BoundedDictionary<string, AppRegistration>(1000);
-    private readonly BoundedDictionary<string, AppToken> _activeTokens = new BoundedDictionary<string, AppToken>(1000);
+    // Maps access-token → (token, owning AppId) to enable O(1) app lookup on ValidateToken.
+    private readonly BoundedDictionary<string, (AppToken Token, string AppId)> _activeTokens = new BoundedDictionary<string, (AppToken Token, string AppId)>(1000);
     private readonly BoundedDictionary<string, (int Count, DateTimeOffset WindowStart)> _rateLimits = new BoundedDictionary<string, (int Count, DateTimeOffset WindowStart)>(1000);
 
     /// <summary>Registers a new application.</summary>
@@ -530,7 +532,8 @@ public sealed class AppPlatformRegistry
     {
         var appId = Guid.NewGuid().ToString("N")[..16];
         var clientId = $"dw-{appId}";
-        var clientSecret = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
+        // Use CSPRNG for client secret (RFC 6749 requires 256-bit entropy minimum)
+        var clientSecret = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         var secretHash = Convert.ToHexString(
             System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(clientSecret)));
 
@@ -563,23 +566,26 @@ public sealed class AppPlatformRegistry
             ? Array.FindAll(requestedScopes, s => Array.Exists(app.Credentials.Scopes, cs => cs == s))
             : app.Credentials.Scopes;
 
+        // Use CSPRNG for token generation (RFC 6749 requires 256-bit entropy minimum)
         var token = new AppToken
         {
-            AccessToken = Convert.ToBase64String(Guid.NewGuid().ToByteArray()),
-            RefreshToken = Convert.ToBase64String(Guid.NewGuid().ToByteArray()),
+            AccessToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
+            RefreshToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
             ExpiresAt = DateTimeOffset.UtcNow.Add(app.Credentials.TokenExpiry),
             Scopes = scopes
         };
 
-        _activeTokens[token.AccessToken] = token;
+        _activeTokens[token.AccessToken] = (token, app.AppId);
         return token;
     }
 
     /// <summary>Validates a token and checks rate limits.</summary>
     public (bool IsValid, AppRegistration? App) ValidateToken(string accessToken)
     {
-        if (!_activeTokens.TryGetValue(accessToken, out var token))
+        if (!_activeTokens.TryGetValue(accessToken, out var entry))
             return (false, null);
+
+        var (token, appId) = entry;
 
         if (token.ExpiresAt < DateTimeOffset.UtcNow)
         {
@@ -587,14 +593,14 @@ public sealed class AppPlatformRegistry
             return (false, null);
         }
 
-        // Find app by matching scopes (simplified lookup)
-        foreach (var app in _apps.Values)
-        {
-            if (app.IsEnabled && CheckRateLimit(app.AppId, app.RateLimitPerMinute))
-                return (true, app);
-        }
+        // Bind token to its owning app — avoids cross-app policy enforcement
+        if (!_apps.TryGetValue(appId, out var app) || !app.IsEnabled)
+            return (false, null);
 
-        return (false, null);
+        if (!CheckRateLimit(app.AppId, app.RateLimitPerMinute))
+            return (false, null);
+
+        return (true, app);
     }
 
     /// <summary>Checks access policy for a request.</summary>

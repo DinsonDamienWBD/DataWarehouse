@@ -133,8 +133,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
 
             if (hasSensitiveAuthData)
             {
-                if (context.OperationType.Equals("store", StringComparison.OrdinalIgnoreCase) ||
-                    context.OperationType.Equals("persist", StringComparison.OrdinalIgnoreCase))
+                if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("store", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(context.OperationType, "persist", StringComparison.OrdinalIgnoreCase))
                 {
                     violations.Add(new ComplianceViolation
                     {
@@ -148,8 +148,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
             }
 
             // Requirement 3.3: Mask PAN when displayed
-            if (context.OperationType.Equals("display", StringComparison.OrdinalIgnoreCase) ||
-                context.OperationType.Equals("render", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("display", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(context.OperationType, "render", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("PANMasked", out var maskedObj) || maskedObj is not true)
                 {

@@ -34,7 +34,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.MiddleEastAfrica
                 }
             }
 
-            if (context.DataClassification.Equals("sensitive", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("sensitive", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("SensitiveDataConsent", out var consentObj) || consentObj is not true)
                 {

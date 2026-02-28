@@ -55,7 +55,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.NIST
             }
 
             // Check media protection (3.8)
-            if (context.OperationType.Equals("export", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("export", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("MediaSanitized", out var sanitizeObj) || sanitizeObj is not true)
                 {

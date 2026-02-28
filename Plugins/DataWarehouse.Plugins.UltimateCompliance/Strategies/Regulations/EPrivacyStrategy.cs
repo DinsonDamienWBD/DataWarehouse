@@ -67,7 +67,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
 
         private void CheckCookieConsent(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.OperationType.Equals("cookie-placement", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("cookie-placement", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("CookieType", out var cookieTypeObj) ||
                     cookieTypeObj is not string cookieType)
@@ -101,8 +101,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
 
         private void CheckCommunicationConfidentiality(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.OperationType.Equals("communication-interception", StringComparison.OrdinalIgnoreCase) ||
-                context.OperationType.Equals("communication-monitoring", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("communication-interception", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(context.OperationType, "communication-monitoring", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("LegalBasis", out var basisObj) ||
                     basisObj is not string basis ||
@@ -130,7 +130,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
 
         private void CheckDirectMarketingConsent(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.OperationType.Equals("direct-marketing", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("direct-marketing", StringComparison.OrdinalIgnoreCase))
             {
                 if (context.Attributes.TryGetValue("MarketingChannel", out var channelObj) &&
                     channelObj is string channel)

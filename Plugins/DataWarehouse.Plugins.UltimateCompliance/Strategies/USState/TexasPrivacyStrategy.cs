@@ -26,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USState
                 violations.Add(new ComplianceViolation { Code = "TX-001", Description = "Privacy notice not provided", Severity = ViolationSeverity.High, Remediation = "Provide privacy notice", RegulatoryReference = "Texas HB 4" });
             }
 
-            if (context.DataClassification.Equals("sensitive", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("sensitive", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("ConsentObtained", out var consentObj) || consentObj is not true)
                 {
@@ -34,7 +34,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USState
                 }
             }
 
-            if (context.OperationType.Equals("deletion-request", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("deletion-request", StringComparison.OrdinalIgnoreCase))
             {
                 if (context.Attributes.TryGetValue("ResponseDays", out var daysObj) && daysObj is int days && days > 45)
                 {

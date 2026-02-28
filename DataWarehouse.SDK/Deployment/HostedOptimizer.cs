@@ -73,6 +73,10 @@ public sealed class HostedOptimizer
         bool vdeWalEnabled,
         CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(context);
+        if (string.IsNullOrEmpty(vdeContainerPath))
+            throw new ArgumentException("VDE container path must not be null or empty.", nameof(vdeContainerPath));
+
         // Step 1: Validate preconditions
         if (context.Environment != DeploymentEnvironment.HostedVm)
         {

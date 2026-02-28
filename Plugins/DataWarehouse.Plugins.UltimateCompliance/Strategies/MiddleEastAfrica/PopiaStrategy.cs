@@ -26,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.MiddleEastAfrica
                 violations.Add(new ComplianceViolation { Code = "POPIA-001", Description = "Conditions for lawful processing not met", Severity = ViolationSeverity.Critical, Remediation = "Ensure all eight conditions for lawful processing", RegulatoryReference = "POPIA Section 4" });
             }
 
-            if (context.OperationType.Equals("direct-marketing", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("direct-marketing", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("OptInConsent", out var consentObj) || consentObj is not true)
                 {
@@ -35,7 +35,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.MiddleEastAfrica
             }
 
             // Check PriorAuthorization for special personal information; treat missing OR false as violation
-            if (context.DataClassification.Equals("special-personal", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("special-personal", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("PriorAuthorization", out var authObj) || authObj is not true)
                 {

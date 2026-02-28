@@ -109,6 +109,18 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
             return base.ShutdownAsyncCore(cancellationToken);
         }
 
+        /// <inheritdoc/>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _httpClient.Dispose();
+                _tokenCache.Clear();
+                _jwksCache.Clear();
+            }
+            base.Dispose(disposing);
+        }
+
 
         /// <summary>
         /// Checks if OAuth 2.0 introspection endpoint is available.

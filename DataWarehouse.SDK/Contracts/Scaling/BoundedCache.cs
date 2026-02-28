@@ -295,6 +295,29 @@ namespace DataWarehouse.SDK.Contracts.Scaling
         }
 
         /// <summary>
+        /// Attempts to get the value associated with the specified key in a single atomic lookup.
+        /// Avoids the TOCTOU race of separate ContainsKey + GetOrDefault calls.
+        /// </summary>
+        /// <param name="key">The key to look up.</param>
+        /// <param name="value">When this method returns true, the cached value; otherwise default.</param>
+        /// <returns><c>true</c> if found and promoted; otherwise <c>false</c>.</returns>
+        public bool TryGet(TKey key, out TValue value)
+        {
+            _lock.EnterWriteLock();
+            try
+            {
+                bool found = _evictionPolicy switch
+                {
+                    CacheEvictionMode.ARC => ArcGet(key, out value!),
+                    _ => LruGet(key, out value!),
+                };
+                if (!found) value = default!;
+                return found;
+            }
+            finally { _lock.ExitWriteLock(); }
+        }
+
+        /// <summary>
         /// Determines whether the cache contains the specified key.
         /// </summary>
         /// <param name="key">The key to check.</param>

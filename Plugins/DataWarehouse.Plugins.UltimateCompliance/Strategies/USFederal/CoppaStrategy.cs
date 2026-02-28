@@ -69,7 +69,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
                     methodObj is string method &&
                     method.Equals("email-only", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (context.DataClassification.Equals("sensitive", StringComparison.OrdinalIgnoreCase))
+                    if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("sensitive", StringComparison.OrdinalIgnoreCase))
                     {
                         violations.Add(new ComplianceViolation
                         {
@@ -162,7 +162,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
                     });
                 }
 
-                if (context.OperationType.Equals("parent-deletion-request", StringComparison.OrdinalIgnoreCase))
+                if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("parent-deletion-request", StringComparison.OrdinalIgnoreCase))
                 {
                     if (!context.Attributes.TryGetValue("RequestHonored", out var honoredObj) || honoredObj is not true)
                     {

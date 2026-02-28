@@ -25,7 +25,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
     public sealed class SideChannelMitigationStrategy : AccessControlStrategyBase
     {
         private readonly ILogger _logger;
-        private readonly RandomNumberGenerator _rng = RandomNumberGenerator.Create();
+        // All randomness uses RandomNumberGenerator static methods; no field-level RNG instance needed.
 
         public SideChannelMitigationStrategy(ILogger? logger = null)
         {
@@ -137,10 +137,15 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
 
                 if (elapsedMs < targetTimeMs)
                 {
-                    // Add random delay within target window
+                    // Add random delay within target window — guard against negative remainingMs
                     var remainingMs = targetTimeMs - elapsedMs;
-                    var delayMs = RandomNumberGenerator.GetInt32((int)(remainingMs * 0.5), (int)remainingMs);
-                    await Task.Delay(TimeSpan.FromMilliseconds(delayMs), cancellationToken);
+                    if (remainingMs > 0)
+                    {
+                        var halfMs = (int)Math.Max(1, remainingMs * 0.5);
+                        var fullMs = (int)Math.Max(halfMs + 1, remainingMs);
+                        var delayMs = RandomNumberGenerator.GetInt32(halfMs, fullMs);
+                        await Task.Delay(TimeSpan.FromMilliseconds(delayMs), cancellationToken);
+                    }
                 }
 
                 // Add small random jitter

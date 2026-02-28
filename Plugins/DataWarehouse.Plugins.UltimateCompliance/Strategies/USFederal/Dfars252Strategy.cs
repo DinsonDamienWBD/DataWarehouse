@@ -50,7 +50,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckNist800171Compliance(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.DataClassification.Equals("cui", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("cui", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("Nist800171Implemented", out var nistObj) || nistObj is not true)
                 {
@@ -95,10 +95,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckCyberIncidentReporting(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.OperationType.Equals("security-incident", StringComparison.OrdinalIgnoreCase) ||
-                context.OperationType.Equals("cyber-incident", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("security-incident", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(context.OperationType, "cyber-incident", StringComparison.OrdinalIgnoreCase))
             {
-                if (context.DataClassification.Equals("cui", StringComparison.OrdinalIgnoreCase))
+                if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("cui", StringComparison.OrdinalIgnoreCase))
                 {
                     if (!context.Attributes.TryGetValue("IncidentReportedWithin72Hours", out var reportedObj) || reportedObj is not true)
                     {
@@ -139,7 +139,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
         {
             if (context.Attributes.TryGetValue("CloudStorage", out var cloudObj) && cloudObj is true)
             {
-                if (context.DataClassification.Equals("cui", StringComparison.OrdinalIgnoreCase))
+                if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("cui", StringComparison.OrdinalIgnoreCase))
                 {
                     if (!context.Attributes.TryGetValue("FedRampModerate", out var fedrampObj) || fedrampObj is not true)
                     {

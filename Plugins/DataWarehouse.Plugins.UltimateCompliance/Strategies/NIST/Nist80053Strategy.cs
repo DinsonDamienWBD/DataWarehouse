@@ -54,7 +54,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.NIST
             }
 
             // Check Configuration Management (CM family)
-            if (context.OperationType.Equals("modify", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("modify", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("ChangeControlled", out var cmObj) || cmObj is not true)
                 {
@@ -76,7 +76,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.NIST
                 authStrength.Equals("single-factor", StringComparison.OrdinalIgnoreCase))
             {
                 var sensitiveClassifications = new[] { "confidential", "secret", "top-secret", "restricted" };
-                if (sensitiveClassifications.Any(c => context.DataClassification.Equals(c, StringComparison.OrdinalIgnoreCase)))
+                if (!string.IsNullOrEmpty(context.DataClassification) && sensitiveClassifications.Any(c => context.DataClassification.Equals(c, StringComparison.OrdinalIgnoreCase)))
                 {
                     violations.Add(new ComplianceViolation
                     {
@@ -90,8 +90,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.NIST
             }
 
             // Check System and Communications Protection (SC family)
-            if (context.DataClassification.Equals("confidential", StringComparison.OrdinalIgnoreCase) ||
-                context.DataClassification.Equals("secret", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("confidential", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(context.DataClassification, "secret", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("EncryptionInTransit", out var transitObj) || transitObj is not true)
                 {

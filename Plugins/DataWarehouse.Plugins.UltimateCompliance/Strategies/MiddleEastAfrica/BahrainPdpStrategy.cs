@@ -26,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.MiddleEastAfrica
                 violations.Add(new ComplianceViolation { Code = "BH-001", Description = "Consent not obtained", Severity = ViolationSeverity.High, Remediation = "Obtain valid consent", RegulatoryReference = "Bahrain PDPL Law No. 30 of 2018" });
             }
 
-            if (context.DataSubjectCategories.Contains("special-category", StringComparer.OrdinalIgnoreCase))
+            if (context.DataSubjectCategories != null && context.DataSubjectCategories.Contains("special-category", StringComparer.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("SpecialConsent", out var specialObj) || specialObj is not true)
                 {

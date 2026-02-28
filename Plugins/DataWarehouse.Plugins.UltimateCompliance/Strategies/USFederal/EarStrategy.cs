@@ -50,8 +50,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckEcccClassification(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.DataClassification.Equals("ear", StringComparison.OrdinalIgnoreCase) ||
-                context.DataSubjectCategories.Contains("dual-use", StringComparer.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("ear", StringComparison.OrdinalIgnoreCase) ||
+                (context.DataSubjectCategories != null && context.DataSubjectCategories.Contains("dual-use", StringComparer.OrdinalIgnoreCase)))
             {
                 if (!context.Attributes.TryGetValue("EcccNumber", out var ecccObj) ||
                     ecccObj is not string eccn ||
@@ -106,8 +106,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckScreeningRequirements(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.OperationType.Equals("export", StringComparison.OrdinalIgnoreCase) ||
-                context.OperationType.Equals("deemed-export", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("export", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(context.OperationType, "deemed-export", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("DeniedPartiesScreening", out var screeningObj) || screeningObj is not true)
                 {
@@ -149,7 +149,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckRecordkeeping(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.OperationType.Equals("export", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("export", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("ExportRecordMaintained", out var recordObj) || recordObj is not true)
                 {

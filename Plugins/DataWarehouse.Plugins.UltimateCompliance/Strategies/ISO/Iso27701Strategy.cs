@@ -83,7 +83,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.ISO
             }
 
             // Check privacy by design (6.4.2)
-            if (context.OperationType.Equals("create", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("create", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("PrivacyByDesignApplied", out var pbdObj) || pbdObj is not true)
                 {

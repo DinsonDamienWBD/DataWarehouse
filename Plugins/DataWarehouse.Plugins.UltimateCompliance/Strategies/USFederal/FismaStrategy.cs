@@ -168,7 +168,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
                 });
             }
 
-            if (context.OperationType.Equals("security-incident", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("security-incident", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("UsCertNotified", out var certObj) || certObj is not true)
                 {

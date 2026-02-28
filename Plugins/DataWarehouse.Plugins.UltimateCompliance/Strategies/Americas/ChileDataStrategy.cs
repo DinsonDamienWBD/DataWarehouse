@@ -26,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Americas
                 violations.Add(new ComplianceViolation { Code = "CL-001", Description = "Consent not obtained", Severity = ViolationSeverity.High, Remediation = "Obtain consent for personal data processing", RegulatoryReference = "Law 19.628 Art. 4" });
             }
 
-            if (context.OperationType.Equals("access-request", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("access-request", StringComparison.OrdinalIgnoreCase))
             {
                 if (context.Attributes.TryGetValue("ResponseDays", out var daysObj) && daysObj is int days && days > 10)
                 {

@@ -94,6 +94,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance
         /// </summary>
         public void RegisterStrategy(IComplianceStrategy strategy)
         {
+            ArgumentNullException.ThrowIfNull(strategy);
             _strategies[strategy.StrategyId] = strategy;
         }
 

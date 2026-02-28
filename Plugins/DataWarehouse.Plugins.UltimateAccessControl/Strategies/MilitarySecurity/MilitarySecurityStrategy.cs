@@ -90,6 +90,9 @@ public void SetClassification(string resourceId, string level, string[] caveats)
             var levels = new[] { "U", "C", "S", "TS" };
             var userIdx = Array.IndexOf(levels, userLevel);
             var reqIdx = Array.IndexOf(levels, requiredLevel);
+            // Deny access if either clearance level is unrecognized (index == -1)
+            if (userIdx < 0 || reqIdx < 0)
+                return false;
             return userIdx >= reqIdx;
         }
     }

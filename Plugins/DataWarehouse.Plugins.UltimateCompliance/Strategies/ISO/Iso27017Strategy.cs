@@ -72,7 +72,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.ISO
             }
 
             // Check cloud data portability (CLD.8.1.4)
-            if (context.OperationType.Equals("export", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("export", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("DataPortabilitySupported", out var portabilityObj) || portabilityObj is not true)
                 {

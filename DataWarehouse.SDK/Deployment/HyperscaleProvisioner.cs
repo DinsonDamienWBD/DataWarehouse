@@ -60,7 +60,7 @@ public sealed class HyperscaleProvisioner : IDisposable
     private readonly ICloudProvider _cloudProvider;
     private readonly AutoScalingPolicy _policy;
     private readonly ILogger<HyperscaleProvisioner> _logger;
-    private bool _isActive;
+    private volatile bool _isActive;
     private bool _disposed;
 
     /// <summary>
@@ -99,12 +99,23 @@ public sealed class HyperscaleProvisioner : IDisposable
                 {
                     await EvaluateScalingAsync(ct);
                 }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Auto-scaling evaluation failed. Continuing monitoring.");
                 }
 
-                await Task.Delay(_policy.EvaluationInterval, ct);
+                try
+                {
+                    await Task.Delay(_policy.EvaluationInterval, ct);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
             }
         }, ct);
 

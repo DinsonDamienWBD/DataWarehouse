@@ -145,8 +145,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckStateDataHandling(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.DataClassification.Equals("sensitive", StringComparison.OrdinalIgnoreCase) ||
-                context.DataClassification.Equals("confidential", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("sensitive", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(context.DataClassification, "confidential", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("EncryptionInTransit", out var transitObj) || transitObj is not true)
                 {

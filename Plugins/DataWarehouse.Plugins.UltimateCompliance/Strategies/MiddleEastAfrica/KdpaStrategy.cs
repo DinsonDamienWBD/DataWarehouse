@@ -31,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.MiddleEastAfrica
                 violations.Add(new ComplianceViolation { Code = "KDPA-002", Description = "Consent not obtained", Severity = ViolationSeverity.High, Remediation = "Obtain valid consent", RegulatoryReference = "KDPA Section 30" });
             }
 
-            if (context.OperationType.Equals("access-request", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("access-request", StringComparison.OrdinalIgnoreCase))
             {
                 if (context.Attributes.TryGetValue("ResponseDays", out var daysObj) && daysObj is int days && days > 30)
                 {

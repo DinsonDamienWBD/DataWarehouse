@@ -25,8 +25,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.WORM
             if (context.OperationType.Contains("update", StringComparison.OrdinalIgnoreCase) ||
                 context.OperationType.Contains("modify", StringComparison.OrdinalIgnoreCase))
             {
-                if (!context.Attributes.TryGetValue("IsWormProtected", out var wormProtected) ||
-                    (wormProtected is bool isProtected && isProtected))
+                if (context.Attributes.TryGetValue("IsWormProtected", out var wormProtected) &&
+                    wormProtected is bool isProtected && isProtected)
                 {
                     violations.Add(new ComplianceViolation
                     {

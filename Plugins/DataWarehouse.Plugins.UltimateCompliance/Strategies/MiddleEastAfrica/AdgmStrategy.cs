@@ -26,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.MiddleEastAfrica
                 violations.Add(new ComplianceViolation { Code = "ADGM-001", Description = "No lawful basis for processing", Severity = ViolationSeverity.Critical, Remediation = "Establish lawful basis for data processing", RegulatoryReference = "ADGM DPR 2021" });
             }
 
-            if (context.DataClassification.Equals("sensitive", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("sensitive", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("ExplicitConsent", out var consentObj) || consentObj is not true)
                 {

@@ -62,6 +62,11 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
 
+            // Guard against unbounded inputs causing blocking regex on huge payloads (finding #1116)
+            const int MaxDlpScanBytes = 100 * 1024 * 1024; // 100 MB
+            if (content.Length > MaxDlpScanBytes)
+                throw new ArgumentException($"Content length {content.Length} bytes exceeds DLP scan limit of {MaxDlpScanBytes} bytes. Split input before scanning.", nameof(content));
+
             var violations = new List<DlpRuleViolation>();
             var applicablePolicies = _policies.Values
                 .Where(p => p.IsEnabled && (p.Scope == DlpScope.All || p.Scope == context.Scope))

@@ -74,7 +74,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.AsiaPacific
             }
 
             // Check automated decision-making (Article 24)
-            if (context.OperationType.Equals("automated-decision", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("automated-decision", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("ExplanationProvided", out var explainObj) || explainObj is not true)
                 {

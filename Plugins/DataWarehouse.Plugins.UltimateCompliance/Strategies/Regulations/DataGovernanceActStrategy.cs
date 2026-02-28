@@ -122,8 +122,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
         {
             if (context.Attributes.TryGetValue("PublicSectorData", out var publicObj) && publicObj is true)
             {
-                if (context.DataClassification.Equals("confidential", StringComparison.OrdinalIgnoreCase) ||
-                    context.DataClassification.Equals("sensitive", StringComparison.OrdinalIgnoreCase))
+                if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("confidential", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(context.DataClassification, "sensitive", StringComparison.OrdinalIgnoreCase))
                 {
                     if (!context.Attributes.TryGetValue("CompetentBodyAuthorization", out var authObj) || authObj is not true)
                     {

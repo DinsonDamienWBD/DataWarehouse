@@ -26,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USState
                 violations.Add(new ComplianceViolation { Code = "OR-001", Description = "Data protection practices not documented", Severity = ViolationSeverity.Medium, Remediation = "Document data protection practices", RegulatoryReference = "Oregon SB 619" });
             }
 
-            if (context.DataClassification.Equals("sensitive", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("sensitive", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("ConsentObtained", out var consentObj) || consentObj is not true)
                 {
@@ -34,7 +34,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USState
                 }
             }
 
-            if (context.OperationType.Equals("access-request", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("access-request", StringComparison.OrdinalIgnoreCase))
             {
                 if (context.Attributes.TryGetValue("ResponseDays", out var daysObj) && daysObj is int days && days > 45)
                 {

@@ -50,10 +50,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckConsentRequirements(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.DataSubjectCategories.Contains("student-education-record", StringComparer.OrdinalIgnoreCase))
+            if (context.DataSubjectCategories != null && context.DataSubjectCategories.Contains("student-education-record", StringComparer.OrdinalIgnoreCase))
             {
-                if (context.OperationType.Equals("disclosure", StringComparison.OrdinalIgnoreCase) ||
-                    context.OperationType.Equals("third-party-sharing", StringComparison.OrdinalIgnoreCase))
+                if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("disclosure", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(context.OperationType, "third-party-sharing", StringComparison.OrdinalIgnoreCase))
                 {
                     if (!context.Attributes.TryGetValue("ParentalConsent", out var consentObj) || consentObj is not true)
                     {
@@ -84,7 +84,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckAccessRights(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.OperationType.Equals("access-request", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("access-request", StringComparison.OrdinalIgnoreCase))
             {
                 if (context.Attributes.TryGetValue("RequestResponseDays", out var daysObj) &&
                     daysObj is int days && days > 45)
@@ -100,7 +100,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
                 }
             }
 
-            if (context.OperationType.Equals("amendment-request", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("amendment-request", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("HearingOffered", out var hearingObj) || hearingObj is not true)
                 {
@@ -141,7 +141,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckDisclosureLogging(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.OperationType.Equals("disclosure", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("disclosure", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("DisclosureRecorded", out var recordedObj) || recordedObj is not true)
                 {

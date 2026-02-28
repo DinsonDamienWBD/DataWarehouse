@@ -34,7 +34,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.MiddleEastAfrica
                 }
             }
 
-            if (context.OperationType.Equals("access-request", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("access-request", StringComparison.OrdinalIgnoreCase))
             {
                 if (context.Attributes.TryGetValue("ResponseDays", out var daysObj) && daysObj is int days && days > 28)
                 {

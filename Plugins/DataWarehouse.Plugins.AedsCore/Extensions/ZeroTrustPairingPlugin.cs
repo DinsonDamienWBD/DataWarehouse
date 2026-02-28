@@ -15,7 +15,7 @@ namespace DataWarehouse.Plugins.AedsCore.Extensions;
 /// </summary>
 public sealed class ZeroTrustPairingPlugin : SecurityPluginBase
 {
-    private readonly Dictionary<string, (string Pin, DateTimeOffset Expires)> _pendingPins = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (string Pin, DateTimeOffset Expires)> _pendingPins = new();
     // Tracks clients that have been elevated to at least Trusted level.
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, ClientTrustLevel> _trustedClients = new();
 
@@ -53,6 +53,14 @@ public sealed class ZeroTrustPairingPlugin : SecurityPluginBase
         var expires = DateTimeOffset.UtcNow.AddMinutes(5);
 
         _pendingPins[clientId] = (pin, expires);
+
+        // Prune expired entries to prevent unbounded growth
+        var now = DateTimeOffset.UtcNow;
+        foreach (var key in _pendingPins.Keys)
+        {
+            if (_pendingPins.TryGetValue(key, out var entry) && entry.Expires <= now)
+                _pendingPins.TryRemove(key, out _);
+        }
 
         System.Diagnostics.Debug.WriteLine($"[Pairing PIN] {pin} (expires {expires:HH:mm:ss})");
         return pin;

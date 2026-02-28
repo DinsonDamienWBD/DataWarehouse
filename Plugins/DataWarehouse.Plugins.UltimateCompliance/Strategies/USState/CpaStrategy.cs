@@ -33,7 +33,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USState
                 });
             }
 
-            if (context.OperationType.Equals("profiling", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("profiling", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("ProfilingDisclosed", out var disclosedObj) || disclosedObj is not true)
                 {
@@ -48,7 +48,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USState
                 }
             }
 
-            if (context.DataClassification.Equals("sensitive", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("sensitive", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("ConsentObtained", out var consentObj) || consentObj is not true)
                 {

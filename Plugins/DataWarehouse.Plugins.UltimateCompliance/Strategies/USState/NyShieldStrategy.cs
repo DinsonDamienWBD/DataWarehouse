@@ -26,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USState
                 violations.Add(new ComplianceViolation { Code = "NYSHIELD-001", Description = "Data security program not implemented", Severity = ViolationSeverity.Critical, Remediation = "Implement reasonable data security safeguards", RegulatoryReference = "NY GBL § 899-bb" });
             }
 
-            if (context.OperationType.Equals("data-breach", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("data-breach", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("BreachNotificationSent", out var notifyObj) || notifyObj is not true)
                 {

@@ -69,7 +69,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.AsiaPacific
             }
 
             // Check real-name verification (Article 24)
-            if (context.OperationType.Equals("user-registration", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("user-registration", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("RealNameVerified", out var nameObj) || nameObj is not true)
                 {

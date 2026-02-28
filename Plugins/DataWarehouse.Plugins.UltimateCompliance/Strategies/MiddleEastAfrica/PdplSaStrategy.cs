@@ -34,7 +34,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.MiddleEastAfrica
                 }
             }
 
-            if (context.DataSubjectCategories.Contains("health-data", StringComparer.OrdinalIgnoreCase))
+            if (context.DataSubjectCategories != null && context.DataSubjectCategories.Contains("health-data", StringComparer.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("SpecialCategoryConsent", out var specialObj) || specialObj is not true)
                 {

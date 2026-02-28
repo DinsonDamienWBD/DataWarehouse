@@ -191,7 +191,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
                 });
             }
 
-            if (context.DataClassification.Equals("sensitive", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("sensitive", StringComparison.OrdinalIgnoreCase))
             {
                 recommendations.Add("Ensure AI system respects fundamental rights when processing sensitive data");
             }

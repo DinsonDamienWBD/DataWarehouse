@@ -39,7 +39,7 @@ namespace DataWarehouse.SDK.Edge.Protocols
         private MqttConnectionSettings? _currentSettings;
         private CancellationTokenSource? _reconnectCts;
         private readonly SemaphoreSlim _connectLock = new(1, 1);
-        private readonly List<string> _subscribedTopics = new();
+        private readonly HashSet<string> _subscribedTopics = new(StringComparer.OrdinalIgnoreCase);
         private readonly object _topicsLock = new();
         private bool _disposed;
 
@@ -144,9 +144,10 @@ namespace DataWarehouse.SDK.Edge.Protocols
         /// <inheritdoc/>
         public async Task DisconnectAsync(CancellationToken ct = default)
         {
-            // Cancel auto-reconnect
-            _reconnectCts?.Cancel();
-            _reconnectCts = null;
+            // Cancel auto-reconnect — atomically swap out CTS to avoid race with reconnect handler
+            var cts = Interlocked.Exchange(ref _reconnectCts, null);
+            cts?.Cancel();
+            cts?.Dispose();
 
             if (_client.IsConnected)
             {

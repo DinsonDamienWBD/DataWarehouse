@@ -54,7 +54,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.ISO
             }
 
             // Check backup and recovery (8.4.4)
-            if (context.DataClassification.Equals("critical", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("critical", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("BackupConfigured", out var backupObj) || backupObj is not true)
                 {

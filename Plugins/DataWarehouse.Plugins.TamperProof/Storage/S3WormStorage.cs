@@ -183,9 +183,9 @@ public class S3WormStorage : WormStorageProviderPluginBase
     private readonly ILogger<S3WormStorage> _logger;
     private readonly string _keyPrefix;
     // Assigned when AWS SDK integration verifies Object Lock configuration on the bucket.
-    // Currently always false since all methods throw PlatformNotSupportedException until AWS SDK is configured.
-#pragma warning disable CS0649 // Field is assigned when AWS SDK integration is implemented
-    private bool _objectLockVerified;
+    // volatile ensures cross-thread visibility without lock overhead.
+#pragma warning disable CS0649 // Field assigned by AWS SDK integration layer at runtime
+    private volatile bool _objectLockVerified;
 #pragma warning restore CS0649
 
     private const string S3NotConfiguredMessage =

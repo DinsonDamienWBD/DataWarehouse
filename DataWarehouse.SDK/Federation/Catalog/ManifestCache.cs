@@ -1,7 +1,5 @@
 using DataWarehouse.SDK.Federation.Addressing;
-using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
-using System.Linq;
 using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Federation.Catalog;
@@ -26,7 +24,6 @@ namespace DataWarehouse.SDK.Federation.Catalog;
 internal sealed class ManifestCache
 {
     private readonly BoundedDictionary<ObjectIdentity, ObjectLocationEntry> _cache;
-    private readonly int _maxSize;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ManifestCache"/> class.
@@ -35,7 +32,6 @@ internal sealed class ManifestCache
     public ManifestCache(int maxSize = 100_000)
     {
         _cache = new BoundedDictionary<ObjectIdentity, ObjectLocationEntry>(maxSize);
-        _maxSize = maxSize;
     }
 
     /// <summary>
@@ -55,13 +51,8 @@ internal sealed class ManifestCache
     /// <param name="entry">The entry to cache.</param>
     public void Set(ObjectLocationEntry entry)
     {
-        if (_cache.Count >= _maxSize && !_cache.ContainsKey(entry.ObjectId))
-        {
-            // Evict oldest
-            var oldest = _cache.Values.MinBy(e => e.UpdatedAt);
-            if (oldest != null) _cache.TryRemove(oldest.ObjectId, out _);
-        }
-
+        // BoundedDictionary enforces capacity and LRU eviction atomically under its internal lock.
+        // Manual eviction here was a TOCTOU race (check-evict-insert non-atomic under ConcurrentDictionary).
         _cache[entry.ObjectId] = entry;
     }
 

@@ -36,7 +36,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Americas
                 violations.Add(new ComplianceViolation { Code = "LAW25-003", Description = "Privacy governance framework not established", Severity = ViolationSeverity.Medium, Remediation = "Establish governance policies and practices", RegulatoryReference = "Law 25 Art. 3.2" });
             }
 
-            if (context.OperationType.Equals("data-breach", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("data-breach", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("CaiNotified", out var caiObj) || caiObj is not true)
                 {

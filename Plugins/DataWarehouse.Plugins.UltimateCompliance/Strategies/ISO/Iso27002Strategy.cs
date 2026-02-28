@@ -54,8 +54,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.ISO
             }
 
             // Check cryptographic controls (A.8.24)
-            if (context.DataClassification.Equals("confidential", StringComparison.OrdinalIgnoreCase) ||
-                context.DataClassification.Equals("secret", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("confidential", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(context.DataClassification, "secret", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("EncryptionEnabled", out var encryptObj) || encryptObj is not true)
                 {
@@ -71,8 +71,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.ISO
             }
 
             // Check change management (A.8.32)
-            if (context.OperationType.Equals("modify", StringComparison.OrdinalIgnoreCase) ||
-                context.OperationType.Equals("update", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("modify", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(context.OperationType, "update", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("ChangeApproved", out var approvedObj) || approvedObj is not true)
                 {

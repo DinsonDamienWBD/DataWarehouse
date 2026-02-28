@@ -258,9 +258,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
         private void CheckDataSubjectRights(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
             // Check if data subject rights mechanisms are in place
-            if (context.OperationType.Equals("access-request", StringComparison.OrdinalIgnoreCase) ||
-                context.OperationType.Equals("deletion-request", StringComparison.OrdinalIgnoreCase) ||
-                context.OperationType.Equals("portability-request", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) &&
+                (context.OperationType.Equals("access-request", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(context.OperationType, "deletion-request", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(context.OperationType, "portability-request", StringComparison.OrdinalIgnoreCase)))
             {
                 if (!context.Attributes.TryGetValue("IdentityVerified", out var verifiedObj) || verifiedObj is not true)
                 {
@@ -275,7 +276,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
                 }
             }
 
-            if (context.OperationType.Equals("automated-decision", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("automated-decision", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("HumanReviewAvailable", out var reviewObj) || reviewObj is not true)
                 {

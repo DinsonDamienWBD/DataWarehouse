@@ -51,7 +51,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckInternalControls(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.DataClassification.Equals("financial", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("financial", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("ItgcDocumented", out var itgcObj) || itgcObj is not true)
                 {
@@ -115,7 +115,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckDataRetention(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.DataClassification.Equals("financial", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("financial", StringComparison.OrdinalIgnoreCase))
             {
                 if (context.Attributes.TryGetValue("RetentionPeriodYears", out var retentionObj) &&
                     retentionObj is int years && years < 7)
@@ -130,7 +130,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
                     });
                 }
 
-                if (context.OperationType.Equals("deletion", StringComparison.OrdinalIgnoreCase))
+                if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("deletion", StringComparison.OrdinalIgnoreCase))
                 {
                     if (!context.Attributes.TryGetValue("LitigationHoldChecked", out var holdObj) || holdObj is not true)
                     {
@@ -181,7 +181,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckChangeManagement(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.OperationType.Equals("system-change", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("system-change", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("ChangeApproved", out var approvedObj) || approvedObj is not true)
                 {

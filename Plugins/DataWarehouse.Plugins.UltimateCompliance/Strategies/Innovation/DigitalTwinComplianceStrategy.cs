@@ -56,8 +56,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
             }
 
             // Check 3: Verify pre-deployment testing
-            if (context.OperationType.Contains("deploy", StringComparison.OrdinalIgnoreCase) ||
-                context.OperationType.Contains("change", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) &&
+                (context.OperationType.Contains("deploy", StringComparison.OrdinalIgnoreCase) ||
+                context.OperationType.Contains("change", StringComparison.OrdinalIgnoreCase)))
             {
                 if (!context.Attributes.ContainsKey("TestedInTwin") ||
                     !context.Attributes.ContainsKey("TwinTestResults"))

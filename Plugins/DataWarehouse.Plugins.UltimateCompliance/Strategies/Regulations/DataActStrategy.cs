@@ -50,7 +50,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
 
         private void CheckDataAccessRights(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.OperationType.Equals("data-access-request", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("data-access-request", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("DataAccessMechanism", out var mechanismObj) || mechanismObj is not true)
                 {
@@ -138,8 +138,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
 
         private void CheckDataSharing(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.OperationType.Equals("b2b-data-sharing", StringComparison.OrdinalIgnoreCase) ||
-                context.OperationType.Equals("b2g-data-sharing", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("b2b-data-sharing", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(context.OperationType, "b2g-data-sharing", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("FairTerms", out var fairObj) || fairObj is not true)
                 {

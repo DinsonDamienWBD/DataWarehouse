@@ -111,7 +111,8 @@ public sealed class FederationOrchestrator : IFederationOrchestrator, ITopologyP
             Latitude = registration.Latitude,
             Longitude = registration.Longitude,
             TotalBytes = registration.TotalBytes,
-            FreeBytes = registration.TotalBytes,
+            // Use reported free space if provided; default to TotalBytes for fresh nodes (FreeBytes == 0).
+            FreeBytes = registration.FreeBytes > 0 ? registration.FreeBytes : registration.TotalBytes,
             HealthScore = 1.0,
             LastHeartbeat = DateTimeOffset.UtcNow
         };

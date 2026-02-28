@@ -26,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USState
                 violations.Add(new ComplianceViolation { Code = "TENN-001", Description = "Data protection assessment not conducted", Severity = ViolationSeverity.Medium, Remediation = "Conduct data protection assessment", RegulatoryReference = "Tennessee HB 1181" });
             }
 
-            if (context.DataClassification.Equals("sensitive", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("sensitive", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("ConsentObtained", out var consentObj) || consentObj is not true)
                 {

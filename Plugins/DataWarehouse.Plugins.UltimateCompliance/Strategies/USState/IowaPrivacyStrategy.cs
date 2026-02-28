@@ -26,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USState
                 violations.Add(new ComplianceViolation { Code = "IOWA-001", Description = "Privacy notice not provided", Severity = ViolationSeverity.High, Remediation = "Provide privacy notice to consumers", RegulatoryReference = "Iowa SF 262" });
             }
 
-            if (context.OperationType.Equals("data-sale", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("data-sale", StringComparison.OrdinalIgnoreCase))
             {
                 if (context.Attributes.TryGetValue("OptOutRequested", out var optOutObj) && optOutObj is true)
                 {
@@ -34,7 +34,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USState
                 }
             }
 
-            if (context.DataClassification.Equals("sensitive", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("sensitive", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("ConsentObtained", out var consentObj) || consentObj is not true)
                 {

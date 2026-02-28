@@ -104,7 +104,7 @@ public sealed class PatternBasedClassifier : IRequestClassifier
         // For ObjectKeyAddress, check if the key matches UUID pattern
         if (address is ObjectKeyAddress objectKey)
         {
-            if (UuidPattern.IsMatch(objectKey.Key))
+            if (objectKey.Key != null && UuidPattern.IsMatch(objectKey.Key))
             {
                 return RequestLanguage.Object;
             }

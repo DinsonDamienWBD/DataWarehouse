@@ -99,7 +99,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckAccessControl(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.DataClassification.Equals("cui", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("cui", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("MultiFactorAuth", out var mfaObj) || mfaObj is not true)
                 {
@@ -129,9 +129,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckIncidentResponse(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.OperationType.Equals("security-incident", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("security-incident", StringComparison.OrdinalIgnoreCase))
             {
-                if (context.DataClassification.Equals("cui", StringComparison.OrdinalIgnoreCase))
+                if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("cui", StringComparison.OrdinalIgnoreCase))
                 {
                     if (!context.Attributes.TryGetValue("DibcacReported", out var reportObj) || reportObj is not true)
                     {
@@ -180,7 +180,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckCuiHandling(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.DataClassification.Equals("cui", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("cui", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("CuiMarked", out var markedObj) || markedObj is not true)
                 {

@@ -45,7 +45,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.SecurityFrameworks
                 });
             }
 
-            if (context.OperationType.Equals("change", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("change", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("ChangeControlProcess", out var changeObj) || changeObj is not true)
                 {

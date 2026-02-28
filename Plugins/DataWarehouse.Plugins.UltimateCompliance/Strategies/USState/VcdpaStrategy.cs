@@ -22,7 +22,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USState
             var recommendations = new List<string>();
 
             // Check consumer rights
-            if (context.OperationType.Equals("access-request", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("access-request", StringComparison.OrdinalIgnoreCase))
             {
                 if (context.Attributes.TryGetValue("ResponseDays", out var daysObj) && daysObj is int days && days > 45)
                 {
@@ -54,8 +54,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USState
             }
 
             // Check data protection assessment
-            if (context.OperationType.Equals("targeted-advertising", StringComparison.OrdinalIgnoreCase) ||
-                context.OperationType.Equals("profiling", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("targeted-advertising", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(context.OperationType, "profiling", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("DataProtectionAssessment", out var dpaObj) || dpaObj is not true)
                 {
@@ -71,7 +71,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USState
             }
 
             // Check sensitive data consent
-            if (context.DataClassification.Equals("sensitive", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("sensitive", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("ConsentObtained", out var consentObj) || consentObj is not true)
                 {

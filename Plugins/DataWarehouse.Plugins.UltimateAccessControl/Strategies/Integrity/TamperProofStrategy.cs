@@ -145,10 +145,13 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
 
                 newBlock = newBlock with { Hash = ComputeBlockHash(newBlock) };
 
-                // Create new chain with appended block
+                // Create new chain with appended block — capacity-aware List avoids O(N²) Concat+ToList
+                var newBlocks = new List<TamperProofBlock>(chain.Blocks.Count + 1);
+                newBlocks.AddRange(chain.Blocks);
+                newBlocks.Add(newBlock);
                 var updatedChain = chain with
                 {
-                    Blocks = chain.Blocks.Concat(new[] { newBlock }).ToList()
+                    Blocks = newBlocks
                 };
 
                 _chains[chainId] = updatedChain;

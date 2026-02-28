@@ -21,8 +21,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
-            bool isDsarRequest = context.OperationType.Contains("request", StringComparison.OrdinalIgnoreCase) &&
-                                context.DataSubjectCategories.Any();
+            bool isDsarRequest = !string.IsNullOrEmpty(context.OperationType) &&
+                                context.OperationType.Contains("request", StringComparison.OrdinalIgnoreCase) &&
+                                context.DataSubjectCategories != null && context.DataSubjectCategories.Any();
 
             if (!isDsarRequest)
             {

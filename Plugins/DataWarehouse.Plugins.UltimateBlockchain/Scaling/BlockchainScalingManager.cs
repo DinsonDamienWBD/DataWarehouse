@@ -160,16 +160,8 @@ public sealed class BlockchainScalingManager : IScalableSubsystem, IDisposable
     /// <returns><c>true</c> if the result was cached; otherwise <c>false</c>.</returns>
     public bool TryGetValidation(string blockHash, out bool isValid)
     {
-        var result = _validationCache.GetOrDefault(blockHash);
-        // For value types, GetOrDefault returns default (false) on miss.
-        // Use ContainsKey to distinguish miss from cached-false.
-        if (_validationCache.ContainsKey(blockHash))
-        {
-            isValid = result;
-            return true;
-        }
-        isValid = false;
-        return false;
+        // Single atomic lookup to avoid TOCTOU race between ContainsKey + GetOrDefault
+        return _validationCache.TryGet(blockHash, out isValid);
     }
 
     /// <summary>

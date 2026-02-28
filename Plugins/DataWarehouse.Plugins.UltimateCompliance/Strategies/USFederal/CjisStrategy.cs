@@ -51,8 +51,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckAccessControl(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.DataClassification.Equals("cjis", StringComparison.OrdinalIgnoreCase) ||
-                context.DataSubjectCategories.Contains("criminal-justice", StringComparer.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("cjis", StringComparison.OrdinalIgnoreCase) ||
+                (context.DataSubjectCategories != null && context.DataSubjectCategories.Contains("criminal-justice", StringComparer.OrdinalIgnoreCase)))
             {
                 if (!context.Attributes.TryGetValue("AdvancedAuthentication", out var authObj) || authObj is not true)
                 {
@@ -82,7 +82,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckEncryptionRequirements(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.DataClassification.Equals("cjis", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("cjis", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("Fips140Encryption", out var fipsObj) || fipsObj is not true)
                 {
@@ -96,7 +96,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
                     });
                 }
 
-                if (context.OperationType.Equals("transmission", StringComparison.OrdinalIgnoreCase))
+                if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("transmission", StringComparison.OrdinalIgnoreCase))
                 {
                     if (!context.Attributes.TryGetValue("EncryptionInTransit", out var transitObj) || transitObj is not true)
                     {
@@ -143,8 +143,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckMediaProtection(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.OperationType.Equals("media-disposal", StringComparison.OrdinalIgnoreCase) ||
-                context.OperationType.Equals("media-sanitization", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("media-disposal", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(context.OperationType, "media-sanitization", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("SanitizationMethod", out var methodObj) ||
                     methodObj is not string method ||

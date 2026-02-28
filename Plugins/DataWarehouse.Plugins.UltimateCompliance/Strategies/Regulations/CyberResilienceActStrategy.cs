@@ -93,8 +93,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
                 });
             }
 
-            if (context.DataClassification.Equals("sensitive", StringComparison.OrdinalIgnoreCase) ||
-                context.DataClassification.Equals("critical", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("sensitive", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(context.DataClassification, "critical", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("EncryptionAtRest", out var encryptObj) || encryptObj is not true)
                 {
@@ -112,7 +112,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
 
         private void CheckIncidentReporting(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.OperationType.Equals("security-incident", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("security-incident", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("IncidentSeverity", out var severityObj) ||
                     severityObj is not string severity)

@@ -200,8 +200,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
 
             // Check if classification is provided
             if (string.IsNullOrEmpty(context.DataClassification) ||
-                context.DataClassification.Equals("Standard", StringComparison.OrdinalIgnoreCase) ||
-                context.DataClassification.Equals("Unknown", StringComparison.OrdinalIgnoreCase))
+                string.Equals(context.DataClassification, "Standard", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(context.DataClassification, "Unknown", StringComparison.OrdinalIgnoreCase))
             {
                 // Attempt auto-classification
                 var input = new ClassificationInput

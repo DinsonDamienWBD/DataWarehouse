@@ -50,7 +50,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USState
 
         private void CheckConsumerRights(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.OperationType.Equals("access-request", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("access-request", StringComparison.OrdinalIgnoreCase))
             {
                 if (context.Attributes.TryGetValue("ResponseDays", out var daysObj) &&
                     daysObj is int days && days > 45)
@@ -66,7 +66,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USState
                 }
             }
 
-            if (context.OperationType.Equals("deletion-request", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("deletion-request", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("ServiceProvidersNotified", out var notifyObj) || notifyObj is not true)
                 {
@@ -84,7 +84,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USState
 
         private void CheckSaleOptOut(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.OperationType.Equals("data-sale", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("data-sale", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("DoNotSellLinkProvided", out var linkObj) || linkObj is not true)
                 {
