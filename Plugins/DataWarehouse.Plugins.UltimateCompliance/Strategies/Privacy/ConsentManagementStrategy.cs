@@ -211,13 +211,15 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
                 };
             }
 
-            // Verify token (simplified - in production would validate cryptographically)
-            if (string.IsNullOrEmpty(confirmationToken))
+            // P2-1492: Validate the token against the one stored when the pending consent was created.
+            // Use constant-time comparison to avoid timing attacks on the token.
+            if (string.IsNullOrEmpty(confirmationToken) ||
+                !CryptographicEquals(confirmationToken, consent.DoubleOptInToken))
             {
                 return new ConsentRecordResult
                 {
                     Success = false,
-                    ErrorMessage = "Invalid confirmation token"
+                    ErrorMessage = "Invalid or missing confirmation token"
                 };
             }
 
@@ -588,6 +590,17 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
                 });
         }
 
+        /// <summary>
+        /// P2-1492: Constant-time string comparison to prevent timing-oracle attacks on tokens.
+        /// </summary>
+        private static bool CryptographicEquals(string a, string? b)
+        {
+            if (b is null) return false;
+            return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+                System.Text.Encoding.UTF8.GetBytes(a),
+                System.Text.Encoding.UTF8.GetBytes(b));
+        }
+
         private string GenerateProofOfConsent(ConsentRequest request)
         {
             var proofData = $"{request.SubjectId}|{request.PurposeId}|{DateTime.UtcNow:O}|{request.CollectionMethod}";
@@ -777,6 +790,12 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
         public bool RequiresParentalConsent { get; init; }
         public bool RequiresDoubleOptIn { get; init; }
         public string? PendingConsentId { get; init; }
+        /// <summary>
+        /// P2-1492: When <see cref="RequiresDoubleOptIn"/> is true this contains the
+        /// one-time token that must be passed back to <see cref="ConsentManagementStrategy.ConfirmDoubleOptIn"/>.
+        /// Callers should embed this in the confirmation link/email rather than storing it.
+        /// </summary>
+        public string? ConfirmationToken { get; init; }
     }
 
     /// <summary>
