@@ -1604,6 +1604,8 @@ public sealed class DemandResponseStrategy : SustainabilityStrategyBase
     protected override Task DisposeCoreAsync();
     public async Task RespondToEventAsync(DemandResponseEvent drEvent, CancellationToken ct = default);
     public void EndParticipation();
+    public string? DrApiEndpoint { get; set; }
+    public string? DrApiKey { get; set; }
 }
 ```
 ```csharp
@@ -1863,6 +1865,7 @@ public sealed class FanZone
 {
 }
     public required string Name { get; init; }
+    public string? SysFsPath { get; init; }
     public int MaxRpm { get; init; }
     public int CurrentRpm { get; set; }
     public int CurrentPercent { get; set; }
@@ -2458,6 +2461,10 @@ public sealed class UpsIntegrationStrategy : SustainabilityStrategyBase
 }
     protected override Task InitializeCoreAsync(CancellationToken ct);
     protected override Task DisposeCoreAsync();
+    public int NutPort { get; set; };
+    public string? NutUsername { get; set; }
+    public string? NutPassword { get; set; }
+    public int ConnectTimeoutMs { get; set; };
     public async Task InitiateShutdownAsync(string reason, CancellationToken ct = default);
 }
 ```
@@ -2543,7 +2550,9 @@ public sealed class DiskSpinDownStrategy : SustainabilityStrategyBase
     get
     {
         lock (_lock)
-            return new Dictionary<string, DiskState>(_disks);
+        {
+            return _disks.ToDictionary(kvp => kvp.Key, kvp => new DiskState { Id = kvp.Value.Id, Type = kvp.Value.Type, IsSpunDown = kvp.Value.IsSpunDown, IdleSeconds = kvp.Value.IdleSeconds, LastSpinDown = kvp.Value.LastSpinDown });
+        }
     }
 }
     protected override Task InitializeCoreAsync(CancellationToken ct);

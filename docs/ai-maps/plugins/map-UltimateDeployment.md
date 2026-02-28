@@ -401,10 +401,14 @@ private sealed class DeploymentMonitor
     public required RollbackPolicy Policy { get; init; }
     public DateTimeOffset StartedAt { get; init; }
     public DateTimeOffset LastHealthCheck { get; set; }
-    public int ErrorCount { get; set; }
-    public int TotalRequests { get; set; }
-    public double AverageLatencyMs { get; set; }
-    public int ConsecutiveFailures { get; set; }
+    public int ErrorCountField;
+    public int TotalRequestsField;
+    public double AverageLatencyMsField;
+    public int ConsecutiveFailuresField;
+    public int ErrorCount { get => System.Threading.Volatile.Read(ref ErrorCountField); set => System.Threading.Volatile.Write(ref ErrorCountField, value); }
+    public int TotalRequests;;
+    public double AverageLatencyMs;;
+    public int ConsecutiveFailures { get => System.Threading.Volatile.Read(ref ConsecutiveFailuresField); set => System.Threading.Volatile.Write(ref ConsecutiveFailuresField, value); }
 }
 ```
 ```csharp

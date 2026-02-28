@@ -462,6 +462,9 @@ public sealed class SyncState
     public required string Status { get; set; }
     public DateTimeOffset LastSync { get; set; }
     public long ObjectsSynced { get; set; }
+    public long BytesSynced { get; set; }
+    public int PendingObjects { get; set; }
+    public long PendingBytes { get; set; }
 }
 ```
 ```csharp
@@ -546,6 +549,8 @@ public sealed class EdgeSyncJob
     public DateTimeOffset? LastRun { get; set; }
     public int ObjectsSynced { get; set; }
     public long BytesSynced { get; set; }
+    public int PendingObjects { get; set; }
+    public long PendingBytes { get; set; }
 }
 ```
 ```csharp
@@ -2442,6 +2447,7 @@ public sealed class DatabaseMapping
     public DatabaseType Type { get; init; }
     public required string ProviderId { get; init; }
     public required string ConnectionString { get; init; }
+    public int TableCount { get; set; }
 }
 ```
 ```csharp

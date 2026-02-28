@@ -122,9 +122,9 @@ internal sealed class EdgeSecurityManagerImpl : EC.IEdgeSecurityManager
     public EdgeSecurityManagerImpl(IMessageBus? messageBus);;
     public async Task<EC.AuthenticationResult> AuthenticateNodeAsync(string nodeId, EC.EdgeCredentials credentials, CancellationToken ct = default);
     public Task<EC.AuthorizationResult> AuthorizeOperationAsync(string nodeId, string operationId, string resourceId, CancellationToken ct = default);;
-    public async Task<EC.EncryptionResult> EncryptAsync(string nodeId, ReadOnlyMemory<byte> data, EC.EncryptionOptions options, CancellationToken ct = default);
-    public async Task<ReadOnlyMemory<byte>> DecryptAsync(string nodeId, ReadOnlyMemory<byte> encryptedData, EC.DecryptionOptions options, CancellationToken ct = default);
-    public Task<EC.CertificateResult> ManageCertificateAsync(string nodeId, EC.CertificateOperation operation, CancellationToken ct = default);;
+    public Task<EC.EncryptionResult> EncryptAsync(string nodeId, ReadOnlyMemory<byte> data, EC.EncryptionOptions options, CancellationToken ct = default);
+    public Task<ReadOnlyMemory<byte>> DecryptAsync(string nodeId, ReadOnlyMemory<byte> encryptedData, EC.DecryptionOptions options, CancellationToken ct = default);
+    public Task<EC.CertificateResult> ManageCertificateAsync(string nodeId, EC.CertificateOperation operation, CancellationToken ct = default);
     public Task<EC.SecureTunnel> CreateSecureTunnelAsync(string nodeId, EC.TunnelConfig config, CancellationToken ct = default);;
     public async IAsyncEnumerable<EC.SecurityAuditEntry> GetSecurityAuditAsync(string nodeId, EC.AuditQuery query, [EnumeratorCancellation] CancellationToken ct = default);
     public Task<EC.PolicyEnforcementResult> EnforcePolicyAsync(string nodeId, EC.SecurityPolicy policy, CancellationToken ct = default);

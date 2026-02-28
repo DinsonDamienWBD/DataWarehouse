@@ -547,6 +547,7 @@ public sealed class BadBlockMapExport
 public sealed class GeoRaid
 {
 }
+    public DataWarehouse.SDK.Contracts.IMessageBus? MessageBus { get; set; }
     public void ConfigureCrossDatacenterParity(string arrayId, IEnumerable<DatacenterConfig> datacenters, ParityDistributionStrategy strategy = ParityDistributionStrategy.DistributedParity);
     public void DefineFailureDomain(string domainId, string name, GeographicLocation location, IEnumerable<string> datacenterIds, FailureDomainType domainType = FailureDomainType.Region);
     public StripeAllocation GetLatencyAwareStriping(string arrayId, long blockIndex, LatencyOptimizationMode mode = LatencyOptimizationMode.MinimizeP99);
@@ -703,12 +704,16 @@ public sealed class RaidDeduplication
 public sealed class DedupIndex
 {
 }
+    public string? DevicePath { get; set; }
     public DedupIndex(string arrayId);
     public int Count;;
     public DedupEntry? Lookup(byte[] hash);;
     public void Add(byte[] hash, DedupEntry entry);;
     public void Remove(byte[] hash);;
     public IEnumerable<DedupEntry> GetEntriesWithZeroReferences();;
+    public void UpdateReference(long from, long to);;
+    public void FreeAddress(long address);;
+    public long ResolveAddress(long address);;
 }
 ```
 ```csharp
@@ -860,6 +865,8 @@ public sealed class LegacyPluginAdapter
     public DateTime RegisteredTime { get; set; }
     public DateTime? MigratedTime { get; set; }
     public string? ErrorMessage { get; set; }
+    public Dictionary<string, object>? Configuration { get; set; }
+    public IEnumerable<string>? ArrayIds { get; set; }
 }
 ```
 ```csharp
@@ -880,6 +887,7 @@ public sealed class PluginMigrationOptions
     public bool CreateBackup { get; set; };
     public bool VerifyAfterMigration { get; set; };
     public bool UpdateReferences { get; set; };
+    public bool CopyConfiguration { get; set; };
 }
 ```
 ```csharp
@@ -924,6 +932,7 @@ public sealed class MigrationRegistry
     public void AddEntry(string pluginId, LegacyPluginInfo info);
     public IReadOnlyList<MigrationEntry> GetEntries();;
     public void UpdateStatus(string pluginId, string status);
+    public void SetOption(string pluginId, string key, object value);
 }
 ```
 ```csharp
@@ -935,6 +944,7 @@ public sealed class MigrationEntry
     public DateTime RegisteredTime { get; set; }
     public DateTime? UpdatedTime { get; set; }
     public string Status { get; set; };
+    public Dictionary<string, object> Options { get; set; };
 }
 ```
 ```csharp
@@ -1378,9 +1388,45 @@ public sealed class GrafanaTemplates
 }
 ```
 ```csharp
+public interface IRaidStateProvider
+{
+}
+    IReadOnlyList<ArraySummary> GetArraySummaries();;
+    ArraySummary? GetArray(string arrayId);;
+    ArrayMetricsSummary GetMetrics();;
+}
+```
+```csharp
+public sealed class ArraySummary
+{
+}
+    public string ArrayId { get; set; };
+    public string RaidLevel { get; set; };
+    public string HealthStatus { get; set; };
+    public int TotalDisks { get; set; }
+    public int HealthyDisks { get; set; }
+    public long CapacityBytes { get; set; }
+    public long UsedBytes { get; set; }
+}
+```
+```csharp
+public sealed class ArrayMetricsSummary
+{
+}
+    public double ReadIops { get; set; }
+    public double WriteIops { get; set; }
+    public double ThroughputReadMBps { get; set; }
+    public double ThroughputWriteMBps { get; set; }
+    public double LatencyReadMs { get; set; }
+    public double LatencyWriteMs { get; set; }
+}
+```
+```csharp
 public sealed class RaidCliCommands
 {
 }
+    public RaidCliCommands();
+    public RaidCliCommands(IRaidStateProvider stateProvider);
     public CliResult Execute(string command, string[] args);
 }
 ```
@@ -1388,6 +1434,8 @@ public sealed class RaidCliCommands
 public sealed class RaidRestApi
 {
 }
+    public RaidRestApi();
+    public RaidRestApi(IRaidStateProvider stateProvider);
     public ApiResponse HandleRequest(string method, string path, string? body = null);
 }
 ```
@@ -1627,6 +1675,7 @@ public sealed class ChainLink
 public sealed class QuantumSafeIntegrity
 {
 }
+    public DataWarehouse.SDK.Contracts.IMessageBus? MessageBus { get; set; }
     public QuantumSafeIntegrity(HashAlgorithmType defaultAlgorithm = HashAlgorithmType.SHA3_256);
     public QuantumSafeChecksum CalculateChecksum(byte[] data, HashAlgorithmType algorithm = HashAlgorithmType.Default);
     public bool VerifyChecksum(byte[] data, QuantumSafeChecksum checksum);
@@ -1751,16 +1800,17 @@ public sealed class CowBlockManager
 }
     public const int BlockSize = 4096;
     public CowState CreateCowState(string arrayId, string snapshotId);
+    public void SetBlockCount(string stateId, long blockCount);
     public CowState CreateCloneCowState(string arrayId, string cloneId, string sourceSnapshotId);
     public CowState? GetCowState(string stateId);;
-    public void ReleaseCowState(string stateId);;
+    public void ReleaseCowState(string stateId);
     public IEnumerable<long> GetModifiedBlocks(string stateId);;
-    public IEnumerable<long> GetSharedBlocks(string stateId);;
-    public List<long> GetDeltaBlocks(string fromSnapshotId, string toSnapshotId);;
-    public List<long> GetAllBlocks(string stateId);;
+    public IEnumerable<long> GetSharedBlocks(string stateId);
+    public List<long> GetDeltaBlocks(string fromStateId, string toStateId);
+    public List<long> GetAllBlocks(string stateId);
     public Task<CowWriteResult> CopyOnWriteAsync(string stateId, long blockIndex, byte[] data, CancellationToken ct);
-    public Task MaterializeBlockAsync(string stateId, long blockIndex, CancellationToken ct);;
-    public Task<byte[]> ReadBlockAsync(string stateId, long blockIndex, CancellationToken ct);;
+    public Task MaterializeBlockAsync(string stateId, long blockIndex, CancellationToken ct);
+    public Task<byte[]> ReadBlockAsync(string stateId, long blockIndex, CancellationToken ct);
 }
 ```
 ```csharp
@@ -1862,10 +1912,22 @@ public sealed class Clone
     public string SourceSnapshotId { get; set; };
     public string CowStateId { get; set; };
     public DateTime CreatedTime { get; set; }
-    public DateTime? LastModified { get; set; }
     public CloneStatus Status { get; set; }
-    public long SharedBlocks { get; set; }
-    public long UniqueBlocks { get; set; }
+    internal long _sharedBlocks;
+    internal long _uniqueBlocks;
+    internal long _lastModifiedTicks;
+    public long SharedBlocks { get => Interlocked.Read(ref _sharedBlocks); set => Interlocked.Exchange(ref _sharedBlocks, value); }
+    public long UniqueBlocks { get => Interlocked.Read(ref _uniqueBlocks); set => Interlocked.Exchange(ref _uniqueBlocks, value); }
+    public DateTime? LastModified
+{
+    get
+    {
+        var ticks = Volatile.Read(ref _lastModifiedTicks);
+        return ticks == 0 ? null : new DateTime(ticks, DateTimeKind.Utc);
+    }
+
+    set => Volatile.Write(ref _lastModifiedTicks, value?.Ticks ?? 0);
+}
 }
 ```
 ```csharp

@@ -170,6 +170,17 @@ private class VxWorksQueue
 }
 ```
 ```csharp
+private class VxWorksWatchdog
+{
+}
+    public required string ResourcePath { get; init; }
+    public bool IsExpired { get; set; }
+    public DateTimeOffset? LastKickTime { get; set; }
+    public long KickCount;;
+    public void IncrementKickCount();;
+}
+```
+```csharp
 public sealed class QnxProtocolAdapter : RtosStrategyBase
 {
 }
@@ -304,9 +315,12 @@ private class IoChannel
 }
     public ConcurrentQueue<byte[]> Buffer { get; };
     public SemaphoreSlim DataReady { get; };
-    public long ReadCount { get; set; }
-    public long WriteCount { get; set; }
-    public long DeadlineMissCount { get; set; }
+    public long ReadCount;;
+    public long WriteCount;;
+    public long DeadlineMissCount;;
+    public void IncrementReadCount();;
+    public void IncrementWriteCount();;
+    public void IncrementDeadlineMissCount();;
     public long MinLatencyMicroseconds { get; set; };
     public long MaxLatencyMicroseconds { get; set; }
     public List<long> LatencySamples { get; };
@@ -370,8 +384,10 @@ private class WatchdogContext
     public bool IsEnabled { get; set; }
     public int TimeoutMs { get; set; };
     public bool IsExpired { get; set; }
-    public long KickCount { get; set; }
-    public long ExpiryCount { get; set; }
+    public long KickCount;;
+    public long ExpiryCount;;
+    public void IncrementKickCount();;
+    public void IncrementExpiryCount();;
     public DateTimeOffset? LastKickTime { get; set; }
     public DateTimeOffset? LastRecoveryTime { get; set; }
     public string RecoveryAction { get; set; };

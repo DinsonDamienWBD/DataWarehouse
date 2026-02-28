@@ -1409,9 +1409,9 @@ public sealed class CompoundTransitStrategy : TransitEncryptionPluginBase
     public override string Version;;
     public string PrimaryCipher { get; set; };
     public string SecondaryCipher { get; set; };
-    protected override async Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
-    public override async Task<EndpointCapabilities> GetCapabilitiesAsync(CancellationToken cancellationToken = default);
+    protected override Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
+    public override Task<EndpointCapabilities> GetCapabilitiesAsync(CancellationToken cancellationToken = default);
     public void ConfigureCiphers(string primaryCipher, string secondaryCipher);
     public Dictionary<string, object> GetCascadeInfo();
 }
@@ -1439,9 +1439,9 @@ public sealed class SerpentGcmTransitStrategy : TransitEncryptionPluginBase
     public override string Id;;
     public override string Name;;
     public override string Version;;
-    protected override async Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
-    public override async Task<EndpointCapabilities> GetCapabilitiesAsync(CancellationToken cancellationToken = default);
+    protected override Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
+    public override Task<EndpointCapabilities> GetCapabilitiesAsync(CancellationToken cancellationToken = default);
 }
 ```
 
