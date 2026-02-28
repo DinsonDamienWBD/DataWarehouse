@@ -130,7 +130,7 @@ public sealed class JitteredExponentialBackoffStrategy : ResilienceStrategyBase
     private readonly TimeSpan _maxDelay;
     private readonly double _multiplier;
     private readonly double _jitterFactor;
-    private readonly Random _random = new();
+    private static readonly Random _random = Random.Shared;
 
     public JitteredExponentialBackoffStrategy()
         : this(maxRetries: 3, initialDelay: TimeSpan.FromMilliseconds(500), maxDelay: TimeSpan.FromSeconds(30), multiplier: 2.0, jitterFactor: 0.5)
@@ -598,7 +598,7 @@ public sealed class DecorrelatedJitterRetryStrategy : ResilienceStrategyBase
     private readonly int _maxRetries;
     private readonly TimeSpan _baseDelay;
     private readonly TimeSpan _maxDelay;
-    private readonly Random _random = new();
+    private static readonly Random _random = Random.Shared;
     private TimeSpan _previousDelay;
 
     public DecorrelatedJitterRetryStrategy()

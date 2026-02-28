@@ -535,7 +535,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
         #endregion
 
         /// <inheritdoc/>
-        private Task HandleAnomalyRequestAsync(PluginMessage message)
+        private async Task HandleAnomalyRequestAsync(PluginMessage message)
         {
             var nodeKey = message.Payload.GetValueOrDefault("nodeKey")?.ToString();
             var lagMsStr = message.Payload.GetValueOrDefault("lagMs")?.ToString();
@@ -544,7 +544,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
             {
                 var result = DetectLagAnomaly(nodeKey, lagMs);
 
-                _messageBus.PublishAsync(IntelligenceAnomalyResponseTopic, new PluginMessage
+                await _messageBus.PublishAsync(IntelligenceAnomalyResponseTopic, new PluginMessage
                 {
                     Type = IntelligenceAnomalyResponseTopic,
                     CorrelationId = message.CorrelationId,
@@ -559,8 +559,6 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
                     }
                 });
             }
-
-            return Task.CompletedTask;
         }
 
         /// <inheritdoc/>

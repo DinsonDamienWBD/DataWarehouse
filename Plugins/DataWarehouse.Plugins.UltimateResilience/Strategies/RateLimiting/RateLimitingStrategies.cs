@@ -163,7 +163,7 @@ public sealed class LeakyBucketRateLimitingStrategy : ResilienceStrategyBase
     private readonly ConcurrentQueue<TaskCompletionSource<bool>> _queue = new();
     private readonly SemaphoreSlim _processingLock = new(1, 1);
     private readonly Timer _leakTimer;
-    private bool _disposed;
+    private volatile bool _disposed;
 
     private readonly int _bucketCapacity;
     private readonly TimeSpan _leakInterval;
@@ -286,12 +286,21 @@ public sealed class LeakyBucketRateLimitingStrategy : ResilienceStrategyBase
 
     protected override string? GetCurrentState() => $"Queue: {_queue.Count}/{_bucketCapacity}";
 
-    public new void Dispose()
+    protected override void Dispose(bool disposing)
     {
         if (_disposed) return;
         _disposed = true;
-        _leakTimer.Dispose();
-        _processingLock.Dispose();
+        if (disposing)
+        {
+            _leakTimer.Dispose();
+            _processingLock.Dispose();
+            // Cancel all pending waiters to prevent them leaking forever
+            while (_queue.TryDequeue(out var tcs))
+            {
+                tcs.TrySetCanceled();
+            }
+        }
+        base.Dispose(disposing);
     }
 }
 

@@ -10,13 +10,12 @@ namespace DataWarehouse.Plugins.UltimateResilience.Strategies.Bulkhead;
 /// <summary>
 /// Thread pool isolation bulkhead strategy.
 /// </summary>
-public sealed class ThreadPoolBulkheadStrategy : ResilienceStrategyBase, IDisposable
+public sealed class ThreadPoolBulkheadStrategy : ResilienceStrategyBase
 {
     private readonly SemaphoreSlim _executionSemaphore;
     private readonly SemaphoreSlim _queueSemaphore;
     private int _activeExecutions;
     private int _queuedItems;
-    private bool _disposed;
 
     private readonly int _maxParallelism;
     private readonly int _maxQueueLength;
@@ -37,12 +36,14 @@ public sealed class ThreadPoolBulkheadStrategy : ResilienceStrategyBase, IDispos
     }
 
     /// <summary>Releases semaphore resources.</summary>
-    public new void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        _disposed = true;
-        _executionSemaphore.Dispose();
-        _queueSemaphore.Dispose();
+        if (disposing)
+        {
+            _executionSemaphore.Dispose();
+            _queueSemaphore.Dispose();
+        }
+        base.Dispose(disposing);
     }
 
     public override string StrategyId => "bulkhead-thread-pool";
@@ -166,11 +167,10 @@ public sealed class ThreadPoolBulkheadStrategy : ResilienceStrategyBase, IDispos
 /// <summary>
 /// Semaphore-based bulkhead strategy for simple concurrency limiting.
 /// </summary>
-public sealed class SemaphoreBulkheadStrategy : ResilienceStrategyBase, IDisposable
+public sealed class SemaphoreBulkheadStrategy : ResilienceStrategyBase
 {
     private readonly SemaphoreSlim _semaphore;
     private int _activeExecutions;
-    private bool _disposed;
 
     private readonly int _maxParallelism;
     private readonly TimeSpan _waitTimeout;
@@ -190,11 +190,13 @@ public sealed class SemaphoreBulkheadStrategy : ResilienceStrategyBase, IDisposa
     }
 
     /// <summary>Releases semaphore resources.</summary>
-    public new void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        _disposed = true;
-        _semaphore.Dispose();
+        if (disposing)
+        {
+            _semaphore.Dispose();
+        }
+        base.Dispose(disposing);
     }
 
     public override string StrategyId => "bulkhead-semaphore";

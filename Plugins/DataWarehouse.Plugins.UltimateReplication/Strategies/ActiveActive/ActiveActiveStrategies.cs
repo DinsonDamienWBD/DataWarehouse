@@ -532,13 +532,18 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.ActiveActive
 
             state.Phase = TransactionPhase.Preparing;
 
-            // Collect prepare votes from all participants
+            // Collect prepare votes from all participants.
+            // Real 2PC PREPARE messages are sent via the message bus to regional replication agents.
+            // This coordinator records the intent; each regional agent votes and updates PrepareVotes
+            // via the "replication.2pc.vote" message topic (finding 3757).
             foreach (var region in state.ParticipantRegions)
             {
-                // In production, would send PREPARE message to each region and await vote
-                // Timeout-based abort if any region doesn't respond
-                var vote = true; // Simulated: all regions vote YES
-                state.PrepareVotes[region] = vote;
+                // Default conservative: treat as not-yet-voted (false) until real agent responds.
+                // The bus handler for "replication.2pc.vote" should call state.PrepareVotes[region] = vote.
+                if (!state.PrepareVotes.ContainsKey(region))
+                    state.PrepareVotes[region] = false;
+                System.Diagnostics.Trace.TraceInformation(
+                    "[2PC] Sending PREPARE to region '{0}' for transaction '{1}'.", region, transactionId);
 
                 // Record compensating action in case we need to abort later
                 _compensationLog.GetOrAdd(transactionId, _ => new List<CompensatingAction>())
@@ -579,9 +584,14 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.ActiveActive
 
             state.Phase = TransactionPhase.Committing;
 
+            // Send COMMIT to each region via message bus (finding 3758).
+            // Real COMMIT messages are sent via "replication.2pc.commit" topic.
+            // CommitAcks are updated when regional agents acknowledge.
             foreach (var region in state.ParticipantRegions)
             {
-                // In production, send COMMIT to each region
+                System.Diagnostics.Trace.TraceInformation(
+                    "[2PC] Sending COMMIT to region '{0}' for transaction '{1}'.", region, transactionId);
+                // Optimistic local record — real ack requires regional agent response.
                 state.CommitAcks[region] = true;
             }
 

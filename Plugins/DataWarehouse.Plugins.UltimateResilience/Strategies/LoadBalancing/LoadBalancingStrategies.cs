@@ -268,28 +268,31 @@ public sealed class WeightedRoundRobinLoadBalancingStrategy : LoadBalancingStrat
 
     public override LoadBalancerEndpoint? SelectEndpoint(ResilienceContext? context = null)
     {
-        var healthy = GetHealthyEndpoints();
-        if (healthy.Count == 0) return null;
-
-        // Weighted round-robin algorithm
-        while (true)
+        lock (_endpointsLock)
         {
-            _currentIndex = (_currentIndex + 1) % healthy.Count;
+            var healthy = GetHealthyEndpoints();
+            if (healthy.Count == 0) return null;
 
-            if (_currentIndex == 0)
+            // Weighted round-robin algorithm
+            while (true)
             {
-                _currentWeight -= _gcd;
-                if (_currentWeight <= 0)
+                _currentIndex = (_currentIndex + 1) % healthy.Count;
+
+                if (_currentIndex == 0)
                 {
-                    _currentWeight = _maxWeight;
-                    if (_currentWeight == 0)
-                        return null;
+                    _currentWeight -= _gcd;
+                    if (_currentWeight <= 0)
+                    {
+                        _currentWeight = _maxWeight;
+                        if (_currentWeight == 0)
+                            return null;
+                    }
                 }
-            }
 
-            if (healthy[_currentIndex].Weight >= _currentWeight)
-            {
-                return healthy[_currentIndex];
+                if (healthy[_currentIndex].Weight >= _currentWeight)
+                {
+                    return healthy[_currentIndex];
+                }
             }
         }
     }
@@ -428,7 +431,7 @@ public sealed class LeastConnectionsLoadBalancingStrategy : LoadBalancingStrateg
 /// </summary>
 public sealed class RandomLoadBalancingStrategy : LoadBalancingStrategyBase
 {
-    private readonly Random _random = new();
+    private static readonly Random _random = Random.Shared;
 
     public override string StrategyId => "lb-random";
     public override string StrategyName => "Random Load Balancer";
@@ -840,7 +843,7 @@ public sealed class LeastResponseTimeLoadBalancingStrategy : LoadBalancingStrate
 /// </summary>
 public sealed class PowerOfTwoChoicesLoadBalancingStrategy : LoadBalancingStrategyBase
 {
-    private readonly Random _random = new();
+    private static readonly Random _random = Random.Shared;
 
     public override string StrategyId => "lb-power-of-two";
     public override string StrategyName => "Power of Two Choices Load Balancer";

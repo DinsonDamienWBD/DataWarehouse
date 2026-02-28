@@ -401,7 +401,15 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
             }
 
             if (compliantRegions.Count == 0)
-                compliantRegions = availableRegions; // Fall back if all fail
+            {
+                // All geofence checks failed (compliance service may be unavailable).
+                // Do NOT fall back to all regions — that would violate data-residency regulations.
+                // Abort the placement and surface a fault to the caller.
+                throw new InvalidOperationException(
+                    "Geo-distributed shard placement failed: no compliant regions found. " +
+                    "All geofence checks failed (possible compliance service outage). " +
+                    "Data placement aborted to preserve data-residency compliance.");
+            }
 
             // Distribute shards across continents using consistent hashing with geo-awareness
             var continentGroups = compliantRegions

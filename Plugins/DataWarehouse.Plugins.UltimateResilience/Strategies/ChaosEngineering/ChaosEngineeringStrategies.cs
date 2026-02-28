@@ -15,7 +15,7 @@ public sealed class FaultInjectionStrategy : ResilienceStrategyBase
     private readonly double _faultRate;
     private readonly Type[] _exceptionTypes;
     private readonly string[]? _faultMessages;
-    private readonly Random _random = new();
+    private static readonly Random _random = Random.Shared;
     private bool _enabled = true;
 
     public FaultInjectionStrategy()
@@ -141,7 +141,7 @@ public sealed class LatencyInjectionStrategy : ResilienceStrategyBase
     private readonly double _injectionRate;
     private readonly TimeSpan _minLatency;
     private readonly TimeSpan _maxLatency;
-    private readonly Random _random = new();
+    private static readonly Random _random = Random.Shared;
     private bool _enabled = true;
 
     public LatencyInjectionStrategy()
@@ -252,7 +252,7 @@ public sealed class LatencyInjectionStrategy : ResilienceStrategyBase
 public sealed class ProcessTerminationStrategy : ResilienceStrategyBase
 {
     private readonly double _terminationRate;
-    private readonly Random _random = new();
+    private static readonly Random _random = Random.Shared;
     private bool _enabled = true;
     private readonly Action? _onTermination;
 
@@ -354,7 +354,7 @@ public sealed class ResourceExhaustionStrategy : ResilienceStrategyBase
 {
     private readonly double _exhaustionRate;
     private readonly string[] _resourceTypes;
-    private readonly Random _random = new();
+    private static readonly Random _random = Random.Shared;
     private bool _enabled = true;
 
     public ResourceExhaustionStrategy()
@@ -465,7 +465,7 @@ public sealed class NetworkPartitionStrategy : ResilienceStrategyBase
 {
     private readonly double _partitionRate;
     private readonly TimeSpan _partitionDuration;
-    private readonly Random _random = new();
+    private static readonly Random _random = Random.Shared;
     private bool _enabled = true;
     private DateTimeOffset _partitionEnd = DateTimeOffset.MinValue;
     private readonly object _lock = new();
@@ -614,7 +614,7 @@ public sealed class NetworkPartitionStrategy : ResilienceStrategyBase
 public sealed class ChaosMonkeyStrategy : ResilienceStrategyBase
 {
     private readonly List<(string name, ResilienceStrategyBase strategy, double weight)> _chaosStrategies = new();
-    private readonly Random _random = new();
+    private static readonly Random _random = Random.Shared;
     private bool _enabled = true;
     private readonly double _overallRate;
 

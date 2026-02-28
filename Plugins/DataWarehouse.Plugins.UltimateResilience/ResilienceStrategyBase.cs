@@ -211,8 +211,11 @@ public abstract class ResilienceStrategyBase : StrategyBase, IResilienceStrategy
     private long _retryAttempts;
     private long _circuitBreakerRejections;
     private long _fallbackInvocations;
-    private DateTimeOffset? _lastFailure;
-    private DateTimeOffset? _lastSuccess;
+    // Stored as ticks (0 = never) for atomic read/write via Interlocked
+    private long _lastFailureTicks;
+    private long _lastSuccessTicks;
+    private DateTimeOffset? _lastFailure => _lastFailureTicks == 0 ? (DateTimeOffset?)null : new DateTimeOffset(_lastFailureTicks, TimeSpan.Zero);
+    private DateTimeOffset? _lastSuccess => _lastSuccessTicks == 0 ? (DateTimeOffset?)null : new DateTimeOffset(_lastSuccessTicks, TimeSpan.Zero);
 
     /// <inheritdoc/>
     public abstract override string StrategyId { get; }
@@ -248,12 +251,12 @@ public abstract class ResilienceStrategyBase : StrategyBase, IResilienceStrategy
             if (result.Success)
             {
                 Interlocked.Increment(ref _successfulExecutions);
-                _lastSuccess = DateTimeOffset.UtcNow;
+                Interlocked.Exchange(ref _lastSuccessTicks, DateTimeOffset.UtcNow.UtcTicks);
             }
             else
             {
                 Interlocked.Increment(ref _failedExecutions);
-                _lastFailure = DateTimeOffset.UtcNow;
+                Interlocked.Exchange(ref _lastFailureTicks, DateTimeOffset.UtcNow.UtcTicks);
             }
 
             return result;
@@ -261,7 +264,7 @@ public abstract class ResilienceStrategyBase : StrategyBase, IResilienceStrategy
         catch (Exception ex)
         {
             Interlocked.Increment(ref _failedExecutions);
-            _lastFailure = DateTimeOffset.UtcNow;
+            Interlocked.Exchange(ref _lastFailureTicks, DateTimeOffset.UtcNow.UtcTicks);
 
             return new ResilienceResult<T>
             {
@@ -338,8 +341,8 @@ public abstract class ResilienceStrategyBase : StrategyBase, IResilienceStrategy
         Interlocked.Exchange(ref _retryAttempts, 0);
         Interlocked.Exchange(ref _circuitBreakerRejections, 0);
         Interlocked.Exchange(ref _fallbackInvocations, 0);
-        _lastFailure = null;
-        _lastSuccess = null;
+        Interlocked.Exchange(ref _lastFailureTicks, 0);
+        Interlocked.Exchange(ref _lastSuccessTicks, 0);
 
         while (_executionTimes.TryDequeue(out _)) { }
     }

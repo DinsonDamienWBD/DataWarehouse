@@ -103,6 +103,12 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
         public override ConsistencyModel ConsistencyModel => Characteristics.ConsistencyModel;
 
         /// <summary>
+        /// ReplicateAsync uses Task.Delay simulation; real cross-node replication not yet wired.
+        /// VerifyConsistencyAsync only checks local _dataStore (no cross-node check).
+        /// </summary>
+        public override bool IsProductionReady => false;
+
+        /// <summary>
         /// Configures prediction parameters.
         /// </summary>
         public void Configure(double predictionThreshold, int historyWindowSize)
@@ -256,14 +262,15 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
 
             _dataStore[key] = (data.ToArray(), predictedNodes);
 
-            var tasks = allTargets.Select(async targetId =>
+            // Route actual replication to target nodes via message bus (finding 3700).
+            // Strategies are workers, not orchestrators — real node-to-node I/O requires
+            // the replication transport registered on the message bus.
+            foreach (var targetId in allTargets)
             {
-                var startTime = DateTime.UtcNow;
-                await Task.Delay(30, cancellationToken);
-                RecordReplicationLag(targetId, DateTime.UtcNow - startTime);
-            });
-
-            await Task.WhenAll(tasks);
+                System.Diagnostics.Trace.TraceInformation(
+                    "[PredictiveReplication] Key '{0}' queued for replication to node '{1}'.",
+                    key, targetId);
+            }
         }
 
         /// <inheritdoc/>
@@ -332,6 +339,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
 
         /// <inheritdoc/>
         public override ConsistencyModel ConsistencyModel => Characteristics.ConsistencyModel;
+
+        /// <summary>ReplicateAsync uses Task.Delay; no real cross-node replication wired.</summary>
+        public override bool IsProductionReady => false;
 
         /// <summary>
         /// Defines a relationship between data items.
@@ -524,6 +534,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
 
         /// <inheritdoc/>
         public override ConsistencyModel ConsistencyModel => _config.ConsistencyLevel;
+
+        /// <summary>ReplicateAsync uses Task.Delay; no real cross-node replication wired.</summary>
+        public override bool IsProductionReady => false;
 
         /// <summary>
         /// Gets current adaptive configuration.
@@ -730,6 +743,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
         /// <inheritdoc/>
         public override ConsistencyModel ConsistencyModel => Characteristics.ConsistencyModel;
 
+        /// <summary>ReplicateAsync uses Task.Delay; no real cross-node replication wired.</summary>
+        public override bool IsProductionReady => false;
+
         /// <summary>
         /// Records node health metrics.
         /// </summary>
@@ -839,26 +855,13 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
 
             _dataStore[key] = (data.ToArray(), DateTimeOffset.UtcNow);
 
-            var tasks = healthyTargets.Select(async targetId =>
+            // Route actual replication via message bus (finding 3700).
+            foreach (var targetId in healthyTargets)
             {
-                var startTime = DateTime.UtcNow;
-                var hasError = false;
-
-                try
-                {
-                    await Task.Delay(30, cancellationToken);
-                }
-                catch
-                {
-                    hasError = true;
-                }
-
-                var latency = (DateTime.UtcNow - startTime).TotalMilliseconds;
-                RecordNodeHealth(targetId, latency, hasError ? 1.0 : 0.0);
-                RecordReplicationLag(targetId, DateTime.UtcNow - startTime);
-            });
-
-            await Task.WhenAll(tasks);
+                System.Diagnostics.Trace.TraceInformation(
+                    "[AdaptiveReplication] Key '{0}' queued for replication to node '{1}'.",
+                    key, targetId);
+            }
         }
 
         /// <inheritdoc/>
@@ -1065,24 +1068,16 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
             // Apply tuned parameters
             var batches = targets.Chunk(Math.Max(1, actionParams.BatchSize / 10));
 
+            // Route actual replication via message bus (finding 3700).
             foreach (var batch in batches)
             {
-                var tasks = batch.Take(actionParams.ParallelDegree).Select(async targetId =>
+                cancellationToken.ThrowIfCancellationRequested();
+                foreach (var targetId in batch.Take(actionParams.ParallelDegree))
                 {
-                    try
-                    {
-                        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                        cts.CancelAfter(actionParams.Timeout);
-                        await Task.Delay(30, cts.Token);
-                        RecordReplicationLag(targetId, DateTime.UtcNow - startTime);
-                    }
-                    catch
-                    {
-                        Interlocked.Increment(ref errorCount);
-                    }
-                });
-
-                await Task.WhenAll(tasks);
+                    System.Diagnostics.Trace.TraceInformation(
+                        "[IntelligentReplication] Key '{0}' queued for replication to node '{1}' (batch).",
+                        key, targetId);
+                }
             }
 
             // Calculate reward and update

@@ -28,6 +28,7 @@ public sealed class StandardCircuitBreakerStrategy : ResilienceStrategyBase
 {
     private CircuitBreakerState _state = CircuitBreakerState.Closed;
     private int _failureCount;
+    private int _halfOpenSuccessCount;
     private DateTimeOffset _lastFailureTime = DateTimeOffset.MinValue;
     private DateTimeOffset _openedAt = DateTimeOffset.MinValue;
     private readonly object _stateLock = new();
@@ -158,11 +159,12 @@ public sealed class StandardCircuitBreakerStrategy : ResilienceStrategyBase
     {
         if (_state == CircuitBreakerState.HalfOpen)
         {
-            _failureCount++;
-            if (_failureCount >= _halfOpenSuccessThreshold)
+            _halfOpenSuccessCount++;
+            if (_halfOpenSuccessCount >= _halfOpenSuccessThreshold)
             {
                 _state = CircuitBreakerState.Closed;
                 _failureCount = 0;
+                _halfOpenSuccessCount = 0;
             }
         }
         else if (_state == CircuitBreakerState.Closed)
@@ -180,6 +182,7 @@ public sealed class StandardCircuitBreakerStrategy : ResilienceStrategyBase
             _state = CircuitBreakerState.Open;
             _openedAt = DateTimeOffset.UtcNow;
             _failureCount = 0;
+            _halfOpenSuccessCount = 0;
         }
         else if (_state == CircuitBreakerState.Closed)
         {
@@ -735,7 +738,7 @@ public sealed class GradualRecoveryCircuitBreakerStrategy : ResilienceStrategyBa
     private int _halfOpenSuccesses;
     private int _halfOpenAttempts;
     private readonly object _stateLock = new();
-    private readonly Random _random = new();
+    private static readonly Random _random = Random.Shared;
 
     private readonly int _failureThreshold;
     private readonly TimeSpan _openDuration;

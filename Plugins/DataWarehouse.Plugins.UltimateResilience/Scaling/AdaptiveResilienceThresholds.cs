@@ -39,7 +39,7 @@ public sealed class AdaptiveResilienceThresholds : IDisposable
     private readonly Timer _adaptationTimer;
     private readonly object _optionsLock = new();
     private AdaptiveThresholdOptions _options;
-    private bool _disposed;
+    private int _disposed; // 0 = alive, 1 = disposed (Interlocked)
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AdaptiveResilienceThresholds"/> class.
@@ -71,7 +71,7 @@ public sealed class AdaptiveResilienceThresholds : IDisposable
     /// </summary>
     public void ComputeAndApplyThresholds()
     {
-        if (_disposed) return;
+        if (Volatile.Read(ref _disposed) != 0) return;
 
         AdaptiveThresholdOptions opts;
         lock (_optionsLock)
@@ -242,8 +242,7 @@ public sealed class AdaptiveResilienceThresholds : IDisposable
     /// </summary>
     public void Dispose()
     {
-        if (_disposed) return;
-        _disposed = true;
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         _adaptationTimer.Dispose();
         _adaptiveStates.Clear();
     }

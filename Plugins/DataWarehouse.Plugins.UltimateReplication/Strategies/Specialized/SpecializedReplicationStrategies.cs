@@ -454,8 +454,16 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Specialized
     {
         private readonly BoundedDictionary<string, (byte[] EncryptedData, byte[] IV)> _dataStore = new BoundedDictionary<string, (byte[] EncryptedData, byte[] IV)>(1000);
         private readonly BoundedDictionary<string, byte[]> _nodeKeys = new BoundedDictionary<string, byte[]>(1000);
-        private byte[] _masterKey = new byte[32];
+        private byte[] _masterKey = GenerateInitialKey();
         private EncryptionAlgorithm _algorithm = EncryptionAlgorithm.AES256;
+
+        private static byte[] GenerateInitialKey()
+        {
+            var key = new byte[32];
+            using var rng = RandomNumberGenerator.Create();
+            rng.GetBytes(key);
+            return key;
+        }
 
         /// <summary>
         /// Supported encryption algorithms.
@@ -497,23 +505,28 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Specialized
         public override ConsistencyModel ConsistencyModel => Characteristics.ConsistencyModel;
 
         /// <summary>
-        /// Sets the master encryption key.
+        /// Sets the master encryption key (copies the provided key to prevent external mutation).
         /// </summary>
         public void SetMasterKey(byte[] key)
         {
             if (key.Length != 32)
                 throw new ArgumentException("Master key must be 32 bytes");
-            _masterKey = key;
+            // Copy to prevent caller from retaining a reference to the internal key buffer
+            _masterKey = (byte[])key.Clone();
         }
 
         /// <summary>
-        /// Generates a new master key.
+        /// Generates a new cryptographically random master key and applies it.
+        /// Returns a copy of the generated key; does not expose the internal buffer.
         /// </summary>
         public byte[] GenerateMasterKey()
         {
+            var newKey = new byte[32];
             using var rng = RandomNumberGenerator.Create();
-            rng.GetBytes(_masterKey);
-            return _masterKey;
+            rng.GetBytes(newKey);
+            _masterKey = newKey;
+            // Return a copy so callers can't corrupt the internal key via the returned array
+            return (byte[])_masterKey.Clone();
         }
 
         /// <summary>

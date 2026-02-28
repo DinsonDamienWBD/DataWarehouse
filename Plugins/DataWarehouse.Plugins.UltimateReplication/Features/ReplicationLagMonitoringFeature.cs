@@ -122,12 +122,15 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
                 TargetNode = targetNode
             });
 
-            status.CurrentLagMs = lagMs;
-            status.LastUpdated = DateTimeOffset.UtcNow;
-            status.MaxLagMs = Math.Max(status.MaxLagMs, lagMs);
-            status.MinLagMs = Math.Min(status.MinLagMs, lagMs);
-            status.SampleCount++;
-            status.AverageLagMs = (status.AverageLagMs * (status.SampleCount - 1) + lagMs) / status.SampleCount;
+            lock (status.SyncLock)
+            {
+                status.CurrentLagMs = lagMs;
+                status.LastUpdated = DateTimeOffset.UtcNow;
+                status.MaxLagMs = Math.Max(status.MaxLagMs, lagMs);
+                status.MinLagMs = Math.Min(status.MinLagMs, lagMs);
+                status.SampleCount++;
+                status.AverageLagMs = (status.AverageLagMs * (status.SampleCount - 1) + lagMs) / status.SampleCount;
+            }
 
             // Record history
             var history = _lagHistory.GetOrAdd(nodeKey, _ => new List<LagSample>());
@@ -327,6 +330,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
     /// </summary>
     public sealed class LagNodeStatus
     {
+        // Internal lock to protect concurrent stat updates from multiple monitoring threads.
+        internal readonly object SyncLock = new();
+
         /// <summary>Node pair key (source->target).</summary>
         public required string NodeKey { get; init; }
         /// <summary>Source node ID.</summary>
