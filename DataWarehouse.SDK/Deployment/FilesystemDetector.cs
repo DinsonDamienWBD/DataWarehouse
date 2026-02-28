@@ -218,20 +218,68 @@ public static class FilesystemDetector
     }
 
     [SupportedOSPlatform("linux")]
-    private static Task<long?> GetLinuxBlockSizeAsync(string path, CancellationToken ct)
+    private static async Task<long?> GetLinuxBlockSizeAsync(string path, CancellationToken ct)
     {
-        // For Linux, block size is typically 4096 bytes
-        // More sophisticated detection could read /sys/block/<device>/queue/physical_block_size
-        // but requires mapping path to block device, which is complex
-        // Default to 4096 for simplicity
-        return Task.FromResult<long?>(4096);
+        // Try to read physical_block_size from sysfs for the device backing this path (finding P2-258)
+        try
+        {
+            // Resolve path to its device via /proc/mounts
+            var realPath = System.IO.Path.GetFullPath(path);
+            var mounts = await System.IO.File.ReadAllTextAsync("/proc/mounts", ct).ConfigureAwait(false);
+            string? bestDevice = null;
+            int bestLen = 0;
+            foreach (var line in mounts.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length >= 2 && realPath.StartsWith(parts[1], StringComparison.Ordinal))
+                {
+                    if (parts[1].Length > bestLen)
+                    {
+                        bestLen = parts[1].Length;
+                        bestDevice = parts[0];
+                    }
+                }
+            }
+
+            if (bestDevice != null && bestDevice.StartsWith("/dev/", StringComparison.Ordinal))
+            {
+                var devName = System.IO.Path.GetFileName(bestDevice).TrimEnd('0', '1', '2', '3', '4', '5', '6', '7', '8', '9');
+                var sysfsPath = $"/sys/block/{devName}/queue/physical_block_size";
+                if (System.IO.File.Exists(sysfsPath))
+                {
+                    var txt = await System.IO.File.ReadAllTextAsync(sysfsPath, ct).ConfigureAwait(false);
+                    if (long.TryParse(txt.Trim(), out var blockSize) && blockSize > 0)
+                        return blockSize;
+                }
+            }
+        }
+        catch (OperationCanceledException) { throw; }
+        catch { /* Fall through to default */ }
+
+        // Default: 4096 is the most common physical block size on modern Linux systems
+        return 4096;
     }
 
     [SupportedOSPlatform("windows")]
-    private static Task<long?> GetWindowsBlockSizeAsync(string path, CancellationToken ct)
+    private static async Task<long?> GetWindowsBlockSizeAsync(string path, CancellationToken ct)
     {
-        // For Windows, block size is typically 4096 bytes (4KB sectors)
-        // Could use GetDiskFreeSpace P/Invoke for exact value, but 4096 is safe default
-        return Task.FromResult<long?>(4096);
+        // Attempt to query actual sector size via Win32 IOCTL_STORAGE_QUERY_PROPERTY (finding P2-258)
+        // Falls back to 4096 (standard 4Kn / 512e sector size) if unavailable
+        try
+        {
+            // GetDiskFreeSpace returns sectors-per-cluster and bytes-per-sector
+            var root = System.IO.Path.GetPathRoot(System.IO.Path.GetFullPath(path)) ?? "C:\\";
+            if (GetDiskFreeSpaceW(root, out _, out var bytesPerSector, out _, out _) && bytesPerSector > 0)
+                return bytesPerSector;
+        }
+        catch { /* Fall through to default */ }
+        await Task.CompletedTask.ConfigureAwait(false);
+        return 4096; // Safe default for 512e / 4Kn drives
     }
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    private static extern bool GetDiskFreeSpaceW(string lpRootPathName,
+        out uint lpSectorsPerCluster, out uint lpBytesPerSector,
+        out uint lpNumberOfFreeClusters, out uint lpTotalNumberOfClusters);
 }

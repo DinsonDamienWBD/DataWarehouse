@@ -402,18 +402,19 @@ public abstract class HybridStoragePluginBase<TConfig> : IndexableStoragePluginB
 
     private void HandleListInstances(PluginMessage message)
     {
-        var instances = _connectionRegistry.GetAll().Select(i => new
+        var instances = _connectionRegistry.GetAll().Select(i => new Dictionary<string, object>
         {
-            i.InstanceId,
-            i.Roles,
-            i.Priority,
-            i.Health,
-            i.IsConnected,
-            i.LastActivity,
-            i.Stats
-        }).ToList();
+            ["instanceId"] = i.InstanceId,
+            ["roles"] = (int)i.Roles,
+            ["priority"] = i.Priority,
+            ["health"] = (int)i.Health,
+            ["isConnected"] = i.IsConnected,
+            ["lastActivity"] = i.LastActivity?.ToString("O") ?? string.Empty,
+        }).ToList<object>();
 
-        // Response would be sent via message context
+        // Populate the message payload with the result so callers awaiting this key can retrieve it
+        message.Payload["instances"] = instances;
+        message.Payload["count"] = instances.Count;
     }
 
     private async Task HandleHealthCheckAsync(PluginMessage message)
@@ -436,9 +437,13 @@ public abstract class HybridStoragePluginBase<TConfig> : IndexableStoragePluginB
 
     private async Task HandleAggregateHealthAsync(PluginMessage message)
     {
-        await CheckAllHealthAsync();
+        var instanceHealthMap = await CheckAllHealthAsync();
         var health = GetAggregateHealth();
-        // Response would be sent via message context
+
+        // Populate the message payload with the result so callers awaiting this key can retrieve it
+        message.Payload["aggregateHealth"] = (int)health;
+        message.Payload["aggregateHealthName"] = health.ToString();
+        message.Payload["instanceCount"] = instanceHealthMap.Count;
     }
 
     /// <summary>

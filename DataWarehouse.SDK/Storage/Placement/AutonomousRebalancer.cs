@@ -136,7 +136,7 @@ public sealed class AutonomousRebalancer : IRebalancer, IAsyncDisposable
         if (_jobs.TryGetValue(jobId, out var job) &&
             job.Status is RebalanceStatus.Running or RebalanceStatus.Paused)
         {
-            _jobs[jobId] = job with { Status = RebalanceStatus.Failed };
+            _jobs[jobId] = job with { Status = RebalanceStatus.Cancelled, CompletedUtc = DateTimeOffset.UtcNow };
         }
 
         return Task.CompletedTask;
@@ -169,7 +169,7 @@ public sealed class AutonomousRebalancer : IRebalancer, IAsyncDisposable
 
             yield return job;
 
-            if (job.Status is RebalanceStatus.Completed or RebalanceStatus.Failed)
+            if (job.Status is RebalanceStatus.Completed or RebalanceStatus.Failed or RebalanceStatus.Cancelled)
                 yield break;
 
             await Task.Delay(1000, ct).ConfigureAwait(false);
@@ -228,13 +228,13 @@ public sealed class AutonomousRebalancer : IRebalancer, IAsyncDisposable
                     }
 
                     // If cancelled during pause
-                    if (paused.Status == RebalanceStatus.Failed)
+                    if (paused.Status is RebalanceStatus.Cancelled or RebalanceStatus.Failed)
                         return;
                 }
 
                 // Check if job was cancelled
                 if (_jobs.TryGetValue(jobId, out var jobState) &&
-                    jobState.Status == RebalanceStatus.Failed)
+                    jobState.Status is RebalanceStatus.Cancelled or RebalanceStatus.Failed)
                 {
                     return;
                 }
@@ -283,7 +283,7 @@ public sealed class AutonomousRebalancer : IRebalancer, IAsyncDisposable
             {
                 _jobs[jobId] = cancelledJob with
                 {
-                    Status = RebalanceStatus.Failed,
+                    Status = RebalanceStatus.Cancelled,
                     CompletedUtc = DateTimeOffset.UtcNow,
                     CompletedMoves = completed,
                     FailedMoves = failed

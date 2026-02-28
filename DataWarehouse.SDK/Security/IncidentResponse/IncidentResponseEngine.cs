@@ -32,6 +32,8 @@ namespace DataWarehouse.SDK.Security.IncidentResponse
         private int _disposed;
         // Guards concurrent mutations of Incident.Status/ResolvedAt/Resolution (finding P2-578).
         private readonly object _incidentStateLock = new();
+        // Atomic counter for active incidents — avoids O(n) scan in ActiveIncidentCount (finding P2-580).
+        private int _activeIncidentCount;
 
         /// <summary>
         /// Creates a new incident response engine.
@@ -54,17 +56,8 @@ namespace DataWarehouse.SDK.Security.IncidentResponse
         /// <summary>
         /// Number of active incidents.
         /// </summary>
-        public int ActiveIncidentCount
-        {
-            get
-            {
-                int count = 0;
-                foreach (var i in _incidents.Values)
-                    if (i.Status == IncidentStatus.Open || i.Status == IncidentStatus.Contained)
-                        count++;
-                return count;
-            }
-        }
+        /// <remarks>O(1) — maintained via atomic Interlocked operations on open/resolve paths (finding P2-580).</remarks>
+        public int ActiveIncidentCount => Interlocked.CompareExchange(ref _activeIncidentCount, 0, 0);
 
         /// <summary>
         /// Number of registered auto-response rules.
@@ -113,6 +106,7 @@ namespace DataWarehouse.SDK.Security.IncidentResponse
             };
 
             _incidents[incident.Id.ToString()] = incident;
+            Interlocked.Increment(ref _activeIncidentCount); // Track active count (finding P2-580)
 
             _logger.LogWarning("Security incident created: {IncidentId} [{Severity}] {Description}",
                 incident.Id, severity, description);
@@ -261,9 +255,12 @@ namespace DataWarehouse.SDK.Security.IncidentResponse
 
             lock (_incidentStateLock)
             {
+                bool wasActive = incident.Status == IncidentStatus.Open || incident.Status == IncidentStatus.Contained;
                 incident.Status = IncidentStatus.Resolved;
                 incident.ResolvedAt = DateTimeOffset.UtcNow;
                 incident.Resolution = resolution;
+                if (wasActive)
+                    Interlocked.Decrement(ref _activeIncidentCount); // Maintain O(1) counter (finding P2-580)
             }
 
             await _auditTrail.RecordAsync(ObsAuditEntry.Create(

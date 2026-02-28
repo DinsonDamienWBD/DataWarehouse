@@ -22,7 +22,7 @@ public sealed class PluginDevelopmentCli
     public PluginDevelopmentCli(CliOptions? options = null, ICliOutput? output = null)
     {
         _options = options ?? new CliOptions();
-        _output = output ?? new ConsoleCliOutput();
+        _output = output ?? NullCliOutput.Instance; // P2-423: default to NullCliOutput to avoid unexpected stdout in consumer libraries
 
         RegisterBuiltInCommands();
     }
@@ -286,6 +286,21 @@ public sealed class ConsoleCliOutput : ICliOutput
         Console.WriteLine($"Warning: {text}");
         Console.ResetColor();
     }
+}
+
+/// <summary>
+/// No-op CLI output — discards all messages. Use as default in SDK classes to prevent
+/// unexpected stdout writes in consumer libraries (finding P2-423).
+/// </summary>
+public sealed class NullCliOutput : ICliOutput
+{
+    /// <summary>Singleton instance to avoid repeated allocation.</summary>
+    public static readonly NullCliOutput Instance = new();
+    public void Write(string text) { }
+    public void WriteLine(string text = "") { }
+    public void WriteError(string text) { }
+    public void WriteSuccess(string text) { }
+    public void WriteWarning(string text) { }
 }
 
 public sealed class CliOptions

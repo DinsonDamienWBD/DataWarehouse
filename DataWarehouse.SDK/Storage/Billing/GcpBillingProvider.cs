@@ -157,17 +157,28 @@ public sealed class GcpBillingProvider : IBillingProvider
         }
         else
         {
-            // Without billing account, get project billing info
+            // Without billing account, cost data is unavailable — warn caller so this is not
+            // silently treated as a free-tier / zero-cost result.
+            System.Diagnostics.Trace.TraceWarning(
+                $"[GcpBillingProvider] No billing account configured for project '{_projectId}'. " +
+                "Cost breakdown cannot be retrieved. Set GCP_BILLING_ACCOUNT_ID to enable full billing reports. " +
+                "Returning empty report with TotalCost=0 — this does NOT mean the project has no charges.");
+
+            // Attempt to verify the project is at least billable (confirms credentials work)
             var billingInfoUrl = $"https://cloudbilling.googleapis.com/v1/projects/{_projectId}/billingInfo";
             try
             {
                 var billingInfo = await SendGcpGetRequestAsync(billingInfoUrl, token, ct).ConfigureAwait(false);
-                // Billing info confirms project is billable but doesn't provide cost data
-                // Cost data requires BigQuery export or detailed billing account access
+                var isBillingEnabled = billingInfo.TryGetProperty("billingEnabled", out var be) && be.GetBoolean();
+                if (!isBillingEnabled)
+                {
+                    System.Diagnostics.Trace.TraceWarning(
+                        $"[GcpBillingProvider] Project '{_projectId}' does not have billing enabled.");
+                }
             }
             catch (HttpRequestException)
             {
-                // Billing info not accessible
+                // Billing info not accessible — credentials may lack billing permissions
             }
         }
 
@@ -304,6 +315,9 @@ public sealed class GcpBillingProvider : IBillingProvider
                         var termMonths = plan.Contains("THIRTY_SIX", StringComparison.OrdinalIgnoreCase) ? 36 : 12;
                         var savingsPercent = termMonths == 36 ? 57.0 : 37.0;
 
+                        // TODO (finding P2-618): Parse ReservedPricePerGBMonth/OnDemandPricePerGBMonth
+                        // from GCP Cloud Billing Catalog API (cloudbilling.googleapis.com/v1/services/{serviceId}/skus).
+                        // CUD pricing requires SKU lookup by resource type and region to get per-GB committed/on-demand rates.
                         results.Add(new ReservedCapacity(
                             CloudProvider.GCP,
                             zoneName,

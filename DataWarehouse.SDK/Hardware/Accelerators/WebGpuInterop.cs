@@ -384,12 +384,12 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         private readonly IPlatformCapabilityRegistry _registry;
         private IntPtr _instance;
         private IntPtr _device;
-        private bool _isAvailable;
-        private bool _initialized;
+        private volatile bool _isAvailable;
+        private volatile bool _initialized;
         private long _operationsCompleted;
         private long _totalProcessingTicks; // accumulated via Interlocked.Add (finding P2-371)
         private readonly object _lock = new();
-        private bool _disposed;
+        private volatile bool _disposed;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="WebGpuAccelerator"/> class.

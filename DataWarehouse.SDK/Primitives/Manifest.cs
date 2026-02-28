@@ -94,9 +94,12 @@
         public Dictionary<string, string> Metadata { get; set; } = new();
 
         /// <summary>
-        /// Created datetime in offset
+        /// Created datetime in offset (Unix seconds). Defaults to 0 (Unix epoch) so that
+        /// deserialized manifests preserve the stored creation time rather than appearing
+        /// freshly created (finding P2-546). Callers writing new manifests should set this
+        /// explicitly: <c>CreatedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds()</c>.
         /// </summary>
-        public long CreatedAt { get; set; } = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        public long CreatedAt { get; set; } = 0;
 
         // Security Metadata
 
@@ -136,9 +139,11 @@
         public string CurrentTier { get; set; } = "Warm";
 
         /// <summary>
-        /// Timestamp of last read access (Unix Seconds).
+        /// Timestamp of last read access (Unix Seconds). Defaults to 0 (Unix epoch) so that
+        /// deserialized manifests preserve the stored access time rather than appearing
+        /// freshly accessed (finding P2-546).
         /// </summary>
-        public long LastAccessedAt { get; set; } = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        public long LastAccessedAt { get; set; } = 0;
 
         /// <summary>
         /// Integrity Checksum (SHA256/CRC32).

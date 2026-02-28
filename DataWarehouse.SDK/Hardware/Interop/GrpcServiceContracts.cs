@@ -499,12 +499,27 @@ public sealed class StorageGrpcService : IStorageServiceContract
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Filter expression is evaluated as a URI prefix match when the filter is of the form
+    /// <c>uri LIKE 'prefix%'</c>. Complex SQL-like filters are not yet supported (finding P2-380).
+    /// </remarks>
     public async IAsyncEnumerable<QueryResultEntry> QueryAsync(
         QueryObjectsRequest request, ServiceRequestMetadata? metadata = null,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
-        // Query delegates to list with filter application
-        var entries = await _listHandler("");
+        // Extract URI prefix from simple "uri LIKE 'prefix%'" filter patterns (finding P2-380)
+        string prefix = "";
+        if (!string.IsNullOrEmpty(request.Filter))
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(
+                request.Filter,
+                @"uri\s+LIKE\s+'([^%']+)%'",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (m.Success)
+                prefix = m.Groups[1].Value;
+        }
+
+        var entries = await _listHandler(prefix);
         var count = 0;
         foreach (var (uri, _, _) in entries)
         {

@@ -1,5 +1,7 @@
 using DataWarehouse.SDK.Contracts;
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace DataWarehouse.SDK.Hardware.Hypervisor;
 
@@ -37,6 +39,7 @@ public sealed class BalloonDriver : IBalloonDriver, IDisposable
     private Action<long>? _pressureHandler;
     private readonly object _lock = new();
     private bool _disposed = false;
+    private CancellationTokenSource? _gcMonitorCts; // GC pressure monitoring task (finding P2-379)
 
     /// <summary>
     /// Initializes a new instance of the <see cref="BalloonDriver"/> class.
@@ -79,25 +82,46 @@ public sealed class BalloonDriver : IBalloonDriver, IDisposable
                 return;
             }
 
-            // Subscribe to OS memory pressure notifications
-            // Production implementation would subscribe to hypervisor-specific pressure APIs:
-            //
-            // VMware: Monitor vmballoon driver via /sys/devices/virtual/misc/balloon or
-            //         /proc/vmware/balloon for current target/actual memory values.
-            //
-            // Hyper-V: On Windows, use RegisterForMemoryResourceNotification or monitor
-            //          performance counters. On Linux, monitor hv_balloon via /sys/bus/vmbus.
-            //
-            // KVM: Monitor virtio-balloon via /sys/devices/virtio-pci/*/balloon (Linux).
-            //
-            // Xen: Monitor xen-balloon via /sys/devices/system/xen_memory.
-            //
-            // Cross-platform: Use GC memory pressure notifications (GC.RegisterForFullGCNotification)
-            // or platform-specific APIs (MemoryFailPoint on Windows).
-            //
-            // Current implementation: API contract established, actual monitoring requires
-            // hypervisor-specific testing and may use background threads or event subscriptions.
-            // Handler is stored and ready to be invoked when pressure is detected.
+            // Cross-platform GC pressure monitoring as a baseline signal (finding P2-379).
+            // Full hypervisor-specific implementations (vmballoon, hv_balloon, virtio-balloon)
+            // require platform SDK integration and are tracked for future phases.
+            _gcMonitorCts?.Cancel();
+            _gcMonitorCts?.Dispose();
+            _gcMonitorCts = new CancellationTokenSource();
+            var ct = _gcMonitorCts.Token;
+            var capturedHandler = _pressureHandler;
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    GC.RegisterForFullGCNotification(10, 10);
+                    while (!ct.IsCancellationRequested)
+                    {
+                        var status = GC.WaitForFullGCApproach(millisecondsTimeout: 1000);
+                        if (status == GCNotificationStatus.Succeeded && !ct.IsCancellationRequested)
+                        {
+                            var pressureBytes = GC.GetTotalMemory(false);
+                            capturedHandler?.Invoke(pressureBytes);
+                            GC.WaitForFullGCComplete(millisecondsTimeout: 5000);
+                        }
+                        else if (status == GCNotificationStatus.Canceled || ct.IsCancellationRequested)
+                        {
+                            break;
+                        }
+                        await Task.Delay(500, ct).ConfigureAwait(false);
+                    }
+                }
+                catch (OperationCanceledException) { }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[BalloonDriver] GC pressure monitor failed: {ex.Message}");
+                }
+                finally
+                {
+                    try { GC.CancelFullGCNotification(); } catch { }
+                }
+            }, ct);
         }
     }
 
@@ -135,12 +159,10 @@ public sealed class BalloonDriver : IBalloonDriver, IDisposable
         {
             _pressureHandler = null;
 
-            // Unsubscribe from pressure notifications
-            // When pressure monitoring is implemented, this would:
-            // - Stop background monitoring threads
-            // - Unregister event handlers (GC notifications, performance counters)
-            // - Close file handles to sysfs/proc monitoring files
-            // - Clean up any hypervisor-specific resources
+            // Stop GC pressure monitoring task (finding P2-379)
+            _gcMonitorCts?.Cancel();
+            _gcMonitorCts?.Dispose();
+            _gcMonitorCts = null;
 
             _disposed = true;
         }

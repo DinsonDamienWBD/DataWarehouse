@@ -100,11 +100,8 @@ namespace DataWarehouse.SDK.Primitives
         Storage,
 
         /// <summary>
-        /// Gets or sets the metadata associated with the current object.
+        /// Capabilities related to metadata management: tagging, schema registration, lineage tracking, and catalog operations.
         /// </summary>
-        /// <remarks>Use this property to store or retrieve additional information relevant to the object,
-        /// such as descriptive attributes or custom data. The structure and meaning of the metadata depend on the
-        /// specific implementation and usage context.</remarks>
         Metadata,
 
         /// <summary>
@@ -113,8 +110,7 @@ namespace DataWarehouse.SDK.Primitives
         Security,
 
         /// <summary>
-        /// Gets or sets the transformation matrix that defines the position, rotation, and scale of the object in world
-        /// space.
+        /// Capabilities related to data transformation: encoding, format conversion, normalization, and ETL pipelines.
         /// </summary>
         Transform,
 
@@ -127,7 +123,7 @@ namespace DataWarehouse.SDK.Primitives
         Orchestration,
 
         /// <summary>
-        /// Represents a measure of cognitive ability or reasoning capacity.
+        /// Capabilities provided by AI/ML or Universal Intelligence (T90): embeddings, inference, classification, anomaly detection, and recommendations.
         /// </summary>
         Intelligence,
 

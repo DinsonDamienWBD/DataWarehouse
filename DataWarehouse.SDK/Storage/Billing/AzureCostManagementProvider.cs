@@ -222,6 +222,10 @@ public sealed class AzureCostManagementProvider : IBillingProvider
 
                 var termMonths = term.Contains("3Y", StringComparison.OrdinalIgnoreCase) ? 36 : 12;
 
+                // TODO (finding P2-616): Parse actual ReservedPricePerGBMonth/OnDemandPricePerGBMonth
+                // from Azure Reservations API properties.billingPlan / billingCurrencyTotal.
+                // The Reservations API returns billing details at reservation-order level;
+                // per-GB pricing requires cross-referencing the retail price sheet API.
                 results.Add(new ReservedCapacity(
                     CloudProvider.Azure,
                     "global",

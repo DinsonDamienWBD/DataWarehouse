@@ -950,7 +950,10 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                             Payload = appliedEntry.Payload
                         };
 
-                        foreach (var handler in _commitHandlers)
+                        // Snapshot handlers under lock to prevent concurrent modification (finding P2-426)
+                        Action<Proposal>[] handlers;
+                        lock (_commitHandlersLock) { handlers = _commitHandlers.ToArray(); }
+                        foreach (var handler in handlers)
                         {
                             try
                             {

@@ -41,6 +41,12 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
         /// </summary>
         /// <param name="config">The persistence configuration. Must not be null.</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="config"/> is null.</exception>
+        /// <remarks>
+        /// The internal store defaults to an in-process <see cref="ConcurrentDictionaryDbStore"/> (finding P2-495).
+        /// For production deployments, wire an external database adapter via the plugin system —
+        /// implement <c>IDbPolicyStore</c> (private nested interface) or replace with a database-backed
+        /// <see cref="PolicyPersistenceBase"/> subclass that targets the desired DB technology.
+        /// </remarks>
         public DatabasePolicyPersistence(PolicyPersistenceConfiguration config)
         {
             if (config == null) throw new ArgumentNullException(nameof(config));

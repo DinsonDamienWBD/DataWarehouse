@@ -171,6 +171,7 @@ namespace DataWarehouse.SDK.Security.KeyManagement
             RandomNumberGenerator.Fill(dek);
 
             // Wrap the DEK with KMS
+            // LoadKeyFromStorage base class override has no CancellationToken parameter (finding P2-581).
             var wrappedDek = await EncryptWithKmsAsync(keyId, dek, CancellationToken.None).ConfigureAwait(false);
 
             // Store the wrapped DEK for recovery — the plaintext DEK is returned for use
@@ -747,12 +748,16 @@ namespace DataWarehouse.SDK.Security.KeyManagement
         public async Task<byte[]> WrapKeyAsync(string kekId, byte[] dataKey, ISecurityContext context)
         {
             IncrementCounter("awskms.wrap");
+            // IEnvelopeKeyStore does not expose CancellationToken; ISecurityContext carries none.
+            // Callers needing cancellation should call EncryptWithKmsAsync directly (finding P2-581).
             return await EncryptWithKmsAsync(kekId, dataKey, CancellationToken.None).ConfigureAwait(false);
         }
 
         public async Task<byte[]> UnwrapKeyAsync(string kekId, byte[] wrappedKey, ISecurityContext context)
         {
             IncrementCounter("awskms.unwrap");
+            // IEnvelopeKeyStore does not expose CancellationToken; ISecurityContext carries none.
+            // Callers needing cancellation should call DecryptWithKmsAsync directly (finding P2-581).
             return await DecryptWithKmsAsync(kekId, wrappedKey, CancellationToken.None).ConfigureAwait(false);
         }
 

@@ -43,12 +43,5 @@ public static class CloudProviderFactory
             "GCP" => new GcpProvider(),
             _ => null
         };
-
-        // Production implementation would:
-        // 1. Locate SDK assemblies in deployment directory or well-known path
-        // 2. Create isolated assembly context for each cloud SDK
-        // 3. Load cloud SDK assemblies
-        // 4. Instantiate provider with cloud clients
-        // 5. Return provider or null if SDK not found
     }
 }
