@@ -108,7 +108,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
     [SdkCompatibility("5.0.0", Notes = "Phase 59: PQC migration")]
     public sealed class DilithiumSignature44Strategy : EncryptionStrategyBase
     {
-        private readonly SecureRandom _secureRandom;
 
         /// <inheritdoc/>
         public override CipherInfo CipherInfo => new()
@@ -152,7 +151,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public DilithiumSignature44Strategy()
         {
-            _secureRandom = new SecureRandom();
         }
 
         /// <summary>
@@ -196,7 +194,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 {
                     // Generate ephemeral key pair and sign
                     var (_, privateKey) = DilithiumSignatureHelper.GenerateKeyPair(
-                        MLDsaParameters.ml_dsa_44, _secureRandom);
+                        MLDsaParameters.ml_dsa_44, new SecureRandom());
                     signature = DilithiumSignatureHelper.Sign(plaintext, privateKey, MLDsaParameters.ml_dsa_44);
                 }
 
@@ -248,7 +246,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         public override byte[] GenerateKey()
         {
             var (_, privateKey) = DilithiumSignatureHelper.GenerateKeyPair(
-                MLDsaParameters.ml_dsa_44, _secureRandom);
+                MLDsaParameters.ml_dsa_44, new SecureRandom());
             return privateKey;
         }
 
@@ -257,7 +255,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair()
         {
-            return DilithiumSignatureHelper.GenerateKeyPair(MLDsaParameters.ml_dsa_44, _secureRandom);
+            return DilithiumSignatureHelper.GenerateKeyPair(MLDsaParameters.ml_dsa_44, new SecureRandom());
         }
     }
 
@@ -278,7 +276,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
     [SdkCompatibility("5.0.0", Notes = "Phase 59: PQC migration")]
     public sealed class DilithiumSignature65Strategy : EncryptionStrategyBase
     {
-        private readonly SecureRandom _secureRandom;
 
         /// <inheritdoc/>
         public override CipherInfo CipherInfo => new()
@@ -322,7 +319,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public DilithiumSignature65Strategy()
         {
-            _secureRandom = new SecureRandom();
         }
 
         /// <summary>
@@ -364,7 +360,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 else
                 {
                     var (_, privateKey) = DilithiumSignatureHelper.GenerateKeyPair(
-                        MLDsaParameters.ml_dsa_65, _secureRandom);
+                        MLDsaParameters.ml_dsa_65, new SecureRandom());
                     signature = DilithiumSignatureHelper.Sign(plaintext, privateKey, MLDsaParameters.ml_dsa_65);
                 }
 
@@ -413,7 +409,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         public override byte[] GenerateKey()
         {
             var (_, privateKey) = DilithiumSignatureHelper.GenerateKeyPair(
-                MLDsaParameters.ml_dsa_65, _secureRandom);
+                MLDsaParameters.ml_dsa_65, new SecureRandom());
             return privateKey;
         }
 
@@ -422,7 +418,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair()
         {
-            return DilithiumSignatureHelper.GenerateKeyPair(MLDsaParameters.ml_dsa_65, _secureRandom);
+            return DilithiumSignatureHelper.GenerateKeyPair(MLDsaParameters.ml_dsa_65, new SecureRandom());
         }
     }
 
@@ -443,7 +439,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
     [SdkCompatibility("5.0.0", Notes = "Phase 59: PQC migration")]
     public sealed class DilithiumSignature87Strategy : EncryptionStrategyBase
     {
-        private readonly SecureRandom _secureRandom;
 
         /// <inheritdoc/>
         public override CipherInfo CipherInfo => new()
@@ -487,7 +482,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public DilithiumSignature87Strategy()
         {
-            _secureRandom = new SecureRandom();
         }
 
         /// <summary>
@@ -529,7 +523,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 else
                 {
                     var (_, privateKey) = DilithiumSignatureHelper.GenerateKeyPair(
-                        MLDsaParameters.ml_dsa_87, _secureRandom);
+                        MLDsaParameters.ml_dsa_87, new SecureRandom());
                     signature = DilithiumSignatureHelper.Sign(plaintext, privateKey, MLDsaParameters.ml_dsa_87);
                 }
 
@@ -578,7 +572,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         public override byte[] GenerateKey()
         {
             var (_, privateKey) = DilithiumSignatureHelper.GenerateKeyPair(
-                MLDsaParameters.ml_dsa_87, _secureRandom);
+                MLDsaParameters.ml_dsa_87, new SecureRandom());
             return privateKey;
         }
 
@@ -587,7 +581,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair()
         {
-            return DilithiumSignatureHelper.GenerateKeyPair(MLDsaParameters.ml_dsa_87, _secureRandom);
+            return DilithiumSignatureHelper.GenerateKeyPair(MLDsaParameters.ml_dsa_87, new SecureRandom());
         }
     }
 }

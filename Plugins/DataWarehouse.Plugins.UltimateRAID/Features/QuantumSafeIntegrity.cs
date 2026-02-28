@@ -327,7 +327,7 @@ public sealed class QuantumSafeIntegrity
         {
             IsValid = isValid,
             AttestationId = attestationId,
-            TransactionHash = attestation.TransactionHash,
+            TransactionHash = attestation.TransactionHash ?? Array.Empty<byte>(),
             BlockNumber = onChainConfirmed ? GenerateSimulatedBlockNumber() : 0,
             Timestamp = attestation.CreatedTime,
             Network = attestation.Network,

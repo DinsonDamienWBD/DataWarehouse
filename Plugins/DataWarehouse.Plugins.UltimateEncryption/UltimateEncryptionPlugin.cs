@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Reflection;
 using System.Runtime.Intrinsics.X86;
 using System.Security.Cryptography;
@@ -49,6 +50,12 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
     private readonly EncryptionStrategyRegistry _registry;
     private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private bool _disposed;
+
+    // Single-use key escrow: key material is never placed on the message bus (#2969).
+    // Callers receive a claim ID; they retrieve and consume the key via a claim call.
+    // Entries expire after 60 seconds to prevent unbounded accumulation.
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (byte[] Key, DateTime Expiry)> _keyEscrow
+        = new();
 
     // Hardware acceleration flags
     private readonly bool _aesNiAvailable;
@@ -331,6 +338,7 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
             "encryption.cascade" => HandleCascadeEncryptAsync(message),
             "encryption.reencrypt" => HandleReencryptAsync(message),
             "encryption.generate-key" => HandleGenerateKeyAsync(message),
+            "encryption.claim-key" => HandleClaimKeyAsync(message),
             _ => base.OnMessageAsync(message)
         };
     }
@@ -471,8 +479,13 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
         }
         else
         {
+            // Key is generated internally and escrowed — never written to the message bus (#2969).
+            // The caller receives a claim ID and must call "claimKey" to retrieve the key once,
+            // after which the escrow entry is removed.
             key = strategy.GenerateKey();
-            message.Payload["generatedKey"] = key;
+            var claimId = Guid.NewGuid().ToString("N");
+            _keyEscrow[claimId] = (key, DateTime.UtcNow.AddSeconds(60));
+            message.Payload["generatedKeyClaimId"] = claimId;
         }
 
         var aad = message.Payload.TryGetValue("associatedData", out var aadObj) && aadObj is byte[] associatedData
@@ -665,13 +678,17 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
         }
 
         var currentData = data;
-        var keys = new List<byte[]>();
+        var keyClaimIds = new List<string>();
 
         foreach (var strategyId in ids)
         {
             var strategy = GetStrategyOrThrow(strategyId);
             var key = strategy.GenerateKey();
-            keys.Add(key);
+
+            // Escrow the key — never write key material to the message bus (#2969).
+            var claimId = Guid.NewGuid().ToString("N");
+            _keyEscrow[claimId] = (key, DateTime.UtcNow.AddSeconds(60));
+            keyClaimIds.Add(claimId);
 
             currentData = await strategy.EncryptAsync(currentData, key);
 
@@ -680,7 +697,7 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
         }
 
         message.Payload["result"] = currentData;
-        message.Payload["keys"] = keys;
+        message.Payload["keyClaimIds"] = keyClaimIds; // Callers retrieve keys via claimKey message
         message.Payload["strategyIds"] = ids;
 
         // Update inherited stats for full cascade (count each strategy pass)
@@ -738,10 +755,43 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
         var strategy = GetStrategyOrThrow(strategyId);
         var key = strategy.GenerateKey();
 
+        // NOTE: HandleGenerateKeyAsync is a direct key-generation helper for callers that
+        // explicitly request it. The key IS returned here because the caller explicitly owns it.
+        // Unlike encrypt which auto-generates keys and leaks them via bus, this is intentional.
         message.Payload["key"] = key;
         message.Payload["keySizeBits"] = strategy.CipherInfo.KeySizeBits;
         message.Payload["strategyId"] = strategyId;
 
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Handles "encryption.claim-key" messages. Retrieves escrowed key material by claim ID
+    /// (single-use — the entry is removed after retrieval to prevent key re-use via the bus).
+    /// Expired entries are pruned automatically.
+    /// </summary>
+    private Task HandleClaimKeyAsync(PluginMessage message)
+    {
+        if (!message.Payload.TryGetValue("claimId", out var claimIdObj) || claimIdObj is not string claimId)
+            throw new ArgumentException("Missing or invalid 'claimId' parameter");
+
+        // Prune expired entries to prevent unbounded growth
+        var now = DateTime.UtcNow;
+        foreach (var expiredKey in _keyEscrow.Where(kv => kv.Value.Expiry < now).Select(kv => kv.Key).ToList())
+            _keyEscrow.TryRemove(expiredKey, out _);
+
+        if (!_keyEscrow.TryRemove(claimId, out var entry))
+        {
+            throw new InvalidOperationException($"Key claim '{claimId}' not found or already consumed");
+        }
+
+        if (entry.Expiry < now)
+        {
+            CryptographicOperations.ZeroMemory(entry.Key);
+            throw new InvalidOperationException($"Key claim '{claimId}' has expired");
+        }
+
+        message.Payload["key"] = entry.Key;
         return Task.CompletedTask;
     }
 

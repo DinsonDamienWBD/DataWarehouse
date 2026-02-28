@@ -168,7 +168,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
     [SdkCompatibility("5.0.0", Notes = "Phase 59: Crypto key rotation")]
     public sealed class KyberKem512Strategy : EncryptionStrategyBase
     {
-        private readonly SecureRandom _secureRandom;
 
         /// <inheritdoc/>
         public override CipherInfo CipherInfo => new()
@@ -208,7 +207,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public KyberKem512Strategy()
         {
-            _secureRandom = new SecureRandom();
         }
 
         /// <summary>
@@ -240,7 +238,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 KyberKemHelper.Encrypt(
                     NtruParameters.NtruHps2048509,
                     plaintext, key, associatedData,
-                    _secureRandom, GenerateIv),
+                    new SecureRandom(), GenerateIv),
                 cancellationToken);
         }
 
@@ -264,7 +262,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public override byte[] GenerateKey()
         {
-            var (_, privateKey) = KyberKemHelper.GenerateKeyPair(NtruParameters.NtruHps2048509, _secureRandom);
+            var (_, privateKey) = KyberKemHelper.GenerateKeyPair(NtruParameters.NtruHps2048509, new SecureRandom());
             return privateKey;
         }
 
@@ -273,7 +271,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair()
         {
-            return KyberKemHelper.GenerateKeyPair(NtruParameters.NtruHps2048509, _secureRandom);
+            return KyberKemHelper.GenerateKeyPair(NtruParameters.NtruHps2048509, new SecureRandom());
         }
     }
 
@@ -296,7 +294,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
     [SdkCompatibility("5.0.0", Notes = "Phase 59: Crypto key rotation")]
     public sealed class KyberKem768Strategy : EncryptionStrategyBase
     {
-        private readonly SecureRandom _secureRandom;
 
         /// <inheritdoc/>
         public override CipherInfo CipherInfo => new()
@@ -337,7 +334,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public KyberKem768Strategy()
         {
-            _secureRandom = new SecureRandom();
         }
 
         /// <summary>
@@ -369,7 +365,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 KyberKemHelper.Encrypt(
                     NtruParameters.NtruHps2048677,
                     plaintext, key, associatedData,
-                    _secureRandom, GenerateIv),
+                    new SecureRandom(), GenerateIv),
                 cancellationToken);
         }
 
@@ -393,7 +389,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public override byte[] GenerateKey()
         {
-            var (_, privateKey) = KyberKemHelper.GenerateKeyPair(NtruParameters.NtruHps2048677, _secureRandom);
+            var (_, privateKey) = KyberKemHelper.GenerateKeyPair(NtruParameters.NtruHps2048677, new SecureRandom());
             return privateKey;
         }
 
@@ -402,7 +398,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair()
         {
-            return KyberKemHelper.GenerateKeyPair(NtruParameters.NtruHps2048677, _secureRandom);
+            return KyberKemHelper.GenerateKeyPair(NtruParameters.NtruHps2048677, new SecureRandom());
         }
     }
 
@@ -425,7 +421,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
     [SdkCompatibility("5.0.0", Notes = "Phase 59: Crypto key rotation")]
     public sealed class KyberKem1024Strategy : EncryptionStrategyBase
     {
-        private readonly SecureRandom _secureRandom;
 
         /// <inheritdoc/>
         public override CipherInfo CipherInfo => new()
@@ -465,7 +460,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public KyberKem1024Strategy()
         {
-            _secureRandom = new SecureRandom();
         }
 
         /// <summary>
@@ -497,7 +491,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 KyberKemHelper.Encrypt(
                     NtruParameters.NtruHps4096821,
                     plaintext, key, associatedData,
-                    _secureRandom, GenerateIv),
+                    new SecureRandom(), GenerateIv),
                 cancellationToken);
         }
 
@@ -521,7 +515,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public override byte[] GenerateKey()
         {
-            var (_, privateKey) = KyberKemHelper.GenerateKeyPair(NtruParameters.NtruHps4096821, _secureRandom);
+            var (_, privateKey) = KyberKemHelper.GenerateKeyPair(NtruParameters.NtruHps4096821, new SecureRandom());
             return privateKey;
         }
 
@@ -530,7 +524,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair()
         {
-            return KyberKemHelper.GenerateKeyPair(NtruParameters.NtruHps4096821, _secureRandom);
+            return KyberKemHelper.GenerateKeyPair(NtruParameters.NtruHps4096821, new SecureRandom());
         }
     }
 }

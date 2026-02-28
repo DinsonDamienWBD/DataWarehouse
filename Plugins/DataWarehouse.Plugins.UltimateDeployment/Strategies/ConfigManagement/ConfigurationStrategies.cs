@@ -88,7 +88,7 @@ public sealed class ConsulConfigStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
-        IncrementCounter("consul_config.deploy");
+        IncrementCounter("consul_config.rollback");
         var keyPrefix = currentState.Metadata.TryGetValue("keyPrefix", out var kp) ? kp?.ToString() : "";
         var versionKey = $"{keyPrefix}:{targetVersion}";
 
@@ -241,7 +241,7 @@ public sealed class EtcdConfigStrategy : DeploymentStrategyBase
     protected override async Task<DeploymentState> RollbackCoreAsync(
         string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
-        IncrementCounter("spring_cloud_config.deploy");
+        IncrementCounter("etcd_config.rollback");
         var keyPrefix = currentState.Metadata.TryGetValue("keyPrefix", out var kp) ? kp?.ToString() : "";
         await RollbackToRevisionAsync(keyPrefix!, targetVersion, ct);
         return currentState with { Health = DeploymentHealth.Healthy, Version = targetVersion, ProgressPercent = 100, CompletedAt = DateTimeOffset.UtcNow };
@@ -333,7 +333,7 @@ public sealed class SpringCloudConfigStrategy : DeploymentStrategyBase
     protected override async Task<DeploymentState> RollbackCoreAsync(
         string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
-        IncrementCounter("aws_app_config.deploy");
+        IncrementCounter("spring_cloud_config.rollback");
         var configServerUrl = currentState.Metadata.TryGetValue("configServerUrl", out var cs) ? cs?.ToString() : "";
         var application = currentState.Metadata.TryGetValue("application", out var app) ? app?.ToString() : "";
 
@@ -431,12 +431,14 @@ public sealed class AwsAppConfigStrategy : DeploymentStrategyBase
     protected override async Task<DeploymentState> RollbackCoreAsync(
         string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
-        IncrementCounter("azure_app_configuration.deploy");
+        IncrementCounter("aws_app_config.rollback");
         var appId = currentState.Metadata.TryGetValue("applicationId", out var ai) ? ai?.ToString() : "";
         var envId = currentState.Metadata.TryGetValue("environmentId", out var ei) ? ei?.ToString() : "";
         var profileId = currentState.Metadata.TryGetValue("configProfileId", out var pi) ? pi?.ToString() : "";
 
-        await RollbackDeploymentAsync(appId!, envId!, profileId!, int.Parse(targetVersion), ct);
+        if (!int.TryParse(targetVersion, out var deploymentNumber))
+            throw new ArgumentException($"Invalid AWS AppConfig deployment number '{targetVersion}': must be a positive integer.", nameof(targetVersion));
+        await RollbackDeploymentAsync(appId!, envId!, profileId!, deploymentNumber, ct);
 
         return currentState with { Health = DeploymentHealth.Healthy, Version = targetVersion, ProgressPercent = 100, CompletedAt = DateTimeOffset.UtcNow };
     }
@@ -529,7 +531,7 @@ public sealed class AzureAppConfigurationStrategy : DeploymentStrategyBase
     protected override async Task<DeploymentState> RollbackCoreAsync(
         string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
-        IncrementCounter("kubernetes_config_map.deploy");
+        IncrementCounter("azure_app_configuration.rollback");
         var configStoreEndpoint = currentState.Metadata.TryGetValue("configStoreEndpoint", out var cs) ? cs?.ToString() : "";
         await RestoreSnapshotAsync(configStoreEndpoint!, targetVersion, ct);
         return currentState with { Health = DeploymentHealth.Healthy, Version = targetVersion, ProgressPercent = 100, CompletedAt = DateTimeOffset.UtcNow };
@@ -622,6 +624,7 @@ public sealed class KubernetesConfigMapStrategy : DeploymentStrategyBase
     protected override async Task<DeploymentState> RollbackCoreAsync(
         string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("kubernetes_config_map.rollback");
         var namespace_ = currentState.Metadata.TryGetValue("namespace", out var ns) ? ns?.ToString() : "";
         var configMapName = currentState.Metadata.TryGetValue("configMapName", out var cm) ? cm?.ToString() : "";
 

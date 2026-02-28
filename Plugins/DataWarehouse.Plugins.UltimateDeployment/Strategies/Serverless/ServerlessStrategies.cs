@@ -79,7 +79,7 @@ public sealed class AwsLambdaStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
-        IncrementCounter("aws_lambda.deploy");
+        IncrementCounter("aws_lambda.rollback");
         var functionName = currentState.Metadata.TryGetValue("functionName", out var fn) ? fn?.ToString() : "";
         var aliasName = currentState.Metadata.TryGetValue("aliasName", out var an) ? an?.ToString() : "prod";
 
@@ -327,7 +327,7 @@ public sealed class AzureFunctionsStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
-        IncrementCounter("aws_app_runner.deploy");
+        IncrementCounter("azure_functions.rollback");
         var resourceGroup = currentState.Metadata.TryGetValue("resourceGroup", out var rg) ? rg?.ToString() : "";
         var functionAppName = currentState.Metadata.TryGetValue("functionAppName", out var fn) ? fn?.ToString() : "";
         var slotName = currentState.Metadata.TryGetValue("slotName", out var sn) ? sn?.ToString() : "staging";
@@ -582,6 +582,7 @@ public sealed class GoogleCloudFunctionsStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
+        IncrementCounter("google_cloud_functions.rollback");
         var project = currentState.Metadata.TryGetValue("project", out var p) ? p?.ToString() : "";
         var region = currentState.Metadata.TryGetValue("region", out var r) ? r?.ToString() : "";
         var functionName = currentState.Metadata.TryGetValue("functionName", out var fn) ? fn?.ToString() : "";
@@ -714,6 +715,7 @@ public sealed class CloudflareWorkersStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
+        IncrementCounter("cloudflare_workers.rollback");
         var accountId = currentState.Metadata.TryGetValue("accountId", out var ai) ? ai?.ToString() : "";
         var workerName = currentState.Metadata.TryGetValue("workerName", out var wn) ? wn?.ToString() : "";
 
@@ -834,6 +836,7 @@ public sealed class AwsAppRunnerStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("aws_app_runner.rollback");
         var serviceArn = currentState.Metadata.TryGetValue("serviceArn", out var sa) ? sa?.ToString() : "";
         await RollbackServiceAsync(serviceArn!, targetVersion, ct);
         return currentState with { Health = DeploymentHealth.Healthy, Version = targetVersion, ProgressPercent = 100, CompletedAt = DateTimeOffset.UtcNow };
@@ -924,6 +927,7 @@ public sealed class GoogleCloudRunStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("google_cloud_run.rollback");
         var project = currentState.Metadata.TryGetValue("project", out var p) ? p?.ToString() : "";
         var region = currentState.Metadata.TryGetValue("region", out var r) ? r?.ToString() : "";
         var serviceName = currentState.Metadata.TryGetValue("serviceName", out var sn) ? sn?.ToString() : "";
@@ -1002,6 +1006,7 @@ public sealed class AzureContainerAppsStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("azure_container_apps.rollback");
         var rg = currentState.Metadata.TryGetValue("resourceGroup", out var r) ? r?.ToString() : "";
         var app = currentState.Metadata.TryGetValue("appName", out var a) ? a?.ToString() : "";
         await UpdateTrafficAsync(rg!, app!, targetVersion, 100, ct);

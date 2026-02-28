@@ -38,7 +38,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
     [SdkCompatibility("5.0.0", Notes = "Phase 59: Crypto key rotation")]
     public sealed class MlKem512Strategy : EncryptionStrategyBase
     {
-        private readonly SecureRandom _secureRandom;
 
         /// <inheritdoc/>
         public override CipherInfo CipherInfo => new()
@@ -95,7 +94,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public MlKem512Strategy()
         {
-            _secureRandom = new SecureRandom();
         }
 
         /// <inheritdoc/>
@@ -111,7 +109,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 var recipientPublicKey = NtruPublicKeyParameters.FromEncoding(NtruParameters.NtruHps2048509, key);
 
                 // Encapsulate to derive shared secret
-                var kemGenerator = new NtruKemGenerator(_secureRandom);
+                var kemGenerator = new NtruKemGenerator(new SecureRandom());
                 var encapsulated = kemGenerator.GenerateEncapsulated(recipientPublicKey);
 
                 var kemCiphertext = encapsulated.GetEncapsulation();
@@ -207,7 +205,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public override byte[] GenerateKey()
         {
-            var keyGenParams = new NtruKeyGenerationParameters(_secureRandom, NtruParameters.NtruHps2048509);
+            var keyGenParams = new NtruKeyGenerationParameters(new SecureRandom(), NtruParameters.NtruHps2048509);
             var keyPairGenerator = new NtruKeyPairGenerator();
             keyPairGenerator.Init(keyGenParams);
             var keyPair = keyPairGenerator.GenerateKeyPair();
@@ -220,7 +218,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair()
         {
-            var keyGenParams = new NtruKeyGenerationParameters(_secureRandom, NtruParameters.NtruHps2048509);
+            var keyGenParams = new NtruKeyGenerationParameters(new SecureRandom(), NtruParameters.NtruHps2048509);
             var keyPairGenerator = new NtruKeyPairGenerator();
             keyPairGenerator.Init(keyGenParams);
             var keyPair = keyPairGenerator.GenerateKeyPair();
@@ -250,7 +248,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
     [SdkCompatibility("5.0.0", Notes = "Phase 59: Crypto key rotation")]
     public sealed class MlKem768Strategy : EncryptionStrategyBase
     {
-        private readonly SecureRandom _secureRandom;
 
         /// <inheritdoc/>
         public override CipherInfo CipherInfo => new()
@@ -284,7 +281,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
 
         public MlKem768Strategy()
         {
-            _secureRandom = new SecureRandom();
         }
 
         /// <inheritdoc/>
@@ -297,7 +293,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
             return await Task.Run(() =>
             {
                 var recipientPublicKey = NtruPublicKeyParameters.FromEncoding(NtruParameters.NtruHps2048677, key);
-                var kemGenerator = new NtruKemGenerator(_secureRandom);
+                var kemGenerator = new NtruKemGenerator(new SecureRandom());
                 var encapsulated = kemGenerator.GenerateEncapsulated(recipientPublicKey);
 
                 var kemCiphertext = encapsulated.GetEncapsulation();
@@ -384,7 +380,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public override byte[] GenerateKey()
         {
-            var keyGenParams = new NtruKeyGenerationParameters(_secureRandom, NtruParameters.NtruHps2048677);
+            var keyGenParams = new NtruKeyGenerationParameters(new SecureRandom(), NtruParameters.NtruHps2048677);
             var keyPairGenerator = new NtruKeyPairGenerator();
             keyPairGenerator.Init(keyGenParams);
             var keyPair = keyPairGenerator.GenerateKeyPair();
@@ -397,7 +393,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair()
         {
-            var keyGenParams = new NtruKeyGenerationParameters(_secureRandom, NtruParameters.NtruHps2048677);
+            var keyGenParams = new NtruKeyGenerationParameters(new SecureRandom(), NtruParameters.NtruHps2048677);
             var keyPairGenerator = new NtruKeyPairGenerator();
             keyPairGenerator.Init(keyGenParams);
             var keyPair = keyPairGenerator.GenerateKeyPair();
@@ -427,7 +423,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
     [SdkCompatibility("5.0.0", Notes = "Phase 59: Crypto key rotation")]
     public sealed class MlKem1024Strategy : EncryptionStrategyBase
     {
-        private readonly SecureRandom _secureRandom;
 
         /// <inheritdoc/>
         public override CipherInfo CipherInfo => new()
@@ -461,7 +456,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
 
         public MlKem1024Strategy()
         {
-            _secureRandom = new SecureRandom();
         }
 
         /// <inheritdoc/>
@@ -474,7 +468,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
             return await Task.Run(() =>
             {
                 var recipientPublicKey = NtruPublicKeyParameters.FromEncoding(NtruParameters.NtruHps4096821, key);
-                var kemGenerator = new NtruKemGenerator(_secureRandom);
+                var kemGenerator = new NtruKemGenerator(new SecureRandom());
                 var encapsulated = kemGenerator.GenerateEncapsulated(recipientPublicKey);
 
                 var kemCiphertext = encapsulated.GetEncapsulation();
@@ -561,7 +555,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public override byte[] GenerateKey()
         {
-            var keyGenParams = new NtruKeyGenerationParameters(_secureRandom, NtruParameters.NtruHps4096821);
+            var keyGenParams = new NtruKeyGenerationParameters(new SecureRandom(), NtruParameters.NtruHps4096821);
             var keyPairGenerator = new NtruKeyPairGenerator();
             keyPairGenerator.Init(keyGenParams);
             var keyPair = keyPairGenerator.GenerateKeyPair();
@@ -574,7 +568,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair()
         {
-            var keyGenParams = new NtruKeyGenerationParameters(_secureRandom, NtruParameters.NtruHps4096821);
+            var keyGenParams = new NtruKeyGenerationParameters(new SecureRandom(), NtruParameters.NtruHps4096821);
             var keyPairGenerator = new NtruKeyPairGenerator();
             keyPairGenerator.Init(keyGenParams);
             var keyPair = keyPairGenerator.GenerateKeyPair();

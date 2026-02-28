@@ -125,7 +125,7 @@ public sealed class CanaryStrategy : DeploymentStrategyBase
 
         // Phase 5: Complete - scale up remaining instances
         await ScaleToFullAsync(config, ct);
-        _canaryStates.Remove(state.DeploymentId);
+        _canaryStates.TryRemove(state.DeploymentId, out _);
 
         return state with
         {
@@ -156,7 +156,7 @@ public sealed class CanaryStrategy : DeploymentStrategyBase
         // Remove canary instances
         await RemoveCanaryInstancesAsync(deploymentId, ct);
 
-        _canaryStates.Remove(deploymentId);
+        _canaryStates.TryRemove(deploymentId, out _);
 
         return currentState with
         {

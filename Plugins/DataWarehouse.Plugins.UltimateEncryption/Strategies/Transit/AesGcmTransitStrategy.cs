@@ -153,7 +153,10 @@ public sealed class AesGcmTransitStrategy : TransitEncryptionPluginBase
         // Write master nonce to stream header
         await ciphertextStream.WriteAsync(masterNonce, cancellationToken);
 
-        var keyId = await KeyStore!.GetCurrentKeyIdAsync();
+        if (KeyStore is null)
+            throw new InvalidOperationException("KeyStore has not been initialized. Call InitializeAsync before streaming encryption (#3000).");
+
+        var keyId = await KeyStore.GetCurrentKeyIdAsync();
         var key = await KeyStore.GetKeyAsync(keyId, context);
 
         if (key.Length != KeySize)
@@ -191,6 +194,10 @@ public sealed class AesGcmTransitStrategy : TransitEncryptionPluginBase
             await ciphertextStream.WriteAsync(tag, cancellationToken);
         }
 
+        // Write end-of-stream sentinel: chunk size of 0 with no data or tag.
+        // Decryptors must verify this sentinel is present to detect truncation attacks (#2995).
+        await ciphertextStream.WriteAsync(BitConverter.GetBytes(0), cancellationToken);
+
         // Secure memory cleanup
         CryptographicOperations.ZeroMemory(key);
 
@@ -201,6 +208,7 @@ public sealed class AesGcmTransitStrategy : TransitEncryptionPluginBase
             ["StreamingMode"] = true,
             ["ChunkSize"] = ChunkSize,
             ["TotalBytes"] = totalBytes,
+            ["ChunkCount"] = chunkCounter,
             ["EncryptedAt"] = DateTime.UtcNow
         };
 

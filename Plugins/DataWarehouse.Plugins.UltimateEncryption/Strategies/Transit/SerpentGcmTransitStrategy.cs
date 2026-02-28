@@ -36,7 +36,7 @@ public sealed class SerpentGcmTransitStrategy : TransitEncryptionPluginBase
     public override string Version => "1.0.0";
 
     /// <inheritdoc/>
-    protected override async Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(
+    protected override Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(
         byte[] plaintext,
         CipherPreset preset,
         byte[] key,
@@ -82,11 +82,11 @@ public sealed class SerpentGcmTransitStrategy : TransitEncryptionPluginBase
             ["EncryptedAt"] = DateTime.UtcNow
         };
 
-        return await Task.FromResult((combined, metadata));
+        return Task.FromResult((combined, metadata));
     }
 
     /// <inheritdoc/>
-    protected override async Task<byte[]> DecryptDataAsync(
+    protected override Task<byte[]> DecryptDataAsync(
         byte[] ciphertext,
         CipherPreset preset,
         byte[] key,
@@ -132,7 +132,7 @@ public sealed class SerpentGcmTransitStrategy : TransitEncryptionPluginBase
         var plaintext = new byte[encryptedDataLength];
         DecryptSerpentGcm(encryptedData, key, nonce, tag, aad, plaintext);
 
-        return await Task.FromResult(plaintext);
+        return Task.FromResult(plaintext);
     }
 
     /// <summary>
@@ -202,7 +202,7 @@ public sealed class SerpentGcmTransitStrategy : TransitEncryptionPluginBase
     }
 
     /// <inheritdoc/>
-    public override async Task<EndpointCapabilities> GetCapabilitiesAsync(CancellationToken cancellationToken = default)
+    public override Task<EndpointCapabilities> GetCapabilitiesAsync(CancellationToken cancellationToken = default)
     {
         var capabilities = new EndpointCapabilities(
             SupportedCipherPresets: new List<string>
@@ -228,6 +228,6 @@ public sealed class SerpentGcmTransitStrategy : TransitEncryptionPluginBase
             }.AsReadOnly()
         );
 
-        return await Task.FromResult(capabilities);
+        return Task.FromResult(capabilities);
     }
 }

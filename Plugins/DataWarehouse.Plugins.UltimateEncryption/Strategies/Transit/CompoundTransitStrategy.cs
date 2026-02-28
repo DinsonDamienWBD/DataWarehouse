@@ -45,7 +45,7 @@ public sealed class CompoundTransitStrategy : TransitEncryptionPluginBase
     public string SecondaryCipher { get; set; } = "Serpent-256-GCM";
 
     /// <inheritdoc/>
-    protected override async Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(
+    protected override Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(
         byte[] plaintext,
         CipherPreset preset,
         byte[] key,
@@ -119,11 +119,11 @@ public sealed class CompoundTransitStrategy : TransitEncryptionPluginBase
             ["EncryptedAt"] = DateTime.UtcNow
         };
 
-        return (combined, metadata);
+        return Task.FromResult((combined, metadata));
     }
 
     /// <inheritdoc/>
-    protected override async Task<byte[]> DecryptDataAsync(
+    protected override Task<byte[]> DecryptDataAsync(
         byte[] ciphertext,
         CipherPreset preset,
         byte[] key,
@@ -201,7 +201,7 @@ public sealed class CompoundTransitStrategy : TransitEncryptionPluginBase
         CryptographicOperations.ZeroMemory(secondaryKey);
         CryptographicOperations.ZeroMemory(primaryLayerData);
 
-        return plaintext;
+        return Task.FromResult(plaintext);
     }
 
     /// <inheritdoc/>
@@ -232,7 +232,7 @@ public sealed class CompoundTransitStrategy : TransitEncryptionPluginBase
             }.AsReadOnly()
         );
 
-        return await Task.FromResult(capabilities);
+        return Task.FromResult(capabilities);
     }
 
     /// <summary>

@@ -23,7 +23,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
     /// </summary>
     public sealed class NtruHrss701Strategy : EncryptionStrategyBase
     {
-        private readonly SecureRandom _secureRandom;
 
         public override CipherInfo CipherInfo => new()
         {
@@ -63,7 +62,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
 
         public NtruHrss701Strategy()
         {
-            _secureRandom = new SecureRandom();
         }
 
         protected override async Task<byte[]> EncryptCoreAsync(
@@ -72,7 +70,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
             return await Task.Run(() =>
             {
                 var recipientPublicKey = NtruPublicKeyParameters.FromEncoding(NtruParameters.NtruHrss701, key);
-                var kemGenerator = new NtruKemGenerator(_secureRandom);
+                var kemGenerator = new NtruKemGenerator(new SecureRandom());
                 var encapsulated = kemGenerator.GenerateEncapsulated(recipientPublicKey);
 
                 var kemCiphertext = encapsulated.GetEncapsulation();
@@ -147,7 +145,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
 
         public override byte[] GenerateKey()
         {
-            var keyGenParams = new NtruKeyGenerationParameters(_secureRandom, NtruParameters.NtruHrss701);
+            var keyGenParams = new NtruKeyGenerationParameters(new SecureRandom(), NtruParameters.NtruHrss701);
             var keyPairGenerator = new NtruKeyPairGenerator();
             keyPairGenerator.Init(keyGenParams);
             var keyPair = keyPairGenerator.GenerateKeyPair();
@@ -156,7 +154,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
 
         public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair()
         {
-            var keyGenParams = new NtruKeyGenerationParameters(_secureRandom, NtruParameters.NtruHrss701);
+            var keyGenParams = new NtruKeyGenerationParameters(new SecureRandom(), NtruParameters.NtruHrss701);
             var keyPairGenerator = new NtruKeyPairGenerator();
             keyPairGenerator.Init(keyGenParams);
             var keyPair = keyPairGenerator.GenerateKeyPair();
@@ -345,7 +343,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
     /// </summary>
     public sealed class FrodoKemStrategy : EncryptionStrategyBase
     {
-        private readonly SecureRandom _secureRandom;
 
         public override CipherInfo CipherInfo => new()
         {
@@ -385,7 +382,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
 
         public FrodoKemStrategy()
         {
-            _secureRandom = new SecureRandom();
         }
 
         protected override async Task<byte[]> EncryptCoreAsync(
@@ -395,7 +391,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
             {
                 // FrodoKEM uses standard lattice assumptions for KEM
                 // BouncyCastle FrodoKEM API - generate encapsulation from public key
-                var kemGen = new Org.BouncyCastle.Pqc.Crypto.Frodo.FrodoKEMGenerator(_secureRandom);
+                var kemGen = new Org.BouncyCastle.Pqc.Crypto.Frodo.FrodoKEMGenerator(new SecureRandom());
                 var pubKeyParams = new Org.BouncyCastle.Pqc.Crypto.Frodo.FrodoPublicKeyParameters(
                     Org.BouncyCastle.Pqc.Crypto.Frodo.FrodoParameters.frodokem976aes, key);
                 var encapsulated = kemGen.GenerateEncapsulated(pubKeyParams);
@@ -474,7 +470,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         public override byte[] GenerateKey()
         {
             var keyGenParams = new Org.BouncyCastle.Pqc.Crypto.Frodo.FrodoKeyGenerationParameters(
-                _secureRandom, Org.BouncyCastle.Pqc.Crypto.Frodo.FrodoParameters.frodokem976aes);
+                new SecureRandom(), Org.BouncyCastle.Pqc.Crypto.Frodo.FrodoParameters.frodokem976aes);
             var keyPairGenerator = new Org.BouncyCastle.Pqc.Crypto.Frodo.FrodoKeyPairGenerator();
             keyPairGenerator.Init(keyGenParams);
             var keyPair = keyPairGenerator.GenerateKeyPair();
@@ -484,7 +480,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair()
         {
             var keyGenParams = new Org.BouncyCastle.Pqc.Crypto.Frodo.FrodoKeyGenerationParameters(
-                _secureRandom, Org.BouncyCastle.Pqc.Crypto.Frodo.FrodoParameters.frodokem976aes);
+                new SecureRandom(), Org.BouncyCastle.Pqc.Crypto.Frodo.FrodoParameters.frodokem976aes);
             var keyPairGenerator = new Org.BouncyCastle.Pqc.Crypto.Frodo.FrodoKeyPairGenerator();
             keyPairGenerator.Init(keyGenParams);
             var keyPair = keyPairGenerator.GenerateKeyPair();

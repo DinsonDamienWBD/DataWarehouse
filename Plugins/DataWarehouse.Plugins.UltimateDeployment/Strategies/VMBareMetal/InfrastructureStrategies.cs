@@ -83,19 +83,26 @@ public sealed class AnsibleStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
-        IncrementCounter("ansible.deploy");
+        IncrementCounter("ansible.rollback");
         var playbookPath = currentState.Metadata.TryGetValue("playbookPath", out var pp) ? pp?.ToString() : "";
         var inventory = currentState.Metadata.TryGetValue("inventory", out var inv) ? inv?.ToString() : "";
 
-        // Run rollback playbook
+        // Run rollback playbook — throw on failure (finding 2889)
         var rollbackPlaybook = playbookPath!.Replace(".yml", "-rollback.yml");
-        await RunPlaybookAsync(rollbackPlaybook, inventory!, new DeploymentConfig
+        var rollbackResult = await RunPlaybookAsync(rollbackPlaybook, inventory!, new DeploymentConfig
         {
             Environment = "rollback",
             Version = targetVersion,
             ArtifactUri = "",
             StrategyConfig = new Dictionary<string, object> { ["targetVersion"] = targetVersion }
         }, ct);
+
+        if (!rollbackResult.Success)
+        {
+            throw new InvalidOperationException(
+                $"Ansible rollback playbook failed: {rollbackResult.ErrorMessage}. " +
+                $"Failed hosts: {string.Join(", ", rollbackResult.FailedHosts)}");
+        }
 
         return currentState with
         {
@@ -263,7 +270,7 @@ public sealed class TerraformStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
-        IncrementCounter("chef.deploy");
+        IncrementCounter("terraform.rollback");
         var workingDir = currentState.Metadata.TryGetValue("workingDir", out var wd) ? wd?.ToString() : "";
 
         // Terraform doesn't have native rollback - need to revert to previous state
@@ -395,7 +402,7 @@ public sealed class PuppetStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
-        IncrementCounter("ssh_direct.deploy");
+        IncrementCounter("puppet.rollback");
         var environment = currentState.Metadata.TryGetValue("environment", out var e) ? e?.ToString() : "";
         var nodes = currentState.Metadata.TryGetValue("nodes", out var n) && n is string[] ns ? ns : Array.Empty<string>();
 
@@ -480,6 +487,7 @@ public sealed class ChefStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("chef.rollback");
         var environment = currentState.Metadata.TryGetValue("environment", out var e) ? e?.ToString() : "";
         var nodes = currentState.Metadata.TryGetValue("nodes", out var n) && n is string[] ns ? ns : Array.Empty<string>();
 
@@ -563,6 +571,7 @@ public sealed class SaltStackStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("salt_stack.rollback");
         var targets = currentState.Metadata.TryGetValue("targets", out var t) ? t?.ToString() : "*";
         await SaltStateApplyAsync(targets!, $"rollback.{targetVersion}", ct);
         return currentState with { Health = DeploymentHealth.Healthy, Version = targetVersion, ProgressPercent = 100, CompletedAt = DateTimeOffset.UtcNow };
@@ -636,6 +645,7 @@ public sealed class PackerAmiStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("packer_ami.rollback");
         // Roll back to previous AMI
         await RollbackLaunchTemplateAsync(targetVersion, ct);
         await RefreshAutoScalingGroupAsync(new DeploymentConfig { Environment = "", Version = "", ArtifactUri = "" }, ct);
@@ -719,6 +729,7 @@ public sealed class SshDirectStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("ssh_direct.rollback");
         var hosts = currentState.Metadata.TryGetValue("hosts", out var h) && h is string[] hs ? hs : Array.Empty<string>();
         foreach (var host in hosts)
         {

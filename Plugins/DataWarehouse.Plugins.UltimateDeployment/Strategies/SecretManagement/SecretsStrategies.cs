@@ -93,13 +93,15 @@ public sealed class HashiCorpVaultStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
-        IncrementCounter("hashi_corp_vault.deploy");
+        IncrementCounter("hashi_corp_vault.rollback");
         var vaultAddr = currentState.Metadata.TryGetValue("vaultAddress", out var va) ? va?.ToString() : "";
         var secretPath = currentState.Metadata.TryGetValue("secretPath", out var sp) ? sp?.ToString() : "";
         var mountPath = currentState.Metadata.TryGetValue("mountPath", out var mp) ? mp?.ToString() : "";
 
         // Rollback to specific version in KV v2
-        await RollbackSecretVersionAsync(vaultAddr!, mountPath!, secretPath!, int.Parse(targetVersion), ct);
+        if (!int.TryParse(targetVersion, out var vaultVersion))
+            throw new ArgumentException($"Invalid Vault KV version '{targetVersion}': must be a positive integer.", nameof(targetVersion));
+        await RollbackSecretVersionAsync(vaultAddr!, mountPath!, secretPath!, vaultVersion, ct);
 
         return currentState with
         {
@@ -254,7 +256,7 @@ public sealed class AwsSecretsManagerStrategy : DeploymentStrategyBase
     protected override async Task<DeploymentState> RollbackCoreAsync(
         string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
-        IncrementCounter("azure_key_vault.deploy");
+        IncrementCounter("aws_secrets_manager.rollback");
         var secretArn = currentState.Metadata.TryGetValue("secretArn", out var sa) ? sa?.ToString() : "";
         await RestoreSecretVersionAsync(secretArn!, targetVersion, ct);
         return currentState with { Health = DeploymentHealth.Healthy, Version = targetVersion, ProgressPercent = 100, CompletedAt = DateTimeOffset.UtcNow };
@@ -350,7 +352,7 @@ public sealed class AzureKeyVaultStrategy : DeploymentStrategyBase
     protected override async Task<DeploymentState> RollbackCoreAsync(
         string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
-        IncrementCounter("gcp_secret_manager.deploy");
+        IncrementCounter("azure_key_vault.rollback");
         var vaultUrl = currentState.Metadata.TryGetValue("vaultUrl", out var vu) ? vu?.ToString() : "";
         await RestoreSecretVersionsAsync(vaultUrl!, targetVersion, ct);
         return currentState with { Health = DeploymentHealth.Healthy, Version = targetVersion, ProgressPercent = 100, CompletedAt = DateTimeOffset.UtcNow };
@@ -442,7 +444,7 @@ public sealed class GcpSecretManagerStrategy : DeploymentStrategyBase
     protected override async Task<DeploymentState> RollbackCoreAsync(
         string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
-        IncrementCounter("kubernetes_secrets.deploy");
+        IncrementCounter("gcp_secret_manager.rollback");
         var project = currentState.Metadata.TryGetValue("project", out var p) ? p?.ToString() : "";
         var secretId = currentState.Metadata.TryGetValue("secretId", out var si) ? si?.ToString() : "";
 
@@ -538,7 +540,7 @@ public sealed class KubernetesSecretsStrategy : DeploymentStrategyBase
     protected override async Task<DeploymentState> RollbackCoreAsync(
         string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
-        IncrementCounter("external_secrets_operator.deploy");
+        IncrementCounter("kubernetes_secrets.rollback");
         var namespace_ = currentState.Metadata.TryGetValue("namespace", out var ns) ? ns?.ToString() : "";
         var secretName = currentState.Metadata.TryGetValue("secretName", out var sn) ? sn?.ToString() : "";
 
@@ -637,7 +639,7 @@ public sealed class ExternalSecretsOperatorStrategy : DeploymentStrategyBase
     protected override async Task<DeploymentState> RollbackCoreAsync(
         string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
-        IncrementCounter("cyber_ark_conjur.deploy");
+        IncrementCounter("external_secrets_operator.rollback");
         var namespace_ = currentState.Metadata.TryGetValue("namespace", out var ns) ? ns?.ToString() : "";
         var externalSecretName = currentState.Metadata.TryGetValue("externalSecretName", out var es) ? es?.ToString() : "";
 
@@ -743,6 +745,7 @@ public sealed class CyberArkConjurStrategy : DeploymentStrategyBase
     protected override async Task<DeploymentState> RollbackCoreAsync(
         string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("cyber_ark_conjur.rollback");
         var conjurUrl = currentState.Metadata.TryGetValue("conjurUrl", out var cu) ? cu?.ToString() : "";
         var account = currentState.Metadata.TryGetValue("account", out var acc) ? acc?.ToString() : "";
 

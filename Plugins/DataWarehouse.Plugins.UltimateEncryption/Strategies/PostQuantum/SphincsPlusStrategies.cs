@@ -113,7 +113,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
     [SdkCompatibility("5.0.0", Notes = "Phase 59: PQC migration")]
     public sealed class SphincsPlus128fStrategy : EncryptionStrategyBase
     {
-        private readonly SecureRandom _secureRandom;
 
         /// <inheritdoc/>
         public override CipherInfo CipherInfo => new()
@@ -158,7 +157,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public SphincsPlus128fStrategy()
         {
-            _secureRandom = new SecureRandom();
         }
 
         /// <summary>
@@ -201,7 +199,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 else
                 {
                     var (_, privateKey) = SphincsPlusSignatureHelper.GenerateKeyPair(
-                        SlhDsaParameters.slh_dsa_shake_128f, _secureRandom);
+                        SlhDsaParameters.slh_dsa_shake_128f, new SecureRandom());
                     signature = SphincsPlusSignatureHelper.Sign(
                         plaintext, privateKey, SlhDsaParameters.slh_dsa_shake_128f);
                 }
@@ -252,7 +250,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         public override byte[] GenerateKey()
         {
             var (_, privateKey) = SphincsPlusSignatureHelper.GenerateKeyPair(
-                SlhDsaParameters.slh_dsa_shake_128f, _secureRandom);
+                SlhDsaParameters.slh_dsa_shake_128f, new SecureRandom());
             return privateKey;
         }
 
@@ -262,7 +260,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair()
         {
             return SphincsPlusSignatureHelper.GenerateKeyPair(
-                SlhDsaParameters.slh_dsa_shake_128f, _secureRandom);
+                SlhDsaParameters.slh_dsa_shake_128f, new SecureRandom());
         }
     }
 
@@ -283,7 +281,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
     [SdkCompatibility("5.0.0", Notes = "Phase 59: PQC migration")]
     public sealed class SphincsPlus192fStrategy : EncryptionStrategyBase
     {
-        private readonly SecureRandom _secureRandom;
 
         /// <inheritdoc/>
         public override CipherInfo CipherInfo => new()
@@ -328,7 +325,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public SphincsPlus192fStrategy()
         {
-            _secureRandom = new SecureRandom();
         }
 
         /// <summary>
@@ -371,7 +367,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 else
                 {
                     var (_, privateKey) = SphincsPlusSignatureHelper.GenerateKeyPair(
-                        SlhDsaParameters.slh_dsa_shake_192f, _secureRandom);
+                        SlhDsaParameters.slh_dsa_shake_192f, new SecureRandom());
                     signature = SphincsPlusSignatureHelper.Sign(
                         plaintext, privateKey, SlhDsaParameters.slh_dsa_shake_192f);
                 }
@@ -422,7 +418,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         public override byte[] GenerateKey()
         {
             var (_, privateKey) = SphincsPlusSignatureHelper.GenerateKeyPair(
-                SlhDsaParameters.slh_dsa_shake_192f, _secureRandom);
+                SlhDsaParameters.slh_dsa_shake_192f, new SecureRandom());
             return privateKey;
         }
 
@@ -432,7 +428,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair()
         {
             return SphincsPlusSignatureHelper.GenerateKeyPair(
-                SlhDsaParameters.slh_dsa_shake_192f, _secureRandom);
+                SlhDsaParameters.slh_dsa_shake_192f, new SecureRandom());
         }
     }
 
@@ -454,7 +450,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
     [SdkCompatibility("5.0.0", Notes = "Phase 59: PQC migration")]
     public sealed class SphincsPlus256fStrategy : EncryptionStrategyBase
     {
-        private readonly SecureRandom _secureRandom;
 
         /// <inheritdoc/>
         public override CipherInfo CipherInfo => new()
@@ -499,7 +494,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public SphincsPlus256fStrategy()
         {
-            _secureRandom = new SecureRandom();
         }
 
         /// <summary>
@@ -542,7 +536,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 else
                 {
                     var (_, privateKey) = SphincsPlusSignatureHelper.GenerateKeyPair(
-                        SlhDsaParameters.slh_dsa_shake_256f, _secureRandom);
+                        SlhDsaParameters.slh_dsa_shake_256f, new SecureRandom());
                     signature = SphincsPlusSignatureHelper.Sign(
                         plaintext, privateKey, SlhDsaParameters.slh_dsa_shake_256f);
                 }
@@ -593,7 +587,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         public override byte[] GenerateKey()
         {
             var (_, privateKey) = SphincsPlusSignatureHelper.GenerateKeyPair(
-                SlhDsaParameters.slh_dsa_shake_256f, _secureRandom);
+                SlhDsaParameters.slh_dsa_shake_256f, new SecureRandom());
             return privateKey;
         }
 
@@ -603,7 +597,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair()
         {
             return SphincsPlusSignatureHelper.GenerateKeyPair(
-                SlhDsaParameters.slh_dsa_shake_256f, _secureRandom);
+                SlhDsaParameters.slh_dsa_shake_256f, new SecureRandom());
         }
     }
 }

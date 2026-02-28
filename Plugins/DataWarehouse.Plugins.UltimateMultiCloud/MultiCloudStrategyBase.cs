@@ -109,8 +109,9 @@ public abstract class MultiCloudStrategyBase : StrategyBase, IMultiCloudStrategy
     private long _totalExecutions;
     private long _successfulExecutions;
     private long _failedExecutions;
-    private DateTimeOffset? _lastSuccess;
-    private DateTimeOffset? _lastFailure;
+    // Store as UTC ticks (long) for Interlocked-safe atomic writes; 0 = never
+    private long _lastSuccessTicks;
+    private long _lastFailureTicks;
 
     /// <inheritdoc/>
     public abstract override string StrategyId { get; }
@@ -150,8 +151,10 @@ public abstract class MultiCloudStrategyBase : StrategyBase, IMultiCloudStrategy
             SuccessfulExecutions = Interlocked.Read(ref _successfulExecutions),
             FailedExecutions = Interlocked.Read(ref _failedExecutions),
             CurrentState = GetCurrentState(),
-            LastSuccess = _lastSuccess,
-            LastFailure = _lastFailure
+            LastSuccess = Interlocked.Read(ref _lastSuccessTicks) is var st and > 0
+                ? new DateTimeOffset(st, TimeSpan.Zero) : (DateTimeOffset?)null,
+            LastFailure = Interlocked.Read(ref _lastFailureTicks) is var ft and > 0
+                ? new DateTimeOffset(ft, TimeSpan.Zero) : (DateTimeOffset?)null
         };
     }
 
@@ -161,8 +164,8 @@ public abstract class MultiCloudStrategyBase : StrategyBase, IMultiCloudStrategy
         Interlocked.Exchange(ref _totalExecutions, 0);
         Interlocked.Exchange(ref _successfulExecutions, 0);
         Interlocked.Exchange(ref _failedExecutions, 0);
-        _lastSuccess = null;
-        _lastFailure = null;
+        Interlocked.Exchange(ref _lastSuccessTicks, 0);
+        Interlocked.Exchange(ref _lastFailureTicks, 0);
     }
 
     /// <summary>Gets all counter values.</summary>
@@ -180,7 +183,7 @@ public abstract class MultiCloudStrategyBase : StrategyBase, IMultiCloudStrategy
     {
         Interlocked.Increment(ref _totalExecutions);
         Interlocked.Increment(ref _successfulExecutions);
-        _lastSuccess = DateTimeOffset.UtcNow;
+        Interlocked.Exchange(ref _lastSuccessTicks, DateTimeOffset.UtcNow.UtcTicks);
     }
 
     /// <summary>
@@ -190,7 +193,7 @@ public abstract class MultiCloudStrategyBase : StrategyBase, IMultiCloudStrategy
     {
         Interlocked.Increment(ref _totalExecutions);
         Interlocked.Increment(ref _failedExecutions);
-        _lastFailure = DateTimeOffset.UtcNow;
+        Interlocked.Exchange(ref _lastFailureTicks, DateTimeOffset.UtcNow.UtcTicks);
     }
 }
 

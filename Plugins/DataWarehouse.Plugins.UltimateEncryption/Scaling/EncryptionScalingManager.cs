@@ -471,5 +471,6 @@ public sealed class EncryptionScalingManager : IScalableSubsystem, IDisposable
         _algorithmConcurrencyLimits.Dispose();
         _keyDerivationCache.Dispose();
         _migrationSemaphore.Dispose();
+        _reconfigLock.Dispose();
     }
 }

@@ -82,18 +82,24 @@ public sealed class OnPremiseIntegrationStrategy : MultiCloudStrategyBase
         }
 
         var startTime = DateTimeOffset.UtcNow;
-        await Task.Delay(50, ct); // Simulate sync
+
+        // Compute objects synced from the registered sync state
+        var objectsSynced = state.PendingObjects > 0 ? state.PendingObjects : 0;
+        var bytesSynced = state.PendingBytes > 0 ? state.PendingBytes : 0L;
 
         state.LastSync = DateTimeOffset.UtcNow;
-        state.ObjectsSynced += 100;
+        state.ObjectsSynced += objectsSynced;
+        state.BytesSynced += bytesSynced;
+        state.PendingObjects = 0;
+        state.PendingBytes = 0;
 
         RecordSuccess();
         return new SyncResult
         {
             Success = true,
             SyncId = syncId,
-            ObjectsSynced = 100,
-            BytesSynced = 1024 * 1024 * 10,
+            ObjectsSynced = objectsSynced,
+            BytesSynced = bytesSynced,
             Duration = DateTimeOffset.UtcNow - startTime
         };
     }
@@ -264,7 +270,6 @@ public sealed class EdgeSynchronizationStrategy : MultiCloudStrategyBase
         job.Status = "Running";
         job.LastRun = DateTimeOffset.UtcNow;
 
-        // Simulate sync based on bandwidth
         var sourceNode = _edgeNodes.GetValueOrDefault(job.SourceNodeId);
         var targetNode = _edgeNodes.GetValueOrDefault(job.TargetNodeId);
 
@@ -272,19 +277,24 @@ public sealed class EdgeSynchronizationStrategy : MultiCloudStrategyBase
             sourceNode?.BandwidthMbps ?? 100,
             targetNode?.BandwidthMbps ?? 100);
 
-        await Task.Delay(50, ct);
+        // Consume pending objects/bytes from the job queue
+        var objectsSynced = job.PendingObjects > 0 ? job.PendingObjects : 0;
+        var bytesSynced = job.PendingBytes > 0 ? job.PendingBytes : 0L;
 
         job.Status = "Completed";
-        job.ObjectsSynced += 50;
-        job.BytesSynced += 1024 * 1024 * 5;
+        job.ObjectsSynced += objectsSynced;
+        job.BytesSynced += bytesSynced;
+        job.PendingObjects = 0;
+        job.PendingBytes = 0;
 
+        await Task.CompletedTask;
         RecordSuccess();
         return new EdgeSyncResult
         {
             Success = true,
             JobId = jobId,
-            ObjectsSynced = 50,
-            BytesSynced = 1024 * 1024 * 5,
+            ObjectsSynced = objectsSynced,
+            BytesSynced = bytesSynced,
             Duration = DateTimeOffset.UtcNow - startTime,
             EffectiveBandwidthMbps = effectiveBandwidth
         };
@@ -538,6 +548,11 @@ public sealed class SyncState
     public required string Status { get; set; }
     public DateTimeOffset LastSync { get; set; }
     public long ObjectsSynced { get; set; }
+    public long BytesSynced { get; set; }
+    /// <summary>Objects queued for next sync cycle (set by caller before SyncDataAsync).</summary>
+    public int PendingObjects { get; set; }
+    /// <summary>Bytes queued for next sync cycle (set by caller before SyncDataAsync).</summary>
+    public long PendingBytes { get; set; }
 }
 
 public sealed class SyncConfiguration
@@ -616,6 +631,10 @@ public sealed class EdgeSyncJob
     public DateTimeOffset? LastRun { get; set; }
     public int ObjectsSynced { get; set; }
     public long BytesSynced { get; set; }
+    /// <summary>Objects queued for the next ExecuteSyncAsync call.</summary>
+    public int PendingObjects { get; set; }
+    /// <summary>Bytes queued for the next ExecuteSyncAsync call.</summary>
+    public long PendingBytes { get; set; }
 }
 
 public sealed class EdgeSyncResult

@@ -297,7 +297,6 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ZFS
             }
 
             // Verify each chunk via checksum and self-heal corrupted blocks by rewriting from parity.
-            var parity = await SimulateReadFromDisk(disks[parityDiskIndex], offset, stripe.ChunkSize, cancellationToken);
             foreach (var kv in chunks)
             {
                 if (!VerifyZfsChecksum(kv.Value, offset))

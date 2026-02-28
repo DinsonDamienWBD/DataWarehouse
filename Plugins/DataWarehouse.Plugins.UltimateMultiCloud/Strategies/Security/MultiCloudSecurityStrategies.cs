@@ -50,13 +50,16 @@ public sealed class UnifiedIamStrategy : MultiCloudStrategyBase
     /// <summary>Maps a unified role to provider-specific roles.</summary>
     public void MapRole(string unifiedRole, string providerId, string providerRole)
     {
-        var mappings = _roleMappings.GetOrAdd(unifiedRole, _ => new List<ProviderRoleMapping>());
-        mappings.Add(new ProviderRoleMapping
+        var mapping = new ProviderRoleMapping
         {
             UnifiedRole = unifiedRole,
             ProviderId = providerId,
             ProviderRole = providerRole
-        });
+        };
+        _roleMappings.AddOrUpdate(
+            unifiedRole,
+            _ => new List<ProviderRoleMapping> { mapping },
+            (_, list) => { lock (list) { list.Add(mapping); } return list; });
     }
 
     /// <summary>Assigns role to identity.</summary>
@@ -438,8 +441,8 @@ public sealed class CrossCloudSecretsStrategy : MultiCloudStrategyBase
         };
 
         _accessLog.AddOrUpdate(secretId,
-            new List<SecretAccess> { access },
-            (_, list) => { list.Add(access); return list; });
+            _ => new List<SecretAccess> { access },
+            (_, list) => { lock (list) { list.Add(access); } return list; });
 
         RecordSuccess();
         return Encoding.UTF8.GetString(Convert.FromBase64String(entry.EncryptedValue));
