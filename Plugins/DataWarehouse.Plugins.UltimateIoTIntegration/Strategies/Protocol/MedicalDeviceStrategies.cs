@@ -371,7 +371,11 @@ public sealed class DicomNetworkStrategy : ProtocolStrategyBase
     }
 
     /// <summary>
-    /// C-FIND: Queries for DICOM objects at specified level.
+    /// C-FIND: Queries for DICOM objects matching the provided keys.
+    /// Returns an empty enumerable — production DICOM network queries require a real DICOM SCU
+    /// library (e.g., fo-dicom) and a live PACS endpoint. Fabricating patient/study data violates
+    /// HIPAA (finding 3385) — callers MUST NOT treat fabricated results as real clinical data.
+    /// Set <see cref="IsProductionReady"/> = true and wire a real DICOM library before using in production.
     /// </summary>
     public IEnumerable<DicomDataset> CFind(string associationId, DicomQueryLevel level, Dictionary<string, string> matchingKeys)
     {
@@ -379,42 +383,16 @@ public sealed class DicomNetworkStrategy : ProtocolStrategyBase
         if (!_associations.TryGetValue(associationId, out var assoc) || assoc.State != DicomAssociationState.Established)
             yield break;
 
-        // Simulate query results based on matching keys
-        var resultCount = Random.Shared.Next(1, 10);
-        for (var i = 0; i < resultCount; i++)
-        {
-            var dataset = new DicomDataset();
-            switch (level)
-            {
-                case DicomQueryLevel.Patient:
-                    dataset.Elements["00100010"] = $"Patient^Test^{i}"; // Patient Name
-                    dataset.Elements["00100020"] = $"PAT{i:D6}"; // Patient ID
-                    dataset.Elements["00100030"] = "19800101"; // Birth Date
-                    dataset.Elements["00100040"] = i % 2 == 0 ? "M" : "F"; // Sex
-                    break;
-                case DicomQueryLevel.Study:
-                    dataset.Elements["0020000D"] = Guid.NewGuid().ToString(); // Study Instance UID
-                    dataset.Elements["00080020"] = DateTimeOffset.UtcNow.AddDays(-i).ToString("yyyyMMdd"); // Study Date
-                    dataset.Elements["00080060"] = new[] { "CT", "MR", "US", "XA" }[i % 4]; // Modality
-                    dataset.Elements["00081030"] = $"Study Description {i}"; // Study Description
-                    break;
-                case DicomQueryLevel.Series:
-                    dataset.Elements["0020000E"] = Guid.NewGuid().ToString(); // Series Instance UID
-                    dataset.Elements["00200011"] = (i + 1).ToString(); // Series Number
-                    dataset.Elements["00080060"] = "CT"; // Modality
-                    break;
-                case DicomQueryLevel.Instance:
-                    dataset.Elements["00080018"] = Guid.NewGuid().ToString(); // SOP Instance UID
-                    dataset.Elements["00200013"] = (i + 1).ToString(); // Instance Number
-                    break;
-            }
-
-            yield return dataset;
-        }
+        // No results returned — real query requires a production DICOM SCU library.
+        // Returning fabricated patient names / study UIDs violates HIPAA / IEC 62304 (finding 3385).
+        yield break;
     }
 
     /// <summary>
-    /// C-MOVE: Retrieves DICOM objects to a destination AE.
+    /// C-MOVE: Issues a DICOM retrieval request to a destination AE.
+    /// Returns a ProcessingFailure response — production C-MOVE requires a real DICOM SCU library.
+    /// Fabricating completed sub-operation counts violates HIPAA / IEC 62304 (finding 3385).
+    /// Set <see cref="IsProductionReady"/> = true and wire a real DICOM library before using in production.
     /// </summary>
     public DicomMoveResponse CMove(string associationId, DicomQueryLevel level,
         Dictionary<string, string> matchingKeys, string destinationAe)
@@ -423,12 +401,12 @@ public sealed class DicomNetworkStrategy : ProtocolStrategyBase
         if (!_associations.TryGetValue(associationId, out var assoc) || assoc.State != DicomAssociationState.Established)
             return new DicomMoveResponse { Status = DicomStatus.ProcessingFailure };
 
-        var totalSubOps = Random.Shared.Next(1, 20);
+        // Return a not-supported indicator — real retrieval requires a production DICOM SCU library.
         return new DicomMoveResponse
         {
-            Status = DicomStatus.Success,
+            Status = DicomStatus.ProcessingFailure,
             RemainingSubOperations = 0,
-            CompletedSubOperations = totalSubOps,
+            CompletedSubOperations = 0,
             FailedSubOperations = 0,
             WarningSubOperations = 0
         };

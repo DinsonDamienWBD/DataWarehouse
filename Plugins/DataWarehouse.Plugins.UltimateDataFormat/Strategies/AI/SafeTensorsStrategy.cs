@@ -114,8 +114,13 @@ public sealed class SafeTensorsStrategy : DataFormatStrategyBase
             await input.ReadExactlyAsync(lengthBytes, 0, 8, ct);
             long headerLength = BitConverter.ToInt64(lengthBytes, 0);
 
+            // Guard: header length must fit in int and be reasonable (finding 2232).
+            const long MaxHeaderBytes = 64 * 1024 * 1024; // 64 MB — generous upper bound for header JSON
+            if (headerLength < 0 || headerLength > MaxHeaderBytes)
+                return DataFormatResult.Fail($"SafeTensors header length {headerLength} is out of valid range [0, {MaxHeaderBytes}]");
+
             // Read header JSON
-            var headerBytes = new byte[headerLength];
+            var headerBytes = new byte[(int)headerLength];
             await input.ReadExactlyAsync(headerBytes, 0, (int)headerLength, ct);
             var headerJson = Encoding.UTF8.GetString(headerBytes);
 
@@ -148,8 +153,13 @@ public sealed class SafeTensorsStrategy : DataFormatStrategyBase
                 long endOffset = dataOffsets[1];
                 long tensorSize = endOffset - startOffset;
 
+                // Guard: individual tensor size must fit in int (finding 2232).
+                const long MaxTensorBytes = 2L * 1024 * 1024 * 1024 - 1; // just under 2 GB
+                if (tensorSize < 0 || tensorSize > MaxTensorBytes)
+                    return DataFormatResult.Fail($"Tensor '{tensorName}' size {tensorSize} is out of valid range [0, {MaxTensorBytes}]");
+
                 // Read tensor data
-                var tensorData = new byte[tensorSize];
+                var tensorData = new byte[(int)tensorSize];
                 input.Position = 8 + headerLength + startOffset;
                 await input.ReadExactlyAsync(tensorData, 0, (int)tensorSize, ct);
 

@@ -24,7 +24,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             await _tcpClient.ConnectAsync(host, port, ct);
             return new DefaultConnectionHandle(_tcpClient, new Dictionary<string, object> { ["host"] = host, ["port"] = port });
         }
-        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { var client = handle.GetConnection<TcpClient>(); await Task.Delay(5, ct); return client.Connected; }
+        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { var client = handle.GetConnection<TcpClient>(); if (!client.Connected) return false; try { await client.GetStream().WriteAsync(Array.Empty<byte>(), 0, 0, ct).ConfigureAwait(false); return true; } catch { return false; } }
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { if (_tcpClient != null) { _tcpClient.Close(); _tcpClient.Dispose(); _tcpClient = null; } await Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var isHealthy = await TestCoreAsync(handle, ct); return new ConnectionHealth(isHealthy, isHealthy ? "NuoDB healthy" : "NuoDB unhealthy", TimeSpan.FromMilliseconds(5), DateTimeOffset.UtcNow); }
         public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default) { await Task.Delay(5, ct); return new List<Dictionary<string, object?>> { new() { ["id"] = 1, ["value"] = "data" } }; }

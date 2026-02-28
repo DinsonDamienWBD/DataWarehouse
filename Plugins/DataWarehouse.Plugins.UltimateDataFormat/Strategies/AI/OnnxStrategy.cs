@@ -114,6 +114,10 @@ public sealed class OnnxStrategy : DataFormatStrategyBase
         // We can parse basic protobuf structure without full ONNX library
         try
         {
+            // Guard: refuse unbounded allocation from untrusted stream length (finding 2233).
+            const long MaxOnnxSchemaBytes = 256L * 1024 * 1024; // 256 MB
+            if (stream.Length > MaxOnnxSchemaBytes)
+                return null;
             var buffer = new byte[stream.Length];
             await stream.ReadExactlyAsync(buffer, 0, buffer.Length, ct);
 

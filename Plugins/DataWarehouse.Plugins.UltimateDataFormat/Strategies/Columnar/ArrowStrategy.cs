@@ -190,6 +190,10 @@ public sealed class ArrowStrategy : DataFormatStrategyBase
         try
         {
             // ECOS-04: Fixed — Read actual schema from Arrow IPC header
+            // Guard: refuse unbounded allocation from untrusted stream length (finding 2233).
+            const long MaxArrowSchemaBytes = 256L * 1024 * 1024; // 256 MB
+            if (stream.Length > MaxArrowSchemaBytes)
+                return null;
             stream.Position = 0;
             var buffer = new byte[stream.Length];
             int totalRead = 0;

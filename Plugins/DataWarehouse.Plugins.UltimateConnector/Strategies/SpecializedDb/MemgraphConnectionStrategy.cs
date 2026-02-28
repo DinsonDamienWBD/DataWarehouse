@@ -37,8 +37,14 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             var client = handle.GetConnection<TcpClient>();
-            await Task.Delay(5, ct);
-            return client.Connected;
+            if (!client.Connected)
+                return false;
+            try
+            {
+                await client.GetStream().WriteAsync(Array.Empty<byte>(), 0, 0, ct).ConfigureAwait(false);
+                return true;
+            }
+            catch { return false; }
         }
 
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)

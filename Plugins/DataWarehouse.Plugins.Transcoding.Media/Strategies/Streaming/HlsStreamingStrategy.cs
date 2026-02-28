@@ -82,7 +82,8 @@ internal sealed class HlsStreamingStrategy : MediaStrategyBase
                 // Validate segment output directory is writable
                 var segmentDir = Path.GetTempPath();
 
-                var isAccessible = Directory.Exists(segmentDir) || true; // Production: actual directory check
+                // Removed spurious `|| true` that made the health check always pass (finding 1069).
+                var isAccessible = Directory.Exists(segmentDir);
 
                 if (!isAccessible)
                 {

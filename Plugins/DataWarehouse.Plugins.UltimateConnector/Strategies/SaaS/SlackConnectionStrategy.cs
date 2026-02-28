@@ -17,8 +17,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
     /// </summary>
     public class SlackConnectionStrategy : SaaSConnectionStrategyBase
     {
-        private string _botToken = "";
-        private string _signingSecret = "";
+        private volatile string _botToken = "";
+        private volatile string _signingSecret = "";
 
         public override string StrategyId => "slack";
         public override string DisplayName => "Slack";

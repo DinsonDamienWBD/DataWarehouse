@@ -90,7 +90,8 @@ internal sealed class DashStreamingStrategy : MediaStrategyBase
             {
                 var segmentDir = Path.GetTempPath();
 
-                var isAccessible = Directory.Exists(segmentDir) || true;
+                // Removed spurious `|| true` that made the health check always pass (finding 1069).
+                var isAccessible = Directory.Exists(segmentDir);
 
                 if (!isAccessible)
                 {

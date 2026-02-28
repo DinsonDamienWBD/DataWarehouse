@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
     /// </summary>
     public class SendGridConnectionStrategy : SaaSConnectionStrategyBase
     {
-        private string _apiKey = "";
+        private volatile string _apiKey = "";
 
         public override string StrategyId => "sendgrid";
         public override string DisplayName => "SendGrid";
@@ -53,7 +53,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             try
             {
                 var response = await handle.GetConnection<HttpClient>().GetAsync("/v3/user/profile", ct);
-                return response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable;
+                return response.IsSuccessStatusCode;
             }
             catch { return false; }
         }

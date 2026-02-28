@@ -70,7 +70,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             {
                 var response = await handle.GetConnection<HttpClient>()
                     .GetAsync("/sap/opu/odata/sap/", ct);
-                return response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable;
+                return response.IsSuccessStatusCode;
             }
             catch { return false; }
         }

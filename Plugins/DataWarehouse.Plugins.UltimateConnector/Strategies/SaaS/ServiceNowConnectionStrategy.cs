@@ -19,9 +19,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
     /// </summary>
     public class ServiceNowConnectionStrategy : SaaSConnectionStrategyBase
     {
-        private string _instanceName = "";
-        private string _username = "";
-        private string _password = "";
+        private volatile string _instanceName = "";
+        private volatile string _username = "";
+        private volatile string _password = "";
 
         public override string StrategyId => "servicenow";
         public override string DisplayName => "ServiceNow";
@@ -66,7 +66,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             {
                 var response = await handle.GetConnection<HttpClient>()
                     .GetAsync("/api/now/table/sys_user?sysparm_limit=1", ct);
-                return response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable;
+                return response.IsSuccessStatusCode;
             }
             catch { return false; }
         }

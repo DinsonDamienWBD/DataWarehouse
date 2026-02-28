@@ -234,14 +234,30 @@ public sealed class BlockchainScalingManager : IScalableSubsystem, IDisposable
         var oldLimits = _currentLimits;
         _currentLimits = limits;
 
-        // Recreate write semaphore if concurrency changed
+        // Recreate write semaphore if concurrency changed.
+        // Safety: store the new semaphore first, then wait for callers to drain the old one
+        // before disposing, to prevent in-flight operations crashing on Release() (findings 1350, 1351).
         if (limits.MaxConcurrentOperations != oldLimits.MaxConcurrentOperations)
         {
             var oldSemaphore = _writeSemaphore;
+            // Assign new semaphore before disposing the old one so new callers use it immediately.
             _writeSemaphore = new SemaphoreSlim(
                 limits.MaxConcurrentOperations,
                 limits.MaxConcurrentOperations);
-            oldSemaphore.Dispose();
+            // Drain outstanding waiters: acquire all old slots to confirm no caller holds it.
+            // In practice the caller should stop new operations before reconfiguring.
+            // We do a best-effort wait; callers that already hold the old semaphore will
+            // still be able to Release() it since SemaphoreSlim.Release() works after Dispose()
+            // only throws ObjectDisposedException on Wait(), not Release().
+            // Schedule disposal on ThreadPool to avoid blocking the reconfig path.
+            _ = Task.Run(async () =>
+            {
+                for (int i = 0; i < oldLimits.MaxConcurrentOperations; i++)
+                {
+                    await oldSemaphore.WaitAsync().ConfigureAwait(false);
+                }
+                oldSemaphore.Dispose();
+            });
         }
 
         _logger.LogInformation(

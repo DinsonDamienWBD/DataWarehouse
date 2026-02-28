@@ -25,12 +25,15 @@ namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.Video;
 internal sealed class GpuAccelerationStrategy : MediaStrategyBase
 {
     private static readonly BoundedDictionary<int, GpuDeviceInfo> _gpuCache = new BoundedDictionary<int, GpuDeviceInfo>(1000);
-    private DateTime _lastGpuScan = DateTime.MinValue;
+    // _lastGpuScan is read/written from background scan and from health check threads (finding 1099).
+    // Store as ticks for atomic read/write via Interlocked.
+    private long _lastGpuScanTicks = DateTime.MinValue.Ticks;
     private static readonly TimeSpan GpuCacheTtl = TimeSpan.FromMinutes(5);
     private static readonly SemaphoreSlim _scanLock = new(1, 1);
 
-    private HardwareEncoder _activeEncoder = HardwareEncoder.CPU;
-    private int _selectedGpuIndex = -1;
+    // _activeEncoder and _selectedGpuIndex are written under _scanLock but read without it (finding 1099).
+    private volatile HardwareEncoder _activeEncoder = HardwareEncoder.CPU;
+    private volatile int _selectedGpuIndex = -1;
     private long _gpuMemoryLimitBytes = 4L * 1024 * 1024 * 1024; // 4GB default
     private long _gpuMemoryAllocated;
 
@@ -83,7 +86,7 @@ internal sealed class GpuAccelerationStrategy : MediaStrategyBase
         await _scanLock.WaitAsync(cancellationToken);
         try
         {
-            if (DateTime.UtcNow - _lastGpuScan < GpuCacheTtl && _gpuCache.Count > 0)
+            if (DateTime.UtcNow - new DateTime(Interlocked.Read(ref _lastGpuScanTicks), DateTimeKind.Utc) < GpuCacheTtl && _gpuCache.Count > 0)
             {
                 return new GpuDetectionResult
                 {
@@ -147,7 +150,7 @@ internal sealed class GpuAccelerationStrategy : MediaStrategyBase
             foreach (var gpu in gpus)
                 _gpuCache[gpu.Index] = gpu;
 
-            _lastGpuScan = DateTime.UtcNow;
+            Interlocked.Exchange(ref _lastGpuScanTicks, DateTime.UtcNow.Ticks);
 
             IncrementCounter("gpu.detect");
 

@@ -60,7 +60,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             {
                 var response = await handle.GetConnection<HttpClient>().GetAsync("/user", ct);
                 UpdateRateLimits(response);
-                return response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable;
+                return response.IsSuccessStatusCode;
             }
             catch { return false; }
         }

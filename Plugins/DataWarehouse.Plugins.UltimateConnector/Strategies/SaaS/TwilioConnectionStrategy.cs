@@ -59,7 +59,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             {
                 var response = await handle.GetConnection<HttpClient>()
                     .GetAsync($"/2010-04-01/Accounts/{_accountSid}.json", ct);
-                return response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable;
+                return response.IsSuccessStatusCode;
             }
             catch { return false; }
         }

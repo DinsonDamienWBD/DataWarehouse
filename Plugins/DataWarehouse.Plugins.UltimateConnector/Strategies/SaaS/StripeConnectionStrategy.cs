@@ -56,7 +56,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             try
             {
                 var response = await handle.GetConnection<HttpClient>().GetAsync("/v1/balance", ct);
-                return response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable;
+                return response.IsSuccessStatusCode;
             }
             catch { return false; }
         }

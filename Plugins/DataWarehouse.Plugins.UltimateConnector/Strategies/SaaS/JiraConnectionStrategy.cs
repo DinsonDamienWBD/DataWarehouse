@@ -18,9 +18,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
     /// </summary>
     public class JiraConnectionStrategy : SaaSConnectionStrategyBase
     {
-        private string _instance = "";
-        private string _email = "";
-        private string _apiToken = "";
+        private volatile string _instance = "";
+        private volatile string _email = "";
+        private volatile string _apiToken = "";
 
         public override string StrategyId => "jira";
         public override string DisplayName => "Jira";
@@ -64,7 +64,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             {
                 var response = await handle.GetConnection<HttpClient>()
                     .GetAsync("/rest/api/3/myself", ct);
-                return response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable;
+                return response.IsSuccessStatusCode;
             }
             catch { return false; }
         }

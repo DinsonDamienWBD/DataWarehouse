@@ -31,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
             {
                 using var response = await client.GetAsync("/bigquery/v2/projects", ct);
                 // 200 or 401/403 means the service is reachable; 503 means unavailable
-                return response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable;
+                return response.IsSuccessStatusCode;
             }
             catch { return false; }
         }

@@ -20,10 +20,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
     public class SalesforceConnectionStrategy : SaaSConnectionStrategyBase
     {
         private const string ApiVersion = "v58.0";
-        private string _instanceUrl = "";
-        private string _clientId = "";
-        private string _clientSecret = "";
-        private string _refreshToken = "";
+        private volatile string _instanceUrl = "";
+        private volatile string _clientId = "";
+        private volatile string _clientSecret = "";
+        private volatile string _refreshToken = "";
 
         public override string StrategyId => "salesforce";
         public override string DisplayName => "Salesforce";
@@ -66,7 +66,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                 using var request = new HttpRequestMessage(HttpMethod.Get, $"/services/data/{ApiVersion}/");
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
                 using var response = await client.SendAsync(request, ct);
-                return response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable;
+                return response.IsSuccessStatusCode;
             }
             catch { return false; }
         }
