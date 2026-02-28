@@ -69,6 +69,10 @@ internal sealed class AvifImageStrategy : MediaStrategyBase
     /// <inheritdoc/>
     public override string StrategyId => "avif";
 
+    // Finding 1067: CompressWithAv1 / CompressWithVp8 fill output with HMAC pseudo-random bytes
+    // — not valid AV1/VP8 OBU bitstream. Requires libavif/libwebp. Not production-ready.
+    public override bool IsProductionReady => false;
+
     /// <inheritdoc/>
     public override string Name => "AVIF Image";
 

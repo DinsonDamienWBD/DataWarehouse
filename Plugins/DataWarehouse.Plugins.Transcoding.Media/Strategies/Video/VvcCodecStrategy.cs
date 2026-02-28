@@ -116,7 +116,7 @@ internal sealed class VvcCodecStrategy : MediaStrategyBase
         Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
     {
         IncrementCounter("vvc.encode");
-        var outputStream = new MemoryStream(1024 * 1024);
+        // Finding 1107: removed unused 1 MB MemoryStream — ExecuteOrPackageAsync creates its own.
         var sourceBytes = await ReadStreamFullyAsync(inputStream, cancellationToken).ConfigureAwait(false);
 
         var qp = DefaultQp;

@@ -202,6 +202,9 @@ public sealed class FfmpegExecutor
         };
 
         var stderrBuilder = new StringBuilder();
+        // Total source duration extracted from FFmpeg's "Duration:" header line.
+        // Used to convert current encoding time to a 0-100 percentage (finding 1047).
+        double totalDurationSeconds = 0.0;
 
         using var process = new Process { StartInfo = psi };
         using var stdoutMemory = new MemoryStream(1024 * 1024);
@@ -213,14 +216,27 @@ public sealed class FfmpegExecutor
             {
                 stderrBuilder.AppendLine(args.Data);
 
-                // Parse progress information if callback is provided
+                // Extract source duration from the "Duration: HH:MM:SS.cc" line that
+                // FFmpeg emits at the start of processing (before progress lines).
+                if (totalDurationSeconds <= 0.0)
+                {
+                    var dur = TryParseDuration(args.Data);
+                    if (dur.HasValue)
+                        totalDurationSeconds = dur.Value;
+                }
+
+                // Parse progress information if callback is provided.
+                // Finding 1047: compute 0-100 percentage using captured total duration.
                 if (progressCallback != null)
                 {
                     // FFmpeg reports progress like: "frame= 123 fps=30 time=00:00:04.10 ..."
-                    var progressPercent = TryParseProgress(args.Data);
-                    if (progressPercent.HasValue)
+                    var currentSeconds = TryParseProgress(args.Data);
+                    if (currentSeconds.HasValue)
                     {
-                        progressCallback(progressPercent.Value);
+                        double pct = totalDurationSeconds > 0.0
+                            ? Math.Clamp(currentSeconds.Value / totalDurationSeconds * 100.0, 0.0, 100.0)
+                            : Math.Min(currentSeconds.Value, 100.0); // fallback: treat raw seconds as best-effort
+                        progressCallback(pct);
                     }
                 }
             }
@@ -356,33 +372,51 @@ public sealed class FfmpegExecutor
     }
 
     /// <summary>
-    /// Tries to parse progress information from FFmpeg stderr output.
-    /// FFmpeg reports progress like "time=00:00:04.10" and "size=1234kB".
+    /// Tries to parse the total source duration from an FFmpeg stderr line.
+    /// FFmpeg emits "  Duration: HH:MM:SS.cc, ..." early in its output.
     /// </summary>
     /// <param name="stderrLine">A line from FFmpeg stderr output.</param>
-    /// <returns>Progress percentage (0-100) if parseable, otherwise null.</returns>
+    /// <returns>Total duration in seconds if parseable, otherwise null.</returns>
+    private static double? TryParseDuration(string stderrLine)
+    {
+        if (!stderrLine.Contains("Duration:"))
+            return null;
+
+        var m = System.Text.RegularExpressions.Regex.Match(
+            stderrLine, @"Duration:\s*(\d{2}):(\d{2}):(\d{2}\.\d+)");
+        if (m.Success &&
+            int.TryParse(m.Groups[1].Value, out var h) &&
+            int.TryParse(m.Groups[2].Value, out var min) &&
+            double.TryParse(m.Groups[3].Value, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var sec))
+        {
+            return h * 3600 + min * 60 + sec;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Tries to parse the current encoding position in seconds from an FFmpeg stderr line.
+    /// Returns elapsed seconds; callers should divide by total duration to get percentage.
+    /// </summary>
+    /// <param name="stderrLine">A line from FFmpeg stderr output.</param>
+    /// <returns>Elapsed encoding seconds if parseable, otherwise null.</returns>
     private static double? TryParseProgress(string stderrLine)
     {
-        // Look for "time=" pattern to extract current encoding position
-        // Note: Percentage calculation requires knowing the total duration, which
-        // is typically extracted from the Duration line earlier in the output.
-        // For now, we just extract the time position in seconds.
+        if (!stderrLine.Contains("time="))
+            return null;
 
-        if (stderrLine.Contains("time="))
+        var timeMatch = System.Text.RegularExpressions.Regex.Match(
+            stderrLine, @"time=(\d{2}):(\d{2}):(\d{2}\.\d{2})");
+
+        if (timeMatch.Success &&
+            int.TryParse(timeMatch.Groups[1].Value, out var hours) &&
+            int.TryParse(timeMatch.Groups[2].Value, out var minutes) &&
+            double.TryParse(timeMatch.Groups[3].Value, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var seconds))
         {
-            var timeMatch = System.Text.RegularExpressions.Regex.Match(
-                stderrLine, @"time=(\d{2}):(\d{2}):(\d{2}\.\d{2})");
-
-            if (timeMatch.Success &&
-                int.TryParse(timeMatch.Groups[1].Value, out var hours) &&
-                int.TryParse(timeMatch.Groups[2].Value, out var minutes) &&
-                double.TryParse(timeMatch.Groups[3].Value, System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture, out var seconds))
-            {
-                var totalSeconds = hours * 3600 + minutes * 60 + seconds;
-                // Return raw seconds; caller can convert to percentage if duration is known
-                return totalSeconds;
-            }
+            return hours * 3600 + minutes * 60 + seconds;
         }
 
         return null;

@@ -163,8 +163,11 @@ namespace DataWarehouse.Kernel.Infrastructure
                     availableMemory = totalMemory - Environment.WorkingSet;
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                // Log the failure so operators are aware memory metrics may be inaccurate.
+                // Using Trace (no logger dependency) to surface persistent GC API failures (finding 948).
+                Trace.TraceWarning($"[MemoryPressureMonitor] Failed to query process memory; using fallback estimate. {ex.GetType().Name}: {ex.Message}");
                 totalMemory = gcInfo.TotalAvailableMemoryBytes > 0
                     ? gcInfo.TotalAvailableMemoryBytes
                     : 8L * 1024 * 1024 * 1024; // Assume 8GB if we can't determine

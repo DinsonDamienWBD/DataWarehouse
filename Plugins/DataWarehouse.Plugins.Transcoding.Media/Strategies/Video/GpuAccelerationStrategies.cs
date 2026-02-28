@@ -1,10 +1,13 @@
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Media;
 using MediaFormat = DataWarehouse.SDK.Contracts.Media.MediaFormat;
 using DataWarehouse.SDK.Utilities;
+using DataWarehouse.Plugins.Transcoding.Media.Execution;
 
 namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.Video;
 
@@ -64,6 +67,12 @@ internal sealed class GpuAccelerationStrategy : MediaStrategyBase
 
     public override string StrategyId => "gpu-acceleration";
     public override string Name => "GPU-Accelerated Encoding (NVENC/QSV/AMF)";
+
+    // Finding 1097: TranscodeAsyncCore builds GPU encoder args then ignores them — returns
+    // empty MemoryStream. All GPU detection/selection logic is dead code. GPU acceleration
+    // is handled via FfmpegExecutor with the appropriate codec flags; this strategy
+    // is a placeholder until native NVENC/QSV/AMF SDK bindings are integrated.
+    public override bool IsProductionReady => false;
 
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
@@ -355,15 +364,31 @@ internal sealed class GpuAccelerationStrategy : MediaStrategyBase
         return File.Exists("/usr/lib/x86_64-linux-gnu/libamfrt64.so");
     }
 
-    protected override Task<Stream> TranscodeAsyncCore(
+    protected override async Task<Stream> TranscodeAsyncCore(
         Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
     {
         IncrementCounter("gpu.transcode");
-        // Build FFmpeg command with GPU acceleration
+        // Build FFmpeg command with GPU-accelerated encoder (finding 1097).
         var encoderArgs = GetEncoderArgs(options.VideoCodec ?? "h264");
+        var resolution = options.TargetResolution ?? Resolution.UHD;
+        var frameRate = options.FrameRate ?? 30.0;
+        var audioArgs = options.AudioCodec != null ? $"-c:a {options.AudioCodec}" : "-c:a aac";
+        var ffmpegArgs = $"-f rawvideo -r {frameRate} -i pipe:0 {encoderArgs} {audioArgs} " +
+                         $"-vf scale={resolution.Width}:{resolution.Height} -f mp4 pipe:1";
 
-        // Delegate to FFmpeg execution engine with GPU args
-        return Task.FromResult<Stream>(new MemoryStream());
+        var sourceBytes = await ReadStreamFullyAsync(inputStream, cancellationToken).ConfigureAwait(false);
+        return await FfmpegTranscodeHelper.ExecuteOrPackageAsync(
+            ffmpegArgs,
+            sourceBytes,
+            async () =>
+            {
+                var outputStream = new MemoryStream(1024 * 1024);
+                await WriteTranscodePackageAsync(outputStream, ffmpegArgs, sourceBytes, encoderArgs, cancellationToken)
+                    .ConfigureAwait(false);
+                outputStream.Position = 0;
+                return outputStream;
+            },
+            cancellationToken).ConfigureAwait(false);
     }
 
     protected override Task<MediaMetadata> ExtractMetadataAsyncCore(
@@ -388,16 +413,67 @@ internal sealed class GpuAccelerationStrategy : MediaStrategyBase
             }));
     }
 
-    protected override Task<Stream> GenerateThumbnailAsyncCore(
+    protected override async Task<Stream> GenerateThumbnailAsyncCore(
         Stream inputStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken)
     {
         IncrementCounter("gpu.thumbnail");
-        return Task.FromResult<Stream>(new MemoryStream());
+        // Extract a single frame at the given time offset using GPU-accelerated decode (finding 1097).
+        var offsetSeconds = (int)timeOffset.TotalSeconds;
+        var hwaccelArgs = _activeEncoder switch
+        {
+            HardwareEncoder.NVENC => "-hwaccel cuda",
+            HardwareEncoder.QuickSync => "-hwaccel qsv",
+            _ => ""
+        };
+        var ffmpegArgs = $"{hwaccelArgs} -ss {offsetSeconds} -i pipe:0 -vframes 1 -vf scale={width}:{height} -f image2 pipe:1";
+        var sourceBytes = await ReadStreamFullyAsync(inputStream, cancellationToken).ConfigureAwait(false);
+        return await FfmpegTranscodeHelper.ExecuteOrPackageAsync(
+            ffmpegArgs,
+            sourceBytes,
+            async () =>
+            {
+                var outputStream = new MemoryStream(64 * 1024);
+                await WriteTranscodePackageAsync(outputStream, ffmpegArgs, sourceBytes, "thumbnail", cancellationToken)
+                    .ConfigureAwait(false);
+                outputStream.Position = 0;
+                return outputStream;
+            },
+            cancellationToken).ConfigureAwait(false);
     }
 
     protected override Task<Uri> StreamAsyncCore(
         Stream inputStream, MediaFormat targetFormat, CancellationToken cancellationToken)
         => Task.FromResult(new Uri("about:blank"));
+
+    /// <summary>Reads a stream fully into a byte array.</summary>
+    private static async Task<byte[]> ReadStreamFullyAsync(Stream stream, CancellationToken cancellationToken)
+    {
+        if (stream is MemoryStream ms && ms.TryGetBuffer(out var buf))
+            return buf.ToArray();
+        using var copy = new MemoryStream(65536);
+        await stream.CopyToAsync(copy, cancellationToken).ConfigureAwait(false);
+        return copy.ToArray();
+    }
+
+    /// <summary>Writes a GPU transcode package header to the output stream.</summary>
+    private static async Task WriteTranscodePackageAsync(
+        MemoryStream outputStream, string ffmpegArgs, byte[] sourceBytes,
+        string encoderLabel, CancellationToken cancellationToken)
+    {
+        using var writer = new BinaryWriter(outputStream, Encoding.UTF8, leaveOpen: true);
+        writer.Write(Encoding.UTF8.GetBytes("GPU_"));
+        var labelBytes = Encoding.UTF8.GetBytes(encoderLabel);
+        writer.Write(labelBytes.Length);
+        writer.Write(labelBytes);
+        var argsBytes = Encoding.UTF8.GetBytes(ffmpegArgs);
+        writer.Write(argsBytes.Length);
+        writer.Write(argsBytes);
+        var sourceHash = SHA256.HashData(sourceBytes);
+        writer.Write(sourceHash.Length);
+        writer.Write(sourceHash);
+        writer.Write(sourceBytes.Length);
+        await writer.BaseStream.FlushAsync(cancellationToken).ConfigureAwait(false);
+    }
 }
 
 #region GPU Types

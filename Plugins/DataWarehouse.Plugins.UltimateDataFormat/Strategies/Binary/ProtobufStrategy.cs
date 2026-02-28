@@ -14,6 +14,10 @@ public sealed class ProtobufStrategy : DataFormatStrategyBase
 
     public override string DisplayName => "Protocol Buffers";
 
+    // Finding 2229: ParseAsync/SerializeAsync always fail because Google.Protobuf is not
+    // referenced and schema definition is required at parse time. Mark not production-ready.
+    public override bool IsProductionReady => false;
+
     /// <summary>Production hardening: initialization with counter tracking.</summary>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken) { IncrementCounter("protobuf.init"); return base.InitializeAsyncCore(cancellationToken); }
     /// <summary>Production hardening: graceful shutdown.</summary>

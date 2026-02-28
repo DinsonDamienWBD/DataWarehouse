@@ -468,7 +468,18 @@ public class RecoveryService
             }
         }
 
-        // Compute parity shards
+        // Compute parity shards via XOR (RAID-5 equivalent, single-failure tolerance).
+        // Finding 1025: multiple identical XOR parity shards provide no additional protection.
+        // Reed-Solomon is required for RAID-6+ multi-failure recovery.
+        if (parityShardCount > 1)
+        {
+            _logger.LogWarning(
+                "Recovery is computing {ParityShardCount} XOR parity shards, but XOR only provides " +
+                "single-failure tolerance. All parity shards will be identical. " +
+                "Reed-Solomon is required for genuine RAID-6+ protection.",
+                parityShardCount);
+        }
+
         for (int i = 0; i < parityShardCount; i++)
         {
             var parityShard = new byte[shardSize];

@@ -41,8 +41,10 @@ internal sealed class Cr2RawStrategy : MediaStrategyBase
     /// <summary>Canon MakerNote tag for white balance data.</summary>
     private const ushort CanonWhiteBalanceTag = 0x4001;
 
-    /// <summary>Canon MakerNote tag for color data.</summary>
-    private const ushort CanonColorDataTag = 0x4001;
+    // Finding 1073: CanonColorDataTag was incorrectly set to 0x4001 (same as WB tag).
+    // Canon EOS CR2 color data uses a distinct tag 0x4003 in the MakerNote IFD.
+    /// <summary>Canon MakerNote tag for color data (e.g., color matrix).</summary>
+    private const ushort CanonColorDataTag = 0x4003;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="Cr2RawStrategy"/> class
@@ -76,6 +78,11 @@ internal sealed class Cr2RawStrategy : MediaStrategyBase
 
     /// <inheritdoc/>
     public override string Name => "Canon CR2 RAW";
+
+    // Finding 1073: CanonWhiteBalanceTag and CanonColorDataTag share constant 0x4001 (dead
+    // constant), and byte-range access at data[i+9] can exceed the bounds check at Length-8.
+    // Not production-ready until constants and bounds are corrected.
+    public override bool IsProductionReady => false;
 
     /// <summary>Production hardening: initialization with counter tracking.</summary>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken) { IncrementCounter("cr2.init"); return base.InitializeAsyncCore(cancellationToken); }
@@ -336,8 +343,9 @@ internal sealed class Cr2RawStrategy : MediaStrategyBase
     /// </summary>
     private static (double r, double g, double b) ExtractWhiteBalance(byte[] data)
     {
-        // Search for Canon WB data pattern in MakerNote
-        for (int i = 0; i < data.Length - 8; i++)
+        // Search for Canon WB data pattern in MakerNote.
+        // Finding 1073: loop bound was Length-8 but body accesses data[i+9] — fixed to Length-9.
+        for (int i = 0; i < data.Length - 9; i++)
         {
             // Canon WB tag signature
             if (data[i] == 0x01 && data[i + 1] == 0x40 && i + 16 < data.Length)

@@ -225,15 +225,9 @@ public class SealService : ISealService
 
         try
         {
-            // Check if already sealed
-            if (_blockSeals.ContainsKey(blockId))
-            {
-                return SealResult.CreateFailure(
-                    $"Block {blockId} is already sealed",
-                    reason);
-            }
-
-            // Generate cryptographic seal token
+            // Generate cryptographic seal token before attempting atomic insert.
+            // The TryAdd below is the atomic gate — no separate ContainsKey check
+            // to avoid TOCTOU race between check and insert (finding 1029).
             var sealToken = GenerateSealToken(blockId, null, reason);
             var sealedAt = DateTime.UtcNow;
             var sealedBy = GetCurrentPrincipal();
@@ -251,7 +245,7 @@ public class SealService : ISealService
             if (!_blockSeals.TryAdd(blockId, sealRecord))
             {
                 return SealResult.CreateFailure(
-                    $"Failed to add seal for block {blockId} (concurrent modification)",
+                    $"Block {blockId} is already sealed or concurrent seal conflict",
                     reason);
             }
 
@@ -367,9 +361,9 @@ public class SealService : ISealService
                 SealedBy = sealedBy
             };
 
+            // Check for overlap under lock first (fast path).
             lock (_rangeSealLock)
             {
-                // Check for overlapping range seals
                 var overlapping = _rangeSeals.FirstOrDefault(r =>
                     (from >= r.RangeStart && from <= r.RangeEnd) ||
                     (to >= r.RangeStart && to <= r.RangeEnd) ||
@@ -381,12 +375,33 @@ public class SealService : ISealService
                         $"Range overlaps with existing seal from {overlapping.RangeStart} to {overlapping.RangeEnd}",
                         reason);
                 }
+            }
+
+            // Persist BEFORE adding to in-memory list (finding 1030): crash between
+            // in-memory add and persist would leave the list with an unpersisted entry.
+            // Persist-first means the durable store is always the authority.
+            await PersistRangeSealAsync(rangeSeal, ct);
+
+            // Re-check overlap under lock after persist, then commit to in-memory list.
+            lock (_rangeSealLock)
+            {
+                var overlapping = _rangeSeals.FirstOrDefault(r =>
+                    (from >= r.RangeStart && from <= r.RangeEnd) ||
+                    (to >= r.RangeStart && to <= r.RangeEnd) ||
+                    (from <= r.RangeStart && to >= r.RangeEnd));
+
+                if (overlapping != null)
+                {
+                    _logger.LogWarning(
+                        "Concurrent range seal detected after persist for {From}–{To}; record persisted but in-memory entry skipped",
+                        from, to);
+                    return SealResult.CreateFailure(
+                        $"Range overlaps with concurrent seal from {overlapping.RangeStart} to {overlapping.RangeEnd}",
+                        reason);
+                }
 
                 _rangeSeals.Add(rangeSeal);
             }
-
-            // Persist to backup storage
-            await PersistRangeSealAsync(rangeSeal, ct);
 
             // Log audit entry
             LogAuditEntry(SealOperation.SealRange, Guid.Empty, null, reason, sealedBy,

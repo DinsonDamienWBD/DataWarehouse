@@ -476,7 +476,9 @@ public class BackgroundIntegrityScanner : IBackgroundIntegrityScanner, IDisposab
                 using var stream = await _metadataStorage.LoadAsync(indexUri);
                 if (stream != null)
                 {
-                    var indexJson = await new StreamReader(stream).ReadToEndAsync(ct);
+                    string indexJson;
+                    using (var r = new StreamReader(stream, leaveOpen: true))
+                        indexJson = await r.ReadToEndAsync(ct);
                     var index = System.Text.Json.JsonSerializer.Deserialize<BlockIndex>(indexJson);
                     if (index?.BlockIds != null)
                     {
@@ -540,7 +542,9 @@ public class BackgroundIntegrityScanner : IBackgroundIntegrityScanner, IDisposab
                             using var prevStream = await _metadataStorage.LoadAsync(prevUri);
                             if (prevStream != null)
                             {
-                                var json = await new StreamReader(prevStream).ReadToEndAsync(ct);
+                                string json;
+                                using (var r = new StreamReader(prevStream, leaveOpen: true))
+                                    json = await r.ReadToEndAsync(ct);
                                 return System.Text.Json.JsonSerializer.Deserialize<TamperProofManifest>(json);
                             }
                         }
@@ -557,7 +561,9 @@ public class BackgroundIntegrityScanner : IBackgroundIntegrityScanner, IDisposab
                         using var prevStream = await _metadataStorage.LoadAsync(prevUri);
                         if (prevStream != null)
                         {
-                            var json = await new StreamReader(prevStream).ReadToEndAsync(ct);
+                            string json;
+                            using (var r = new StreamReader(prevStream, leaveOpen: true))
+                                json = await r.ReadToEndAsync(ct);
                             return System.Text.Json.JsonSerializer.Deserialize<TamperProofManifest>(json);
                         }
                     }
@@ -570,7 +576,9 @@ public class BackgroundIntegrityScanner : IBackgroundIntegrityScanner, IDisposab
             using var v1Stream = await _metadataStorage.LoadAsync(v1Uri);
             if (v1Stream != null)
             {
-                var json = await new StreamReader(v1Stream).ReadToEndAsync(ct);
+                string json;
+                using (var r = new StreamReader(v1Stream, leaveOpen: true))
+                    json = await r.ReadToEndAsync(ct);
                 return System.Text.Json.JsonSerializer.Deserialize<TamperProofManifest>(json);
             }
         }

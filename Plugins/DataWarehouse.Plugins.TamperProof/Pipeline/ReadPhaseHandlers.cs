@@ -110,8 +110,12 @@ public static class ReadPhaseHandlers
                 return null;
             }
 
-            var manifestJson = await new StreamReader(stream).ReadToEndAsync(ct);
-            var manifest = System.Text.Json.JsonSerializer.Deserialize<TamperProofManifest>(manifestJson);
+            TamperProofManifest? manifest;
+            using (var reader = new StreamReader(stream, leaveOpen: true))
+            {
+                var manifestJson = await reader.ReadToEndAsync(ct);
+                manifest = System.Text.Json.JsonSerializer.Deserialize<TamperProofManifest>(manifestJson);
+            }
 
             if (manifest == null)
             {
@@ -159,7 +163,9 @@ public static class ReadPhaseHandlers
                 using var indexStream = await metadataStorage.LoadAsync(indexUri);
                 if (indexStream != null)
                 {
-                    var indexJson = await new StreamReader(indexStream).ReadToEndAsync(ct);
+                    string indexJson;
+                    using (var reader = new StreamReader(indexStream, leaveOpen: true))
+                        indexJson = await reader.ReadToEndAsync(ct);
                     var versionIndex = System.Text.Json.JsonSerializer.Deserialize<VersionIndex>(indexJson);
                     if (versionIndex != null)
                     {
@@ -581,45 +587,60 @@ public static class ReadPhaseHandlers
     }
 
     /// <summary>
-    /// Reconstructs missing shards using parity information (simple XOR for now).
+    /// Reconstructs missing shards using XOR parity.
+    /// Valid for single-failure RAID-5 configurations (one parity shard, one missing data shard).
+    /// Finding 1008: RAID-6+ configurations require Reed-Solomon; this method throws for those cases
+    /// rather than silently producing incorrect data.
     /// </summary>
     private static void ReconstructMissingShards(List<byte[]?> shards, RaidRecord raidConfig)
     {
-        // Simple XOR reconstruction for demonstration
-        // Production would use Reed-Solomon codes
+        var missingDataShards = Enumerable.Range(0, raidConfig.DataShardCount)
+            .Where(i => shards[i] == null)
+            .ToList();
 
-        for (int i = 0; i < raidConfig.DataShardCount; i++)
+        var parityShardCount = shards.Count - raidConfig.DataShardCount;
+
+        // Finding 1008: XOR can only recover from a single missing shard per parity shard.
+        // For RAID-6+ (multiple parity shards), Reed-Solomon is required.
+        // Fail fast rather than producing silently incorrect data.
+        if (missingDataShards.Count > parityShardCount)
         {
-            if (shards[i] == null)
+            throw new InvalidOperationException(
+                $"Cannot reconstruct {missingDataShards.Count} missing data shards with only " +
+                $"{parityShardCount} parity shard(s). Reed-Solomon required for RAID-6+ recovery. " +
+                "Install a Reed-Solomon library (e.g., Backblaze/JavaReedSolomon port) to enable multi-failure recovery.");
+        }
+
+        if (missingDataShards.Count == 0)
+            return;
+
+        // XOR reconstruction — valid for single-parity (RAID-5) with exactly one missing data shard.
+        // If multiple failures but equal parity count, we attempt sequential XOR per parity shard
+        // which is only correct when each missing shard is independently recoverable.
+        foreach (var missingIdx in missingDataShards)
+        {
+            var shardSize = raidConfig.ShardSize;
+            var reconstructed = new byte[shardSize];
+
+            // XOR all available data shards
+            for (int j = 0; j < raidConfig.DataShardCount; j++)
             {
-                // Reconstruct data shard from other data shards and parity
-                var shardSize = raidConfig.ShardSize;
-                var reconstructed = new byte[shardSize];
-
-                // XOR all available data shards and first parity shard
-                for (int j = 0; j < raidConfig.DataShardCount; j++)
+                if (j != missingIdx && shards[j] != null)
                 {
-                    if (j != i && shards[j] != null)
-                    {
-                        for (int k = 0; k < Math.Min(shardSize, shards[j]!.Length); k++)
-                        {
-                            reconstructed[k] ^= shards[j]![k];
-                        }
-                    }
+                    for (int k = 0; k < Math.Min(shardSize, shards[j]!.Length); k++)
+                        reconstructed[k] ^= shards[j]![k];
                 }
-
-                // XOR with first parity shard
-                var parityShard = shards[raidConfig.DataShardCount];
-                if (parityShard != null)
-                {
-                    for (int k = 0; k < Math.Min(shardSize, parityShard.Length); k++)
-                    {
-                        reconstructed[k] ^= parityShard[k];
-                    }
-                }
-
-                shards[i] = reconstructed;
             }
+
+            // XOR with first available parity shard
+            var parityShard = shards[raidConfig.DataShardCount];
+            if (parityShard != null)
+            {
+                for (int k = 0; k < Math.Min(shardSize, parityShard.Length); k++)
+                    reconstructed[k] ^= parityShard[k];
+            }
+
+            shards[missingIdx] = reconstructed;
         }
     }
 

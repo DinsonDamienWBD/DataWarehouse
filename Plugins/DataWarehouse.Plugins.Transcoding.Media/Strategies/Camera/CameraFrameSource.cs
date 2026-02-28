@@ -126,8 +126,11 @@ public sealed class CameraFrameSource : MediaStrategyBase, IAsyncDisposable
     {
         if (disposing)
         {
-            // Don't call async dispose from sync Dispose
-            // User must call DisposeAsync() for proper cleanup
+            // Finding 1051: synchronously dispose the camera handle when the sync Dispose path
+            // is taken (e.g. via a using block). IAsyncDisposable.DisposeAsync() is preferred
+            // for graceful async teardown, but the sync path must not leak the handle.
+            if (_camera is IDisposable syncDisposable)
+                syncDisposable.Dispose();
         }
         base.Dispose(disposing);
     }

@@ -17,7 +17,15 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
         public override string SemanticDescription => "Connects to Oracle NetSuite ERP using HTTPS REST API (SuiteTalk).";
         public override string[] Tags => new[] { "netsuite", "erp", "accounting", "saas", "rest-api" };
         public NetSuiteConnectionStrategy(ILogger? logger = null) : base(logger) { }
-        protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct) { var accountId = GetConfiguration<string>(config, "AccountId", string.Empty); var endpoint = $"https://{accountId}.suitetalk.api.netsuite.com"; var httpClient = new HttpClient { BaseAddress = new Uri(endpoint), Timeout = config.Timeout }; return new DefaultConnectionHandle(httpClient, new Dictionary<string, object> { ["AccountId"] = accountId, ["Endpoint"] = endpoint }); }
+        protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
+        {
+            var accountId = GetConfiguration<string>(config, "AccountId", string.Empty);
+            if (string.IsNullOrWhiteSpace(accountId))
+                throw new ArgumentException("Required configuration key 'AccountId' is missing or empty.", nameof(config));
+            var endpoint = $"https://{accountId}.suitetalk.api.netsuite.com";
+            var httpClient = new HttpClient { BaseAddress = new Uri(endpoint), Timeout = config.Timeout };
+            return new DefaultConnectionHandle(httpClient, new Dictionary<string, object> { ["AccountId"] = accountId, ["Endpoint"] = endpoint });
+        }
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { try { var response = await handle.GetConnection<HttpClient>().GetAsync("/services/rest/record/v1/metadata-catalog", ct); return response.IsSuccessStatusCode; } catch { return false; } }
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<HttpClient>()?.Dispose(); await Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, isHealthy ? "NetSuite is reachable" : "NetSuite is not responding", sw.Elapsed, DateTimeOffset.UtcNow); }

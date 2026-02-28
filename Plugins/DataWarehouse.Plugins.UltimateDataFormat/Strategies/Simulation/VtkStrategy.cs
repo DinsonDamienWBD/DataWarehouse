@@ -14,6 +14,10 @@ public sealed class VtkStrategy : DataFormatStrategyBase
 
     public override string DisplayName => "VTK";
 
+    // Finding 2246: ParseAsync always fails because the VTK library is not referenced.
+    // Mark not production-ready so the plugin host does not route live data through here.
+    public override bool IsProductionReady => false;
+
     /// <summary>Production hardening: initialization with counter tracking.</summary>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken) { IncrementCounter("vtk.init"); return base.InitializeAsyncCore(cancellationToken); }
     /// <summary>Production hardening: graceful shutdown.</summary>

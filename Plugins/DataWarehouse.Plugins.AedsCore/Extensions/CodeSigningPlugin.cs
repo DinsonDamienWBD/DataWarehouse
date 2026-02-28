@@ -179,10 +179,35 @@ public sealed class CodeSigningPlugin : SecurityPluginBase
             var leafCertBytes = Convert.FromBase64String(certificateChain[0]);
             var leafCert = X509CertificateLoader.LoadCertificate(leafCertBytes);
 
-            return chain.Build(leafCert);
+            var valid = chain.Build(leafCert);
+            if (!valid)
+            {
+                // Log each chain status element so the caller can distinguish
+                // misconfigured trust store from a legitimately rejected certificate.
+                var statuses = chain.ChainStatus
+                    .Select(s => $"{s.Status}: {s.StatusInformation?.Trim()}")
+                    .ToArray();
+                System.Diagnostics.Debug.WriteLine(
+                    $"[CodeSigningPlugin] Certificate chain validation failed: {string.Join("; ", statuses)}");
+            }
+            return valid;
         }
-        catch
+        catch (FormatException ex)
         {
+            System.Diagnostics.Debug.WriteLine(
+                $"[CodeSigningPlugin] Certificate Base64 decode failed: {ex.Message}");
+            return false;
+        }
+        catch (System.Security.Cryptography.CryptographicException ex)
+        {
+            System.Diagnostics.Debug.WriteLine(
+                $"[CodeSigningPlugin] Certificate load failed: {ex.Message}");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine(
+                $"[CodeSigningPlugin] Unexpected error in ValidateCertificateChain: {ex.GetType().Name}: {ex.Message}");
             return false;
         }
     }

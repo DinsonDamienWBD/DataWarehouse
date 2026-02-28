@@ -19,9 +19,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
     /// </summary>
     public class SapConnectionStrategy : SaaSConnectionStrategyBase
     {
-        private string _host = "";
-        private string _client = "100";
-        private string _csrfToken = "";
+        private volatile string _host = "";
+        private volatile string _client = "100";
+        private volatile string _csrfToken = "";
 
         public override string StrategyId => "sap";
         public override string DisplayName => "SAP";
