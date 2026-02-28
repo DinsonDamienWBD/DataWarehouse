@@ -154,7 +154,9 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
             // Location deviation
             if (!string.IsNullOrEmpty(behavior.Location))
             {
-                var locationFrequency = (double)profile.Locations.Count(l => l == behavior.Location) / profile.Locations.Count;
+                var locationFrequency = profile.Locations.Count > 0
+                    ? (double)profile.Locations.Count(l => l == behavior.Location) / profile.Locations.Count
+                    : 0.0;
                 if (locationFrequency < 0.1) // Less than 10% of historical sessions
                 {
                     deviations.Add(new BehaviorDeviation
@@ -234,36 +236,36 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
                 profile.LastActivityAt = DateTime.UtcNow;
                 profile.BehaviorSamples.Add(behavior.Timestamp);
 
-                // Update login times (sliding window)
+                // Update login times (sliding window — trim oldest first to avoid O(n) RemoveAt(0))
                 profile.LoginTimes.Add(behavior.LoginTime);
                 if (profile.LoginTimes.Count > 100)
-                    profile.LoginTimes.RemoveAt(0);
+                { profile.LoginTimes.RemoveRange(0, profile.LoginTimes.Count - 100); }
 
                 // Update session durations
                 if (behavior.SessionDurationMinutes > 0)
                 {
                     profile.SessionDurations.Add(behavior.SessionDurationMinutes);
                     if (profile.SessionDurations.Count > 100)
-                        profile.SessionDurations.RemoveAt(0);
+                    { profile.SessionDurations.RemoveRange(0, profile.SessionDurations.Count - 100); }
                 }
 
                 // Update actions per hour
                 profile.ActionsPerHour.Add(behavior.ActionsPerHour);
                 if (profile.ActionsPerHour.Count > 100)
-                    profile.ActionsPerHour.RemoveAt(0);
+                { profile.ActionsPerHour.RemoveRange(0, profile.ActionsPerHour.Count - 100); }
 
                 // Update locations
                 if (!string.IsNullOrEmpty(behavior.Location))
                 {
                     profile.Locations.Add(behavior.Location);
                     if (profile.Locations.Count > 50)
-                        profile.Locations.RemoveAt(0);
+                    { profile.Locations.RemoveRange(0, profile.Locations.Count - 50); }
                 }
 
                 // Update failed login attempts
                 profile.FailedLoginAttempts.Add(behavior.FailedLoginAttempts);
                 if (profile.FailedLoginAttempts.Count > 100)
-                    profile.FailedLoginAttempts.RemoveAt(0);
+                { profile.FailedLoginAttempts.RemoveRange(0, profile.FailedLoginAttempts.Count - 100); }
             }
         }
 
