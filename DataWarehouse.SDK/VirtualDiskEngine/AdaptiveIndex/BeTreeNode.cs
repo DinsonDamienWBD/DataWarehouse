@@ -225,7 +225,8 @@ public sealed class BeTreeNode
             {
                 int keyLen = BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(offset));
                 offset += 4;
-                if (offset + keyLen + 8 > data.Length) break;
+                // Guard against OOM: negative or oversized keyLen from corrupt data
+                if (keyLen < 0 || keyLen > 65536 || offset + keyLen + 8 > data.Length) break;
                 var key = data.AsSpan(offset, keyLen).ToArray();
                 offset += keyLen;
                 long value = BinaryPrimitives.ReadInt64BigEndian(data.AsSpan(offset));

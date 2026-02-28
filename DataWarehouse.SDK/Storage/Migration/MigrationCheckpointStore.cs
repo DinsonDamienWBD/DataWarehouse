@@ -37,6 +37,9 @@ public sealed class MigrationCheckpointStore
     /// <param name="ct">Cancellation token.</param>
     public async Task SaveCheckpointAsync(MigrationCheckpoint checkpoint, CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(checkpoint);
+        if (string.IsNullOrEmpty(checkpoint.JobId))
+            throw new ArgumentException("Checkpoint JobId must not be null or empty.", nameof(checkpoint));
         _inMemory.AddOrUpdate(checkpoint.JobId, checkpoint, (_, _) => checkpoint);
         var path = GetCheckpointPath(checkpoint.JobId);
         var json = JsonSerializer.Serialize(checkpoint);
@@ -51,17 +54,30 @@ public sealed class MigrationCheckpointStore
     /// <returns>The checkpoint if found, or null.</returns>
     public async Task<MigrationCheckpoint?> LoadCheckpointAsync(string jobId, CancellationToken ct = default)
     {
+        if (string.IsNullOrEmpty(jobId))
+            throw new ArgumentException("Job ID must not be null or empty.", nameof(jobId));
+
         if (_inMemory.TryGetValue(jobId, out var cached))
             return cached;
 
         var path = GetCheckpointPath(jobId);
         if (!File.Exists(path)) return null;
 
-        var json = await File.ReadAllTextAsync(path, ct);
-        var checkpoint = JsonSerializer.Deserialize<MigrationCheckpoint>(json);
-        if (checkpoint != null)
-            _inMemory.TryAdd(checkpoint.JobId, checkpoint);
-        return checkpoint;
+        try
+        {
+            var json = await File.ReadAllTextAsync(path, ct);
+            var checkpoint = JsonSerializer.Deserialize<MigrationCheckpoint>(json);
+            if (checkpoint != null)
+                _inMemory.TryAdd(checkpoint.JobId, checkpoint);
+            return checkpoint;
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            // Corrupt checkpoint file — treat as missing, log and return null so caller retries from scratch
+            System.Diagnostics.Trace.TraceWarning(
+                $"[MigrationCheckpointStore] Corrupt checkpoint file for job '{jobId}': {ex.Message}. Treating as missing.");
+            return null;
+        }
     }
 
     /// <summary>
@@ -72,6 +88,8 @@ public sealed class MigrationCheckpointStore
     /// <param name="ct">Cancellation token.</param>
     public Task DeleteCheckpointAsync(string jobId, CancellationToken ct = default)
     {
+        if (string.IsNullOrEmpty(jobId))
+            throw new ArgumentException("Job ID must not be null or empty.", nameof(jobId));
         _inMemory.TryRemove(jobId, out _);
         var path = GetCheckpointPath(jobId);
         if (File.Exists(path)) File.Delete(path);

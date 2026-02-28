@@ -217,6 +217,9 @@ public sealed class BwTree<TKey, TValue> : IDisposable where TKey : IComparable<
 
     /// <summary>
     /// Performs a range query, returning all key-value pairs in [startKey, endKey) sorted order.
+    /// The caller MUST dispose the returned enumerator (e.g., use a foreach or explicit using) to
+    /// guarantee the epoch is released. Abandoning the enumerator leaks the epoch and blocks
+    /// garbage collection of all subsequent delta chains. Use <c>foreach</c> which always calls Dispose.
     /// </summary>
     /// <param name="startKey">The inclusive start key. Null means from the beginning.</param>
     /// <param name="endKey">The exclusive end key. Null means to the end.</param>

@@ -130,7 +130,7 @@ public abstract class HybridStoragePluginBase<TConfig> : IndexableStoragePluginB
     /// <summary>
     /// Whether the plugin has been disposed.
     /// </summary>
-    private bool _disposed;
+    private volatile bool _disposed;
 
     /// <summary>
     /// Storage category for this plugin (e.g., "Local", "Cloud", "Network").

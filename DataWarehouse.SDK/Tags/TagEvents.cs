@@ -71,6 +71,8 @@ public sealed record TagUpdatedEvent(
 /// <summary>
 /// Published when multiple tags are mutated in a single batch operation.
 /// Contains the individual events for each tag mutation.
+/// Inherits from <see cref="TagEvent"/> so polymorphic bus subscribers for TagEvent receive bulk events too.
+/// Uses a sentinel <see cref="TagKey"/> (empty namespace/name) to satisfy the base record constructor.
 /// </summary>
 /// <param name="ObjectKey">The storage key of the object.</param>
 /// <param name="Events">The individual tag events within the batch.</param>
@@ -82,6 +84,7 @@ public sealed record TagsBulkUpdatedEvent(
     IReadOnlyList<TagEvent> Events,
     DateTimeOffset Timestamp,
     string CorrelationId)
+    : TagEvent(ObjectKey, new TagKey("system", "bulk"), Timestamp, CorrelationId)
 {
     /// <inheritdoc />
     public override string ToString() => $"TagsBulkUpdated({ObjectKey}, {Events.Count} events)";

@@ -300,8 +300,12 @@ public sealed class AdaptiveIndexEngine : IAdaptiveIndex, IAsyncDisposable
             await newIndex.InsertAsync(entry.Key, entry.Value, ct).ConfigureAwait(false);
         }
 
-        // Dispose old index if disposable
-        if (_current is IDisposable disposable)
+        // Dispose old index — prefer IAsyncDisposable over IDisposable (old index may have async cleanup).
+        if (_current is IAsyncDisposable asyncDisposable)
+        {
+            await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+        }
+        else if (_current is IDisposable disposable)
         {
             disposable.Dispose();
         }

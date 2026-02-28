@@ -17,14 +17,42 @@ public sealed class DefaultTierManager : ITierManager
 {
     private readonly BoundedDictionary<string, TierEntry> _tierMap = new BoundedDictionary<string, TierEntry>(1000);
 
-    /// <summary>Days since last access before recommending Cool tier. Default: 30.</summary>
-    public int CoolThresholdDays { get; set; } = 30;
+    private int _coolThresholdDays = 30;
+    private int _coldThresholdDays = 90;
+    private int _archiveThresholdDays = 365;
 
-    /// <summary>Days since last access before recommending Cold tier. Default: 90.</summary>
-    public int ColdThresholdDays { get; set; } = 90;
+    /// <summary>Days since last access before recommending Cool tier. Default: 30. Must be at least 1.</summary>
+    public int CoolThresholdDays
+    {
+        get => _coolThresholdDays;
+        set
+        {
+            if (value < 1) throw new ArgumentOutOfRangeException(nameof(value), "CoolThresholdDays must be at least 1.");
+            _coolThresholdDays = value;
+        }
+    }
 
-    /// <summary>Days since last access before recommending Archive tier. Default: 365.</summary>
-    public int ArchiveThresholdDays { get; set; } = 365;
+    /// <summary>Days since last access before recommending Cold tier. Default: 90. Must be greater than CoolThresholdDays.</summary>
+    public int ColdThresholdDays
+    {
+        get => _coldThresholdDays;
+        set
+        {
+            if (value < 1) throw new ArgumentOutOfRangeException(nameof(value), "ColdThresholdDays must be at least 1.");
+            _coldThresholdDays = value;
+        }
+    }
+
+    /// <summary>Days since last access before recommending Archive tier. Default: 365. Must be greater than ColdThresholdDays.</summary>
+    public int ArchiveThresholdDays
+    {
+        get => _archiveThresholdDays;
+        set
+        {
+            if (value < 1) throw new ArgumentOutOfRangeException(nameof(value), "ArchiveThresholdDays must be at least 1.");
+            _archiveThresholdDays = value;
+        }
+    }
 
     /// <inheritdoc/>
     public Task<string> MoveToTierAsync(string key, StorageTier targetTier, CancellationToken ct = default)

@@ -49,6 +49,8 @@ public sealed class DefaultStorageIndex : IStorageIndex
     public Task<IReadOnlyList<StorageObjectMetadata>> SearchAsync(string query, int maxResults = 100, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
+        if (maxResults <= 0)
+            throw new ArgumentOutOfRangeException(nameof(maxResults), "maxResults must be greater than zero.");
 
         if (string.IsNullOrWhiteSpace(query))
             return Task.FromResult<IReadOnlyList<StorageObjectMetadata>>(Array.Empty<StorageObjectMetadata>());

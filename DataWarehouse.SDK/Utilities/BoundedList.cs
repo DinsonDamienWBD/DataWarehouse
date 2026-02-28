@@ -291,13 +291,11 @@ namespace DataWarehouse.SDK.Utilities
             _debounceTimer?.Dispose();
             _debounceTimer = null;
 
-            // Flush pending persist synchronously on dispose — Dispose() is synchronous.
-            // Task.Run avoids deadlocks on synchronization-context-bound threads.
-            // Prefer DisposeAsync() for callers that can await.
+            // Best-effort flush — do NOT block (sync-over-async deadlocks threadpool-starved callers).
+            // Prefer DisposeAsync() for guaranteed flush. Dispose() is a fire-and-forget fallback.
             if (_pendingPersist && PersistenceEnabled)
             {
-                try { Task.Run(() => PersistAsync()).ConfigureAwait(false).GetAwaiter().GetResult(); }
-                catch { /* Best-effort */ }
+                _ = Task.Run(() => PersistAsync());
             }
 
             _lock.Dispose();

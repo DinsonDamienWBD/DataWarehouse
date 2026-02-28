@@ -69,7 +69,7 @@ public sealed class PersistentExtentTree : IAsyncDisposable
     // ── Auto-checkpoint policy ───────────────────────────────────────────
 
     private Timer? _autoCheckpointTimer;
-    private bool _disposed;
+    private volatile bool _disposed;
 
     /// <summary>
     /// Configuration for automatic checkpoint triggers.

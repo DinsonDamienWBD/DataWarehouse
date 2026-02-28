@@ -42,6 +42,8 @@ public sealed class IndexTiering : IAdaptiveIndex, IAsyncDisposable
     private readonly Timer _backgroundTimer;
     private readonly CancellationTokenSource _cts = new();
     private int _disposed;
+    // Tracks the most recently fired background task for graceful shutdown in DisposeAsync.
+    private volatile Task _lastBackgroundTask = Task.CompletedTask;
 
     /// <summary>
     /// Initializes a new tiered index with three tiers.
@@ -75,9 +77,10 @@ public sealed class IndexTiering : IAdaptiveIndex, IAsyncDisposable
         _l1MaxEntries = l1MaxEntries;
         _l2MaxEntries = l2MaxEntries;
 
-        // Background tier management every 30 seconds
+        // Background tier management every 30 seconds.
+        // Track the last task so DisposeAsync can await it for graceful shutdown.
         _backgroundTimer = new Timer(
-            _ => _ = ManageTiersAsync(),
+            _ => { _lastBackgroundTask = ManageTiersAsync(); },
             null,
             TimeSpan.FromSeconds(30),
             TimeSpan.FromSeconds(30));
@@ -245,6 +248,8 @@ public sealed class IndexTiering : IAdaptiveIndex, IAsyncDisposable
 
         _cts.Cancel();
         await _backgroundTimer.DisposeAsync().ConfigureAwait(false);
+        // Await any in-flight background task so we don't dispose tier indexes underneath it.
+        try { await _lastBackgroundTask.ConfigureAwait(false); } catch { /* already handled inside ManageTiersAsync */ }
         _cts.Dispose();
         _tierLock.Dispose();
 

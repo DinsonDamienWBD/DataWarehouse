@@ -142,6 +142,11 @@ public readonly record struct BeTreeMessage : IComparable<BeTreeMessage>
         var type = (BeTreeMessageType)source[offset++];
         int keyLen = BinaryPrimitives.ReadInt32BigEndian(source.Slice(offset));
         offset += 4;
+        // Guard against OOM from corrupt/malicious keyLen before allocating
+        const int MaxKeyLen = 65536; // 64 KB — reasonable upper bound for B-epsilon tree keys
+        if (keyLen < 0 || keyLen > MaxKeyLen || offset + keyLen > source.Length)
+            throw new InvalidDataException(
+                $"BeTreeMessage deserialization failed: keyLen {keyLen} is invalid (max {MaxKeyLen}, available {source.Length - offset}).");
         var key = source.Slice(offset, keyLen).ToArray();
         offset += keyLen;
         long value = BinaryPrimitives.ReadInt64BigEndian(source.Slice(offset));

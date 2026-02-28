@@ -19,7 +19,7 @@ namespace DataWarehouse.SDK.Services
         // Type Index: Map InterfaceType -> List of PluginIDs
         private readonly BoundedDictionary<Type, List<string>> _typeIndex = new BoundedDictionary<Type, List<string>>(1000);
 
-        private OperatingMode _currentMode = OperatingMode.Laptop; // Default
+        private volatile OperatingMode _currentMode = OperatingMode.Laptop; // Default
 
         /// <summary>
         /// Sets the operating mode for intelligent resolution.
