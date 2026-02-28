@@ -132,11 +132,14 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.ContextMixing
 
             var encoder = new ArithmeticRangeEncoder(output);
             var trie = new PpmTrie(MaxOrder);
+            // P2-1576: Reuse HashSet across per-byte iterations to avoid ~1M allocations/MB.
+            var excludedBuf = new HashSet<byte>(256);
 
             for (int i = 0; i < input.Length; i++)
             {
                 byte symbol = input[i];
-                EncodeSymbol(encoder, trie, input, i, symbol);
+                excludedBuf.Clear();
+                EncodeSymbol(encoder, trie, input, i, symbol, excludedBuf);
                 trie.AddContext(input, i);
             }
 
@@ -175,10 +178,13 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.ContextMixing
             var decoder = new ArithmeticRangeDecoder(stream);
             var trie = new PpmTrie(MaxOrder);
             var result = new byte[originalLength];
+            // P2-1576: Reuse HashSet across per-byte iterations.
+            var excludedBuf = new HashSet<byte>(256);
 
             for (int i = 0; i < originalLength; i++)
             {
-                byte symbol = DecodeSymbol(decoder, trie, result, i);
+                excludedBuf.Clear();
+                byte symbol = DecodeSymbol(decoder, trie, result, i, excludedBuf);
                 result[i] = symbol;
                 trie.AddContext(result, i);
             }
@@ -191,9 +197,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.ContextMixing
         /// Tries the longest context first, falls back on escape.
         /// </summary>
         private static void EncodeSymbol(ArithmeticRangeEncoder encoder, PpmTrie trie,
-            byte[] data, int position, byte symbol)
+            byte[] data, int position, byte symbol, HashSet<byte> excludedSymbols)
         {
-            var excludedSymbols = new HashSet<byte>();
 
             for (int order = Math.Min(MaxOrder, position); order >= 0; order--)
             {
@@ -238,9 +243,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.ContextMixing
         /// Decodes a symbol using PPM with escape mechanism (Method C).
         /// </summary>
         private static byte DecodeSymbol(ArithmeticRangeDecoder decoder, PpmTrie trie,
-            byte[] data, int position)
+            byte[] data, int position, HashSet<byte> excludedSymbols)
         {
-            var excludedSymbols = new HashSet<byte>();
 
             for (int order = Math.Min(MaxOrder, position); order >= 0; order--)
             {

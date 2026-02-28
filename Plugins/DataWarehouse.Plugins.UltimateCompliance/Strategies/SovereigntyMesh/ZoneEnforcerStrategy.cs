@@ -32,7 +32,8 @@ public sealed class ZoneEnforcerStrategy : ComplianceStrategyBase, IZoneEnforcer
     private readonly DeclarativeZoneRegistry _registry;
 
     private readonly BoundedDictionary<string, CachedEnforcementResult> _enforcementCache = new BoundedDictionary<string, CachedEnforcementResult>(1000);
-    private readonly BoundedDictionary<string, List<EnforcementAuditEntry>> _auditTrail = new BoundedDictionary<string, List<EnforcementAuditEntry>>(1000);
+    // P2-1551: Use Queue<T> so Dequeue() is O(1) instead of List.RemoveAt(0) O(n).
+    private readonly BoundedDictionary<string, Queue<EnforcementAuditEntry>> _auditTrail = new BoundedDictionary<string, Queue<EnforcementAuditEntry>>(1000);
 
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
 
@@ -281,6 +282,7 @@ public sealed class ZoneEnforcerStrategy : ComplianceStrategyBase, IZoneEnforcer
         {
             lock (entries)
             {
+                // P2-1551: Queue<T> — enumerate as IEnumerable (no ToList needed before OrderBy)
                 return entries.OrderByDescending(e => e.Timestamp).ToList();
             }
         }
@@ -512,15 +514,15 @@ public sealed class ZoneEnforcerStrategy : ComplianceStrategyBase, IZoneEnforcer
             Details = details
         };
 
-        var trail = _auditTrail.GetOrAdd(objectId, _ => new List<EnforcementAuditEntry>());
+        var trail = _auditTrail.GetOrAdd(objectId, _ => new Queue<EnforcementAuditEntry>());
         lock (trail)
         {
-            trail.Add(entry);
+            trail.Enqueue(entry);
 
-            // Retain last 500 entries per object
+            // P2-1551: Retain last 500 entries per object — Dequeue() is O(1) vs List.RemoveAt(0) O(n).
             if (trail.Count > 500)
             {
-                trail.RemoveAt(0);
+                trail.Dequeue();
             }
         }
     }

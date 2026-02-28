@@ -133,11 +133,14 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.ContextMixing
 
             var encoder = new ArithmeticRangeEncoder(output);
             var model = new PpmdModel(MaxOrder);
+            // P2-1577: Reuse HashSet across per-byte iterations to avoid ~1M allocations/MB.
+            var excludedBuf = new HashSet<byte>(256);
 
             for (int i = 0; i < input.Length; i++)
             {
                 byte symbol = input[i];
-                EncodeSymbol(encoder, model, input, i, symbol);
+                excludedBuf.Clear();
+                EncodeSymbol(encoder, model, input, i, symbol, excludedBuf);
                 model.UpdateModel(input, i, symbol);
             }
 
@@ -180,10 +183,13 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.ContextMixing
             var decoder = new ArithmeticRangeDecoder(stream);
             var model = new PpmdModel(maxOrder);
             var result = new byte[originalLength];
+            // P2-1577: Reuse HashSet across per-byte iterations.
+            var excludedBuf = new HashSet<byte>(256);
 
             for (int i = 0; i < originalLength; i++)
             {
-                byte symbol = DecodeSymbol(decoder, model, result, i);
+                excludedBuf.Clear();
+                byte symbol = DecodeSymbol(decoder, model, result, i, excludedBuf);
                 result[i] = symbol;
                 model.UpdateModel(result, i, symbol);
             }
@@ -195,9 +201,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.ContextMixing
         /// Encodes a symbol using PPMd with SEE-based escape estimation.
         /// </summary>
         private static void EncodeSymbol(ArithmeticRangeEncoder encoder, PpmdModel model,
-            byte[] data, int position, byte symbol)
+            byte[] data, int position, byte symbol, HashSet<byte> excludedSymbols)
         {
-            var excludedSymbols = new HashSet<byte>();
 
             for (int order = Math.Min(model.MaxOrder, position); order >= 0; order--)
             {
@@ -245,9 +250,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.ContextMixing
         /// Decodes a symbol using PPMd with SEE-based escape estimation.
         /// </summary>
         private static byte DecodeSymbol(ArithmeticRangeDecoder decoder, PpmdModel model,
-            byte[] data, int position)
+            byte[] data, int position, HashSet<byte> excludedSymbols)
         {
-            var excludedSymbols = new HashSet<byte>();
 
             for (int order = Math.Min(model.MaxOrder, position); order >= 0; order--)
             {
