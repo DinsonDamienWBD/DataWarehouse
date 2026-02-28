@@ -87,7 +87,7 @@ protected override async Task<AccessDecision> EvaluateAccessCoreAsync(
 
                 // Validate TOTP code with time window
                 var currentTimeStep = GetCurrentTimeStep(userData.Period);
-                var isValid = ValidateTotp(code, userData.SecretKey, currentTimeStep, userData.Period, userData.Algorithm);
+                var isValid = ValidateTotp(code, userData.SecretKey, currentTimeStep, userData.Period, userData.Algorithm, userData.Digits);
 
                 if (isValid)
                 {
@@ -192,13 +192,13 @@ protected override async Task<AccessDecision> EvaluateAccessCoreAsync(
         /// <summary>
         /// Validates TOTP code with time window for clock skew tolerance.
         /// </summary>
-        private bool ValidateTotp(string code, byte[] secretKey, long currentTimeStep, int period, HashAlgorithmName algorithm)
+        private bool ValidateTotp(string code, byte[] secretKey, long currentTimeStep, int period, HashAlgorithmName algorithm, int digits = DefaultDigits)
         {
             // Try current time step and ±window for clock skew
             for (int i = -TimeStepWindow; i <= TimeStepWindow; i++)
             {
                 var testTimeStep = currentTimeStep + i;
-                var expectedCode = GenerateTotpCode(secretKey, testTimeStep, DefaultDigits, algorithm);
+                var expectedCode = GenerateTotpCode(secretKey, testTimeStep, digits, algorithm);
 
                 if (ConstantTimeEquals(code, expectedCode))
                 {
