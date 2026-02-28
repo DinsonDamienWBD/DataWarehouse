@@ -40,6 +40,7 @@ internal sealed class SmartRateLimitStrategy : SdkInterface.InterfaceStrategyBas
     public string[] Tags => new[] { "rate-limiting", "throttling", "abuse-detection", "429", "security" };
 
     // SDK contract properties
+    public override bool IsProductionReady => false;
     public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.REST;
     public override SdkInterface.InterfaceCapabilities Capabilities => new SdkInterface.InterfaceCapabilities(
         SupportsStreaming: false,

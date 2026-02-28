@@ -50,7 +50,7 @@ internal sealed class WasmtimeStrategy : ComputeRuntimeStrategyBase
                 if (task.ResourceLimits?.AllowFileSystemAccess == true && task.ResourceLimits.AllowedFileSystemPaths != null)
                 {
                     foreach (var path in task.ResourceLimits.AllowedFileSystemPaths)
-                        args.Append($"--dir {path} ");
+                        args.Append($"--dir \"{path}\" ");
                 }
 
                 args.Append($"\"{wasmPath}\"");
@@ -58,7 +58,7 @@ internal sealed class WasmtimeStrategy : ComputeRuntimeStrategyBase
                 if (task.Arguments != null)
                 {
                     foreach (var arg in task.Arguments)
-                        args.Append($" {arg}");
+                        args.Append($" \"{arg.Replace("\"", "\\\"")}\"");
                 }
 
                 var timeout = GetEffectiveTimeout(task);

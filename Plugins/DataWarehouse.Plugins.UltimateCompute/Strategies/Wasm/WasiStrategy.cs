@@ -71,7 +71,7 @@ internal sealed class WasiStrategy : ComputeRuntimeStrategyBase
                 if (task.Arguments != null)
                 {
                     foreach (var arg in task.Arguments)
-                        args.Append($" {arg}");
+                        args.Append($" \"{arg.Replace("\"", "\\\"")}\"");
                 }
 
                 var timeout = GetEffectiveTimeout(task);

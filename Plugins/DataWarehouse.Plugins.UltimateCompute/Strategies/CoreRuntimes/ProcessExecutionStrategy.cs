@@ -117,6 +117,10 @@ internal sealed class ProcessExecutionStrategy : ComputeRuntimeStrategyBase
 internal sealed class ServerlessExecutionStrategy : ComputeRuntimeStrategyBase
 {
     /// <inheritdoc/>
+    // Local in-process execution path is a simplified stub; AWS Lambda and Azure Functions paths are production-ready.
+    public override bool IsProductionReady => false;
+
+    /// <inheritdoc/>
     public override string StrategyId => "compute.serverless.function";
     /// <inheritdoc/>
     public override string StrategyName => "Serverless Function Execution";
@@ -177,12 +181,15 @@ internal sealed class ServerlessExecutionStrategy : ComputeRuntimeStrategyBase
         }
     }
 
+    // Shared HttpClient instance — avoids socket exhaustion from per-request instantiation.
+    private static readonly HttpClient SharedAzureHttpClient = new();
+
     private async Task<(byte[] output, string? logs)> ExecuteAzureFunctionAsync(ComputeTask task, CancellationToken ct)
     {
         // Azure Functions invocation via HTTP trigger
         var functionUrl = task.EntryPoint ?? task.Metadata?["function_url"]?.ToString() ?? throw new ArgumentException("Azure Function URL required");
 
-        using var httpClient = new HttpClient();
+        var httpClient = SharedAzureHttpClient;
         using var request = new HttpRequestMessage(HttpMethod.Post, functionUrl);
 
         if (task.InputData.Length > 0)

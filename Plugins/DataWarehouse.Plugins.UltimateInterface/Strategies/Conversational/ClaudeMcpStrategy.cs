@@ -40,6 +40,7 @@ internal sealed class ClaudeMcpStrategy : SdkInterface.InterfaceStrategyBase, IP
     public string[] Tags => new[] { "claude", "mcp", "ai", "anthropic", "json-rpc", "tools", "resources" };
 
     // SDK contract properties
+    public override bool IsProductionReady => false;
     public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.Custom;
     public override SdkInterface.InterfaceCapabilities Capabilities => new SdkInterface.InterfaceCapabilities(
         SupportsStreaming: true, // SSE support

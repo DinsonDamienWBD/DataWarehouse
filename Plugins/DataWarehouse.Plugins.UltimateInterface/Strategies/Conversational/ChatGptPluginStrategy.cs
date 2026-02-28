@@ -56,6 +56,7 @@ internal sealed class ChatGptPluginStrategy : SdkInterface.InterfaceStrategyBase
     public string[] Tags => new[] { "chatgpt", "openai", "ai", "plugin", "conversational", "natural-language" };
 
     // SDK contract properties
+    public override bool IsProductionReady => false;
     public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.REST;
     public override SdkInterface.InterfaceCapabilities Capabilities => new SdkInterface.InterfaceCapabilities(
         SupportsStreaming: false,

@@ -35,6 +35,7 @@ internal sealed class SqlInterfaceStrategy : SdkInterface.InterfaceStrategyBase,
     private static readonly Regex SqlStatementPattern = new(@"^\s*(SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|BEGIN|COMMIT|ROLLBACK)\s+",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    public override bool IsProductionReady => false;
     public override string StrategyId => "sql";
     public string DisplayName => "SQL Query Interface";
     public string SemanticDescription => "SQL query interface with parameterized queries, transaction support, and wire protocol routing.";

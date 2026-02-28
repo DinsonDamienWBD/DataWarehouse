@@ -258,11 +258,7 @@ internal sealed class AmqpStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
             return SdkInterface.InterfaceResponse.NotFound($"Queue not found: {queueName}");
 
         var count = request.QueryParameters.TryGetValue("count", out var countStr) && int.TryParse(countStr, out var c) ? c : 1;
-        var messages = queue.Messages.Take(count).ToList();
-
-        // Remove consumed messages (basic.get - auto-ack for simplicity)
-        foreach (var msg in messages)
-            queue.Messages.Remove(msg);
+        var messages = queue.DequeueMessages(count);
 
         var responsePayload = JsonSerializer.SerializeToUtf8Bytes(new
         {
@@ -377,7 +373,7 @@ internal sealed class AmqpStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
         {
             if (_queues.TryGetValue(binding.Queue, out var queue))
             {
-                queue.Messages.Add(message);
+                queue.EnqueueMessage(message);
                 deliveredQueues.Add(binding.Queue);
             }
         }
@@ -438,7 +434,31 @@ internal sealed class AmqpQueue
     public bool Durable { get; init; }
     public bool Exclusive { get; init; }
     public bool AutoDelete { get; init; }
-    public List<AmqpMessage> Messages { get; } = new();
+    private readonly object _messagesLock = new();
+    private readonly List<AmqpMessage> _messages = new();
+
+    public void EnqueueMessage(AmqpMessage message)
+    {
+        lock (_messagesLock)
+        {
+            _messages.Add(message);
+        }
+    }
+
+    public List<AmqpMessage> DequeueMessages(int count)
+    {
+        lock (_messagesLock)
+        {
+            var taken = _messages.Take(count).ToList();
+            _messages.RemoveRange(0, taken.Count);
+            return taken;
+        }
+    }
+
+    public int MessageCount
+    {
+        get { lock (_messagesLock) { return _messages.Count; } }
+    }
 }
 
 internal sealed class AmqpBinding

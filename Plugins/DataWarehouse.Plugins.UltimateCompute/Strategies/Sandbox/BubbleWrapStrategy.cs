@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using DataWarehouse.SDK.Contracts.Compute;
 
 namespace DataWarehouse.Plugins.UltimateCompute.Strategies.Sandbox;
@@ -9,6 +10,9 @@ namespace DataWarehouse.Plugins.UltimateCompute.Strategies.Sandbox;
 /// </summary>
 internal sealed class BubbleWrapStrategy : ComputeRuntimeStrategyBase
 {
+    // Allowlist for bind-mount paths — prevents path injection via bwrap arguments.
+    private static readonly Regex SafeBindPathRegex = new(@"^[a-zA-Z0-9/_.\-]+$", RegexOptions.Compiled);
+
     /// <inheritdoc/>
     public override string StrategyId => "compute.sandbox.bwrap";
     /// <inheritdoc/>
@@ -58,11 +62,15 @@ internal sealed class BubbleWrapStrategy : ComputeRuntimeStrategyBase
                 // Bind code file
                 args.Append($"--ro-bind \"{codePath}\" /code.sh ");
 
-                // Optional additional paths
+                // Optional additional paths — validate to prevent path injection.
                 if (task.ResourceLimits?.AllowedFileSystemPaths != null)
                 {
                     foreach (var path in task.ResourceLimits.AllowedFileSystemPaths)
+                    {
+                        if (!SafeBindPathRegex.IsMatch(path))
+                            throw new ArgumentException($"Bind-mount path '{path}' contains invalid characters.");
                         args.Append($"--bind \"{path}\" \"{path}\" ");
+                    }
                 }
 
                 // Unshare namespaces

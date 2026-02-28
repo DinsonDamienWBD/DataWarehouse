@@ -9,6 +9,9 @@ namespace DataWarehouse.Plugins.UltimateCompute.Strategies.Wasm;
 /// </summary>
 internal sealed class WasmEdgeStrategy : ComputeRuntimeStrategyBase
 {
+    // Allowlist for WASI-NN backends — prevents injection via backend flag.
+    private static readonly string[] AllowedNnBackends = ["TensorFlow", "TensorFlowLite", "PyTorch", "OpenVINO", "ONNX"];
+
     /// <inheritdoc/>
     public override string StrategyId => "compute.wasm.wasmedge";
 
@@ -50,6 +53,9 @@ internal sealed class WasmEdgeStrategy : ComputeRuntimeStrategyBase
                     var nnBackend = "TensorFlow";
                     if (task.Metadata?.TryGetValue("nn_backend", out var nnb) == true && nnb is string nnbs)
                         nnBackend = nnbs;
+                    // Validate backend against allowlist to prevent argument injection.
+                    if (!Array.Exists(AllowedNnBackends, b => b == nnBackend))
+                        throw new ArgumentException($"WASI-NN backend '{nnBackend}' is not allowed. Permitted: {string.Join(", ", AllowedNnBackends)}.");
                     args.Append($"--dir .:. --nn-preload default:{nnBackend}:CPU:model.bin ");
                 }
 

@@ -53,12 +53,18 @@ internal sealed class PipelinedExecutionStrategy : ComputeRuntimeStrategyBase
                     FullMode = BoundedChannelFullMode.Wait
                 });
 
-            // Feed input into first channel
+            // Feed input into first channel — complete in finally to prevent deadlock on failure.
             var feeder = Task.Run(async () =>
             {
-                foreach (var line in lines)
-                    await channels[0].Writer.WriteAsync(line, cancellationToken);
-                channels[0].Writer.Complete();
+                try
+                {
+                    foreach (var line in lines)
+                        await channels[0].Writer.WriteAsync(line, cancellationToken);
+                }
+                finally
+                {
+                    channels[0].Writer.Complete();
+                }
             }, cancellationToken);
 
             // Create pipeline stages

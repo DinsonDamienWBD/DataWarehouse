@@ -38,6 +38,7 @@ internal sealed class QuantumSafeApiStrategy : SdkInterface.InterfaceStrategyBas
     public string[] Tags => new[] { "quantum-safe", "post-quantum", "ml-kem", "ml-dsa", "cryptography", "security" };
 
     // SDK contract properties
+    public override bool IsProductionReady => false;
     public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.REST;
     public override SdkInterface.InterfaceCapabilities Capabilities => new SdkInterface.InterfaceCapabilities(
         SupportsStreaming: false,

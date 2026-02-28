@@ -34,6 +34,7 @@ internal sealed class GraphQLInterfaceStrategy : SdkInterface.InterfaceStrategyB
     private const int MaxQueryDepth = 15;
     private const int MaxComplexity = 1000;
 
+    public override bool IsProductionReady => false;
     public override string StrategyId => "graphql";
     public string DisplayName => "GraphQL";
     public string SemanticDescription => "GraphQL API with queries, mutations, subscriptions, introspection, and complexity analysis.";

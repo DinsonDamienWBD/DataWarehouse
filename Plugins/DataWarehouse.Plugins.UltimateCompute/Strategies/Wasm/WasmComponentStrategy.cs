@@ -50,12 +50,12 @@ internal sealed class WasmComponentStrategy : ComputeRuntimeStrategyBase
                 args.Append($"\"{wasmPath}\"");
 
                 if (task.EntryPoint != null)
-                    args.Append($" --invoke {task.EntryPoint}");
+                    args.Append($" --invoke \"{task.EntryPoint.Replace("\"", "\\\"")}\"");
 
                 if (task.Arguments != null)
                 {
                     foreach (var arg in task.Arguments)
-                        args.Append($" {arg}");
+                        args.Append($" \"{arg.Replace("\"", "\\\"")}\"");
                 }
 
                 var timeout = GetEffectiveTimeout(task);

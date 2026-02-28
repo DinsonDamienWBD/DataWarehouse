@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
@@ -10,7 +11,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Dashboards.Strategies.Embedded
 /// </summary>
 public sealed class EmbeddedSdkStrategy : DashboardStrategyBase
 {
-    private readonly Dictionary<string, Dashboard> _dashboards = new();
+    private readonly ConcurrentDictionary<string, Dashboard> _dashboards = new();
 
     public override string StrategyId => "embedded-sdk";
     public override string StrategyName => "Embedded Analytics SDK";
@@ -56,7 +57,7 @@ public sealed class EmbeddedSdkStrategy : DashboardStrategyBase
         if (!_dashboards.ContainsKey(dashboard.Id!))
             throw new KeyNotFoundException($"Dashboard {dashboard.Id} not found");
         var updated = dashboard with { UpdatedAt = DateTimeOffset.UtcNow, Version = dashboard.Version + 1 };
-        _dashboards[dashboard.Id!] = updated;
+        _dashboards[dashboard.Id!] = updated; // ConcurrentDictionary indexer is thread-safe
         return Task.FromResult(updated);
     }
 
@@ -69,7 +70,7 @@ public sealed class EmbeddedSdkStrategy : DashboardStrategyBase
 
     protected override Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct)
     {
-        _dashboards.Remove(dashboardId);
+        _dashboards.TryRemove(dashboardId, out _);
         return Task.CompletedTask;
     }
 
@@ -105,12 +106,12 @@ public sealed class EmbeddedSdkStrategy : DashboardStrategyBase
             throw new KeyNotFoundException($"Dashboard {dashboardId} not found");
 
         var sb = new StringBuilder();
-        sb.AppendLine($"<div id=\"dashboard-{dashboardId}\" class=\"embedded-dashboard\" style=\"width:{width}px;height:{height}px;\">");
-        sb.AppendLine($"  <h2>{dashboard.Title}</h2>");
+        sb.AppendLine($"<div id=\"dashboard-{System.Net.WebUtility.HtmlEncode(dashboardId)}\" class=\"embedded-dashboard\" style=\"width:{width}px;height:{height}px;\">");
+        sb.AppendLine($"  <h2>{System.Net.WebUtility.HtmlEncode(dashboard.Title)}</h2>");
         foreach (var widget in dashboard.Widgets)
         {
-            sb.AppendLine($"  <div class=\"widget\" data-type=\"{widget.Type}\" style=\"grid-column:{widget.Position.X+1}/span {widget.Position.Width};grid-row:{widget.Position.Y+1}/span {widget.Position.Height};\">");
-            sb.AppendLine($"    <h3>{widget.Title}</h3>");
+            sb.AppendLine($"  <div class=\"widget\" data-type=\"{System.Net.WebUtility.HtmlEncode(widget.Type.ToString())}\" style=\"grid-column:{widget.Position.X+1}/span {widget.Position.Width};grid-row:{widget.Position.Y+1}/span {widget.Position.Height};\">");
+            sb.AppendLine($"    <h3>{System.Net.WebUtility.HtmlEncode(widget.Title)}</h3>");
             sb.AppendLine($"    <div class=\"widget-content\"></div>");
             sb.AppendLine("  </div>");
         }
@@ -124,8 +125,8 @@ public sealed class EmbeddedSdkStrategy : DashboardStrategyBase
 /// </summary>
 public sealed class IframeIntegrationStrategy : DashboardStrategyBase
 {
-    private readonly Dictionary<string, Dashboard> _dashboards = new();
-    private readonly Dictionary<string, string> _embedUrls = new();
+    private readonly ConcurrentDictionary<string, Dashboard> _dashboards = new();
+    private readonly ConcurrentDictionary<string, string> _embedUrls = new();
 
     public override string StrategyId => "iframe";
     public override string StrategyName => "IFrame Integration";
@@ -178,8 +179,8 @@ public sealed class IframeIntegrationStrategy : DashboardStrategyBase
 
     protected override Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct)
     {
-        _dashboards.Remove(dashboardId);
-        _embedUrls.Remove(dashboardId);
+        _dashboards.TryRemove(dashboardId, out _);
+        _embedUrls.TryRemove(dashboardId, out _);
         return Task.CompletedTask;
     }
 
@@ -197,13 +198,21 @@ public sealed class IframeIntegrationStrategy : DashboardStrategyBase
     }
 
     /// <summary>
-    /// Generates iframe HTML for embedding.
+    /// Generates iframe HTML for embedding. Only http/https URLs are allowed to prevent XSS via javascript: URIs.
     /// </summary>
     public string GenerateIframeHtml(string dashboardId, int width = 800, int height = 600)
     {
         if (!_embedUrls.TryGetValue(dashboardId, out var url))
             throw new InvalidOperationException($"No embed URL set for dashboard {dashboardId}");
-        return $"<iframe src=\"{url}\" width=\"{width}\" height=\"{height}\" frameborder=\"0\" allowfullscreen></iframe>";
+
+        // Validate URL scheme to prevent javascript: URI XSS
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var parsedUri) ||
+            (parsedUri.Scheme != Uri.UriSchemeHttp && parsedUri.Scheme != Uri.UriSchemeHttps))
+        {
+            throw new ArgumentException($"Embed URL must use http or https scheme. Provided URL has invalid or disallowed scheme.", nameof(dashboardId));
+        }
+
+        return $"<iframe src=\"{System.Net.WebUtility.HtmlEncode(url)}\" width=\"{width}\" height=\"{height}\" frameborder=\"0\" allowfullscreen></iframe>";
     }
 }
 
@@ -212,7 +221,7 @@ public sealed class IframeIntegrationStrategy : DashboardStrategyBase
 /// </summary>
 public sealed class ApiRenderingStrategy : DashboardStrategyBase
 {
-    private readonly Dictionary<string, Dashboard> _dashboards = new();
+    private readonly ConcurrentDictionary<string, Dashboard> _dashboards = new();
 
     public override string StrategyId => "api-rendering";
     public override string StrategyName => "API-Based Rendering";
@@ -274,7 +283,7 @@ public sealed class ApiRenderingStrategy : DashboardStrategyBase
 
     protected override Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct)
     {
-        _dashboards.Remove(dashboardId);
+        _dashboards.TryRemove(dashboardId, out _);
         return Task.CompletedTask;
     }
 
@@ -308,7 +317,7 @@ public sealed class ApiRenderingStrategy : DashboardStrategyBase
 /// </summary>
 public sealed class WhiteLabelStrategy : DashboardStrategyBase
 {
-    private readonly Dictionary<string, Dictionary<string, Dashboard>> _tenantDashboards = new();
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, Dashboard>> _tenantDashboards = new();
 
     public override string StrategyId => "white-label";
     public override string StrategyName => "White Label Dashboards";
@@ -367,7 +376,7 @@ public sealed class WhiteLabelStrategy : DashboardStrategyBase
     protected override Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct)
     {
         var tenantDashboards = GetTenantDashboards();
-        tenantDashboards.Remove(dashboardId);
+        tenantDashboards.TryRemove(dashboardId, out _);
         return Task.CompletedTask;
     }
 
@@ -387,14 +396,9 @@ public sealed class WhiteLabelStrategy : DashboardStrategyBase
         return Task.FromResult(copy);
     }
 
-    private Dictionary<string, Dashboard> GetTenantDashboards()
+    private ConcurrentDictionary<string, Dashboard> GetTenantDashboards()
     {
-        if (!_tenantDashboards.TryGetValue(TenantId, out var dashboards))
-        {
-            dashboards = new Dictionary<string, Dashboard>();
-            _tenantDashboards[TenantId] = dashboards;
-        }
-        return dashboards;
+        return _tenantDashboards.GetOrAdd(TenantId, _ => new ConcurrentDictionary<string, Dashboard>());
     }
 
     /// <summary>

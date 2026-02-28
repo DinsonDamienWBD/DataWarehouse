@@ -39,6 +39,7 @@ internal sealed class NaturalLanguageApiStrategy : SdkInterface.InterfaceStrateg
     public string[] Tags => new[] { "nlp", "natural-language", "ai", "intent", "innovation" };
 
     // SDK contract properties
+    public override bool IsProductionReady => false;
     public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.REST;
     public override SdkInterface.InterfaceCapabilities Capabilities => new SdkInterface.InterfaceCapabilities(
         SupportsStreaming: false,

@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using DataWarehouse.SDK.Contracts.Compute;
 
 namespace DataWarehouse.Plugins.UltimateCompute.Strategies.Sandbox;
@@ -9,6 +10,12 @@ namespace DataWarehouse.Plugins.UltimateCompute.Strategies.Sandbox;
 /// </summary>
 internal sealed class SeLinuxStrategy : ComputeRuntimeStrategyBase
 {
+    // Validates SELinux context format: user:role:type[:range] — prevents context injection.
+    // Each component: alphanumeric, underscore, dot, hyphen, comma. Range may include colon for MCS.
+    private static readonly Regex SeContextRegex = new(
+        @"^[a-zA-Z0-9_.\-]+:[a-zA-Z0-9_.\-]+:[a-zA-Z0-9_.\-]+(:[a-zA-Z0-9_.\-,]+)?$",
+        RegexOptions.Compiled);
+
     /// <inheritdoc/>
     public override string StrategyId => "compute.sandbox.selinux";
     /// <inheritdoc/>
@@ -37,10 +44,12 @@ internal sealed class SeLinuxStrategy : ComputeRuntimeStrategyBase
             {
                 await File.WriteAllBytesAsync(codePath, task.Code.ToArray(), cancellationToken);
 
-                // Set SELinux context on the script
+                // Set SELinux context on the script — validate format to prevent injection.
                 var seContext = "system_u:system_r:sandbox_t:s0";
                 if (task.Metadata?.TryGetValue("selinux_context", out var ctx) == true && ctx is string ctxs)
                     seContext = ctxs;
+                if (!SeContextRegex.IsMatch(seContext))
+                    throw new ArgumentException($"SELinux context '{seContext}' has invalid format. Expected user:role:type[:range].");
 
                 // Set file context
                 await RunProcessAsync("chcon", $"{seContext} \"{codePath}\"", timeout: TimeSpan.FromSeconds(5), cancellationToken: cancellationToken);

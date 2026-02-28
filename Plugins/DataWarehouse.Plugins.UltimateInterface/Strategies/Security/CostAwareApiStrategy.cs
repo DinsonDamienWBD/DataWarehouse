@@ -70,6 +70,8 @@ internal sealed class CostAwareApiStrategy : SdkInterface.InterfaceStrategyBase,
     private sealed class ClientBudget
     {
         public required string ClientId { get; init; }
+        /// <summary>Lock to serialize concurrent budget reads and updates for this client.</summary>
+        public readonly object Lock = new();
         public decimal TotalBudget { get; set; } = 100.0m; // Default 100 credits
         public decimal UsedBudget { get; set; }
         public DateTimeOffset ResetAt { get; set; }
@@ -126,49 +128,70 @@ internal sealed class CostAwareApiStrategy : SdkInterface.InterfaceStrategyBase,
                 ResetAt = DateTimeOffset.UtcNow.AddDays(30) // Monthly billing cycle
             });
 
-            // Reset budget if period expired
-            if (DateTimeOffset.UtcNow >= budget.ResetAt)
-            {
-                budget.UsedBudget = 0;
-                budget.ResetAt = DateTimeOffset.UtcNow.AddDays(30);
-                budget.CostHistory.Clear();
-            }
-
-            // Calculate operation cost
+            // Calculate operation cost (no shared state — safe outside lock)
             var costBreakdown = CalculateOperationCost(request);
             var totalCost = costBreakdown.Values.Sum();
 
             // Check if this is a cost estimation request
             var estimateOnly = request.QueryParameters?.GetValueOrDefault("estimate") == "true";
 
-            if (estimateOnly)
+            // All budget reads and mutations must be serialized per-client
+            SdkInterface.InterfaceResponse? earlyReturn = null;
+            lock (budget.Lock)
             {
-                return CreateEstimateResponse(clientId, budget, totalCost, costBreakdown);
+                // Reset budget if period expired
+                if (DateTimeOffset.UtcNow >= budget.ResetAt)
+                {
+                    budget.UsedBudget = 0;
+                    budget.ResetAt = DateTimeOffset.UtcNow.AddDays(30);
+                    budget.CostHistory.Clear();
+                }
+
+                if (estimateOnly)
+                {
+                    earlyReturn = CreateEstimateResponse(clientId, budget, totalCost, costBreakdown);
+                }
+                else
+                {
+                    // Check budget
+                    var remainingBudget = budget.TotalBudget - budget.UsedBudget;
+                    if (totalCost > remainingBudget)
+                    {
+                        earlyReturn = Create402Response(clientId, totalCost, remainingBudget, budget.TotalBudget);
+                    }
+                    else
+                    {
+                        // Deduct cost from budget
+                        budget.UsedBudget += totalCost;
+                        budget.CostHistory.Add(new CostEntry
+                        {
+                            Timestamp = DateTimeOffset.UtcNow,
+                            Operation = $"{request.Method} {request.Path}",
+                            Cost = totalCost,
+                            CostBreakdown = costBreakdown
+                        });
+                    }
+                }
             }
 
-            // Check budget
-            var remainingBudget = budget.TotalBudget - budget.UsedBudget;
-            if (totalCost > remainingBudget)
-            {
-                return Create402Response(clientId, totalCost, remainingBudget, budget.TotalBudget);
-            }
-
-            // Deduct cost from budget
-            budget.UsedBudget += totalCost;
-            budget.CostHistory.Add(new CostEntry
-            {
-                Timestamp = DateTimeOffset.UtcNow,
-                Operation = $"{request.Method} {request.Path}",
-                Cost = totalCost,
-                CostBreakdown = costBreakdown
-            });
+            if (earlyReturn != null)
+                return earlyReturn;
 
             // Execute operation
             var responseData = await ExecuteOperationAsync(request, cancellationToken);
             var json = JsonSerializer.Serialize(responseData, new JsonSerializerOptions { WriteIndented = true });
             var body = Encoding.UTF8.GetBytes(json);
 
-            var newRemainingBudget = budget.TotalBudget - budget.UsedBudget;
+            // Snapshot budget values under lock for response headers
+            decimal snapshotTotal, snapshotUsed, snapshotRemaining;
+            DateTimeOffset snapshotReset;
+            lock (budget.Lock)
+            {
+                snapshotTotal = budget.TotalBudget;
+                snapshotUsed = budget.UsedBudget;
+                snapshotRemaining = snapshotTotal - snapshotUsed;
+                snapshotReset = budget.ResetAt;
+            }
 
             return new SdkInterface.InterfaceResponse(
                 StatusCode: 200,
@@ -176,10 +199,10 @@ internal sealed class CostAwareApiStrategy : SdkInterface.InterfaceStrategyBase,
                 {
                     ["Content-Type"] = "application/json",
                     ["X-Api-Cost"] = totalCost.ToString("F4"),
-                    ["X-Api-Budget-Total"] = budget.TotalBudget.ToString("F2"),
-                    ["X-Api-Budget-Used"] = budget.UsedBudget.ToString("F4"),
-                    ["X-Api-Budget-Remaining"] = newRemainingBudget.ToString("F4"),
-                    ["X-Api-Budget-Reset"] = budget.ResetAt.ToString("O"),
+                    ["X-Api-Budget-Total"] = snapshotTotal.ToString("F2"),
+                    ["X-Api-Budget-Used"] = snapshotUsed.ToString("F4"),
+                    ["X-Api-Budget-Remaining"] = snapshotRemaining.ToString("F4"),
+                    ["X-Api-Budget-Reset"] = snapshotReset.ToString("O"),
                     ["X-Api-Cost-Breakdown"] = JsonSerializer.Serialize(costBreakdown)
                 },
                 Body: body

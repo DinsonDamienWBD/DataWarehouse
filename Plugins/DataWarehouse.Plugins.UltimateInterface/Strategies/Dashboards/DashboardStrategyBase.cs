@@ -167,6 +167,7 @@ public abstract class DashboardStrategyBase : StrategyBase, IDashboardStrategy
     private readonly BoundedDictionary<string, HttpClient> _httpClientPool = new BoundedDictionary<string, HttpClient>(1000);
     private readonly DashboardStrategyStatistics _statistics = new();
     private readonly SemaphoreSlim _rateLimiter;
+    private readonly SemaphoreSlim _tokenRefreshLock = new SemaphoreSlim(1, 1);
     private readonly object _statsLock = new();
     private string? _cachedAccessToken;
     private DateTimeOffset _tokenExpiry = DateTimeOffset.MinValue;
@@ -566,57 +567,72 @@ public abstract class DashboardStrategyBase : StrategyBase, IDashboardStrategy
     }
 
     /// <summary>
-    /// Gets or refreshes an OAuth2 access token.
+    /// Gets or refreshes an OAuth2 access token. Thread-safe via SemaphoreSlim.
     /// </summary>
     protected virtual async Task<string?> GetOAuth2TokenAsync(CancellationToken cancellationToken)
     {
         if (Config == null || Config.AuthType != AuthenticationType.OAuth2) return null;
 
-        // Return cached token if still valid
+        // Fast path: return cached token if still valid (read without lock first)
         if (!string.IsNullOrEmpty(_cachedAccessToken) && DateTimeOffset.UtcNow < _tokenExpiry.AddMinutes(-5))
         {
             return _cachedAccessToken;
         }
 
-        if (string.IsNullOrEmpty(Config.OAuth2TokenEndpoint) ||
-            string.IsNullOrEmpty(Config.OAuth2ClientId) ||
-            string.IsNullOrEmpty(Config.OAuth2ClientSecret))
+        // Serialize token refresh to prevent concurrent refresh races
+        await _tokenRefreshLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            return null;
+            // Re-check after acquiring lock (another thread may have refreshed already)
+            if (!string.IsNullOrEmpty(_cachedAccessToken) && DateTimeOffset.UtcNow < _tokenExpiry.AddMinutes(-5))
+            {
+                return _cachedAccessToken;
+            }
+
+            if (string.IsNullOrEmpty(Config.OAuth2TokenEndpoint) ||
+                string.IsNullOrEmpty(Config.OAuth2ClientId) ||
+                string.IsNullOrEmpty(Config.OAuth2ClientSecret))
+            {
+                return null;
+            }
+
+            var requestBody = new Dictionary<string, string>
+            {
+                ["grant_type"] = "client_credentials",
+                ["client_id"] = Config.OAuth2ClientId,
+                ["client_secret"] = Config.OAuth2ClientSecret
+            };
+
+            if (Config.OAuth2Scopes != null)
+            {
+                requestBody["scope"] = string.Join(" ", Config.OAuth2Scopes);
+            }
+
+            using var response = await SharedHttpClient.PostAsync(
+                Config.OAuth2TokenEndpoint,
+                new FormUrlEncodedContent(requestBody),
+                cancellationToken);
+
+            response.EnsureSuccessStatusCode();
+
+            var tokenResponse = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+            _cachedAccessToken = tokenResponse.GetProperty("access_token").GetString();
+
+            if (tokenResponse.TryGetProperty("expires_in", out var expiresIn))
+            {
+                _tokenExpiry = DateTimeOffset.UtcNow.AddSeconds(expiresIn.GetInt32());
+            }
+            else
+            {
+                _tokenExpiry = DateTimeOffset.UtcNow.AddHours(1);
+            }
+
+            return _cachedAccessToken;
         }
-
-        var requestBody = new Dictionary<string, string>
+        finally
         {
-            ["grant_type"] = "client_credentials",
-            ["client_id"] = Config.OAuth2ClientId,
-            ["client_secret"] = Config.OAuth2ClientSecret
-        };
-
-        if (Config.OAuth2Scopes != null)
-        {
-            requestBody["scope"] = string.Join(" ", Config.OAuth2Scopes);
+            _tokenRefreshLock.Release();
         }
-
-        using var response = await SharedHttpClient.PostAsync(
-            Config.OAuth2TokenEndpoint,
-            new FormUrlEncodedContent(requestBody),
-            cancellationToken);
-
-        response.EnsureSuccessStatusCode();
-
-        var tokenResponse = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
-        _cachedAccessToken = tokenResponse.GetProperty("access_token").GetString();
-
-        if (tokenResponse.TryGetProperty("expires_in", out var expiresIn))
-        {
-            _tokenExpiry = DateTimeOffset.UtcNow.AddSeconds(expiresIn.GetInt32());
-        }
-        else
-        {
-            _tokenExpiry = DateTimeOffset.UtcNow.AddHours(1);
-        }
-
-        return _cachedAccessToken;
     }
 
     #endregion

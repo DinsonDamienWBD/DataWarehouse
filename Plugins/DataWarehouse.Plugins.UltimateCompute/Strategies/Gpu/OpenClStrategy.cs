@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using DataWarehouse.SDK.Contracts.Compute;
 
 namespace DataWarehouse.Plugins.UltimateCompute.Strategies.Gpu;
@@ -9,6 +10,11 @@ namespace DataWarehouse.Plugins.UltimateCompute.Strategies.Gpu;
 /// </summary>
 internal sealed class OpenClStrategy : ComputeRuntimeStrategyBase
 {
+    // Patterns that could break out of the C string literal in the generated host code.
+    private static readonly Regex DangerousKernelPattern = new(
+        @"(?:\\x00|\\0|""|\bsystem\s*\(|\bexec\s*\(|\bpopen\s*\()",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
     /// <inheritdoc/>
     public override string StrategyId => "compute.gpu.opencl";
     /// <inheritdoc/>
@@ -52,8 +58,12 @@ internal sealed class OpenClStrategy : ComputeRuntimeStrategyBase
                 var deviceIdx = 0;
                 if (task.Metadata?.TryGetValue("device_idx", out var di) == true && di is int dii) deviceIdx = dii;
 
+                // Validate kernel source for dangerous patterns before embedding into generated C code.
+                var rawKernelSource = task.GetCodeAsString();
+                if (DangerousKernelPattern.IsMatch(rawKernelSource))
+                    throw new ArgumentException("OpenCL kernel source contains prohibited patterns (system calls, null bytes, or unescaped quotes).");
                 // Generate host wrapper code that loads and executes the kernel
-                var kernelSource = task.GetCodeAsString().Replace("\"", "\\\"").Replace("\n", "\\n");
+                var kernelSource = rawKernelSource.Replace("\"", "\\\"").Replace("\n", "\\n");
                 var hostCode = $$"""
                     #include <stdio.h>
                     #include <stdlib.h>

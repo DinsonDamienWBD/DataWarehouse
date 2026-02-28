@@ -9,6 +9,9 @@ namespace DataWarehouse.Plugins.UltimateCompute.Strategies.Enclave;
 /// </summary>
 internal sealed class ConfidentialVmStrategy : ComputeRuntimeStrategyBase
 {
+    // Allowlist for cloud providers — prevents arbitrary executable injection.
+    private static readonly string[] AllowedProviders = ["azure", "gcp", "generic"];
+
     /// <inheritdoc/>
     public override string StrategyId => "compute.enclave.confidential-vm";
     /// <inheritdoc/>
@@ -34,6 +37,9 @@ internal sealed class ConfidentialVmStrategy : ComputeRuntimeStrategyBase
             var provider = "azure";
             if (task.Metadata?.TryGetValue("cloud_provider", out var cp) == true && cp is string cps)
                 provider = cps.ToLowerInvariant();
+            // Validate provider against allowlist to prevent arbitrary command injection.
+            if (!Array.Exists(AllowedProviders, p => p == provider))
+                throw new ArgumentException($"Cloud provider '{provider}' is not supported. Allowed: {string.Join(", ", AllowedProviders)}.");
 
             var codePath = Path.GetTempFileName() + ".sh";
             try

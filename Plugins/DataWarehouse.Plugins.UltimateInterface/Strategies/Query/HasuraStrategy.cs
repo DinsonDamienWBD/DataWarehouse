@@ -31,6 +31,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Query;
 /// </remarks>
 internal sealed class HasuraStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
+    public override bool IsProductionReady => false;
     public override string StrategyId => "hasura";
     public string DisplayName => "Hasura GraphQL";
     public string SemanticDescription => "Hasura-style instant GraphQL API with auto-generated schema, aggregations, and real-time subscriptions.";

@@ -20,6 +20,7 @@ namespace DataWarehouse.Plugins.UltimateCompute.Strategies.IndustryFirst;
 internal sealed class AdaptiveRuntimeSelectionStrategy : ComputeRuntimeStrategyBase
 {
     private readonly BoundedDictionary<string, List<SelectionRecord>> _selectionHistory = new BoundedDictionary<string, List<SelectionRecord>>(1000);
+    private readonly object _selectionHistoryLock = new();
     private readonly BoundedDictionary<string, double> _successRates = new BoundedDictionary<string, double>(1000);
 
     /// <inheritdoc/>
@@ -167,9 +168,9 @@ internal sealed class AdaptiveRuntimeSelectionStrategy : ComputeRuntimeStrategyB
         if (isolation == MemoryIsolationLevel.Sandbox)
             candidates.InsertRange(0, ["bwrap", "nsjail"]);
 
-        // Always include shell as ultimate fallback
-        if (!candidates.Contains("sh"))
-            candidates.Add("sh");
+        // Shell fallback is only added for unknown/generic languages — explicit languages get explicit candidates.
+        // For security: do NOT silently add sh for unknown languages; callers must specify a known runtime.
+        // sh is already in the candidate list for the default case above.
 
         return candidates;
     }
@@ -192,7 +193,8 @@ internal sealed class AdaptiveRuntimeSelectionStrategy : ComputeRuntimeStrategyB
             "podman" => ("podman", $"run --rm -i --memory={GetMaxMemoryBytes(task, 512 * 1024 * 1024)} alpine sh \"{codePath}\""),
             "docker" => ("docker", $"run --rm -i alpine sh \"{codePath}\""),
             "bwrap" => ("bwrap", $"--ro-bind / / --dev /dev --proc /proc sh \"{codePath}\""),
-            _ => ("sh", $"\"{codePath}\"")
+            "sh" or "bash" => (runtime, $"\"{codePath}\""),
+            _ => throw new NotSupportedException($"Runtime '{runtime}' is not supported by AdaptiveRuntimeSelectionStrategy.")
         };
     }
 
@@ -230,9 +232,12 @@ internal sealed class AdaptiveRuntimeSelectionStrategy : ComputeRuntimeStrategyB
     private void RecordSelection(string language, string runtime, bool success)
     {
         var key = $"{language}:{runtime}";
-        _selectionHistory.AddOrUpdate(key,
-            _ => [new SelectionRecord(success, DateTime.UtcNow)],
-            (_, list) => { list.Add(new SelectionRecord(success, DateTime.UtcNow)); return list; });
+        lock (_selectionHistoryLock)
+        {
+            _selectionHistory.AddOrUpdate(key,
+                _ => [new SelectionRecord(success, DateTime.UtcNow)],
+                (_, list) => { list.Add(new SelectionRecord(success, DateTime.UtcNow)); return list; });
+        }
 
         // Update exponential moving average success rate
         var alpha = 0.1; // Learning rate

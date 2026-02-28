@@ -9,6 +9,9 @@ namespace DataWarehouse.Plugins.UltimateCompute.Strategies.Wasm;
 /// </summary>
 internal sealed class WasmerStrategy : ComputeRuntimeStrategyBase
 {
+    // Allowlist for Wasmer compiler backends — prevents argument injection.
+    private static readonly string[] AllowedBackends = ["cranelift", "singlepass", "llvm"];
+
     /// <inheritdoc/>
     public override string StrategyId => "compute.wasm.wasmer";
 
@@ -44,10 +47,12 @@ internal sealed class WasmerStrategy : ComputeRuntimeStrategyBase
                 var args = new StringBuilder();
                 args.Append("run ");
 
-                // Select backend from metadata or default to cranelift
+                // Select backend from metadata or default to cranelift — validate against allowlist.
                 var backend = "cranelift";
                 if (task.Metadata?.TryGetValue("backend", out var b) == true && b is string bs)
                     backend = bs;
+                if (!Array.Exists(AllowedBackends, ab => ab == backend))
+                    throw new ArgumentException($"Wasmer backend '{backend}' is not allowed. Permitted: {string.Join(", ", AllowedBackends)}.");
                 args.Append($"--{backend} ");
 
                 if (task.EntryPoint != null)

@@ -11,6 +11,7 @@ public sealed class PdfGenerationStrategy : DashboardStrategyBase
 {
     private readonly Dictionary<string, Dashboard> _dashboards = new();
 
+    public override bool IsProductionReady => false;
     public override string StrategyId => "pdf-export";
     public override string StrategyName => "PDF Generation";
     public override string VendorName => "DataWarehouse";
@@ -136,6 +137,7 @@ public sealed class ImageExportStrategy : DashboardStrategyBase
 {
     private readonly Dictionary<string, Dashboard> _dashboards = new();
 
+    public override bool IsProductionReady => false;
     public override string StrategyId => "image-export";
     public override string StrategyName => "Image Export";
     public override string VendorName => "DataWarehouse";
@@ -403,6 +405,7 @@ public sealed class EmailDeliveryStrategy : DashboardStrategyBase
 {
     private readonly Dictionary<string, Dashboard> _dashboards = new();
 
+    public override bool IsProductionReady => false;
     public override string StrategyId => "email-delivery";
     public override string StrategyName => "Email Delivery";
     public override string VendorName => "DataWarehouse";

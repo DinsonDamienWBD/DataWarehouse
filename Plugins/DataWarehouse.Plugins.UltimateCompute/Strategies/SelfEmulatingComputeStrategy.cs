@@ -58,6 +58,10 @@ internal sealed class SelfEmulatingComputeStrategy : ComputeRuntimeStrategyBase
         "lifecycle, and sandboxed viewer execution.";
 
     /// <inheritdoc/>
+    // Viewer bundling and sandboxed WASM execution are not yet fully implemented — format detection and envelope creation are production-ready but viewer runtime dispatch is stubbed.
+    public override bool IsProductionReady => false;
+
+    /// <inheritdoc/>
     public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default)
     {
         ValidateTask(task);

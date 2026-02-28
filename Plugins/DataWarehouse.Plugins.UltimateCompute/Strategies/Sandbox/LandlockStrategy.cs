@@ -21,6 +21,15 @@ internal sealed class LandlockStrategy : ComputeRuntimeStrategyBase
     public override IReadOnlyList<ComputeRuntime> SupportedRuntimes => [ComputeRuntime.Native];
 
     /// <inheritdoc/>
+    public override async Task InitializeAsync(CancellationToken cancellationToken = default)
+    {
+        // Verify that the sandboxer binary (Landlock wrapper) is available on this system.
+        var available = await IsToolAvailableAsync("sandboxer", "--help", cancellationToken);
+        if (!available)
+            throw new PlatformNotSupportedException("Landlock sandbox requires the 'sandboxer' binary (Linux kernel 5.13+ with Landlock LSM). The binary was not found on PATH.");
+    }
+
+    /// <inheritdoc/>
     public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default)
     {
         ValidateTask(task);

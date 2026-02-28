@@ -173,7 +173,7 @@ internal sealed class NatsStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
         }
         else if (_subjects.TryGetValue(subject, out var subjectMessages))
         {
-            messages.AddRange(subjectMessages);
+            lock (subjectMessages) { messages.AddRange(subjectMessages); }
         }
 
         var responsePayload = JsonSerializer.SerializeToUtf8Bytes(new
@@ -286,22 +286,22 @@ internal sealed class NatsStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
             {
                 // Queue group: deliver to one random subscriber (load balancing)
                 var selectedSubscription = subscriptions[Random.Shared.Next(subscriptions.Count)];
-                selectedSubscription.Messages.Add(message);
+                selectedSubscription.AddMessage(message);
             }
             else
             {
                 // No queue group: deliver to all subscribers
                 foreach (var subscription in subscriptions)
                 {
-                    subscription.Messages.Add(message);
+                    subscription.AddMessage(message);
                 }
             }
         }
 
-        // Store in subject buffer
+        // Store in subject buffer (use ConcurrentBag via wrapper for thread-safety)
         _subjects.AddOrUpdate(message.Subject,
             _ => new List<NatsMessage> { message },
-            (_, list) => { list.Add(message); return list; });
+            (_, list) => { lock (list) { list.Add(message); } return list; });
 
         await Task.CompletedTask;
     }
@@ -312,13 +312,7 @@ internal sealed class NatsStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
         {
             if (stream.Subjects.Any(pattern => SubjectMatches(pattern, message.Subject)))
             {
-                stream.Messages.Add(message);
-
-                // Enforce max messages limit
-                if (stream.Messages.Count > stream.MaxMessages)
-                {
-                    stream.Messages.RemoveAt(0);
-                }
+                stream.AddMessage(message); // lock-protected, enforces MaxMessages internally
             }
         }
     }
@@ -331,7 +325,7 @@ internal sealed class NatsStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
         {
             if (stream.Subjects.Any(pattern => SubjectMatches(pattern, subject)))
             {
-                messages.AddRange(stream.Messages.Where(m => SubjectMatches(subject, m.Subject)));
+                messages.AddRange(stream.GetMessages().Where(m => SubjectMatches(subject, m.Subject)));
             }
         }
 
@@ -383,7 +377,10 @@ internal sealed class NatsSubscription
     public string? QueueGroup { get; init; }
     public bool Durable { get; init; }
     public DateTimeOffset SubscribedAt { get; init; }
-    public List<NatsMessage> Messages { get; } = new();
+    private readonly object _messagesLock = new();
+    private readonly List<NatsMessage> _messages = new();
+    public void AddMessage(NatsMessage message) { lock (_messagesLock) { _messages.Add(message); } }
+    public IReadOnlyList<NatsMessage> GetMessages() { lock (_messagesLock) { return _messages.ToList(); } }
 }
 
 internal sealed class NatsMessage
@@ -401,5 +398,17 @@ internal sealed class NatsStream
     public required string[] Subjects { get; init; }
     public required string Retention { get; init; } // limits, interest, workqueue
     public required int MaxMessages { get; init; }
-    public List<NatsMessage> Messages { get; } = new();
+    private readonly object _messagesLock = new();
+    private readonly List<NatsMessage> _messages = new();
+    public void AddMessage(NatsMessage message)
+    {
+        lock (_messagesLock)
+        {
+            _messages.Add(message);
+            if (_messages.Count > MaxMessages)
+                _messages.RemoveAt(0);
+        }
+    }
+    public IReadOnlyList<NatsMessage> GetMessages() { lock (_messagesLock) { return _messages.ToList(); } }
+    public int Count { get { lock (_messagesLock) { return _messages.Count; } } }
 }

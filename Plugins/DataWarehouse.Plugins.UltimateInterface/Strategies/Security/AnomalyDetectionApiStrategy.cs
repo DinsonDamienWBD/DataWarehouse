@@ -39,6 +39,7 @@ internal sealed class AnomalyDetectionApiStrategy : SdkInterface.InterfaceStrate
     public string[] Tags => new[] { "anomaly-detection", "ml", "abuse-detection", "security", "intelligence" };
 
     // SDK contract properties
+    public override bool IsProductionReady => false;
     public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.REST;
     public override SdkInterface.InterfaceCapabilities Capabilities => new SdkInterface.InterfaceCapabilities(
         SupportsStreaming: false,
@@ -62,6 +63,8 @@ internal sealed class AnomalyDetectionApiStrategy : SdkInterface.InterfaceStrate
     private sealed class ClientBaseline
     {
         public required string ClientId { get; init; }
+        /// <summary>Lock to serialize concurrent baseline updates and reads for this client.</summary>
+        public readonly object Lock = new();
         public List<RequestPattern> RecentRequests { get; } = new();
         public Dictionary<string, int> PathFrequency { get; } = new();
         public Dictionary<string, int> MethodFrequency { get; } = new();
@@ -153,8 +156,12 @@ internal sealed class AnomalyDetectionApiStrategy : SdkInterface.InterfaceStrate
             // Get or create baseline
             var baseline = _baselines.GetOrAdd(clientId, _ => new ClientBaseline { ClientId = clientId });
 
-            // Extract request features
-            var features = ExtractRequestFeatures(request, baseline);
+            // Extract request features and update baseline — serialize per-client to prevent races
+            Dictionary<string, object> features;
+            lock (baseline.Lock)
+            {
+                features = ExtractRequestFeatures(request, baseline);
+            }
 
             // Calculate anomaly score
             double anomalyScore;
@@ -168,11 +175,17 @@ internal sealed class AnomalyDetectionApiStrategy : SdkInterface.InterfaceStrate
             else
             {
                 // Fallback: statistical threshold detection
-                (anomalyScore, anomalyReasons) = DetectAnomaliesStatistically(features, baseline);
+                lock (baseline.Lock)
+                {
+                    (anomalyScore, anomalyReasons) = DetectAnomaliesStatistically(features, baseline);
+                }
             }
 
-            // Update baseline with this request
-            UpdateBaseline(baseline, request, features);
+            // Update baseline with this request (serialized per-client)
+            lock (baseline.Lock)
+            {
+                UpdateBaseline(baseline, request, features);
+            }
 
             // Route high-anomaly requests to Access Control
             if (anomalyScore >= HighAnomalyThreshold)

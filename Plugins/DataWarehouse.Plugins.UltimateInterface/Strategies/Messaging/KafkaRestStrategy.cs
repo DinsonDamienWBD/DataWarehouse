@@ -248,7 +248,7 @@ internal sealed class KafkaRestStrategy : SdkInterface.InterfaceStrategyBase, IP
         };
 
         _consumers[$"{groupName}:{instanceId}"] = consumer;
-        group.Instances.Add(instanceId);
+        group.AddInstance(instanceId);
 
         var responsePayload = JsonSerializer.SerializeToUtf8Bytes(new
         {
@@ -312,7 +312,7 @@ internal sealed class KafkaRestStrategy : SdkInterface.InterfaceStrategyBase, IP
         if (!_consumers.TryGetValue(consumerKey, out var consumer))
             return SdkInterface.InterfaceResponse.NotFound($"Consumer instance not found: {instanceId}");
 
-        // Commit current offsets
+        // Commit current offsets (ConcurrentDictionary is thread-safe)
         foreach (var kvp in consumer.CurrentOffsets)
         {
             consumer.CommittedOffsets[kvp.Key] = kvp.Value;
@@ -338,13 +338,13 @@ internal sealed class KafkaRestStrategy : SdkInterface.InterfaceStrategyBase, IP
 
         if (subscribeRequest?.Topics != null)
         {
-            consumer.Subscriptions.AddRange(subscribeRequest.Topics);
+            consumer.AddSubscriptions(subscribeRequest.Topics);
         }
 
         var responsePayload = JsonSerializer.SerializeToUtf8Bytes(new
         {
             status = "subscribed",
-            topics = consumer.Subscriptions.Distinct().ToArray()
+            topics = consumer.Subscriptions.ToArray()
         });
 
         return SdkInterface.InterfaceResponse.NoContent();
@@ -410,7 +410,10 @@ internal sealed class KafkaTopic
 internal sealed class KafkaConsumerGroup
 {
     public required string Name { get; init; }
-    public List<string> Instances { get; } = new();
+    private readonly object _instancesLock = new();
+    private readonly List<string> _instances = new();
+    public void AddInstance(string instanceId) { lock (_instancesLock) { _instances.Add(instanceId); } }
+    public IReadOnlyList<string> GetInstances() { lock (_instancesLock) { return _instances.ToList(); } }
 }
 
 internal sealed class KafkaConsumerInstance
@@ -420,9 +423,12 @@ internal sealed class KafkaConsumerInstance
     public required string Format { get; init; }
     public required string AutoOffsetReset { get; init; }
     public DateTimeOffset CreatedAt { get; init; }
-    public List<string> Subscriptions { get; } = new();
-    public Dictionary<string, long> CurrentOffsets { get; } = new();
-    public Dictionary<string, long> CommittedOffsets { get; } = new();
+    private readonly object _subscriptionsLock = new();
+    private readonly List<string> _subscriptions = new();
+    public void AddSubscriptions(IEnumerable<string> topics) { lock (_subscriptionsLock) { _subscriptions.AddRange(topics); } }
+    public IReadOnlyList<string> Subscriptions { get { lock (_subscriptionsLock) { return _subscriptions.Distinct().ToList(); } } }
+    public System.Collections.Concurrent.ConcurrentDictionary<string, long> CurrentOffsets { get; } = new();
+    public System.Collections.Concurrent.ConcurrentDictionary<string, long> CommittedOffsets { get; } = new();
 }
 
 internal sealed class KafkaRecord
