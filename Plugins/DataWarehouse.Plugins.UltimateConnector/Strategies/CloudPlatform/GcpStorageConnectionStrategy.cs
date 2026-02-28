@@ -88,9 +88,16 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
                 }
                 return true;
             }
+            catch (Google.GoogleApiException ex) when (ex.HttpStatusCode == System.Net.HttpStatusCode.Forbidden ||
+                                                        ex.HttpStatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                // Finding 1843: A 403/401 from GCS means we can reach the endpoint but credentials
+                // are invalid — this is NOT healthy; return false so callers know auth is broken.
+                return false;
+            }
             catch (Google.GoogleApiException)
             {
-                // Even auth errors mean we can reach GCP
+                // Other GCS API errors (e.g., 429 throttling) mean the endpoint is reachable.
                 return true;
             }
             catch (Exception)

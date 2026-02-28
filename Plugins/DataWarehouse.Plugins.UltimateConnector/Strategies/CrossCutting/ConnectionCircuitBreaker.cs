@@ -124,14 +124,27 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
 
             if (currentState == CircuitBreakerState.HalfOpen)
             {
-                TripCircuit(circuit);
-
-                if (circuit.HalfOpenGate.CurrentCount == 0)
-                    circuit.HalfOpenGate.Release();
+                // Finding 1866: Use CAS to prevent concurrent callers both tripping the circuit.
+                if (Interlocked.CompareExchange(
+                        ref circuit.State,
+                        (int)CircuitBreakerState.Open,
+                        (int)CircuitBreakerState.HalfOpen) == (int)CircuitBreakerState.HalfOpen)
+                {
+                    circuit.OpenedAt = DateTimeOffset.UtcNow;
+                    if (circuit.HalfOpenGate.CurrentCount == 0)
+                        circuit.HalfOpenGate.Release();
+                }
             }
             else if (currentState == CircuitBreakerState.Closed && failures >= circuit.Config.FailureThreshold)
             {
-                TripCircuit(circuit);
+                // Finding 1866: CAS from Closed → Open so only one thread trips the circuit.
+                if (Interlocked.CompareExchange(
+                        ref circuit.State,
+                        (int)CircuitBreakerState.Open,
+                        (int)CircuitBreakerState.Closed) == (int)CircuitBreakerState.Closed)
+                {
+                    circuit.OpenedAt = DateTimeOffset.UtcNow;
+                }
             }
         }
 
@@ -173,11 +186,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
                 circuit.HalfOpenGate.Release();
         }
 
-        private static void TripCircuit(CircuitState circuit)
-        {
-            Interlocked.Exchange(ref circuit.State, (int)CircuitBreakerState.Open);
-            circuit.OpenedAt = DateTimeOffset.UtcNow;
-        }
+        // TripCircuit removed: inline CAS in RecordFailure prevents double-trip races (Finding 1866).
 
         /// <inheritdoc/>
         public void Dispose()

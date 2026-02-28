@@ -46,9 +46,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
         private bool _allowInsecureCoap;
 
         /// <summary>
-        /// CSPRNG-generated initial message ID to prevent predictable message ID attacks.
+        /// CSPRNG-generated initial message ID stored as int for Interlocked operations.
+        /// Finding 1968: Use Interlocked.Increment to make GetNextMessageId thread-safe.
         /// </summary>
-        private ushort _currentMessageId;
+        private int _currentMessageId;
 
         /// <inheritdoc/>
         public override string StrategyId => "coap";
@@ -80,8 +81,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
         /// Generates a cryptographically random initial message ID (NET-05).
         /// Prevents predictable sequential message ID attacks.
         /// </summary>
-        /// <returns>A random unsigned 16-bit message ID.</returns>
-        private static ushort GenerateRandomMessageId()
+        /// <returns>A random int seeded from a 16-bit CSPRNG value.</returns>
+        private static int GenerateRandomMessageId()
         {
             Span<byte> buffer = stackalloc byte[2];
             RandomNumberGenerator.Fill(buffer);
@@ -89,12 +90,13 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
         }
 
         /// <summary>
-        /// Gets the next message ID using CSPRNG-seeded counter with wraparound.
+        /// Gets the next message ID using CSPRNG-seeded counter with atomic wraparound.
+        /// Finding 1968: Interlocked.Increment prevents torn reads/writes on concurrent callers.
         /// </summary>
-        /// <returns>The next message ID.</returns>
+        /// <returns>The next message ID (masked to 16-bit CoAP range).</returns>
         public ushort GetNextMessageId()
         {
-            return _currentMessageId++;
+            return (ushort)(Interlocked.Increment(ref _currentMessageId) & 0xFFFF);
         }
 
         /// <inheritdoc/>
@@ -102,7 +104,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
         {
             var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':');
             var host = parts[0];
-            var port = parts.Length > 1 ? int.Parse(parts[1]) : 5683;
+            var port = parts.Length > 1 && int.TryParse(parts[1], out var p5683) ? p5683 : 5683;
 
             // NET-05: Load security configuration
             _useDtls = GetConfiguration(config, "UseDtls", true);
@@ -146,7 +148,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
                 ["connected_at"] = DateTimeOffset.UtcNow,
                 ["dtls_enabled"] = isSecurePort || connectionScheme == "coaps",
                 ["insecure_allowed"] = _allowInsecureCoap,
-                ["initial_message_id"] = _currentMessageId
+                ["initial_message_id"] = (ushort)(_currentMessageId & 0xFFFF)
             };
 
             System.Diagnostics.Trace.TraceInformation(

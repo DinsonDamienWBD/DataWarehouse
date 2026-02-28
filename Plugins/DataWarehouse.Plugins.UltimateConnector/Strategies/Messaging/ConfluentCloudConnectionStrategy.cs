@@ -24,7 +24,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
             var brokers = config.ConnectionString.Split(',');
             var parts = brokers[0].Split(':');
             var host = parts[0];
-            var port = parts.Length > 1 ? int.Parse(parts[1]) : 9092;
+            var port = parts.Length > 1 && int.TryParse(parts[1], out var p9092) ? p9092 : 9092;
             var tcpClient = new TcpClient();
             await tcpClient.ConnectAsync(host, port, ct);
             var stream = tcpClient.GetStream();

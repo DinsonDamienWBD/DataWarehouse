@@ -188,10 +188,12 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
 
             try
             {
-                var reportResponse = await client.GetAsync(
+                // Finding 1925: Dispose the response to avoid resource leaks.
+                using var reportResponse = await client.GetAsync(
                     $"/api/v1/healing/sessions/{sessionId}/report", ct);
 
-                await client.DeleteAsync($"/api/v1/healing/sessions/{sessionId}", ct);
+                // Also dispose the DELETE response
+                using var deleteResponse = await client.DeleteAsync($"/api/v1/healing/sessions/{sessionId}", ct);
             }
             finally
             {

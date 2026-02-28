@@ -35,9 +35,22 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
             return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "TN3270", ["host"] = host, ["port"] = port });
         }
 
-        protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(handle.GetConnection<TcpClient>().Connected);
+        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        {
+            var info = handle.ConnectionInfo;
+            var host = info.GetValueOrDefault("host")?.ToString() ?? "";
+            if (!int.TryParse(info.GetValueOrDefault("port")?.ToString(), out var port)) port = 23;
+            try { using var probe = new TcpClient(); await probe.ConnectAsync(host, port, ct); return true; }
+            catch { return false; }
+        }
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<TcpClient>().Close(); return Task.CompletedTask; }
-        protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(new ConnectionHealth(handle.GetConnection<TcpClient>().Connected, "TN3270 mainframe", TimeSpan.Zero, DateTimeOffset.UtcNow));
+        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var isHealthy = await TestCoreAsync(handle, ct);
+            sw.Stop();
+            return new ConnectionHealth(isHealthy, isHealthy ? "TN3270 mainframe reachable" : "TN3270 mainframe unreachable", sw.Elapsed, DateTimeOffset.UtcNow);
+        }
         public override async Task<string> EmulateProtocolAsync(IConnectionHandle handle, string protocolCommand, CancellationToken ct = default)
         {
             var client = handle.GetConnection<TcpClient>();

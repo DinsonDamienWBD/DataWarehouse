@@ -27,18 +27,18 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
     /// </remarks>
     public class UniversalCdcEngineStrategy : ConnectionStrategyBase
     {
-        private static readonly Dictionary<string, string> DatabaseSignatures = new(StringComparer.OrdinalIgnoreCase)
+        // Finding 1966: Replace brittle substring matching with structured detection.
+        // "host=" is present in ALL ADO.NET connection strings, and "server=" is too generic.
+        // Use scheme-prefix checks first (unambiguous), then key=value parsing for semi-colon formats.
+        private static readonly Dictionary<string, string> UriSchemeSignatures = new(StringComparer.OrdinalIgnoreCase)
         {
-            ["host="] = "postgresql",
-            ["server="] = "sqlserver",
-            ["data source="] = "oracle",
             ["mongodb://"] = "mongodb",
             ["mongodb+srv://"] = "mongodb",
             ["mysql://"] = "mysql",
-            ["port=3306"] = "mysql",
-            ["port=5432"] = "postgresql",
-            ["port=1433"] = "sqlserver",
-            ["port=1521"] = "oracle"
+            ["postgresql://"] = "postgresql",
+            ["postgres://"] = "postgresql",
+            ["mssql://"] = "sqlserver",
+            ["sqlserver://"] = "sqlserver"
         };
 
         private static readonly Dictionary<string, string> CdcMethods = new(StringComparer.OrdinalIgnoreCase)
@@ -220,24 +220,52 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
         }
 
         /// <summary>
-        /// Detects the database type from a connection string by matching known patterns.
+        /// Detects the database type from a connection string by using URI scheme prefixes
+        /// first (unambiguous), then structured key=value parsing for ADO.NET-style strings.
+        /// Finding 1966: Replaced brittle substring matching that falsely matched "host=" in all
+        /// connection strings and "server=" in SQL Server and MySQL simultaneously.
         /// </summary>
         private string DetectDatabaseType(string connectionString)
         {
+            // 1) Explicit override via db_type key
             var explicitType = connectionString.Split(';')
                 .Select(p => p.Trim().Split('='))
                 .Where(p => p.Length == 2 && p[0].Trim().Equals("db_type", StringComparison.OrdinalIgnoreCase))
                 .Select(p => p[1].Trim())
                 .FirstOrDefault();
-
             if (!string.IsNullOrEmpty(explicitType))
                 return explicitType;
 
-            foreach (var (signature, dbType) in DatabaseSignatures)
+            // 2) URI-scheme detection (mongodb://, mysql://, postgresql://, etc.)
+            foreach (var (scheme, dbType) in UriSchemeSignatures)
             {
-                if (connectionString.Contains(signature, StringComparison.OrdinalIgnoreCase))
+                if (connectionString.StartsWith(scheme, StringComparison.OrdinalIgnoreCase))
                     return dbType;
             }
+
+            // 3) ADO.NET key=value parsing — look for provider-specific discriminators
+            var kvPairs = connectionString.Split(';', StringSplitOptions.RemoveEmptyEntries)
+                .Select(p => p.Trim().Split('=', 2, StringSplitOptions.TrimEntries))
+                .Where(p => p.Length == 2)
+                .ToDictionary(p => p[0].ToLowerInvariant(), p => p[1], StringComparer.OrdinalIgnoreCase);
+
+            // Port-based detection as a tiebreaker
+            if (kvPairs.TryGetValue("port", out var portStr) && int.TryParse(portStr, out var port))
+            {
+                return port switch
+                {
+                    5432 => "postgresql",
+                    3306 => "mysql",
+                    1433 => "sqlserver",
+                    1521 => "oracle",
+                    27017 or 27018 or 27019 => "mongodb",
+                    _ => string.Empty
+                };
+            }
+
+            // Oracle-specific discriminators ("data source" without host/server keys → TNS alias)
+            if (kvPairs.ContainsKey("data source") && !kvPairs.ContainsKey("host") && !kvPairs.ContainsKey("server"))
+                return "oracle";
 
             return string.Empty;
         }

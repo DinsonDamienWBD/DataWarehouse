@@ -7,10 +7,24 @@ public sealed class ZabbixConnectionStrategy : ObservabilityConnectionStrategyBa
 {
     public override string StrategyId => "zabbix";public override string DisplayName => "Zabbix";public override ConnectionStrategyCapabilities Capabilities => new();public override string SemanticDescription => "Zabbix enterprise monitoring. Infrastructure, network, and application monitoring with alerting.";public override string[] Tags => ["zabbix", "monitoring", "infrastructure", "network", "enterprise", "open-source"];
     public ZabbixConnectionStrategy(ILogger? logger = null) : base(logger) { }
-    protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct){var parts = config.ConnectionString?.Split(':') ?? ["localhost", "10051"];var host = parts[0];var port = parts.Length > 1 ? int.Parse(parts[1]) : 10051;var tcpClient = new TcpClient();await tcpClient.ConnectAsync(host, port, ct);return new DefaultConnectionHandle(tcpClient, new Dictionary<string, object> { ["Provider"] = "Zabbix", ["Host"] = host, ["Port"] = port });}
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(handle.GetConnection<TcpClient>().Connected);
+    protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct){var parts = config.ConnectionString?.Split(':') ?? ["localhost", "10051"];var host = parts[0];var port = parts.Length > 1 && int.TryParse(parts[1], out var p10051) ? p10051 : 10051;var tcpClient = new TcpClient();await tcpClient.ConnectAsync(host, port, ct);return new DefaultConnectionHandle(tcpClient, new Dictionary<string, object> { ["Provider"] = "Zabbix", ["Host"] = host, ["Port"] = port });}
+    // Finding 2071: TcpClient.Connected is stale; probe with fresh TCP connect.
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
+    {
+        var info = handle.ConnectionInfo;
+        var host = info.GetValueOrDefault("Host")?.ToString() ?? "localhost";
+        if (!int.TryParse(info.GetValueOrDefault("Port")?.ToString(), out var port)) port = 10051;
+        try { using var probe = new TcpClient(); await probe.ConnectAsync(host, port, ct); return true; }
+        catch { return false; }
+    }
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct){handle.GetConnection<TcpClient>().Close();if (handle is DefaultConnectionHandle defaultHandle) defaultHandle.MarkDisconnected();return Task.CompletedTask;}
-    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct){var connected = handle.GetConnection<TcpClient>().Connected;return Task.FromResult(new ConnectionHealth(connected, connected ? "Connected" : "Disconnected", TimeSpan.Zero, DateTimeOffset.UtcNow));}
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var isHealthy = await TestCoreAsync(handle, ct);
+        sw.Stop();
+        return new ConnectionHealth(isHealthy, isHealthy ? "Zabbix reachable" : "Zabbix unreachable", sw.Elapsed, DateTimeOffset.UtcNow);
+    }
     public override async Task PushMetricsAsync(IConnectionHandle handle, IReadOnlyList<Dictionary<string, object>> metrics, CancellationToken ct = default){var tcpClient = handle.GetConnection<TcpClient>();var stream = tcpClient.GetStream();var json = JsonSerializer.Serialize(new { request = "sender data", data = metrics });var header = new byte[] { 90, 66, 88, 68, 1 };var dataBytes = Encoding.UTF8.GetBytes(json);var length = BitConverter.IsLittleEndian ? BitConverter.GetBytes((long)dataBytes.Length) : BitConverter.GetBytes(System.Buffers.Binary.BinaryPrimitives.ReverseEndianness((long)dataBytes.Length));await stream.WriteAsync(header, ct);await stream.WriteAsync(length, ct);await stream.WriteAsync(dataBytes, ct);await stream.FlushAsync(ct);}
     public override Task PushLogsAsync(IConnectionHandle handle, IReadOnlyList<Dictionary<string, object>> logs, CancellationToken ct = default) => throw new NotSupportedException("Zabbix is for metrics.");
     public override Task PushTracesAsync(IConnectionHandle handle, IReadOnlyList<Dictionary<string, object>> traces, CancellationToken ct = default) => throw new NotSupportedException("Zabbix does not support traces.");

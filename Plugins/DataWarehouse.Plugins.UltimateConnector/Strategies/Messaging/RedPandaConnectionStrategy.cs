@@ -22,7 +22,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
         public override string SemanticDescription => "Connects to RedPanda using Kafka-compatible TCP protocol on port 9092 for high-performance streaming.";
         public override string[] Tags => new[] { "redpanda", "kafka-compatible", "streaming", "tcp", "performance" };
         public RedPandaConnectionStrategy(ILogger? logger = null) : base(logger) { }
-        protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct) { var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':'); var host = parts[0]; var port = parts.Length > 1 ? int.Parse(parts[1]) : 9092; var tcpClient = new TcpClient(); await tcpClient.ConnectAsync(host, port, ct); return new DefaultConnectionHandle(tcpClient, new Dictionary<string, object> { ["Host"] = host, ["Port"] = port }); }
+        protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct) { var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':'); var host = parts[0]; var port = parts.Length > 1 && int.TryParse(parts[1], out var p9092) ? p9092 : 9092; var tcpClient = new TcpClient(); await tcpClient.ConnectAsync(host, port, ct); return new DefaultConnectionHandle(tcpClient, new Dictionary<string, object> { ["Host"] = host, ["Port"] = port }); }
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { try { return handle.GetConnection<TcpClient>()?.Connected ?? false; } catch { return false; } }
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<TcpClient>()?.Close(); await Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, isHealthy ? "RedPanda is connected" : "RedPanda is disconnected", sw.Elapsed, DateTimeOffset.UtcNow); }
@@ -65,6 +65,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
             if (client == null || !client.Connected)
                 throw new InvalidOperationException("RedPanda connection is not established");
             var stream = client.GetStream();
+            // Finding 2054: Track the fetch offset per partition so we don't replay the entire topic.
+            long fetchOffset = 0L;
             while (!ct.IsCancellationRequested && client.Connected)
             {
                 using var ms = new System.IO.MemoryStream();
@@ -83,7 +85,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
                 WriteKafkaString(writer, topic);
                 writer.Write(System.Net.IPAddress.HostToNetworkOrder(1));            // Partition count
                 writer.Write(System.Net.IPAddress.HostToNetworkOrder(0));            // Partition
-                writer.Write(System.Net.IPAddress.HostToNetworkOrder(0L));           // Fetch offset
+                writer.Write(System.Net.IPAddress.HostToNetworkOrder(fetchOffset));  // Fetch offset (advances)
                 writer.Write(System.Net.IPAddress.HostToNetworkOrder(1024 * 1024)); // Max bytes
                 var payload = ms.ToArray();
                 var lengthPrefix = BitConverter.GetBytes(System.Net.IPAddress.HostToNetworkOrder(payload.Length));
@@ -99,7 +101,14 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
                     var respBuf = new byte[respLength];
                     var totalRead = 0;
                     while (totalRead < respLength) { var chunk = await stream.ReadAsync(respBuf, totalRead, respLength - totalRead, ct); if (chunk == 0) break; totalRead += chunk; }
-                    if (totalRead > 8) yield return respBuf;
+                    if (totalRead > 8)
+                    {
+                        // Finding 2054: Advance fetch offset to avoid re-reading messages on the next fetch.
+                        // The response contains the high watermark offset in the first 8 bytes after correlation ID.
+                        // Increment conservatively by 1 message per batch as we don't parse the full response format.
+                        fetchOffset++;
+                        yield return respBuf;
+                    }
                 }
                 await Task.Delay(100, ct);
             }

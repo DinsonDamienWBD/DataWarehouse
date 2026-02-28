@@ -44,7 +44,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
         {
             var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':');
             var host = parts[0];
-            var port = parts.Length > 1 ? int.Parse(parts[1]) : 21;
+            var port = parts.Length > 1 && int.TryParse(parts[1], out var p21) ? p21 : 21;
 
             var client = new TcpClient();
             await client.ConnectAsync(host, port, ct);

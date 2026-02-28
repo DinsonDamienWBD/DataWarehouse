@@ -311,15 +311,41 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
 
         private class FailoverState
         {
+            // Finding 1942: Protect mutable state that is read/written from TestCoreAsync and
+            // AttemptFailoverAsync concurrently with a dedicated lock.
+            private readonly object _stateLock = new();
+
             public string PrimaryEndpoint { get; set; } = "";
             public string[] ReplicaEndpoints { get; set; } = [];
-            public string ActiveEndpoint { get; set; } = "";
             public double FailoverThreshold { get; set; }
             public CircularBuffer<double> LatencyWindow { get; set; } = new(20);
             public CircularBuffer<bool> ErrorWindow { get; set; } = new(50);
-            public double HealthScore { get; set; }
-            public int FailoverCount { get; set; }
-            public DateTimeOffset LastFailoverAt { get; set; }
+
+            private string _activeEndpoint = "";
+            private double _healthScore;
+            private int _failoverCount;
+            private DateTimeOffset _lastFailoverAt = DateTimeOffset.MinValue;
+
+            public string ActiveEndpoint
+            {
+                get { lock (_stateLock) return _activeEndpoint; }
+                set { lock (_stateLock) _activeEndpoint = value; }
+            }
+            public double HealthScore
+            {
+                get { lock (_stateLock) return _healthScore; }
+                set { lock (_stateLock) _healthScore = value; }
+            }
+            public int FailoverCount
+            {
+                get { lock (_stateLock) return _failoverCount; }
+                set { lock (_stateLock) _failoverCount = value; }
+            }
+            public DateTimeOffset LastFailoverAt
+            {
+                get { lock (_stateLock) return _lastFailoverAt; }
+                set { lock (_stateLock) _lastFailoverAt = value; }
+            }
         }
 
         /// <summary>

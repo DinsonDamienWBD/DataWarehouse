@@ -67,20 +67,22 @@ public sealed class RedisConnectionStrategy : DatabaseConnectionStrategyBase
         return new DefaultConnectionHandle(multiplexer, connectionInfo);
     }
 
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
     {
         try
         {
             var multiplexer = handle.GetConnection<IConnectionMultiplexer>();
-            if (!multiplexer.IsConnected) return Task.FromResult(false);
+            if (!multiplexer.IsConnected) return false;
 
+            // Finding 2051: Use async PingAsync instead of synchronous db.Ping() to avoid
+            // blocking the calling thread.
             var db = multiplexer.GetDatabase();
-            var result = db.Ping();
-            return Task.FromResult(result.TotalMilliseconds >= 0);
+            var result = await db.PingAsync();
+            return result.TotalMilliseconds >= 0;
         }
         catch
         {
-            return Task.FromResult(false);
+            return false;
         }
     }
 
@@ -96,33 +98,34 @@ public sealed class RedisConnectionStrategy : DatabaseConnectionStrategyBase
         }
     }
 
-    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
     {
         var sw = Stopwatch.StartNew();
         try
         {
             var multiplexer = handle.GetConnection<IConnectionMultiplexer>();
             var db = multiplexer.GetDatabase();
-            var latency = db.Ping();
+            // Finding 2052: Use async PingAsync instead of synchronous db.Ping().
+            var latency = await db.PingAsync();
             sw.Stop();
 
             var server = multiplexer.GetServers().FirstOrDefault();
             var version = server?.Version?.ToString() ?? "unknown";
 
-            return Task.FromResult(new ConnectionHealth(
+            return new ConnectionHealth(
                 IsHealthy: multiplexer.IsConnected,
                 StatusMessage: $"Redis {version} - Ping: {latency.TotalMilliseconds:F1}ms",
                 Latency: sw.Elapsed,
-                CheckedAt: DateTimeOffset.UtcNow));
+                CheckedAt: DateTimeOffset.UtcNow);
         }
         catch (Exception ex)
         {
             sw.Stop();
-            return Task.FromResult(new ConnectionHealth(
+            return new ConnectionHealth(
                 IsHealthy: false,
                 StatusMessage: $"Health check failed: {ex.Message}",
                 Latency: sw.Elapsed,
-                CheckedAt: DateTimeOffset.UtcNow));
+                CheckedAt: DateTimeOffset.UtcNow);
         }
     }
 

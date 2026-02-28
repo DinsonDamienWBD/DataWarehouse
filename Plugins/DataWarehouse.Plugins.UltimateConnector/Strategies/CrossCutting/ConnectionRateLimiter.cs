@@ -43,6 +43,13 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
             ArgumentException.ThrowIfNullOrWhiteSpace(strategyId);
             ArgumentNullException.ThrowIfNull(rateConfig);
 
+            // Finding 1868: BurstSize=0 causes SemaphoreSlim(0,0) which throws.
+            // TokensPerSecond=0 means tokens are never replenished, blocking callers forever.
+            if (rateConfig.BurstSize <= 0)
+                throw new ArgumentOutOfRangeException(nameof(rateConfig), "BurstSize must be at least 1.");
+            if (rateConfig.TokensPerSecond <= 0)
+                throw new ArgumentOutOfRangeException(nameof(rateConfig), "TokensPerSecond must be greater than 0.");
+
             _buckets.TryAdd(strategyId, new TokenBucket(rateConfig));
         }
 

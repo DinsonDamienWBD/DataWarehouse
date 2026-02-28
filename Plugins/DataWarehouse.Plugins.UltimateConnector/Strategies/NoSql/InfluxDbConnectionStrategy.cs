@@ -135,7 +135,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
                         if (line.StartsWith("#") || string.IsNullOrWhiteSpace(line))
                             continue;
 
-                        var values = line.Split(',');
+                        // Finding 2053: Use RFC 4180-compliant CSV parsing that handles quoted
+                        // fields containing commas and escaped double-quotes.
+                        var values = ParseCsvLine(line);
                         if (headers == null)
                         {
                             headers = values;
@@ -246,6 +248,59 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
             var clean = connectionString.Replace("http://", "").Replace("https://", "").Split('/')[0];
             var parts = clean.Split(':');
             return (parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : defaultPort);
+        }
+
+        /// <summary>
+        /// RFC 4180-compliant CSV line parser that correctly handles quoted fields containing
+        /// commas or double-quotes. Finding 2053: fixes split(',') which breaks on quoted values.
+        /// </summary>
+        private static string[] ParseCsvLine(string line)
+        {
+            var fields = new List<string>();
+            var current = new System.Text.StringBuilder();
+            bool inQuotes = false;
+            int i = 0;
+            while (i < line.Length)
+            {
+                char c = line[i];
+                if (inQuotes)
+                {
+                    if (c == '"')
+                    {
+                        // Check for escaped double-quote ("")
+                        if (i + 1 < line.Length && line[i + 1] == '"')
+                        {
+                            current.Append('"');
+                            i += 2;
+                            continue;
+                        }
+                        inQuotes = false;
+                    }
+                    else
+                    {
+                        current.Append(c);
+                    }
+                }
+                else
+                {
+                    if (c == '"')
+                    {
+                        inQuotes = true;
+                    }
+                    else if (c == ',')
+                    {
+                        fields.Add(current.ToString());
+                        current.Clear();
+                    }
+                    else
+                    {
+                        current.Append(c);
+                    }
+                }
+                i++;
+            }
+            fields.Add(current.ToString());
+            return fields.ToArray();
         }
     }
 }

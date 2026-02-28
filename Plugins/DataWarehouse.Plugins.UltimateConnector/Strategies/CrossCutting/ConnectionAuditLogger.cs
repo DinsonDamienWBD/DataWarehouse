@@ -224,12 +224,18 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
         /// <inheritdoc/>
         public async ValueTask DisposeAsync()
         {
-            if (_disposed) return;
+            // Finding 1865: Use Interlocked to prevent a timer callback running concurrently with
+            // DisposeAsync from observing a partially disposed state.
+            // We must stop the timer BEFORE setting _disposed=true so that any in-progress timer
+            // callback sees the timer already cancelled and exits cleanly.
+            if (Interlocked.Exchange(ref _disposeGuard, 1) != 0) return;
             _disposed = true;
 
             await _flushTimer.DisposeAsync();
             await FlushAsync();
         }
+
+        private int _disposeGuard;
     }
 
     /// <summary>

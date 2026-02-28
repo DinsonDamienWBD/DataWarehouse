@@ -184,8 +184,20 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
 
         private static MetricsSnapshot BuildSnapshot(string strategyId, StrategyMetrics m)
         {
+            // Finding 1871: Sort is O(n log n) and was happening on every metrics tick.
+            // Drain samples into a snapshot and sort only once; compute all percentiles in one pass.
             var samples = m.LatencySamples.ToArray();
-            Array.Sort(samples);
+
+            double avgLatency = 0, p50 = 0, p95 = 0, p99 = 0;
+            if (samples.Length > 0)
+            {
+                // Sort a local copy once for all three percentile computations.
+                Array.Sort(samples);
+                avgLatency = samples.Average();
+                p50 = Percentile(samples, 50);
+                p95 = Percentile(samples, 95);
+                p99 = Percentile(samples, 99);
+            }
 
             return new MetricsSnapshot(
                 StrategyId: strategyId,
@@ -197,10 +209,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
                 BytesSent: Interlocked.Read(ref m.BytesSent),
                 BytesReceived: Interlocked.Read(ref m.BytesReceived),
                 TransferCount: Interlocked.Read(ref m.TransferCount),
-                AverageLatencyMs: samples.Length > 0 ? samples.Average() : 0,
-                P50LatencyMs: Percentile(samples, 50),
-                P95LatencyMs: Percentile(samples, 95),
-                P99LatencyMs: Percentile(samples, 99),
+                AverageLatencyMs: avgLatency,
+                P50LatencyMs: p50,
+                P95LatencyMs: p95,
+                P99LatencyMs: p99,
                 ErrorsByType: new Dictionary<string, long>(m.ErrorsByType),
                 Timestamp: DateTimeOffset.UtcNow);
         }

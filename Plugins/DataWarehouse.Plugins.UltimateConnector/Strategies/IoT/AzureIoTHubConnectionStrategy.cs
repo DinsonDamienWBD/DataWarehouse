@@ -23,7 +23,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var endpoint = config.ConnectionString;
+            // Finding 1967: Null-check ConnectionString before calling Contains.
+            var endpoint = config.ConnectionString ?? throw new ArgumentException("Azure IoT Hub endpoint required (*.azure-devices.net)");
             if (!endpoint.Contains(".azure-devices.net"))
                 throw new ArgumentException("Azure IoT Hub endpoint required (*.azure-devices.net)");
             var client = new HttpClient { BaseAddress = new Uri($"https://{endpoint}") };

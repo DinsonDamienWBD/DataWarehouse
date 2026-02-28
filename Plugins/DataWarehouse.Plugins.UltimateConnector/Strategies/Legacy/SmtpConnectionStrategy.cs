@@ -34,7 +34,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
             _host = GetConfiguration<string>(config, "Host", (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':')[0]);
+            if (string.IsNullOrWhiteSpace(_host)) throw new ArgumentException("SMTP host is required.");
             _port = GetConfiguration(config, "Port", 587);
+            // Finding 1992: Validate port is in valid TCP range.
+            if (_port < 1 || _port > 65535) throw new ArgumentOutOfRangeException(nameof(config), $"SMTP port {_port} is out of valid range (1-65535).");
             _username = GetConfiguration<string>(config, "Username", "");
             _password = GetConfiguration<string>(config, "Password", "");
             _useSsl = GetConfiguration(config, "UseSsl", true);
@@ -109,6 +112,12 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
             string subject, string body, bool isHtml = false, SmtpAttachment[]? attachments = null,
             string[]? cc = null, string[]? bcc = null, CancellationToken ct = default)
         {
+            // Finding 1993: Validate sender and recipient email addresses before attempting send.
+            if (string.IsNullOrWhiteSpace(from)) throw new ArgumentException("Sender address 'from' is required.");
+            if (string.IsNullOrWhiteSpace(to)) throw new ArgumentException("Recipient address 'to' is required.");
+            if (!from.Contains('@')) throw new ArgumentException($"Invalid sender address: '{from}'. Must contain '@'.");
+            if (!to.Contains('@')) throw new ArgumentException($"Invalid recipient address: '{to}'. Must contain '@'.");
+            if (string.IsNullOrWhiteSpace(subject)) throw new ArgumentException("Email subject is required.");
             try
             {
 #pragma warning disable SYSLIB0014 // SmtpClient is obsolete but functional for SMTP

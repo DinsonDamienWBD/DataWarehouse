@@ -387,19 +387,45 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
 
         private class PoolWarmingState
         {
+            // Finding 1943: Guard mutable scaling fields with a lock so reads from
+            // GetHealthCoreAsync and writes from the background scaling loop don't tear.
+            private readonly object _scaleLock = new();
+
             public required TrafficHistogram Histogram { get; set; }
-            public int CurrentPoolSize { get; set; }
             public int BasePoolSize { get; set; }
             public int MaxPoolSize { get; set; }
             public int LookAheadMinutes { get; set; }
             public int CoolingDelayMinutes { get; set; }
             public int CheckIntervalSec { get; set; }
-            public long WarmingEvents { get; set; }
-            public long CoolingEvents { get; set; }
             public int ActiveConnections;
             public DateTimeOffset LastCoolingCheck { get; set; }
-            public DateTimeOffset? LowDemandSince { get; set; }
             public CancellationTokenSource MonitorCts { get; set; } = new();
+
+            private int _currentPoolSize;
+            private long _warmingEvents;
+            private long _coolingEvents;
+            private DateTimeOffset? _lowDemandSince;
+
+            public int CurrentPoolSize
+            {
+                get { lock (_scaleLock) return _currentPoolSize; }
+                set { lock (_scaleLock) _currentPoolSize = value; }
+            }
+            public long WarmingEvents
+            {
+                get { lock (_scaleLock) return _warmingEvents; }
+                set { lock (_scaleLock) _warmingEvents = value; }
+            }
+            public long CoolingEvents
+            {
+                get { lock (_scaleLock) return _coolingEvents; }
+                set { lock (_scaleLock) _coolingEvents = value; }
+            }
+            public DateTimeOffset? LowDemandSince
+            {
+                get { lock (_scaleLock) return _lowDemandSince; }
+                set { lock (_scaleLock) _lowDemandSince = value; }
+            }
         }
     }
 }

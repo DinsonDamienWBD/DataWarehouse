@@ -224,7 +224,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
                 var fileContent = await File.ReadAllBytesAsync(localPath, ct);
                 request.ContentLength = fileContent.Length;
 
-                using var requestStream = request.GetRequestStream();
+                // Finding 1991: FtpWebRequest.GetRequestStream() is synchronous with no async variant.
+                // Off-load to a thread-pool thread via Task.Run to avoid blocking the calling thread.
+                using var requestStream = await Task.Run(() => request.GetRequestStream(), ct);
                 await requestStream.WriteAsync(fileContent, ct);
 
                 using var response = (FtpWebResponse)await request.GetResponseAsync();

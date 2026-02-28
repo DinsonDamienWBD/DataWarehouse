@@ -23,7 +23,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
         {
             var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':');
             var client = new TcpClient();
-            await client.ConnectAsync(parts[0], parts.Length > 1 ? int.Parse(parts[1]) : 2049, ct);
+            await client.ConnectAsync(parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p2049) ? p2049 : 2049, ct);
             return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "NFS" });
         }
 

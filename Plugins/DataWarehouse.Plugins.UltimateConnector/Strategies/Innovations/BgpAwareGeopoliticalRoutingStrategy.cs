@@ -241,13 +241,31 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 if (!response.IsSuccessStatusCode) return string.Empty;
 
                 var json = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
-                if (json.TryGetProperty("data", out var data) &&
-                    data.TryGetProperty("resource", out _) &&
-                    data.TryGetProperty("holder", out var holder))
+                // Finding 1940: Read the explicit "country" field rather than the first 2 chars
+                // of the "holder" name string, which is an organisation name not a country code.
+                if (json.TryGetProperty("data", out var data))
                 {
-                    var holderStr = holder.GetString() ?? string.Empty;
-                    if (holderStr.Length >= 2)
-                        return holderStr[..2].ToUpperInvariant();
+                    if (data.TryGetProperty("country", out var countryProp))
+                    {
+                        var countryStr = countryProp.GetString() ?? string.Empty;
+                        if (countryStr.Length == 2)
+                            return countryStr.ToUpperInvariant();
+                    }
+                    // Fallback: try "rir" → derive region (best-effort only)
+                    if (data.TryGetProperty("rir", out var rirProp))
+                    {
+                        var rir = rirProp.GetString()?.ToUpperInvariant() ?? string.Empty;
+                        // Map well-known RIR regions as a coarse fallback
+                        return rir switch
+                        {
+                            "ARIN" => "US",
+                            "RIPE NCC" => "EU",
+                            "APNIC" => "AP",
+                            "LACNIC" => "LA",
+                            "AFRINIC" => "AF",
+                            _ => string.Empty
+                        };
+                    }
                 }
             }
             catch { /* Country resolution is best-effort */ }

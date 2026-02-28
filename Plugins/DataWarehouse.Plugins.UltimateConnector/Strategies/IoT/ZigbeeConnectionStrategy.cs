@@ -25,7 +25,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
         {
             var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':');
             var client = new TcpClient();
-            await client.ConnectAsync(parts[0], parts.Length > 1 ? int.Parse(parts[1]) : 8888, ct);
+            await client.ConnectAsync(parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p8888) ? p8888 : 8888, ct);
             return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "Zigbee/TCP" });
         }
 

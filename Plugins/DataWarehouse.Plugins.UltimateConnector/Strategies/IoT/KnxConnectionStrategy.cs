@@ -25,7 +25,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
         {
             var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':');
             var client = new UdpClient();
-            client.Connect(parts[0], parts.Length > 1 ? int.Parse(parts[1]) : 3671);
+            client.Connect(parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p3671) ? p3671 : 3671);
             await Task.Delay(10, ct);
             return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "KNX/IP" });
         }

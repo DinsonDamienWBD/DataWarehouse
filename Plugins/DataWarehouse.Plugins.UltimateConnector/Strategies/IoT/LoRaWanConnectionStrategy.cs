@@ -34,7 +34,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
         {
             var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':');
             var host = parts[0];
-            var port = parts.Length > 1 ? int.Parse(parts[1]) : 1700;
+            var port = parts.Length > 1 && int.TryParse(parts[1], out var p1700) ? p1700 : 1700;
             var client = new TcpClient();
             await client.ConnectAsync(host, port, ct);
             return new DefaultConnectionHandle(client, new Dictionary<string, object>
@@ -96,14 +96,31 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
 
         /// <summary>
         /// Registers a device via OTAA (Over-The-Air Activation).
+        /// AppKey must be provided via the appKey parameter to verify the MIC before accepting any device.
         /// </summary>
-        public LoRaJoinResult ProcessOtaaJoin(string devEui, byte[] joinRequest)
+        public LoRaJoinResult ProcessOtaaJoin(string devEui, byte[] joinRequest, byte[]? appKey = null)
         {
             // Parse join request: MHDR (1) + AppEUI (8) + DevEUI (8) + DevNonce (2) + MIC (4)
             if (joinRequest.Length < 23)
                 return new LoRaJoinResult { Success = false, Reason = "Invalid join request length" };
 
+            // Finding 1970: Verify OTAA join MIC before accepting any device.
+            // The MIC covers bytes 0..18 (MHDR+AppEUI+DevEUI+DevNonce) using CMAC with AppKey.
+            // If AppKey is supplied, reject joins whose MIC doesn't match.
+            if (appKey != null && appKey.Length == 16)
+            {
+                var mic = ComputeJoinMic(appKey, joinRequest[..19]);
+                var receivedMic = BinaryPrimitives.ReadUInt32LittleEndian(joinRequest.AsSpan(19, 4));
+                if (mic != receivedMic)
+                    return new LoRaJoinResult { Success = false, Reason = "Invalid MIC — join request rejected" };
+            }
+
             var devNonce = BinaryPrimitives.ReadUInt16LittleEndian(joinRequest.AsSpan(17, 2));
+
+            // Finding 1971: Reject replayed DevNonces.
+            // LoRaWAN spec §6.2.5: each DevNonce MUST be unique per device across all joins.
+            if (_devices.TryGetValue(devEui, out var existingDevice) && existingDevice.DevNonce == devNonce)
+                return new LoRaJoinResult { Success = false, Reason = $"Replayed DevNonce {devNonce} — join request rejected" };
 
             // Generate session keys
             var devAddr = GenerateDevAddr();
@@ -170,12 +187,26 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
         /// Processes an uplink frame from a device.
         /// </summary>
         public LoRaUplinkResult ProcessUplink(string devEui, byte[] payload, int fPort,
-            double rssi, double snr, int dataRate)
+            double rssi, double snr, int dataRate, uint receivedFrameCounter = uint.MaxValue)
         {
             if (!_devices.TryGetValue(devEui, out var device))
                 return new LoRaUplinkResult { Success = false, Reason = "Device not registered" };
 
-            lock (device) { device.FrameCounterUp++; }
+            // Finding 1971: Enforce monotonic frame counter to prevent replay attacks.
+            // If the caller provides the frame counter from the received frame, validate it.
+            if (receivedFrameCounter != uint.MaxValue)
+            {
+                lock (device)
+                {
+                    if (receivedFrameCounter <= device.FrameCounterUp)
+                        return new LoRaUplinkResult { Success = false, Reason = $"Frame counter replay detected: received {receivedFrameCounter}, expected > {device.FrameCounterUp}" };
+                    device.FrameCounterUp = receivedFrameCounter;
+                }
+            }
+            else
+            {
+                lock (device) { device.FrameCounterUp++; }
+            }
             device.LastRssi = rssi;
             device.LastSnr = snr;
             device.DataRate = dataRate;
@@ -312,6 +343,62 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
             var key = new byte[16];
             RandomNumberGenerator.Fill(key);
             return key;
+        }
+
+        /// <summary>
+        /// Computes the 4-byte LoRaWAN AES-128 CMAC MIC for a join-request payload.
+        /// Per LoRaWAN spec §6.2.4: CMAC is computed over the message bytes using the AppKey.
+        /// Returns the low 32 bits of the CMAC.
+        /// </summary>
+        private static uint ComputeJoinMic(byte[] appKey, byte[] message)
+        {
+            // AES-128 CMAC per RFC 4493
+            var cmac = new byte[16];
+            using var aes = System.Security.Cryptography.Aes.Create();
+            aes.Key = appKey;
+            aes.Mode = System.Security.Cryptography.CipherMode.ECB;
+            aes.Padding = System.Security.Cryptography.PaddingMode.None;
+
+            // Subkey generation
+            var k1 = new byte[16];
+            var k2 = new byte[16];
+            var zeros = new byte[16];
+            using (var enc = aes.CreateEncryptor())
+                enc.TransformBlock(zeros, 0, 16, k1, 0);
+
+            bool msb1 = (k1[0] & 0x80) != 0;
+            for (int i = 0; i < 15; i++) k1[i] = (byte)((k1[i] << 1) | (k1[i + 1] >> 7));
+            k1[15] = (byte)((k1[15] << 1) ^ (msb1 ? 0x87 : 0x00));
+
+            bool msb2 = (k1[0] & 0x80) != 0;
+            for (int i = 0; i < 15; i++) k2[i] = (byte)((k1[i] << 1) | (k1[i + 1] >> 7));
+            k2[15] = (byte)((k1[15] << 1) ^ (msb2 ? 0x87 : 0x00));
+
+            // Pad message to 16-byte block
+            int blocks = (message.Length + 15) / 16;
+            if (blocks == 0) blocks = 1;
+            var padded = new byte[blocks * 16];
+            Buffer.BlockCopy(message, 0, padded, 0, message.Length);
+            bool complete = message.Length > 0 && message.Length % 16 == 0;
+            if (!complete) padded[message.Length] = 0x80;
+
+            // XOR last block with appropriate subkey
+            var xorKey = complete ? k1 : k2;
+            for (int i = 0; i < 16; i++)
+                padded[(blocks - 1) * 16 + i] ^= xorKey[i];
+
+            // CBC-MAC
+            var x = new byte[16];
+            using (var enc = aes.CreateEncryptor())
+            {
+                for (int b = 0; b < blocks; b++)
+                {
+                    for (int i = 0; i < 16; i++) x[i] ^= padded[b * 16 + i];
+                    enc.TransformBlock(x, 0, 16, x, 0);
+                }
+            }
+
+            return BinaryPrimitives.ReadUInt32LittleEndian(x.AsSpan(0, 4));
         }
     }
 

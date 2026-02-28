@@ -41,7 +41,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
         {
             var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':');
             var host = parts[0];
-            var port = parts.Length > 1 ? int.Parse(parts[1]) : 47808;
+            var port = parts.Length > 1 && int.TryParse(parts[1], out var p47808) ? p47808 : 47808;
 
             var client = new UdpClient();
             client.Connect(host, port);

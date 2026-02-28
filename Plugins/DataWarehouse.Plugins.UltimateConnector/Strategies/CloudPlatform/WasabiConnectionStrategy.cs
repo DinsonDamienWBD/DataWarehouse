@@ -18,7 +18,19 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
         public override string[] Tags => new[] { "wasabi", "s3-compatible", "cloud", "object-storage", "rest-api" };
         public WasabiConnectionStrategy(ILogger? logger = null) : base(logger) { }
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct) { var region = GetConfiguration(config, "Region", "us-east-1"); var endpoint = $"https://s3.{region}.wasabisys.com"; var httpClient = new HttpClient { BaseAddress = new Uri(endpoint), Timeout = config.Timeout }; return new DefaultConnectionHandle(httpClient, new Dictionary<string, object> { ["Region"] = region, ["Endpoint"] = endpoint }); }
-        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { try { var response = await handle.GetConnection<HttpClient>().GetAsync("/", ct); return response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.Forbidden; } catch { return false; } }
+        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        {
+            try
+            {
+                using var response = await handle.GetConnection<HttpClient>().GetAsync("/", ct);
+                // Finding 1844: 403 Forbidden means credentials are invalid — do NOT report as healthy.
+                // Only treat the endpoint as healthy when it returns 200 or an S3-expected redirect (301/307).
+                return response.IsSuccessStatusCode ||
+                       response.StatusCode == System.Net.HttpStatusCode.MovedPermanently ||
+                       response.StatusCode == System.Net.HttpStatusCode.TemporaryRedirect;
+            }
+            catch { return false; }
+        }
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<HttpClient>()?.Dispose(); await Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, isHealthy ? "Wasabi is reachable" : "Wasabi is not responding", sw.Elapsed, DateTimeOffset.UtcNow); }
         protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default)

@@ -20,7 +20,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
         public override string[] Tags => new[] { "rocketmq", "messaging", "distributed", "tcp", "alibaba" };
         private int _requestId = 0;
         public ApacheRocketMqConnectionStrategy(ILogger? logger = null) : base(logger) { }
-        protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct) { var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':'); var host = parts[0]; var port = parts.Length > 1 ? int.Parse(parts[1]) : 9876; var tcpClient = new TcpClient(); await tcpClient.ConnectAsync(host, port, ct); return new DefaultConnectionHandle(tcpClient, new Dictionary<string, object> { ["Host"] = host, ["Port"] = port }); }
+        protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct) { var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':'); var host = parts[0]; var port = parts.Length > 1 && int.TryParse(parts[1], out var p9876) ? p9876 : 9876; var tcpClient = new TcpClient(); await tcpClient.ConnectAsync(host, port, ct); return new DefaultConnectionHandle(tcpClient, new Dictionary<string, object> { ["Host"] = host, ["Port"] = port }); }
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { try { return handle.GetConnection<TcpClient>()?.Connected ?? false; } catch { return false; } }
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<TcpClient>()?.Close(); await Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, isHealthy ? "RocketMQ is connected" : "RocketMQ is disconnected", sw.Elapsed, DateTimeOffset.UtcNow); }
@@ -81,7 +81,13 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
         {
             using var ms = new System.IO.MemoryStream();
             // RocketMQ frame: [total length (4)] [header length (4)] [header json] [body]
-            var headerJson = $"{{\"code\":10,\"language\":\"JAVA\",\"version\":0,\"opaque\":{requestId},\"flag\":0,\"remark\":\"\",\"extFields\":{{\"topic\":\"{topic}\",\"defaultTopic\":\"TBW102\",\"queueId\":\"0\"}}}}";
+            // Finding 2022: Use JsonSerializer to escape topic/consumerGroup, preventing JSON injection.
+            var headerObj = new
+            {
+                code = 10, language = "JAVA", version = 0, opaque = requestId, flag = 0, remark = "",
+                extFields = new { topic, defaultTopic = "TBW102", queueId = "0" }
+            };
+            var headerJson = System.Text.Json.JsonSerializer.Serialize(headerObj);
             var headerBytes = Encoding.UTF8.GetBytes(headerJson);
             var totalLength = 4 + headerBytes.Length + body.Length;
             var lengthBytes = BitConverter.GetBytes(System.Net.IPAddress.HostToNetworkOrder(totalLength));
@@ -96,7 +102,13 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
         private static byte[] BuildRocketMqPullRequest(int requestId, string topic, string consumerGroup)
         {
             using var ms = new System.IO.MemoryStream();
-            var headerJson = $"{{\"code\":11,\"language\":\"JAVA\",\"version\":0,\"opaque\":{requestId},\"flag\":0,\"remark\":\"\",\"extFields\":{{\"topic\":\"{topic}\",\"consumerGroup\":\"{consumerGroup}\",\"queueId\":\"0\",\"queueOffset\":\"0\",\"maxMsgNums\":\"32\"}}}}";
+            // Finding 2022: Use JsonSerializer to prevent JSON injection via topic or consumerGroup.
+            var headerObj = new
+            {
+                code = 11, language = "JAVA", version = 0, opaque = requestId, flag = 0, remark = "",
+                extFields = new { topic, consumerGroup, queueId = "0", queueOffset = "0", maxMsgNums = "32" }
+            };
+            var headerJson = System.Text.Json.JsonSerializer.Serialize(headerObj);
             var headerBytes = Encoding.UTF8.GetBytes(headerJson);
             var totalLength = 4 + headerBytes.Length;
             var lengthBytes = BitConverter.GetBytes(System.Net.IPAddress.HostToNetworkOrder(totalLength));

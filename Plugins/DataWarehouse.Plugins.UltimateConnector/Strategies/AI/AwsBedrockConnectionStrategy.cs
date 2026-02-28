@@ -6,6 +6,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.AI;
 public sealed class AwsBedrockConnectionStrategy : AiConnectionStrategyBase
 {
     public override string StrategyId => "aws-bedrock";public override string DisplayName => "AWS Bedrock";public override ConnectionStrategyCapabilities Capabilities => new();public override string SemanticDescription => "AWS Bedrock managed foundation models. Claude, Llama, Titan with AWS integration.";public override string[] Tags => ["aws", "bedrock", "llm", "managed", "multi-model"];
+    // Finding 1759: AWS Bedrock requires SigV4 request signing. Raw HttpClient without SigV4 will
+    // receive 403 on all model invocations. Mark not production-ready until signing is implemented.
+    public override bool IsProductionReady => false;
     public AwsBedrockConnectionStrategy(ILogger? logger = null) : base(logger) { }
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct){var region = config.Properties.GetValueOrDefault("Region", "us-east-1")?.ToString() ?? "us-east-1";var baseUrl = $"https://bedrock-runtime.{region}.amazonaws.com";var httpClient = new HttpClient { BaseAddress = new Uri(baseUrl), Timeout = config.Timeout };return new DefaultConnectionHandle(httpClient, new Dictionary<string, object> { ["Provider"] = "Bedrock", ["Region"] = region });}
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct){try{var httpClient = handle.GetConnection<HttpClient>();using var response = await httpClient.GetAsync("/", ct);return response.IsSuccessStatusCode;}catch{return false;}}

@@ -22,14 +22,30 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
             var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':');
+            var host = parts[0];
+            if (string.IsNullOrWhiteSpace(host)) throw new ArgumentException("Host is required in connection string.");
+            var port = parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : 50000;
             var client = new TcpClient();
-            await client.ConnectAsync(parts[0], parts.Length > 1 ? int.Parse(parts[1]) : 50000, ct);
-            return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "DB2/MVS" });
+            await client.ConnectAsync(host, port, ct);
+            return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "DB2/MVS", ["host"] = host, ["port"] = port });
         }
 
-        protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(handle.GetConnection<TcpClient>().Connected);
+        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        {
+            var info = handle.ConnectionInfo;
+            var host = info.GetValueOrDefault("host")?.ToString() ?? "";
+            if (!int.TryParse(info.GetValueOrDefault("port")?.ToString(), out var port)) port = 50000;
+            try { using var probe = new TcpClient(); await probe.ConnectAsync(host, port, ct); return true; }
+            catch { return false; }
+        }
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<TcpClient>().Close(); return Task.CompletedTask; }
-        protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(new ConnectionHealth(handle.GetConnection<TcpClient>().Connected, "DB2 mainframe", TimeSpan.Zero, DateTimeOffset.UtcNow));
+        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var isHealthy = await TestCoreAsync(handle, ct);
+            sw.Stop();
+            return new ConnectionHealth(isHealthy, isHealthy ? "DB2 mainframe reachable" : "DB2 mainframe unreachable", sw.Elapsed, DateTimeOffset.UtcNow);
+        }
         public override async Task<string> EmulateProtocolAsync(IConnectionHandle handle, string protocolCommand, CancellationToken ct = default)
         {
             var client = handle.GetConnection<TcpClient>();

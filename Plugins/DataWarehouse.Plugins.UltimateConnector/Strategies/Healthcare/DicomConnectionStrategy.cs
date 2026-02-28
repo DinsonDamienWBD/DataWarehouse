@@ -25,7 +25,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Healthcare
         {
             var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':');
             var client = new TcpClient();
-            await client.ConnectAsync(parts[0], parts.Length > 1 ? int.Parse(parts[1]) : 104, ct);
+            await client.ConnectAsync(parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p104) ? p104 : 104, ct);
             return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "DICOM" });
         }
 
