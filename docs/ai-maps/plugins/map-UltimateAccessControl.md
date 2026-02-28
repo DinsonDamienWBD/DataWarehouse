@@ -371,7 +371,7 @@ public sealed class MfaOrchestrator
 {
 }
     public Task<MfaRequirement> DetermineRequiredMfaAsync(string userId, double riskScore, string deviceId, CancellationToken cancellationToken = default);
-    public Task<MfaChallenge> InitiateChallengeAsync(string userId, MfaMethodType methodType, CancellationToken cancellationToken = default);
+    public Task<MfaChallengeResult> InitiateChallengeAsync(string userId, MfaMethodType methodType, CancellationToken cancellationToken = default);
     public Task<bool> VerifyChallengeAsync(string challengeId, string response, CancellationToken cancellationToken = default);
     public Task RegisterTrustedDeviceAsync(string userId, string deviceId, TimeSpan trustDuration, CancellationToken cancellationToken = default);
     public Task RegisterMethodAsync(string userId, MfaMethod method, CancellationToken cancellationToken = default);
@@ -409,8 +409,17 @@ public sealed class MfaChallenge
     public required DateTime CreatedAt { get; init; }
     public required DateTime ExpiresAt { get; init; }
     public required ChallengeStatus Status { get; set; }
-    public required string Code { get; init; }
+    public required string CodeHash { get; init; }
     public DateTime? VerifiedAt { get; set; }
+}
+```
+```csharp
+public sealed class MfaChallengeResult
+{
+}
+    public required string ChallengeId { get; init; }
+    public required string Code { get; init; }
+    public required DateTime ExpiresAt { get; init; }
 }
 ```
 ```csharp
@@ -658,6 +667,9 @@ public sealed class AutomatedIncidentResponse
 }
     public void RegisterPlaybook(ResponsePlaybook playbook);
     public async Task<IncidentResponse> RespondToIncidentAsync(SecurityIncident incident, CancellationToken cancellationToken = default);
+    public bool IsIpBlocked(string ipAddress);
+    public bool IsAccountDisabled(string userId);;
+    public bool IsDeviceIsolated(string deviceId);;
     public IReadOnlyCollection<IncidentResponse> GetResponseHistory(int maxCount = 100);
 }
 ```
@@ -870,11 +882,12 @@ public sealed class SecurityRule
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateAccessControl/Features/SiemConnector.cs
 ```csharp
-public sealed class SiemConnector
+public sealed class SiemConnector : IDisposable
 {
 }
     public void RegisterEndpoint(SiemEndpoint endpoint);
     public async Task<ForwardResult> ForwardEventAsync(SecurityEvent securityEvent, CancellationToken cancellationToken = default);
+    public void Dispose();
     public IReadOnlyCollection<SiemEndpoint> GetEndpoints();
     public IReadOnlyCollection<ForwardedEvent> GetForwardHistory(int maxCount = 100);
     public bool RemoveEndpoint(string endpointId);
@@ -1872,8 +1885,8 @@ private sealed class PushChallengeSession
     public required Dictionary<string, object> Context { get; init; }
     public required DateTime CreatedAt { get; init; }
     public required DateTime ExpiresAt { get; init; }
-    public bool Responded { get; set; }
-    public bool Approved { get; set; }
+    public volatile bool Responded;
+    public volatile bool Approved;
     public DateTime RespondedAt { get; set; }
 }
 ```
@@ -2117,7 +2130,7 @@ private sealed class EmailOtpSession
     public required string EmailAddress { get; init; }
     public required DateTime CreatedAt { get; init; }
     public required DateTime ExpiresAt { get; init; }
-    public int AttemptsUsed { get; set; }
+    public int AttemptsUsed;
 }
 ```
 ```csharp
@@ -5232,7 +5245,7 @@ public sealed class EmbeddedSqliteIdentityStrategy : AccessControlStrategyBase
     public override AccessControlCapabilities Capabilities;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
+    protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
 }
 ```
 
@@ -5262,7 +5275,7 @@ public sealed class EncryptedFileIdentityStrategy : AccessControlStrategyBase
     public override AccessControlCapabilities Capabilities;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
+    protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
 }
 ```
 
@@ -5677,6 +5690,7 @@ public record ImageMetadata
     public int BitsPerPixel { get; init; }
     public bool HasAlpha { get; init; }
     public int PixelDataOffset { get; init; }
+    public byte[]? OriginalHeader { get; init; }
 }
 ```
 ```csharp
@@ -7524,6 +7538,9 @@ public sealed class SoarStrategy : AccessControlStrategyBase
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
+    public bool IsSubjectIsolated(string subjectId);;
+    public bool IsIpBlocked(string ip);;
+    public bool IsResourceQuarantined(string resourceId);;
     public IReadOnlyCollection<IncidentResponse> GetActiveIncidents();
     public IReadOnlyCollection<ContainmentAction> GetContainmentActions(string incidentId);
 }

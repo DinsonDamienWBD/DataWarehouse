@@ -2502,6 +2502,7 @@ public class SelfHealingConnectionPoolStrategy : ConnectionStrategyBase
 private class PoolMetrics
 {
 }
+    public readonly object SyncRoot = new();
     public int PoolSize { get; set; }
     public int ActiveConnections { get; set; }
     public double DegradationThresholdMs { get; set; }
@@ -2615,6 +2616,7 @@ public class AdaptiveCircuitBreakerStrategy : ConnectionStrategyBase
 private class BreakerState
 {
 }
+    public readonly object SyncRoot = new();
     public CircuitState State { get; set; }
     public int FailureCount { get; set; }
     public int SuccessCount { get; set; }
@@ -2729,6 +2731,7 @@ private class PidState
 private class PidConnectionState
 {
 }
+    public readonly object SyncRoot = new();
     public double TargetAckRate { get; set; }
     public double MeasuredAckRate { get; set; }
     public int CurrentWindowKb { get; set; }
@@ -3134,7 +3137,19 @@ internal sealed class CircuitState
     public long TotalFailures;
     public long SuccessCount;
     public long RejectedCount;
-    public DateTimeOffset? OpenedAt;
+    public DateTimeOffset? OpenedAt
+{
+    get
+    {
+        var ticks = Interlocked.Read(ref _openedAtTicks);
+        return ticks == 0 ? null : new DateTimeOffset(ticks, TimeSpan.Zero);
+    }
+
+    set
+    {
+        Interlocked.Exchange(ref _openedAtTicks, value?.UtcTicks ?? 0);
+    }
+}
     public CircuitState(CircuitBreakerConfiguration config);
 }
 ```
@@ -4860,9 +4875,9 @@ public sealed class GroqConnectionStrategy : AiConnectionStrategyBase
     public override string[] Tags;;
     public GroqConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<string> SendRequestAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, CancellationToken ct = default);
     public override async IAsyncEnumerable<string> StreamResponseAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, [EnumeratorCancellation] CancellationToken ct = default);
 }
@@ -4900,9 +4915,9 @@ public sealed class PerplexityConnectionStrategy : AiConnectionStrategyBase
     public override string[] Tags;;
     public PerplexityConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<string> SendRequestAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, CancellationToken ct = default);
     public override async IAsyncEnumerable<string> StreamResponseAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, [EnumeratorCancellation] CancellationToken ct = default);
 }
@@ -4920,9 +4935,9 @@ public sealed class AwsSageMakerConnectionStrategy : AiConnectionStrategyBase
     public override string[] Tags;;
     public AwsSageMakerConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<string> SendRequestAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, CancellationToken ct = default);
     public override async IAsyncEnumerable<string> StreamResponseAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, [EnumeratorCancellation] CancellationToken ct = default);
 }
@@ -4940,9 +4955,9 @@ public sealed class OpenAiConnectionStrategy : AiConnectionStrategyBase
     public override string[] Tags;;
     public OpenAiConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<string> SendRequestAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, CancellationToken ct = default);
     public override async IAsyncEnumerable<string> StreamResponseAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, [EnumeratorCancellation] CancellationToken ct = default);
 }
@@ -5020,9 +5035,9 @@ public sealed class HuggingFaceConnectionStrategy : AiConnectionStrategyBase
     public override string[] Tags;;
     public HuggingFaceConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<string> SendRequestAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, CancellationToken ct = default);
     public override async IAsyncEnumerable<string> StreamResponseAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, [EnumeratorCancellation] CancellationToken ct = default);
 }
@@ -5060,9 +5075,9 @@ public sealed class GoogleGeminiConnectionStrategy : AiConnectionStrategyBase
     public override string[] Tags;;
     public GoogleGeminiConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<string> SendRequestAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, CancellationToken ct = default);
     public override async IAsyncEnumerable<string> StreamResponseAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, [EnumeratorCancellation] CancellationToken ct = default);
 }
@@ -5120,9 +5135,9 @@ public sealed class AnthropicConnectionStrategy : AiConnectionStrategyBase
     public override string[] Tags;;
     public AnthropicConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<string> SendRequestAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, CancellationToken ct = default);
     public override async IAsyncEnumerable<string> StreamResponseAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, [EnumeratorCancellation] CancellationToken ct = default);
 }
@@ -5140,9 +5155,9 @@ public sealed class AwsBedrockConnectionStrategy : AiConnectionStrategyBase
     public override string[] Tags;;
     public AwsBedrockConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<string> SendRequestAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, CancellationToken ct = default);
     public override async IAsyncEnumerable<string> StreamResponseAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, [EnumeratorCancellation] CancellationToken ct = default);
 }
@@ -5200,9 +5215,9 @@ public sealed class HeliconeConnectionStrategy : AiConnectionStrategyBase
     public override string[] Tags;;
     public HeliconeConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<string> SendRequestAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, CancellationToken ct = default);
     public override async IAsyncEnumerable<string> StreamResponseAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, [EnumeratorCancellation] CancellationToken ct = default);
 }
@@ -5220,9 +5235,9 @@ public sealed class AzureOpenAiConnectionStrategy : AiConnectionStrategyBase
     public override string[] Tags;;
     public AzureOpenAiConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<string> SendRequestAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, CancellationToken ct = default);
     public override async IAsyncEnumerable<string> StreamResponseAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, [EnumeratorCancellation] CancellationToken ct = default);
 }
@@ -5240,9 +5255,9 @@ public sealed class WhisperConnectionStrategy : AiConnectionStrategyBase
     public override string[] Tags;;
     public WhisperConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<string> SendRequestAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, CancellationToken ct = default);
     public override async IAsyncEnumerable<string> StreamResponseAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, [EnumeratorCancellation] CancellationToken ct = default);
 }
@@ -5280,9 +5295,9 @@ public sealed class VertexAiConnectionStrategy : AiConnectionStrategyBase
     public override string[] Tags;;
     public VertexAiConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<string> SendRequestAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, CancellationToken ct = default);
     public override async IAsyncEnumerable<string> StreamResponseAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, [EnumeratorCancellation] CancellationToken ct = default);
 }
@@ -5320,9 +5335,9 @@ public sealed class MistralConnectionStrategy : AiConnectionStrategyBase
     public override string[] Tags;;
     public MistralConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<string> SendRequestAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, CancellationToken ct = default);
     public override async IAsyncEnumerable<string> StreamResponseAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, [EnumeratorCancellation] CancellationToken ct = default);
 }
@@ -5440,9 +5455,9 @@ public sealed class AzureMlConnectionStrategy : AiConnectionStrategyBase
     public override string[] Tags;;
     public AzureMlConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<string> SendRequestAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, CancellationToken ct = default);
     public override async IAsyncEnumerable<string> StreamResponseAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, [EnumeratorCancellation] CancellationToken ct = default);
 }
@@ -5460,9 +5475,9 @@ public sealed class CohereConnectionStrategy : AiConnectionStrategyBase
     public override string[] Tags;;
     public CohereConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<string> SendRequestAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, CancellationToken ct = default);
     public override async IAsyncEnumerable<string> StreamResponseAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, [EnumeratorCancellation] CancellationToken ct = default);
 }
@@ -5500,9 +5515,9 @@ public sealed class TogetherAiConnectionStrategy : AiConnectionStrategyBase
     public override string[] Tags;;
     public TogetherAiConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<string> SendRequestAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, CancellationToken ct = default);
     public override async IAsyncEnumerable<string> StreamResponseAsync(IConnectionHandle handle, string prompt, Dictionary<string, object>? options = null, [EnumeratorCancellation] CancellationToken ct = default);
 }
@@ -5560,9 +5575,9 @@ public sealed class KlipfolioConnectionStrategy : DashboardConnectionStrategyBas
     public override string[] Tags;;
     public KlipfolioConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<string> ProvisionDashboardAsync(IConnectionHandle handle, string dashboardDefinition, CancellationToken ct = default);
     public override async Task PushDataAsync(IConnectionHandle handle, string datasetId, IReadOnlyList<Dictionary<string, object?>> data, CancellationToken ct = default);
 }
@@ -5580,9 +5595,9 @@ public sealed class DataboxConnectionStrategy : DashboardConnectionStrategyBase
     public override string[] Tags;;
     public DataboxConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override Task<string> ProvisionDashboardAsync(IConnectionHandle handle, string dashboardDefinition, CancellationToken ct = default);;
     public override async Task PushDataAsync(IConnectionHandle handle, string datasetId, IReadOnlyList<Dictionary<string, object?>> data, CancellationToken ct = default);
 }
@@ -5600,9 +5615,9 @@ public sealed class PowerBiConnectionStrategy : DashboardConnectionStrategyBase
     public override string[] Tags;;
     public PowerBiConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<string> ProvisionDashboardAsync(IConnectionHandle handle, string dashboardDefinition, CancellationToken ct = default);
     public override Task PushDataAsync(IConnectionHandle handle, string datasetId, IReadOnlyList<Dictionary<string, object?>> data, CancellationToken ct = default);;
 }
@@ -5800,9 +5815,9 @@ public sealed class GeckoboardConnectionStrategy : DashboardConnectionStrategyBa
     public override string[] Tags;;
     public GeckoboardConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<string> ProvisionDashboardAsync(IConnectionHandle handle, string dashboardDefinition, CancellationToken ct = default);
     public override async Task PushDataAsync(IConnectionHandle handle, string datasetId, IReadOnlyList<Dictionary<string, object?>> data, CancellationToken ct = default);
 }
@@ -6006,7 +6021,7 @@ public sealed class NewRelicConnectionStrategy : ObservabilityConnectionStrategy
     public override string[] Tags;;
     public NewRelicConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);;
     public override async Task PushMetricsAsync(IConnectionHandle handle, IReadOnlyList<Dictionary<string, object>> metrics, CancellationToken ct = default);
@@ -6324,7 +6339,7 @@ public sealed class NetdataConnectionStrategy : ObservabilityConnectionStrategyB
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    public override async Task PushMetricsAsync(IConnectionHandle handle, IReadOnlyList<Dictionary<string, object>> metrics, CancellationToken ct = default);
+    public override Task PushMetricsAsync(IConnectionHandle handle, IReadOnlyList<Dictionary<string, object>> metrics, CancellationToken ct = default);;
     public override Task PushLogsAsync(IConnectionHandle handle, IReadOnlyList<Dictionary<string, object>> logs, CancellationToken ct = default);;
     public override Task PushTracesAsync(IConnectionHandle handle, IReadOnlyList<Dictionary<string, object>> traces, CancellationToken ct = default);;
 }
@@ -6721,7 +6736,7 @@ public sealed class GcpPubSubConnectionStrategy : SaaSConnectionStrategyBase
     public override string[] Tags;;
     public GcpPubSubConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
