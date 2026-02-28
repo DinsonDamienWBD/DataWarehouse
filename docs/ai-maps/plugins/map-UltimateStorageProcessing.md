@@ -99,6 +99,9 @@ internal static class CliProcessHelper
     public static async IAsyncEnumerable<ProcessingResult> EnumerateProjectFiles(ProcessingQuery query, string[] extensions, Stopwatch sw, [EnumeratorCancellation] CancellationToken ct = default);
     public static Task<AggregationResult> AggregateProjectFiles(ProcessingQuery query, AggregationType aggregationType, string[] extensions, CancellationToken ct);
     public static T? GetOption<T>(ProcessingQuery query, string key);
+    public static void ValidateNoShellMetachars(string value, string paramName);
+    public static void ValidateAllowlist(string value, string paramName, IReadOnlySet<string> allowedValues);
+    public static void ValidateIdentifier(string value, string paramName);
 }
 ```
 ```csharp
@@ -177,6 +180,7 @@ private sealed class ScheduledJob
     public required int Priority { get; init; }
     public required DateTimeOffset ScheduledAt { get; init; }
     public required TaskCompletionSource<ProcessingResult> Completion { get; init; }
+    public required CancellationTokenSource Cts { get; init; }
 }
 ```
 
@@ -762,7 +766,7 @@ internal sealed class OnStorageSnappyStrategy : StorageProcessingStrategyBase
     public override string StrategyId;;
     public override string Name;;
     public override StorageProcessingCapabilities Capabilities;;
-    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
+    public override Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
     public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
     public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
 }
@@ -776,7 +780,7 @@ internal sealed class OnStorageZstdStrategy : StorageProcessingStrategyBase
     public override string StrategyId;;
     public override string Name;;
     public override StorageProcessingCapabilities Capabilities;;
-    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
+    public override Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
     public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
     public override async Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
 }
@@ -825,7 +829,7 @@ internal sealed class OnStorageLz4Strategy : StorageProcessingStrategyBase
     public override string StrategyId;;
     public override string Name;;
     public override StorageProcessingCapabilities Capabilities;;
-    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
+    public override Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
     public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
     public override async Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
 }

@@ -2491,12 +2491,12 @@ internal class DpapiTier : IKeyProtectionTier
 }
 ```
 ```csharp
-internal class CredentialManagerTier : IKeyProtectionTier
+internal class MasterKeyDerivedTier : IKeyProtectionTier
 {
 }
     public string Name;;
     public bool IsAvailable;;
-    public CredentialManagerTier(FileKeyStoreConfig config);
+    public MasterKeyDerivedTier(FileKeyStoreConfig config);
     public byte[] Encrypt(byte[] data);
     public byte[] Decrypt(byte[] encryptedData);
 }
@@ -3950,6 +3950,7 @@ public sealed class SocialRecoveryStrategy : KeyStoreStrategyBase
     public override async Task<IReadOnlyList<string>> ListKeysAsync(ISecurityContext context, CancellationToken ct = default);
     public override async Task DeleteKeyAsync(string keyId, ISecurityContext context, CancellationToken ct = default);
     public override async Task<KeyMetadata?> GetKeyMetadataAsync(string keyId, ISecurityContext context, CancellationToken ct = default);
+    internal static byte[] UnwrapShare(byte[] wrapped, string guardianId);
     public override void Dispose();
 }
 ```
