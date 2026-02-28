@@ -82,38 +82,43 @@ public sealed class VictoriaMetricsStorageStrategy : DatabaseStorageStrategyBase
         var dataBase64 = Convert.ToBase64String(data);
         var metadataJson = metadata != null ? JsonSerializer.Serialize(metadata, JsonOptions) : "";
 
-        // Store data as a metric with labels
         var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-        var lines = new StringBuilder();
-        lines.AppendLine($"{_metricName}_size{{key=\"{EscapeLabel(key)}\",etag=\"{EscapeLabel(etag)}\"}} {data.LongLength} {timestamp}");
+        // Store size metric via Prometheus exposition format (correct endpoint)
+        var sizeLines = new StringBuilder();
+        sizeLines.AppendLine($"{_metricName}_size{{key=\"{EscapeLabel(key)}\",etag=\"{EscapeLabel(etag)}\",content_type=\"{EscapeLabel(contentType ?? "")}\"}} {data.LongLength} {timestamp}");
 
-        // Store actual data via import API
-        var importData = new
+        var sizeContent = new StringContent(sizeLines.ToString(), Encoding.UTF8, "text/plain");
+        var sizeResponse = await _httpClient!.PostAsync("/api/v1/import/prometheus", sizeContent, ct);
+        sizeResponse.EnsureSuccessStatusCode();
+
+        // Store blob data via JSON Lines import format (correct VictoriaMetrics /api/v1/import format)
+        // Each chunk gets its own metric with a chunk index label to support large blobs
+        const int chunkSize = 16384; // 16KB chunks to stay within label size limits
+        var chunks = SplitBase64IntoChunks(dataBase64, chunkSize);
+
+        var jsonLines = new StringBuilder();
+        for (int i = 0; i < chunks.Count; i++)
         {
-            metric = new { __name__ = $"{_metricName}_data", key, contentType = contentType ?? "", etag },
-            values = new[] { 1.0 },
-            timestamps = new[] { timestamp }
-        };
+            var entry = new
+            {
+                metric = new Dictionary<string, string>
+                {
+                    ["__name__"] = $"{_metricName}_blob",
+                    ["key"] = key,
+                    ["chunk"] = i.ToString(),
+                    ["total_chunks"] = chunks.Count.ToString(),
+                    ["data"] = chunks[i]
+                },
+                values = new[] { 1.0 },
+                timestamps = new[] { timestamp }
+            };
+            jsonLines.AppendLine(JsonSerializer.Serialize(entry));
+        }
 
-        // Store size metric
-        var content = new StringContent(lines.ToString(), Encoding.UTF8, "text/plain");
-        await _httpClient!.PostAsync("/api/v1/import/prometheus", content, ct);
-
-        // Store data in a separate storage (VictoriaMetrics is not ideal for large blobs)
-        // Using a simple key-value approach via labels (limited)
-        var dataContent = new StringContent(JsonSerializer.Serialize(new
-        {
-            key,
-            data = dataBase64,
-            size = data.LongLength,
-            contentType,
-            etag,
-            metadata = metadataJson,
-            timestamp
-        }), Encoding.UTF8, "application/json");
-
-        await _httpClient.PostAsync($"/api/v1/import?extra_label=__storage_key__={Uri.EscapeDataString(key)}", dataContent, ct);
+        var blobContent = new StringContent(jsonLines.ToString(), Encoding.UTF8, "application/json");
+        var blobResponse = await _httpClient.PostAsync("/api/v1/import", blobContent, ct);
+        blobResponse.EnsureSuccessStatusCode();
 
         return new StorageObjectMetadata
         {
@@ -128,10 +133,21 @@ public sealed class VictoriaMetricsStorageStrategy : DatabaseStorageStrategyBase
         };
     }
 
+    private static List<string> SplitBase64IntoChunks(string base64, int chunkSize)
+    {
+        var chunks = new List<string>();
+        for (int i = 0; i < base64.Length; i += chunkSize)
+        {
+            chunks.Add(base64.Substring(i, Math.Min(chunkSize, base64.Length - i)));
+        }
+        if (chunks.Count == 0) chunks.Add("");
+        return chunks;
+    }
+
     protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct)
     {
-        // Query the last value for this key
-        var query = Uri.EscapeDataString($"{_metricName}_data{{key=\"{key}\"}}");
+        // Query all blob chunks for this key, ordered by chunk index
+        var query = Uri.EscapeDataString($"{_metricName}_blob{{key=\"{EscapeLabel(key)}\"}}");
         var response = await _httpClient!.GetAsync($"/api/v1/query?query={query}", ct);
 
         if (!response.IsSuccessStatusCode)
@@ -140,21 +156,27 @@ public sealed class VictoriaMetricsStorageStrategy : DatabaseStorageStrategyBase
         }
 
         var result = await response.Content.ReadFromJsonAsync<VmQueryResult>(cancellationToken: ct);
-        var data = result?.Data?.Result?.FirstOrDefault();
+        var results = result?.Data?.Result;
 
-        if (data?.Metric == null)
+        if (results == null || results.Length == 0)
         {
             throw new FileNotFoundException($"Object not found: {key}");
         }
 
-        // The data is stored as base64 in metric labels (for demonstration)
-        // In production, you'd use a separate blob store
-        if (data.Metric.TryGetValue("data", out var dataBase64))
+        // Reassemble chunks in order
+        var orderedChunks = results
+            .Where(r => r.Metric != null && r.Metric.ContainsKey("data") && r.Metric.ContainsKey("chunk"))
+            .OrderBy(r => int.TryParse(r.Metric!["chunk"], out var idx) ? idx : 0)
+            .Select(r => r.Metric!["data"])
+            .ToList();
+
+        if (orderedChunks.Count == 0)
         {
-            return Convert.FromBase64String(dataBase64);
+            throw new FileNotFoundException($"Object not found: {key}");
         }
 
-        throw new FileNotFoundException($"Object not found: {key}");
+        var fullBase64 = string.Concat(orderedChunks);
+        return Convert.FromBase64String(fullBase64);
     }
 
     protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct)

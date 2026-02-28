@@ -3,6 +3,7 @@ using DataWarehouse.SDK.Database;
 using Npgsql;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace DataWarehouse.Plugins.UltimateDatabaseStorage.Strategies.TimeSeries;
 
@@ -46,10 +47,24 @@ public sealed class TimescaleDbStorageStrategy : DatabaseStorageStrategyBase
     public override bool SupportsTransactions => true;
     public override bool SupportsSql => true;
 
+    /// <summary>
+    /// Regex for safe PostgreSQL interval literals: digits + time unit keywords only.
+    /// </summary>
+    private static readonly Regex SafeIntervalRegex =
+        new(@"^\d+\s+(microseconds?|milliseconds?|seconds?|minutes?|hours?|days?|weeks?|months?|years?)$",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
     protected override async Task InitializeCoreAsync(CancellationToken ct)
     {
         _tableName = GetConfiguration("TableName", "storage_timeseries");
+        ValidateSqlIdentifier(_tableName, nameof(_tableName));
         _chunkInterval = GetConfiguration("ChunkInterval", "1 day");
+        if (!SafeIntervalRegex.IsMatch(_chunkInterval))
+        {
+            throw new ArgumentException(
+                $"ChunkInterval contains unsafe characters. Must be a simple interval like '1 day'. Got: '{_chunkInterval}'",
+                nameof(_chunkInterval));
+        }
 
         var connectionString = GetConnectionString();
         _dataSource = NpgsqlDataSource.Create(connectionString);
@@ -333,6 +348,11 @@ public sealed class TimescaleDbStorageStrategy : DatabaseStorageStrategyBase
     /// </summary>
     public async Task EnableCompressionAsync(string olderThan = "7 days", CancellationToken ct = default)
     {
+        if (!SafeIntervalRegex.IsMatch(olderThan))
+        {
+            throw new ArgumentException($"olderThan contains unsafe characters. Got: '{olderThan}'", nameof(olderThan));
+        }
+
         await using var connection = await _dataSource!.OpenConnectionAsync(ct);
 
         await using (var cmd = connection.CreateCommand())
@@ -354,6 +374,11 @@ public sealed class TimescaleDbStorageStrategy : DatabaseStorageStrategyBase
     /// </summary>
     public async Task SetRetentionPolicyAsync(string retentionPeriod = "90 days", CancellationToken ct = default)
     {
+        if (!SafeIntervalRegex.IsMatch(retentionPeriod))
+        {
+            throw new ArgumentException($"retentionPeriod contains unsafe characters. Got: '{retentionPeriod}'", nameof(retentionPeriod));
+        }
+
         await using var connection = await _dataSource!.OpenConnectionAsync(ct);
         await using var cmd = connection.CreateCommand();
 

@@ -51,6 +51,7 @@ public sealed class SqliteStorageStrategy : DatabaseStorageStrategyBase
     protected override async Task InitializeCoreAsync(CancellationToken ct)
     {
         _tableName = GetConfiguration("TableName", "data_warehouse_storage");
+        ValidateSqlIdentifier(_tableName, nameof(_tableName));
         _databasePath = GetConfiguration("DatabasePath", "datawarehouse.db");
         _useWalMode = GetConfiguration("UseWalMode", true);
 

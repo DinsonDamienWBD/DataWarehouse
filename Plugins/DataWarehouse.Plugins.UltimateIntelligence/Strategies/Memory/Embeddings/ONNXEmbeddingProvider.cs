@@ -342,7 +342,10 @@ public sealed class ONNXEmbeddingProvider : EmbeddingProviderBase
 
     private Task<float[]> RunInferenceAsync(int[] tokens, CancellationToken ct)
     {
-        // In production, this would use ONNX Runtime:
+        // ONNX Runtime is required for actual embedding inference.
+        // Install the Microsoft.ML.OnnxRuntime NuGet package and provide a valid ONNX model file.
+        //
+        // Example usage with ONNX Runtime:
         // var inputTensor = new DenseTensor<long>(tokens.Select(t => (long)t).ToArray(), new[] { 1, tokens.Length });
         // var attentionMask = new DenseTensor<long>(Enumerable.Repeat(1L, tokens.Length).ToArray(), new[] { 1, tokens.Length });
         // var inputs = new List<NamedOnnxValue>
@@ -353,32 +356,10 @@ public sealed class ONNXEmbeddingProvider : EmbeddingProviderBase
         // using var results = _session.Run(inputs);
         // var output = results.First().AsTensor<float>();
 
-        // Deterministic hash-based pseudo-embeddings (Phase 36-04 will build proper WASI-NN + ONNX Runtime)
-        var embedding = new float[_dimensions];
-        using var sha256 = System.Security.Cryptography.SHA256.Create();
-        var tokenBytes = new byte[tokens.Length * 4];
-        Buffer.BlockCopy(tokens, 0, tokenBytes, 0, tokenBytes.Length);
-        var hash = sha256.ComputeHash(tokenBytes);
-
-        // Generate deterministic pseudo-embedding from hash
-        for (int i = 0; i < _dimensions; i++)
-        {
-            var hashIndex = (i * 2) % hash.Length;
-            var value = (hash[hashIndex] << 8 | hash[(hashIndex + 1) % hash.Length]) / 65535.0f;
-            embedding[i] = (float)(value * 2 - 1); // Map [0,1] to [-1,1]
-        }
-
-        // Normalize the embedding
-        var norm = (float)Math.Sqrt(embedding.Sum(x => x * x));
-        if (norm > 0)
-        {
-            for (int i = 0; i < embedding.Length; i++)
-            {
-                embedding[i] /= norm;
-            }
-        }
-
-        return Task.FromResult(embedding);
+        throw new PlatformNotSupportedException(
+            "ONNX Runtime is required for embedding inference. " +
+            "Install the 'Microsoft.ML.OnnxRuntime' NuGet package and configure an ONNX model path. " +
+            "Hash-based pseudo-embeddings are not suitable for production use.");
     }
 
     private async Task<float[][]> RunBatchInferenceAsync(string[] texts, CancellationToken ct)

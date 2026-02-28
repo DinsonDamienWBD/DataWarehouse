@@ -60,7 +60,7 @@ public sealed class RavenDbStorageStrategy : DatabaseStorageStrategyBase
             _serverUrls = connectionString.Split(';', StringSplitOptions.RemoveEmptyEntries);
         }
 
-        _store = new DocumentStore
+        var store = new DocumentStore
         {
             Urls = _serverUrls,
             Database = _databaseName
@@ -71,10 +71,10 @@ public sealed class RavenDbStorageStrategy : DatabaseStorageStrategyBase
 #pragma warning disable SYSLIB0057
             var cert = new X509Certificate2(_certificatePath);
 #pragma warning restore SYSLIB0057
-            // Certificate is read-only in newer versions, so we skip this
-            // _store.Certificate = cert;
+            store.Certificate = cert;
         }
 
+        _store = store;
         _store.Initialize();
 
         await EnsureSchemaCoreAsync(ct);

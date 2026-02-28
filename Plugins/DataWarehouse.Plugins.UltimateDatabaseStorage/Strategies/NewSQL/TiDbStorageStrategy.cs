@@ -48,6 +48,7 @@ public sealed class TiDbStorageStrategy : DatabaseStorageStrategyBase
     protected override async Task InitializeCoreAsync(CancellationToken ct)
     {
         _tableName = GetConfiguration("TableName", "storage");
+        ValidateSqlIdentifier(_tableName, nameof(_tableName));
 
         var connectionString = GetConnectionString();
         _dataSource = new MySqlDataSource(connectionString);

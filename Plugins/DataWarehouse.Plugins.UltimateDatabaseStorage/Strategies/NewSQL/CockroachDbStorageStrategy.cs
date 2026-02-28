@@ -48,6 +48,7 @@ public sealed class CockroachDbStorageStrategy : DatabaseStorageStrategyBase
     protected override async Task InitializeCoreAsync(CancellationToken ct)
     {
         _tableName = GetConfiguration("TableName", "storage");
+        ValidateSqlIdentifier(_tableName, nameof(_tableName));
 
         var connectionString = GetConnectionString();
         _dataSource = NpgsqlDataSource.Create(connectionString);

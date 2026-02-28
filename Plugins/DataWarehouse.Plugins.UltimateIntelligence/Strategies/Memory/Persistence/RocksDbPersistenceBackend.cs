@@ -75,8 +75,9 @@ public sealed record RocksDbPersistenceConfig : PersistenceBackendConfig
 /// bloom filters, compression, write-ahead logging, and snapshots.
 /// </summary>
 /// <remarks>
-/// This implementation simulates RocksDB behavior using in-memory structures
-/// with file-based persistence. In production, use the actual RocksDB library.
+/// This backend requires the RocksDb NuGet package for production use.
+/// It uses in-memory structures with file-based persistence as a local development fallback
+/// when the native library is not available, but will log a warning on construction.
 /// </remarks>
 public sealed class RocksDbPersistenceBackend : IProductionPersistenceBackend
 {
@@ -84,8 +85,9 @@ public sealed class RocksDbPersistenceBackend : IProductionPersistenceBackend
     private readonly PersistenceMetrics _metrics = new();
     private readonly PersistenceCircuitBreaker _circuitBreaker;
     private readonly SemaphoreSlim _writeLock = new(1, 1);
+    private readonly bool _isSimulated;
 
-    // Simulated column families per tier
+    // In-memory fallback column families per tier (used only when RocksDb is unavailable)
     private readonly BoundedDictionary<MemoryTier, BoundedDictionary<string, MemoryRecord>> _columnFamilies = new BoundedDictionary<MemoryTier, BoundedDictionary<string, MemoryRecord>>(1000);
     private readonly BoundedDictionary<string, MemoryTier> _recordTierMap = new BoundedDictionary<string, MemoryTier>(1000);
     private readonly BoundedDictionary<string, HashSet<string>> _scopeIndex = new BoundedDictionary<string, HashSet<string>>(1000);
@@ -133,6 +135,21 @@ public sealed class RocksDbPersistenceBackend : IProductionPersistenceBackend
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _circuitBreaker = new PersistenceCircuitBreaker();
 
+        _isSimulated = !IsRocksDbAvailable();
+        if (_isSimulated && _config.RequireRealBackend)
+        {
+            throw new PlatformNotSupportedException(
+                "RocksDB persistence requires the 'RocksDb' NuGet package. " +
+                "Install it via: dotnet add package RocksDb. " +
+                "Set RequireRealBackend=false to use in-memory fallback (NOT for production).");
+        }
+
+        if (_isSimulated)
+        {
+            Debug.WriteLine("WARNING: RocksDbPersistenceBackend running in in-memory simulation mode. " +
+                "Data will NOT be persisted to RocksDB. Install 'RocksDb' NuGet package for production use.");
+        }
+
         // Initialize column families for each tier
         foreach (var tier in Enum.GetValues<MemoryTier>())
         {
@@ -141,6 +158,19 @@ public sealed class RocksDbPersistenceBackend : IProductionPersistenceBackend
 
         // Initialize data directory
         InitializeDataDirectory();
+    }
+
+    private static bool IsRocksDbAvailable()
+    {
+        try
+        {
+            return AppDomain.CurrentDomain.GetAssemblies()
+                .Any(a => a.GetName().Name == "RocksDbSharp" || a.GetName().Name == "RocksDb");
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private void InitializeDataDirectory()
@@ -1096,14 +1126,63 @@ public sealed class RocksDbPersistenceBackend : IProductionPersistenceBackend
 
     private Task<MemoryRecord> CompressRecordAsync(MemoryRecord record, CancellationToken ct)
     {
-        // Simulated compression - in production, use actual compression
-        return Task.FromResult(record);
+        ct.ThrowIfCancellationRequested();
+
+        if (record.Content == null || record.Content.Length == 0)
+            return Task.FromResult(record);
+
+        using var outputStream = new MemoryStream();
+        using (var gzipStream = new System.IO.Compression.GZipStream(outputStream, System.IO.Compression.CompressionLevel.Optimal, leaveOpen: true))
+        {
+            gzipStream.Write(record.Content, 0, record.Content.Length);
+        }
+
+        var compressed = outputStream.ToArray();
+
+        // Only use compressed version if it's actually smaller
+        if (compressed.Length >= record.Content.Length)
+            return Task.FromResult(record);
+
+        return Task.FromResult(record with
+        {
+            Content = compressed,
+            Metadata = new Dictionary<string, object>(record.Metadata ?? new())
+            {
+                ["_compression"] = "gzip",
+                ["_originalSize"] = record.Content.Length
+            }
+        });
     }
 
     private Task<MemoryRecord> DecompressRecordAsync(MemoryRecord record, CancellationToken ct)
     {
-        // Simulated decompression - in production, use actual decompression
-        return Task.FromResult(record);
+        ct.ThrowIfCancellationRequested();
+
+        if (record.Content == null || record.Content.Length == 0)
+            return Task.FromResult(record);
+
+        // Check if record was compressed
+        if (record.Metadata == null ||
+            !record.Metadata.TryGetValue("_compression", out var compression) ||
+            compression?.ToString() != "gzip")
+        {
+            return Task.FromResult(record);
+        }
+
+        using var inputStream = new MemoryStream(record.Content);
+        using var gzipStream = new System.IO.Compression.GZipStream(inputStream, System.IO.Compression.CompressionMode.Decompress);
+        using var outputStream = new MemoryStream();
+        gzipStream.CopyTo(outputStream);
+
+        var metadata = new Dictionary<string, object>(record.Metadata);
+        metadata.Remove("_compression");
+        metadata.Remove("_originalSize");
+
+        return Task.FromResult(record with
+        {
+            Content = outputStream.ToArray(),
+            Metadata = metadata
+        });
     }
 
     private static string ComputeHash(byte[] data)

@@ -706,6 +706,36 @@ public abstract class DatabaseStorageStrategyBase : StorageStrategyBase, IAsyncD
     #region Helper Methods
 
     /// <summary>
+    /// Regex pattern for validating SQL identifiers (table names, schema names, keyspace names).
+    /// Allows letters, digits, and underscores; must start with a letter or underscore; max 128 chars.
+    /// </summary>
+    private static readonly System.Text.RegularExpressions.Regex SqlIdentifierRegex =
+        new(@"^[a-zA-Z_][a-zA-Z0-9_]{0,127}$", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    /// <summary>
+    /// Validates that a SQL identifier (table name, schema name, keyspace name) is safe for use in DDL/DML.
+    /// Prevents SQL injection through identifier interpolation.
+    /// </summary>
+    /// <param name="identifier">The identifier to validate.</param>
+    /// <param name="parameterName">The name of the parameter for error reporting.</param>
+    /// <exception cref="ArgumentException">Thrown if the identifier contains invalid characters.</exception>
+    protected static void ValidateSqlIdentifier(string identifier, string parameterName = "identifier")
+    {
+        if (string.IsNullOrWhiteSpace(identifier))
+        {
+            throw new ArgumentException($"SQL identifier '{parameterName}' cannot be null or whitespace.", parameterName);
+        }
+
+        if (!SqlIdentifierRegex.IsMatch(identifier))
+        {
+            throw new ArgumentException(
+                $"SQL identifier '{parameterName}' contains invalid characters. " +
+                $"Must match pattern ^[a-zA-Z_][a-zA-Z0-9_]{{0,127}}$. Got: '{identifier}'",
+                parameterName);
+        }
+    }
+
+    /// <summary>
     /// Validates a storage key.
     /// </summary>
     protected virtual void ValidateKey(string key)

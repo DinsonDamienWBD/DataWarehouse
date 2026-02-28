@@ -64,13 +64,19 @@ public sealed record AzureBlobPersistenceConfig : PersistenceBackendConfig
 /// Provides cloud-native storage with container per tier, Hot/Cool/Archive access tiers,
 /// blob index tags for querying, and lifecycle policies for automatic tiering.
 /// </summary>
+/// <remarks>
+/// This backend requires the Azure.Storage.Blobs NuGet package for production use.
+/// It uses in-memory structures as a local development fallback when the SDK is not available,
+/// but will log a warning on construction indicating that data is NOT persisted to Azure Blob Storage.
+/// </remarks>
 public sealed class AzureBlobPersistenceBackend : IProductionPersistenceBackend
 {
     private readonly AzureBlobPersistenceConfig _config;
     private readonly PersistenceMetrics _metrics = new();
     private readonly PersistenceCircuitBreaker _circuitBreaker;
+    private readonly bool _isSimulated;
 
-    // Simulated containers and blobs
+    // In-memory fallback containers and blobs (used only when Azure.Storage.Blobs is unavailable)
     private readonly BoundedDictionary<string, BoundedDictionary<string, AzureBlob>> _containers = new BoundedDictionary<string, BoundedDictionary<string, AzureBlob>>(1000);
     private readonly BoundedDictionary<string, (string Container, string BlobName)> _idIndex = new BoundedDictionary<string, (string Container, string BlobName)>(1000);
     private readonly SemaphoreSlim _uploadSemaphore;
@@ -100,13 +106,40 @@ public sealed class AzureBlobPersistenceBackend : IProductionPersistenceBackend
         _circuitBreaker = new PersistenceCircuitBreaker();
         _uploadSemaphore = new SemaphoreSlim(_config.MaxConcurrentUploads, _config.MaxConcurrentUploads);
 
+        _isSimulated = !IsAzureBlobSdkAvailable();
+        if (_isSimulated && _config.RequireRealBackend)
+        {
+            throw new PlatformNotSupportedException(
+                "Azure Blob persistence requires the 'Azure.Storage.Blobs' NuGet package. " +
+                "Install it via: dotnet add package Azure.Storage.Blobs. " +
+                "Set RequireRealBackend=false to use in-memory fallback (NOT for production).");
+        }
+
         InitializeContainers();
+    }
+
+    private static bool IsAzureBlobSdkAvailable()
+    {
+        try
+        {
+            return AppDomain.CurrentDomain.GetAssemblies()
+                .Any(a => a.GetName().Name == "Azure.Storage.Blobs");
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private void InitializeContainers()
     {
         try
         {
+            if (_isSimulated)
+            {
+                Debug.WriteLine("WARNING: AzureBlobPersistenceBackend running in in-memory simulation mode. " +
+                    "Data will NOT be persisted to Azure Blob Storage. Install 'Azure.Storage.Blobs' NuGet package for production use.");
+            }
             foreach (var tier in Enum.GetValues<MemoryTier>())
             {
                 var containerName = GetContainerName(tier);

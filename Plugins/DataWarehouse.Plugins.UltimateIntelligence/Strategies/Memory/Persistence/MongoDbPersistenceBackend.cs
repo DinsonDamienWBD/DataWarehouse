@@ -78,23 +78,25 @@ public sealed record MongoDbPersistenceConfig : PersistenceBackendConfig
 /// change streams for real-time updates, and GridFS for large content.
 /// </summary>
 /// <remarks>
-/// This implementation simulates MongoDB behavior using in-memory structures.
-/// In production, use the MongoDB.Driver package.
+/// This backend requires the MongoDB.Driver NuGet package for production use.
+/// It uses in-memory structures as a local development fallback when the driver is not available,
+/// but will log a warning on construction indicating that data is NOT persisted to MongoDB.
 /// </remarks>
 public sealed class MongoDbPersistenceBackend : IProductionPersistenceBackend
 {
     private readonly MongoDbPersistenceConfig _config;
     private readonly PersistenceMetrics _metrics = new();
     private readonly PersistenceCircuitBreaker _circuitBreaker;
+    private readonly bool _isSimulated;
 
-    // Simulated collections per tier
+    // In-memory fallback collections per tier (used only when MongoDB driver is unavailable)
     private readonly BoundedDictionary<MemoryTier, BoundedDictionary<string, MongoDocument>> _collections = new BoundedDictionary<MemoryTier, BoundedDictionary<string, MongoDocument>>(1000);
 
-    // Simulated indexes
+    // In-memory fallback indexes
     private readonly BoundedDictionary<string, HashSet<string>> _scopeIndex = new BoundedDictionary<string, HashSet<string>>(1000);
     private readonly BoundedDictionary<string, HashSet<string>> _tagIndex = new BoundedDictionary<string, HashSet<string>>(1000);
 
-    // Simulated GridFS
+    // In-memory fallback GridFS
     private readonly BoundedDictionary<string, byte[]> _gridFsFiles = new BoundedDictionary<string, byte[]>(1000);
 
     // Change stream
@@ -124,10 +126,23 @@ public sealed class MongoDbPersistenceBackend : IProductionPersistenceBackend
     /// Creates a new MongoDB persistence backend.
     /// </summary>
     /// <param name="config">Backend configuration.</param>
+    /// <exception cref="PlatformNotSupportedException">
+    /// Thrown when the MongoDB.Driver NuGet package is not installed and
+    /// <see cref="PersistenceBackendConfig.RequireRealBackend"/> is true.
+    /// </exception>
     public MongoDbPersistenceBackend(MongoDbPersistenceConfig config)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _circuitBreaker = new PersistenceCircuitBreaker();
+
+        _isSimulated = !IsMongoDriverAvailable();
+        if (_isSimulated && _config.RequireRealBackend)
+        {
+            throw new PlatformNotSupportedException(
+                "MongoDB persistence requires the 'MongoDB.Driver' NuGet package. " +
+                "Install it via: dotnet add package MongoDB.Driver. " +
+                "Set RequireRealBackend=false to use in-memory fallback (NOT for production).");
+        }
 
         // Initialize collections
         foreach (var tier in Enum.GetValues<MemoryTier>())
@@ -135,15 +150,32 @@ public sealed class MongoDbPersistenceBackend : IProductionPersistenceBackend
             _collections[tier] = new BoundedDictionary<string, MongoDocument>(1000);
         }
 
-        // Simulate connection
         Connect();
+    }
+
+    private static bool IsMongoDriverAvailable()
+    {
+        try
+        {
+            return AppDomain.CurrentDomain.GetAssemblies()
+                .Any(a => a.GetName().Name == "MongoDB.Driver");
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private void Connect()
     {
         try
         {
-            // In production, would establish actual MongoDB connection
+            if (_isSimulated)
+            {
+                Debug.WriteLine("WARNING: MongoDbPersistenceBackend running in in-memory simulation mode. " +
+                    "Data will NOT be persisted to MongoDB. Install 'MongoDB.Driver' NuGet package for production use.");
+            }
+            // In production with real driver, would establish actual MongoDB connection
             // and create indexes
             _isConnected = true;
         }

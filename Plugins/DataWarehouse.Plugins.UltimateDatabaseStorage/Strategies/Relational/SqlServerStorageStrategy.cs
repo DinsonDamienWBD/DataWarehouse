@@ -50,7 +50,9 @@ public sealed class SqlServerStorageStrategy : DatabaseStorageStrategyBase
     protected override async Task InitializeCoreAsync(CancellationToken ct)
     {
         _tableName = GetConfiguration("TableName", "DataWarehouseStorage");
+        ValidateSqlIdentifier(_tableName, nameof(_tableName));
         _schemaName = GetConfiguration("SchemaName", "dbo");
+        ValidateSqlIdentifier(_schemaName, nameof(_schemaName));
         _maxPoolSize = GetConfiguration("MaxPoolSize", 100);
         _minPoolSize = GetConfiguration("MinPoolSize", 5);
 

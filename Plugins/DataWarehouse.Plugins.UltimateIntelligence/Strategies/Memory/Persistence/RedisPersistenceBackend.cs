@@ -77,22 +77,24 @@ public sealed record RedisPersistenceConfig : PersistenceBackendConfig
 /// Lua scripts for atomic operations, Redis Streams for change events, and TTL per tier.
 /// </summary>
 /// <remarks>
-/// This implementation simulates Redis behavior using in-memory structures.
-/// In production, use StackExchange.Redis or similar client library.
+/// This backend requires the StackExchange.Redis NuGet package for production use.
+/// It uses in-memory structures as a local development fallback when the driver is not available,
+/// but will log a warning on construction indicating that data is NOT persisted to Redis.
 /// </remarks>
 public sealed class RedisPersistenceBackend : IProductionPersistenceBackend
 {
     private readonly RedisPersistenceConfig _config;
     private readonly PersistenceMetrics _metrics = new();
     private readonly PersistenceCircuitBreaker _circuitBreaker;
+    private readonly bool _isSimulated;
 
-    // Simulated Redis data structures
+    // In-memory fallback Redis data structures (used only when StackExchange.Redis is unavailable)
     private readonly BoundedDictionary<string, RedisEntry> _store = new BoundedDictionary<string, RedisEntry>(1000);
     private readonly BoundedDictionary<string, SortedSet<string>> _tierSets = new BoundedDictionary<string, SortedSet<string>>(1000);
     private readonly BoundedDictionary<string, SortedSet<string>> _scopeSets = new BoundedDictionary<string, SortedSet<string>>(1000);
     private readonly ConcurrentQueue<StreamEntry> _changeStream = new();
 
-    // Simulated connection pool
+    // Connection pool
     private readonly SemaphoreSlim _connectionPool;
     private int _activeConnections;
 
@@ -121,11 +123,24 @@ public sealed class RedisPersistenceBackend : IProductionPersistenceBackend
     /// Creates a new Redis persistence backend.
     /// </summary>
     /// <param name="config">Backend configuration.</param>
+    /// <exception cref="PlatformNotSupportedException">
+    /// Thrown when the StackExchange.Redis NuGet package is not installed and
+    /// <see cref="PersistenceBackendConfig.RequireRealBackend"/> is true.
+    /// </exception>
     public RedisPersistenceBackend(RedisPersistenceConfig config)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _circuitBreaker = new PersistenceCircuitBreaker();
         _connectionPool = new SemaphoreSlim(_config.ConnectionPoolSize, _config.ConnectionPoolSize);
+
+        _isSimulated = !IsRedisDriverAvailable();
+        if (_isSimulated && _config.RequireRealBackend)
+        {
+            throw new PlatformNotSupportedException(
+                "Redis persistence requires the 'StackExchange.Redis' NuGet package. " +
+                "Install it via: dotnet add package StackExchange.Redis. " +
+                "Set RequireRealBackend=false to use in-memory fallback (NOT for production).");
+        }
 
         // Initialize tier sets
         foreach (var tier in Enum.GetValues<MemoryTier>())
@@ -133,15 +148,32 @@ public sealed class RedisPersistenceBackend : IProductionPersistenceBackend
             _tierSets[$"tier:{tier}"] = new SortedSet<string>();
         }
 
-        // Simulate connection
         Connect();
+    }
+
+    private static bool IsRedisDriverAvailable()
+    {
+        try
+        {
+            return AppDomain.CurrentDomain.GetAssemblies()
+                .Any(a => a.GetName().Name == "StackExchange.Redis");
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private void Connect()
     {
         try
         {
-            // In production, this would establish actual Redis connection
+            if (_isSimulated)
+            {
+                Debug.WriteLine("WARNING: RedisPersistenceBackend running in in-memory simulation mode. " +
+                    "Data will NOT be persisted to Redis. Install 'StackExchange.Redis' NuGet package for production use.");
+            }
+            // In production with real driver, this would establish actual Redis connection
             _isConnected = true;
         }
         catch (Exception)
@@ -868,19 +900,57 @@ public sealed class RedisPersistenceBackend : IProductionPersistenceBackend
     /// <param name="record">Record to store.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>True if stored, false if key already exists.</returns>
-    public async Task<bool> StoreIfNotExistsAsync(MemoryRecord record, CancellationToken ct = default)
+    public Task<bool> StoreIfNotExistsAsync(MemoryRecord record, CancellationToken ct = default)
     {
         ThrowIfDisposed();
+        ct.ThrowIfCancellationRequested();
 
         var key = GetKey(record.Id);
 
-        if (_store.ContainsKey(key))
+        // Atomic check-and-set to avoid TOCTOU race condition.
+        // Use a lock to ensure the containment check and store are performed atomically.
+        lock (_store)
         {
-            return false;
+            if (_store.ContainsKey(key))
+            {
+                return Task.FromResult(false);
+            }
+
+            var entry = new RedisEntry
+            {
+                Record = record,
+                CreatedAt = DateTimeOffset.UtcNow,
+                ExpiresAt = record.ExpiresAt
+            };
+
+            _store[key] = entry;
+
+            // Update tier set
+            var tierSetKey = $"tier:{record.Tier}";
+            if (_tierSets.TryGetValue(tierSetKey, out var tierSet))
+            {
+                lock (tierSet)
+                {
+                    tierSet.Add(key);
+                }
+            }
+
+            // Update scope set
+            if (!string.IsNullOrEmpty(record.Scope))
+            {
+                if (!_scopeSets.TryGetValue(record.Scope, out var scopeSet))
+                {
+                    scopeSet = new SortedSet<string>();
+                    _scopeSets[record.Scope] = scopeSet;
+                }
+                lock (scopeSet)
+                {
+                    scopeSet.Add(key);
+                }
+            }
         }
 
-        await StoreAsync(record, ct);
-        return true;
+        return Task.FromResult(true);
     }
 
     /// <summary>

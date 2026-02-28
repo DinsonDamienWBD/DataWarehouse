@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -400,10 +401,34 @@ public sealed class RocksDbMemoryStore : IPersistentMemoryStore
     {
         ct.ThrowIfCancellationRequested();
 
-        // In a real implementation, this would persist to RocksDB
-        // For simulation, we just update the flush timestamp
-        _lastFlush = DateTimeOffset.UtcNow;
-        return Task.FromResult(true);
+        try
+        {
+            // Persist in-memory state to disk as JSON for durability
+            var dataFile = Path.Combine(_dataPath, "memory_store.json");
+            var entries = _store.Values.ToList();
+
+            var json = System.Text.Json.JsonSerializer.Serialize(entries, new System.Text.Json.JsonSerializerOptions
+            {
+                WriteIndented = false
+            });
+
+            // Write atomically via temp file + rename
+            var tempFile = dataFile + ".tmp";
+            File.WriteAllText(tempFile, json);
+
+            // Replace existing file atomically (on most platforms)
+            if (File.Exists(dataFile))
+                File.Delete(dataFile);
+            File.Move(tempFile, dataFile);
+
+            _lastFlush = DateTimeOffset.UtcNow;
+            return Task.FromResult(true);
+        }
+        catch (Exception)
+        {
+            Debug.WriteLine("Failed to flush RocksDbMemoryStore to disk");
+            return Task.FromResult(false);
+        }
     }
 
     /// <inheritdoc/>
@@ -706,18 +731,27 @@ public sealed class ObjectStorageMemoryStore : IPersistentMemoryStore
         await _writeSemaphore.WaitAsync(ct);
         try
         {
-            // Batch upload queued entries to S3
+            // Collect queued entries
             var batch = new List<ContextEntry>();
             while (_writeQueue.TryDequeue(out var entry))
             {
                 batch.Add(entry);
             }
 
-            // In real implementation, would upload batch to S3 using multipart upload
-            // For each entry: PUT s3://{bucket}/{prefix}{scope}/{entryId}.json
+            if (batch.Count == 0)
+            {
+                _lastFlush = DateTimeOffset.UtcNow;
+                return true;
+            }
 
-            _lastFlush = DateTimeOffset.UtcNow;
-            return true;
+            // Object storage upload requires a configured endpoint.
+            // Without a real object storage SDK (e.g., AWSSDK.S3, Azure.Storage.Blobs, Google.Cloud.Storage.V1),
+            // we cannot upload data. Re-enqueue entries and throw to inform the caller.
+            throw new NotSupportedException(
+                $"Object storage upload not available. {batch.Count} entries require upload to " +
+                $"s3://{_bucketName}/{_prefix}. Configure a real object storage endpoint and install " +
+                "the appropriate SDK (AWSSDK.S3, Azure.Storage.Blobs, or Google.Cloud.Storage.V1). " +
+                "Entries remain in local cache but are NOT durably persisted.");
         }
         finally
         {

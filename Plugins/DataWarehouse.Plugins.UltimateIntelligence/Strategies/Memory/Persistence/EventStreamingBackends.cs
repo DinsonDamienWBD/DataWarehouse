@@ -81,16 +81,18 @@ public sealed record KafkaPersistenceConfig : PersistenceBackendConfig
 /// topic per tier, Schema Registry integration, and full replication support.
 /// </summary>
 /// <remarks>
-/// This implementation simulates Kafka behavior using in-memory structures.
-/// In production, use Confluent.Kafka package.
+/// This backend requires the Confluent.Kafka NuGet package for production use.
+/// It uses in-memory structures as a local development fallback when the driver is not available,
+/// but will log a warning on construction indicating that data is NOT persisted to Kafka.
 /// </remarks>
 public sealed class KafkaPersistenceBackend : IProductionPersistenceBackend
 {
     private readonly KafkaPersistenceConfig _config;
     private readonly PersistenceMetrics _metrics = new();
     private readonly PersistenceCircuitBreaker _circuitBreaker;
+    private readonly bool _isSimulated;
 
-    // Simulated topics with partitions
+    // In-memory fallback topics with partitions (used only when Confluent.Kafka is unavailable)
     private readonly BoundedDictionary<string, BoundedDictionary<int, List<KafkaMessage>>> _topics = new BoundedDictionary<string, BoundedDictionary<int, List<KafkaMessage>>>(1000);
     private readonly BoundedDictionary<string, MemoryRecord> _compactedState = new BoundedDictionary<string, MemoryRecord>(1000);
     private readonly BoundedDictionary<string, MemoryTier> _idTierMap = new BoundedDictionary<string, MemoryTier>(1000);
@@ -119,13 +121,40 @@ public sealed class KafkaPersistenceBackend : IProductionPersistenceBackend
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _circuitBreaker = new PersistenceCircuitBreaker();
 
+        _isSimulated = !IsKafkaDriverAvailable();
+        if (_isSimulated && _config.RequireRealBackend)
+        {
+            throw new PlatformNotSupportedException(
+                "Kafka persistence requires the 'Confluent.Kafka' NuGet package. " +
+                "Install it via: dotnet add package Confluent.Kafka. " +
+                "Set RequireRealBackend=false to use in-memory fallback (NOT for production).");
+        }
+
         InitializeTopics();
+    }
+
+    private static bool IsKafkaDriverAvailable()
+    {
+        try
+        {
+            return AppDomain.CurrentDomain.GetAssemblies()
+                .Any(a => a.GetName().Name == "Confluent.Kafka");
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private void InitializeTopics()
     {
         try
         {
+            if (_isSimulated)
+            {
+                Debug.WriteLine("WARNING: KafkaPersistenceBackend running in in-memory simulation mode. " +
+                    "Data will NOT be persisted to Kafka. Install 'Confluent.Kafka' NuGet package for production use.");
+            }
             foreach (var tier in Enum.GetValues<MemoryTier>())
             {
                 var topicName = GetTopicName(tier);

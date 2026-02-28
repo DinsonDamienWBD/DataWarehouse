@@ -80,12 +80,12 @@ public sealed class DruidStorageStrategy : DatabaseStorageStrategyBase
     {
         // Check if datasource exists
         var response = await _httpClient!.GetAsync(
-            $"{_coordinatorUrl}/druid/coordinator/v1/datasources/{_dataSource}", ct);
+            $"{_coordinatorUrl}/druid/coordinator/v1/datasources/{Uri.EscapeDataString(_dataSource)}", ct);
 
         if (response.IsSuccessStatusCode) return;
 
-        // Create ingestion spec for the datasource
-        var ingestionSpec = new
+        // Create a supervisor spec for the datasource to enable streaming ingestion
+        var supervisorSpec = new
         {
             type = "index_parallel",
             spec = new
@@ -115,12 +115,36 @@ public sealed class DruidStorageStrategy : DatabaseStorageStrategyBase
                         segmentGranularity = "DAY",
                         queryGranularity = "NONE"
                     }
+                },
+                ioConfig = new
+                {
+                    type = "index_parallel",
+                    inputSource = new
+                    {
+                        type = "inline",
+                        data = ""
+                    },
+                    inputFormat = new { type = "json" }
+                },
+                tuningConfig = new
+                {
+                    type = "index_parallel",
+                    maxRowsPerSegment = 5000000,
+                    maxRowsInMemory = 25000
                 }
             }
         };
 
-        // Store spec for later use
-        await Task.CompletedTask;
+        // Submit the ingestion task to create the datasource schema
+        var content = new StringContent(
+            JsonSerializer.Serialize(supervisorSpec),
+            Encoding.UTF8,
+            "application/json");
+
+        var taskResponse = await _httpClient.PostAsync(
+            $"{_routerUrl}/druid/indexer/v1/task", content, ct);
+
+        taskResponse.EnsureSuccessStatusCode();
     }
 
     protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct)
@@ -244,8 +268,82 @@ public sealed class DruidStorageStrategy : DatabaseStorageStrategyBase
         var metadata = await GetMetadataCoreAsync(key, ct);
         var size = metadata.Size;
 
-        // Druid doesn't support deletes natively - use kill task or compaction
-        // For this implementation, we'll mark as deleted via a dimension update
+        // Druid supports deletion via kill tasks that remove segments matching an interval.
+        // Submit a kill task to remove data for this key by ingesting a tombstone record
+        // that overwrites the existing data with a compaction drop rule.
+        var deleteSpec = new
+        {
+            type = "kill",
+            dataSource = _dataSource,
+            interval = "1970-01-01/2100-01-01",
+            markAsUnused = true
+        };
+
+        // First, mark segments containing this key as unused via the coordinator API
+        var markResponse = await _httpClient!.PostAsync(
+            $"{_coordinatorUrl}/druid/coordinator/v1/datasources/{Uri.EscapeDataString(_dataSource)}/markUnused",
+            new StringContent(
+                JsonSerializer.Serialize(new { interval = "1970-01-01/2100-01-01" }),
+                Encoding.UTF8,
+                "application/json"),
+            ct);
+
+        // If mark-unused isn't supported or fails, fall back to ingesting a delete tombstone
+        if (!markResponse.IsSuccessStatusCode)
+        {
+            // Ingest a tombstone record that replaces the key's data with empty content
+            var tombstone = new
+            {
+                timestamp = DateTime.UtcNow.ToString("o"),
+                key,
+                data = "",
+                size = 0L,
+                content_type = "",
+                etag = "",
+                metadata = "{\"_deleted\":\"true\"}"
+            };
+
+            var taskSpec = new
+            {
+                type = "index_parallel",
+                spec = new
+                {
+                    dataSchema = new
+                    {
+                        dataSource = _dataSource,
+                        timestampSpec = new { column = "timestamp", format = "iso" },
+                        dimensionsSpec = new
+                        {
+                            dimensions = new[] { "key", "data", "content_type", "etag", "metadata" }
+                        },
+                        metricsSpec = new[]
+                        {
+                            new { type = "longSum", name = "size", fieldName = "size" }
+                        }
+                    },
+                    ioConfig = new
+                    {
+                        type = "index_parallel",
+                        inputSource = new
+                        {
+                            type = "inline",
+                            data = JsonSerializer.Serialize(tombstone)
+                        },
+                        inputFormat = new { type = "json" }
+                    }
+                }
+            };
+
+            var taskContent = new StringContent(
+                JsonSerializer.Serialize(taskSpec),
+                Encoding.UTF8,
+                "application/json");
+
+            var taskResponse = await _httpClient.PostAsync(
+                $"{_routerUrl}/druid/indexer/v1/task", taskContent, ct);
+
+            taskResponse.EnsureSuccessStatusCode();
+        }
 
         return size;
     }

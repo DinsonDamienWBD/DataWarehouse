@@ -395,8 +395,8 @@ public class WasiNnBackend
 public class WasiNnGpuBridge
 {
     private readonly IMessageBus _messageBus;
-    private bool _gpuAvailable = true;
-    private int _gpuFailureCount = 0;
+    private volatile bool _gpuAvailable = true;
+    private int _gpuFailureCount; // Accessed via Interlocked
     private const int MaxGpuFailures = 3;
 
     /// <summary>
@@ -411,7 +411,7 @@ public class WasiNnGpuBridge
     /// <summary>
     /// Gets whether GPU acceleration is currently available.
     /// </summary>
-    public bool IsGpuAvailable => _gpuAvailable && _gpuFailureCount < MaxGpuFailures;
+    public bool IsGpuAvailable => _gpuAvailable && Interlocked.CompareExchange(ref _gpuFailureCount, 0, 0) < MaxGpuFailures;
 
     /// <summary>
     /// Executes inference on GPU via message bus.
@@ -434,9 +434,9 @@ public class WasiNnGpuBridge
             catch (Exception)
             {
                 Debug.WriteLine($"Caught Exception in InferenceEngine.cs");
-                _gpuFailureCount++;
+                var newCount = Interlocked.Increment(ref _gpuFailureCount);
 
-                if (_gpuFailureCount >= MaxGpuFailures)
+                if (newCount >= MaxGpuFailures)
                 {
                     _gpuAvailable = false;
                 }
@@ -477,7 +477,7 @@ public class WasiNnGpuBridge
         var outputShape = System.Text.Json.JsonSerializer.Deserialize<int[]>(((System.Text.Json.JsonElement)response.Metadata["outputShape"]).GetRawText())!;
 
         // Reset failure count on success
-        _gpuFailureCount = 0;
+        Interlocked.Exchange(ref _gpuFailureCount, 0);
 
         return new InferenceResult
         {

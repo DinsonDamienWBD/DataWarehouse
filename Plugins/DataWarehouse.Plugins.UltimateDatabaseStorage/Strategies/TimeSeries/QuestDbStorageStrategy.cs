@@ -52,6 +52,7 @@ public sealed class QuestDbStorageStrategy : DatabaseStorageStrategyBase
     protected override async Task InitializeCoreAsync(CancellationToken ct)
     {
         _tableName = GetConfiguration("TableName", "storage");
+        ValidateSqlIdentifier(_tableName, nameof(_tableName));
         _useHttpForWrite = GetConfiguration("UseHttpForWrite", true);
 
         var connectionString = GetConnectionString();

@@ -30,6 +30,12 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
         private ConnectorIntegrationMode _mode = ConnectorIntegrationMode.Disabled;
         private readonly BoundedDictionary<string, System.Net.Http.HttpClient> _httpClients = new BoundedDictionary<string, System.Net.Http.HttpClient>(1000);
 
+        /// <summary>
+        /// Gets or sets the connector registry endpoint URL.
+        /// Must be configured before initialization. Throws if not set when registry access is needed.
+        /// </summary>
+        public string? ConnectorRegistryEndpoint { get; set; }
+
         /// <inheritdoc/>
         public override string StrategyId => "feature-connector-integration";
 
@@ -47,6 +53,13 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
                           IntelligenceCapabilities.SemanticSearch,
             ConfigurationRequirements = new[]
             {
+                new ConfigurationRequirement
+                {
+                    Key = "ConnectorRegistryEndpoint",
+                    Description = "URL of the connector registry service (e.g., http://registry.internal:5000)",
+                    Required = true,
+                    DefaultValue = null
+                },
                 new ConfigurationRequirement
                 {
                     Key = "IntegrationMode",
@@ -122,10 +135,18 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
         /// </summary>
         private async Task ValidateConfigurationAsync(CancellationToken ct)
         {
-            // Validate connector registry endpoints (placeholder - would come from config)
-            var registryEndpoint = "http://localhost:5000"; // Example
-            if (string.IsNullOrWhiteSpace(registryEndpoint))
-                throw new InvalidOperationException("Connector registry endpoint is required");
+            // Validate connector registry endpoint from configuration
+            if (string.IsNullOrWhiteSpace(ConnectorRegistryEndpoint))
+                throw new InvalidOperationException(
+                    "ConnectorRegistryEndpoint must be configured before initialization. " +
+                    "Set the ConnectorRegistryEndpoint property or provide 'ConnectorRegistryEndpoint' in strategy configuration.");
+
+            if (!Uri.TryCreate(ConnectorRegistryEndpoint, UriKind.Absolute, out var uri) ||
+                (uri.Scheme != "http" && uri.Scheme != "https"))
+                throw new InvalidOperationException(
+                    $"ConnectorRegistryEndpoint must be a valid HTTP/HTTPS URL, got: '{ConnectorRegistryEndpoint}'");
+
+            var registryEndpoint = ConnectorRegistryEndpoint;
 
             // Validate max concurrent connections
             var maxConcurrent = 10; // Default
@@ -156,8 +177,10 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
         {
             try
             {
-                // Placeholder - would test actual registry endpoint
-                var registryEndpoint = "http://localhost:5000";
+                if (string.IsNullOrWhiteSpace(ConnectorRegistryEndpoint))
+                    return false;
+
+                var registryEndpoint = ConnectorRegistryEndpoint;
                 using var httpClient = new System.Net.Http.HttpClient();
                 httpClient.Timeout = TimeSpan.FromSeconds(5);
 

@@ -49,7 +49,9 @@ public sealed class VitessStorageStrategy : DatabaseStorageStrategyBase
     protected override async Task InitializeCoreAsync(CancellationToken ct)
     {
         _keyspace = GetConfiguration("Keyspace", "datawarehouse");
+        ValidateSqlIdentifier(_keyspace, nameof(_keyspace));
         _tableName = GetConfiguration("TableName", "storage");
+        ValidateSqlIdentifier(_tableName, nameof(_tableName));
 
         var connectionString = GetConnectionString();
         _dataSource = new MySqlDataSource(connectionString);

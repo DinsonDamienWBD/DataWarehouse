@@ -218,39 +218,243 @@ public sealed class SchemaExtractionService
 
     private async Task<DatasetSchema> ExtractParquetSchemaAsync(string filePath, CancellationToken ct)
     {
-        // Parquet schema extraction using basic file introspection
-        // Phase 39-05 will implement proper Apache Arrow/Parquet integration
         await Task.CompletedTask;
 
-        // Return minimal schema with placeholder columns
+        // Parse actual Parquet file format: PAR1 magic + Thrift footer
+        if (!File.Exists(filePath))
+            throw new FileNotFoundException($"Parquet file not found: {filePath}");
+
+        using var stream = File.OpenRead(filePath);
+        if (stream.Length < 12)
+            throw new InvalidDataException($"File too small to be a valid Parquet file: {filePath}");
+
+        // Verify PAR1 magic bytes at start
+        var magic = new byte[4];
+        stream.ReadExactly(magic, 0, 4);
+        if (magic[0] != (byte)'P' || magic[1] != (byte)'A' || magic[2] != (byte)'R' || magic[3] != (byte)'1')
+            throw new InvalidDataException($"Invalid Parquet file: missing PAR1 magic header in {filePath}");
+
+        // Verify PAR1 magic bytes at end
+        stream.Seek(-4, SeekOrigin.End);
+        var endMagic = new byte[4];
+        stream.ReadExactly(endMagic, 0, 4);
+        if (endMagic[0] != (byte)'P' || endMagic[1] != (byte)'A' || endMagic[2] != (byte)'R' || endMagic[3] != (byte)'1')
+            throw new InvalidDataException($"Invalid Parquet file: missing PAR1 magic footer in {filePath}");
+
+        // Read footer length (4 bytes before trailing PAR1 magic, little-endian)
+        stream.Seek(-8, SeekOrigin.End);
+        var footerLenBytes = new byte[4];
+        stream.ReadExactly(footerLenBytes, 0, 4);
+        var footerLength = BitConverter.ToInt32(footerLenBytes, 0);
+
+        if (footerLength <= 0 || footerLength > stream.Length - 12)
+            throw new InvalidDataException($"Invalid Parquet footer length ({footerLength}) in {filePath}");
+
+        // Read the Thrift-encoded footer
+        stream.Seek(-8 - footerLength, SeekOrigin.End);
+        var footerBytes = new byte[footerLength];
+        stream.ReadExactly(footerBytes, 0, footerLength);
+
+        // Parse Thrift compact protocol footer to extract schema elements
+        var columns = ParseThriftSchemaElements(footerBytes);
+        var rowCount = ParseThriftRowCount(footerBytes);
+
+        if (columns.Count == 0)
+            throw new InvalidDataException($"Could not extract schema from Parquet footer in {filePath}");
+
         return new DatasetSchema
         {
-            RowCount = 0,
-            Columns = new[]
-            {
-                new ColumnMetadata { Name = "column_0", DataType = "string", IsNullable = true, SampleValues = Array.Empty<string>() }
-            },
+            SourcePath = filePath,
+            SourceType = DataSourceType.Parquet,
+            RowCount = rowCount,
+            Columns = columns.ToArray(),
             SampleRows = Array.Empty<Dictionary<string, object?>>()
         };
     }
 
+    /// <summary>
+    /// Parses Thrift compact protocol footer to extract schema element names and types.
+    /// Parquet uses Thrift compact protocol for its metadata.
+    /// </summary>
+    private static List<ColumnMetadata> ParseThriftSchemaElements(byte[] footer)
+    {
+        var columns = new List<ColumnMetadata>();
+
+        // Map Parquet physical types (field id 1 in SchemaElement) to readable names
+        var typeNames = new Dictionary<int, string>
+        {
+            { 0, "boolean" }, { 1, "integer" }, { 2, "long" },
+            { 3, "float" }, { 4, "double" }, { 5, "binary" },
+            { 6, "binary" }, { 7, "integer" }
+        };
+
+        // Scan for UTF-8 string patterns that represent column names in the Thrift structure.
+        // SchemaElement fields: name (string, field 4), type (i32, field 1), repetition_type (i32, field 2)
+        // In Thrift compact protocol, strings are length-prefixed.
+        int pos = 0;
+        while (pos < footer.Length - 4)
+        {
+            // Look for Thrift string field patterns: field header byte followed by varint length then UTF-8
+            // We scan for plausible column name strings in SchemaElement structures
+            if (footer[pos] >= 0x18 && footer[pos] <= 0x1F) // Thrift compact: type 8 (string) with small field delta
+            {
+                int strStart = pos + 1;
+                if (strStart < footer.Length)
+                {
+                    int strLen = footer[strStart]; // varint length (simple case: < 128)
+                    if (strLen > 0 && strLen < 128 && strStart + 1 + strLen <= footer.Length)
+                    {
+                        try
+                        {
+                            var name = System.Text.Encoding.UTF8.GetString(footer, strStart + 1, strLen);
+                            // Validate: column names should be printable ASCII-compatible
+                            if (name.Length > 0 && name.All(c => c >= 32 && c < 127) && !name.Contains('\0'))
+                            {
+                                // Check surrounding bytes for type information
+                                var dataType = "binary"; // default
+                                // Look ahead for type field (field 1, type i32 = compact type 5)
+                                int typeSearchEnd = Math.Min(strStart + 1 + strLen + 10, footer.Length);
+                                for (int t = strStart + 1 + strLen; t < typeSearchEnd - 1; t++)
+                                {
+                                    if ((footer[t] & 0x0F) == 0x05) // i32 type in compact protocol
+                                    {
+                                        int typeVal = footer[t + 1];
+                                        if (typeNames.TryGetValue(typeVal, out var tn))
+                                            dataType = tn;
+                                        break;
+                                    }
+                                }
+
+                                columns.Add(new ColumnMetadata
+                                {
+                                    Name = name,
+                                    DataType = dataType,
+                                    IsNullable = true, // Default to nullable; repetition_type OPTIONAL
+                                    SampleValues = Array.Empty<string?>()
+                                });
+                            }
+                        }
+                        catch
+                        {
+                            // Not valid UTF-8, skip
+                        }
+                    }
+                }
+            }
+            pos++;
+        }
+
+        // If Thrift parsing yielded nothing, the file may use a format variant we don't handle
+        // Skip the root schema element (first element is typically the root message)
+        if (columns.Count > 1)
+        {
+            // First element is typically the root schema, not an actual column
+            columns.RemoveAt(0);
+        }
+
+        return columns;
+    }
+
+    /// <summary>
+    /// Attempts to extract total row count from the Parquet footer.
+    /// </summary>
+    private static int ParseThriftRowCount(byte[] footer)
+    {
+        // Row count is stored in the FileMetaData Thrift struct as num_rows (field 3, type i64).
+        // We do a best-effort scan. In compact protocol, i64 fields use type 6.
+        // This is approximate; for exact counts, use a full Parquet library.
+        return 0; // Row count requires full Thrift deserialization; return 0 to indicate "unknown"
+    }
+
     private async Task<DatasetSchema> ExtractDatabaseSchemaAsync(string connectionString, CancellationToken ct)
     {
-        // Database schema extraction using basic introspection
-        // Phase 39-05 will implement full INFORMATION_SCHEMA queries
-        await Task.CompletedTask;
+        if (string.IsNullOrWhiteSpace(connectionString))
+            throw new ArgumentException("Connection string is required for database schema extraction", nameof(connectionString));
 
-        // Return minimal schema with placeholder columns
-        return new DatasetSchema
+        // Use ADO.NET DbProviderFactories or direct connection to extract schema.
+        // Determine provider from connection string heuristics.
+        System.Data.Common.DbConnection? connection = null;
+        try
         {
-            RowCount = 0,
-            Columns = new[]
+            // Attempt to detect provider and create connection
+            if (connectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase) ||
+                connectionString.Contains("Data Source=", StringComparison.OrdinalIgnoreCase))
             {
-                new ColumnMetadata { Name = "id", DataType = "integer", IsNullable = false, SampleValues = Array.Empty<string>() },
-                new ColumnMetadata { Name = "data", DataType = "string", IsNullable = true, SampleValues = Array.Empty<string>() }
-            },
-            SampleRows = Array.Empty<Dictionary<string, object?>>()
-        };
+                // Try to find a registered DbProviderFactory
+                var factories = System.Data.Common.DbProviderFactories.GetProviderInvariantNames();
+                string? providerName = null;
+
+                if (connectionString.Contains("Initial Catalog=", StringComparison.OrdinalIgnoreCase) ||
+                    connectionString.Contains("Database=", StringComparison.OrdinalIgnoreCase))
+                {
+                    // SQL Server or PostgreSQL style
+                    foreach (var factory in factories)
+                    {
+                        if (factory.Contains("SqlClient", StringComparison.OrdinalIgnoreCase) ||
+                            factory.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) ||
+                            factory.Contains("MySql", StringComparison.OrdinalIgnoreCase))
+                        {
+                            providerName = factory;
+                            break;
+                        }
+                    }
+                }
+
+                if (providerName != null)
+                {
+                    var factory = System.Data.Common.DbProviderFactories.GetFactory(providerName);
+                    connection = factory.CreateConnection();
+                    if (connection != null)
+                        connection.ConnectionString = connectionString;
+                }
+            }
+
+            if (connection == null)
+                throw new PlatformNotSupportedException(
+                    "No ADO.NET provider registered for the given connection string. " +
+                    "Install and register the appropriate NuGet package (e.g., Microsoft.Data.SqlClient, Npgsql, MySql.Data, " +
+                    "Microsoft.Data.Sqlite) and register it via DbProviderFactories.RegisterFactory().");
+
+            await connection.OpenAsync(ct);
+
+            // Use GetSchema("Columns") for standard INFORMATION_SCHEMA extraction
+            var schemaTable = connection.GetSchema("Columns");
+            var columns = new List<ColumnMetadata>();
+
+            foreach (System.Data.DataRow row in schemaTable.Rows)
+            {
+                var colName = row["COLUMN_NAME"]?.ToString() ?? "unknown";
+                var dataType = row["DATA_TYPE"]?.ToString() ?? "string";
+                var isNullable = string.Equals(row["IS_NULLABLE"]?.ToString(), "YES", StringComparison.OrdinalIgnoreCase);
+
+                columns.Add(new ColumnMetadata
+                {
+                    Name = colName,
+                    DataType = dataType,
+                    IsNullable = isNullable,
+                    SampleValues = Array.Empty<string?>()
+                });
+            }
+
+            if (columns.Count == 0)
+                throw new InvalidOperationException("No columns found in database schema. Verify the connection string targets a database with tables.");
+
+            return new DatasetSchema
+            {
+                SourcePath = connectionString,
+                SourceType = DataSourceType.Database,
+                RowCount = 0, // Row count requires per-table COUNT queries
+                Columns = columns.ToArray(),
+                SampleRows = Array.Empty<Dictionary<string, object?>>()
+            };
+        }
+        finally
+        {
+            if (connection != null)
+            {
+                await connection.DisposeAsync();
+            }
+        }
     }
 
     private string InferColumnType(List<Dictionary<string, object?>> sampleRows, string columnName)
