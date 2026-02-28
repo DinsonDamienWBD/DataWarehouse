@@ -4702,6 +4702,7 @@ public sealed class OAuth2Strategy : AccessControlStrategyBase
     public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override void Dispose(bool disposing);
     public async Task<bool> IsAvailableAsync(CancellationToken cancellationToken = default);
     public async Task<OAuth2ValidationResult> ValidateTokenAsync(string accessToken, CancellationToken cancellationToken = default);
     protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);

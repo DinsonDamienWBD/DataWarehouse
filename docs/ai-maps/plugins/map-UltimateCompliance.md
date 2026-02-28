@@ -761,6 +761,15 @@ public sealed class ComplianceReportService
 }
 ```
 ```csharp
+public record ComplianceReportPeriod
+{
+}
+    public DateTime Start { get; }
+    public DateTime End { get; }
+    public ComplianceReportPeriod(DateTime start, DateTime end);
+}
+```
+```csharp
 public sealed class FrameworkComplianceReport
 {
 }
@@ -2594,8 +2603,8 @@ private sealed class AuditEntry
     public List<string>? ProcessingPurposes { get; init; }
     public Dictionary<string, object>? Attributes { get; init; }
     public List<string>? ComplianceFrameworks { get; init; }
-    public string? Hash { get; set; }
-    public string? PreviousHash { get; set; }
+    public string? Hash { get; init; }
+    public string? PreviousHash { get; init; }
 }
 ```
 ```csharp
