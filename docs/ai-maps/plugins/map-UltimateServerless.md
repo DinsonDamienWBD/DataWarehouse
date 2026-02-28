@@ -95,6 +95,7 @@ public abstract class ServerlessStrategyBase
     public abstract string SemanticDescription { get; }
     public abstract string[] Tags { get; }
     public virtual ServerlessPlatform? TargetPlatform;;
+    public virtual bool IsProductionReady;;
     protected void RecordOperation(string operationType = "default");
     public IReadOnlyDictionary<string, long> GetOperationStats();;
     public virtual KnowledgeObject GetKnowledge();
@@ -567,6 +568,7 @@ public sealed class DurableObjectsStateStrategy : ServerlessStrategyBase
     public override string[] Tags;;
     public Task<object?> GetStateAsync(string objectId, CancellationToken ct = default);
     public Task PutStateAsync(string objectId, object state, CancellationToken ct = default);
+    public Task DeleteStateAsync(string objectId, CancellationToken ct = default);
 }
 ```
 ```csharp
@@ -583,6 +585,7 @@ public sealed class FirestoreStateStrategy : ServerlessStrategyBase
     public override string[] Tags;;
     public Task<T?> GetDocumentAsync<T>(string collection, string documentId, CancellationToken ct = default);
     public Task SetDocumentAsync<T>(string collection, string documentId, T data, CancellationToken ct = default);
+    public Task DeleteDocumentAsync(string collection, string documentId, CancellationToken ct = default);
 }
 ```
 ```csharp
