@@ -120,6 +120,7 @@ internal sealed class SelfEmulatingComputeStrategy : ComputeRuntimeStrategyBase
     public override ComputeCapabilities Capabilities;;
     public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
     public override string Description;;
+    public override bool IsProductionReady;;
     public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
 }
 ```
@@ -448,6 +449,7 @@ internal sealed class LandlockStrategy : ComputeRuntimeStrategyBase
     public override ComputeRuntime Runtime;;
     public override ComputeCapabilities Capabilities;;
     public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
+    public override async Task InitializeAsync(CancellationToken cancellationToken = default);
     public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
 }
 ```
@@ -695,6 +697,7 @@ internal sealed class ProcessExecutionStrategy : ComputeRuntimeStrategyBase
 internal sealed class ServerlessExecutionStrategy : ComputeRuntimeStrategyBase
 {
 }
+    public override bool IsProductionReady;;
     public override string StrategyId;;
     public override string StrategyName;;
     public override ComputeRuntime Runtime;;
@@ -990,6 +993,7 @@ internal sealed class WasmInterpreterStrategy : ComputeRuntimeStrategyBase
     public override ComputeCapabilities Capabilities;;
     public override IReadOnlyList<ComputeRuntime> SupportedRuntimes;;
     public override string Description;;
+    public override bool IsProductionReady;;
     public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
 }
 ```

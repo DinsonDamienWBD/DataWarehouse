@@ -225,7 +225,18 @@ internal sealed class AmqpQueue
     public bool Durable { get; init; }
     public bool Exclusive { get; init; }
     public bool AutoDelete { get; init; }
-    public List<AmqpMessage> Messages { get; };
+    public void EnqueueMessage(AmqpMessage message);
+    public List<AmqpMessage> DequeueMessages(int count);
+    public int MessageCount
+{
+    get
+    {
+        lock (_messagesLock)
+        {
+            return _messages.Count;
+        }
+    }
+}
 }
 ```
 ```csharp
@@ -294,7 +305,8 @@ internal sealed class KafkaConsumerGroup
 {
 }
     public required string Name { get; init; }
-    public List<string> Instances { get; };
+    public void AddInstance(string instanceId);
+    public IReadOnlyList<string> GetInstances();
 }
 ```
 ```csharp
@@ -306,9 +318,19 @@ internal sealed class KafkaConsumerInstance
     public required string Format { get; init; }
     public required string AutoOffsetReset { get; init; }
     public DateTimeOffset CreatedAt { get; init; }
-    public List<string> Subscriptions { get; };
-    public Dictionary<string, long> CurrentOffsets { get; };
-    public Dictionary<string, long> CommittedOffsets { get; };
+    public void AddSubscriptions(IEnumerable<string> topics);
+    public IReadOnlyList<string> Subscriptions
+{
+    get
+    {
+        lock (_subscriptionsLock)
+        {
+            return _subscriptions.Distinct().ToList();
+        }
+    }
+}
+    public System.Collections.Concurrent.ConcurrentDictionary<string, long> CurrentOffsets { get; };
+    public System.Collections.Concurrent.ConcurrentDictionary<string, long> CommittedOffsets { get; };
 }
 ```
 ```csharp
@@ -413,7 +435,8 @@ internal sealed class MqttSubscription
     public required string Topic { get; init; }
     public int QoS { get; set; }
     public DateTimeOffset SubscribedAt { get; init; }
-    public List<MqttMessage> QueuedMessages { get; };
+    public void EnqueueMessage(MqttMessage message);
+    public List<MqttMessage> DequeueAll();
 }
 ```
 ```csharp
@@ -467,7 +490,8 @@ internal sealed class NatsSubscription
     public string? QueueGroup { get; init; }
     public bool Durable { get; init; }
     public DateTimeOffset SubscribedAt { get; init; }
-    public List<NatsMessage> Messages { get; };
+    public void AddMessage(NatsMessage message);
+    public IReadOnlyList<NatsMessage> GetMessages();
 }
 ```
 ```csharp
@@ -489,7 +513,18 @@ internal sealed class NatsStream
     public required string[] Subjects { get; init; }
     public required string Retention { get; init; }
     public required int MaxMessages { get; init; }
-    public List<NatsMessage> Messages { get; };
+    public void AddMessage(NatsMessage message);
+    public IReadOnlyList<NatsMessage> GetMessages();
+    public int Count
+{
+    get
+    {
+        lock (_messagesLock)
+        {
+            return _messages.Count;
+        }
+    }
+}
 }
 ```
 
@@ -554,6 +589,7 @@ internal sealed class QuantumSafeApiStrategy : SdkInterface.InterfaceStrategyBas
     public string SemanticDescription;;
     public InterfaceCategory Category;;
     public string[] Tags;;
+    public override bool IsProductionReady;;
     public override SdkInterface.InterfaceProtocol Protocol;;
     public override SdkInterface.InterfaceCapabilities Capabilities;;
     protected override Task StartAsyncCore(CancellationToken cancellationToken);
@@ -600,6 +636,7 @@ internal sealed class AnomalyDetectionApiStrategy : SdkInterface.InterfaceStrate
     public string SemanticDescription;;
     public InterfaceCategory Category;;
     public string[] Tags;;
+    public override bool IsProductionReady;;
     public override SdkInterface.InterfaceProtocol Protocol;;
     public override SdkInterface.InterfaceCapabilities Capabilities;;
     protected override Task StartAsyncCore(CancellationToken cancellationToken);
@@ -612,6 +649,7 @@ private sealed class ClientBaseline
 {
 }
     public required string ClientId { get; init; }
+    public readonly object Lock = new();
     public List<RequestPattern> RecentRequests { get; };
     public Dictionary<string, int> PathFrequency { get; };
     public Dictionary<string, int> MethodFrequency { get; };
@@ -674,6 +712,7 @@ private sealed class ClientBudget
 {
 }
     public required string ClientId { get; init; }
+    public readonly object Lock = new();
     public decimal TotalBudget { get; set; };
     public decimal UsedBudget { get; set; }
     public DateTimeOffset ResetAt { get; set; }
@@ -701,6 +740,7 @@ internal sealed class SmartRateLimitStrategy : SdkInterface.InterfaceStrategyBas
     public string SemanticDescription;;
     public InterfaceCategory Category;;
     public string[] Tags;;
+    public override bool IsProductionReady;;
     public override SdkInterface.InterfaceProtocol Protocol;;
     public override SdkInterface.InterfaceCapabilities Capabilities;;
     protected override Task StartAsyncCore(CancellationToken cancellationToken);
@@ -740,6 +780,7 @@ internal sealed class ZeroTrustApiStrategy : SdkInterface.InterfaceStrategyBase,
     public string SemanticDescription;;
     public InterfaceCategory Category;;
     public string[] Tags;;
+    public override bool IsProductionReady;;
     public override SdkInterface.InterfaceProtocol Protocol;;
     public override SdkInterface.InterfaceCapabilities Capabilities;;
     protected override Task StartAsyncCore(CancellationToken cancellationToken);
@@ -843,6 +884,7 @@ internal sealed class FalcorStrategy : SdkInterface.InterfaceStrategyBase, IPlug
     public string SemanticDescription;;
     public InterfaceCategory Category;;
     public string[] Tags;;
+    public override bool IsProductionReady;;
     public override SdkInterface.InterfaceProtocol Protocol;;
     public override SdkInterface.InterfaceCapabilities Capabilities;;
     protected override Task StartAsyncCore(CancellationToken cancellationToken);
@@ -1151,7 +1193,24 @@ private sealed class WebSocketConnection : IDisposable
 {
 }
     public string ConnectionId { get; }
-    public DateTimeOffset LastPingTime { get; set; }
+    public DateTimeOffset LastPingTime
+{
+    get
+    {
+        lock (_pingLock)
+        {
+            return _lastPingTime;
+        }
+    }
+
+    set
+    {
+        lock (_pingLock)
+        {
+            _lastPingTime = value;
+        }
+    }
+}
     public WebSocketConnection(string connectionId);
     public void SendMessage(string message);
     public void Dispose();
@@ -1328,6 +1387,7 @@ internal sealed class MergeResultsSummaryStrategy : SdkInterface.InterfaceStrate
     public string SemanticDescription;;
     public InterfaceCategory Category;;
     public string[] Tags;;
+    public override bool IsProductionReady;;
     public override SdkInterface.InterfaceProtocol Protocol;;
     public override SdkInterface.InterfaceCapabilities Capabilities;;
     protected override Task StartAsyncCore(CancellationToken cancellationToken);
@@ -1346,6 +1406,7 @@ internal sealed class SchemaConflictResolutionUIStrategy : SdkInterface.Interfac
     public string SemanticDescription;;
     public InterfaceCategory Category;;
     public string[] Tags;;
+    public override bool IsProductionReady;;
     public override SdkInterface.InterfaceProtocol Protocol;;
     public override SdkInterface.InterfaceCapabilities Capabilities;;
     protected override Task StartAsyncCore(CancellationToken cancellationToken);
@@ -1364,6 +1425,7 @@ internal sealed class InstanceArrivalNotificationStrategy : SdkInterface.Interfa
     public string SemanticDescription;;
     public InterfaceCategory Category;;
     public string[] Tags;;
+    public override bool IsProductionReady;;
     public override SdkInterface.InterfaceProtocol Protocol;;
     public override SdkInterface.InterfaceCapabilities Capabilities;;
     protected override Task StartAsyncCore(CancellationToken cancellationToken);
@@ -1382,6 +1444,7 @@ internal sealed class MasterInstanceSelectionStrategy : SdkInterface.InterfaceSt
     public string SemanticDescription;;
     public InterfaceCategory Category;;
     public string[] Tags;;
+    public override bool IsProductionReady;;
     public override SdkInterface.InterfaceProtocol Protocol;;
     public override SdkInterface.InterfaceCapabilities Capabilities;;
     protected override Task StartAsyncCore(CancellationToken cancellationToken);
@@ -1400,6 +1463,7 @@ internal sealed class MergePreviewStrategy : SdkInterface.InterfaceStrategyBase,
     public string SemanticDescription;;
     public InterfaceCategory Category;;
     public string[] Tags;;
+    public override bool IsProductionReady;;
     public override SdkInterface.InterfaceProtocol Protocol;;
     public override SdkInterface.InterfaceCapabilities Capabilities;;
     protected override Task StartAsyncCore(CancellationToken cancellationToken);
@@ -1436,6 +1500,7 @@ internal sealed class ConvergenceChoiceDialogStrategy : SdkInterface.InterfaceSt
     public string SemanticDescription;;
     public InterfaceCategory Category;;
     public string[] Tags;;
+    public override bool IsProductionReady;;
     public override SdkInterface.InterfaceProtocol Protocol;;
     public override SdkInterface.InterfaceCapabilities Capabilities;;
     protected override Task StartAsyncCore(CancellationToken cancellationToken);
@@ -1454,6 +1519,7 @@ internal sealed class MergeProgressTrackingStrategy : SdkInterface.InterfaceStra
     public string SemanticDescription;;
     public InterfaceCategory Category;;
     public string[] Tags;;
+    public override bool IsProductionReady;;
     public override SdkInterface.InterfaceProtocol Protocol;;
     public override SdkInterface.InterfaceCapabilities Capabilities;;
     protected override Task StartAsyncCore(CancellationToken cancellationToken);
@@ -1509,6 +1575,7 @@ internal sealed class ClaudeMcpStrategy : SdkInterface.InterfaceStrategyBase, IP
     public string SemanticDescription;;
     public InterfaceCategory Category;;
     public string[] Tags;;
+    public override bool IsProductionReady;;
     public override SdkInterface.InterfaceProtocol Protocol;;
     public override SdkInterface.InterfaceCapabilities Capabilities;;
     protected override Task StartAsyncCore(CancellationToken cancellationToken);
@@ -1621,6 +1688,7 @@ internal sealed class ChatGptPluginStrategy : SdkInterface.InterfaceStrategyBase
     public string SemanticDescription;;
     public InterfaceCategory Category;;
     public string[] Tags;;
+    public override bool IsProductionReady;;
     public override SdkInterface.InterfaceProtocol Protocol;;
     public override SdkInterface.InterfaceCapabilities Capabilities;;
     protected override Task StartAsyncCore(CancellationToken cancellationToken);
@@ -1675,6 +1743,7 @@ internal sealed class IntentBasedApiStrategy : SdkInterface.InterfaceStrategyBas
     public string SemanticDescription;;
     public InterfaceCategory Category;;
     public string[] Tags;;
+    public override bool IsProductionReady;;
     public override SdkInterface.InterfaceProtocol Protocol;;
     public override SdkInterface.InterfaceCapabilities Capabilities;;
     protected override Task StartAsyncCore(CancellationToken cancellationToken);
@@ -1711,6 +1780,7 @@ internal sealed class PredictiveApiStrategy : SdkInterface.InterfaceStrategyBase
     public string SemanticDescription;;
     public InterfaceCategory Category;;
     public string[] Tags;;
+    public override bool IsProductionReady;;
     public override SdkInterface.InterfaceProtocol Protocol;;
     public override SdkInterface.InterfaceCapabilities Capabilities;;
     protected override Task StartAsyncCore(CancellationToken cancellationToken);
@@ -1794,6 +1864,7 @@ internal sealed class VoiceFirstApiStrategy : SdkInterface.InterfaceStrategyBase
     public string SemanticDescription;;
     public InterfaceCategory Category;;
     public string[] Tags;;
+    public override bool IsProductionReady;;
     public override SdkInterface.InterfaceProtocol Protocol;;
     public override SdkInterface.InterfaceCapabilities Capabilities;;
     protected override Task StartAsyncCore(CancellationToken cancellationToken);
@@ -1812,6 +1883,7 @@ internal sealed class NaturalLanguageApiStrategy : SdkInterface.InterfaceStrateg
     public string SemanticDescription;;
     public InterfaceCategory Category;;
     public string[] Tags;;
+    public override bool IsProductionReady;;
     public override SdkInterface.InterfaceProtocol Protocol;;
     public override SdkInterface.InterfaceCapabilities Capabilities;;
     protected override Task StartAsyncCore(CancellationToken cancellationToken);
@@ -1825,6 +1897,7 @@ internal sealed class NaturalLanguageApiStrategy : SdkInterface.InterfaceStrateg
 internal sealed class HasuraStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
 }
+    public override bool IsProductionReady;;
     public override string StrategyId;;
     public string DisplayName;;
     public string SemanticDescription;;
@@ -1863,6 +1936,7 @@ private sealed class HasuraQueryArguments
 internal sealed class PrismaStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
 }
+    public override bool IsProductionReady;;
     public override string StrategyId;;
     public string DisplayName;;
     public string SemanticDescription;;
@@ -1902,6 +1976,7 @@ private sealed class PrismaQueryArguments
 internal sealed class SqlInterfaceStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
 }
+    public override bool IsProductionReady;;
     public override string StrategyId;;
     public string DisplayName;;
     public string SemanticDescription;;
@@ -1966,6 +2041,7 @@ private sealed class FederationRequest
 internal sealed class GraphQLInterfaceStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
 }
+    public override bool IsProductionReady;;
     public override string StrategyId;;
     public string DisplayName;;
     public string SemanticDescription;;
@@ -1993,6 +2069,7 @@ private sealed class GraphQLRequest
 internal sealed class PostGraphileStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
 }
+    public override bool IsProductionReady;;
     public override string StrategyId;;
     public string DisplayName;;
     public string SemanticDescription;;
@@ -2020,6 +2097,7 @@ private sealed class PostGraphileRequest
 internal sealed class RelayStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
 }
+    public override bool IsProductionReady;;
     public override string StrategyId;;
     public string DisplayName;;
     public string SemanticDescription;;
@@ -2062,6 +2140,7 @@ internal sealed class ApiVersioningStrategy : SdkInterface.InterfaceStrategyBase
     public string SemanticDescription;;
     public InterfaceCategory Category;;
     public string[] Tags;;
+    public override bool IsProductionReady;;
     public override SdkInterface.InterfaceProtocol Protocol;;
     public override SdkInterface.InterfaceCapabilities Capabilities;;
     protected override Task StartAsyncCore(CancellationToken cancellationToken);
@@ -2164,6 +2243,7 @@ internal sealed class InteractivePlaygroundStrategy : SdkInterface.InterfaceStra
     public string SemanticDescription;;
     public InterfaceCategory Category;;
     public string[] Tags;;
+    public override bool IsProductionReady;;
     public override SdkInterface.InterfaceProtocol Protocol;;
     public override SdkInterface.InterfaceCapabilities Capabilities;;
     protected override Task StartAsyncCore(CancellationToken cancellationToken);
@@ -2227,6 +2307,7 @@ internal sealed class InstantSdkGenerationStrategy : SdkInterface.InterfaceStrat
     public string SemanticDescription;;
     public InterfaceCategory Category;;
     public string[] Tags;;
+    public override bool IsProductionReady;;
     public override SdkInterface.InterfaceProtocol Protocol;;
     public override SdkInterface.InterfaceCapabilities Capabilities;;
     protected override Task StartAsyncCore(CancellationToken cancellationToken);
@@ -3371,6 +3452,7 @@ public sealed record BrandingOptions
 public sealed class PdfGenerationStrategy : DashboardStrategyBase
 {
 }
+    public override bool IsProductionReady;;
     public override string StrategyId;;
     public override string StrategyName;;
     public override string VendorName;;
@@ -3405,6 +3487,7 @@ public sealed record PdfExportOptions
 public sealed class ImageExportStrategy : DashboardStrategyBase
 {
 }
+    public override bool IsProductionReady;;
     public override string StrategyId;;
     public override string StrategyName;;
     public override string VendorName;;
@@ -3462,6 +3545,7 @@ public sealed class ScheduledReportsStrategy : DashboardStrategyBase
 public sealed class EmailDeliveryStrategy : DashboardStrategyBase
 {
 }
+    public override bool IsProductionReady;;
     public override string StrategyId;;
     public override string StrategyName;;
     public override string VendorName;;
