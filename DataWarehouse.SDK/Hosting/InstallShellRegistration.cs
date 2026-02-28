@@ -198,7 +198,17 @@ public static class InstallShellRegistration
         };
 
         process.Start();
+
+        // Must drain stdout/stderr concurrently before WaitForExit to prevent pipe-buffer
+        // deadlock when output exceeds the OS pipe buffer (~4KB) (finding P1-404).
+        var stdoutTask = process.StandardOutput.ReadToEndAsync();
+        var stderrTask = process.StandardError.ReadToEndAsync();
+
         process.WaitForExit(TimeSpan.FromSeconds(30));
+
+        // Ensure reader tasks complete to avoid abandoned stream handles
+        stdoutTask.Wait(TimeSpan.FromSeconds(5));
+        stderrTask.Wait(TimeSpan.FromSeconds(5));
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -245,8 +255,8 @@ public static class InstallShellRegistration
             Encoding.UTF8);
 
         // Run update-mime-database and update-desktop-database (best-effort)
-        TryRunProcess("update-mime-database", mimeDir);
-        TryRunProcess("update-desktop-database", applicationsDir);
+        TryRunProcess("update-mime-database", [mimeDir]);
+        TryRunProcess("update-desktop-database", [applicationsDir]);
 
         return new ShellRegistrationResult(true, AllRegisteredExtensions);
     }
@@ -265,8 +275,8 @@ public static class InstallShellRegistration
         if (File.Exists(desktopPath)) File.Delete(desktopPath);
 
         // Rebuild databases
-        TryRunProcess("update-mime-database", mimeDir);
-        TryRunProcess("update-desktop-database", applicationsDir);
+        TryRunProcess("update-mime-database", [mimeDir]);
+        TryRunProcess("update-desktop-database", [applicationsDir]);
 
         return new ShellRegistrationResult(true, AllRegisteredExtensions);
     }
@@ -295,7 +305,9 @@ public static class InstallShellRegistration
         // Refresh Launch Services registration
         const string lsRegister = "/System/Library/Frameworks/CoreServices.framework/" +
                                   "Frameworks/LaunchServices.framework/Support/lsregister";
-        TryRunProcess(lsRegister, $"-f {installPath}");
+        // Use ArgumentList (not string interpolation) to prevent argument injection via
+        // installPath containing spaces, semicolons, or backticks (finding P1-403).
+        TryRunProcess(lsRegister, ["-f", installPath]);
 
         return new ShellRegistrationResult(true, AllRegisteredExtensions);
     }
@@ -317,10 +329,10 @@ public static class InstallShellRegistration
     // ─────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Attempts to run an external process. Failures are silently ignored since
-    /// shell registration is non-fatal.
+    /// Attempts to run an external process with a list of arguments (no shell-injection risk).
+    /// Failures are silently ignored since shell registration is non-fatal.
     /// </summary>
-    private static void TryRunProcess(string fileName, string arguments)
+    private static void TryRunProcess(string fileName, IEnumerable<string> arguments)
     {
         try
         {
@@ -328,15 +340,26 @@ public static class InstallShellRegistration
             process.StartInfo = new ProcessStartInfo
             {
                 FileName = fileName,
-                Arguments = arguments,
                 UseShellExecute = false,
                 CreateNoWindow = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
             };
 
+            foreach (var arg in arguments)
+                process.StartInfo.ArgumentList.Add(arg);
+
             process.Start();
+
+            // Must drain stdout/stderr concurrently before WaitForExit to prevent pipe-buffer
+            // deadlock when output exceeds the OS pipe buffer (~4KB) (finding P1-405).
+            var stdoutTask = process.StandardOutput.ReadToEndAsync();
+            var stderrTask = process.StandardError.ReadToEndAsync();
+
             process.WaitForExit(TimeSpan.FromSeconds(15));
+
+            stdoutTask.Wait(TimeSpan.FromSeconds(5));
+            stderrTask.Wait(TimeSpan.FromSeconds(5));
         }
         catch
         {

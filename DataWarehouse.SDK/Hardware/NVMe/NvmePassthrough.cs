@@ -331,16 +331,25 @@ public sealed class NvmePassthrough : INvmePassthrough
                     "Ensure you have Administrator privileges and the device is accessible.");
             }
 
-            // Parse completion (simplified - actual completion is in device-specific format)
-            return new NvmeCompletion
+            // Read actual NVMe completion queue entry from the output buffer.
+            // The STORAGE_PROTOCOL_COMMAND structure has a ReturnStatus field at a fixed offset;
+            // the 16-byte NVMe completion entry follows immediately after the command packet
+            // (finding P1-388: was returning hardcoded zero NvmeCompletion).
+            //
+            // Layout (offsets approximate — adjust per STORAGE_PROTOCOL_COMMAND struct size):
+            //   [0]    STORAGE_PROTOCOL_COMMAND
+            //   [+64]  NVMe command packet
+            //   [+128] NVMe completion (returned by driver)
+            int completionOffset = Marshal.SizeOf<NvmeInterop.STORAGE_PROTOCOL_COMMAND>() + 64;
+            if (bytesReturned >= completionOffset + Marshal.SizeOf<NvmeCompletion>())
             {
-                Result = 0,
-                Reserved = 0,
-                SqHead = 0,
-                SqId = 0,
-                CommandId = 0,
-                Status = 0 // Success
-            };
+                IntPtr completionPtr = IntPtr.Add(buffer, completionOffset);
+                var completion = Marshal.PtrToStructure<NvmeCompletion>(completionPtr);
+                return completion;
+            }
+
+            // Fallback if driver returned fewer bytes than expected (command still succeeded)
+            return new NvmeCompletion { Result = 0, Status = 0 };
         }
         finally
         {

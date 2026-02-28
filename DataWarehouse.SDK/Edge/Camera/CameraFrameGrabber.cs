@@ -54,24 +54,29 @@ public sealed class CameraFrameGrabber : ICameraDevice
     /// <exception cref="InvalidOperationException">Thrown if device cannot be opened.</exception>
     public Task OpenAsync(CameraSettings settings, CancellationToken ct = default)
     {
-        // Parse device path as integer index (0, 1, 2, etc.) or use 0 as default
-        var deviceIndex = int.TryParse(settings.DevicePath, out var idx) ? idx : 0;
-
-        _capture = new VideoCapture(deviceIndex);
-        if (!_capture.IsOpened())
+        // Offload blocking OpenCV constructor and ioctl calls to the thread pool to
+        // avoid starvation on constrained single-threaded schedulers (finding P1-274).
+        return Task.Run(() =>
         {
-            throw new InvalidOperationException($"Failed to open camera device {deviceIndex}");
-        }
+            // Parse device path as integer index (0, 1, 2, etc.) or use 0 as default
+            var deviceIndex = int.TryParse(settings.DevicePath, out var idx) ? idx : 0;
 
-        // Configure capture properties
-        _capture.Set(VideoCaptureProperties.FrameWidth, settings.Width);
-        _capture.Set(VideoCaptureProperties.FrameHeight, settings.Height);
-        _capture.Set(VideoCaptureProperties.Fps, settings.FrameRate);
+            var capture = new VideoCapture(deviceIndex);
+            if (!capture.IsOpened())
+            {
+                capture.Dispose();
+                throw new InvalidOperationException($"Failed to open camera device {deviceIndex}");
+            }
 
-        _currentSettings = settings;
-        _frameMat = new Mat();
+            // Configure capture properties
+            capture.Set(VideoCaptureProperties.FrameWidth, settings.Width);
+            capture.Set(VideoCaptureProperties.FrameHeight, settings.Height);
+            capture.Set(VideoCaptureProperties.Fps, settings.FrameRate);
 
-        return Task.CompletedTask;
+            _capture = capture;
+            _currentSettings = settings;
+            _frameMat = new Mat();
+        }, ct);
     }
 
     /// <summary>
@@ -80,13 +85,16 @@ public sealed class CameraFrameGrabber : ICameraDevice
     /// <param name="ct">Cancellation token.</param>
     public Task CloseAsync(CancellationToken ct = default)
     {
-        _capture?.Release();
-        _capture?.Dispose();
-        _frameMat?.Dispose();
-        _capture = null;
-        _frameMat = null;
-        _currentSettings = null;
-        return Task.CompletedTask;
+        // Offload blocking OpenCV release to thread pool (finding P1-274)
+        return Task.Run(() =>
+        {
+            _capture?.Release();
+            _capture?.Dispose();
+            _frameMat?.Dispose();
+            _capture = null;
+            _frameMat = null;
+            _currentSettings = null;
+        }, ct);
     }
 
     /// <summary>
@@ -100,25 +108,27 @@ public sealed class CameraFrameGrabber : ICameraDevice
         if (_capture is null || _frameMat is null)
             throw new InvalidOperationException("Camera not open");
 
-        var success = _capture.Read(_frameMat);
-        if (!success || _frameMat.Empty())
-            return Task.FromResult<FrameBuffer?>(null);
-
-        // Convert Mat to byte array (requires copy for managed access)
-        var dataSize = (int)(_frameMat.Total() * _frameMat.ElemSize());
-        var data = new byte[dataSize];
-        System.Runtime.InteropServices.Marshal.Copy(_frameMat.Data, data, 0, dataSize);
-
-        var frameBuffer = new FrameBuffer(
-            data,
-            _frameMat.Width,
-            _frameMat.Height,
-            _currentSettings!.PixelFormat)
+        // Offload blocking VideoCapture.Read (V4L2/DirectShow/AVFoundation ioctl) to thread pool
+        // to honour async contract and prevent thread-pool starvation on constrained devices (finding P1-274).
+        var capture = _capture;
+        var frameMat = _frameMat;
+        var settings = _currentSettings!;
+        return Task.Run<FrameBuffer?>(() =>
         {
-            Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-        };
+            var success = capture.Read(frameMat);
+            if (!success || frameMat.Empty())
+                return null;
 
-        return Task.FromResult<FrameBuffer?>(frameBuffer);
+            // Convert Mat to byte array (requires copy for managed access)
+            var dataSize = (int)(frameMat.Total() * frameMat.ElemSize());
+            var data = new byte[dataSize];
+            System.Runtime.InteropServices.Marshal.Copy(frameMat.Data, data, 0, dataSize);
+
+            return new FrameBuffer(data, frameMat.Width, frameMat.Height, settings.PixelFormat)
+            {
+                Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+            };
+        }, ct);
     }
 
     /// <summary>
@@ -132,12 +142,16 @@ public sealed class CameraFrameGrabber : ICameraDevice
         if (_capture is null)
             throw new InvalidOperationException("Camera not open");
 
-        _capture.Set(VideoCaptureProperties.FrameWidth, settings.Width);
-        _capture.Set(VideoCaptureProperties.FrameHeight, settings.Height);
-        _capture.Set(VideoCaptureProperties.Fps, settings.FrameRate);
+        // Offload blocking OpenCV property calls to thread pool (finding P1-274)
+        var capture = _capture;
+        return Task.Run(() =>
+        {
+            capture.Set(VideoCaptureProperties.FrameWidth, settings.Width);
+            capture.Set(VideoCaptureProperties.FrameHeight, settings.Height);
+            capture.Set(VideoCaptureProperties.Fps, settings.FrameRate);
 
-        _currentSettings = settings;
-        return Task.CompletedTask;
+            _currentSettings = settings;
+        }, ct);
     }
 
     /// <summary>

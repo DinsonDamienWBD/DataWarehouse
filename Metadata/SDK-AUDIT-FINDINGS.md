@@ -15,8 +15,8 @@
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
 | 1 | 4 | P1 | `Configuration/IUserOverridable.cs:388` | Regex.IsMatch without timeout on externally-supplied RegexPattern — ReDoS vector. `catch (RegexParseException)` only handles syntax errors, not pathological backtracking. | [X]
-| 2 | 2 | P1 | `Configuration/FaultToleranceConfig.cs:496-501` | `_defaultConfig` read without lock in `GetConfig()` while `SetDefaultConfig` writes under lock — data race, stale/torn reference on ARM/32-bit. | [ ]
-| 3 | 2 | P1 | `AI/MlPipeline/VdeFeatureStore.cs:296-314` | TOCTOU race in `RegisterModelAsync`: version check and insert are not atomic. Two concurrent registrations can both pass the monotonicity guard. | [ ]
+| 2 | 2 | P1 | `Configuration/FaultToleranceConfig.cs:496-501` | `_defaultConfig` read without lock in `GetConfig()` while `SetDefaultConfig` writes under lock — data race, stale/torn reference on ARM/32-bit. | [X]
+| 3 | 2 | P1 | `AI/MlPipeline/VdeFeatureStore.cs:296-314` | TOCTOU race in `RegisterModelAsync`: version check and insert are not atomic. Two concurrent registrations can both pass the monotonicity guard. | [X]
 | 4 | 6 | P2 | `Configuration/FeatureToggleRegistry.cs:395-398` | `ContinueWith` without `TaskScheduler.Default` — inherits ambient SynchronizationContext. Debug.WriteLine in fault handler disappears in Release builds. | [ ]
 | 5 | 5 | P2 | `Configuration/ConfigurationHierarchy.cs:165-169` | Silent `catch (JsonException) {}` skips corrupt config files with no logging. Also at line 188-191. | [X]
 | 6 | 13 | P2 | `AI/MlPipeline/VdeFeatureStore.cs:276-282,296-298,325-329` | O(n) prefix scan on ConcurrentDictionary for every feature/model lookup. No secondary index. | [ ]
@@ -35,8 +35,8 @@
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
 | 10 | 10 | P0 | `Configuration/LoadBalancingConfig.cs:613-615` | `string.GetHashCode()` used for consistent hashing in `SelectConsistentHashing` — non-deterministic across process restarts and runtimes. Breaks session affinity completely. | [X]
-| 11 | 2 | P1 | `Configuration/LoadBalancingConfig.cs:399-403` | TOCTOU race on `_lastMetricsReset` (plain DateTime field, non-atomic on 32-bit). Multiple threads can reset minute counter simultaneously. | [ ]
-| 12 | 2 | P1 | `Configuration/LoadBalancingConfig.cs:371-378` | `_defaultConfig` read without lock in `GetConfig()` while `SetDefaultConfig` writes under lock — stale reference on ARM. | [ ]
+| 11 | 2 | P1 | `Configuration/LoadBalancingConfig.cs:399-403` | TOCTOU race on `_lastMetricsReset` (plain DateTime field, non-atomic on 32-bit). Multiple threads can reset minute counter simultaneously. | [X]
+| 12 | 2 | P1 | `Configuration/LoadBalancingConfig.cs:371-378` | `_defaultConfig` read without lock in `GetConfig()` while `SetDefaultConfig` writes under lock — stale reference on ARM. | [X]
 | 13 | 5 | P1 | `Contracts/ActiveStoragePluginBases.cs:751-754,789-792` | Bare `catch { return null; }` in `RequestOptimalResourceLimitsAsync` and `RequestOptimalExecutionTimeAsync` — no logging at all. | [X]
 | 14 | 15 | P2 | `Contracts/Carbon/IEnergyMeasurement.cs:50` | `GetCurrentPowerDrawWatts` returns `Task<double>` but missing `Async` suffix — inconsistent with all other methods in same interface. | [ ]
 | 15 | 13 | P2 | `Configuration/LoadBalancingConfig.cs:432` | O(n) LINQ Count with predicate on every `SelectIntelligentMode` call (hot path). | [ ]
@@ -453,8 +453,8 @@
 | 239 | 6 | P1 | `Deployment/BalloonCoordinator.cs:101` | `_ = Task.Run(async () => {...}, ct)` — discarded task. Inner try/catch only covers `GetStatisticsAsync`; outer `Task.Delay` and `HandleBalloonInflation/Deflation` are uncaught. Monitoring loop dies silently on cancellation or exception. | [X]
 | 240 | 2 | P1 | `Deployment/BalloonCoordinator.cs:62,96,137` | `_isActive` is plain `bool` written from `StartCooperationAsync`/`StopCooperationAsync`/`Dispose` but read from `Task.Run` background thread — no volatile, no Interlocked, no memory barrier. Loop may not stop on ARM. | [ ]
 | 241 | 2 | P1 | `Contracts/TransitEncryptionPluginBases.cs:105,266-281` | `_presetsInitialized` is plain `bool` in double-checked lock pattern — outer check at line 266 is non-volatile read, no memory barrier on fast path. Double-initialization race on weak-ordering architectures. | [X]
-| 242 | 7 | P1 | `Deployment/BareMetalDetector.cs:127` | `new HttpClient` per-call inside `IsCloudEnvironmentAsync` — classic socket exhaustion anti-pattern. Each disposal puts socket in TIME_WAIT for 4 minutes. | [ ]
-| 243 | 7 | P1 | `Deployment/CloudDetector.cs:46` | Same per-request `new HttpClient` anti-pattern — creates fresh client on every `DetectAsync` call with up to 5 HTTP requests. | [ ]
+| 242 | 7 | P1 | `Deployment/BareMetalDetector.cs:127` | `new HttpClient` per-call inside `IsCloudEnvironmentAsync` — classic socket exhaustion anti-pattern. Each disposal puts socket in TIME_WAIT for 4 minutes. | [X]
+| 243 | 7 | P1 | `Deployment/CloudDetector.cs:46` | Same per-request `new HttpClient` anti-pattern — creates fresh client on every `DetectAsync` call with up to 5 HTTP requests. | [X]
 | 244 | 1 | P2 | `Deployment/CloudProviders/CloudProviderFactory.cs:41-53` | Comment describes intended production behavior (dynamic SDK loading via assembly contexts) but implementation just calls `new AwsProvider()`/`new AzureProvider()`/`new GcpProvider()` — all stubs. | [ ]
 | 245 | 5 | P2 | `Deployment/BareMetalDetector.cs:113-118` | Outer catch swallows all exceptions from entire `DetectAsync` body, returns `null` with only a comment — no logging, not even Debug.WriteLine. | [X]
 | 246 | 5 | P2 | `Deployment/BalloonCoordinator.cs:168-171` | `GetBalloonStatusAsync` has bare `catch { return null; }` with no logging — driver errors indistinguishable from "balloon not available". | [X]
@@ -478,7 +478,7 @@
 | 253 | 1 | P1 | `Deployment/EdgeProfiles/EdgeProfileEnforcer.cs:201-214` | `ConfigureConnectionLimit(int maxConnections)` is log-only stub — "In production, this would use SemaphoreSlim to cap network listeners." Connection limits never enforced on constrained hardware. | [ ]
 | 254 | 1 | P1 | `Deployment/EdgeProfiles/EdgeProfileEnforcer.cs:217-233` | `ConfigureBandwidthThrottle(long bytesPerSec)` is log-only stub — "In production, this would implement token bucket algorithm." No rate limiter wired. Cellular links can be saturated. | [ ]
 | 255 | 1 | P1 | `Deployment/HostedOptimizer.cs:219-243` | `ConfigureIoAlignmentAsync` detects block size then does nothing — "For now, just log the recommendation" comment. I/O alignment optimization never applied to any hosted VM deployment. | [ ]
-| 256 | 4 | P1 | `Deployment/FilesystemDetector.cs:186-210` | `DetectMacOsFilesystemAsync` passes `path` directly into shell argument via string interpolation `$"-T \"{path}\""` — command injection if path contains quotes/semicolons/backticks. Should use `ArgumentList`. | [ ]
+| 256 | 4 | P1 | `Deployment/FilesystemDetector.cs:186-210` | `DetectMacOsFilesystemAsync` passes `path` directly into shell argument via string interpolation `$"-T \"{path}\""` — command injection if path contains quotes/semicolons/backticks. Should use `ArgumentList`. | [X]
 | 257 | 5 | P1 | `Deployment/EdgeDetector.cs:132-136` | Outer catch swallows ALL exceptions including `OperationCanceledException` — returns null with only a comment, no logging. Cancellation tokens silently ignored, bugs invisible. | [X]
 | 258 | 1 | P2 | `Deployment/FilesystemDetector.cs:218-226` | `GetLinuxBlockSizeAsync` hardcodes return 4096 regardless of actual block size — comment acknowledges limitation. Same at `GetWindowsBlockSizeAsync`. Wrong for 512-byte or 8KB+ block devices. | [ ]
 | 259 | 5 | P2 | `Deployment/EdgeDetector.cs:165-168` | Catch in `DetectLinuxEdgePlatformAsync` swallows all exceptions with only comment — hides permission errors, OperationCanceledException, genuine bugs from operators. | [X]
@@ -517,10 +517,10 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 273 | 1 | P1 | `Edge/Flash/FlashDevice.cs:76-138` | `LinuxMtdFlashDevice` — every method is a silent no-op stub. `EraseBlockAsync`, `WritePageAsync`, `ReadPageAsync` do nothing. `IsBlockBadAsync` returns hardcoded `false`. No PlatformNotSupportedException. FTL stack silently passes while writing nothing. | [ ]
-| 274 | 15 | P1 | `Edge/Camera/CameraFrameGrabber.cs:55,81,98,130` | `*Async` methods (`OpenAsync`, `CloseAsync`, `CaptureFrameAsync`, `UpdateSettingsAsync`) perform blocking native OpenCV calls but return `Task.CompletedTask` — violates async contract, causes thread starvation on constrained devices. | [ ]
-| 275 | 2 | P1 | `Edge/Flash/BadBlockManager.cs:29,44-62,69,75` | `_badBlocks` is `HashSet<long>` used across concurrent async paths (`ScanBadBlocksAsync` + `MarkBadAsync` + `IsBad`) without synchronization — corrupts set state, data written to defective blocks. | [ ]
-| 276 | 2 | P1 | `Edge/Flash/FlashTranslationLayer.cs:34-38` | `_logicalToPhysical` (Dictionary), `_freeBlocks` (HashSet), `_dirtyBlocks` (HashSet), `_writeCount`, `_eraseCount` all mutated concurrently with no locks — corrupts L2P map, silent data corruption. | [ ]
+| 273 | 1 | P1 | `Edge/Flash/FlashDevice.cs:76-138` | `LinuxMtdFlashDevice` — every method is a silent no-op stub. `EraseBlockAsync`, `WritePageAsync`, `ReadPageAsync` do nothing. `IsBlockBadAsync` returns hardcoded `false`. No PlatformNotSupportedException. FTL stack silently passes while writing nothing. | [X]
+| 274 | 15 | P1 | `Edge/Camera/CameraFrameGrabber.cs:55,81,98,130` | `*Async` methods (`OpenAsync`, `CloseAsync`, `CaptureFrameAsync`, `UpdateSettingsAsync`) perform blocking native OpenCV calls but return `Task.CompletedTask` — violates async contract, causes thread starvation on constrained devices. | [X]
+| 275 | 2 | P1 | `Edge/Flash/BadBlockManager.cs:29,44-62,69,75` | `_badBlocks` is `HashSet<long>` used across concurrent async paths (`ScanBadBlocksAsync` + `MarkBadAsync` + `IsBad`) without synchronization — corrupts set state, data written to defective blocks. | [X]
+| 276 | 2 | P1 | `Edge/Flash/FlashTranslationLayer.cs:34-38` | `_logicalToPhysical` (Dictionary), `_freeBlocks` (HashSet), `_dirtyBlocks` (HashSet), `_writeCount`, `_eraseCount` all mutated concurrently with no locks — corrupts L2P map, silent data corruption. | [X]
 | 277 | 15 | P2 | `Edge/Inference/OnnxWasiNnHost.cs:107,129` | `LoadModelAsync` and `InferAsync` do blocking CPU/IO work then `return await Task.FromResult(...)` — sync disguised as async. | [ ]
 | 278 | 1 | P2 | `Edge/Bus/PinMapping.cs:126-171` | `BeagleBoneBlack` maps 4/92 pins, `JetsonNano` maps 10/40 pins — "partial mapping only" with "placeholder for future expansion" comment. Runtime `ArgumentException` on unmapped pins. | [ ]
 | 279 | 9 | P2 | `Edge/Flash/FlashTranslationLayer.cs:209-214` | `GarbageCollectAsync` catch block marks block bad but emits no log/metric — silently reduces usable capacity with no operator visibility. | [ ]
@@ -542,20 +542,20 @@
 |---|-----|-----|-----------|-------------|
 | 285 | 1 | P0 | `Edge/Mesh/BleMesh.cs:7-52`, `ZigbeeMesh.cs:7-52`, `LoRaMesh.cs:7-98` | All three mesh implementations self-identify as "Stub implementation demonstrating API contract." Loopback simulation inverts source/destination. `DiscoverTopologyAsync` returns empty lists. Rule 13 violation. | [X]
 | 286 | 1 | P0 | `Edge/Protocols/CoApClient.cs:131-139` | `ObserveAsync` returns no-op `IDisposable`, never registers callback, never sends Observe option. Callers believe they have live subscription but receive nothing. Silent stub. | [X]
-| 287 | 1 | P1 | `Edge/Protocols/CoApClient.cs:63-66` | DTLS flag silently ignored — `UseDtls=true` and `coaps://` URIs use plain `UdpClient`. Security-sensitive IoT payloads travel in cleartext. | [ ]
-| 288 | 2 | P1 | `Edge/Inference/OnnxWasiNnHost.cs:61-106` | Session cache check-then-act (`TryGetValue→build→evict→assign`) not atomic. Concurrent loads orphan native ONNX Runtime handles. | [ ]
-| 289 | 2 | P1 | `Edge/Protocols/CoApClient.cs:76-77` | `_nextMessageId++` on plain `ushort` is not atomic — concurrent sends produce duplicate message IDs, causing response mismatch or permanent hangs. | [ ]
-| 290 | 3 | P1 | `Edge/Protocols/CoApClient.cs:260` | `UdpClient.ReceiveAsync()` without CancellationToken — `DisposeAsync` hangs forever on quiet network waiting for UDP packet. | [ ]
+| 287 | 1 | P1 | `Edge/Protocols/CoApClient.cs:63-66` | DTLS flag silently ignored — `UseDtls=true` and `coaps://` URIs use plain `UdpClient`. Security-sensitive IoT payloads travel in cleartext. | [X]
+| 288 | 2 | P1 | `Edge/Inference/OnnxWasiNnHost.cs:61-106` | Session cache check-then-act (`TryGetValue→build→evict→assign`) not atomic. Concurrent loads orphan native ONNX Runtime handles. | [X]
+| 289 | 2 | P1 | `Edge/Protocols/CoApClient.cs:76-77` | `_nextMessageId++` on plain `ushort` is not atomic — concurrent sends produce duplicate message IDs, causing response mismatch or permanent hangs. | [X]
+| 290 | 3 | P1 | `Edge/Protocols/CoApClient.cs:260` | `UdpClient.ReceiveAsync()` without CancellationToken — `DisposeAsync` hangs forever on quiet network waiting for UDP packet. | [X]
 | 291 | 5 | P1 | `Edge/Protocols/CoApClient.cs:263-265` | Bare `catch (Exception)` in receive loop silences all errors including `ObjectDisposedException`, `SocketException` — causes busy-spin on unrecoverable errors. | [X]
-| 292 | 6 | P1 | `Edge/Protocols/CoApClient.cs:253-268` | Receive loop stored as `_receiveTask` but exceptions consumed by silent catch — task fault leaves all in-flight callers waiting until 5s timeout. | [ ]
-| 293 | 7 | P1 | `Edge/Inference/OnnxWasiNnHost.cs:95-106` | Session leaked on cache-full race — concurrent insert replaces entry without disposing overwritten session's native handle. | [ ]
-| 294 | 7 | P1 | `Edge/Inference/OnnxWasiNnHost.cs:65-95` | `SessionOptions` created with `new`, disposed only in catch block — leaked on success path. Per-model-load native memory leak. | [ ]
-| 295 | 7 | P1 | `Edge/Inference/OnnxWasiNnHost.cs:153-158` | `Dispose` iterates `_sessionCache.Values` while concurrent `LoadModelAsync` may mutate it. If not snapshot-safe, `InvalidOperationException` or missed disposal. | [ ]
-| 296 | 9 | P1 | `Edge/Inference/OnnxWasiNnHost.cs:118` | Hard cast `(OnnxInferenceSession)session` with no type guard — `InvalidCastException` with no diagnostic for non-ONNX session types. | [ ]
-| 297 | 9 | P1 | `Edge/Inference/OnnxWasiNnHost.cs:119` | `session.InputNames[0]` with no empty-check — `IndexOutOfRangeException` on models with zero inputs. | [ ]
-| 298 | 10 | P1 | `Edge/Memory/MemoryBudgetTracker.cs:76-88` | `_allocatedBytes` incremented by requested `size` on Rent but decremented by `array.Length` on Return — counter drifts negative due to ArrayPool rounding. | [ ]
-| 299 | 12 | P1 | `Edge/Protocols/CoApClient.cs:241-245` | CoAP option encoding violates RFC 7252 — writes absolute option number instead of delta. All requests with options are malformed; client non-functional against real servers. | [ ]
-| 300 | 15 | P1 | `Edge/Protocols/CoApClient.cs:88` | Hardcoded 5-second timeout with no override — LoRa networks (2-20s RTT) always time out. Violates user-configurability. | [ ]
+| 292 | 6 | P1 | `Edge/Protocols/CoApClient.cs:253-268` | Receive loop stored as `_receiveTask` but exceptions consumed by silent catch — task fault leaves all in-flight callers waiting until 5s timeout. | [X]
+| 293 | 7 | P1 | `Edge/Inference/OnnxWasiNnHost.cs:95-106` | Session leaked on cache-full race — concurrent insert replaces entry without disposing overwritten session's native handle. | [X]
+| 294 | 7 | P1 | `Edge/Inference/OnnxWasiNnHost.cs:65-95` | `SessionOptions` created with `new`, disposed only in catch block — leaked on success path. Per-model-load native memory leak. | [X]
+| 295 | 7 | P1 | `Edge/Inference/OnnxWasiNnHost.cs:153-158` | `Dispose` iterates `_sessionCache.Values` while concurrent `LoadModelAsync` may mutate it. If not snapshot-safe, `InvalidOperationException` or missed disposal. | [X]
+| 296 | 9 | P1 | `Edge/Inference/OnnxWasiNnHost.cs:118` | Hard cast `(OnnxInferenceSession)session` with no type guard — `InvalidCastException` with no diagnostic for non-ONNX session types. | [X]
+| 297 | 9 | P1 | `Edge/Inference/OnnxWasiNnHost.cs:119` | `session.InputNames[0]` with no empty-check — `IndexOutOfRangeException` on models with zero inputs. | [X]
+| 298 | 10 | P1 | `Edge/Memory/MemoryBudgetTracker.cs:76-88` | `_allocatedBytes` incremented by requested `size` on Rent but decremented by `array.Length` on Return — counter drifts negative due to ArrayPool rounding. | [X]
+| 299 | 12 | P1 | `Edge/Protocols/CoApClient.cs:241-245` | CoAP option encoding violates RFC 7252 — writes absolute option number instead of delta. All requests with options are malformed; client non-functional against real servers. | [X]
+| 300 | 15 | P1 | `Edge/Protocols/CoApClient.cs:88` | Hardcoded 5-second timeout with no override — LoRa networks (2-20s RTT) always time out. Violates user-configurability. | [X]
 | 301 | 2 | P2 | `Edge/Protocols/CoApClient.cs:69-73` | `_udpClient` lazy init not thread-safe — concurrent `SendAsync` creates two UdpClients, starts two receive loops, leaks first. | [ ]
 | 302 | 2 | P2 | `Edge/Mesh/LoRaMesh.cs:15,34,56-60` | `_initialized` plain `bool` (not volatile), `_knownNodes` plain `Dictionary` — both used from multiple threads. Same issue in BleMesh/ZigbeeMesh. | [ ]
 | 303 | 7 | P2 | `Edge/Memory/BoundedMemoryRuntime.cs:134-137` | `Dispose` doesn't null `_monitorTimer` or dispose `_tracker` — timer callback can fire post-dispose. | [ ]
@@ -574,7 +574,7 @@
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
 | 307 | 5 | P1 | `Edge/Protocols/MqttClient.cs:359` | Reconnect loop bare `catch (Exception)` swallows `OperationCanceledException` and permanent auth failures — spins for MaxReconnectAttempts against unrecoverable errors. | [X]
-| 308 | 12 | P1 | `Federation/Authorization/InMemoryPermissionCache.cs:56` | `BoundedDictionary` constructed with hardcoded `1000` instead of `_config.MaxEntries` — ignores user configuration, 10x higher cache miss rate than configured. | [ ]
+| 308 | 12 | P1 | `Federation/Authorization/InMemoryPermissionCache.cs:56` | `BoundedDictionary` constructed with hardcoded `1000` instead of `_config.MaxEntries` — ignores user configuration, 10x higher cache miss rate than configured. | [X]
 | 309 | 2 | P2 | `Edge/Protocols/MqttClient.cs:148-149` | `_reconnectCts` cancelled/nulled in `DisconnectAsync` without synchronization — races with `OnMqttDisconnectedAsync`, NRE or orphaned CTS. | [ ]
 | 310 | 5 | P2 | `Federation/Authorization/PermissionAwareRouter.cs:207-210` | Security denial audit logs silently discarded with no diagnostic trace — compliance/forensics gap. | [X]
 | 311 | 5 | P2 | `Federation/Authorization/PermissionAwareRouter.cs:252,288` | `TryExtractBool`/`TryExtractString` swallow all reflection exceptions — property getter throws → permanent silent denial with no trace. | [X]
@@ -595,10 +595,10 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 318 | 12 | P1 | `Federation/Catalog/ManifestCache.cs:37` | BoundedDictionary hardcoded capacity 1,000 — `_maxSize` parameter (default 100,000) completely ignored. Cache collapses at 1K entries regardless of config. | [ ]
-| 319 | 12 | P1 | `Federation/Catalog/ManifestStateMachine.cs:35` | `_disposed` not volatile; no disposed-check guard in Apply/GetSnapshot/RestoreSnapshot — post-Dispose calls throw opaque ObjectDisposedException from ReaderWriterLockSlim internals. Same defect in ClusterTopology:31. | [ ]
+| 318 | 12 | P1 | `Federation/Catalog/ManifestCache.cs:37` | BoundedDictionary hardcoded capacity 1,000 — `_maxSize` parameter (default 100,000) completely ignored. Cache collapses at 1K entries regardless of config. | [X]
+| 319 | 12 | P1 | `Federation/Catalog/ManifestStateMachine.cs:35` | `_disposed` not volatile; no disposed-check guard in Apply/GetSnapshot/RestoreSnapshot — post-Dispose calls throw opaque ObjectDisposedException from ReaderWriterLockSlim internals. Same defect in ClusterTopology:31. | [X]
 | 320 | 6 | P1 | `Federation/Orchestration/FederationOrchestrator.cs:77` | `_ = RunHealthCheckLoopAsync(_cts.Token)` — fire-and-forget discards health loop task. Exceptions silently kill health monitoring; cluster degrades without signal. | [X]
-| 321 | 7 | P1 | `Federation/Orchestration/FederationOrchestrator.cs:315-320` | `_topology` (ClusterTopology : IDisposable, owns ReaderWriterLockSlim) never disposed in Dispose() — handle leak per instance. | [ ]
+| 321 | 7 | P1 | `Federation/Orchestration/FederationOrchestrator.cs:315-320` | `_topology` (ClusterTopology : IDisposable, owns ReaderWriterLockSlim) never disposed in Dispose() — handle leak per instance. | [X]
 | 322 | 15 | P1 | `Federation/Orchestration/FederationOrchestrator.cs:220` | `RegisterNodeAsync(registration, bool skipTopologyRateLimit, ct)` is public but absent from `IFederationOrchestrator` interface — callers via interface silently lack rate-limit bypass. | [ ]
 | 323 | 1 | P1 | `Federation/Replication/LocationAwareReplicaSelector.cs:184-198` | `GetLeaderNodeIdAsync` returns null for all non-leader nodes — `ConsistencyLevel.Strong` always throws InvalidOperationException in multi-node clusters. Doc comment says "Placeholder Implementation". | [ ]
 | 324 | 12 | P2 | `Federation/Catalog/ManifestCache.cs:58-65` | TOCTOU race in Set() eviction: check-evict-insert not atomic — concurrent calls can double-evict or overflow by 1. | [ ]
@@ -626,10 +626,10 @@
 |---|-----|-----|-----------|-------------|
 | 336 | 1 | P1 | `Federation/Routing/RoutingPipeline.cs:ObjectPipeline,FilePathPipeline` | Both `ObjectPipeline` and `FilePathPipeline` throw `NotSupportedException` unconditionally — stub implementations behind production interfaces. | [ ]
 | 337 | 1 | P1 | `Hardware/Accelerators/HsmProvider.cs:EncryptAsync,DecryptAsync,SignAsync,VerifyAsync` | All 4 crypto operations throw "HSM operations not yet implemented" — entire HSM provider is a hard stub. | [ ]
-| 338 | 15 | P1 | `Hardware/Accelerators/GpuAccelerator.cs:GpuAccelerator,CannInterop` | `GpuAccelerator` silently falls back to CPU loops when GPU unavailable; `CannInterop` silently uses CPU when NPU present. `IsCpuFallback` reports false when hardware is "available" but never actually uses hardware. | [ ]
-| 339 | 15 | P1 | `Hardware/Accelerators/CannInterop.cs:IsCpuFallback` | `IsCpuFallback => _isAvailable` — semantically inverted: returns true when NPU IS available, false when it isn't. | [ ]
+| 338 | 15 | P1 | `Hardware/Accelerators/GpuAccelerator.cs:GpuAccelerator,CannInterop` | `GpuAccelerator` silently falls back to CPU loops when GPU unavailable; `CannInterop` silently uses CPU when NPU present. `IsCpuFallback` reports false when hardware is "available" but never actually uses hardware. | [X]
+| 339 | 15 | P1 | `Hardware/Accelerators/CannInterop.cs:IsCpuFallback` | `IsCpuFallback => _isAvailable` — semantically inverted: returns true when NPU IS available, false when it isn't. | [X]
 | 340 | 6 | P1 | `Hardware/Accelerators/HsmProvider.cs:Dispose` | `Dispose()` does `_ = DisconnectAsync()` — fire-and-forget async disconnect; connection may not be cleaned up. | [X]
-| 341 | 2 | P1 | `Hardware/Accelerators/CannInterop.cs:Dispose` | `_disposed` check-and-set outside lock — concurrent Dispose() calls race: double-free of native resources. | [ ]
+| 341 | 2 | P1 | `Hardware/Accelerators/CannInterop.cs:Dispose` | `_disposed` check-and-set outside lock — concurrent Dispose() calls race: double-free of native resources. | [X]
 | 342 | 12 | P2 | `Federation/Topology/ProximityCalculator.cs:CalculateLatencyScore` | Latency score formula divides by `node.EstimatedLatencyMs` — returns infinity for 0ms latency; NaN propagates through routing weights. | [ ]
 | 343 | 12 | P2 | `Federation/Topology/ProximityCalculator.cs:CalculateCapacityScore` | Capacity score: `node.FreeBytes / (double)node.TotalBytes` — division by zero when TotalBytes=0 (uninitialized node). | [ ]
 | 344 | 9 | P2 | `Federation/Topology/LocationAwareRouter.cs:RouteAsync` | Catch-all `catch (Exception)` returns empty `RoutingDecision` — caller cannot distinguish "no route" from "routing failed"; errors silently swallowed. | [ ]
@@ -652,22 +652,22 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 353 | 1 | P1 | `Hardware/Accelerators/MetalInterop.cs:302-376` + 5 others | CPU fallback disguised as GPU execution — Metal, OpenCL, SYCL, Triton, Vulkan, WebGPU all report hardware available then silently compute on CPU via Task.Run. Comments say "CPU fallback to establish API contract." Systemic across 6 accelerator classes. | [ ]
+| 353 | 1 | P1 | `Hardware/Accelerators/MetalInterop.cs:302-376` + 5 others | CPU fallback disguised as GPU execution — Metal, OpenCL, SYCL, Triton, Vulkan, WebGPU all report hardware available then silently compute on CPU via Task.Run. Comments say "CPU fallback to establish API contract." Systemic across 6 accelerator classes. | [X]
 | 354 | 1 | P1 | `Hardware/Accelerators/QatAccelerator.cs:396-420` | `EncryptQatAsync`/`DecryptQatAsync` unconditionally throw "deferred to future phases" — QAT crypto entirely unimplemented. | [ ]
 | 355 | 1 | P1 | `Hardware/Accelerators/Tpm2Provider.cs:114-244` | All 5 ITpm2Provider methods (`CreateKeyAsync`, `SignAsync`, `EncryptAsync`, `DecryptAsync`, `GetRandomAsync`) unconditionally throw "deferred to future phases" — complete stub class. | [ ]
-| 356 | 2 | P1 | `Hardware/Accelerators/Tpm2Provider.cs:279-315` | Double-checked locking on non-volatile `_isAvailable` — ARM64 unsafe, spurious re-initialization. | [ ]
-| 357 | 2 | P1 | `Hardware/Accelerators/WasiNnAccelerator.cs:394-426` | Double-checked locking on non-volatile `_initialized` in `GetAvailableBackends`/`GetBestBackend` — concurrent `DetectAvailableBackends` on ARM. | [ ]
-| 358 | 3 | P1 | `Hardware/DriverLoader.cs:355-356` | Sync-over-async `.Wait()` on `UnloadAsync` inside `Dispose()` — deadlock risk when SemaphoreSlim.WaitAsync blocks under single-threaded SyncContext. | [ ]
-| 359 | 2 | P1 | `Hardware/Accelerators/QatAccelerator.cs:87-163` | Non-volatile `_isAvailable`/`_initialized` written inside lock, read outside via `IsAvailable` property — stale reads on ARM. | [ ]
+| 356 | 2 | P1 | `Hardware/Accelerators/Tpm2Provider.cs:279-315` | Double-checked locking on non-volatile `_isAvailable` — ARM64 unsafe, spurious re-initialization. | [X]
+| 357 | 2 | P1 | `Hardware/Accelerators/WasiNnAccelerator.cs:394-426` | Double-checked locking on non-volatile `_initialized` in `GetAvailableBackends`/`GetBestBackend` — concurrent `DetectAvailableBackends` on ARM. | [X]
+| 358 | 3 | P1 | `Hardware/DriverLoader.cs:355-356` | Sync-over-async `.Wait()` on `UnloadAsync` inside `Dispose()` — deadlock risk when SemaphoreSlim.WaitAsync blocks under single-threaded SyncContext. | [X]
+| 359 | 2 | P1 | `Hardware/Accelerators/QatAccelerator.cs:87-163` | Non-volatile `_isAvailable`/`_initialized` written inside lock, read outside via `IsAvailable` property — stale reads on ARM. | [X]
 | 360 | 6 | P1 | `Hardware/DriverLoader.cs:461-502` | `_ = Task.Run(async () => ...)` fire-and-forget in `OnHardwareChangedHandler` — exceptions before inner try/catch silently lost; post-dispose execution possible. | [X]
-| 361 | 6 | P1 | `Hardware/DriverLoader.cs:393-394` | `async void` FileSystemWatcher event handlers — unhandled exceptions crash the process. | [ ]
-| 362 | 7 | P1 | `Hardware/DriverLoader.cs:72,355-373` | Use-after-dispose race: `_loadLock` disposed while `UnloadAsync` still holds/releases it — `ObjectDisposedException` in finally block. | [ ]
+| 361 | 6 | P1 | `Hardware/DriverLoader.cs:393-394` | `async void` FileSystemWatcher event handlers — unhandled exceptions crash the process. | [X]
+| 362 | 7 | P1 | `Hardware/DriverLoader.cs:72,355-373` | Use-after-dispose race: `_loadLock` disposed while `UnloadAsync` still holds/releases it — `ObjectDisposedException` in finally block. | [X]
 | 363 | 1 | P1 | `Hardware/Accelerators/Pkcs11Wrapper.cs:188-203` | `CK_FUNCTION_LIST` struct has only 6 of 70+ PKCS#11 function pointers — `[StructLayout(Sequential)]` maps wrong offsets for `C_OpenSession`/`C_Login`. | [ ]
 | 364 | 4 | P0 | `Hardware/Accelerators/Pkcs11Wrapper.cs:189-203` | P/Invoke struct layout mismatch — HSM `C_Login` with PIN may invoke arbitrary function pointer. Memory safety and security defect. | [X]
-| 365 | 15 | P1 | `MetalInterop.cs:207` + 5 others | `IsCpuFallback => _isAvailable` — semantically inverted in all 6 accelerators (returns true when hardware IS available). | [ ]
-| 366 | 9 | P1 | `Hardware/Accelerators/WasiNnAccelerator.cs:344-348` | Silent CPU fallback on unavailable backend — no log, no event, no signal to caller of >10x performance degradation. | [ ]
-| 367 | 9 | P1 | `Hardware/Accelerators/WasiNnAccelerator.cs:446-458` | `MapBackendToProvider` silently maps ROCm/CoreML/NNAPI/OpenCL/CANN to CPU — hardware detected but never used. | [ ]
-| 368 | 14 | P1 | `Hardware/Accelerators/TritonInterop.cs:215-223` | `entryPoint` parameter inserted into shell-out arguments without quoting/sanitization — command injection via model config. | [ ]
+| 365 | 15 | P1 | `MetalInterop.cs:207` + 5 others | `IsCpuFallback => _isAvailable` — semantically inverted in all 6 accelerators (returns true when hardware IS available). | [X]
+| 366 | 9 | P1 | `Hardware/Accelerators/WasiNnAccelerator.cs:344-348` | Silent CPU fallback on unavailable backend — no log, no event, no signal to caller of >10x performance degradation. | [X]
+| 367 | 9 | P1 | `Hardware/Accelerators/WasiNnAccelerator.cs:446-458` | `MapBackendToProvider` silently maps ROCm/CoreML/NNAPI/OpenCL/CANN to CPU — hardware detected but never used. | [X]
+| 368 | 14 | P1 | `Hardware/Accelerators/TritonInterop.cs:215-223` | `entryPoint` parameter inserted into shell-out arguments without quoting/sanitization — command injection via model config. | [X]
 | 369 | 5 | P1 | `Hardware/Accelerators/MetalInterop.cs:266-271` + 3 others | Silent bare `catch` in GPU initialization (Metal, Vulkan, WebGPU, Triton) — all failure modes invisible. | [X]
 | 370 | 1 | P2 | `MetalInterop.cs:201, VulkanInterop.cs:493, WebGpuInterop.cs:404` | `AcceleratorType` returns `NvidiaGpu\|AmdGpu` for Metal/Vulkan/WebGPU — wrong vendor identification. | [ ]
 | 371 | 1 | P2 | 7 accelerator files | `GetStatisticsAsync` returns hardcoded zeros for all metrics — monitoring blind to actual hardware utilization. | [ ]
@@ -685,10 +685,10 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 375 | 1 | P1 | `Hardware/Interop/CrossLanguageSdkPorts.cs:152-266` | Full C ABI interop (Read/Write/Delete/List/Query) is a stub — all operations return empty success. Comment: "In production, this would route through the kernel's storage pipeline." Data loss at interop boundary. | [ ]
+| 375 | 1 | P1 | `Hardware/Interop/CrossLanguageSdkPorts.cs:152-266` | Full C ABI interop (Read/Write/Delete/List/Query) is a stub — all operations return empty success. Comment: "In production, this would route through the kernel's storage pipeline." Data loss at interop boundary. | [X]
 | 376 | 1 | P1 | `Hardware/Hypervisor/HypervisorDetector.cs:190-198` | `GetCpuidHypervisorSignature` always returns `string.Empty` — comment says "SIMPLIFIED — use placeholder." CPUID detection branch is dead code; VMs get wrong HypervisorType. | [ ]
-| 377 | 2 | P1 | `Hardware/Hypervisor/HypervisorDetector.cs:60-78` | Double-checked locking on non-volatile `_cachedResult` reference — ARM64 may observe partially-constructed `HypervisorInfo`. | [ ]
-| 378 | 2 | P1 | `Hardware/Interop/CrossLanguageSdkPorts.cs:628-641` | `CheckRateLimit` TOCTOU race: GetOrAdd + separate write is non-atomic — rate limiter fails open under concurrency, enabling DoS. | [ ]
+| 377 | 2 | P1 | `Hardware/Hypervisor/HypervisorDetector.cs:60-78` | Double-checked locking on non-volatile `_cachedResult` reference — ARM64 may observe partially-constructed `HypervisorInfo`. | [X]
+| 378 | 2 | P1 | `Hardware/Interop/CrossLanguageSdkPorts.cs:628-641` | `CheckRateLimit` TOCTOU race: GetOrAdd + separate write is non-atomic — rate limiter fails open under concurrency, enabling DoS. | [X]
 | 379 | 1 | P2 | `Hardware/Hypervisor/BalloonDriver.cs:82-101` | `RegisterPressureHandler` stores callback but never subscribes to OS/hypervisor memory pressure — handler never invoked during real balloon events. | [ ]
 | 380 | 1 | P2 | `Hardware/Interop/GrpcServiceContracts.cs:502-517` | `QueryAsync` ignores filter/projection/orderBy — returns all objects with hardcoded score 1.0. Comment: "Query delegates to list with filter application" but no filter is applied. | [ ]
 | 381 | 4 | P2 | `Hardware/Interop/CrossLanguageSdkPorts.cs:528-531,566` | OAuth tokens generated with `Guid.NewGuid()` — only 122 bits entropy vs RFC 6749 requirement of 256-bit CSPRNG. | [ ]
@@ -709,10 +709,10 @@
 |---|-----|-----|-----------|-------------|
 | 386 | 1 | P1 | `Hardware/Memory/NumaAllocator.cs:143-157,198-205` | Both Windows and Linux NUMA topology detectors always return null — `IsNumaAware` permanently false. Comments say "Graceful degradation until multi-socket hardware testing." All multi-socket deployments silently lose NUMA-aware allocation. | [ ]
 | 387 | 1 | P1 | `Hardware/Memory/NumaAllocator.cs:265` | `GetDeviceNumaNode` always returns 0 — device-to-NUMA-node affinity never queried. Comment describes Linux implementation path but not implemented. | [ ]
-| 388 | 1 | P1 | `Hardware/NVMe/NvmePassthrough.cs:335-344` | `SubmitWindowsAdminCommand` returns hardcoded zero NvmeCompletion after DeviceIoControl — never reads actual completion queue entry from output buffer. Identify/GetLogPage return zeros. | [ ]
-| 389 | 2 | P1 | `Hardware/NVMe/NvmePassthrough.cs:57-62,595-616` | `_disposed` not volatile; read outside lock, written inside — double-dispose or use-after-dispose on multi-core. | [ ]
-| 390 | 2 | P1 | `Hardware/LinuxHardwareProbe.cs:25,118-124` | `_disposed` not volatile; FileSystemWatcher callback races with Dispose creating new timer after old one disposed. | [ ]
-| 391 | 6 | P1 | `Hardware/PlatformCapabilityRegistry.cs:149-153` + 10 more sites | Background refresh failures use `Debug.WriteLine` only (no-op in production) — cache becomes permanently stale with zero alerting. | [ ]
+| 388 | 1 | P1 | `Hardware/NVMe/NvmePassthrough.cs:335-344` | `SubmitWindowsAdminCommand` returns hardcoded zero NvmeCompletion after DeviceIoControl — never reads actual completion queue entry from output buffer. Identify/GetLogPage return zeros. | [X]
+| 389 | 2 | P1 | `Hardware/NVMe/NvmePassthrough.cs:57-62,595-616` | `_disposed` not volatile; read outside lock, written inside — double-dispose or use-after-dispose on multi-core. | [X]
+| 390 | 2 | P1 | `Hardware/LinuxHardwareProbe.cs:25,118-124` | `_disposed` not volatile; FileSystemWatcher callback races with Dispose creating new timer after old one disposed. | [X]
+| 391 | 6 | P1 | `Hardware/PlatformCapabilityRegistry.cs:149-153` + 10 more sites | Background refresh failures use `Debug.WriteLine` only (no-op in production) — cache becomes permanently stale with zero alerting. | [X]
 | 392 | 5 | P2 | `Hardware/MacOsHardwareProbe.cs:115-119` | `RunSystemProfilerAsync` broad catch swallows `OperationCanceledException` — cancellation requests not honoured. | [X]
 | 393 | 5 | P2 | `Hardware/MacOsHardwareProbe.cs:149-152,185-188,223-226,247-249,303-305` | 5 completely empty catch blocks in parser methods — zero diagnostic signal for any deserialization or programming error. | [X]
 | 394 | 5 | P2 | `Hardware/WindowsHardwareProbe.cs:158-161` | WMI event handler `OnWmiEventArrived` swallows all exceptions with no logging. | [X]
@@ -735,13 +735,13 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 403 | 4 | P1 | `Hosting/InstallShellRegistration.cs:298` | Unsanitized `installPath` injected into `lsregister` argument string — argument injection on macOS. | [ ]
-| 404 | 9 | P1 | `Hosting/InstallShellRegistration.cs:185-202` | `ExecutePowerShell` redirects stdout/stderr but never reads them — pipe buffer deadlock + silent failure (exit code ignored). | [ ]
-| 405 | 9 | P1 | `Hosting/InstallShellRegistration.cs:323-345` | `TryRunProcess` same pipe-buffer deadlock risk — redirected streams never consumed. | [ ]
-| 406 | 3 | P1 | `IO/DeterministicIo/DeadlineScheduler.cs:297` | `.AsTask().GetAwaiter().GetResult()` on EDF hot path — unnecessary Task allocation on every scheduled op, contradicts zero-allocation design. | [ ]
-| 407 | 6 | P1 | `IO/PushToPullStreamAdapter.cs:25-39` | Pump task `finally` block exceptions (DisposeAsync on transform stream) silently swallowed — consumer blocked on pipe reader with no error signal. | [ ]
-| 408 | 11 | P1 | `Infrastructure/Authority/AuthorityChainFacade.cs:86` | Down-cast to concrete `AuthorityResolutionEngine` — any other `IAuthorityResolver` silently falls back to SystemDefaults (wrong authority level). | [ ]
-| 409 | 2 | P1 | `Infrastructure/Authority/DeadManSwitch.cs:163-188` | Non-atomic check-then-set on `_isLocked` — concurrent calls both pass check, both record duplicate auto-lock authority decisions. Security-critical component. | [ ]
+| 403 | 4 | P1 | `Hosting/InstallShellRegistration.cs:298` | Unsanitized `installPath` injected into `lsregister` argument string — argument injection on macOS. | [X]
+| 404 | 9 | P1 | `Hosting/InstallShellRegistration.cs:185-202` | `ExecutePowerShell` redirects stdout/stderr but never reads them — pipe buffer deadlock + silent failure (exit code ignored). | [X]
+| 405 | 9 | P1 | `Hosting/InstallShellRegistration.cs:323-345` | `TryRunProcess` same pipe-buffer deadlock risk — redirected streams never consumed. | [X]
+| 406 | 3 | P1 | `IO/DeterministicIo/DeadlineScheduler.cs:297` | `.AsTask().GetAwaiter().GetResult()` on EDF hot path — unnecessary Task allocation on every scheduled op, contradicts zero-allocation design. | [X]
+| 407 | 6 | P1 | `IO/PushToPullStreamAdapter.cs:25-39` | Pump task `finally` block exceptions (DisposeAsync on transform stream) silently swallowed — consumer blocked on pipe reader with no error signal. | [X]
+| 408 | 11 | P1 | `Infrastructure/Authority/AuthorityChainFacade.cs:86` | Down-cast to concrete `AuthorityResolutionEngine` — any other `IAuthorityResolver` silently falls back to SystemDefaults (wrong authority level). | [X]
+| 409 | 2 | P1 | `Infrastructure/Authority/DeadManSwitch.cs:163-188` | Non-atomic check-then-set on `_isLocked` — concurrent calls both pass check, both record duplicate auto-lock authority decisions. Security-critical component. | [X]
 | 410 | 2 | P2 | `Infrastructure/Authority/AuthorityResolutionEngine.cs:151-163` | `TryGetValue` outside `_historyLock`, list mutated concurrently — TOCTOU race in security-critical authority chain. `List<T>.OrderByDescending` can throw under concurrent modification. | [ ]
 | 411 | 2 | P2 | `IO/DeterministicIo/DeadlineScheduler.cs:372-374` | `_latencyWriteIndex` written without volatile; non-barrier read in `ComputeP99` — stale P99 on ARM. | [ ]
 | 412 | 7 | P2 | `IO/DeterministicIo/DeadlineScheduler.cs:194-223` | Double-dispose guard uses CTS state not `_disposed` flag — re-entry throws ObjectDisposedException; `_shutdownCts` not disposed on second call. | [ ]
@@ -760,9 +760,9 @@
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
 | 416 | 1 | P1 | `Infrastructure/DeveloperExperience.cs:451-516` | Plugin scaffolding generates in-memory `Dictionary<string,byte[]>` store and `GetHashCode()`-seeded embedding — developers following scaffold ship mocks. | [ ]
-| 417 | 2 | P1 | `Infrastructure/Distributed/AutoScaling/ProductionAutoScaler.cs:300-348` | `_isScaling` plain bool with non-atomic check-then-act — concurrent scale calls both pass guard. | [ ]
-| 418 | 2 | P1 | `Infrastructure/Distributed/AutoScaling/ProductionAutoScaler.cs:317-360` | `_lastAction` (ScalingAction?) and `_lastScaledAt` (DateTimeOffset?) written without sync — torn reads on 64-bit. | [ ]
-| 419 | 3 | P1 | `Infrastructure/Distributed/Discovery/MdnsServiceDiscovery.cs:513-515` | `Dispose()` calls `DisposeAsync().AsTask().Wait()` — deadlock risk under SynchronizationContext. | [ ]
+| 417 | 2 | P1 | `Infrastructure/Distributed/AutoScaling/ProductionAutoScaler.cs:300-348` | `_isScaling` plain bool with non-atomic check-then-act — concurrent scale calls both pass guard. | [X]
+| 418 | 2 | P1 | `Infrastructure/Distributed/AutoScaling/ProductionAutoScaler.cs:317-360` | `_lastAction` (ScalingAction?) and `_lastScaledAt` (DateTimeOffset?) written without sync — torn reads on 64-bit. | [X]
+| 419 | 3 | P1 | `Infrastructure/Distributed/Discovery/MdnsServiceDiscovery.cs:513-515` | `Dispose()` calls `DisposeAsync().AsTask().Wait()` — deadlock risk under SynchronizationContext. | [X]
 | 420 | 1 | P1 | `Infrastructure/DeveloperExperience.cs:593-920` | 6 CLI commands (`PluginBuild`, `PluginTest`, `KernelRun`, `PluginList`, `KernelHealth`, `Config`) are complete stubs — print hardcoded strings, no real I/O. | [ ]
 | 421 | 1 | P1 | `Infrastructure/DeveloperExperience.cs:1191-1306` | `GraphQLGateway.ParseQuery()` splits on braces (comment: "Simplified parser"); `FindResolver()` returns "not implemented" for all unregistered fields. | [ ]
 | 422 | 8 | P2 | `Infrastructure/Distributed/Discovery/MdnsServiceDiscovery.cs:105,140,147,436,451,462,469,492` | 8 `Console.WriteLine` calls in SDK library code — should use ILogger. | [X]
@@ -791,11 +791,11 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 437 | 3 | P1 | `Infrastructure/Distributed/Discovery/ZeroConfigClusterBootstrap.cs:239` | `Dispose()` calls `DisposeAsync().AsTask().Wait()` (deadlock) + double-disposes `_joinLock` (ObjectDisposedException). | [ ]
+| 437 | 3 | P1 | `Infrastructure/Distributed/Discovery/ZeroConfigClusterBootstrap.cs:239` | `Dispose()` calls `DisposeAsync().AsTask().Wait()` (deadlock) + double-disposes `_joinLock` (ObjectDisposedException). | [X]
 | 438 | 6 | P1 | `Infrastructure/Distributed/TcpP2PNetwork.cs:280` | `_ = Task.Run(() => HandleIncomingConnectionAsync(client))` — faults silently lost; connection-level errors invisible. | [X]
-| 439 | 1 | P1 | `Infrastructure/Distributed/TcpP2PNetwork.cs:481-488` | Request handler always returns `byte[0]` — SWIM ping/ack protocol broken; all nodes appear unreachable. | [ ]
-| 440 | 4 | P1 | `Infrastructure/Distributed/TcpP2PNetwork.cs:412` | `SendMessageAsync` uses `client.GetStream()` (raw NetworkStream), bypassing authenticated SslStream — all mTLS traffic sent plaintext. | [ ]
-| 441 | 2 | P1 | `Infrastructure/Distributed/Membership/SwimClusterMembership.cs:104-128` | `_cachedMembers` non-atomic rebuild; member mutations from `HandleJoinMessage` etc. bypass `_stateLock` — stale cache races. | [ ]
+| 439 | 1 | P1 | `Infrastructure/Distributed/TcpP2PNetwork.cs:481-488` | Request handler always returns `byte[0]` — SWIM ping/ack protocol broken; all nodes appear unreachable. | [X]
+| 440 | 4 | P1 | `Infrastructure/Distributed/TcpP2PNetwork.cs:412` | `SendMessageAsync` uses `client.GetStream()` (raw NetworkStream), bypassing authenticated SslStream — all mTLS traffic sent plaintext. | [X]
+| 441 | 2 | P1 | `Infrastructure/Distributed/Membership/SwimClusterMembership.cs:104-128` | `_cachedMembers` non-atomic rebuild; member mutations from `HandleJoinMessage` etc. bypass `_stateLock` — stale cache races. | [X]
 | 442 | 8 | P2 | `Infrastructure/Distributed/Discovery/ZeroConfigClusterBootstrap.cs:161,167,194,197,201,213` | 6 `Console.WriteLine` calls in SDK library code. | [X]
 | 443 | 5 | P2 | `Infrastructure/Distributed/Replication/CrdtReplicationSync.cs:363` | Bare `catch {}` in `HandleGossipReceived` — no logging for malformed/malicious payloads. | [X]
 | 444 | 5 | P2 | `Infrastructure/Distributed/Replication/CrdtReplicationSync.cs:463` | Bare `catch {}` in `ProcessRemoteItem` — CRDT merge errors silently lost. | [X]
@@ -823,10 +823,10 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 458 | 1 | P1 | `Infrastructure/Intelligence/AiAutonomyConfiguration.cs:104-107` | Dead `for` loop iterating `PolicyLevelValues` with empty body — vestigial stub or logic gap. | [ ]
-| 459 | 2 | P1 | `Infrastructure/InMemory/InMemoryCircuitBreaker.cs:119-122` | `GetStatistics()` reads `_lastFailureTime` and `_lastSuccessAt` without lock; fields are written inside `_lock` elsewhere — memory model violation. | [ ]
-| 460 | 13 | P1 | `Infrastructure/InMemory/InMemoryDeadLetterQueue.cs:41-48` | `EnqueueAsync` eviction calls `OrderBy` (O(n log n)) inside a while loop on every over-capacity enqueue — severe hot-path perf regression at 10K capacity. | [ ]
-| 461 | 13 | P1 | `Infrastructure/InMemory/InMemoryDeadLetterQueue.cs:67-78` | `PeekAsync` and `DequeueAsync` also perform full O(n log n) sort of entire dictionary on every call. | [ ]
+| 458 | 1 | P1 | `Infrastructure/Intelligence/AiAutonomyConfiguration.cs:104-107` | Dead `for` loop iterating `PolicyLevelValues` with empty body — vestigial stub or logic gap. | [X]
+| 459 | 2 | P1 | `Infrastructure/InMemory/InMemoryCircuitBreaker.cs:119-122` | `GetStatistics()` reads `_lastFailureTime` and `_lastSuccessAt` without lock; fields are written inside `_lock` elsewhere — memory model violation. | [X]
+| 460 | 13 | P1 | `Infrastructure/InMemory/InMemoryDeadLetterQueue.cs:41-48` | `EnqueueAsync` eviction calls `OrderBy` (O(n log n)) inside a while loop on every over-capacity enqueue — severe hot-path perf regression at 10K capacity. | [X]
+| 461 | 13 | P1 | `Infrastructure/InMemory/InMemoryDeadLetterQueue.cs:67-78` | `PeekAsync` and `DequeueAsync` also perform full O(n log n) sort of entire dictionary on every call. | [X]
 | 462 | 1 | P2 | `Infrastructure/InMemory/InMemoryResourceMeter.cs:50-55` | `GetHistoryAsync` returns single-point snapshot regardless of requested time window — silently violates interface contract. | [ ]
 | 463 | 1 | P2 | `Infrastructure/InMemory/InMemoryResourceMeter.cs:90` | `CpuPercent` always hardcoded to 0 — stub value never computed. | [ ]
 | 464 | 2 | P2 | `Infrastructure/InMemory/InMemoryDeadLetterQueue.cs:41-50` | TOCTOU race: capacity check + OrderBy + TryRemove + insert not atomic — concurrent enqueues exceed capacity. | [ ]
@@ -847,10 +847,10 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 471 | 1 | P1 | `Infrastructure/KernelInfrastructure.cs:477-483` | `CheckVersionCompatibilityAsync` is a complete stub — always returns `IsCompatible = true` with "In production, this would:" comment. | [ ]
-| 472 | 1 | P1 | `Infrastructure/KernelInfrastructure.cs:503-517` | `TryPreserveStateAsync` stores `Array.Empty<byte>()` — never calls `IReloadablePlugin.ExportStateAsync`. Plugin state silently lost on reload. | [ ]
-| 473 | 1 | P1 | `Infrastructure/KernelInfrastructure.cs:519-526` | `TryRestoreStateAsync` never calls `IReloadablePlugin.ImportStateAsync` — captured `state` variable completely ignored. | [ ]
-| 474 | 1 | P1 | `Infrastructure/KernelInfrastructure.cs:486-501` | `DrainPluginConnectionsAsync` is a hardcoded `Task.Delay(100)` — never calls `IReloadablePlugin.PrepareForUnloadAsync`. | [ ]
+| 471 | 1 | P1 | `Infrastructure/KernelInfrastructure.cs:477-483` | `CheckVersionCompatibilityAsync` is a complete stub — always returns `IsCompatible = true` with "In production, this would:" comment. | [X]
+| 472 | 1 | P1 | `Infrastructure/KernelInfrastructure.cs:503-517` | `TryPreserveStateAsync` stores `Array.Empty<byte>()` — never calls `IReloadablePlugin.ExportStateAsync`. Plugin state silently lost on reload. | [X]
+| 473 | 1 | P1 | `Infrastructure/KernelInfrastructure.cs:519-526` | `TryRestoreStateAsync` never calls `IReloadablePlugin.ImportStateAsync` — captured `state` variable completely ignored. | [X]
+| 474 | 1 | P1 | `Infrastructure/KernelInfrastructure.cs:486-501` | `DrainPluginConnectionsAsync` is a hardcoded `Task.Delay(100)` — never calls `IReloadablePlugin.PrepareForUnloadAsync`. | [X]
 | 475 | 5 | P1 | `Infrastructure/KernelInfrastructure.cs:503-516` | Bare `catch { return false; }` in `TryPreserveStateAsync` — state preservation errors silently swallowed. | [X]
 | 476 | 5 | P1 | `Infrastructure/KernelInfrastructure.cs:528-543` | `TryRollbackAsync` bare catch says "log but don't throw" — no logging actually implemented. | [X]
 | 477 | 6 | P1 | `Infrastructure/KernelInfrastructure.cs:1862-1886` | `_ = Task.Run(...)` in `CheckAvailability` timer — outer task faults silently lost. | [X]
@@ -877,9 +877,9 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 490 | 2 | P1 | `Infrastructure/Policy/DatabasePolicyPersistence.cs:82-90` | TOCTOU race in LWW replication: `GetAllAsync` + conditional `UpsertAsync` not atomic — concurrent writers silently violate last-writer-wins. | [ ]
-| 491 | 2 | P1 | `Infrastructure/Policy/InMemoryPolicyStore.cs:70-79` | Non-atomic `ContainsKey` → `Count` → `AddOrUpdate` — concurrent inserts silently exceed capacity and corrupt `_locationCounts`. | [ ]
-| 492 | 2 | P1 | `Infrastructure/Policy/InMemoryPolicyPersistence.cs:76-82` | Same non-atomic capacity check + insert pattern — advertises thread-safety but capacity bound silently exceeded. | [ ]
+| 490 | 2 | P1 | `Infrastructure/Policy/DatabasePolicyPersistence.cs:82-90` | TOCTOU race in LWW replication: `GetAllAsync` + conditional `UpsertAsync` not atomic — concurrent writers silently violate last-writer-wins. | [X]
+| 491 | 2 | P1 | `Infrastructure/Policy/InMemoryPolicyStore.cs:70-79` | Non-atomic `ContainsKey` → `Count` → `AddOrUpdate` — concurrent inserts silently exceed capacity and corrupt `_locationCounts`. | [X]
+| 492 | 2 | P1 | `Infrastructure/Policy/InMemoryPolicyPersistence.cs:76-82` | Same non-atomic capacity check + insert pattern — advertises thread-safety but capacity bound silently exceeded. | [X]
 | 493 | 5 | P1 | `Infrastructure/Policy/FilePolicyPersistence.cs:77-84` | Silent catch on `JsonException` and `IOException` — corrupted/inaccessible policy files dropped with zero logging, wrong policies applied. | [X]
 | 494 | 9 | P2 | `Infrastructure/Policy/CircularReferenceDetector.cs:160` | `visited` is `List<string>` with O(n) `Contains` inside loop — O(maxDepth²). Also `visited.Count > maxDepth` check never fires (off-by-one). | [ ]
 | 495 | 1 | P2 | `Infrastructure/Policy/DatabasePolicyPersistence.cs:49` | `DatabasePolicyPersistence` ignores `ConnectionString`, uses `ConcurrentDictionaryDbStore` — functionally identical to InMemory. Rule 13 name lie. | [ ]
@@ -900,9 +900,9 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 502 | 2 | P1 | `Infrastructure/Policy/Performance/PolicyDelegateCache.cs:63-65` | TOCTOU in version invalidation: `InvalidateAll` does `Clear()` then `Exchange` — concurrent `GetOrCompile` can trap stale delegate as if version N. | [ ]
-| 503 | 7 | P1 | `Infrastructure/Policy/Performance/PolicyMaterializationEngine.cs:31` | `SemaphoreSlim(1,1)` field never disposed — class doesn't implement `IDisposable`. Kernel event leaks. | [ ]
-| 504 | 7 | P1 | `Infrastructure/Policy/Performance/PolicySimulationSandbox.cs:353-358` | `Dispose` nulls `_sandboxStore` without disposing it — `_sandboxStore` resources leak. | [ ]
+| 502 | 2 | P1 | `Infrastructure/Policy/Performance/PolicyDelegateCache.cs:63-65` | TOCTOU in version invalidation: `InvalidateAll` does `Clear()` then `Exchange` — concurrent `GetOrCompile` can trap stale delegate as if version N. | [X]
+| 503 | 7 | P1 | `Infrastructure/Policy/Performance/PolicyMaterializationEngine.cs:31` | `SemaphoreSlim(1,1)` field never disposed — class doesn't implement `IDisposable`. Kernel event leaks. | [X]
+| 504 | 7 | P1 | `Infrastructure/Policy/Performance/PolicySimulationSandbox.cs:353-358` | `Dispose` nulls `_sandboxStore` without disposing it — `_sandboxStore` resources leak. | [X]
 | 505 | 2 | P2 | `Infrastructure/Policy/Performance/PolicySimulationSandbox.cs:266-267` | Double-checked lock on non-volatile `_sandboxStore`/`_sandboxEngine` — outer check unsafe on ARM. | [ ]
 | 506 | 13 | P2 | `Infrastructure/Policy/PolicyResolutionEngine.cs:536` | `string.Join` + `Take(i+1)` in hot resolution loop — per-level string + enumerator allocation on every resolve. | [ ]
 | 507 | 15 | P2 | `Infrastructure/Policy/Performance/PolicyDelegateCache.cs:55` | `GetOrCompile` is synchronous but delegates to potentially-async compilation path — contract ambiguity. | [ ]
@@ -920,11 +920,11 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 511 | 6 | P1 | `Infrastructure/Scaling/WalMessageQueue.cs:113,121` | Timer callbacks discard `CompactAsync` and `FlushAllAsync` tasks via `_ =` — WAL flush failures silently lost, data loss invisible. | [ ]
-| 512 | 6 | P1 | `Infrastructure/StorageConnectionRegistry.cs:622` | `DisposeAsync().AsTask().ContinueWith(_ => {})` silently discards disposal exceptions — resource leaks invisible. | [ ]
-| 513 | 2 | P1 | `Infrastructure/Policy/TamperProofPolicyPersistence.cs:36` | `_lastHash` (string) not `volatile` — written under `_chainLock` but JIT may cache reads; integrity chain hash visibility not guaranteed. | [ ]
-| 514 | 2 | P1 | `Infrastructure/Scaling/ScalableMessageBus.cs:240` | `TopicPartition.RingBuffer ??=` assigns non-volatile field — concurrent `PublishAsync` reader may see partially-constructed object. | [ ]
-| 515 | 13 | P1 | `Infrastructure/Scaling/WalMessageQueue.cs:398` | `CompactWalData` copies WAL byte-by-byte into `List<byte>` — 2× allocation for 1GB partitions, severe GC pressure. | [ ]
+| 511 | 6 | P1 | `Infrastructure/Scaling/WalMessageQueue.cs:113,121` | Timer callbacks discard `CompactAsync` and `FlushAllAsync` tasks via `_ =` — WAL flush failures silently lost, data loss invisible. | [X]
+| 512 | 6 | P1 | `Infrastructure/StorageConnectionRegistry.cs:622` | `DisposeAsync().AsTask().ContinueWith(_ => {})` silently discards disposal exceptions — resource leaks invisible. | [X]
+| 513 | 2 | P1 | `Infrastructure/Policy/TamperProofPolicyPersistence.cs:36` | `_lastHash` (string) not `volatile` — written under `_chainLock` but JIT may cache reads; integrity chain hash visibility not guaranteed. | [X]
+| 514 | 2 | P1 | `Infrastructure/Scaling/ScalableMessageBus.cs:240` | `TopicPartition.RingBuffer ??=` assigns non-volatile field — concurrent `PublishAsync` reader may see partially-constructed object. | [X]
+| 515 | 13 | P1 | `Infrastructure/Scaling/WalMessageQueue.cs:398` | `CompactWalData` copies WAL byte-by-byte into `List<byte>` — 2× allocation for 1GB partitions, severe GC pressure. | [X]
 | 516 | 5 | P2 | `Infrastructure/StorageConnectionRegistry.cs:577` | `CheckHealthAsync` catch stores only `ex.Message` — full exception silently discarded. | [X]
 | 517 | 5 | P2 | `Mathematics/ParityCalculation.cs:318` | Bare `catch { return false; }` in `ValidateXorParity` — programming errors masked as parity mismatches. | [X]
 | 518 | 5 | P2 | `Infrastructure/StorageConnectionRegistry.cs:268` | Registry-level `CheckHealthAsync` bare catch — health check failure reason entirely lost. | [X]
@@ -946,10 +946,10 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 526 | 3 | P1 | `Primitives/Configuration/ConfigurationAuditLog.cs:75-107` | `LogChangeAsync` is entirely synchronous — `File.AppendAllText` inside `lock`, returns `Task.CompletedTask`. Blocks thread pool. | [ ]
+| 526 | 3 | P1 | `Primitives/Configuration/ConfigurationAuditLog.cs:75-107` | `LogChangeAsync` is entirely synchronous — `File.AppendAllText` inside `lock`, returns `Task.CompletedTask`. Blocks thread pool. | [X]
 | 527 | 5 | P1 | `Primitives/Configuration/ConfigurationAuditLog.cs:210-212` | Bare `catch {}` in `QueryChangesAsync` — corrupt audit entries silently skipped, partial results returned. | [X]
 | 528 | 5 | P1 | `Primitives/Configuration/ConfigurationAuditLog.cs:250-253` | Bare `catch {}` in `LoadChainHead` — chain head silently resets to genesis, integrity chain permanently broken. | [X]
-| 529 | 2 | P1 | `Primitives/Configuration/ConfigurationAuditLog.cs:31,119` | `_chainHeadHash` non-volatile, read in `VerifyIntegrityAsync` without lock while mutated under lock in `LogChangeAsync`. | [ ]
+| 529 | 2 | P1 | `Primitives/Configuration/ConfigurationAuditLog.cs:31,119` | `_chainHeadHash` non-volatile, read in `VerifyIntegrityAsync` without lock while mutated under lock in `LogChangeAsync`. | [X]
 | 530 | 14 | P2 | `Primitives/Configuration/ConfigurationChangeApi.cs:85` | Unguarded `Convert.ChangeType` — `InvalidCastException`/`FormatException` propagates to caller with no context. | [ ]
 | 531 | 14 | P2 | `Primitives/Configuration/ConfigurationChangeApi.cs:113` | Direct `propertyInfo.SetValue` without type validation — `ArgumentException` on type mismatch. | [ ]
 | 532 | 15 | P2 | `Primitives/Configuration/ConfigurationAuditLog.cs:75` | `LogChangeAsync` named Async but entirely synchronous — contract lie to callers. | [ ]
@@ -969,10 +969,10 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 538 | 2 | P1 | `Primitives/Performance/PerformanceUtilities.cs:62-73` | ObjectPool `_count` TOCTOU: `Return()` checks `_count < _maxSize` then adds — two concurrent returns both pass guard, exceeding `_maxSize`. | [ ]
-| 539 | 7 | P1 | `Primitives/Performance/PerformanceUtilities.cs:293-313` | `BatchProcessor.DisposeAsync` leaks `_cts`/`_semaphore` if final `FlushAsync()` throws — `_disposed` never set true. | [ ]
-| 540 | 12 | P1 | `Primitives/Performance/PerformanceUtilities.cs:217` | `CurrentBatchCount` reads non-thread-safe `List<T>.Count` without semaphore — data race with `AddAsync`/`FlushAsync`. | [ ]
-| 541 | 12 | P1 | `Primitives/Configuration/PresetSelector.cs:31-35` | HSM/TPM check overrides ALL resource tiers — every enterprise machine with TPM locked into `paranoid` preset regardless of 512-core GPU workstation capability. | [ ]
+| 538 | 2 | P1 | `Primitives/Performance/PerformanceUtilities.cs:62-73` | ObjectPool `_count` TOCTOU: `Return()` checks `_count < _maxSize` then adds — two concurrent returns both pass guard, exceeding `_maxSize`. | [X]
+| 539 | 7 | P1 | `Primitives/Performance/PerformanceUtilities.cs:293-313` | `BatchProcessor.DisposeAsync` leaks `_cts`/`_semaphore` if final `FlushAsync()` throws — `_disposed` never set true. | [X]
+| 540 | 12 | P1 | `Primitives/Performance/PerformanceUtilities.cs:217` | `CurrentBatchCount` reads non-thread-safe `List<T>.Count` without semaphore — data race with `AddAsync`/`FlushAsync`. | [X]
+| 541 | 12 | P1 | `Primitives/Configuration/PresetSelector.cs:31-35` | HSM/TPM check overrides ALL resource tiers — every enterprise machine with TPM locked into `paranoid` preset regardless of 512-core GPU workstation capability. | [X]
 | 542 | 15 | P2 | `Primitives/Enums.cs:74-80` | `PluginCategory.InterfaceProvider` and `PluginCategory.Interface` are duplicates with overlapping docs. | [ ]
 | 543 | 15 | P2 | `Primitives/Enums.cs:93-163` | Several `CapabilityCategory` XML docs are wrong copy-paste from unrelated domains (3D graphics, psychology). | [ ]
 | 544 | 14 | P2 | `Primitives/Manifest.cs:43` | `StorageUri` getter throws `UriFormatException` on invalid `BlobUri` — no validation at assignment time. | [ ]
@@ -993,8 +993,8 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 551 | 12 | P1 | `Primitives/Probabilistic/CountMinSketch.cs:36,155,185` | `GetConfidenceInterval` uses mutable `_lastQueryResult` from previous `Estimate()` — stale data if any intervening call. Same in HyperLogLog and TDigest. | [ ]
-| 552 | 14 | P1 | `Primitives/Probabilistic/BloomFilter.cs:229-246` | `Deserialize()` no input length validation — attacker-controlled `bitCount` causes buffer over-read or OOM. Same in CountMinSketch:266. | [ ]
+| 551 | 12 | P1 | `Primitives/Probabilistic/CountMinSketch.cs:36,155,185` | `GetConfidenceInterval` uses mutable `_lastQueryResult` from previous `Estimate()` — stale data if any intervening call. Same in HyperLogLog and TDigest. | [X]
+| 552 | 14 | P1 | `Primitives/Probabilistic/BloomFilter.cs:229-246` | `Deserialize()` no input length validation — attacker-controlled `bitCount` causes buffer over-read or OOM. Same in CountMinSketch:266. | [X]
 | 553 | 14 | P1 | `Primitives/Probabilistic/HyperLogLog.cs:235-250` | `Deserialize()` no bounds check on `precision` — value of 31+ causes 2GB allocation. TopKHeavyHitters:281 same pattern. | [ ]
 | 554 | 7 | P1 | `Primitives/Probabilistic/SketchMerger.cs:56` | `SemaphoreSlim` created inside `while` loop per iteration, never disposed — handle leak per merge round. | [ ]
 | 555 | 12 | P1 | `Replication/IMultiMasterReplication.cs:141-146` | `VectorClock.HappensBefore` returns false for empty clock — violates Lamport causality, causes spurious conflict detection. | [ ]

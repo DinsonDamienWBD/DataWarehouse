@@ -496,7 +496,8 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         public bool IsAvailable => _isAvailable;
 
         /// <inheritdoc/>
-        public bool IsCpuFallback => _isAvailable;
+        /// <remarks>True when Vulkan GPU is unavailable and CPU is used as fallback (finding P1-365).</remarks>
+        public bool IsCpuFallback => !_isAvailable;
 
         /// <inheritdoc/>
         public GpuRuntime Runtime => GpuRuntime.None; // Vulkan is cross-vendor, not CUDA/ROCm specific
