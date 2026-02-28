@@ -1366,6 +1366,7 @@ public sealed class VeleroBackupStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;
+    public override bool IsProductionReady;;
     public override string StrategyName;;
     public override DataProtectionCategory Category;;
     public override DataProtectionCapabilities Capabilities;;
@@ -1382,6 +1383,7 @@ public sealed class EtcdBackupStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;
+    public override bool IsProductionReady;;
     public override string StrategyName;;
     public override DataProtectionCategory Category;;
     public override DataProtectionCapabilities Capabilities;;
@@ -1398,6 +1400,7 @@ public sealed class PVCBackupStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;
+    public override bool IsProductionReady;;
     public override string StrategyName;;
     public override DataProtectionCategory Category;;
     public override DataProtectionCapabilities Capabilities;;
@@ -1414,6 +1417,7 @@ public sealed class HelmBackupStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;
+    public override bool IsProductionReady;;
     public override string StrategyName;;
     public override DataProtectionCategory Category;;
     public override DataProtectionCapabilities Capabilities;;
@@ -1430,6 +1434,7 @@ public sealed class CRDBackupStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;
+    public override bool IsProductionReady;;
     public override string StrategyName;;
     public override DataProtectionCategory Category;;
     public override DataProtectionCapabilities Capabilities;;
@@ -1597,6 +1602,7 @@ public sealed class AirGappedBackupStrategy : DataProtectionStrategyBase
 #endregion
 }
     public override string StrategyId;;
+    public override bool IsProductionReady;;
     public override string StrategyName;;
     public override DataProtectionCategory Category;;
     public override DataProtectionCapabilities Capabilities;;
@@ -1688,6 +1694,7 @@ public sealed class BlockLevelBackupStrategy : DataProtectionStrategyBase
 #endregion
 }
     public override string StrategyId;;
+    public override bool IsProductionReady;;
     public override string StrategyName;;
     public override DataProtectionCategory Category;;
     public override DataProtectionCapabilities Capabilities;;
@@ -1736,6 +1743,7 @@ public sealed class SyntheticFullBackupStrategy : DataProtectionStrategyBase
 #endregion
 }
     public override string StrategyId;;
+    public override bool IsProductionReady;;
     public override string StrategyName;;
     public override DataProtectionCategory Category;;
     public override DataProtectionCapabilities Capabilities;;
@@ -1782,6 +1790,7 @@ public sealed class BreakGlassRecoveryStrategy : DataProtectionStrategyBase
 #endregion
 }
     public override string StrategyId;;
+    public override bool IsProductionReady;;
     public override string StrategyName;;
     public override DataProtectionCategory Category;;
     public override DataProtectionCapabilities Capabilities;;
@@ -1867,6 +1876,7 @@ public sealed class CrashRecoveryStrategy : DataProtectionStrategyBase
 #endregion
 }
     public override string StrategyId;;
+    public override bool IsProductionReady;;
     public override string StrategyName;;
     public override DataProtectionCategory Category;;
     public override DataProtectionCapabilities Capabilities;;
@@ -1934,6 +1944,7 @@ public sealed class SemanticBackupStrategy : DataProtectionStrategyBase
     public const int DefaultCriticalThreshold = 80;
     public const int DefaultHighPriorityThreshold = 60;
     public override string StrategyId;;
+    public override bool IsProductionReady;;
     public override string StrategyName;;
     public override DataProtectionCategory Category;;
     public override DataProtectionCapabilities Capabilities;;
@@ -2052,6 +2063,7 @@ public sealed class ZeroKnowledgeBackupStrategy : DataProtectionStrategyBase
 #endregion
 }
     public override string StrategyId;;
+    public override bool IsProductionReady;;
     public override string StrategyName;;
     public override DataProtectionCategory Category;;
     public override DataProtectionCapabilities Capabilities;;
@@ -2685,6 +2697,7 @@ public sealed class QuantumSafeBackupStrategy : DataProtectionStrategyBase
     public enum PqcAlgorithm;
     public enum PqcSecurityLevel;
     public override string StrategyId;;
+    public override bool IsProductionReady;;
     public override string StrategyName;;
     public override DataProtectionCategory Category;;
     public override DataProtectionCapabilities Capabilities;;
@@ -3578,6 +3591,7 @@ public sealed class SatelliteBackupStrategy : DataProtectionStrategyBase
 #endregion
 }
     public override string StrategyId;;
+    public override bool IsProductionReady;;
     public override string StrategyName;;
     public override DataProtectionCategory Category;;
     public override DataProtectionCapabilities Capabilities;;
@@ -4061,6 +4075,7 @@ public sealed class BlockchainAnchoredBackupStrategy : DataProtectionStrategyBas
 }
     public enum BlockchainNetwork;
     public override string StrategyId;;
+    public override bool IsProductionReady;;
     public override string StrategyName;;
     public override DataProtectionCategory Category;;
     public override DataProtectionCapabilities Capabilities;;
@@ -4176,6 +4191,7 @@ public sealed class TimeCapsuleBackupStrategy : DataProtectionStrategyBase
 }
     public TimeCapsuleBackupStrategy();
     public override string StrategyId;;
+    public override bool IsProductionReady;;
     public override string StrategyName;;
     public override DataProtectionCategory Category;;
     public override DataProtectionCapabilities Capabilities;;
@@ -4658,6 +4674,7 @@ public sealed class BackupConfidenceScoreStrategy : DataProtectionStrategyBase
 #endregion
 }
     public override string StrategyId;;
+    public override bool IsProductionReady;;
     public override string StrategyName;;
     public override DataProtectionCategory Category;;
     public override DataProtectionCapabilities Capabilities;;
@@ -5800,6 +5817,7 @@ public sealed class PredictiveBackupStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;
+    public override bool IsProductionReady;;
     public override string StrategyName;;
     public override DataProtectionCategory Category;;
     public override DataProtectionCapabilities Capabilities;;
@@ -5817,6 +5835,7 @@ public sealed class AnomalyAwareBackupStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;
+    public override bool IsProductionReady;;
     public override string StrategyName;;
     public override DataProtectionCategory Category;;
     public override DataProtectionCapabilities Capabilities;;
@@ -5834,6 +5853,7 @@ public sealed class OptimizedRetentionStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;
+    public override bool IsProductionReady;;
     public override string StrategyName;;
     public override DataProtectionCategory Category;;
     public override DataProtectionCapabilities Capabilities;;
@@ -5851,6 +5871,7 @@ public sealed class SmartRecoveryStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;
+    public override bool IsProductionReady;;
     public override string StrategyName;;
     public override DataProtectionCategory Category;;
     public override DataProtectionCapabilities Capabilities;;
@@ -5968,6 +5989,7 @@ public sealed class CopyOnWriteSnapshotStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;
+    public override bool IsProductionReady;;
     public override string StrategyName;;
     public override DataProtectionCategory Category;;
     public override DataProtectionCapabilities Capabilities;;
@@ -5984,6 +6006,7 @@ public sealed class RedirectOnWriteSnapshotStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;
+    public override bool IsProductionReady;;
     public override string StrategyName;;
     public override DataProtectionCategory Category;;
     public override DataProtectionCapabilities Capabilities;;
@@ -6000,6 +6023,7 @@ public sealed class VSSSnapshotStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;
+    public override bool IsProductionReady;;
     public override string StrategyName;;
     public override DataProtectionCategory Category;;
     public override DataProtectionCapabilities Capabilities;;
@@ -6016,6 +6040,7 @@ public sealed class LVMSnapshotStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;
+    public override bool IsProductionReady;;
     public override string StrategyName;;
     public override DataProtectionCategory Category;;
     public override DataProtectionCapabilities Capabilities;;
@@ -6032,6 +6057,7 @@ public sealed class ZFSSnapshotStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;
+    public override bool IsProductionReady;;
     public override string StrategyName;;
     public override DataProtectionCategory Category;;
     public override DataProtectionCapabilities Capabilities;;
@@ -6048,6 +6074,7 @@ public sealed class CloudSnapshotStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;
+    public override bool IsProductionReady;;
     public override string StrategyName;;
     public override DataProtectionCategory Category;;
     public override DataProtectionCapabilities Capabilities;;

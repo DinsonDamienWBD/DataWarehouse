@@ -1082,6 +1082,7 @@ internal sealed class WatermarkManagement : IDisposable
 private sealed class PartitionWatermarkState
 {
 }
+    public readonly object Lock = new();
     public DateTimeOffset CurrentWatermark;
     public DateTimeOffset MaxObservedEventTime;
     public long EventsProcessed;
@@ -4657,6 +4658,7 @@ public sealed record KinesisStream
     public string? KmsKeyId { get; init; }
     public DateTimeOffset CreatedAt { get; init; };
     public bool EnhancedFanOutEnabled { get; init; }
+    public string? AwsAccountId { get; init; }
     public string StreamMode { get; init; };
 }
 ```
@@ -4986,6 +4988,7 @@ private sealed record LoRaWanDeviceState
     public LoRaWanActivation ActivationMode { get; init; }
     public DateTime LastSeen { get; init; }
     public long FrameCounterUp { get; init; }
+    public byte[] AppKey { get; init; };
 }
 ```
 ```csharp
@@ -5156,6 +5159,7 @@ internal sealed class AutoScaler
     public required string ScalerId { get; init; }
     public required string JobId { get; init; }
     public required AutoScaleConfig Config { get; init; }
+    public readonly object ScalingLock = new();
     public int CurrentInstances { get; set; }
     public required List<ScalingMetrics> MetricsHistory { get; init; }
     public required List<ScalingEvent> ScalingHistory { get; init; }
@@ -5238,6 +5242,7 @@ internal sealed class BackpressureController
     public long BlockedCount;
     public long RateLimitedCount;
     public long SampledOutCount;
+    public readonly object RateLimitLock = new();
     public DateTimeOffset RateLimitWindowStart = DateTimeOffset.UtcNow;
     public long RateLimitCounter;
 }

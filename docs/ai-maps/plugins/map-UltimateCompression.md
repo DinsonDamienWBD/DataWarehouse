@@ -1789,7 +1789,8 @@ public sealed class AnsStrategy : CompressionStrategyBase
 {
 #endregion
 }
-    public AnsStrategy() : base(CompressionLevel.Default);
+    public AnsStrategy() : this(CompressionLevel.Default, tableLogSize: 11, precision: 11);
+    public AnsStrategy(CompressionLevel level, int tableLogSize = 11, int precision = 11) : base(level);
     public override CompressionCharacteristics Characteristics { get; };
     protected override async Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);

@@ -59,7 +59,7 @@ public sealed class UltimateDataManagementPlugin : DataManagementPluginBase, IDi
 }
     protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge();
     protected override Dictionary<string, object> GetMetadata();
-    public override Task OnMessageAsync(PluginMessage message);
+    public override async Task OnMessageAsync(PluginMessage message);
     protected override async Task OnStartWithIntelligenceAsync(CancellationToken ct);
     protected override async Task OnStartCoreAsync(CancellationToken ct);
     protected override async Task OnBeforeStatePersistAsync(CancellationToken ct);
@@ -1564,6 +1564,7 @@ public sealed class GeoDistributedCacheStrategy : CachingStrategyBase
 {
 }
     public GeoDistributedCacheStrategy(GeoDistributedCacheConfig config);
+    protected override Task InitializeCoreAsync(CancellationToken ct);
     public override string StrategyId;;
     public override string DisplayName;;
     public override DataManagementCapabilities Capabilities { get; };
@@ -1591,7 +1592,7 @@ private sealed class CacheEntry
 }
     public byte[] Value { get; }
     public DateTime? ExpiresAt { get; set; }
-    public DateTime LastAccess { get; set; }
+    public DateTime LastAccess { get => new DateTime(Interlocked.Read(ref _lastAccessTicks), DateTimeKind.Utc); set => Interlocked.Exchange(ref _lastAccessTicks, value.Ticks); }
     public CachePriority Priority { get; }
     public string[]? Tags { get; }
     public string OriginRegion { get; init; }
@@ -3699,7 +3700,7 @@ public sealed class DataBranch
     public DateTime ModifiedAt { get; set; };
     public string? CreatedBy { get; init; }
     public string? Description { get; init; }
-    public List<string> BlockIds { get; };
+    public HashSet<string> BlockIds { get; };
     public Dictionary<string, string> Tags { get; };
     public Dictionary<string, object> Metadata { get; };
     public long CommitCount { get; set; }

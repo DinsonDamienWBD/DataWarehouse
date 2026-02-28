@@ -2947,6 +2947,7 @@ public sealed class H2StorageStrategy : DatabaseStorageStrategyBase
 {
 }
     public override string StrategyId;;
+    public override bool IsProductionReady;;
     public override string Name;;
     public override StorageTier Tier;;
     public override DatabaseCategory DatabaseCategory;;
