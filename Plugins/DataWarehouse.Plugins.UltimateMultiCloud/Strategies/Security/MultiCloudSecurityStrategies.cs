@@ -133,25 +133,23 @@ public sealed class CrossCloudEncryptionStrategy : MultiCloudStrategyBase
     }
 
     /// <summary>Encrypts data with unified key.</summary>
+    /// <remarks>
+    /// Cross-cloud encryption delegates to the UltimateEncryption plugin via message bus
+    /// to ensure consistent key management across cloud boundaries. This strategy manages
+    /// key metadata and replication; actual cryptographic operations are performed by
+    /// the dedicated encryption plugin.
+    /// </remarks>
     public EncryptedData Encrypt(string keyId, ReadOnlySpan<byte> plaintext)
     {
         if (!_keys.ContainsKey(keyId))
             throw new InvalidOperationException($"Key {keyId} not found");
 
-        // In production, this would use actual encryption
-        var ciphertext = new byte[plaintext.Length + 16];
-        plaintext.CopyTo(ciphertext);
-        var nonce = new byte[12];
-        RandomNumberGenerator.Fill(nonce);
-
-        RecordSuccess();
-        return new EncryptedData
-        {
-            KeyId = keyId,
-            Ciphertext = ciphertext,
-            Nonce = nonce,
-            Algorithm = "AES-256-GCM"
-        };
+        // Cross-cloud encryption must delegate to UltimateEncryption plugin.
+        // Local encryption without proper key exchange would leak plaintext.
+        throw new InvalidOperationException(
+            "Encryption requires UltimateEncryption plugin. " +
+            "Cross-cloud encryption must be performed via message bus to ensure secure key management. " +
+            "Send an 'encryption.encrypt' message with the keyId to the UltimateEncryption plugin.");
     }
 
     /// <summary>Replicates key to a provider.</summary>

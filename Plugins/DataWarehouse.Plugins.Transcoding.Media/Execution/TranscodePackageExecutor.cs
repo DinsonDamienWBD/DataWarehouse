@@ -124,11 +124,24 @@ public sealed class TranscodePackageExecutor
         // Read source data length
         var sourceDataLength = reader.ReadInt32();
 
-        // Read source data from the original input stream
-        // Note: The package format doesn't actually include the source data inline,
-        // it just references it. For now, we'll return empty source data.
-        // Strategies that want full execution should embed the source data in the package.
-        var sourceData = Array.Empty<byte>();
+        // Read source data if present inline in the package
+        byte[] sourceData;
+        if (sourceDataLength > 0)
+        {
+            sourceData = reader.ReadBytes(sourceDataLength);
+            if (sourceData.Length != sourceDataLength)
+            {
+                throw new InvalidOperationException(
+                    $"Package truncated: expected {sourceDataLength} bytes of source data but got {sourceData.Length}. " +
+                    "The transcode package may be corrupt or incomplete.");
+            }
+        }
+        else
+        {
+            throw new InvalidOperationException(
+                "Package does not contain inline source data (sourceDataLength is 0). " +
+                "Provide source data embedded in the package, or supply a source path separately.");
+        }
 
         return new TranscodePackage(
             Magic: magic,

@@ -92,9 +92,10 @@ public sealed class GitHubActionsStrategy : DeploymentStrategyBase
     private static string GetRepo(DeploymentConfig config) => config.StrategyConfig.TryGetValue("repo", out var r) && r is string rs ? rs : "owner/repo";
     private static string GetWorkflow(DeploymentConfig config) => config.StrategyConfig.TryGetValue("workflow", out var w) && w is string ws ? ws : "deploy.yml";
 
-    private Task<long> TriggerWorkflowAsync(string repo, string workflow, DeploymentConfig config, CancellationToken ct) => Task.FromResult(12345L);
+    private Task<long> TriggerWorkflowAsync(string repo, string workflow, DeploymentConfig config, CancellationToken ct)
+        => throw new NotSupportedException("Configure GitHub Actions endpoint and credentials via StrategyConfig['repo'] and StrategyConfig['githubToken'].");
     private Task<(bool Success, string? ErrorMessage, string Conclusion)> WaitForWorkflowCompletionAsync(string repo, long runId, CancellationToken ct)
-        => Task.FromResult((true, (string?)null, "success"));
+        => throw new NotSupportedException("Configure GitHub Actions endpoint and credentials via StrategyConfig['repo'] and StrategyConfig['githubToken'].");
 }
 
 /// <summary>
@@ -169,10 +170,14 @@ public sealed class GitLabCiStrategy : DeploymentStrategyBase
 
     private static string GetProjectId(DeploymentConfig config) => config.StrategyConfig.TryGetValue("projectId", out var p) && p is string ps ? ps : "12345";
 
-    private Task<int> TriggerPipelineAsync(string projectId, DeploymentConfig config, CancellationToken ct) => Task.FromResult(67890);
-    private Task<(bool Success, string? ErrorMessage)> WaitForPipelineAsync(string projectId, int pipelineId, CancellationToken ct) => Task.FromResult((true, (string?)null));
-    private Task UpdateEnvironmentAsync(string projectId, string env, string version, CancellationToken ct) => Task.Delay(30, ct);
-    private Task RollbackEnvironmentAsync(string projectId, string version, CancellationToken ct) => Task.Delay(50, ct);
+    private Task<int> TriggerPipelineAsync(string projectId, DeploymentConfig config, CancellationToken ct)
+        => throw new NotSupportedException("Configure GitLab CI/CD endpoint and credentials via StrategyConfig['projectId'] and StrategyConfig['gitlabToken'].");
+    private Task<(bool Success, string? ErrorMessage)> WaitForPipelineAsync(string projectId, int pipelineId, CancellationToken ct)
+        => throw new NotSupportedException("Configure GitLab CI/CD endpoint and credentials via StrategyConfig['projectId'] and StrategyConfig['gitlabToken'].");
+    private Task UpdateEnvironmentAsync(string projectId, string env, string version, CancellationToken ct)
+        => throw new NotSupportedException("Configure GitLab CI/CD endpoint and credentials via StrategyConfig['projectId'] and StrategyConfig['gitlabToken'].");
+    private Task RollbackEnvironmentAsync(string projectId, string version, CancellationToken ct)
+        => throw new NotSupportedException("Configure GitLab CI/CD endpoint and credentials via StrategyConfig['projectId'] and StrategyConfig['gitlabToken'].");
 }
 
 /// <summary>
@@ -247,8 +252,10 @@ public sealed class JenkinsStrategy : DeploymentStrategyBase
     private static string GetJobName(DeploymentConfig config) => config.StrategyConfig.TryGetValue("jobName", out var jn) && jn is string jns ? jns : "deploy";
     private static string GetJenkinsUrl(DeploymentConfig config) => config.StrategyConfig.TryGetValue("jenkinsUrl", out var ju) && ju is string jus ? jus : "http://jenkins:8080";
 
-    private Task<int> TriggerBuildAsync(string url, string job, DeploymentConfig config, CancellationToken ct) => Task.FromResult(123);
-    private Task<(bool Success, string? ErrorMessage)> WaitForBuildAsync(string url, string job, int build, CancellationToken ct) => Task.FromResult((true, (string?)null));
+    private Task<int> TriggerBuildAsync(string url, string job, DeploymentConfig config, CancellationToken ct)
+        => throw new NotSupportedException("Configure Jenkins endpoint and credentials via StrategyConfig['jenkinsUrl'] and StrategyConfig['jenkinsToken'].");
+    private Task<(bool Success, string? ErrorMessage)> WaitForBuildAsync(string url, string job, int build, CancellationToken ct)
+        => throw new NotSupportedException("Configure Jenkins endpoint and credentials via StrategyConfig['jenkinsUrl'] and StrategyConfig['jenkinsToken'].");
 }
 
 /// <summary>
@@ -325,9 +332,12 @@ public sealed class AzureDevOpsStrategy : DeploymentStrategyBase
     private static string GetProject(DeploymentConfig config) => config.StrategyConfig.TryGetValue("project", out var p) && p is string ps ? ps : "myproject";
     private static int GetPipelineId(DeploymentConfig config) => config.StrategyConfig.TryGetValue("pipelineId", out var p) && p is int pi ? pi : 1;
 
-    private Task<int> QueuePipelineRunAsync(string org, string project, int pipeline, DeploymentConfig config, CancellationToken ct) => Task.FromResult(456);
-    private Task<(bool Success, string? ErrorMessage)> WaitForRunAsync(string org, string project, int runId, CancellationToken ct) => Task.FromResult((true, (string?)null));
-    private Task TriggerRollbackAsync(string org, string project, string version, CancellationToken ct) => Task.Delay(50, ct);
+    private Task<int> QueuePipelineRunAsync(string org, string project, int pipeline, DeploymentConfig config, CancellationToken ct)
+        => throw new NotSupportedException("Configure Azure DevOps endpoint and credentials via StrategyConfig['organization'] and StrategyConfig['azureDevOpsToken'].");
+    private Task<(bool Success, string? ErrorMessage)> WaitForRunAsync(string org, string project, int runId, CancellationToken ct)
+        => throw new NotSupportedException("Configure Azure DevOps endpoint and credentials via StrategyConfig['organization'] and StrategyConfig['azureDevOpsToken'].");
+    private Task TriggerRollbackAsync(string org, string project, string version, CancellationToken ct)
+        => throw new NotSupportedException("Configure Azure DevOps endpoint and credentials via StrategyConfig['organization'] and StrategyConfig['azureDevOpsToken'].");
 }
 
 /// <summary>
@@ -392,8 +402,10 @@ public sealed class CircleCiStrategy : DeploymentStrategyBase
 
     private static string GetProjectSlug(DeploymentConfig config) => config.StrategyConfig.TryGetValue("projectSlug", out var ps) && ps is string pss ? pss : "gh/owner/repo";
 
-    private Task<string> TriggerPipelineAsync(string projectSlug, DeploymentConfig config, CancellationToken ct) => Task.FromResult("pipeline-123");
-    private Task<(bool Success, string? ErrorMessage)> WaitForWorkflowAsync(string pipelineId, CancellationToken ct) => Task.FromResult((true, (string?)null));
+    private Task<string> TriggerPipelineAsync(string projectSlug, DeploymentConfig config, CancellationToken ct)
+        => throw new NotSupportedException("Configure CircleCI endpoint and credentials via StrategyConfig['projectSlug'] and StrategyConfig['circleCiToken'].");
+    private Task<(bool Success, string? ErrorMessage)> WaitForWorkflowAsync(string pipelineId, CancellationToken ct)
+        => throw new NotSupportedException("Configure CircleCI endpoint and credentials via StrategyConfig['projectSlug'] and StrategyConfig['circleCiToken'].");
 }
 
 /// <summary>
@@ -484,11 +496,16 @@ public sealed class ArgoCdStrategy : DeploymentStrategyBase
     private static string GetAppName(DeploymentConfig config) => config.StrategyConfig.TryGetValue("appName", out var an) && an is string ans ? ans : $"app-{config.Environment}";
     private static string GetRepoUrl(DeploymentConfig config) => config.StrategyConfig.TryGetValue("repoUrl", out var ru) && ru is string rus ? rus : "https://github.com/org/manifests";
 
-    private Task UpdateApplicationAsync(string appName, string revision, CancellationToken ct) => Task.Delay(30, ct);
-    private Task SyncApplicationAsync(string appName, CancellationToken ct) => Task.Delay(50, ct);
-    private Task<(bool Synced, string? ErrorMessage)> WaitForSyncAsync(string appName, CancellationToken ct) => Task.FromResult((true, (string?)null));
-    private Task WaitForHealthyAsync(string appName, CancellationToken ct) => Task.Delay(50, ct);
-    private Task RollbackApplicationAsync(string appName, string version, CancellationToken ct) => Task.Delay(30, ct);
+    private Task UpdateApplicationAsync(string appName, string revision, CancellationToken ct)
+        => throw new NotSupportedException("Configure ArgoCD endpoint and credentials via StrategyConfig['argoCdUrl'] and StrategyConfig['argoCdToken'].");
+    private Task SyncApplicationAsync(string appName, CancellationToken ct)
+        => throw new NotSupportedException("Configure ArgoCD endpoint and credentials via StrategyConfig['argoCdUrl'] and StrategyConfig['argoCdToken'].");
+    private Task<(bool Synced, string? ErrorMessage)> WaitForSyncAsync(string appName, CancellationToken ct)
+        => throw new NotSupportedException("Configure ArgoCD endpoint and credentials via StrategyConfig['argoCdUrl'] and StrategyConfig['argoCdToken'].");
+    private Task WaitForHealthyAsync(string appName, CancellationToken ct)
+        => throw new NotSupportedException("Configure ArgoCD endpoint and credentials via StrategyConfig['argoCdUrl'] and StrategyConfig['argoCdToken'].");
+    private Task RollbackApplicationAsync(string appName, string version, CancellationToken ct)
+        => throw new NotSupportedException("Configure ArgoCD endpoint and credentials via StrategyConfig['argoCdUrl'] and StrategyConfig['argoCdToken'].");
 }
 
 /// <summary>
@@ -564,12 +581,18 @@ public sealed class FluxCdStrategy : DeploymentStrategyBase
     private static string GetNamespace(DeploymentConfig config) => config.StrategyConfig.TryGetValue("namespace", out var ns) && ns is string nss ? nss : "flux-system";
     private static string GetKustomizationName(DeploymentConfig config) => config.StrategyConfig.TryGetValue("kustomizationName", out var kn) && kn is string kns ? kns : "app";
 
-    private Task UpdateImageAutomationAsync(string namespace_, string image, CancellationToken ct) => Task.Delay(30, ct);
-    private Task ReconcileKustomizationAsync(string namespace_, string name, CancellationToken ct) => Task.Delay(50, ct);
-    private Task WaitForReconciliationAsync(string namespace_, string name, CancellationToken ct) => Task.Delay(50, ct);
-    private Task SuspendKustomizationAsync(string namespace_, string name, CancellationToken ct) => Task.Delay(20, ct);
-    private Task RevertGitAsync(string version, CancellationToken ct) => Task.Delay(30, ct);
-    private Task ResumeKustomizationAsync(string namespace_, string name, CancellationToken ct) => Task.Delay(20, ct);
+    private Task UpdateImageAutomationAsync(string namespace_, string image, CancellationToken ct)
+        => throw new NotSupportedException("Configure FluxCD endpoint and credentials via StrategyConfig['fluxCdKubeconfig'] and StrategyConfig['namespace'].");
+    private Task ReconcileKustomizationAsync(string namespace_, string name, CancellationToken ct)
+        => throw new NotSupportedException("Configure FluxCD endpoint and credentials via StrategyConfig['fluxCdKubeconfig'] and StrategyConfig['namespace'].");
+    private Task WaitForReconciliationAsync(string namespace_, string name, CancellationToken ct)
+        => throw new NotSupportedException("Configure FluxCD endpoint and credentials via StrategyConfig['fluxCdKubeconfig'] and StrategyConfig['namespace'].");
+    private Task SuspendKustomizationAsync(string namespace_, string name, CancellationToken ct)
+        => throw new NotSupportedException("Configure FluxCD endpoint and credentials via StrategyConfig['fluxCdKubeconfig'] and StrategyConfig['namespace'].");
+    private Task RevertGitAsync(string version, CancellationToken ct)
+        => throw new NotSupportedException("Configure FluxCD endpoint and credentials via StrategyConfig['fluxCdKubeconfig'] and StrategyConfig['namespace'].");
+    private Task ResumeKustomizationAsync(string namespace_, string name, CancellationToken ct)
+        => throw new NotSupportedException("Configure FluxCD endpoint and credentials via StrategyConfig['fluxCdKubeconfig'] and StrategyConfig['namespace'].");
 }
 
 /// <summary>
@@ -640,7 +663,10 @@ public sealed class SpinnakerStrategy : DeploymentStrategyBase
     private static string GetApplication(DeploymentConfig config) => config.StrategyConfig.TryGetValue("application", out var a) && a is string ass ? ass : "myapp";
     private static string GetPipeline(DeploymentConfig config) => config.StrategyConfig.TryGetValue("pipeline", out var p) && p is string ps ? ps : "deploy";
 
-    private Task<string> TriggerPipelineAsync(string app, string pipeline, DeploymentConfig config, CancellationToken ct) => Task.FromResult("exec-123");
-    private Task<(bool Success, string? ErrorMessage)> WaitForExecutionAsync(string app, string execId, CancellationToken ct) => Task.FromResult((true, (string?)null));
-    private Task TriggerRollbackPipelineAsync(string app, string version, CancellationToken ct) => Task.Delay(50, ct);
+    private Task<string> TriggerPipelineAsync(string app, string pipeline, DeploymentConfig config, CancellationToken ct)
+        => throw new NotSupportedException("Configure Spinnaker endpoint and credentials via StrategyConfig['spinnakerUrl'] and StrategyConfig['spinnakerToken'].");
+    private Task<(bool Success, string? ErrorMessage)> WaitForExecutionAsync(string app, string execId, CancellationToken ct)
+        => throw new NotSupportedException("Configure Spinnaker endpoint and credentials via StrategyConfig['spinnakerUrl'] and StrategyConfig['spinnakerToken'].");
+    private Task TriggerRollbackPipelineAsync(string app, string version, CancellationToken ct)
+        => throw new NotSupportedException("Configure Spinnaker endpoint and credentials via StrategyConfig['spinnakerUrl'] and StrategyConfig['spinnakerToken'].");
 }

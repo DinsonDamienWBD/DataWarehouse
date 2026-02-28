@@ -71,6 +71,20 @@ public interface ITamperProofProvider
         CancellationToken ct = default);
 
     /// <summary>
+    /// Reads data from tamper-proof storage with verification, recording the calling principal for forensic attribution.
+    /// </summary>
+    /// <param name="objectId">Unique identifier of the object to read.</param>
+    /// <param name="mode">Read verification mode (Fast, Verified, Audit).</param>
+    /// <param name="principal">The principal (user/service) performing the read, for audit logging.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Result containing reconstructed data, integrity verification, and recovery details.</returns>
+    Task<SecureReadResult> SecureReadAsync(
+        Guid objectId,
+        ReadMode mode,
+        string principal,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Creates a correction (new version) of an existing object.
     /// Preserves the original in WORM, creates a new version with incremented version number,
     /// and links to the previous version in the audit chain.
@@ -325,7 +339,7 @@ public abstract class TamperProofProviderPluginBase : IntegrityPluginBase, ITamp
 
         try
         {
-            // Log write operation
+            // Log write operation (pre-write entry uses ErrorMessage to indicate pending state)
             await _accessLogProvider.LogAccessAsync(new AccessLogEntry
             {
                 EntryId = Guid.NewGuid(),
@@ -335,7 +349,8 @@ public abstract class TamperProofProviderPluginBase : IntegrityPluginBase, ITamp
                 Timestamp = DateTimeOffset.UtcNow,
                 ClientIp = context.ClientIp,
                 SessionId = context.SessionId,
-                Succeeded = false
+                Succeeded = false,
+                ErrorMessage = "pending"
             }, ct);
 
             // Execute the write pipeline (transformation, sharding, storage, etc.)
@@ -382,26 +397,43 @@ public abstract class TamperProofProviderPluginBase : IntegrityPluginBase, ITamp
 
     /// <summary>
     /// Reads data from tamper-proof storage with verification and optional recovery.
+    /// Uses "system" as the principal for backward compatibility.
+    /// Prefer the overload that accepts a principal for proper forensic attribution.
+    /// </summary>
+    public virtual Task<SecureReadResult> SecureReadAsync(
+        Guid objectId,
+        ReadMode mode,
+        CancellationToken ct = default)
+    {
+        return SecureReadAsync(objectId, mode, "system", ct);
+    }
+
+    /// <summary>
+    /// Reads data from tamper-proof storage with verification, recording the calling principal.
     /// </summary>
     public virtual async Task<SecureReadResult> SecureReadAsync(
         Guid objectId,
         ReadMode mode,
+        string principal,
         CancellationToken ct = default)
     {
         if (objectId == Guid.Empty)
             throw new ArgumentException("Object ID cannot be empty.", nameof(objectId));
 
+        ArgumentException.ThrowIfNullOrWhiteSpace(principal, nameof(principal));
+
         try
         {
-            // Log read operation
+            // Log read operation (pre-write entry uses ErrorMessage to indicate pending state)
             await _accessLogProvider.LogAccessAsync(new AccessLogEntry
             {
                 EntryId = Guid.NewGuid(),
                 ObjectId = objectId,
                 AccessType = AccessType.Read,
-                Principal = "system", // Hardcoded: resolve from security context when available.
+                Principal = principal,
                 Timestamp = DateTimeOffset.UtcNow,
-                Succeeded = false
+                Succeeded = false,
+                ErrorMessage = "pending"
             }, ct);
 
             // Execute the read pipeline (fetch, verify, reconstruct, reverse pipeline)
@@ -416,7 +448,7 @@ public abstract class TamperProofProviderPluginBase : IntegrityPluginBase, ITamp
                 EntryId = Guid.NewGuid(),
                 ObjectId = objectId,
                 AccessType = AccessType.Read,
-                Principal = "system",
+                Principal = principal,
                 Timestamp = DateTimeOffset.UtcNow,
                 Succeeded = true
             }, ct);
@@ -431,7 +463,7 @@ public abstract class TamperProofProviderPluginBase : IntegrityPluginBase, ITamp
                 EntryId = Guid.NewGuid(),
                 ObjectId = objectId,
                 AccessType = AccessType.Read,
-                Principal = "system",
+                Principal = principal,
                 Timestamp = DateTimeOffset.UtcNow,
                 Succeeded = false,
                 ErrorMessage = ex.Message

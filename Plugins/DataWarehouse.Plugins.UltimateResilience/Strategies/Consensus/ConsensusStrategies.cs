@@ -24,7 +24,9 @@ public sealed class RaftConsensusStrategy : ResilienceStrategyBase
     private readonly BoundedDictionary<string, long> _nextIndex = new BoundedDictionary<string, long>(1000);
     private readonly BoundedDictionary<string, long> _matchIndex = new BoundedDictionary<string, long>(1000);
     private readonly List<(long term, object command)> _log = new();
+#pragma warning disable CS0649 // _commitIndex is assigned during network replication (requires configured endpoints)
     private long _commitIndex;
+#pragma warning restore CS0649
     private DateTimeOffset _lastHeartbeat = DateTimeOffset.UtcNow;
     private readonly object _stateLock = new();
 
@@ -96,7 +98,7 @@ public sealed class RaftConsensusStrategy : ResilienceStrategyBase
     /// <summary>
     /// Starts an election (become candidate).
     /// </summary>
-    public async Task<bool> StartElectionAsync(CancellationToken cancellationToken = default)
+    public Task<bool> StartElectionAsync(CancellationToken cancellationToken = default)
     {
         lock (_stateLock)
         {
@@ -105,81 +107,32 @@ public sealed class RaftConsensusStrategy : ResilienceStrategyBase
             _votedFor = _nodeId;
         }
 
-        var votesReceived = 1; // Vote for self
-        var votesNeeded = (_clusterNodes.Count + 1) / 2 + 1;
+        // Cluster endpoints must be configured for actual RPC communication.
+        if (_clusterNodes.Count == 0)
+            throw new NotSupportedException("Configure cluster endpoints for Raft. No cluster nodes registered.");
 
-        // Request votes from other nodes (simulated)
-        var voteTasks = _clusterNodes.Select(async nodeId =>
-        {
-            await Task.Delay(Random.Shared.Next(5, 20), cancellationToken);
-            // In production: send RequestVote RPC to nodeId
-            // Simulate vote response
-            return Random.Shared.NextDouble() > 0.3;
-        }).ToList();
-
-        var results = await Task.WhenAll(voteTasks);
-        votesReceived += results.Count(v => v);
-
-        lock (_stateLock)
-        {
-            if (votesReceived >= votesNeeded && _state == RaftState.Candidate)
-            {
-                _state = RaftState.Leader;
-                _leaderId = _nodeId;
-
-                // Initialize leader state
-                foreach (var nodeId in _clusterNodes)
-                {
-                    _nextIndex[nodeId] = _log.Count;
-                    _matchIndex[nodeId] = 0;
-                }
-
-                return true;
-            }
-            else
-            {
-                _state = RaftState.Follower;
-                return false;
-            }
-        }
+        throw new NotSupportedException(
+            "Configure cluster endpoints for Raft. " +
+            "RequestVote RPC requires network transport to be configured via AddNode() with reachable endpoint addresses.");
     }
 
     /// <summary>
     /// Appends a command to the log (leader only).
     /// </summary>
-    public async Task<bool> AppendCommandAsync(object command, CancellationToken cancellationToken = default)
+    public Task<bool> AppendCommandAsync(object command, CancellationToken cancellationToken = default)
     {
         if (_state != RaftState.Leader)
-            return false;
+            return Task.FromResult(false);
 
         lock (_stateLock)
         {
             _log.Add((_currentTerm, command));
         }
 
-        // Replicate to followers (simulated)
-        var replicationTasks = _clusterNodes.Select(async nodeId =>
-        {
-            await Task.Delay(Random.Shared.Next(5, 15), cancellationToken);
-            // In production: send AppendEntries RPC
-            return Random.Shared.NextDouble() > 0.2;
-        }).ToList();
-
-        var results = await Task.WhenAll(replicationTasks);
-        var replicatedCount = results.Count(r => r) + 1; // +1 for leader
-
-        var majority = (_clusterNodes.Count + 1) / 2 + 1;
-
-        if (replicatedCount >= majority)
-        {
-            lock (_stateLock)
-            {
-                _commitIndex = _log.Count - 1;
-            }
-            return true;
-        }
-
-        return false;
+        // AppendEntries RPC requires configured network transport
+        throw new NotSupportedException(
+            "Configure cluster endpoints for Raft. " +
+            "AppendEntries RPC requires network transport to be configured via AddNode() with reachable endpoint addresses.");
     }
 
     /// <summary>
@@ -270,8 +223,10 @@ public sealed class RaftConsensusStrategy : ResilienceStrategyBase
 public sealed class PaxosConsensusStrategy : ResilienceStrategyBase
 {
     private long _proposalNumber;
+#pragma warning disable CS0649, CS0169 // Fields assigned during network consensus (requires configured endpoints)
     private long _highestAcceptedProposal;
     private object? _acceptedValue;
+#pragma warning restore CS0649, CS0169
     private readonly BoundedDictionary<long, object?> _promises = new BoundedDictionary<long, object?>(1000);
     private readonly object _stateLock = new();
 
@@ -309,63 +264,17 @@ public sealed class PaxosConsensusStrategy : ResilienceStrategyBase
     /// <summary>
     /// Proposes a value using Paxos protocol.
     /// </summary>
-    public async Task<(bool success, object? value)> ProposeAsync(object value, CancellationToken cancellationToken = default)
+    public Task<(bool success, object? value)> ProposeAsync(object value, CancellationToken cancellationToken = default)
     {
-        // Phase 1: Prepare
-        long proposalNum;
+        // Phase 1: Prepare -- requires network transport to acceptor nodes
         lock (_stateLock)
         {
             _proposalNumber++;
-            proposalNum = _proposalNumber;
         }
 
-        // Send Prepare messages (simulated)
-        var prepareResponses = new List<(long acceptedProposal, object? acceptedValue)>();
-        for (int i = 0; i < _quorumSize; i++)
-        {
-            await Task.Delay(Random.Shared.Next(5, 15), cancellationToken);
-            // Simulate acceptor response
-            if (Random.Shared.NextDouble() > 0.2)
-            {
-                prepareResponses.Add((_highestAcceptedProposal, _acceptedValue));
-            }
-        }
-
-        if (prepareResponses.Count < (_quorumSize / 2 + 1))
-        {
-            return (false, null);
-        }
-
-        // Choose value: if any acceptor has accepted a value, use the one with highest proposal
-        var valueToPropose = prepareResponses
-            .Where(r => r.acceptedValue != null)
-            .OrderByDescending(r => r.acceptedProposal)
-            .Select(r => r.acceptedValue)
-            .FirstOrDefault() ?? value;
-
-        // Phase 2: Accept
-        var acceptCount = 0;
-        for (int i = 0; i < _quorumSize; i++)
-        {
-            await Task.Delay(Random.Shared.Next(5, 15), cancellationToken);
-            // Simulate acceptor response
-            if (Random.Shared.NextDouble() > 0.2)
-            {
-                acceptCount++;
-            }
-        }
-
-        if (acceptCount >= (_quorumSize / 2 + 1))
-        {
-            lock (_stateLock)
-            {
-                _highestAcceptedProposal = proposalNum;
-                _acceptedValue = valueToPropose;
-            }
-            return (true, valueToPropose);
-        }
-
-        return (false, null);
+        throw new NotSupportedException(
+            "Configure cluster endpoints for Paxos. " +
+            "Prepare/Accept phases require network transport to acceptor nodes.");
     }
 
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(
@@ -471,58 +380,18 @@ public sealed class PbftConsensusStrategy : ResilienceStrategyBase
     /// <summary>
     /// Executes PBFT consensus for a request.
     /// </summary>
-    public async Task<bool> ExecuteConsensusAsync(object request, CancellationToken cancellationToken = default)
+    public Task<bool> ExecuteConsensusAsync(object request, CancellationToken cancellationToken = default)
     {
-        long seqNum;
         lock (_stateLock)
         {
-            seqNum = ++_sequenceNumber;
-            _pending[seqNum] = (request, 0, 0);
+            ++_sequenceNumber;
+            _pending[_sequenceNumber] = (request, 0, 0);
         }
 
-        // Pre-prepare phase (leader broadcasts)
-        await Task.Delay(Random.Shared.Next(2, 10), cancellationToken);
-
-        // Prepare phase
-        var prepareCount = 0;
-        for (int i = 0; i < _totalNodes; i++)
-        {
-            await Task.Delay(Random.Shared.Next(2, 10), cancellationToken);
-            if (Random.Shared.NextDouble() > 0.1)
-            {
-                prepareCount++;
-            }
-        }
-
-        var prepareQuorum = 2 * _faultyNodes;
-        if (prepareCount < prepareQuorum)
-        {
-            return false;
-        }
-
-        // Commit phase
-        var commitCount = 0;
-        for (int i = 0; i < _totalNodes; i++)
-        {
-            await Task.Delay(Random.Shared.Next(2, 10), cancellationToken);
-            if (Random.Shared.NextDouble() > 0.1)
-            {
-                commitCount++;
-            }
-        }
-
-        var commitQuorum = 2 * _faultyNodes + 1;
-        if (commitCount >= commitQuorum)
-        {
-            lock (_stateLock)
-            {
-                _committed[seqNum] = request;
-                _pending.TryRemove(seqNum, out _);
-            }
-            return true;
-        }
-
-        return false;
+        // Pre-prepare, Prepare, and Commit phases require network transport to replica nodes
+        throw new NotSupportedException(
+            "Configure cluster endpoints for PBFT. " +
+            "Pre-prepare/Prepare/Commit phases require network transport to all replica nodes.");
     }
 
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(
@@ -631,37 +500,21 @@ public sealed class ZabConsensusStrategy : ResilienceStrategyBase
     /// <summary>
     /// Broadcasts a proposal using ZAB.
     /// </summary>
-    public async Task<bool> BroadcastAsync(object proposal, CancellationToken cancellationToken = default)
+    public Task<bool> BroadcastAsync(object proposal, CancellationToken cancellationToken = default)
     {
-        if (!_isLeader) return false;
+        if (!_isLeader) return Task.FromResult(false);
 
-        long proposalZxid;
         lock (_stateLock)
         {
             _zxid++;
-            proposalZxid = _zxid;
-            _proposals[proposalZxid] = proposal;
-            _ackCounts[proposalZxid] = 1; // Leader's own ack
+            _proposals[_zxid] = proposal;
+            _ackCounts[_zxid] = 1; // Leader's own ack
         }
 
-        // Send proposal to followers
-        var ackTasks = Enumerable.Range(0, _quorumSize - 1).Select(async _ =>
-        {
-            await Task.Delay(Random.Shared.Next(3, 12), cancellationToken);
-            return Random.Shared.NextDouble() > 0.15;
-        }).ToList();
-
-        var acks = await Task.WhenAll(ackTasks);
-        var totalAcks = 1 + acks.Count(a => a);
-
-        if (totalAcks >= (_quorumSize / 2 + 1))
-        {
-            // Send COMMIT to followers
-            await Task.Delay(Random.Shared.Next(2, 8), cancellationToken);
-            return true;
-        }
-
-        return false;
+        // Broadcast and ACK collection require network transport to follower nodes
+        throw new NotSupportedException(
+            "Configure cluster endpoints for ZAB. " +
+            "Proposal broadcast requires network transport to follower nodes.");
     }
 
     /// <summary>
@@ -744,7 +597,9 @@ public sealed class ViewstampedReplicationStrategy : ResilienceStrategyBase
 {
     private long _viewNumber;
     private long _opNumber;
+#pragma warning disable CS0649 // _commitNumber is assigned during network replication (requires configured endpoints)
     private long _commitNumber;
+#pragma warning restore CS0649
     private bool _isPrimary;
     private readonly BoundedDictionary<long, object> _log = new BoundedDictionary<long, object>(1000);
     private readonly object _stateLock = new();
@@ -783,42 +638,20 @@ public sealed class ViewstampedReplicationStrategy : ResilienceStrategyBase
     /// <summary>
     /// Processes a client request (primary only).
     /// </summary>
-    public async Task<bool> ProcessRequestAsync(object request, CancellationToken cancellationToken = default)
+    public Task<bool> ProcessRequestAsync(object request, CancellationToken cancellationToken = default)
     {
-        if (!_isPrimary) return false;
+        if (!_isPrimary) return Task.FromResult(false);
 
-        long opNum;
         lock (_stateLock)
         {
             _opNumber++;
-            opNum = _opNumber;
-            _log[opNum] = request;
+            _log[_opNumber] = request;
         }
 
-        // Send PREPARE to backups
-        var prepareCount = 1;
-        for (int i = 0; i < _replicaCount - 1; i++)
-        {
-            await Task.Delay(Random.Shared.Next(3, 10), cancellationToken);
-            if (Random.Shared.NextDouble() > 0.15)
-            {
-                prepareCount++;
-            }
-        }
-
-        if (prepareCount >= (_replicaCount / 2 + 1))
-        {
-            lock (_stateLock)
-            {
-                _commitNumber = opNum;
-            }
-
-            // Send COMMIT to backups
-            await Task.Delay(Random.Shared.Next(2, 8), cancellationToken);
-            return true;
-        }
-
-        return false;
+        // PREPARE/COMMIT require network transport to backup replicas
+        throw new NotSupportedException(
+            "Configure cluster endpoints for Viewstamped Replication. " +
+            "PREPARE/COMMIT phases require network transport to backup replica nodes.");
     }
 
     /// <summary>

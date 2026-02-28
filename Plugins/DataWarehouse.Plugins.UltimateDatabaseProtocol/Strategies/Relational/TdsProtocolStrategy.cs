@@ -1001,7 +1001,6 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
 
     private object? ParseColumnValue(byte[] payload, ref int index, string dataType)
     {
-        // Simplified parsing - production code would handle all types
         switch (dataType)
         {
             case "INT":
@@ -1014,21 +1013,96 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
                 index += 8;
                 return longVal;
 
+            case "SMALLINT":
+                var shortVal = (short)(payload[index] | (payload[index + 1] << 8));
+                index += 2;
+                return shortVal;
+
+            case "TINYINT":
+                var byteVal = payload[index];
+                index += 1;
+                return byteVal;
+
+            case "BIT":
+                var bitVal = payload[index] != 0;
+                index += 1;
+                return bitVal;
+
+            case "FLOAT":
+                var doubleVal = BitConverter.ToDouble(payload, index);
+                index += 8;
+                return doubleVal;
+
+            case "REAL":
+                var floatVal = BitConverter.ToSingle(payload, index);
+                index += 4;
+                return floatVal;
+
+            case "DECIMAL":
+            case "NUMERIC":
+            case "MONEY":
+                // TDS MONEY is 8 bytes: high 4 bytes then low 4 bytes, value / 10000
+                var moneyHigh = ReadInt32LE(payload.AsSpan(index, 4));
+                var moneyLow = ReadInt32LE(payload.AsSpan(index + 4, 4));
+                index += 8;
+                var moneyRaw = ((long)moneyHigh << 32) | (uint)moneyLow;
+                return moneyRaw / 10000m;
+
+            case "SMALLMONEY":
+                var smallMoneyRaw = ReadInt32LE(payload.AsSpan(index, 4));
+                index += 4;
+                return smallMoneyRaw / 10000m;
+
+            case "DATETIME":
+                // TDS DATETIME: 4 bytes days since 1900-01-01, 4 bytes 1/300th second intervals
+                var daysSince1900 = ReadInt32LE(payload.AsSpan(index, 4));
+                var timeTicks = ReadInt32LE(payload.AsSpan(index + 4, 4));
+                index += 8;
+                var baseDate = new DateTime(1900, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                return baseDate.AddDays(daysSince1900).AddSeconds(timeTicks / 300.0);
+
+            case "SMALLDATETIME":
+                var sdDays = (ushort)(payload[index] | (payload[index + 1] << 8));
+                var sdMinutes = (ushort)(payload[index + 2] | (payload[index + 3] << 8));
+                index += 4;
+                var sdBase = new DateTime(1900, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                return sdBase.AddDays(sdDays).AddMinutes(sdMinutes);
+
+            case "UNIQUEIDENTIFIER":
+                var guidBytes = new byte[16];
+                Array.Copy(payload, index, guidBytes, 0, 16);
+                index += 16;
+                return new Guid(guidBytes);
+
             case "NVARCHAR":
             case "VARCHAR":
+            case "NCHAR":
+            case "CHAR":
                 var strLen = payload[index] | (payload[index + 1] << 8);
                 index += 2;
                 if (strLen == 0xffff)
                     return null;
-                var str = dataType == "NVARCHAR"
+                var str = dataType.StartsWith('N')
                     ? Encoding.Unicode.GetString(payload, index, strLen)
                     : Encoding.UTF8.GetString(payload, index, strLen);
                 index += strLen;
                 return str;
 
+            case "BINARY":
+            case "VARBINARY":
+                var binLen = payload[index] | (payload[index + 1] << 8);
+                index += 2;
+                if (binLen == 0xffff)
+                    return null;
+                var binData = new byte[binLen];
+                Array.Copy(payload, index, binData, 0, binLen);
+                index += binLen;
+                return binData;
+
             default:
-                // Skip unknown types
-                return null;
+                throw new NotSupportedException(
+                    $"TDS column type '{dataType}' is not supported. " +
+                    "Add a handler for this type or use a supported column type.");
         }
     }
 

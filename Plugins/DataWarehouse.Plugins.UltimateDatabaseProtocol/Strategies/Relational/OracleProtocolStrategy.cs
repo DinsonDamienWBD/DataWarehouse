@@ -315,17 +315,13 @@ public sealed class OracleTnsProtocolStrategy : DatabaseProtocolStrategyBase
     private static byte[] ComputePasswordVerifier(string username, string password,
         byte[] serverSessionKey, byte[] authVfrData)
     {
-        // Simplified Oracle password verification
-        // Real implementation uses DES/AES with session keys
-
-        using var sha1 = SHA1.Create();
-        var combined = Encoding.UTF8.GetBytes(password + username);
-        var hash1 = sha1.ComputeHash(combined);
-
-        using var sha256 = SHA256.Create();
-        var hash2 = sha256.ComputeHash(hash1.Concat(serverSessionKey).Concat(authVfrData).ToArray());
-
-        return hash2[..32];
+        // O5LOGON authentication requires the Oracle client library for proper
+        // PBKDF2-based key derivation and DES-CBC-encrypted verifier computation.
+        // A simplified hash-based approach would be rejected by the server.
+        throw new NotSupportedException(
+            "O5LOGON authentication requires Oracle client library. " +
+            "The password verifier computation uses proprietary PBKDF2+DES-CBC key derivation " +
+            "that cannot be correctly implemented without the Oracle OCI/ODP.NET client.");
     }
 
     private async Task SendDataPacketAsync(byte[] data, CancellationToken ct)
@@ -967,14 +963,14 @@ public sealed class Db2DrdaProtocolStrategy : DatabaseProtocolStrategyBase
 
     private static List<Dictionary<string, object?>> ParseQueryData(byte[] data)
     {
-        var rows = new List<Dictionary<string, object?>>();
-        // Simplified - actual parsing depends on column metadata
-        var row = new Dictionary<string, object?>
-        {
-            ["data"] = Encoding.GetEncoding("IBM037").GetString(data)
-        };
-        rows.Add(row);
-        return rows;
+        // Oracle TNS wire protocol data packets have a complex format that depends on
+        // column metadata (DESCRIBE response) to determine column count, types, and sizes.
+        // Dumping the entire packet into a single key corrupts the result set.
+        // A proper implementation requires tracking column descriptors from the preceding
+        // DESCRIBE response to parse individual column values.
+        throw new NotSupportedException(
+            "Oracle wire protocol result set parsing requires column metadata from the DESCRIBE response. " +
+            "Use Oracle OCI/ODP.NET client library for proper data packet deserialization.");
     }
 
     /// <inheritdoc/>

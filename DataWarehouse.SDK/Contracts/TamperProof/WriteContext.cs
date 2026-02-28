@@ -76,6 +76,21 @@ public class WriteContext
     public const int MaxCommentLength = 4096;
 
     /// <summary>
+    /// Maximum allowed length for ClientIp field (supports IPv6 mapped addresses).
+    /// </summary>
+    public const int MaxClientIpLength = 45;
+
+    /// <summary>
+    /// Maximum allowed length for UserAgent field.
+    /// </summary>
+    public const int MaxUserAgentLength = 500;
+
+    /// <summary>
+    /// Maximum allowed length for SessionId field.
+    /// </summary>
+    public const int MaxSessionIdLength = 128;
+
+    /// <summary>
     /// Validates the write context for completeness and correctness.
     /// </summary>
     /// <returns>List of validation errors, empty if valid.</returns>
@@ -99,6 +114,28 @@ public class WriteContext
         else if (Comment.Length > MaxCommentLength)
         {
             errors.Add($"Comment cannot exceed {MaxCommentLength} characters.");
+        }
+
+        if (ClientIp is not null)
+        {
+            if (ClientIp.Length > MaxClientIpLength)
+            {
+                errors.Add($"ClientIp cannot exceed {MaxClientIpLength} characters.");
+            }
+            else if (!System.Net.IPAddress.TryParse(ClientIp, out _))
+            {
+                errors.Add("ClientIp must be a valid IPv4 or IPv6 address.");
+            }
+        }
+
+        if (UserAgent is not null && UserAgent.Length > MaxUserAgentLength)
+        {
+            errors.Add($"UserAgent cannot exceed {MaxUserAgentLength} characters.");
+        }
+
+        if (SessionId is not null && SessionId.Length > MaxSessionIdLength)
+        {
+            errors.Add($"SessionId cannot exceed {MaxSessionIdLength} characters.");
         }
 
         return errors;

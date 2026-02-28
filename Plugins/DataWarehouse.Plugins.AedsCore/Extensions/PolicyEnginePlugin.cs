@@ -5,6 +5,7 @@ using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Distribution;
 using DataWarehouse.SDK.Primitives;
 using System.Collections.Concurrent;
+using System.IO;
 
 namespace DataWarehouse.Plugins.AedsCore.Extensions;
 
@@ -78,13 +79,43 @@ public sealed class PolicyEnginePlugin : SecurityPluginBase, IClientPolicyEngine
     /// Loads policy rules from JSON file.
     /// </summary>
     /// <param name="policyPath">Path to policy file.</param>
-    public Task LoadPolicyAsync(string policyPath)
+    public async Task LoadPolicyAsync(string policyPath)
     {
         if (string.IsNullOrEmpty(policyPath))
             throw new ArgumentException("Policy path cannot be null or empty.", nameof(policyPath));
 
-        // In production, parse JSON and load rules
-        return Task.CompletedTask;
+        if (!File.Exists(policyPath))
+            throw new InvalidOperationException($"Policy file not found: {policyPath}");
+
+        var json = await File.ReadAllTextAsync(policyPath).ConfigureAwait(false);
+        var doc = System.Text.Json.JsonDocument.Parse(json);
+
+        if (doc.RootElement.TryGetProperty("rules", out var rulesElement) &&
+            rulesElement.ValueKind == System.Text.Json.JsonValueKind.Array)
+        {
+            foreach (var ruleElement in rulesElement.EnumerateArray())
+            {
+                var name = ruleElement.GetProperty("name").GetString()
+                    ?? throw new InvalidOperationException("Policy rule missing 'name' property.");
+                var condition = ruleElement.GetProperty("condition").GetString()
+                    ?? throw new InvalidOperationException($"Policy rule '{name}' missing 'condition' property.");
+                var actionStr = ruleElement.GetProperty("action").GetString()
+                    ?? throw new InvalidOperationException($"Policy rule '{name}' missing 'action' property.");
+
+                if (!Enum.TryParse<PolicyAction>(actionStr, ignoreCase: true, out var action))
+                    throw new InvalidOperationException($"Policy rule '{name}' has invalid action: '{actionStr}'.");
+
+                var reason = ruleElement.TryGetProperty("reason", out var reasonProp)
+                    ? reasonProp.GetString()
+                    : null;
+
+                AddRule(new PolicyRule(name, condition, action, reason));
+            }
+        }
+        else
+        {
+            throw new InvalidOperationException("Policy file must contain a 'rules' array.");
+        }
     }
 
     /// <summary>

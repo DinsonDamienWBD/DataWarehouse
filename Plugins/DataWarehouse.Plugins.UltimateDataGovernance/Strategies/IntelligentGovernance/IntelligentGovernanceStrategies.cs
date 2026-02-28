@@ -373,10 +373,16 @@ public sealed class ComplianceGapDetectorStrategy : DataGovernanceStrategyBase
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(requirements);
 
+        var boundedRequirements = new BoundedDictionary<string, Requirement>(1000);
+        foreach (var kvp in requirements)
+        {
+            boundedRequirements[kvp.Key] = kvp.Value;
+        }
+
         _frameworks[frameworkId] = new FrameworkRequirements(
             frameworkId,
             name,
-            new BoundedDictionary<string, Requirement>(1000));
+            boundedRequirements);
     }
 
     /// <summary>

@@ -201,54 +201,12 @@ internal sealed class EncryptionInTransitLayer : IDataTransitStrategy
             System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
-        // Fallback: AES-256-GCM encryption
-        return await EncryptWithAesGcmAsync(source, ct).ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// Encrypts data using AES-256-GCM as a fallback when the UltimateEncryption plugin is unavailable.
-    /// Generates a random 256-bit key and 96-bit nonce, encrypts the plaintext, and produces
-    /// an authenticated ciphertext with a 128-bit authentication tag.
-    /// </summary>
-    /// <param name="source">The source stream to encrypt.</param>
-    /// <param name="ct">Cancellation token.</param>
-    /// <returns>A tuple of the encrypted memory stream and metadata containing the Base64-encoded key, nonce, and tag.</returns>
-    private static async Task<(Stream EncryptedStream, Dictionary<string, string> Metadata)> EncryptWithAesGcmAsync(
-        Stream source,
-        CancellationToken ct)
-    {
-        // Read plaintext into memory for AES-GCM (operates on byte arrays)
-        using var plaintextStream = new MemoryStream(4096);
-        await source.CopyToAsync(plaintextStream, ct).ConfigureAwait(false);
-        var plaintext = plaintextStream.ToArray();
-
-        // Generate random key and nonce
-        var key = RandomNumberGenerator.GetBytes(AesKeySizeBytes);
-        var nonce = RandomNumberGenerator.GetBytes(AesGcmNonceSizeBytes);
-        var ciphertext = new byte[plaintext.Length];
-        var tag = new byte[AesGcmTagSizeBytes];
-
-        // Encrypt with AES-256-GCM
-        using var aesGcm = new AesGcm(key, AesGcmTagSizeBytes);
-        aesGcm.Encrypt(nonce, plaintext, ciphertext, tag);
-
-        // Build output stream: [nonce][tag][ciphertext]
-        var outputStream = new MemoryStream(4096);
-        await outputStream.WriteAsync(nonce.AsMemory(), ct).ConfigureAwait(false);
-        await outputStream.WriteAsync(tag.AsMemory(), ct).ConfigureAwait(false);
-        await outputStream.WriteAsync(ciphertext.AsMemory(), ct).ConfigureAwait(false);
-        outputStream.Position = 0;
-
-        // Store key in metadata for the receiver (in production, use key management service)
-        var metadata = new Dictionary<string, string>
-        {
-            ["encryption-provider"] = "AES-256-GCM-Fallback",
-            ["encryption-key"] = Convert.ToBase64String(key),
-            ["encryption-nonceSizeBytes"] = AesGcmNonceSizeBytes.ToString(),
-            ["encryption-tagSizeBytes"] = AesGcmTagSizeBytes.ToString()
-        };
-
-        return (outputStream, metadata);
+        // Fallback: encryption requires UltimateEncryption plugin via message bus.
+        // We must not perform local encryption because we have no secure way to
+        // exchange the key with the receiver without a key management service.
+        throw new InvalidOperationException(
+            "Transit encryption requires the UltimateEncryption plugin. " +
+            "Ensure UltimateEncryption is registered and responding on the message bus.");
     }
 
     /// <inheritdoc/>

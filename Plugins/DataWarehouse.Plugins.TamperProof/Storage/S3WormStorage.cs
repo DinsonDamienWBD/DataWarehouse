@@ -182,11 +182,18 @@ public class S3WormStorage : WormStorageProviderPluginBase
     private readonly S3WormConfiguration _config;
     private readonly ILogger<S3WormStorage> _logger;
     private readonly string _keyPrefix;
+    // Assigned when AWS SDK integration verifies Object Lock configuration on the bucket.
+    // Currently always false since all methods throw PlatformNotSupportedException until AWS SDK is configured.
+#pragma warning disable CS0649 // Field is assigned when AWS SDK integration is implemented
     private bool _objectLockVerified;
+#pragma warning restore CS0649
 
-    // Simulated storage for development/testing (in production, would use AWS SDK)
-    private readonly Dictionary<string, S3ObjectRecord> _objects = new();
-    private readonly object _lock = new();
+    private const string S3NotConfiguredMessage =
+        "S3 WORM storage requires AWS SDK configuration. " +
+        "Install AWSSDK.S3 NuGet package and provide IAM credentials with s3:PutObject, " +
+        "s3:GetObject, s3:PutObjectRetention, s3:GetObjectRetention, " +
+        "s3:PutObjectLegalHold, s3:GetObjectLegalHold permissions. " +
+        "The target bucket must have Object Lock enabled at creation time.";
 
     /// <summary>
     /// Creates a new S3 WORM storage instance.
@@ -255,36 +262,14 @@ public class S3WormStorage : WormStorageProviderPluginBase
     /// </summary>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>True if Object Lock is properly configured.</returns>
-    public async Task<bool> VerifyObjectLockConfigurationAsync(CancellationToken ct = default)
+    public Task<bool> VerifyObjectLockConfigurationAsync(CancellationToken ct = default)
     {
-        _logger.LogInformation(
-            "Verifying S3 Object Lock configuration for bucket {Bucket} in region {Region}",
-            _config.BucketName, _config.Region);
-
-        try
-        {
-            // In production, this would call:
-            // var response = await _s3Client.GetObjectLockConfigurationAsync(
-            //     new GetObjectLockConfigurationRequest { BucketName = _config.BucketName }, ct);
-            // return response.ObjectLockConfiguration.ObjectLockEnabled == ObjectLockEnabled.Enabled;
-
-            // Simulated verification
-            await Task.Delay(10, ct);
-            _objectLockVerified = true;
-
-            _logger.LogInformation(
-                "S3 Object Lock verified for bucket {Bucket}: Mode={Mode}, DefaultRetention={Retention}",
-                _config.BucketName,
-                _config.DefaultMode,
-                _config.EffectiveDefaultRetention);
-
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to verify Object Lock configuration for bucket {Bucket}", _config.BucketName);
-            return false;
-        }
+        // Real implementation requires AWS SDK S3 client:
+        // var response = await _s3Client.GetObjectLockConfigurationAsync(
+        //     new GetObjectLockConfigurationRequest { BucketName = _config.BucketName }, ct);
+        // _objectLockVerified = response.ObjectLockConfiguration.ObjectLockEnabled == ObjectLockEnabled.Enabled;
+        // return _objectLockVerified;
+        throw new PlatformNotSupportedException(S3NotConfiguredMessage);
     }
 
     /// <summary>
@@ -297,7 +282,7 @@ public class S3WormStorage : WormStorageProviderPluginBase
     /// <param name="applyLegalHold">Whether to apply a legal hold.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>S3-specific write result with version information.</returns>
-    public async Task<S3WormWriteResult> WriteWithObjectLockAsync(
+    public Task<S3WormWriteResult> WriteWithObjectLockAsync(
         Guid objectId,
         Stream data,
         WormRetentionPolicy retention,
@@ -305,336 +290,89 @@ public class S3WormStorage : WormStorageProviderPluginBase
         bool applyLegalHold = false,
         CancellationToken ct = default)
     {
-        var key = BuildObjectKey(objectId);
-        var effectiveMode = lockMode ?? _config.DefaultMode;
-        var retainUntil = DateTimeOffset.UtcNow.Add(retention.RetentionPeriod);
-
-        _logger.LogInformation(
-            "Writing object {ObjectId} to S3 WORM storage with {Mode} mode, retention until {RetainUntil}",
-            objectId, effectiveMode, retainUntil);
-
-        try
-        {
-            // Read data and compute hash
-            var capacity = data.CanSeek && data.Length > 0 ? (int)data.Length : 0;
-            using var ms = new MemoryStream(capacity);
-            await data.CopyToAsync(ms, ct);
-            var bytes = ms.ToArray();
-            var contentHash = ComputeContentHash(bytes);
-            var versionId = GenerateVersionId();
-
-            // In production, this would:
-            // 1. PUT object to S3
-            // var putRequest = new PutObjectRequest
-            // {
-            //     BucketName = _config.BucketName,
-            //     Key = key,
-            //     InputStream = new MemoryStream(bytes),
-            //     ObjectLockMode = effectiveMode == S3ObjectLockMode.Compliance
-            //         ? ObjectLockMode.COMPLIANCE : ObjectLockMode.GOVERNANCE,
-            //     ObjectLockRetainUntilDate = retainUntil.UtcDateTime,
-            //     ObjectLockLegalHoldStatus = applyLegalHold
-            //         ? ObjectLockLegalHoldStatus.ON : ObjectLockLegalHoldStatus.OFF
-            // };
-            // var response = await _s3Client.PutObjectAsync(putRequest, ct);
-
-            // Simulated storage
-            lock (_lock)
-            {
-                _objects[key] = new S3ObjectRecord
-                {
-                    Key = key,
-                    VersionId = versionId,
-                    Data = bytes,
-                    ContentHash = contentHash,
-                    ETag = $"\"{contentHash[..32]}\"",
-                    LockMode = effectiveMode,
-                    RetainUntil = retainUntil,
-                    LegalHoldActive = applyLegalHold || retention.HasLegalHold,
-                    CreatedAt = DateTimeOffset.UtcNow,
-                    SizeBytes = bytes.Length
-                };
-            }
-
-            _logger.LogInformation(
-                "Successfully wrote object {ObjectId} to S3: VersionId={VersionId}, Size={Size} bytes",
-                objectId, versionId, bytes.Length);
-
-            return S3WormWriteResult.CreateSuccess(
-                key,
-                versionId,
-                $"\"{contentHash[..32]}\"",
-                retainUntil,
-                effectiveMode,
-                bytes.Length,
-                contentHash,
-                applyLegalHold || retention.HasLegalHold);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to write object {ObjectId} to S3 WORM storage", objectId);
-            return S3WormWriteResult.CreateFailure(key, ex.Message);
-        }
+        // Real implementation requires AWS SDK S3 client with PutObjectAsync + Object Lock headers.
+        throw new PlatformNotSupportedException(S3NotConfiguredMessage);
     }
 
     /// <inheritdoc/>
-    protected override async Task<SdkWormWriteResult> WriteInternalAsync(
+    protected override Task<SdkWormWriteResult> WriteInternalAsync(
         Guid objectId,
         Stream data,
         WormRetentionPolicy retention,
         WriteContext context,
         CancellationToken ct)
     {
-        var s3Result = await WriteWithObjectLockAsync(
-            objectId,
-            data,
-            retention,
-            _config.DefaultMode,
-            retention.HasLegalHold,
-            ct);
-
-        if (!s3Result.Success)
-        {
-            throw new InvalidOperationException($"S3 WORM write failed: {s3Result.Error}");
-        }
-
-        return new SdkWormWriteResult
-        {
-            StorageKey = s3Result.Key,
-            ContentHash = s3Result.ContentHash!,
-            HashAlgorithm = HashAlgorithmType.SHA256,
-            SizeBytes = s3Result.SizeBytes,
-            WrittenAt = DateTimeOffset.UtcNow,
-            RetentionExpiry = s3Result.RetainUntil,
-            HardwareImmutabilityEnabled = _config.DefaultMode == S3ObjectLockMode.Compliance,
-            ProviderMetadata = new Dictionary<string, string>
-            {
-                ["s3:VersionId"] = s3Result.VersionId ?? "",
-                ["s3:ETag"] = s3Result.ETag ?? "",
-                ["s3:Bucket"] = _config.BucketName,
-                ["s3:Region"] = _config.Region,
-                ["s3:LockMode"] = s3Result.LockMode.ToString(),
-                ["s3:LegalHold"] = s3Result.LegalHoldActive.ToString()
-            }
-        };
+        // Real implementation delegates to WriteWithObjectLockAsync which calls AWS SDK PutObjectAsync.
+        throw new PlatformNotSupportedException(S3NotConfiguredMessage);
     }
 
     /// <inheritdoc/>
-    public override async Task<Stream> ReadAsync(Guid objectId, CancellationToken ct = default)
+    public override Task<Stream> ReadAsync(Guid objectId, CancellationToken ct = default)
     {
-        var key = BuildObjectKey(objectId);
-
-        _logger.LogDebug("Reading object {ObjectId} from S3 WORM storage", objectId);
-
-        // In production:
-        // var response = await _s3Client.GetObjectAsync(_config.BucketName, key, ct);
-        // return response.ResponseStream;
-
-        lock (_lock)
-        {
-            if (_objects.TryGetValue(key, out var record))
-            {
-                return new MemoryStream(record.Data);
-            }
-        }
-
-        throw new KeyNotFoundException($"Object {objectId} not found in S3 WORM storage.");
+        // Real implementation: await _s3Client.GetObjectAsync(_config.BucketName, key, ct)
+        throw new PlatformNotSupportedException(S3NotConfiguredMessage);
     }
 
     /// <inheritdoc/>
-    public override async Task<WormObjectStatus> GetStatusAsync(Guid objectId, CancellationToken ct = default)
+    public override Task<WormObjectStatus> GetStatusAsync(Guid objectId, CancellationToken ct = default)
     {
-        var key = BuildObjectKey(objectId);
-
-        lock (_lock)
-        {
-            if (_objects.TryGetValue(key, out var record))
-            {
-                return new WormObjectStatus
-                {
-                    Exists = true,
-                    ObjectId = objectId,
-                    RetentionExpiry = record.RetainUntil,
-                    LegalHolds = record.LegalHoldActive
-                        ? new[] { new LegalHold
-                        {
-                            HoldId = "s3-legal-hold",
-                            Reason = "Legal hold active",
-                            PlacedAt = record.CreatedAt,
-                            PlacedBy = "system"
-                        }}
-                        : Array.Empty<LegalHold>(),
-                    SizeBytes = record.SizeBytes,
-                    WrittenAt = record.CreatedAt,
-                    ContentHash = record.ContentHash,
-                    HardwareImmutabilityEnabled = record.LockMode == S3ObjectLockMode.Compliance,
-                    StorageKey = key
-                };
-            }
-        }
-
-        return new WormObjectStatus
-        {
-            Exists = false,
-            ObjectId = objectId
-        };
+        // Real implementation: GetObjectRetentionAsync + GetObjectLegalHoldAsync + HeadObjectAsync
+        throw new PlatformNotSupportedException(S3NotConfiguredMessage);
     }
 
     /// <inheritdoc/>
-    public override async Task<bool> ExistsAsync(Guid objectId, CancellationToken ct = default)
+    public override Task<bool> ExistsAsync(Guid objectId, CancellationToken ct = default)
     {
-        var key = BuildObjectKey(objectId);
-
-        lock (_lock)
-        {
-            return _objects.ContainsKey(key);
-        }
+        // Real implementation: HeadObjectAsync to check existence
+        throw new PlatformNotSupportedException(S3NotConfiguredMessage);
     }
 
     /// <inheritdoc/>
-    public override async Task<IReadOnlyList<LegalHold>> GetLegalHoldsAsync(Guid objectId, CancellationToken ct = default)
+    public override Task<IReadOnlyList<LegalHold>> GetLegalHoldsAsync(Guid objectId, CancellationToken ct = default)
     {
-        var status = await GetStatusAsync(objectId, ct);
-        return status.LegalHolds;
+        // Real implementation: GetObjectLegalHoldAsync
+        throw new PlatformNotSupportedException(S3NotConfiguredMessage);
     }
 
     /// <inheritdoc/>
-    protected override async Task ExtendRetentionInternalAsync(
+    protected override Task ExtendRetentionInternalAsync(
         Guid objectId,
         DateTimeOffset newExpiry,
         CancellationToken ct)
     {
-        var key = BuildObjectKey(objectId);
-
-        _logger.LogInformation(
-            "Extending retention for object {ObjectId} to {NewExpiry}",
-            objectId, newExpiry);
-
-        // In production:
-        // var request = new PutObjectRetentionRequest
-        // {
-        //     BucketName = _config.BucketName,
-        //     Key = key,
-        //     Retention = new ObjectLockRetention
-        //     {
-        //         Mode = _objects[key].LockMode == S3ObjectLockMode.Compliance
-        //             ? ObjectLockRetentionMode.COMPLIANCE : ObjectLockRetentionMode.GOVERNANCE,
-        //         RetainUntilDate = newExpiry.UtcDateTime
-        //     }
-        // };
-        // await _s3Client.PutObjectRetentionAsync(request, ct);
-
-        lock (_lock)
-        {
-            if (_objects.TryGetValue(key, out var record))
-            {
-                record.RetainUntil = newExpiry;
-            }
-            else
-            {
-                throw new KeyNotFoundException($"Object {objectId} not found in S3 WORM storage.");
-            }
-        }
+        // Real implementation: PutObjectRetentionAsync with new RetainUntilDate
+        throw new PlatformNotSupportedException(S3NotConfiguredMessage);
     }
 
     /// <inheritdoc/>
-    protected override async Task PlaceLegalHoldInternalAsync(
+    protected override Task PlaceLegalHoldInternalAsync(
         Guid objectId,
         string holdId,
         string reason,
         CancellationToken ct)
     {
-        var key = BuildObjectKey(objectId);
-
-        _logger.LogInformation(
-            "Placing legal hold {HoldId} on object {ObjectId}: {Reason}",
-            holdId, objectId, reason);
-
-        // In production:
-        // var request = new PutObjectLegalHoldRequest
-        // {
-        //     BucketName = _config.BucketName,
-        //     Key = key,
-        //     LegalHold = new ObjectLockLegalHold { Status = ObjectLockLegalHoldStatus.ON }
-        // };
-        // await _s3Client.PutObjectLegalHoldAsync(request, ct);
-
-        lock (_lock)
-        {
-            if (_objects.TryGetValue(key, out var record))
-            {
-                record.LegalHoldActive = true;
-            }
-            else
-            {
-                throw new KeyNotFoundException($"Object {objectId} not found in S3 WORM storage.");
-            }
-        }
+        // Real implementation: PutObjectLegalHoldAsync with Status = ON
+        throw new PlatformNotSupportedException(S3NotConfiguredMessage);
     }
 
     /// <inheritdoc/>
-    protected override async Task RemoveLegalHoldInternalAsync(
+    protected override Task RemoveLegalHoldInternalAsync(
         Guid objectId,
         string holdId,
         CancellationToken ct)
     {
-        var key = BuildObjectKey(objectId);
-
-        _logger.LogInformation(
-            "Removing legal hold {HoldId} from object {ObjectId}",
-            holdId, objectId);
-
-        // In production:
-        // var request = new PutObjectLegalHoldRequest
-        // {
-        //     BucketName = _config.BucketName,
-        //     Key = key,
-        //     LegalHold = new ObjectLockLegalHold { Status = ObjectLockLegalHoldStatus.OFF }
-        // };
-        // await _s3Client.PutObjectLegalHoldAsync(request, ct);
-
-        lock (_lock)
-        {
-            if (_objects.TryGetValue(key, out var record))
-            {
-                record.LegalHoldActive = false;
-            }
-            else
-            {
-                throw new KeyNotFoundException($"Object {objectId} not found in S3 WORM storage.");
-            }
-        }
+        // Real implementation: PutObjectLegalHoldAsync with Status = OFF
+        throw new PlatformNotSupportedException(S3NotConfiguredMessage);
     }
 
     /// <summary>
     /// Builds the S3 object key for a given object ID.
+    /// Uses hierarchical key structure for better S3 performance.
     /// </summary>
     private string BuildObjectKey(Guid objectId)
     {
-        // Use hierarchical key structure for better S3 performance
         var idStr = objectId.ToString("N");
         return $"{_keyPrefix}{idStr[..2]}/{idStr[2..4]}/{idStr}";
-    }
-
-    /// <summary>
-    /// Computes SHA-256 hash of content.
-    /// </summary>
-    private static string ComputeContentHash(byte[] data)
-    {
-        // Hash computed inline; bus delegation to UltimateDataIntegrity available for centralized policy enforcement
-        var hash = SHA256.HashData(data);
-        return Convert.ToHexString(hash).ToLowerInvariant();
-    }
-
-    /// <summary>
-    /// Generates a version ID (simulating S3 versioning).
-    /// </summary>
-    private static string GenerateVersionId()
-    {
-        return Convert.ToBase64String(Guid.NewGuid().ToByteArray())
-            .Replace("/", "_")
-            .Replace("+", "-")
-            .TrimEnd('=');
     }
 
     /// <inheritdoc/>
@@ -647,22 +385,5 @@ public class S3WormStorage : WormStorageProviderPluginBase
         metadata["DefaultRetention"] = _config.EffectiveDefaultRetention.ToString();
         metadata["ObjectLockVerified"] = _objectLockVerified;
         return metadata;
-    }
-
-    /// <summary>
-    /// Internal record for simulated S3 object storage.
-    /// </summary>
-    private class S3ObjectRecord
-    {
-        public required string Key { get; init; }
-        public required string VersionId { get; init; }
-        public required byte[] Data { get; init; }
-        public required string ContentHash { get; init; }
-        public required string ETag { get; init; }
-        public required S3ObjectLockMode LockMode { get; init; }
-        public DateTimeOffset RetainUntil { get; set; }
-        public bool LegalHoldActive { get; set; }
-        public required DateTimeOffset CreatedAt { get; init; }
-        public required long SizeBytes { get; init; }
     }
 }

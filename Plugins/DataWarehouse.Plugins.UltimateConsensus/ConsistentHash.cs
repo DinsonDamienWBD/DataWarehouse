@@ -48,30 +48,66 @@ public sealed class ConsistentHash
 
     /// <summary>
     /// Routes a key to one of the active Raft group IDs.
+    /// If the jump hash lands on a removed node, probes forward to find
+    /// the nearest active node (wrapping around).
     /// </summary>
     /// <param name="key">The key to route.</param>
     /// <returns>Raft group ID.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when no active nodes exist.</exception>
     public int Route(string key)
     {
         lock (_lock)
         {
-            return GetBucket(key, _bucketCount);
+            if (_activeNodes.Count == 0)
+                throw new InvalidOperationException("No active nodes in the hash ring.");
+
+            var bucket = GetBucket(key, _bucketCount);
+            return ResolveActiveBucket(bucket);
         }
     }
 
     /// <summary>
     /// Routes raw binary data to a Raft group using XxHash32.
+    /// If the jump hash lands on a removed node, probes forward to find
+    /// the nearest active node (wrapping around).
     /// </summary>
     /// <param name="data">Binary data to hash.</param>
     /// <returns>Raft group ID.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when no active nodes exist.</exception>
     public int Route(byte[] data)
     {
         lock (_lock)
         {
+            if (_activeNodes.Count == 0)
+                throw new InvalidOperationException("No active nodes in the hash ring.");
+
             if (_bucketCount <= 0) return 0;
             var hash = XxHash32.HashToUInt32(data);
-            return JumpHash(hash, _bucketCount);
+            var bucket = JumpHash(hash, _bucketCount);
+            return ResolveActiveBucket(bucket);
         }
+    }
+
+    /// <summary>
+    /// Given a bucket from jump hash, finds the nearest active node.
+    /// Probes forward with wrap-around. Caller must hold _lock and ensure _activeNodes is non-empty.
+    /// </summary>
+    private int ResolveActiveBucket(int bucket)
+    {
+        // Fast path: bucket is active
+        if (_activeNodes.Contains(bucket))
+            return bucket;
+
+        // Probe forward with wrap-around
+        for (int i = 1; i < _bucketCount; i++)
+        {
+            var candidate = (bucket + i) % _bucketCount;
+            if (_activeNodes.Contains(candidate))
+                return candidate;
+        }
+
+        // Fallback (should not reach here if _activeNodes is non-empty)
+        return _activeNodes.First();
     }
 
     /// <summary>
@@ -89,7 +125,8 @@ public sealed class ConsistentHash
 
     /// <summary>
     /// Removes a node (Raft group) from the hash ring.
-    /// Note: Does not reduce bucket count to maintain stable routing.
+    /// Traffic for the removed node is redistributed to remaining active nodes
+    /// via nearest-active-node probing in <see cref="Route(string)"/>.
     /// </summary>
     /// <param name="nodeId">Node/group ID to remove.</param>
     public void RemoveNode(int nodeId)

@@ -389,9 +389,9 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 200 | 1 | P0 | `Contracts/TamperProof/AccessLogEntry.cs:232-237` | `ComputeBlake3Hash` silently returns SHA512 — callers requesting Blake3 get wrong algorithm with no indication. Security contract lie. | [ ]
-| 201 | 4 | P0 | `Contracts/TamperProof/ITamperProofProvider.cs:402,419` | `Principal = "system"` hardcoded in tamper-proof audit log — defeats forensic attribution for all read/audit ops. | [ ]
-| 202 | 4 | P0 | `Contracts/TamperProof/ITamperProofProvider.cs:329-339` | Pre-write log entry has `Succeeded=false` with no `ErrorMessage` — fails own `Validate()`, throws on every write. | [ ]
+| 200 | 1 | P0 | `Contracts/TamperProof/AccessLogEntry.cs:232-237` | `ComputeBlake3Hash` silently returns SHA512 — callers requesting Blake3 get wrong algorithm with no indication. Security contract lie. | [X]
+| 201 | 4 | P0 | `Contracts/TamperProof/ITamperProofProvider.cs:402,419` | `Principal = "system"` hardcoded in tamper-proof audit log — defeats forensic attribution for all read/audit ops. | [X]
+| 202 | 4 | P0 | `Contracts/TamperProof/ITamperProofProvider.cs:329-339` | Pre-write log entry has `Succeeded=false` with no `ErrorMessage` — fails own `Validate()`, throws on every write. | [X]
 | 203 | 5 | P1 | `Contracts/TamperProof/IBlockchainProvider.cs:562-564` | Bare `catch { return false; }` in `ValidateChainIntegrityAsync` — network errors indistinguishable from corruption. | [X]
 | 204 | 3 | P1 | `Contracts/TamperProof/IAccessLogProvider.cs:131` + 4 others | All 5 TamperProof bases: `ComputeHashAsync` wraps sync `sha.ComputeHash(Stream)` in `Task.FromResult` — blocks thread. | [ ]
 | 205 | 2 | P1 | `Contracts/StrategyBase.cs:88-98` | `InitializeAsync` broken DCL — `_initialized` not volatile, set outside lock after await. Race allows duplicate init. | [X]
@@ -418,7 +418,7 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 218 | 4 | P0 | `Contracts/TamperProof/WriteContext.cs:43-46` | `ClientIp`, `UserAgent`, `SessionId` stored in audit records without any length/format validation — injection into tamper-proof manifests. | [ ]
+| 218 | 4 | P0 | `Contracts/TamperProof/WriteContext.cs:43-46` | `ClientIp`, `UserAgent`, `SessionId` stored in audit records without any length/format validation — injection into tamper-proof manifests. | [X]
 | 219 | 1 | P1 | `Contracts/TamperProof/IWormStorageProvider.cs:348,537-546` | `RequestRetentionPolicyAsync` always returns null + region explicitly named "Stub Types". | [ ]
 | 220 | 3 | P1 | `Contracts/TamperProof/IWormStorageProvider.cs:287-291` | `ComputeHashAsync` blocks on `sha.ComputeHash(data)` stream read — sync-over-async. | [ ]
 | 221 | 4 | P1 | `Contracts/Transit/TransitAuditTypes.cs:97-102` | Endpoint URIs logged without credential redaction — `sftp://user:password@host` leaks to bus. | [X]
@@ -1681,8 +1681,8 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 940 | 3 | P0 | `EnhancedPipelineOrchestrator.cs:~64` | `.Result` on Task in hot pipeline path — blocks thread pool thread and risks deadlock under synchronization context. | [ ]
-| 941 | 3 | P0 | `EnhancedPipelineOrchestrator.cs:~93` | `.GetAwaiter().GetResult()` on hot pipeline path — same sync-over-async deadlock risk as #940, compounds under load. | [ ]
+| 940 | 3 | P0 | `EnhancedPipelineOrchestrator.cs:~64` | `.Result` on Task in hot pipeline path — blocks thread pool thread and risks deadlock under synchronization context. | [X]
+| 941 | 3 | P0 | `EnhancedPipelineOrchestrator.cs:~93` | `.GetAwaiter().GetResult()` on hot pipeline path — same sync-over-async deadlock risk as #940, compounds under load. | [X]
 | 942 | 1 | P0 | `PipelineMigrationEngine.cs:~480-502` | `ReverseStageAsync` is a self-described placeholder that returns unmodified data — pipeline migration rollback is non-functional. | [X]
 | 943 | 6 | P1 | `MemoryPressureMonitor.cs:~56` | GC notification registration task is fire-and-forget — exceptions from GC monitoring silently lost, no fault observation. | [X]
 | 944 | 6 | P1 | `DataWarehouseKernel.cs:~930` | Shutdown audit-log task discarded with `_ =` pattern — if audit logging fails during shutdown, no error is ever surfaced. | [ ]
@@ -1741,7 +1741,7 @@
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
 | 967 | 6 | P0 | `AedsCore/ClientCourierPlugin.cs:149` | `_ = Task.Run(() => ListenLoopAsync(...))` and `_ = Task.Run(() => HeartbeatLoopAsync(...))` — both background loops fully discarded. Unhandled exceptions silently kill courier while `_isRunning` remains true. No fault observation. | [X]
-| 968 | 1 | P0 | `AedsCore/Extensions/PolicyEnginePlugin.cs:81-88` | `LoadPolicyAsync` is a stub — comment "In production, parse JSON and load rules", body returns `Task.CompletedTask`. File-based policy configuration is non-functional; defaults to allow-all. | [ ]
+| 968 | 1 | P0 | `AedsCore/Extensions/PolicyEnginePlugin.cs:81-88` | `LoadPolicyAsync` is a stub — comment "In production, parse JSON and load rules", body returns `Task.CompletedTask`. File-based policy configuration is non-functional; defaults to allow-all. | [X]
 | 969 | 6 | P1 | `AedsCore/Adapters/MeshNetworkAdapter.cs:65-69` | Timer callback `async _ => await DiscoverTopologyAsync()` coerced to `async void` — unhandled exception crashes process on .NET 6+. | [X]
 | 970 | 6 | P1 | `AedsCore/ClientCourierPlugin.cs:214` | `_ = Task.Run(() => ProcessManifestAsync(manifest, ct))` — per-manifest task unobserved. Processing errors silently lost, unbounded concurrent tasks under load. | [X]
 | 971 | 7 | P1 | `AedsCore/DataPlane/Http3DataPlanePlugin.cs:99-161` | `HttpRequestMessage` and `HttpResponseMessage` not disposed in retry loop — socket/handle leak on every transfer attempt. Same in `FetchDeltaAsync` and `PushPayloadAsync`. | [X]
@@ -1828,7 +1828,7 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 1022 | 3 | P0 | `TamperProof/Services/OrphanCleanupService.cs:497-499` | `Dispose(bool)` calls `DisposeAsync().AsTask().Wait()` — sync-over-async deadlock under SynchronizationContext (ASP.NET, test runners). | [ ]
+| 1022 | 3 | P0 | `TamperProof/Services/OrphanCleanupService.cs:497-499` | `Dispose(bool)` calls `DisposeAsync().AsTask().Wait()` — sync-over-async deadlock under SynchronizationContext (ASP.NET, test runners). | [X]
 | 1023 | 1 | P1 | `TamperProof/Storage/AzureWormStorage.cs:195-275` | Entire class is simulation — uses in-memory `Dictionary<string, AzureBlobRecord>` instead of Azure SDK. Comment: "Simulated storage for development/testing (in production, would use Azure SDK)". `VerifyImmutabilityConfigurationAsync` unconditionally sets `_immutabilityVerified = true` after `Task.Delay(10)`. | [ ]
 | 1024 | 1 | P1 | `TamperProof/Services/ComplianceReportingService.cs:764-768` | `ComputeBlockHash` returns SHA-256 of GUID bytes only — comment: "Placeholder - in production, would compute actual content hash". Attestation Merkle roots built from GUID hashes, not real data. | [ ]
 | 1025 | 1 | P1 | `TamperProof/Pipeline/WritePhaseHandlers.cs:470` | XOR parity stub — comment: "simple XOR for now, would use Reed-Solomon in production". Same pattern in `RecoveryService.cs:471`. Multi-parity protection severely less than advertised. | [ ]
@@ -1858,8 +1858,8 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 1041 | 1 | P0 | `TamperProof/Storage/S3WormStorage.cs:187-288` | Entire class is in-memory `Dictionary` simulation — comment: "Simulated storage for development/testing (in production, would use AWS SDK)". `VerifyObjectLockConfigurationAsync` unconditionally sets `_objectLockVerified = true`. Zero actual S3 Object Lock enforcement. | [ ]
-| 1042 | 1 | P0 | `Transcoding.Media/Execution/TranscodePackageExecutor.cs:126-138` | `ParsePackageAsync` sets `sourceData = Array.Empty<byte>()` — comment: "package format doesn't actually include the source data inline". FFmpeg receives empty stdin. All package transcoding broken. | [ ]
+| 1041 | 1 | P0 | `TamperProof/Storage/S3WormStorage.cs:187-288` | Entire class is in-memory `Dictionary` simulation — comment: "Simulated storage for development/testing (in production, would use AWS SDK)". `VerifyObjectLockConfigurationAsync` unconditionally sets `_objectLockVerified = true`. Zero actual S3 Object Lock enforcement. | [X]
+| 1042 | 1 | P0 | `Transcoding.Media/Execution/TranscodePackageExecutor.cs:126-138` | `ParsePackageAsync` sets `sourceData = Array.Empty<byte>()` — comment: "package format doesn't actually include the source data inline". FFmpeg receives empty stdin. All package transcoding broken. | [X]
 | 1043 | 6 | P1 | `TamperProof/TamperProofPlugin.cs:349` | `_ = Task.Run(() => ProcessBlockchainBatchAsync(ct))` — blockchain batch discarded. Anchor loss for all queued objects on exception. | [X]
 | 1044 | 6 | P1 | `TamperProof/TamperProofPlugin.cs:150-161` | Integrity violation alert `_ = Task.Run(...)` with `CancellationToken.None` — can outlive plugin disposal. No backpressure. | [X]
 | 1045 | 10 | P1 | `TamperProof/TimeLock/HsmTimeLockProvider.cs:464-494` | AES-GCM wrapping key generated, used, then zeroed — no decryption path exists. Comment: "in production HSM, this key stays in hardware". Encrypted key material permanently irrecoverable. | [ ]
@@ -1940,7 +1940,7 @@
 | 1098 | 1 | P1 | `UltimateAccessControl/Features/AutomatedIncidentResponse.cs:113-170` | Six containment actions (`BlockIpAsync`, `DisableAccountAsync`, `IsolateDeviceAsync`, `SendAlertAsync`, `CreateTicketAsync`, `QuarantineResourceAsync`) only set string fields — no actual firewall/ticketing/OS API calls. Security-critical no-ops. | [ ]
 | 1099 | 2 | P1 | `Transcoding.Media/Strategies/Video/GpuAccelerationStrategies.cs:27-35` | `_activeEncoder`, `_selectedGpuIndex`, `_lastGpuScan` written under `_scanLock` but read without synchronization from `CheckGpuMemory`, `GetEncoderArgs`, `GetHealthStats`. Stale/mismatched encoder-GPU pairing on concurrent access. | [ ]
 | 1100 | 2 | P1 | `UltimateAccessControl/Features/BehavioralAnalysis.cs:230-265` | `UserProfile` plain `List<T>` fields mutated in `UpdateProfile` without synchronization. Same profile from `BoundedDictionary.GetOrAdd` shared across concurrent calls for same user. Identical in `MlAnomalyDetection.cs:294-326`. | [ ]
-| 1101 | 4 | P0 | `Transcoding.Media/Strategies/Video/H264CodecStrategy.cs:383-401` | User-controlled `CustomMetadata` values (`watermarkText`, `watermarkImagePath`) interpolated into FFmpeg arguments without sanitization — command injection. Same in `H265CodecStrategy.cs:336-369` for `colorSpace`, `colorPrimaries`, `hdrTransfer`. | [ ]
+| 1101 | 4 | P0 | `Transcoding.Media/Strategies/Video/H264CodecStrategy.cs:383-401` | User-controlled `CustomMetadata` values (`watermarkText`, `watermarkImagePath`) interpolated into FFmpeg arguments without sanitization — command injection. Same in `H265CodecStrategy.cs:336-369` for `colorSpace`, `colorPrimaries`, `hdrTransfer`. | [X]
 | 1102 | 4 | P0 | `UltimateAccessControl/Features/MfaOrchestrator.cs:96` | `challenge.Code.Equals(response, StringComparison.Ordinal)` — timing-unsafe MFA code comparison enables oracle attacks. Must use `CryptographicOperations.FixedTimeEquals`. | [X]
 | 1103 | 4 | P1 | `UltimateAccessControl/Features/AiSecurityIntegration.cs:142-144` | Intelligence plugin response parsed via `Enum.Parse` without allowlist — compromised plugin returning `"Allow"` bypasses all MFA/approval checks at line 159. | [ ]
 | 1104 | 4 | P1 | `UltimateAccessControl/Features/DlpEngine.cs:199-211` | `ComputeSimpleHash` uses 32-bit polynomial hash for DLP content fingerprinting — predictable, trivially colliding. Use SHA-256. | [ ]
@@ -2305,7 +2305,7 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 1347 | 4 | P0 | `UltimateBlockchain/Strategies/Network/SpiffeSpireStrategy.cs:187-210` | SPIFFE JWT SVID signature is never verified — `ValidateJwtSvidAsync` decodes claims but does not check `alg` or signature. Any forged SVID is accepted as authentic. | [ ]
+| 1347 | 4 | P0 | `UltimateBlockchain/Strategies/Network/SpiffeSpireStrategy.cs:187-210` | SPIFFE JWT SVID signature is never verified — `ValidateJwtSvidAsync` decodes claims but does not check `alg` or signature. Any forged SVID is accepted as authentic. | [X]
 | 1348 | 4 | P1 | `UltimateBlockchain/Strategies/Network/X509CertStrategy.cs:165-178` | `ValidateCertificateChainAsync` builds X509Chain but uses default `RevocationMode` — OCSP/CRL failures cause silent fallback to accepting revoked certs in offline environments. | [ ]
 | 1349 | 4 | P1 | `UltimateBlockchain/Strategies/Network/X509CertStrategy.cs:182-195` | SAN parsing splits on `,` and `:` — fails for SAN entries containing literal commas (e.g., `O=Acme, Inc.`) leading to identity mismatch. | [ ]
 | 1350 | 2 | P1 | `UltimateBlockchain/Scaling/BlockchainScalingManager.cs:240-244` | `ReconfigureLimitsAsync` disposes old semaphore immediately — any in-flight `AppendBlockAsync` holding the old semaphore will crash on `Release()`. | [ ]
@@ -3571,7 +3571,7 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 2189 | 12 | P0 | `UltimateConsensus/ConsistentHash.cs:95-101` | **Data-loss routing bug**: `RemoveNode` removes from `_activeNodes` but doesn't reduce `_bucketCount`. `Route` uses `_bucketCount` directly without consulting `_activeNodes` — removed nodes still receive traffic. Keys hashing to dead node's bucket routed to dead Raft group until restart. | [ ]
+| 2189 | 12 | P0 | `UltimateConsensus/ConsistentHash.cs:95-101` | **Data-loss routing bug**: `RemoveNode` removes from `_activeNodes` but doesn't reduce `_bucketCount`. `Route` uses `_bucketCount` directly without consulting `_activeNodes` — removed nodes still receive traffic. Keys hashing to dead node's bucket routed to dead Raft group until restart. | [X]
 | 2190 | 1 | P1 | **SYSTEMIC** — `HazelcastConnectionStrategy.cs:31-33`, `MemgraphConnectionStrategy.cs:62-80`, `NuoDbConnectionStrategy.cs:30-32`, `QuestDbConnectionStrategy.cs:58-77`, `RethinkDbConnectionStrategy.cs:30-32`, `SingleStoreConnectionStrategy.cs:30-32`, `SurrealDbConnectionStrategy.cs:60-78`, `TigerGraphConnectionStrategy.cs:60-78`, `VoltDbConnectionStrategy.cs:31-33` | Rule 13 stubs: `ExecuteQueryAsync`/`ExecuteNonQueryAsync`/`GetSchemaAsync` return hardcoded fake data (e.g. `{ ["key"]="key1" }`, hardcoded `1` rows, static schemas) behind `Task.Delay`. Nine strategies produce invented results indistinguishable from real data. | [ ]
 | 2191 | 2 | P1 | **SYSTEMIC** — `EventStoreDbConnectionStrategy.cs:13`, `FaunaDbConnectionStrategy.cs:13`, `HazelcastConnectionStrategy.cs:13`, `QuestDbConnectionStrategy.cs:13`, `SurrealDbConnectionStrategy.cs:13`, `TigerGraphConnectionStrategy.cs:13`, `VoltDbConnectionStrategy.cs:13` | `_httpClient` unsynchronized instance field. Concurrent `ConnectCoreAsync` races to assign — old client leaks, torn state. | [ ]
 | 2192 | 2 | P1 | **SYSTEMIC** — `FoundationDbConnectionStrategy.cs:13`, `MemgraphConnectionStrategy.cs:13`, `NuoDbConnectionStrategy.cs:13`, `RethinkDbConnectionStrategy.cs:13`, `SingleStoreConnectionStrategy.cs:13` | Same race as #2191 but for `_tcpClient`. Previous `TcpClient` undisposed on concurrent reconnect. | [ ]
@@ -3700,7 +3700,7 @@
 
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
-| 2263 | 11 | P0 | `UltimateDataGovernance/Strategies/IntelligentGovernance/IntelligentGovernanceStrategies.cs:376-380` | **Compliance-gap detection completely broken**: `RegisterFramework` creates `FrameworkRequirements` with freshly allocated empty `BoundedDictionary`, discards the `requirements` parameter entirely. Seeded GDPR/HIPAA/PCI-DSS requirements never inserted. `DetectGaps` always finds zero requirements → always reports full compliance. Entire feature is a no-op. | [ ]
+| 2263 | 11 | P0 | `UltimateDataGovernance/Strategies/IntelligentGovernance/IntelligentGovernanceStrategies.cs:376-380` | **Compliance-gap detection completely broken**: `RegisterFramework` creates `FrameworkRequirements` with freshly allocated empty `BoundedDictionary`, discards the `requirements` parameter entirely. Seeded GDPR/HIPAA/PCI-DSS requirements never inserted. `DetectGaps` always finds zero requirements → always reports full compliance. Entire feature is a no-op. | [X]
 | 2264 | 5 | P1 | `UltimateDataGovernance/Scaling/GovernanceScalingManager.cs:385-388` | Silent catch in `RefreshInBackgroundAsync` swallows all backing-store read exceptions. Failed refreshes leave stale cache data with no diagnostic signal. | [X]
 | 2265 | 6 | P1 | **SYSTEMIC** — `UltimateDataGovernance/Scaling/GovernanceScalingManager.cs:185,238,290` | Fire-and-forget `_ = RefreshInBackgroundAsync(...)` in `GetPolicyAsync`, `GetOwnershipAsync`, `GetClassificationAsync`. Unhandled exceptions silently swallowed. No dedup guard — concurrent stale reads launch unbounded parallel refreshes for same key. | [X]
 | 2266 | 10 | P1 | `UltimateDataGovernance/Moonshots/MoonshotRegistryImpl.cs:53-71` | TOCTOU race in `UpdateStatus`: reads existing, checks oldStatus, calls TryUpdate. Concurrent callers both reading same record → second writer's update silently lost, StatusChanged event fires only for first. | [ ]
@@ -4239,7 +4239,7 @@
 
 | # | Cat | Sev | Location | Description |
 |---|-----|-----|----------|-------------|
-| 2646 | 4 | P0 | `UltimateDataTransit/Layers/EncryptionInTransitLayer.cs:241-248` | AES-256-GCM fallback stores raw encryption key in transit metadata (`"encryption-key": Convert.ToBase64String(key)`). Key travels alongside ciphertext defeating encryption entirely. Comment admits "in production, use key management service". | [ ]
+| 2646 | 4 | P0 | `UltimateDataTransit/Layers/EncryptionInTransitLayer.cs:241-248` | AES-256-GCM fallback stores raw encryption key in transit metadata (`"encryption-key": Convert.ToBase64String(key)`). Key travels alongside ciphertext defeating encryption entirely. Comment admits "in production, use key management service". | [X]
 | 2647 | 6 | P1 | `UltimateDataTransit/Audit/TransitAuditService.cs:73,168-214` | `PublishAuditEntryAsync` fire-and-forget `_ = Task.Run(...)` with bare `catch {}`. Audit failures silently dropped with zero observability. | [X]
 | 2648 | 5 | P1 | `UltimateDataTransit/Audit/TransitAuditService.cs:210-213` | Catch block inside fire-and-forget Task.Run is completely empty. No logging at all. | [X]
 | 2649 | 4 | P1 | `UltimateDataTransit/Layers/EncryptionInTransitLayer.cs:196-199` | Bare catch falls back from encryption plugin to local AES-GCM silently. Degraded encryption not logged. | [ ]
@@ -4271,7 +4271,7 @@
 | # | Cat | Sev | Location | Description |
 |---|-----|-----|----------|-------------|
 | 2668 | 4 | P0 | `UltimateDataTransit/Strategies/ScpRsyncTransitStrategy.cs:374` | Default username is literal `"anonymous"` when no credentials supplied. SSH connections silently attempt to authenticate as anonymous with empty password. Same issue in `SftpTransitStrategy.cs:265`. | [X]
-| 2669 | 4 | P0 | `UltimateDataTransit/Strategies/AirGapTransferStrategy.cs:117` | `VerifyPackageSignature` catches all exceptions silently, returns `false`. HMAC comparison uses `==` (not constant-time), vulnerable to timing side-channel. | [ ]
+| 2669 | 4 | P0 | `UltimateDataTransit/Strategies/AirGapTransferStrategy.cs:117` | `VerifyPackageSignature` catches all exceptions silently, returns `false`. HMAC comparison uses `==` (not constant-time), vulnerable to timing side-channel. | [X]
 | 2670 | 14 | P1 | `UltimateDataTransit/Strategies/StoreAndForwardStrategy.cs:392` | `IngestPackageAsync` uses `entry.RelativePath` from deserialized manifest JSON to construct file path without path traversal validation. Crafted `../../../etc/passwd` escapes `dataDir`. | [ ]
 | 2671 | 5 | P1 | `UltimateDataTransit/Strategies/P2PSwarmStrategy.cs:822-830` | `RegisterAsSeederAsync` bare `catch { }` swallows all exceptions without logging. | [X]
 | 2672 | 5 | P1 | `UltimateDataTransit/UltimateDataTransitPlugin.cs:761` | `PublishTransferEventAsync` bare `catch { }` silently swallows message-bus publish failures. Audit data gaps invisible. | [X]
@@ -4342,9 +4342,9 @@
 
 | # | Cat | Sev | Location | Description |
 |---|-----|-----|----------|-------------|
-| 2724 | 1 | P0 | `UltimateDatabaseProtocol/Strategies/Relational/OracleProtocolStrategy.cs:315-329` | `ComputePasswordVerifier()` is stub: SHA1+SHA256 double-hash instead of O5LOGON. Will never auth against real Oracle. Comment: "Simplified Oracle password verification." | [ ]
-| 2725 | 1 | P0 | `UltimateDatabaseProtocol/Strategies/Relational/OracleProtocolStrategy.cs:966-976` | `ParseQueryData()` stub: all result data dumped into single `"data"` key as raw EBCDIC string. Real query results corrupted. | [ ]
-| 2726 | 1 | P0 | `UltimateDatabaseProtocol/Strategies/Relational/TdsProtocolStrategy.cs:1003-1033` | `ParseColumnValue()` only handles INT/BIGINT/NVARCHAR/VARCHAR. FLOAT, DECIMAL, DATETIME, BIT, MONEY, XML etc. silently return `null`. | [ ]
+| 2724 | 1 | P0 | `UltimateDatabaseProtocol/Strategies/Relational/OracleProtocolStrategy.cs:315-329` | `ComputePasswordVerifier()` is stub: SHA1+SHA256 double-hash instead of O5LOGON. Will never auth against real Oracle. Comment: "Simplified Oracle password verification." | [X]
+| 2725 | 1 | P0 | `UltimateDatabaseProtocol/Strategies/Relational/OracleProtocolStrategy.cs:966-976` | `ParseQueryData()` stub: all result data dumped into single `"data"` key as raw EBCDIC string. Real query results corrupted. | [X]
+| 2726 | 1 | P0 | `UltimateDatabaseProtocol/Strategies/Relational/TdsProtocolStrategy.cs:1003-1033` | `ParseColumnValue()` only handles INT/BIGINT/NVARCHAR/VARCHAR. FLOAT, DECIMAL, DATETIME, BIT, MONEY, XML etc. silently return `null`. | [X]
 | 2727 | 1 | P1 | `UltimateDatabaseProtocol/Strategies/Relational/PostgreSqlSqlEngineIntegration.cs:489-512` | `ExecuteDdlAsync`/`ExecuteDmlAsync` return success with hardcoded row counts ("INSERT 0 1", "UPDATE 1") without performing any storage operation. | [ ]
 | 2728 | 4 | P1 | `UltimateDatabaseProtocol/Strategies/Relational/OracleProtocolStrategy.cs:119-121` | Host/port/service interpolated into TNS string without sanitization. `)(` chars in host enable injection. | [ ]
 | 2729 | 4 | P1 | `UltimateDatabaseProtocol/Strategies/Search/AdditionalSearchStrategies.cs:70-76` | SSL bypass `(message, cert, chain, errors) => true` guarded by `_verifySsl` flag with no safe setter — dead code that could be accidentally activated. Same in Elasticsearch/OpenSearch. | [ ]
@@ -4495,7 +4495,7 @@
 
 | # | Cat | Sev | Location | Description |
 |---|-----|-----|----------|-------------|
-| 2845 | 1 | P0 | `UltimateDeployment/Strategies/CICD/CiCdStrategies.cs:95-645` | ALL seven CI/CD strategies (GitHubActions, GitLabCi, Jenkins, AzureDevOps, CircleCi, ArgoCd, FluxCd, Spinnaker) are complete stubs — every private method returns hardcoded success (`Task.FromResult(12345L)`, `Task.FromResult(123)`, etc.). No real HTTP calls, no authentication, no CI/CD integration. | [ ]
+| 2845 | 1 | P0 | `UltimateDeployment/Strategies/CICD/CiCdStrategies.cs:95-645` | ALL seven CI/CD strategies (GitHubActions, GitLabCi, Jenkins, AzureDevOps, CircleCi, ArgoCd, FluxCd, Spinnaker) are complete stubs — every private method returns hardcoded success (`Task.FromResult(12345L)`, `Task.FromResult(123)`, etc.). No real HTTP calls, no authentication, no CI/CD integration. | [X]
 | 2846 | 1 | P0 | `UltimateDatabaseStorage/Strategies/TimeSeries/VictoriaMetricsStorageStrategy.cs:85-157` | `StoreCoreAsync` posts JSON to `/api/v1/import` (wrong endpoint for blobs); `RetrieveCoreAsync` tries to read binary from Prometheus metric label which cannot work. Every retrieve throws `FileNotFoundException`. | [X]
 | 2847 | 4 | P0 | `UltimateDatabaseStorage/Strategies/TimeSeries/QuestDbStorageStrategy.cs:98-272` | SQL injection: `_tableName` from user config interpolated into all SQL/DDL. `ListCoreAsync` also builds regex prefix filter with no sanitisation. | [X]
 | 2848 | 4 | P0 | `UltimateDatabaseStorage/Strategies/TimeSeries/TimescaleDbStorageStrategy.cs:91-360` | SQL injection: `_tableName` and `_chunkInterval` interpolated into DDL, `create_hypertable`, `ALTER TABLE`, `add_compression_policy` — all from user config with no validation. | [X]
@@ -4532,7 +4532,7 @@
 
 | # | Cat | Sev | Location | Description |
 |---|-----|-----|----------|-------------|
-| 2873 | 1 | P0 | `UltimateDeployment/Strategies: Config/Secrets/Serverless/Infrastructure/HotReload/Rollback (ALL files)` | Every private implementation method across ALL remaining deployment strategies is a stub: Config returns `Task.Delay`, Vault returns `"hvs.token123"`, Terraform returns hardcoded plan, Lambda returns `"$LATEST"`, etc. Zero real API calls in entire plugin. | [ ]
+| 2873 | 1 | P0 | `UltimateDeployment/Strategies: Config/Secrets/Serverless/Infrastructure/HotReload/Rollback (ALL files)` | Every private implementation method across ALL remaining deployment strategies is a stub: Config returns `Task.Delay`, Vault returns `"hvs.token123"`, Terraform returns hardcoded plan, Lambda returns `"$LATEST"`, etc. Zero real API calls in entire plugin. | [X]
 | 2874 | 6 | P0 | `UltimateDeployment/Strategies/Rollback/RollbackStrategies.cs:60` | Fire-and-forget: `_ = MonitorDeploymentAsync(...)` — unobserved exceptions in automatic rollback permanently lost. Uses deploy-call CancellationToken that expires when deploy returns. | [X]
 | 2875 | 5 | P0 | `UltimateDeployment/UltimateDeploymentPlugin.cs:688-691` | Bare `catch { }` in `DiscoverAndRegisterStrategies` — strategy instantiation failures silently swallowed, invisible capability loss. | [X]
 | 2876 | 5 | P1 | `UltimateDeployment/UltimateDeploymentPlugin.cs:183-186,221-224` | Bare `catch { }` in `GetDeploymentStateAsync` and `HealthCheckAsync` — all strategy exceptions (bugs, connectivity) silently consumed. | [X]
@@ -5504,7 +5504,7 @@
 | # | Cat | Sev | Location | Description |
 |---|-----|-----|----------|-------------|
 | 3608 | 4 | P0 | `UltimateMultiCloud/Strategies/Security/MultiCloudSecurityStrategies.cs:411-413` | `CrossCloudSecretsStrategy.StoreSecret` stores secrets as plain Base64 (`Convert.ToBase64String(Encoding.UTF8.GetBytes(value))`). Comment: "Simplified." Base64 is not encryption — any stored secret is trivially decoded. | [X]
-| 3609 | 4 | P0 | `UltimateMultiCloud/Strategies/Security/MultiCloudSecurityStrategies.cs:136-155` | `CrossCloudEncryptionStrategy.Encrypt` copies plaintext into `ciphertext` without applying any cipher, pads 16 bytes. Comment: "In production, this would use actual encryption." Callers believe data is encrypted. | [ ]
+| 3609 | 4 | P0 | `UltimateMultiCloud/Strategies/Security/MultiCloudSecurityStrategies.cs:136-155` | `CrossCloudEncryptionStrategy.Encrypt` copies plaintext into `ciphertext` without applying any cipher, pads 16 bytes. Comment: "In production, this would use actual encryption." Callers believe data is encrypted. | [X]
 | 3610 | 5 | P0 | `UltimateMicroservices/UltimateMicroservicesPlugin.cs:519-525` | Silent catch in `DiscoverAndRegisterStrategies` swallows all strategy instantiation exceptions. Broken strategy types silently skipped. | [X]
 | 3611 | 5 | P1 | `UltimateMultiCloud/MultiCloudStrategyBase.cs:213-227` | Silent catch in `MultiCloudStrategyRegistry.DiscoverStrategies`. Comment: "Skip strategies that fail to instantiate." Same silent discard pattern. | [X]
 | 3612 | 2 | P1 | `UltimateMultiCloud/Strategies/Security/MultiCloudSecurityStrategies.cs:53-58` | `UnifiedIamStrategy.MapRole` calls `GetOrAdd` then `list.Add()` without lock. Concurrent callers race on same list. | [ ]
@@ -5648,8 +5648,8 @@
 
 | # | Cat | Sev | Location | Description |
 |---|-----|-----|----------|-------------|
-| 3717 | 1 | P0 | `UltimateResilience/Strategies/Consensus/ConsensusStrategies.cs:112-117,161-165,326-356,484-522,648-654,801-808` | All 5 consensus protocols (Raft, Paxos, PBFT, Zab, Viewstamped) use `Random.Shared.NextDouble()` to simulate network responses. Comments: "In production: send RequestVote RPC". No real distributed communication. | [ ]
-| 3718 | 1 | P0 | `UltimateResilience/Strategies/DisasterRecovery/DisasterRecoveryStrategies.cs:194,254,512` | Failover/failback/restore all stub `Task.Delay(10)` with "Simulate failover work" comments. No real region switching or data restoration. | [ ]
+| 3717 | 1 | P0 | `UltimateResilience/Strategies/Consensus/ConsensusStrategies.cs:112-117,161-165,326-356,484-522,648-654,801-808` | All 5 consensus protocols (Raft, Paxos, PBFT, Zab, Viewstamped) use `Random.Shared.NextDouble()` to simulate network responses. Comments: "In production: send RequestVote RPC". No real distributed communication. | [X]
+| 3718 | 1 | P0 | `UltimateResilience/Strategies/DisasterRecovery/DisasterRecoveryStrategies.cs:194,254,512` | Failover/failback/restore all stub `Task.Delay(10)` with "Simulate failover work" comments. No real region switching or data restoration. | [X]
 | 3719 | 6 | P1 | `UltimateResilience/Scaling/ResilienceScalingManager.cs:482-487` | Fire-and-forget in `WireCircuitBreakerStateChange`: `PublishCircuitBreakerStateAsync(...).ConfigureAwait(false)` in synchronous handler — Task abandoned, exceptions silently lost. | [X]
 | 3720 | 2 | P1 | `UltimateResilience/Scaling/AdaptiveResilienceThresholds.cs:73-74,243-248` | `_disposed` flag checked/set without synchronization. Timer callback races with `Dispose()`. Needs `volatile` or `Interlocked`. | [ ]
 | 3721 | 2 | P1 | `UltimateResilience/Strategies/ChaosEngineering/ChaosEngineeringStrategies.cs:18,144,255,357,465,619` | Non-thread-safe `Random _random = new()` in 6 chaos strategies (Fault, Latency, ProcessTermination, ResourceExhaustion, NetworkPartition, ChaosMonkey). Called concurrently from `ExecuteCoreAsync`. Use `Random.Shared`. | [ ]
@@ -5725,7 +5725,7 @@
 
 | # | Cat | Sev | Location | Description |
 |---|-----|-----|----------|-------------|
-| 3776 | 1 | P0 | `UltimateResourceManager/UltimateResourceManagerPlugin.cs:474-481` | `HandleReserveAsync` stub — comment "placeholder implementation", returns `success=true` with GUID. Nothing actually reserved. Advertised as capability. | [ ]
+| 3776 | 1 | P0 | `UltimateResourceManager/UltimateResourceManagerPlugin.cs:474-481` | `HandleReserveAsync` stub — comment "placeholder implementation", returns `success=true` with GUID. Nothing actually reserved. Advertised as capability. | [X]
 | 3777 | 5 | P1 | `UltimateResourceManager/ResourceStrategyBase.cs:332-333` | `AutoDiscover` bare `catch {}` swallows all exceptions including OOM. Broken strategy types silently skipped with no diagnostic. | [X]
 | 3778 | 2 | P1 | `UltimateResourceManager/Strategies/ContainerStrategies.cs:12,66,98,153,182,248,276,323,350,401,429,487,515,565` | Plain `Dictionary<string,…>` in 8 container strategies (Cgroup, Docker, K8s, Podman, WinJob, WinContainer, ProcessGroup, Namespace). Concurrent Allocate/Release corrupts state. | [ ]
 | 3779 | 2 | P1 | `UltimateResourceManager/Strategies/CpuStrategies.cs:11-12,43-44,62` | `FairShareCpuStrategy._weights` (Dictionary) and `_totalWeight` (double) unprotected. Concurrent allocations produce phantom weights. | [ ]
@@ -6384,11 +6384,11 @@
 
 | # | Cat | Severity | Location | Description |
 |---|-----|----------|----------|-------------|
-| 4301 | 4 | P0 | `UltimateStorageProcessing/Strategies/Media/WebPConversionStrategy.cs:45` | Path traversal/command injection — query.Source passed directly to dwebp/cwebp CLI. Shell metacharacters allow injection. | [ ]
-| 4302 | 4 | P0 | `UltimateStorageProcessing/Strategies/Media/WebPConversionStrategy.cs:59` | Command injection via resize option — appended verbatim as `-resize {resize}`. No validation against WxH pattern. | [ ]
+| 4301 | 4 | P0 | `UltimateStorageProcessing/Strategies/Media/WebPConversionStrategy.cs:45` | Path traversal/command injection — query.Source passed directly to dwebp/cwebp CLI. Shell metacharacters allow injection. | [X]
+| 4302 | 4 | P0 | `UltimateStorageProcessing/Strategies/Media/WebPConversionStrategy.cs:59` | Command injection via resize option — appended verbatim as `-resize {resize}`. No validation against WxH pattern. | [X]
 | 4303 | 6 | P0 | `UltimateStreamingData/Scaling/StreamingScalingManager.cs:651` | Fire-and-forget `_ = CommitCheckpointAsync(...).ContinueWith(...)` — checkpoint failures invisible. Data loss hazard. | [X]
-| 4304 | 6 | P0 | `UltimateStreamingData/Features/BackpressureHandling.cs:144` | Timer callback uses async lambda — exceptions silently kill timer, permanently halting metrics reporting. | [ ]
-| 4305 | 6 | P0 | `UltimateStreamingData/Features/StatefulStreamProcessing.cs:157` | Timer callback async lambda — exceptions silently kill checkpoint timer. No further checkpoints taken. | [ ]
+| 4304 | 6 | P0 | `UltimateStreamingData/Features/BackpressureHandling.cs:144` | Timer callback uses async lambda — exceptions silently kill timer, permanently halting metrics reporting. | [X]
+| 4305 | 6 | P0 | `UltimateStreamingData/Features/StatefulStreamProcessing.cs:157` | Timer callback async lambda — exceptions silently kill checkpoint timer. No further checkpoints taken. | [X]
 | 4306 | 6 | P1 | `UltimateStreamingData/Strategies/AdaptiveTransport/AdaptiveTransportStrategy.cs:60` | Timer callback async lambda — exceptions silently halt bandwidth probes. | [ ]
 | 4307 | 5 | P1 | `UltimateStorageProcessing/UltimateStorageProcessingPlugin.cs:449` | Silent bare catch {} in PublishStrategyRegisteredAsync — message bus failures hidden during initialization. | [X]
 | 4308 | 5 | P1 | `UltimateStreamingData/Strategies/AdaptiveTransport/AdaptiveTransportStrategy.cs:163` | Silent bare catch in ProbeAndClassifyAsync — DNS/network errors fully discarded. | [X]

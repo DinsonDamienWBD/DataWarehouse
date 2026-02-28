@@ -154,7 +154,17 @@ internal sealed class StatefulStreamProcessing : IDisposable
         _messageBus = messageBus;
 
         _checkpointTimer = new Timer(
-            async _ => await TriggerCheckpointAsync(CancellationToken.None),
+            _ =>
+            {
+                try
+                {
+                    _ = TriggerCheckpointAsync(CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[StatefulStreamProcessing] Checkpoint timer callback failed: {ex.Message}");
+                }
+            },
             null,
             _config.CheckpointInterval,
             _config.CheckpointInterval);

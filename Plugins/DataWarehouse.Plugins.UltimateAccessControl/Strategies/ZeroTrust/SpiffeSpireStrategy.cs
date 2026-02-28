@@ -196,9 +196,27 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ZeroTrust
 
             try
             {
-                // Parse JWT (simplified - in production use a proper JWT library)
                 var parts = jwtToken.Split('.');
                 if (parts.Length != 3)
+                    return false;
+
+                // Validate header — reject "alg":"none" and unsigned tokens
+                var header = parts[0];
+                var paddedHeader = header.PadRight(header.Length + (4 - header.Length % 4) % 4, '=');
+                var headerBytes = Convert.FromBase64String(paddedHeader);
+                var headerJson = System.Text.Encoding.UTF8.GetString(headerBytes);
+
+                var algMatch = Regex.Match(headerJson, @"""alg""\s*:\s*""([^""]+)""");
+                if (!algMatch.Success)
+                    return false;
+
+                var alg = algMatch.Groups[1].Value;
+                // Reject "none" algorithm — accepting it would bypass signature verification entirely
+                if (string.Equals(alg, "none", StringComparison.OrdinalIgnoreCase))
+                    return false;
+
+                // Reject empty or whitespace-only signature (third part)
+                if (string.IsNullOrWhiteSpace(parts[2]))
                     return false;
 
                 // Decode payload
@@ -207,7 +225,6 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ZeroTrust
                 var payloadBytes = Convert.FromBase64String(paddedPayload);
                 var payloadJson = System.Text.Encoding.UTF8.GetString(payloadBytes);
 
-                // Parse claims (simplified)
                 claims = new Dictionary<string, object>();
 
                 // Extract "sub" claim (SPIFFE ID)
@@ -218,19 +235,38 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ZeroTrust
                     claims["sub"] = spiffeId;
                 }
 
-                // Extract "exp" claim (expiration)
+                // Extract and validate "exp" claim (expiration) — REQUIRED for SPIFFE JWT SVIDs
                 var expMatch = Regex.Match(payloadJson, @"""exp""\s*:\s*(\d+)");
-                if (expMatch.Success && long.TryParse(expMatch.Groups[1].Value, out var exp))
-                {
-                    var expiration = DateTimeOffset.FromUnixTimeSeconds(exp).UtcDateTime;
-                    claims["exp"] = expiration;
+                if (!expMatch.Success || !long.TryParse(expMatch.Groups[1].Value, out var exp))
+                    return false; // exp claim is mandatory for SPIFFE JWT SVIDs
 
-                    // Check expiration
-                    if (DateTime.UtcNow > expiration)
+                var expiration = DateTimeOffset.FromUnixTimeSeconds(exp).UtcDateTime;
+                claims["exp"] = expiration;
+
+                if (DateTime.UtcNow > expiration)
+                    return false;
+
+                // Validate "nbf" (not before) claim if present
+                var nbfMatch = Regex.Match(payloadJson, @"""nbf""\s*:\s*(\d+)");
+                if (nbfMatch.Success && long.TryParse(nbfMatch.Groups[1].Value, out var nbf))
+                {
+                    var notBefore = DateTimeOffset.FromUnixTimeSeconds(nbf).UtcDateTime;
+                    claims["nbf"] = notBefore;
+
+                    if (DateTime.UtcNow < notBefore)
                         return false;
                 }
 
-                return !string.IsNullOrWhiteSpace(spiffeId) && IsValidSpiffeId(spiffeId);
+                if (string.IsNullOrWhiteSpace(spiffeId) || !IsValidSpiffeId(spiffeId))
+                    return false;
+
+                // NOTE: Cryptographic signature verification requires the SPIFFE trust bundle.
+                // This implementation validates structure, algorithm safety, and temporal claims.
+                // Full signature verification should be performed when the trust bundle is available
+                // via the SPIFFE Workload API.
+                IncrementCounter("spiffe.jwt.signature_unverified_warning");
+
+                return true;
             }
             catch
             {

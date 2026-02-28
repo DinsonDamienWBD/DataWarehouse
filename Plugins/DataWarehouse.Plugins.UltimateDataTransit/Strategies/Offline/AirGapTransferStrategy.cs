@@ -115,15 +115,22 @@ public sealed class AirGapTransferStrategy
         {
             var dataToSign = GetPackageSignableData(package);
             using var hmac = new HMACSHA256(_encryptionKey);
-            var hmacBytes = hmac.ComputeHash(dataToSign);
-            var expectedSignature = Convert.ToBase64String(hmacBytes);
+            var computedMac = hmac.ComputeHash(dataToSign);
+            var expectedMac = Convert.FromBase64String(package.Signature);
 
-            return package.Signature == expectedSignature;
+            return CryptographicOperations.FixedTimeEquals(computedMac, expectedMac);
         }
-        catch
+        catch (FormatException)
         {
+            // Invalid Base64 in signature
             return false;
         }
+        catch (CryptographicException)
+        {
+            // Crypto operation failed
+            return false;
+        }
+        // Let other exceptions (ArgumentNullException, etc.) propagate
     }
 
     /// <summary>

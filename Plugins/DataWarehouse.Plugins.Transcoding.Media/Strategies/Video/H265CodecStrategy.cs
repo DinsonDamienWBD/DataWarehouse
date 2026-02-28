@@ -351,22 +351,28 @@ internal sealed class H265CodecStrategy : MediaStrategyBase
         if (options.CustomMetadata != null &&
             options.CustomMetadata.TryGetValue("watermark_text", out var watermarkText))
         {
-            var fontSize = options.CustomMetadata.TryGetValue("watermark_fontsize", out var fontSizeStr)
-                ? fontSizeStr : "24";
-            var position = options.CustomMetadata.TryGetValue("watermark_position", out var pos)
-                ? pos : "x=W-w-10:y=H-h-10";
-            var opacity = options.CustomMetadata.TryGetValue("watermark_opacity", out var opacityStr)
-                ? opacityStr : "0.7";
+            var sanitizedText = SanitizeFfmpegArgument(watermarkText);
+            var fontSize = SanitizeFfmpegArgument(
+                options.CustomMetadata.TryGetValue("watermark_fontsize", out var fontSizeStr)
+                    ? fontSizeStr : "24");
+            var position = SanitizeFfmpegArgument(
+                options.CustomMetadata.TryGetValue("watermark_position", out var pos)
+                    ? pos : "x=W-w-10:y=H-h-10");
+            var opacity = SanitizeFfmpegArgument(
+                options.CustomMetadata.TryGetValue("watermark_opacity", out var opacityStr)
+                    ? opacityStr : "0.7");
 
-            sb.Append($" -vf \"drawtext=text='{watermarkText}':fontsize={fontSize}:{position}:fontcolor=white@{opacity}\"");
+            sb.Append($" -vf \"drawtext=text='{sanitizedText}':fontsize={fontSize}:{position}:fontcolor=white@{opacity}\"");
         }
         else if (options.CustomMetadata != null &&
                  options.CustomMetadata.TryGetValue("watermark_image", out var watermarkImagePath))
         {
-            var position = options.CustomMetadata.TryGetValue("watermark_position", out var pos)
-                ? pos : "overlay=W-w-10:H-h-10";
+            var sanitizedPath = SanitizeFfmpegPath(watermarkImagePath);
+            var position = SanitizeFfmpegArgument(
+                options.CustomMetadata.TryGetValue("watermark_position", out var pos)
+                    ? pos : "overlay=W-w-10:H-h-10");
 
-            sb.Append($" -i \"{watermarkImagePath}\" -filter_complex \"{position}\"");
+            sb.Append($" -i \"{sanitizedPath}\" -filter_complex \"{position}\"");
         }
 
         // HDR to SDR tone mapping
@@ -396,6 +402,35 @@ internal sealed class H265CodecStrategy : MediaStrategyBase
         sb.Append(" -f mp4 pipe:1");
 
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// Sanitizes a user-provided value for safe interpolation into FFmpeg arguments.
+    /// Strips shell metacharacters that could enable command injection.
+    /// </summary>
+    private static string SanitizeFfmpegArgument(string value)
+    {
+        if (string.IsNullOrEmpty(value)) return value;
+        return System.Text.RegularExpressions.Regex.Replace(value, @"[;|&$`""'\\<>()\[\]{}!\n\r\t]", "");
+    }
+
+    /// <summary>
+    /// Sanitizes a user-provided file path for safe use in FFmpeg -i arguments.
+    /// Rejects paths with shell metacharacters or path traversal.
+    /// </summary>
+    private static string SanitizeFfmpegPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            throw new ArgumentException("Watermark image path cannot be empty.");
+
+        if (path.Contains(".."))
+            throw new ArgumentException("Watermark image path must not contain path traversal (..).");
+
+        var sanitized = System.Text.RegularExpressions.Regex.Replace(path, @"[;|&$`'\\<>()\[\]{}!\n\r\t]", "");
+        if (sanitized != path)
+            throw new ArgumentException("Watermark image path contains disallowed characters.");
+
+        return sanitized;
     }
 
     /// <summary>

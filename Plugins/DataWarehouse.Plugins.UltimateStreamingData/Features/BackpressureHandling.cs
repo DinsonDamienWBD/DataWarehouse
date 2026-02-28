@@ -141,7 +141,17 @@ internal sealed class BackpressureHandling : IDisposable
             _config.RateAdjustmentInterval);
 
         _metricsTimer = new Timer(
-            async _ => await ReportMetricsAsync(CancellationToken.None),
+            _ =>
+            {
+                try
+                {
+                    _ = ReportMetricsAsync(CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[BackpressureHandling] Metrics timer callback failed: {ex.Message}");
+                }
+            },
             null,
             _config.MetricsInterval,
             _config.MetricsInterval);
