@@ -30,8 +30,9 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
     private readonly VdeOptions _options;
     private readonly StripedWriteLock _stripedLock = new(64);
     private readonly SemaphoreSlim _checkpointLock = new(1, 1);
-    private bool _disposed;
-    private bool _initialized;
+    private readonly SemaphoreSlim _initLock = new(1, 1);
+    private volatile bool _disposed;
+    private volatile bool _initialized;
 
     // Subsystems (initialized in InitializeAsync)
     private ContainerFile? _container;
@@ -70,6 +71,15 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
         {
             return;
         }
+
+        await _initLock.WaitAsync(ct);
+        try
+        {
+            // Double-check after acquiring lock
+            if (_initialized)
+            {
+                return;
+            }
 
         // Step 1: Create or open the container file
         bool containerExists = File.Exists(_options.ContainerPath);
@@ -152,8 +162,9 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
             _options.BlockSize);
 
         // Step 8: Initialize CoW engine (separate B-Tree for ref counts)
-        // Create a separate B-Tree for reference counting
-        var refCountBTreeRoot = _container.Layout.DataStartBlock; // Note: should be allocated from metadata region when metadata allocator is available
+        // Allocate a dedicated block for the ref-count B-Tree root from the block allocator
+        // to avoid colliding with data blocks
+        var refCountBTreeRoot = _allocator.AllocateBlock(ct);
         var refCountBTree = new BTree(
             _container.BlockDevice,
             _allocator,
@@ -184,6 +195,11 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
         _spaceReclaimer = new SpaceReclaimer(_cowEngine, _allocator);
 
         _initialized = true;
+        }
+        finally
+        {
+            _initLock.Release();
+        }
     }
 
     #region Store/Retrieve/Delete Operations
@@ -635,6 +651,7 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
             ChecksumErrorCount = checksumErrorCount,
             SnapshotCount = snapshots.Count,
             HealthStatus = healthStatus,
+            BlockSize = _options.BlockSize,
             GeneratedAtUtc = DateTimeOffset.UtcNow
         };
     }
@@ -696,7 +713,21 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
             return;
         }
 
-        _disposed = true;
+        // Acquire init lock to ensure no concurrent initialization/operations
+        await _initLock.WaitAsync();
+        try
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+        }
+        finally
+        {
+            _initLock.Release();
+        }
 
         // Orderly shutdown: checkpoint, flush, dispose subsystems in reverse order
         try
@@ -719,6 +750,7 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
 
         await _stripedLock.DisposeAsync();
         _checkpointLock.Dispose();
+        _initLock.Dispose();
     }
 
     #endregion

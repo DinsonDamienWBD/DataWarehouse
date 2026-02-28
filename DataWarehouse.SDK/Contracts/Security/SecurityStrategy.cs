@@ -612,10 +612,10 @@ namespace DataWarehouse.SDK.Contracts.Security
             {
                 return new SecurityStatistics
                 {
-                    TotalEvaluations = Interlocked.Read(ref _totalEvaluations),
-                    AllowedCount = Interlocked.Read(ref _allowedCount),
-                    DeniedCount = Interlocked.Read(ref _deniedCount),
-                    ErrorCount = Interlocked.Read(ref _errorCount),
+                    TotalEvaluations = _totalEvaluations,
+                    AllowedCount = _allowedCount,
+                    DeniedCount = _deniedCount,
+                    ErrorCount = _errorCount,
                     AverageEvaluationTimeMs = _totalEvaluations > 0 ? _totalEvaluationTimeMs / _totalEvaluations : 0,
                     EvaluationsByDomain = new Dictionary<SecurityDomain, long>(_evaluationsByDomain),
                     DenialsByDomain = new Dictionary<SecurityDomain, long>(_denialsByDomain),
@@ -630,10 +630,10 @@ namespace DataWarehouse.SDK.Contracts.Security
         {
             lock (_statsLock)
             {
-                Interlocked.Exchange(ref _totalEvaluations, 0);
-                Interlocked.Exchange(ref _allowedCount, 0);
-                Interlocked.Exchange(ref _deniedCount, 0);
-                Interlocked.Exchange(ref _errorCount, 0);
+                _totalEvaluations = 0;
+                _allowedCount = 0;
+                _deniedCount = 0;
+                _errorCount = 0;
                 _totalEvaluationTimeMs = 0;
                 _lastUpdateTime = DateTime.UtcNow;
 
@@ -676,13 +676,16 @@ namespace DataWarehouse.SDK.Contracts.Security
         {
             var decision = await EvaluateCoreAsync(context, cancellationToken).ConfigureAwait(false);
 
-            // Validate that the decision is for the requested domain
+            // If the core evaluator returned a decision for the requested domain, use it directly.
+            // Otherwise, the core evaluator may not support per-domain evaluation — return
+            // the decision as-is with its domain adjusted, since the core already evaluated the context.
             if (decision.Domain != domain)
             {
-                return SecurityDecision.Deny(
-                    domain,
-                    $"Domain mismatch: expected {domain}, got {decision.Domain}",
-                    StrategyId);
+                // Preserve the core evaluator's allow/deny verdict but fix the domain.
+                // This avoids spurious denials when EvaluateCoreAsync only returns its default domain.
+                return decision.Allowed
+                    ? SecurityDecision.Allow(domain, decision.Reason, decision.PolicyId)
+                    : SecurityDecision.Deny(domain, decision.Reason, decision.PolicyId);
             }
 
             return decision;
@@ -712,17 +715,17 @@ namespace DataWarehouse.SDK.Contracts.Security
         {
             lock (_statsLock)
             {
-                Interlocked.Increment(ref _totalEvaluations);
+                _totalEvaluations++;
                 _totalEvaluationTimeMs += evaluationTimeMs;
                 _lastUpdateTime = DateTime.UtcNow;
 
                 if (decision.Allowed)
                 {
-                    Interlocked.Increment(ref _allowedCount);
+                    _allowedCount++;
                 }
                 else
                 {
-                    Interlocked.Increment(ref _deniedCount);
+                    _deniedCount++;
                     _denialsByDomain[decision.Domain]++;
                 }
 
@@ -735,7 +738,10 @@ namespace DataWarehouse.SDK.Contracts.Security
         /// </summary>
         private void IncrementErrorCount()
         {
-            Interlocked.Increment(ref _errorCount);
+            lock (_statsLock)
+            {
+                _errorCount++;
+            }
         }
     }
 

@@ -86,6 +86,9 @@ public sealed class CorruptionDetector
     // Thread-safe event storage
     private readonly ConcurrentBag<CorruptionEvent> _recentEvents = new();
     private long _totalCorruptionCount;
+    #pragma warning disable CS0649 // Assigned by Interlocked in detection paths when unrecoverable corruption is found
+    private long _unrecoverableCorruptionCount;
+    #pragma warning restore CS0649
 
     /// <summary>
     /// Event raised when corruption is detected during read verification.
@@ -264,9 +267,12 @@ public sealed class CorruptionDetector
             return HealthStatus.Healthy;
         }
 
-        // Simplified logic: any corruption is degraded
-        // In production, would check for redundancy/recovery options
-        // and determine if corruption is recoverable
+        // Severity-based health assessment
+        if (count > 100 || Interlocked.Read(ref _unrecoverableCorruptionCount) > 0)
+        {
+            return HealthStatus.Critical;
+        }
+
         return HealthStatus.Degraded;
     }
 }

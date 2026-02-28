@@ -226,9 +226,11 @@ public sealed class BackgroundMigrationEngine : IMigrationEngine, IDisposable
                         CurrentThroughputBytesPerSec = bytesMigrated / Math.Max(1, sw.Elapsed.TotalSeconds)
                     };
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
                     state.Job = state.Job with { FailedObjects = state.Job.FailedObjects + 1 };
+                    System.Diagnostics.Trace.TraceError(
+                        $"[BackgroundMigrationEngine] Object migration failed for job {state.Job.JobId}: {ex.GetType().Name}: {ex.Message}");
                 }
 
                 // Throttle: if we are ahead of the target throughput, delay

@@ -945,24 +945,24 @@ namespace DataWarehouse.SDK.Contracts.Compliance
         {
             lock (_statsLock)
             {
-                Interlocked.Increment(ref _totalAssessments);
+                _totalAssessments++;
                 _totalAssessmentTimeMs += assessmentTimeMs;
                 _totalComplianceScore += result.ComplianceScore;
                 _lastUpdateTime = DateTime.UtcNow;
 
                 if (result.IsCompliant)
                 {
-                    Interlocked.Increment(ref _compliantCount);
+                    _compliantCount++;
                 }
                 else
                 {
-                    Interlocked.Increment(ref _nonCompliantCount);
+                    _nonCompliantCount++;
                 }
 
                 _assessmentsByFramework[framework]++;
 
                 // Update violation counters
-                Interlocked.Add(ref _totalViolations, result.Violations.Count);
+                _totalViolations += result.Violations.Count;
                 foreach (var violation in result.Violations)
                 {
                     _violationsBySeverity[violation.Severity]++;
@@ -975,7 +975,10 @@ namespace DataWarehouse.SDK.Contracts.Compliance
         /// </summary>
         private void IncrementErrorCount()
         {
-            Interlocked.Increment(ref _errorCount);
+            lock (_statsLock)
+            {
+                _errorCount++;
+            }
         }
     }
 }

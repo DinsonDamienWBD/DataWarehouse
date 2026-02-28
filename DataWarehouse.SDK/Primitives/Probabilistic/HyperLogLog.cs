@@ -234,9 +234,19 @@ public sealed class HyperLogLog<T> : IProbabilisticStructure, IMergeable<HyperLo
     /// </summary>
     public static HyperLogLog<T> Deserialize(byte[] data, Func<T, byte[]>? serializer = null)
     {
+        ArgumentNullException.ThrowIfNull(data);
+        if (data.Length < 12)
+            throw new ArgumentException("Data too short for HyperLogLog deserialization header (minimum 12 bytes).", nameof(data));
+
         var precision = BitConverter.ToInt32(data, 0);
+        if (precision < 4 || precision > 18) // Standard HLL precision range; 18 = 256K registers
+            throw new ArgumentException($"Invalid precision {precision} in serialized HyperLogLog data. Must be 4-18.", nameof(data));
+
         var itemCount = BitConverter.ToInt64(data, 4);
         var registerCount = 1 << precision;
+
+        if (data.Length < 12 + registerCount)
+            throw new ArgumentException($"Data too short: need {12 + registerCount} bytes but got {data.Length}.", nameof(data));
 
         var registers = new byte[registerCount];
         Array.Copy(data, 12, registers, 0, registerCount);

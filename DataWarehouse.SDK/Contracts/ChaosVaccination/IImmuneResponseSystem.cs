@@ -61,7 +61,7 @@ namespace DataWarehouse.SDK.Contracts.ChaosVaccination
     /// Types of remediation actions the immune response system can take.
     /// </summary>
     [SdkCompatibility("5.0.0", Notes = "Phase 61: Chaos vaccination types")]
-    public enum RemediationActionType
+    public enum ImmuneRemediationActionType
     {
         /// <summary>Restart the affected plugin.</summary>
         RestartPlugin,
@@ -138,7 +138,7 @@ namespace DataWarehouse.SDK.Contracts.ChaosVaccination
         /// <summary>
         /// The type of remediation action to perform.
         /// </summary>
-        public required RemediationActionType ActionType { get; init; }
+        public required ImmuneRemediationActionType ActionType { get; init; }
 
         /// <summary>
         /// The ID of the target component (plugin, node, circuit breaker, etc.).

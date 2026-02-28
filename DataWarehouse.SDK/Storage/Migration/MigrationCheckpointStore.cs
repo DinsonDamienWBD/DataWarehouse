@@ -78,6 +78,12 @@ public sealed class MigrationCheckpointStore
         return Task.CompletedTask;
     }
 
-    private string GetCheckpointPath(string jobId) =>
-        Path.Combine(_checkpointDirectory, $"migration-{jobId}.checkpoint.json");
+    private string GetCheckpointPath(string jobId)
+    {
+        // Sanitize jobId to prevent path traversal (e.g., "../../etc/passwd")
+        var sanitized = Path.GetFileName(jobId);
+        if (string.IsNullOrWhiteSpace(sanitized) || sanitized != jobId)
+            throw new ArgumentException($"Invalid job ID: contains path separator characters", nameof(jobId));
+        return Path.Combine(_checkpointDirectory, $"migration-{sanitized}.checkpoint.json");
+    }
 }

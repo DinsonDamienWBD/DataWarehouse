@@ -106,8 +106,10 @@ public sealed class IlgpuVectorAccelerator : IGpuVectorAccelerator
             //   var context = Context.CreateDefault();
             //   var accelerator = context.GetPreferredDevice(preferCuda: true).CreateAccelerator(context);
             // Since ILGPU may not be referenced, we probe for CUDA availability via native library.
-            _gpuDetected = ProbeGpuAvailability();
-            _deviceName = _gpuDetected ? "CUDA Device (ILGPU)" : "None";
+            // Note: Even when CUDA is available, GPU kernels are not yet compiled — CPU fallback is used.
+            // Report IsAvailable=false until actual GPU kernel compilation is implemented.
+            _gpuDetected = false;
+            _deviceName = ProbeGpuAvailability() ? "CUDA Device (ILGPU) [CPU fallback]" : "None";
         }
         catch
         {
@@ -278,7 +280,9 @@ public sealed class CuvsVectorAccelerator : IGpuVectorAccelerator
     /// </summary>
     public CuvsVectorAccelerator()
     {
-        _cuvsAvailable = ProbeCuvsAvailability();
+        // Note: Even when cuVS library is available, native P/Invoke is not yet wired — CPU fallback is used.
+        // Report IsAvailable=false until actual cuVS bindings are implemented.
+        _cuvsAvailable = false;
     }
 
     /// <inheritdoc/>

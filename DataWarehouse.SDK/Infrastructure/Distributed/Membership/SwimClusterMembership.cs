@@ -614,6 +614,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
 
                     if (_members.TryAdd(update.NodeId, newState))
                     {
+                        InvalidateMemberCache();
                         FireMembershipEvent(ClusterMembershipEventType.NodeJoined, newNode, "SWIM join");
                     }
                 }
@@ -626,6 +627,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             {
                 member.Status = ClusterNodeStatus.Leaving;
                 member.Node = member.Node with { Status = ClusterNodeStatus.Leaving };
+                InvalidateMemberCache();
                 FireMembershipEvent(ClusterMembershipEventType.NodeLeft, member.Node, "Graceful leave");
             }
         }

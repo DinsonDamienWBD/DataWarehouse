@@ -32,7 +32,7 @@ public sealed class NativeKeyHandle : IDisposable
 {
     private unsafe byte* _pointer;
     private readonly int _length;
-    private volatile bool _disposed;
+    private int _disposedFlag; // 0=active, 1=disposed (atomic via Interlocked)
 
     /// <summary>
     /// Initializes a new <see cref="NativeKeyHandle"/> with the specified size.
@@ -65,7 +65,7 @@ public sealed class NativeKeyHandle : IDisposable
     {
         get
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposedFlag) != 0, this);
             return new Span<byte>(_pointer, _length);
         }
     }
@@ -113,10 +113,10 @@ public sealed class NativeKeyHandle : IDisposable
     /// </summary>
     public unsafe void Dispose()
     {
-        if (_disposed)
+        // Atomic CAS: clear+free happens BEFORE marking disposed to prevent
+        // concurrent thread from seeing disposed while key material is still in memory
+        if (Interlocked.CompareExchange(ref _disposedFlag, 1, 0) != 0)
             return;
-
-        _disposed = true;
 
         if (_pointer != null)
         {

@@ -121,7 +121,7 @@ public sealed class GravityAwarePlacementOptimizer : IPlacementOptimizer
         ArgumentNullException.ThrowIfNull(objectKeys);
 
         // Process in parallel with bounded concurrency
-        var semaphore = new SemaphoreSlim(Environment.ProcessorCount * 2);
+        using var semaphore = new SemaphoreSlim(Environment.ProcessorCount * 2);
         var tasks = objectKeys.Select(async key =>
         {
             await semaphore.WaitAsync(ct).ConfigureAwait(false);
@@ -191,9 +191,15 @@ public sealed class GravityAwarePlacementOptimizer : IPlacementOptimizer
             n => n.NodeId,
             n => n.Weight / totalWeight);
 
-        // Actual move enumeration requires storage layer integration (provided by Plan 07 rebalancer service).
+        // WARNING: Move enumeration requires storage layer integration (Plan 07 rebalancer service).
         // The optimizer produces the scoring and ideal distribution; the rebalancer enumerates objects,
         // scores them, and feeds them back through OptimizePlacementAsync to build the move list.
+        // Until the rebalancer integration is complete, this returns an empty plan with ideal distribution metadata.
+        System.Diagnostics.Trace.TraceWarning(
+            "[GravityAwarePlacementOptimizer] GenerateRebalancePlanAsync returned empty plan: " +
+            "storage layer integration (Plan 07 rebalancer service) not yet wired. " +
+            $"Ideal distribution computed for {clusterMap.Count} nodes.");
+
         return new RebalancePlan(
             Moves: Array.Empty<RebalanceMove>(),
             EstimatedDurationSeconds: 0,

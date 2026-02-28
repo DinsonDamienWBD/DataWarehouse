@@ -270,7 +270,13 @@ public class TamperProofManifest
 
         var data = string.Join("|", components);
         var bytes = System.Text.Encoding.UTF8.GetBytes(data);
-        var hash = System.Security.Cryptography.SHA256.HashData(bytes);
+        // Use the manifest's configured hash algorithm instead of hardcoded SHA-256
+        byte[] hash;
+        using (var algo = System.Security.Cryptography.HashAlgorithm.Create(HashAlgorithm.ToString()) ??
+                          System.Security.Cryptography.SHA256.Create())
+        {
+            hash = algo.ComputeHash(bytes);
+        }
         return Convert.ToHexString(hash);
     }
 

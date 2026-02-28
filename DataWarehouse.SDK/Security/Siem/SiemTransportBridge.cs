@@ -303,7 +303,11 @@ namespace DataWarehouse.SDK.Security.Siem
             }
             _subscriptions.Clear();
 
-            _processingTask?.Wait(TimeSpan.FromSeconds(5));
+            if (_processingTask != null)
+            {
+                try { _processingTask.Wait(TimeSpan.FromSeconds(5)); }
+                catch (AggregateException) { /* Processing may throw on cancellation */ }
+            }
             _cts.Dispose();
         }
     }
@@ -417,12 +421,23 @@ namespace DataWarehouse.SDK.Security.Siem
 
         private async Task SendViaUdpAsync(Uri endpoint, byte[] data, CancellationToken ct)
         {
-            if (_udpClient == null)
+            var client = Volatile.Read(ref _udpClient);
+            if (client == null)
             {
-                _udpClient = new UdpClient();
-                _udpClient.Connect(endpoint.Host, endpoint.Port);
+                await _connectLock.WaitAsync(ct).ConfigureAwait(false);
+                try
+                {
+                    client = _udpClient;
+                    if (client == null)
+                    {
+                        client = new UdpClient();
+                        client.Connect(endpoint.Host, endpoint.Port);
+                        Volatile.Write(ref _udpClient, client);
+                    }
+                }
+                finally { _connectLock.Release(); }
             }
-            await _udpClient.SendAsync(data, ct);
+            await client.SendAsync(data, ct).ConfigureAwait(false);
         }
 
         private async Task SendViaTcpAsync(Uri endpoint, byte[] data, CancellationToken ct)

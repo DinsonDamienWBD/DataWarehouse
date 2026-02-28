@@ -418,13 +418,17 @@ public static class TierPerformanceBenchmark
 
         if (tier1vs2 > 1.0)
             analysis.Append($"Tier 1 is {tier1vs2:F1}x faster than Tier 2. ");
-        else
+        else if (tier1vs2 > 0.0)
             analysis.Append($"Tier 2 is {1.0 / tier1vs2:F1}x faster than Tier 1. ");
+        else
+            analysis.Append("Tier 2 ratio unavailable (Tier 1 zero latency). ");
 
         if (tier1vs3 > 1.0)
             analysis.Append($"Tier 1 is {tier1vs3:F1}x faster than Tier 3 (Tier 3 loses persistence). ");
-        else
+        else if (tier1vs3 > 0.0)
             analysis.Append($"Tier 3 is {1.0 / tier1vs3:F1}x faster than Tier 1 (Tier 3 trades persistence for speed). ");
+        else
+            analysis.Append("Tier 3 ratio unavailable (Tier 1 zero latency). ");
 
         return new BenchmarkResult
         {

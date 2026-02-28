@@ -28,7 +28,7 @@ public class ConfigurationAuditLog
     /// Current chain head hash for fast append validation.
     /// Initialized from existing log on construction or set to genesis hash.
     /// </summary>
-    private string _chainHeadHash;
+    private volatile string _chainHeadHash;
 
     /// <summary>
     /// Creates a new configuration audit log writing to the specified file.
@@ -72,8 +72,11 @@ public class ConfigurationAuditLog
     /// Log a configuration change with hash chain integrity protection.
     /// Append-only: never modifies existing entries.
     /// </summary>
-    public Task LogChangeAsync(string user, string settingPath, object? oldValue, object? newValue, string? reason = null)
+    public async Task LogChangeAsync(string user, string settingPath, object? oldValue, object? newValue, string? reason = null)
     {
+        string finalJson;
+        string integrityHash;
+
         lock (_lock)
         {
             var previousHash = _chainHeadHash;
@@ -91,19 +94,17 @@ public class ConfigurationAuditLog
 
             // Compute integrity hash: SHA-256(previousHash + entryData)
             var entryJson = JsonSerializer.Serialize(entryData);
-            var integrityHash = ComputeSha256(previousHash + entryJson);
+            integrityHash = ComputeSha256(previousHash + entryJson);
 
             // Create final entry with integrity hash
             var finalEntry = entryData with { IntegrityHash = integrityHash };
-            var finalJson = JsonSerializer.Serialize(finalEntry);
+            finalJson = JsonSerializer.Serialize(finalEntry);
 
-            File.AppendAllText(_auditFilePath, finalJson + Environment.NewLine);
-
-            // Update chain head
+            // Update chain head inside lock to maintain chain ordering
             _chainHeadHash = integrityHash;
         }
 
-        return Task.CompletedTask;
+        await File.AppendAllTextAsync(_auditFilePath, finalJson + Environment.NewLine).ConfigureAwait(false);
     }
 
     /// <summary>

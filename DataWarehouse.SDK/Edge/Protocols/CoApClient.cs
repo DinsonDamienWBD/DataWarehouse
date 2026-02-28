@@ -38,7 +38,7 @@ namespace DataWarehouse.SDK.Edge.Protocols
         private UdpClient? _udpClient;
         private readonly BoundedDictionary<ushort, TaskCompletionSource<CoApResponse>> _pendingRequests = new BoundedDictionary<ushort, TaskCompletionSource<CoApResponse>>(1000);
         private readonly BoundedDictionary<string, Action<CoApResponse>> _observations = new BoundedDictionary<string, Action<CoApResponse>>(1000);
-        private ushort _nextMessageId;
+        private int _nextMessageId; // use int for Interlocked, cast to ushort
         private CancellationTokenSource? _receiveCts;
         private Task? _receiveTask;
         private bool _disposed;
@@ -48,7 +48,7 @@ namespace DataWarehouse.SDK.Edge.Protocols
         /// </summary>
         public CoApClient()
         {
-            _nextMessageId = (ushort)Random.Shared.Next(1, 65535);
+            _nextMessageId = Random.Shared.Next(1, 65535);
         }
 
         /// <summary>
@@ -73,7 +73,7 @@ namespace DataWarehouse.SDK.Edge.Protocols
             }
 
             // Build CoAP message (binary encoding)
-            var messageId = _nextMessageId++;
+            var messageId = (ushort)(Interlocked.Increment(ref _nextMessageId) & 0xFFFF);
             var message = BuildCoApMessage(request, messageId);
 
             // Register pending request

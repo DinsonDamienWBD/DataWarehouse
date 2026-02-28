@@ -81,7 +81,6 @@ namespace DataWarehouse.SDK.Infrastructure.Authority
             var switchStatus = await DeadManSwitch.CheckStatusAsync(ct).ConfigureAwait(false);
 
             // Gather all active decisions for this action from the authority resolver
-            // Cast to AuthorityResolutionEngine to access GetDecisionHistory (implementation-specific)
             var decisions = new List<AuthorityDecision>();
             if (Authority is AuthorityResolutionEngine engine)
             {
@@ -97,6 +96,14 @@ namespace DataWarehouse.SDK.Infrastructure.Authority
 
                     decisions.Add(decision);
                 }
+            }
+            else
+            {
+                // Non-engine resolver: log that decision history is unavailable;
+                // will fall through to SystemDefaults below rather than silently using wrong authority.
+                System.Diagnostics.Debug.WriteLine(
+                    $"AuthorityChainFacade: IAuthorityResolver implementation '{Authority.GetType().Name}' " +
+                    $"does not support GetDecisionHistory for action '{action}'. Falling back to SystemDefaults.");
             }
 
             // If no decisions found, create a SystemDefaults decision as baseline

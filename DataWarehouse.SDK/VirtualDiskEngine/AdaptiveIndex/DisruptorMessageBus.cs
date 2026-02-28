@@ -199,10 +199,14 @@ public sealed class DisruptorMessageBus : IDisposable
         }
         else
         {
-            // Channel-based fallback - use TryWrite for non-blocking, fall back to sync wait
+            // Channel-based fallback - use TryWrite for non-blocking, fall back to SpinWait
             if (!_channel!.Writer.TryWrite(msg))
             {
-                _channel.Writer.WriteAsync(msg).AsTask().GetAwaiter().GetResult();
+                var spinner = new SpinWait();
+                while (!_channel.Writer.TryWrite(msg))
+                {
+                    spinner.SpinOnce();
+                }
             }
         }
     }

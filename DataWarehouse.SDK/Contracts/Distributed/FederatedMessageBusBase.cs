@@ -47,7 +47,7 @@ namespace DataWarehouse.SDK.Contracts.Distributed
         /// </summary>
         protected byte[]? FederationSecret { get; private set; }
 
-        private bool _insecureModeWarned;
+        private volatile bool _insecureModeWarned;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="FederatedMessageBusBase"/> class.
@@ -192,16 +192,19 @@ namespace DataWarehouse.SDK.Contracts.Distributed
             // Publish locally first
             await LocalBus.PublishAsync(topic, message, ct);
 
-            // Then to all remote nodes
+            // Then to all remote nodes concurrently (avoids N x RTT sequential latency)
             var self = ClusterMembershipInstance.GetSelf();
             var members = ClusterMembershipInstance.GetMembers();
+            var remoteTasks = new List<Task>();
             foreach (var member in members)
             {
+                ct.ThrowIfCancellationRequested();
                 if (!string.Equals(member.NodeId, self.NodeId, StringComparison.Ordinal))
                 {
-                    await SendToRemoteNodeAuthenticatedAsync(member.NodeId, topic, message, ct);
+                    remoteTasks.Add(SendToRemoteNodeAuthenticatedAsync(member.NodeId, topic, message, ct));
                 }
             }
+            await Task.WhenAll(remoteTasks);
         }
 
         /// <summary>
@@ -344,13 +347,18 @@ namespace DataWarehouse.SDK.Contracts.Distributed
             return hmac.ComputeHash(data);
         }
 
-        private void WarnInsecureMode()
+        /// <summary>
+        /// Emits a one-time warning that the federated message bus is operating without
+        /// HMAC authentication. Override in subclasses to route to a real logger.
+        /// </summary>
+        protected virtual void WarnInsecureMode()
         {
             if (!_insecureModeWarned)
             {
                 _insecureModeWarned = true;
-                // Log warning once - subclasses can access this via override or their own logging
-                // This is a one-time warning per instance
+                System.Diagnostics.Debug.WriteLine(
+                    "[SECURITY WARNING] FederatedMessageBus operating in insecure mode " +
+                    "(no FederationSecret configured). Cross-node messages are not authenticated.");
             }
         }
 

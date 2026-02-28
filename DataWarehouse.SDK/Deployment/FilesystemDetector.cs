@@ -183,14 +183,16 @@ public static class FilesystemDetector
         try
         {
             // Run "df -T <path>" to get filesystem type
+            // Use ArgumentList to prevent command injection via path
             var startInfo = new ProcessStartInfo
             {
                 FileName = "df",
-                Arguments = $"-T \"{path}\"",
                 RedirectStandardOutput = true,
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
+            startInfo.ArgumentList.Add("-T");
+            startInfo.ArgumentList.Add(path);
 
             using var process = Process.Start(startInfo);
             if (process == null) return null;

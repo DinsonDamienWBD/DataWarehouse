@@ -27,6 +27,7 @@ namespace DataWarehouse.SDK.Deployment;
 [SdkCompatibility("3.0.0", Notes = "Phase 37: Cloud provider detection (ENV-04)")]
 public sealed class CloudDetector : IDeploymentDetector
 {
+    private static readonly HttpClient SharedMetadataClient = new() { Timeout = TimeSpan.FromMilliseconds(500) };
     private const string AwsMetadataUrl = "http://169.254.169.254/latest/meta-data/";
     private const string AzureMetadataUrl = "http://169.254.169.254/metadata/instance?api-version=2021-02-01";
     private const string GcpMetadataUrl = "http://metadata.google.internal/computeMetadata/v1/";
@@ -41,9 +42,8 @@ public sealed class CloudDetector : IDeploymentDetector
     /// </returns>
     public async Task<DeploymentContext?> DetectAsync(CancellationToken ct = default)
     {
-        // Create HttpClient with aggressive timeout (500ms)
-        // Cloud metadata responds instantly (<10ms), non-cloud times out quickly
-        using var client = new HttpClient { Timeout = TimeSpan.FromMilliseconds(500) };
+        // Reuse static HttpClient to avoid socket exhaustion
+        var client = SharedMetadataClient;
 
         // Try AWS detection first (most common)
         var awsContext = await TryDetectAwsAsync(client, ct);

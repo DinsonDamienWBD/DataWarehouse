@@ -22,7 +22,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy.Performance
     /// </para>
     /// </summary>
     [SdkCompatibility("6.0.0", Notes = "Phase 76: Performance Optimization (PERF-01, PERF-06)")]
-    public sealed class PolicyMaterializationEngine
+    public sealed class PolicyMaterializationEngine : IDisposable
     {
         private readonly IPolicyEngine _engine;
         private readonly MaterializedPolicyCache _cache;
@@ -187,6 +187,12 @@ namespace DataWarehouse.SDK.Infrastructure.Policy.Performance
 
             var profile = await _engine.GetActiveProfileAsync(ct).ConfigureAwait(false);
             return profile.FeaturePolicies.Keys;
+        }
+
+        /// <summary>Disposes the materialization semaphore.</summary>
+        public void Dispose()
+        {
+            _materializationLock.Dispose();
         }
     }
 }

@@ -70,6 +70,8 @@ public readonly record struct GeoRegion
 
         ushort nameLen = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(offset));
         offset += 2;
+        if (nameLen > MaxNameLength || offset + nameLen > buffer.Length)
+            throw new InvalidDataException($"GeoRegion nameLen {nameLen} exceeds maximum {MaxNameLength} or buffer bounds.");
 
         byte[] regionName = nameLen > 0
             ? buffer.Slice(offset, nameLen).ToArray()

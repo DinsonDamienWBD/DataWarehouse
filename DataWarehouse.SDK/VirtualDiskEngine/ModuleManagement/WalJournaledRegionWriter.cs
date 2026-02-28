@@ -432,7 +432,7 @@ public sealed class WalJournaledRegionWriter
             int totalRead = 0;
             while (totalRead < _blockSize)
             {
-                int bytesRead = _vdeStream.Read(buffer, totalRead, _blockSize - totalRead);
+                int bytesRead = await _vdeStream.ReadAsync(buffer.AsMemory(totalRead, _blockSize - totalRead));
                 if (bytesRead == 0) break;
                 totalRead += bytesRead;
             }

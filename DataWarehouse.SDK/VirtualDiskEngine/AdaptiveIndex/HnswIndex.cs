@@ -573,17 +573,16 @@ public sealed class HnswIndex : IAsyncDisposable
         // results: track best ef results
         var results = new List<(HnswNode Node, float Distance)> { (entry, entryDist) };
 
+        // Track worst result distance to avoid O(n) scan per iteration
+        float trackedWorstDist = float.MaxValue;
+
         while (candidates.Count > 0)
         {
             var (closestDist, closestNode) = (candidates.Keys[0], candidates.Values[0]);
             candidates.RemoveAt(0);
 
             // If closest candidate is farther than worst result, stop
-            float worstResultDist = results.Count >= ef
-                ? results.Max(r => r.Distance)
-                : float.MaxValue;
-
-            if (closestDist > worstResultDist)
+            if (results.Count >= ef && closestDist > trackedWorstDist)
                 break;
 
             foreach (int neighborId in closestNode.GetNeighbors(layer))
@@ -591,16 +590,13 @@ public sealed class HnswIndex : IAsyncDisposable
                 if (visited.Add(neighborId) && TryGetNode(neighborId, out var neighbor))
                 {
                     float dist = _distanceFunc(query, neighbor.Vector);
-                    worstResultDist = results.Count >= ef
-                        ? results.Max(r => r.Distance)
-                        : float.MaxValue;
 
-                    if (dist < worstResultDist || results.Count < ef)
+                    if (dist < trackedWorstDist || results.Count < ef)
                     {
                         candidates.Add(dist, neighbor);
                         results.Add((neighbor, dist));
 
-                        // Keep only ef best results
+                        // Keep only ef best results and update tracked worst
                         if (results.Count > ef)
                         {
                             int worstIdx = 0;
@@ -614,6 +610,17 @@ public sealed class HnswIndex : IAsyncDisposable
                                 }
                             }
                             results.RemoveAt(worstIdx);
+                        }
+
+                        // Recompute tracked worst after modification
+                        if (results.Count >= ef)
+                        {
+                            trackedWorstDist = float.MinValue;
+                            for (int i = 0; i < results.Count; i++)
+                            {
+                                if (results[i].Distance > trackedWorstDist)
+                                    trackedWorstDist = results[i].Distance;
+                            }
                         }
                     }
                 }
@@ -721,8 +728,10 @@ public sealed class HnswNode
 
         lock (_lock)
         {
-            if (!_neighbors[layer].Contains(neighborId))
-                _neighbors[layer].Add(neighborId);
+            // Use binary search on sorted list for O(log n) duplicate check
+            int idx = _neighbors[layer].BinarySearch(neighborId);
+            if (idx < 0)
+                _neighbors[layer].Insert(~idx, neighborId);
         }
     }
 

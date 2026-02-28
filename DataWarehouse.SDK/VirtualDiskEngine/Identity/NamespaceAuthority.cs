@@ -248,10 +248,8 @@ public static class NamespaceAuthority
         byte[] privateKey,
         byte[] publicKey)
     {
-        // The HmacSignatureProvider.Sign uses the private key parameter,
-        // but verification uses the public key. For consistency in the HMAC scheme,
-        // we sign with the public key so verification can recompute.
-        // This is the HMAC fallback approach -- real Ed25519 uses private key to sign.
-        return provider.Sign(data, publicKey);
+        // Sign with the private key — only the holder can produce valid signatures.
+        // Verification recomputes using the private key (HMAC is symmetric).
+        return provider.Sign(data, privateKey);
     }
 }

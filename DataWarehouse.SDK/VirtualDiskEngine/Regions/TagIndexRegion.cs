@@ -624,6 +624,9 @@ public sealed class TagIndexRegion
             bool isLeaf = nodeBlock[offset++] == 1;
             int keyCount = BinaryPrimitives.ReadUInt16LittleEndian(nodeBlock.Slice(offset));
             offset += 2;
+            int maxKeysPerBlock = (blockSize - 16) / 8; // Conservative estimate of max keys that fit in a block
+            if (keyCount < 0 || keyCount > maxKeysPerBlock)
+                throw new InvalidDataException($"TagIndex B+-tree node keyCount {keyCount} exceeds block capacity {maxKeysPerBlock}.");
 
             var node = new BPlusTreeNode(Math.Max(keyCount + 1, DefaultOrder), isLeaf);
 

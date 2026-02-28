@@ -34,7 +34,7 @@ internal sealed class ManifestCache
     /// <param name="maxSize">The maximum number of entries to cache. Default: 100,000.</param>
     public ManifestCache(int maxSize = 100_000)
     {
-        _cache = new BoundedDictionary<ObjectIdentity, ObjectLocationEntry>(1000);
+        _cache = new BoundedDictionary<ObjectIdentity, ObjectLocationEntry>(maxSize);
         _maxSize = maxSize;
     }
 

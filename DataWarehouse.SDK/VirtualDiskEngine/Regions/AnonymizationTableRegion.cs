@@ -326,9 +326,9 @@ public sealed class AnonymizationTableRegion
 
         while (mappingIndex < _mappings.Count)
         {
-            int blockPayloadEnd = payloadSize;
-
-            if (offset + AnonymizationMapping.SerializedSize > blockPayloadEnd)
+            // offset is relative to current block start
+            // payloadSize accounts for trailer but not for the block-0 header
+            if (offset + AnonymizationMapping.SerializedSize > payloadSize)
             {
                 UniversalBlockTrailer.Write(
                     buffer.Slice(currentBlock * blockSize, blockSize),

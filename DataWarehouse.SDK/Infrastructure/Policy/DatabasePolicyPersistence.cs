@@ -79,15 +79,11 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
             string sourceNodeId,
             CancellationToken ct = default)
         {
-            var existing = await _store.GetAllAsync(ct).ConfigureAwait(false);
-            var current = existing.FirstOrDefault(r => r.Key == key);
-
-            // Last-writer-wins: only apply if incoming timestamp is newer
-            if (current != null && current.Timestamp >= timestamp)
-                return;
-
+            // Atomic LWW upsert: the store's UpsertIfNewerAsync handles the
+            // compare-and-set atomically to prevent TOCTOU races between
+            // concurrent replication writers.
             var row = new DbPolicyRow(key, featureId, (int)level, path, data, timestamp, sourceNodeId);
-            await _store.UpsertAsync(row, ct).ConfigureAwait(false);
+            await _store.UpsertIfNewerAsync(row, ct).ConfigureAwait(false);
         }
 
         /// <inheritdoc/>
@@ -148,6 +144,12 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
             /// <summary>Inserts or updates a policy row, keyed by <see cref="DbPolicyRow.Key"/>.</summary>
             Task UpsertAsync(DbPolicyRow row, CancellationToken ct);
 
+            /// <summary>
+            /// Atomically inserts or updates a policy row only if the incoming timestamp is newer
+            /// than the existing record. Prevents TOCTOU race in LWW replication.
+            /// </summary>
+            Task UpsertIfNewerAsync(DbPolicyRow row, CancellationToken ct);
+
             /// <summary>Removes the policy row with the specified key.</summary>
             Task DeleteAsync(string key, CancellationToken ct);
 
@@ -197,6 +199,15 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
             public Task UpsertAsync(DbPolicyRow row, CancellationToken ct)
             {
                 _policies[row.Key] = row;
+                return Task.CompletedTask;
+            }
+
+            public Task UpsertIfNewerAsync(DbPolicyRow row, CancellationToken ct)
+            {
+                _policies.AddOrUpdate(
+                    row.Key,
+                    row,
+                    (_, existing) => row.Timestamp > existing.Timestamp ? row : existing);
                 return Task.CompletedTask;
             }
 

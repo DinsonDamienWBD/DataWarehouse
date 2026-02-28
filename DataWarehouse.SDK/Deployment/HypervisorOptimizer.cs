@@ -137,16 +137,11 @@ public sealed class HypervisorOptimizer
     /// </remarks>
     public Task RegisterLiveMigrationHooksAsync(Func<Task> preMigrationFlush, CancellationToken ct = default)
     {
-        _logger.LogInformation(
-            "Live migration hooks registration requested. " +
-            "In production, this would install pre-migration callbacks per hypervisor type. " +
-            "For now, logging recommendation: Ensure WAL sync interval is short (<5s).");
-
-        // In a real implementation, this would:
-        // - KVM: Monitor QEMU guest agent for pre-migration signal
-        // - VMware: Register VMware Tools pre-migration hook
-        // - Hyper-V: Monitor Hyper-V integration services
-        // - Xen: Monitor XenStore for migration signals
+        _logger.LogWarning(
+            "Live migration hooks registration requested but hypervisor-specific integration " +
+            "(KVM guest agent, VMware Tools, Hyper-V integration services, XenStore) is not yet implemented. " +
+            "Pre-migration flush callback will NOT be invoked during live migrations. " +
+            "Ensure WAL sync interval is short (<5s) to minimize data loss risk during migration.");
 
         return Task.CompletedTask;
     }

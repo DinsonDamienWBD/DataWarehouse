@@ -599,15 +599,24 @@ namespace DataWarehouse.SDK.Contracts
 
             if (optionalDestinations.Count > 0)
             {
-                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 timeoutCts.CancelAfter(options.NonRequiredTimeout);
                 var optionalTasks = optionalDestinations.Select(async d =>
                 {
                     try { var result = await WriteToDestinationAsync(d, objectId, indexableContent, timeoutCts.Token); destinationResults[d.DestinationType] = result; }
                     catch (OperationCanceledException) { destinationResults[d.DestinationType] = new WriteDestinationResult { Success = false, DestinationType = d.DestinationType, ErrorMessage = "Timeout" }; }
                 });
-                if (options.WaitForAll) await Task.WhenAll(optionalTasks);
-                else _ = Task.WhenAll(optionalTasks);
+                if (options.WaitForAll)
+                {
+                    try { await Task.WhenAll(optionalTasks); }
+                    finally { timeoutCts.Dispose(); }
+                }
+                else
+                {
+                    // Fire-and-forget: dispose CTS only after all tasks complete
+                    var allTasks = Task.WhenAll(optionalTasks);
+                    _ = allTasks.ContinueWith(_ => timeoutCts.Dispose(), TaskScheduler.Default);
+                }
             }
 
             sw.Stop();

@@ -236,6 +236,47 @@ public sealed class RoaringBitmapTagIndex
                     block, ct).ConfigureAwait(false);
             }
         }
+
+        // Persist tag name reverse mapping after bitmap data blocks
+        // Format: [nameCount:4][hash:8][keyLen:2][keyBytes][valueLen:2][valueBytes]...
+        var tagNameEntries = _tagNames.ToArray();
+        using var tagNameStream = new System.IO.MemoryStream();
+        var countBytes = new byte[4];
+        BinaryPrimitives.WriteInt32LittleEndian(countBytes, tagNameEntries.Length);
+        tagNameStream.Write(countBytes);
+        foreach (var (hash, (key, value)) in tagNameEntries)
+        {
+            var hashBytes = new byte[8];
+            BinaryPrimitives.WriteUInt64LittleEndian(hashBytes, hash);
+            tagNameStream.Write(hashBytes);
+            var keyData = Encoding.UTF8.GetBytes(key);
+            var valData = Encoding.UTF8.GetBytes(value);
+            var lenBuf = new byte[2];
+            BinaryPrimitives.WriteUInt16LittleEndian(lenBuf, (ushort)keyData.Length);
+            tagNameStream.Write(lenBuf);
+            tagNameStream.Write(keyData);
+            BinaryPrimitives.WriteUInt16LittleEndian(lenBuf, (ushort)valData.Length);
+            tagNameStream.Write(lenBuf);
+            tagNameStream.Write(valData);
+        }
+        var tagNameData = tagNameStream.ToArray();
+        int tagNameBlocks = (tagNameData.Length + _blockSize - 1) / _blockSize;
+        for (int b = 0; b < tagNameBlocks; b++)
+        {
+            var block = new byte[_blockSize];
+            int srcOffset = b * _blockSize;
+            int len = Math.Min(_blockSize, tagNameData.Length - srcOffset);
+            if (len > 0)
+                tagNameData.AsSpan(srcOffset, len).CopyTo(block);
+            await _device.WriteBlockAsync(
+                _regionStart + currentBlock + b,
+                block, ct).ConfigureAwait(false);
+        }
+        // Store tag name block offset in reserved header bytes (offset 8-12)
+        BinaryPrimitives.WriteInt32LittleEndian(headerBuffer.AsSpan(8), (int)currentBlock);
+        BinaryPrimitives.WriteInt32LittleEndian(headerBuffer.AsSpan(12), tagNameBlocks);
+        // Re-write first header block with updated reserved fields
+        await _device.WriteBlockAsync(_regionStart, headerBuffer.AsMemory(0, _blockSize), ct).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -288,6 +329,41 @@ public sealed class RoaringBitmapTagIndex
 
             var bitmap = RoaringBitmap.Deserialize(bitmapData);
             _index[hash] = bitmap;
+        }
+
+        // Load tag name reverse mapping from reserved header fields
+        int tagNameBlockStart = BinaryPrimitives.ReadInt32LittleEndian(headerBuffer.AsSpan(8));
+        int tagNameBlockCount = BinaryPrimitives.ReadInt32LittleEndian(headerBuffer.AsSpan(12));
+        if (tagNameBlockStart > 0 && tagNameBlockCount > 0)
+        {
+            var tagNameData = new byte[tagNameBlockCount * _blockSize];
+            for (int b = 0; b < tagNameBlockCount; b++)
+            {
+                await _device.ReadBlockAsync(
+                    _regionStart + tagNameBlockStart + b,
+                    tagNameData.AsMemory(b * _blockSize, _blockSize),
+                    ct).ConfigureAwait(false);
+            }
+            int tnOffset = 0;
+            int nameCount = BinaryPrimitives.ReadInt32LittleEndian(tagNameData.AsSpan(tnOffset));
+            tnOffset += 4;
+            for (int n = 0; n < nameCount && tnOffset + 12 <= tagNameData.Length; n++)
+            {
+                ulong tnHash = BinaryPrimitives.ReadUInt64LittleEndian(tagNameData.AsSpan(tnOffset));
+                tnOffset += 8;
+                int keyLen = BinaryPrimitives.ReadUInt16LittleEndian(tagNameData.AsSpan(tnOffset));
+                tnOffset += 2;
+                if (tnOffset + keyLen > tagNameData.Length) break;
+                string key = Encoding.UTF8.GetString(tagNameData, tnOffset, keyLen);
+                tnOffset += keyLen;
+                if (tnOffset + 2 > tagNameData.Length) break;
+                int valLen = BinaryPrimitives.ReadUInt16LittleEndian(tagNameData.AsSpan(tnOffset));
+                tnOffset += 2;
+                if (tnOffset + valLen > tagNameData.Length) break;
+                string value = Encoding.UTF8.GetString(tagNameData, tnOffset, valLen);
+                tnOffset += valLen;
+                _tagNames.TryAdd(tnHash, (key, value));
+            }
         }
     }
 

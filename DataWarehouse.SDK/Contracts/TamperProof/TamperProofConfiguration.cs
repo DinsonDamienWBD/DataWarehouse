@@ -158,25 +158,11 @@ public class TamperProofConfiguration
     {
         var errors = new List<string>();
 
-        // Validate storage instances
-        if (StorageInstances is null)
-        {
-            errors.Add("StorageInstances configuration is required.");
-        }
-        else
-        {
-            errors.AddRange(StorageInstances.Validate());
-        }
+        // Validate storage instances (required property — always non-null after construction)
+        errors.AddRange(StorageInstances.Validate());
 
-        // Validate RAID config
-        if (Raid is null)
-        {
-            errors.Add("Raid configuration is required.");
-        }
-        else
-        {
-            errors.AddRange(Raid.Validate());
-        }
+        // Validate RAID config (required property — always non-null after construction)
+        errors.AddRange(Raid.Validate());
 
         // Validate timeouts
         if (OperationTimeout <= TimeSpan.Zero)
@@ -257,44 +243,14 @@ public class StorageInstancesConfig
     {
         var errors = new List<string>();
 
-        if (Data is null)
-        {
-            errors.Add("Data storage instance is required.");
-        }
-        else
-        {
-            errors.AddRange(Data.Validate().Select(e => $"Data instance: {e}"));
-        }
-
-        if (Metadata is null)
-        {
-            errors.Add("Metadata storage instance is required.");
-        }
-        else
-        {
-            errors.AddRange(Metadata.Validate().Select(e => $"Metadata instance: {e}"));
-        }
-
-        if (Worm is null)
-        {
-            errors.Add("Worm storage instance is required.");
-        }
-        else
-        {
-            errors.AddRange(Worm.Validate().Select(e => $"Worm instance: {e}"));
-        }
-
-        if (Blockchain is null)
-        {
-            errors.Add("Blockchain storage instance is required.");
-        }
-        else
-        {
-            errors.AddRange(Blockchain.Validate().Select(e => $"Blockchain instance: {e}"));
-        }
+        // All properties are `required` — null checks are unnecessary after construction
+        errors.AddRange(Data.Validate().Select(e => $"Data instance: {e}"));
+        errors.AddRange(Metadata.Validate().Select(e => $"Metadata instance: {e}"));
+        errors.AddRange(Worm.Validate().Select(e => $"Worm instance: {e}"));
+        errors.AddRange(Blockchain.Validate().Select(e => $"Blockchain instance: {e}"));
 
         // Check for duplicate instance IDs
-        var instanceIds = new[] { Data?.InstanceId, Metadata?.InstanceId, Worm?.InstanceId, Blockchain?.InstanceId }
+        var instanceIds = new[] { Data.InstanceId, Metadata.InstanceId, Worm.InstanceId, Blockchain.InstanceId }
             .Where(id => !string.IsNullOrEmpty(id))
             .ToList();
 

@@ -102,7 +102,7 @@ namespace DataWarehouse.SDK.Contracts
         private readonly List<CipherPreset> _quantumSafePresets = new();
         private readonly Dictionary<string, CipherPreset> _presetLookup = new();
         private readonly SemaphoreSlim _initializationLock = new(1, 1);
-        private bool _presetsInitialized;
+        private volatile bool _presetsInitialized;
 
         /// <summary>
         /// Gets the plugin category (always SecurityProvider).

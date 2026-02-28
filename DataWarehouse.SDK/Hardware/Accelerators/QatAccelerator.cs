@@ -48,8 +48,8 @@ public sealed class QatAccelerator : IQatAccelerator, IDisposable
     private readonly IPlatformCapabilityRegistry _registry;
     private readonly IHardwareProbe _probe;
     private IntPtr _qatInstance = IntPtr.Zero;
-    private bool _isAvailable = false;
-    private bool _initialized = false;
+    private volatile bool _isAvailable = false;
+    private volatile bool _initialized = false;
     private long _operationsCompleted = 0;
     private readonly object _lock = new();
     private IntPtr _libraryHandle = IntPtr.Zero;

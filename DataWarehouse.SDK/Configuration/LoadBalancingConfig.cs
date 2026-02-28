@@ -336,13 +336,13 @@ public sealed class LoadBalancingManager
 {
     private readonly BoundedDictionary<string, NodeMetrics> _nodeMetrics = new BoundedDictionary<string, NodeMetrics>(1000);
     private readonly BoundedDictionary<string, LoadBalancingConfig> _containerConfigs = new BoundedDictionary<string, LoadBalancingConfig>(1000);
-    private LoadBalancingConfig _defaultConfig;
+    private volatile LoadBalancingConfig _defaultConfig;
     private readonly object _lock = new();
 
     // Metrics for intelligent mode selection
     private long _totalRequests;
     private long _requestsLastMinute;
-    private DateTime _lastMetricsReset = DateTime.UtcNow;
+    private long _lastMetricsResetTicks = DateTime.UtcNow.Ticks;
 
     public LoadBalancingManager(LoadBalancingConfig? defaultConfig = null)
     {
@@ -395,11 +395,15 @@ public sealed class LoadBalancingManager
                 return existing;
             });
 
-        // Reset minute counter periodically
-        if ((DateTime.UtcNow - _lastMetricsReset).TotalMinutes >= 1)
+        // Reset minute counter periodically (atomic via Interlocked on long ticks)
+        var lastResetTicks = Interlocked.Read(ref _lastMetricsResetTicks);
+        if ((DateTime.UtcNow - new DateTime(lastResetTicks, DateTimeKind.Utc)).TotalMinutes >= 1)
         {
-            Interlocked.Exchange(ref _requestsLastMinute, 0);
-            _lastMetricsReset = DateTime.UtcNow;
+            var nowTicks = DateTime.UtcNow.Ticks;
+            if (Interlocked.CompareExchange(ref _lastMetricsResetTicks, nowTicks, lastResetTicks) == lastResetTicks)
+            {
+                Interlocked.Exchange(ref _requestsLastMinute, 0);
+            }
         }
     }
 

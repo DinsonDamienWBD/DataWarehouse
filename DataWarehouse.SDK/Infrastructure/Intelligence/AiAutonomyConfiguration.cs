@@ -101,11 +101,6 @@ public sealed class AiAutonomyConfiguration
     /// <param name="autonomy">The autonomy level to apply to every feature at this level.</param>
     public void SetAutonomyForLevel(PolicyLevel level, AiAutonomyLevel autonomy)
     {
-        for (int i = 0; i < PolicyLevelValues.Length; i++)
-        {
-            // Only process the requested level but iterate all features
-        }
-
         // Iterate all known features from the classification table
         foreach (CheckTiming timing in Enum.GetValues<CheckTiming>())
         {

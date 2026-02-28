@@ -27,6 +27,7 @@ namespace DataWarehouse.SDK.Edge.Flash;
 internal sealed class BadBlockManager
 {
     private readonly HashSet<long> _badBlocks = new();
+    private readonly object _badBlockLock = new();
     private readonly IFlashDevice _flashDevice;
 
     public BadBlockManager(IFlashDevice flashDevice)
@@ -45,7 +46,7 @@ internal sealed class BadBlockManager
         {
             if (await _flashDevice.IsBlockBadAsync(block, ct))
             {
-                _badBlocks.Add(block);
+                lock (_badBlockLock) { _badBlocks.Add(block); }
             }
         }
     }
@@ -57,7 +58,7 @@ internal sealed class BadBlockManager
     /// <param name="ct">Cancellation token.</param>
     public async Task MarkBadAsync(long blockNumber, CancellationToken ct = default)
     {
-        _badBlocks.Add(blockNumber);
+        lock (_badBlockLock) { _badBlocks.Add(blockNumber); }
         await _flashDevice.MarkBlockBadAsync(blockNumber, ct);
     }
 
@@ -66,13 +67,13 @@ internal sealed class BadBlockManager
     /// </summary>
     /// <param name="blockNumber">Block number to check.</param>
     /// <returns>True if block is bad; otherwise false.</returns>
-    public bool IsBad(long blockNumber) => _badBlocks.Contains(blockNumber);
+    public bool IsBad(long blockNumber) { lock (_badBlockLock) { return _badBlocks.Contains(blockNumber); } }
 
     /// <summary>
     /// Gets the list of all bad blocks.
     /// </summary>
     /// <returns>List of bad block numbers.</returns>
-    public IReadOnlyList<long> GetBadBlocks() => _badBlocks.ToList();
+    public IReadOnlyList<long> GetBadBlocks() { lock (_badBlockLock) { return _badBlocks.ToList(); } }
 
     /// <summary>
     /// Gets the total count of bad blocks.

@@ -170,9 +170,9 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.AutoScaling
         private readonly CancellationTokenSource _cts = new();
 
         private int _currentNodeCount;
-        private volatile bool _isScaling;
-        private ScalingAction? _lastAction;
-        private DateTimeOffset? _lastScaledAt;
+        private int _isScalingFlag; // 0=idle, 1=scaling (atomic via Interlocked)
+        private ScalingAction? _lastAction; // Protected by _isScalingFlag gate
+        private long _lastScaledAtTicks; // DateTimeOffset.UtcNow.Ticks (atomic via Interlocked.Read)
         private Task? _evaluationTask;
 
         /// <inheritdoc />
@@ -213,9 +213,10 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.AutoScaling
             ct.ThrowIfCancellationRequested();
 
             // Check cooldown
-            if (_lastScaledAt.HasValue)
+            var lastTicks = Interlocked.Read(ref _lastScaledAtTicks);
+            if (lastTicks > 0)
             {
-                var elapsed = (DateTimeOffset.UtcNow - _lastScaledAt.Value).TotalSeconds;
+                var elapsed = (DateTimeOffset.UtcNow - new DateTimeOffset(lastTicks, TimeSpan.Zero)).TotalSeconds;
                 if (elapsed < _config.CooldownSeconds)
                 {
                     var decision = new ScalingDecision
@@ -298,14 +299,15 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.AutoScaling
         {
             ct.ThrowIfCancellationRequested();
 
-            if (_isScaling)
+            if (Interlocked.CompareExchange(ref _isScalingFlag, 1, 0) != 0)
                 return ScalingResult.Error("A scaling operation is already in progress.");
 
             int newTotal = _currentNodeCount + request.NodeCount;
             if (newTotal > _config.MaxNodes)
+            {
+                Interlocked.Exchange(ref _isScalingFlag, 0);
                 return ScalingResult.Error($"Scale-out would exceed maximum nodes ({_config.MaxNodes}). Current: {_currentNodeCount}, Requested: +{request.NodeCount}");
-
-            _isScaling = true;
+            }
             FireEvent(ScalingEventType.ScaleOutStarted, ScalingAction.ScaleOut, request.NodeCount, request.Reason);
 
             try
@@ -316,7 +318,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.AutoScaling
                 {
                     Interlocked.Add(ref _currentNodeCount, result.NodesAffected);
                     _lastAction = ScalingAction.ScaleOut;
-                    _lastScaledAt = DateTimeOffset.UtcNow;
+                    Interlocked.Exchange(ref _lastScaledAtTicks, DateTimeOffset.UtcNow.Ticks);
                     FireEvent(ScalingEventType.ScaleOutCompleted, ScalingAction.ScaleOut, result.NodesAffected,
                         $"Scaled out: +{result.NodesAffected} nodes (total: {_currentNodeCount})");
                 }
@@ -329,7 +331,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.AutoScaling
             }
             finally
             {
-                _isScaling = false;
+                Interlocked.Exchange(ref _isScalingFlag, 0);
             }
         }
 
@@ -338,14 +340,15 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.AutoScaling
         {
             ct.ThrowIfCancellationRequested();
 
-            if (_isScaling)
+            if (Interlocked.CompareExchange(ref _isScalingFlag, 1, 0) != 0)
                 return ScalingResult.Error("A scaling operation is already in progress.");
 
             int newTotal = _currentNodeCount - request.NodeCount;
             if (newTotal < _config.MinNodes)
+            {
+                Interlocked.Exchange(ref _isScalingFlag, 0);
                 return ScalingResult.Error($"Scale-in would go below minimum nodes ({_config.MinNodes}). Current: {_currentNodeCount}, Requested: -{request.NodeCount}");
-
-            _isScaling = true;
+            }
             FireEvent(ScalingEventType.ScaleInStarted, ScalingAction.ScaleIn, request.NodeCount, request.Reason);
 
             try
@@ -357,7 +360,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.AutoScaling
                     var updatedCount = Math.Max(_config.MinNodes, Interlocked.Add(ref _currentNodeCount, -result.NodesAffected));
                     Volatile.Write(ref _currentNodeCount, updatedCount);
                     _lastAction = ScalingAction.ScaleIn;
-                    _lastScaledAt = DateTimeOffset.UtcNow;
+                    Interlocked.Exchange(ref _lastScaledAtTicks, DateTimeOffset.UtcNow.Ticks);
                     FireEvent(ScalingEventType.ScaleInCompleted, ScalingAction.ScaleIn, result.NodesAffected,
                         $"Scaled in: -{result.NodesAffected} nodes (total: {_currentNodeCount})");
                 }
@@ -370,18 +373,22 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.AutoScaling
             }
             finally
             {
-                _isScaling = false;
+                Interlocked.Exchange(ref _isScalingFlag, 0);
             }
         }
 
         /// <inheritdoc />
-        public ScalingState GetCurrentState() => new()
+        public ScalingState GetCurrentState()
         {
-            CurrentNodeCount = _currentNodeCount,
-            IsScaling = _isScaling,
-            LastAction = _lastAction,
-            LastScaledAt = _lastScaledAt
-        };
+            var lastTicks = Interlocked.Read(ref _lastScaledAtTicks);
+            return new()
+            {
+                CurrentNodeCount = _currentNodeCount,
+                IsScaling = Volatile.Read(ref _isScalingFlag) != 0,
+                LastAction = _lastAction,
+                LastScaledAt = lastTicks > 0 ? new DateTimeOffset(lastTicks, TimeSpan.Zero) : null
+            };
+        }
 
         /// <summary>
         /// Collects current resource metrics from the local process.

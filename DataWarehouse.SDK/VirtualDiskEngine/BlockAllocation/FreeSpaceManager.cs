@@ -89,21 +89,10 @@ public sealed class FreeSpaceManager : IBlockAllocator
 
             if (extent != null)
             {
-                // Allocate from the extent
-                var allocated = new long[blockCount];
-                for (int i = 0; i < blockCount; i++)
-                {
-                    allocated[i] = extent.StartBlock + i;
-                    // Mark in bitmap
-                    _bitmap.FreeBlock(extent.StartBlock + i); // First free it if it was marked allocated
-                    _bitmap.AllocateBlock(); // Then reallocate to update count
-                }
-
-                // Actually, we need to directly manipulate the bitmap. Let's use the extent allocator from bitmap.
-                // For now, delegate to bitmap's AllocateExtent which does linear scan.
+                // Use bitmap to perform the actual allocation (handles bit manipulation)
                 var result = _bitmap.AllocateExtent(blockCount);
 
-                // Update extent tree: split the extent
+                // Update extent tree to reflect the allocation
                 _extents.SplitExtent(extent, blockCount);
 
                 return result;

@@ -317,6 +317,7 @@ public sealed class FederationOrchestrator : IFederationOrchestrator, ITopologyP
         _cts.Cancel();
         _cts.Dispose();
         _healthCheckTimer.Dispose();
+        _topology.Dispose();
     }
 }
 

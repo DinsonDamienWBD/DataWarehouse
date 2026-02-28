@@ -124,7 +124,7 @@ public static class FormatDetector
             bufferSize: RecommendedHeaderSize,
             useAsync: true);
 
-        var bytesToRead = (int)Math.Min(stream.Length, RecommendedHeaderSize);
+        var bytesToRead = stream.CanSeek ? (int)Math.Min(stream.Length, RecommendedHeaderSize) : RecommendedHeaderSize;
         if (bytesToRead < 4)
             return VirtualDiskFormat.Unknown;
 

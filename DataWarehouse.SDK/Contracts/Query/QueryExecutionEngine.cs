@@ -935,15 +935,22 @@ public sealed class QueryExecutionEngine
     private object? EvaluateTagFunction(FunctionCallExpression func, ColumnarBatch batch, int row)
     {
         if (_tagProvider == null || func.Arguments.Length < 1) return null;
-        var tagName = EvaluateExpression(func.Arguments[0], batch, row)?.ToString();
-        if (tagName == null) return null;
 
-        // If two arguments: first is object key column, second is tag name
         if (func.Arguments.Length >= 2)
         {
+            // Two arguments: tag(objectKey, tagName)
             var objectKey = EvaluateExpression(func.Arguments[0], batch, row)?.ToString();
-            tagName = EvaluateExpression(func.Arguments[1], batch, row)?.ToString();
+            var tagName = EvaluateExpression(func.Arguments[1], batch, row)?.ToString();
             if (objectKey != null && tagName != null)
+                return _tagProvider.GetTag(objectKey, tagName);
+        }
+        else
+        {
+            // Single argument: tag(tagName) — use first column as implicit object key
+            var tagName = EvaluateExpression(func.Arguments[0], batch, row)?.ToString();
+            if (tagName == null) return null;
+            var objectKey = batch.ColumnCount > 0 ? batch.GetValue(0, row)?.ToString() : null;
+            if (objectKey != null)
                 return _tagProvider.GetTag(objectKey, tagName);
         }
 
@@ -953,14 +960,22 @@ public sealed class QueryExecutionEngine
     private object? EvaluateHasTagFunction(FunctionCallExpression func, ColumnarBatch batch, int row)
     {
         if (_tagProvider == null || func.Arguments.Length < 1) return false;
-        var tagName = EvaluateExpression(func.Arguments[0], batch, row)?.ToString();
-        if (tagName == null) return false;
 
         if (func.Arguments.Length >= 2)
         {
+            // Two arguments: has_tag(objectKey, tagName)
             var objectKey = EvaluateExpression(func.Arguments[0], batch, row)?.ToString();
-            tagName = EvaluateExpression(func.Arguments[1], batch, row)?.ToString();
+            var tagName = EvaluateExpression(func.Arguments[1], batch, row)?.ToString();
             if (objectKey != null && tagName != null)
+                return _tagProvider.HasTag(objectKey, tagName);
+        }
+        else
+        {
+            // Single argument: has_tag(tagName) — use first column as implicit object key
+            var tagName = EvaluateExpression(func.Arguments[0], batch, row)?.ToString();
+            if (tagName == null) return false;
+            var objectKey = batch.ColumnCount > 0 ? batch.GetValue(0, row)?.ToString() : null;
+            if (objectKey != null)
                 return _tagProvider.HasTag(objectKey, tagName);
         }
 
@@ -1007,17 +1022,23 @@ public sealed class QueryExecutionEngine
     {
         if (value == null) return null;
         var type = targetType.ToUpperInvariant();
-        return type switch
+        try
         {
-            "INT" or "INTEGER" => Convert.ToInt32(value),
-            "BIGINT" or "LONG" => Convert.ToInt64(value),
-            "FLOAT" or "REAL" => Convert.ToSingle(value),
-            "DOUBLE" => Convert.ToDouble(value),
-            "DECIMAL" or "NUMERIC" => Convert.ToDecimal(value),
-            "VARCHAR" or "TEXT" or "STRING" or "NVARCHAR" => value.ToString(),
-            "BOOLEAN" or "BOOL" => Convert.ToBoolean(value),
-            _ => value
-        };
+            return type switch
+            {
+                "INT" or "INTEGER" => Convert.ToInt32(value),
+                "BIGINT" or "LONG" => Convert.ToInt64(value),
+                "FLOAT" or "REAL" => Convert.ToSingle(value),
+                "DOUBLE" => Convert.ToDouble(value),
+                "DECIMAL" or "NUMERIC" => Convert.ToDecimal(value),
+                "VARCHAR" or "TEXT" or "STRING" or "NVARCHAR" => value.ToString(),
+                "BOOLEAN" or "BOOL" => Convert.ToBoolean(value),
+                _ => value
+            };
+        }
+        catch (FormatException) { return null; }
+        catch (OverflowException) { return null; }
+        catch (InvalidCastException) { return null; }
     }
 
     private string EvaluateExpressionAsString(Expression expr, ColumnarBatch batch, int row)

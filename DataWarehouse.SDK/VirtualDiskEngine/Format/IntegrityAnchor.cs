@@ -226,7 +226,13 @@ public readonly struct IntegrityAnchor : IEquatable<IntegrityAnchor>
     public bool Equals(IntegrityAnchor other) =>
         HashChainCounter == other.HashChainCounter
         && ChainGeneration == other.ChainGeneration
-        && ChainTimestamp == other.ChainTimestamp;
+        && ChainTimestamp == other.ChainTimestamp
+        && MerkleRootHash.AsSpan().SequenceEqual(other.MerkleRootHash)
+        && PolicyVaultHash.AsSpan().SequenceEqual(other.PolicyVaultHash)
+        && InodeTableHash.AsSpan().SequenceEqual(other.InodeTableHash)
+        && TagIndexHash.AsSpan().SequenceEqual(other.TagIndexHash)
+        && HashChainHead.AsSpan().SequenceEqual(other.HashChainHead)
+        && MetadataChainHash.AsSpan().SequenceEqual(other.MetadataChainHash);
 
     /// <inheritdoc />
     public override bool Equals(object? obj) => obj is IntegrityAnchor other && Equals(other);

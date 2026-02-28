@@ -360,6 +360,8 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
                 // Audit cost-aware route selection
                 _auditService?.LogEvent(new TransitAuditEntry
                 {
+                    AuditId = Guid.NewGuid().ToString("N"),
+                    Timestamp = DateTime.UtcNow,
                     TransferId = request.TransferId,
                     EventType = TransitAuditEventType.CostRouteSelected,
                     StrategyId = selectedRoute.StrategyId,
@@ -405,6 +407,8 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
         {
             _auditService?.LogEvent(new TransitAuditEntry
             {
+                AuditId = Guid.NewGuid().ToString("N"),
+                Timestamp = DateTime.UtcNow,
                 TransferId = request.TransferId,
                 EventType = TransitAuditEventType.StrategySelected,
                 StrategyId = bestStrategy.StrategyId,
@@ -439,6 +443,8 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
         // Audit: transfer started
         _auditService?.LogEvent(new TransitAuditEntry
         {
+            AuditId = Guid.NewGuid().ToString("N"),
+            Timestamp = DateTime.UtcNow,
             TransferId = request.TransferId,
             EventType = TransitAuditEventType.TransferStarted,
             StrategyId = strategy.StrategyId,
@@ -481,6 +487,8 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
 
                 _auditService?.LogEvent(new TransitAuditEntry
                 {
+                    AuditId = Guid.NewGuid().ToString("N"),
+                    Timestamp = DateTime.UtcNow,
                     TransferId = request.TransferId,
                     EventType = TransitAuditEventType.QoSEnforced,
                     StrategyId = strategy.StrategyId,
@@ -504,6 +512,8 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
 
                     _auditService?.LogEvent(new TransitAuditEntry
                     {
+                        AuditId = Guid.NewGuid().ToString("N"),
+                        Timestamp = DateTime.UtcNow,
                         TransferId = request.TransferId,
                         EventType = TransitAuditEventType.LayerApplied,
                         StrategyId = strategy.StrategyId,
@@ -521,6 +531,8 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
 
                     _auditService?.LogEvent(new TransitAuditEntry
                     {
+                        AuditId = Guid.NewGuid().ToString("N"),
+                        Timestamp = DateTime.UtcNow,
                         TransferId = request.TransferId,
                         EventType = TransitAuditEventType.LayerApplied,
                         StrategyId = strategy.StrategyId,
@@ -541,6 +553,8 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
                 // Audit: transfer completed
                 _auditService?.LogEvent(new TransitAuditEntry
                 {
+                    AuditId = Guid.NewGuid().ToString("N"),
+                    Timestamp = DateTime.UtcNow,
                     TransferId = request.TransferId,
                     EventType = TransitAuditEventType.TransferCompleted,
                     StrategyId = strategy.StrategyId,
@@ -565,6 +579,8 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
                 // Audit: transfer failed
                 _auditService?.LogEvent(new TransitAuditEntry
                 {
+                    AuditId = Guid.NewGuid().ToString("N"),
+                    Timestamp = DateTime.UtcNow,
                     TransferId = request.TransferId,
                     EventType = TransitAuditEventType.TransferFailed,
                     StrategyId = strategy.StrategyId,
@@ -590,6 +606,8 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
         {
             _auditService?.LogEvent(new TransitAuditEntry
             {
+                AuditId = Guid.NewGuid().ToString("N"),
+                Timestamp = DateTime.UtcNow,
                 TransferId = request.TransferId,
                 EventType = TransitAuditEventType.TransferCancelled,
                 StrategyId = strategy.StrategyId,
@@ -619,6 +637,8 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
         {
             _auditService?.LogEvent(new TransitAuditEntry
             {
+                AuditId = Guid.NewGuid().ToString("N"),
+                Timestamp = DateTime.UtcNow,
                 TransferId = request.TransferId,
                 EventType = TransitAuditEventType.TransferFailed,
                 StrategyId = strategy.StrategyId,

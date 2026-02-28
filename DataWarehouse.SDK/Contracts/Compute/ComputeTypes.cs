@@ -73,9 +73,10 @@ public record ComputeTask(
     /// <returns>
     /// The code decoded as a UTF-8 string.
     /// </returns>
-    /// <exception cref="InvalidOperationException">
-    /// Thrown if the code is not valid UTF-8 text (e.g., for compiled binary code).
-    /// </exception>
+    /// <remarks>
+    /// Invalid UTF-8 byte sequences are replaced with U+FFFD (replacement character)
+    /// per the default UTF-8 encoding behavior.
+    /// </remarks>
     public string GetCodeAsString() => System.Text.Encoding.UTF8.GetString(Code.Span);
 
     /// <summary>
@@ -84,9 +85,10 @@ public record ComputeTask(
     /// <returns>
     /// The input data decoded as a UTF-8 string.
     /// </returns>
-    /// <exception cref="InvalidOperationException">
-    /// Thrown if the input data is not valid UTF-8 text.
-    /// </exception>
+    /// <remarks>
+    /// Invalid UTF-8 byte sequences are replaced with U+FFFD (replacement character)
+    /// per the default UTF-8 encoding behavior.
+    /// </remarks>
     public string GetInputDataAsString() => System.Text.Encoding.UTF8.GetString(InputData.Span);
 
     /// <summary>

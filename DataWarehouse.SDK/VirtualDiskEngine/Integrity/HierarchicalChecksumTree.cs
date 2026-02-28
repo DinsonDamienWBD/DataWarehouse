@@ -320,8 +320,10 @@ public sealed class HierarchicalChecksumTree
             // Merkle root is computed; actual verification against stored root
             // would use MerkleIntegrityVerifier. Here we validate internal consistency.
             var computedRoot = BuildMerkleTreeRoot(allLeafHashes);
-            // Level 3 pass means the tree was built successfully and is internally consistent
-            result.Level3Ok = computedRoot.Length == HashSize;
+            // Validate computed root has correct size AND leaf hashes are consistent
+            // True verification requires comparing against a stored Merkle root from the integrity anchor
+            result.Level3Ok = computedRoot.Length == HashSize && allLeafHashes.Count > 0
+                && result.CorruptBlocks.Count == 0;
         }
 
         return result;

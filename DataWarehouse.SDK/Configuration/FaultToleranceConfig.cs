@@ -454,7 +454,7 @@ public sealed class FaultToleranceValidationResult
 public sealed class FaultToleranceManager
 {
     private readonly BoundedDictionary<string, FaultToleranceConfig> _containerConfigs = new BoundedDictionary<string, FaultToleranceConfig>(1000);
-    private FaultToleranceConfig _defaultConfig;
+    private volatile FaultToleranceConfig _defaultConfig;
     private readonly object _lock = new();
 
     public FaultToleranceManager(FaultToleranceConfig? defaultConfig = null)

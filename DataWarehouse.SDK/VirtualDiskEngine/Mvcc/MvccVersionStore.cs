@@ -43,12 +43,12 @@ public sealed class MvccVersionStore
     /// <summary>
     /// Gets the number of blocks currently used for storing old versions.
     /// </summary>
-    public long UsedBlocks => _nextFreeBlock;
+    public long UsedBlocks => Interlocked.Read(ref _nextFreeBlock);
 
     /// <summary>
     /// Gets the number of free blocks remaining in the MVCC region.
     /// </summary>
-    public long FreeBlocks => _mvccRegionBlockCount - _nextFreeBlock;
+    public long FreeBlocks => _mvccRegionBlockCount - Interlocked.Read(ref _nextFreeBlock);
 
     /// <summary>
     /// Creates a new MVCC version store backed by a region of the block device.

@@ -130,8 +130,7 @@ public abstract class AccessLogProviderPluginBase : IntegrityPluginBase, IAccess
     /// <inheritdoc/>
     public override async Task<byte[]> ComputeHashAsync(Stream data, CancellationToken ct = default)
     {
-        using var sha = System.Security.Cryptography.SHA256.Create();
-        return await Task.FromResult(sha.ComputeHash(data));
+        return await System.Security.Cryptography.SHA256.HashDataAsync(data, ct).ConfigureAwait(false);
     }
 
     #region Intelligence Socket
@@ -499,8 +498,7 @@ public abstract class AccessLogProviderPluginBase : IntegrityPluginBase, IAccess
     /// </summary>
     public virtual async Task PurgeAsync(DateTimeOffset olderThan, CancellationToken ct = default)
     {
-        // Default implementation: query old entries and delete individually
-        // Derived classes should override with bulk delete for better performance
+        // Query old entries and delete them via the derived class's persistence layer
         var query = new AccessLogQuery
         {
             EndTime = olderThan,
@@ -509,9 +507,23 @@ public abstract class AccessLogProviderPluginBase : IntegrityPluginBase, IAccess
 
         var oldEntries = await QueryLogsAsync(query, ct);
 
-        // Derived classes can override to implement actual deletion
-        // This base implementation just identifies what would be deleted
-        await Task.CompletedTask;
+        foreach (var entry in oldEntries)
+        {
+            ct.ThrowIfCancellationRequested();
+            await DeleteLogEntryAsync(entry.EntryId, ct).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Deletes a single access log entry by its ID.
+    /// Derived classes must implement actual deletion from their storage backend.
+    /// </summary>
+    /// <param name="entryId">The entry ID to delete.</param>
+    /// <param name="ct">Cancellation token.</param>
+    protected virtual Task DeleteLogEntryAsync(string entryId, CancellationToken ct = default)
+    {
+        // Default: no-op — derived classes override with actual storage deletion
+        return Task.CompletedTask;
     }
 
     /// <summary>

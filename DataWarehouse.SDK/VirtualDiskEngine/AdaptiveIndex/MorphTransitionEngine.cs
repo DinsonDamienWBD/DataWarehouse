@@ -40,7 +40,7 @@ public sealed class MorphTransitionEngine
     private readonly SemaphoreSlim _morphLock = new(1, 1);
     private readonly ConcurrentQueue<(byte[] Key, long Value)> _pendingWrites = new();
 
-    private MorphTransition? _currentTransition;
+    private volatile MorphTransition? _currentTransition;
 
     /// <summary>
     /// Batch size for entry migration. Entries are migrated in batches for progress tracking.
@@ -532,10 +532,10 @@ public sealed class MorphTransitionEngine
         MorphLevel.DirectPointer => new DirectPointerIndex(),
         MorphLevel.SortedArray => new SortedArrayIndex(10_000),
         MorphLevel.AdaptiveRadixTree => new ArtIndex(),
-        MorphLevel.BeTree => throw new NotSupportedException($"Level {level} morph target not yet supported."),
-        MorphLevel.LearnedIndex => throw new NotSupportedException($"Level {level} morph target not yet supported."),
-        MorphLevel.BeTreeForest => throw new NotSupportedException($"Level {level} morph target not yet supported."),
-        MorphLevel.DistributedRouting => throw new NotSupportedException($"Level {level} morph target not yet supported."),
+        MorphLevel.BeTree => new BeTree(_device, _allocator, _wal, rootBlockNumber: 0, _blockSize),
+        MorphLevel.LearnedIndex => new AlexLearnedIndex(new BeTree(_device, _allocator, _wal, rootBlockNumber: 0, _blockSize)),
+        MorphLevel.BeTreeForest => new BeTreeForest(_device, _allocator, _wal, _blockSize),
+        MorphLevel.DistributedRouting => new BeTreeForest(_device, _allocator, _wal, _blockSize), // Uses forest as distributed routing base
         _ => throw new ArgumentOutOfRangeException(nameof(level), level, "Unknown morph level.")
     };
 }

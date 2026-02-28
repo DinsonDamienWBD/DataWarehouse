@@ -111,6 +111,12 @@ public static class BlockTypeTags
     /// <summary>Extent tree node ("EXTN").</summary>
     public const uint EXTN = 0x4558544E;
 
+    /// <summary>Extended metadata ("EXMD").</summary>
+    public const uint EXMD = 0x45584D44;
+
+    /// <summary>Integrity anchor ("IANT").</summary>
+    public const uint IANT = 0x49414E54;
+
     // ── SQL / Analytics ─────────────────────────────────────────────────
 
     /// <summary>Columnar region ("COLR").</summary>
@@ -126,7 +132,7 @@ public static class BlockTypeTags
         SUPB, RMAP, POLV, ENCR, BMAP, INOD, TAGI, MWAL, MTRK, BTRE,
         SNAP, REPL, RAID, COMP, INTE, STRE, XREF, WORM, CODE, DWAL,
         DATA, FREE, CMVT, ALOG, CLOG, DICT, ANON, MLOG, ERCV, EXTN,
-        COLR, ZMAP
+        COLR, ZMAP, EXMD, IANT
     }.ToFrozenSet();
 
     /// <summary>

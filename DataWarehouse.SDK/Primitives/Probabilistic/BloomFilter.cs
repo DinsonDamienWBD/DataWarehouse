@@ -228,10 +228,23 @@ public sealed class BloomFilter<T> : IProbabilisticStructure, IMergeable<BloomFi
     /// <returns>Reconstructed Bloom filter.</returns>
     public static BloomFilter<T> Deserialize(byte[] data, Func<T, byte[]>? serializer = null)
     {
+        ArgumentNullException.ThrowIfNull(data);
+        if (data.Length < 24)
+            throw new ArgumentException("Data too short for BloomFilter deserialization header (minimum 24 bytes).", nameof(data));
+
         var bitCount = BitConverter.ToInt32(data, 0);
         var hashCount = BitConverter.ToInt32(data, 4);
         var errorRate = BitConverter.ToDouble(data, 8);
         var itemCount = BitConverter.ToInt64(data, 16);
+
+        if (bitCount <= 0 || bitCount > 1_000_000_000) // 1 billion bits max (~125 MB)
+            throw new ArgumentException($"Invalid bitCount {bitCount} in serialized BloomFilter data.", nameof(data));
+        if (hashCount <= 0 || hashCount > 100)
+            throw new ArgumentException($"Invalid hashCount {hashCount} in serialized BloomFilter data.", nameof(data));
+
+        int requiredBytes = 24 + (bitCount + 7) / 8;
+        if (data.Length < requiredBytes)
+            throw new ArgumentException($"Data too short: need {requiredBytes} bytes but got {data.Length}.", nameof(data));
 
         var bitBytes = new byte[(bitCount + 7) / 8];
         Array.Copy(data, 24, bitBytes, 0, bitBytes.Length);

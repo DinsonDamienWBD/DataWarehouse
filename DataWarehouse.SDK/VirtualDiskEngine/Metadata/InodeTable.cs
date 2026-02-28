@@ -180,12 +180,15 @@ public sealed class InodeTable : IInodeTable, IDisposable
         var inode = await ReadInodeAsync(inodeNumber, ct);
         if (inode != null && inode.LinkCount > 0)
         {
-            // Add to cache (with eviction if needed)
-            if (_cache.Count >= MaxCachedInodes)
+            // Atomically add to cache with eviction under lock to prevent unbounded growth
+            lock (_cache)
             {
-                EvictOldestCacheEntry();
+                if (_cache.Count >= MaxCachedInodes)
+                {
+                    EvictOldestCacheEntry();
+                }
+                _cache[inodeNumber] = inode;
             }
-            _cache[inodeNumber] = inode;
         }
 
         return inode?.LinkCount > 0 ? inode : null;

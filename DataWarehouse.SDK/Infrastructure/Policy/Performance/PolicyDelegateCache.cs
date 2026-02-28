@@ -89,8 +89,10 @@ namespace DataWarehouse.SDK.Infrastructure.Policy.Performance
         /// </summary>
         public void InvalidateAll()
         {
-            _delegates.Clear();
+            // Update version BEFORE clearing to prevent concurrent GetOrCompile from
+            // trapping a stale delegate as if it belongs to the new version
             Interlocked.Exchange(ref _compiledForVersion, _materializedCache.CurrentVersion);
+            _delegates.Clear();
             Interlocked.Increment(ref _recompileCount);
         }
 

@@ -68,8 +68,9 @@ namespace DataWarehouse.SDK.Contracts.Transit
     {
         /// <summary>
         /// Unique identifier for this audit entry.
+        /// Must be explicitly set by the creator to preserve record equality semantics.
         /// </summary>
-        public string AuditId { get; init; } = Guid.NewGuid().ToString("N");
+        public required string AuditId { get; init; }
 
         /// <summary>
         /// The unique identifier of the transfer this audit entry relates to.
@@ -82,14 +83,14 @@ namespace DataWarehouse.SDK.Contracts.Transit
         public required TransitAuditEventType EventType { get; init; }
 
         /// <summary>
-        /// UTC timestamp when the event occurred.
+        /// UTC timestamp when the event occurred. Must be explicitly set.
         /// </summary>
-        public DateTime Timestamp { get; init; } = DateTime.UtcNow;
+        public required DateTime Timestamp { get; init; }
 
         /// <summary>
         /// The identifier of the transit strategy involved in this event.
         /// </summary>
-        public string StrategyId { get; init; } = string.Empty;
+        public required string StrategyId { get; init; }
 
         /// <summary>
         /// The source endpoint URI for the transfer.

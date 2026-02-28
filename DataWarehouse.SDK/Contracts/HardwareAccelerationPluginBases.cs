@@ -28,11 +28,11 @@ namespace DataWarehouse.SDK.Contracts
         public override Task<Dictionary<string, object>> ExecuteWorkloadAsync(Dictionary<string, object> workload, CancellationToken ct = default)
             => Task.FromResult(new Dictionary<string, object> { ["status"] = "delegated-to-hardware-accelerator" });
 
-        private bool _initialized;
+        private volatile bool _initialized;
         private long _operationsCompleted;
         private long _totalBytesProcessed;
-        private DateTime _startTime;
-        private TimeSpan _totalProcessingTime;
+        private long _startTimeTicks;
+        private long _totalProcessingTimeTicks;
 
         #region Intelligence Socket
 
@@ -143,13 +143,22 @@ namespace DataWarehouse.SDK.Contracts
         /// Only initializes if available and not already initialized.
         /// </summary>
         /// <returns>A task representing the initialization operation.</returns>
+        private volatile bool _initStarted;
         public async Task InitializeAsync()
         {
-            if (!_initialized && IsAvailable)
+            if (_initialized || !IsAvailable) return;
+            if (_initStarted) return;
+            _initStarted = true;
+            try
             {
                 await InitializeHardwareAsync();
+                Interlocked.Exchange(ref _startTimeTicks, DateTime.UtcNow.Ticks);
                 _initialized = true;
-                _startTime = DateTime.UtcNow;
+            }
+            catch
+            {
+                _initStarted = false;
+                throw;
             }
         }
 
@@ -174,7 +183,7 @@ namespace DataWarehouse.SDK.Contracts
             // Update statistics
             Interlocked.Increment(ref _operationsCompleted);
             Interlocked.Add(ref _totalBytesProcessed, data.Length);
-            _totalProcessingTime += duration;
+            Interlocked.Add(ref _totalProcessingTimeTicks, duration.Ticks);
 
             return result;
         }
@@ -225,10 +234,12 @@ namespace DataWarehouse.SDK.Contracts
         {
             var operations = Interlocked.Read(ref _operationsCompleted);
             var totalBytes = Interlocked.Read(ref _totalBytesProcessed);
-            var uptime = _initialized ? DateTime.UtcNow - _startTime : TimeSpan.Zero;
+            var startTicks = Interlocked.Read(ref _startTimeTicks);
+            var uptime = _initialized && startTicks > 0 ? DateTime.UtcNow - new DateTime(startTicks, DateTimeKind.Utc) : TimeSpan.Zero;
             var throughputMBps = uptime.TotalSeconds > 0 ? (totalBytes / (1024.0 * 1024.0)) / uptime.TotalSeconds : 0;
-            var utilization = _totalProcessingTime.TotalSeconds > 0 && uptime.TotalSeconds > 0
-                ? _totalProcessingTime.TotalSeconds / uptime.TotalSeconds
+            var totalProcessingTime = TimeSpan.FromTicks(Interlocked.Read(ref _totalProcessingTimeTicks));
+            var utilization = totalProcessingTime.TotalSeconds > 0 && uptime.TotalSeconds > 0
+                ? totalProcessingTime.TotalSeconds / uptime.TotalSeconds
                 : 0.0;
 
             return Task.FromResult(new AcceleratorStatistics(
@@ -236,7 +247,7 @@ namespace DataWarehouse.SDK.Contracts
                 operations,
                 throughputMBps,
                 Math.Min(1.0, utilization),
-                _totalProcessingTime
+                totalProcessingTime
             ));
         }
 

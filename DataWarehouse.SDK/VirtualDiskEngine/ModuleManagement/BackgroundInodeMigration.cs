@@ -162,7 +162,7 @@ public sealed class BackgroundInodeMigration
                     return await CompleteSwapAsync(superblock, newManifest, newLayout,
                         newTableStartBlock, newTableBlockCount,
                         inodeStartBlock, inodeBlockCount,
-                        totalInodes, checkpoint, migrationId, sw, ct);
+                        totalInodes, checkpoint, migrationId, module, sw, ct);
                 }
             }
             else
@@ -279,7 +279,7 @@ public sealed class BackgroundInodeMigration
         return await CompleteSwapAsync(superblock, newManifest, newLayout,
             newTableStartBlock, newTableBlockCount,
             inodeStartBlock, inodeBlockCount,
-            totalInodes, checkpoint, migrationId, sw, ct);
+            totalInodes, checkpoint, migrationId, module, sw, ct);
     }
 
     /// <summary>
@@ -373,7 +373,7 @@ public sealed class BackgroundInodeMigration
         long newTableStartBlock, long newTableBlockCount,
         long oldTableStartBlock, long oldTableBlockCount,
         long totalInodes, MigrationCheckpoint checkpoint, Guid migrationId,
-        Stopwatch sw, CancellationToken ct)
+        ModuleId targetModule, Stopwatch sw, CancellationToken ct)
     {
         ReportProgress(totalInodes, totalInodes, MigrationPhase.SwappingRegions);
 
@@ -381,7 +381,7 @@ public sealed class BackgroundInodeMigration
         await checkpoint.SaveAsync(new CheckpointData
         {
             MigrationId = migrationId,
-            TargetModule = ModuleId.Security, // placeholder; actual module in manifest diff
+            TargetModule = targetModule,
             OriginalManifest = superblock.ModuleManifest,
             TargetManifest = newManifest,
             TotalInodes = totalInodes,

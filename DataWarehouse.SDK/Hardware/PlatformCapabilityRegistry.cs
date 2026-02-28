@@ -147,8 +147,8 @@ namespace DataWarehouse.SDK.Hardware
             if (IsCacheStale())
             {
                 _ = RefreshAsync()
-                    .ContinueWith(t => System.Diagnostics.Debug.WriteLine(
-                        $"[PlatformCapabilityRegistry] Refresh failed: {t.Exception?.InnerException?.Message}"),
+                    .ContinueWith(t => System.Diagnostics.Trace.TraceError(
+                        $"[PlatformCapabilityRegistry] Background refresh failed: {t.Exception?.InnerException?.Message}"),
                         TaskContinuationOptions.OnlyOnFaulted);
             }
 
@@ -179,8 +179,8 @@ namespace DataWarehouse.SDK.Hardware
             if (IsCacheStale())
             {
                 _ = RefreshAsync()
-                    .ContinueWith(t => System.Diagnostics.Debug.WriteLine(
-                        $"[PlatformCapabilityRegistry] Refresh failed: {t.Exception?.InnerException?.Message}"),
+                    .ContinueWith(t => System.Diagnostics.Trace.TraceError(
+                        $"[PlatformCapabilityRegistry] Background refresh failed: {t.Exception?.InnerException?.Message}"),
                         TaskContinuationOptions.OnlyOnFaulted);
             }
 
@@ -211,8 +211,8 @@ namespace DataWarehouse.SDK.Hardware
             if (IsCacheStale())
             {
                 _ = RefreshAsync()
-                    .ContinueWith(t => System.Diagnostics.Debug.WriteLine(
-                        $"[PlatformCapabilityRegistry] Refresh failed: {t.Exception?.InnerException?.Message}"),
+                    .ContinueWith(t => System.Diagnostics.Trace.TraceError(
+                        $"[PlatformCapabilityRegistry] Background refresh failed: {t.Exception?.InnerException?.Message}"),
                         TaskContinuationOptions.OnlyOnFaulted);
             }
 
@@ -243,8 +243,8 @@ namespace DataWarehouse.SDK.Hardware
             if (IsCacheStale())
             {
                 _ = RefreshAsync()
-                    .ContinueWith(t => System.Diagnostics.Debug.WriteLine(
-                        $"[PlatformCapabilityRegistry] Refresh failed: {t.Exception?.InnerException?.Message}"),
+                    .ContinueWith(t => System.Diagnostics.Trace.TraceError(
+                        $"[PlatformCapabilityRegistry] Background refresh failed: {t.Exception?.InnerException?.Message}"),
                         TaskContinuationOptions.OnlyOnFaulted);
             }
 
@@ -275,8 +275,8 @@ namespace DataWarehouse.SDK.Hardware
             if (IsCacheStale())
             {
                 _ = RefreshAsync()
-                    .ContinueWith(t => System.Diagnostics.Debug.WriteLine(
-                        $"[PlatformCapabilityRegistry] Refresh failed: {t.Exception?.InnerException?.Message}"),
+                    .ContinueWith(t => System.Diagnostics.Trace.TraceError(
+                        $"[PlatformCapabilityRegistry] Background refresh failed: {t.Exception?.InnerException?.Message}"),
                         TaskContinuationOptions.OnlyOnFaulted);
             }
 

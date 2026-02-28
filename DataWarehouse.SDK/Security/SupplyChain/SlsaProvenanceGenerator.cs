@@ -488,10 +488,11 @@ namespace DataWarehouse.SDK.Security.SupplyChain
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[SlsaProvenanceGenerator.SignPayload] {ex.GetType().Name}: {ex.Message}");
-                // If not a valid RSA key, use HMAC-SHA256 as fallback
-                using var hmac = new HMACSHA256(keyBytes);
-                return hmac.ComputeHash(payload);
+                // Fail-closed: do NOT silently downgrade from RSA-PSS to HMAC-SHA256
+                // HMAC-SHA256 is a symmetric algorithm and provides weaker provenance guarantees
+                throw new CryptographicException(
+                    $"RSA-PSS signing failed and HMAC fallback is disabled (security policy). " +
+                    $"Provide a valid RSA private key for SLSA provenance signing. Original error: {ex.Message}", ex);
             }
         }
 

@@ -51,11 +51,11 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         private readonly IPlatformCapabilityRegistry _registry;
         private GpuRuntime _runtime = GpuRuntime.None;
         private int _deviceCount = 0;
-        private bool _isAvailable = false;
-        private bool _initialized = false;
+        private volatile bool _isAvailable = false;
+        private volatile bool _initialized = false;
         private long _operationsCompleted = 0;
         private readonly object _lock = new();
-        private bool _disposed = false;
+        private volatile bool _disposed = false;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="GpuAccelerator"/> class.
@@ -79,7 +79,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         public bool IsAvailable => _isAvailable;
 
         /// <inheritdoc/>
-        public bool IsCpuFallback => _isAvailable;
+        public bool IsCpuFallback => true; // Phase 35: GPU operations use CPU fallback (no CUDA/ROCm kernel launch yet)
 
         /// <inheritdoc/>
         public GpuRuntime Runtime => _runtime;

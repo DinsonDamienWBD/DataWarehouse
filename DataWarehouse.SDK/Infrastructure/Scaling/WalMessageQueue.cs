@@ -110,7 +110,11 @@ namespace DataWarehouse.SDK.Infrastructure.Scaling
             _config = config ?? WalMessageQueueConfig.Default;
 
             _compactionTimer = new Timer(
-                _ => _ = CompactAsync(CancellationToken.None),
+                _ => CompactAsync(CancellationToken.None).ContinueWith(t =>
+                {
+                    if (t.IsFaulted)
+                        System.Diagnostics.Debug.WriteLine($"WAL compaction failed: {t.Exception?.GetBaseException().Message}");
+                }, TaskContinuationOptions.OnlyOnFaulted),
                 null,
                 _config.CompactionInterval,
                 _config.CompactionInterval);
@@ -118,7 +122,11 @@ namespace DataWarehouse.SDK.Infrastructure.Scaling
             if (_config.FsyncPolicy == FsyncPolicy.Timed)
             {
                 _fsyncTimer = new Timer(
-                    _ => _ = FlushAllAsync(CancellationToken.None),
+                    _ => FlushAllAsync(CancellationToken.None).ContinueWith(t =>
+                    {
+                        if (t.IsFaulted)
+                            System.Diagnostics.Debug.WriteLine($"WAL flush failed: {t.Exception?.GetBaseException().Message}");
+                    }, TaskContinuationOptions.OnlyOnFaulted),
                     null,
                     _config.FsyncInterval,
                     _config.FsyncInterval);
@@ -395,7 +403,8 @@ namespace DataWarehouse.SDK.Infrastructure.Scaling
 
         private static byte[] CompactWalData(byte[] walData, long minConsumerOffset, long cutoffTimestamp)
         {
-            var kept = new List<byte>();
+            // Use MemoryStream instead of List<byte> to avoid byte-by-byte 2x allocation
+            using var kept = new MemoryStream(walData.Length);
             long currentOffset = 0;
             int position = 0;
 
@@ -412,10 +421,7 @@ namespace DataWarehouse.SDK.Infrastructure.Scaling
 
                 if (currentOffset > minConsumerOffset || timestamp >= cutoffTimestamp)
                 {
-                    for (int i = 0; i < totalEntrySize; i++)
-                    {
-                        kept.Add(walData[position + i]);
-                    }
+                    kept.Write(walData, position, totalEntrySize);
                 }
 
                 position += totalEntrySize;

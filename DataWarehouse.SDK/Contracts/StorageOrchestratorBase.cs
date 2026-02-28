@@ -12,7 +12,7 @@ namespace DataWarehouse.SDK.Contracts
     public abstract class StoragePoolBase : Hierarchy.InfrastructurePluginBase, IStoragePool
     {
         protected readonly BoundedDictionary<string, (IStorageProvider Provider, StorageRole Role)> _providers = new BoundedDictionary<string, (IStorageProvider Provider, StorageRole Role)>(1000);
-        protected IStorageStrategy _strategy;
+        protected volatile IStorageStrategy _strategy;
 
         /// <summary>
         /// Per-URI locks to prevent concurrent writes to the same resource.
@@ -68,7 +68,8 @@ namespace DataWarehouse.SDK.Contracts
             try
             {
                 var providers = Providers;
-                var plans = _strategy.PlanWrite(providers, intent, data.Length).ToList();
+                long dataLength = data.CanSeek ? data.Length : 0;
+                var plans = _strategy.PlanWrite(providers, intent, dataLength).ToList();
                 var usedProviders = new List<string>();
                 long bytesWritten = 0;
 
@@ -152,7 +153,8 @@ namespace DataWarehouse.SDK.Contracts
         public virtual async Task DeleteAsync(Uri uri, CancellationToken ct = default)
         {
             var tasks = Providers.Select(p => p.DeleteAsync(uri));
-            await Task.WhenAll(tasks);
+            var results = await Task.WhenAll(tasks);
+            // Any exceptions from individual providers will propagate via AggregateException
         }
 
         public virtual Task<StoragePoolHealth> GetHealthAsync(CancellationToken ct = default)
@@ -326,8 +328,16 @@ namespace DataWarehouse.SDK.Contracts
                 await semaphore.WaitAsync(ct);
                 try
                 {
-                    var provider = Providers.FirstOrDefault();
-                    var exists = provider != null && await provider.ExistsAsync(uri);
+                    // Check all providers per strategy, not just the first
+                    bool exists = false;
+                    foreach (var provider in Providers)
+                    {
+                        if (await provider.ExistsAsync(uri, ct))
+                        {
+                            exists = true;
+                            break;
+                        }
+                    }
                     lock (resultsLock)
                     {
                         results[uri] = exists;

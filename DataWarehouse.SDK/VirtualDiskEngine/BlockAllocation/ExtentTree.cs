@@ -61,9 +61,10 @@ public sealed class ExtentTree
 
         // Compute merged extent
         long mergedStart = toMerge.Count > 0 ? Math.Min(start, toMerge.Min(e => e.StartBlock)) : start;
-        int mergedCount = toMerge.Count > 0
-            ? (int)(toMerge.Max(e => e.EndBlock) - mergedStart) + count
-            : count;
+        long mergedEnd = start + count; // End of new extent
+        if (toMerge.Count > 0)
+            mergedEnd = Math.Max(mergedEnd, toMerge.Max(e => e.EndBlock));
+        int mergedCount = (int)(mergedEnd - mergedStart);
 
         extent = new FreeExtent(mergedStart, mergedCount);
 

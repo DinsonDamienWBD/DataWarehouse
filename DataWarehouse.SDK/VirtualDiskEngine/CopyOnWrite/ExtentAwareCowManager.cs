@@ -89,10 +89,10 @@ public sealed class ExtentAwareCowManager
             static (_, current, _) => current - 1,
             (object?)null);
 
-        if (newCount <= 1)
+        if (newCount <= 0)
         {
-            // Remove from dictionary: either back to default (1) or ready to free (0)
-            _extentRefCounts.TryRemove(extent.StartBlock, out _);
+            // Ref count hit zero — keep it at 0 in the dictionary so GetRefCount returns 0 (freed)
+            _extentRefCounts.TryUpdate(extent.StartBlock, 0, newCount);
         }
     }
 

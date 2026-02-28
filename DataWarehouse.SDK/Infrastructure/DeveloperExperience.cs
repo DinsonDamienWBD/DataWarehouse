@@ -499,20 +499,16 @@ public sealed class {pluginName}Plugin : {baseClass}
         return @"
     public Task<string> GenerateAsync(string prompt, CancellationToken cancellationToken = default)
     {
-        // Simple echo implementation - replace with actual AI service integration
-        return Task.FromResult($""Echo: {prompt}"");
+        // TODO: Replace with actual AI service integration (e.g., OpenAI, Azure OpenAI, or local model)
+        throw new NotImplementedException(
+            ""AI generation not configured. Integrate an AI service provider in this method."");
     }
 
     public Task<float[]> EmbedAsync(string text, CancellationToken cancellationToken = default)
     {
-        // Simple hash-based embedding - replace with actual embedding service
-        var hash = text.GetHashCode();
-        var embedding = new float[384]; // Common embedding dimension
-        for (int i = 0; i < embedding.Length; i++)
-        {
-            embedding[i] = (float)((hash + i) % 1000) / 1000f;
-        }
-        return Task.FromResult(embedding);
+        // TODO: Replace with actual embedding service (e.g., OpenAI ada-002, Sentence-BERT, or local ONNX model)
+        throw new NotImplementedException(
+            ""Embedding not configured. Integrate an embedding service provider in this method."");
     }";
     }
 
@@ -597,11 +593,49 @@ public sealed class PluginBuildCommand : ICliCommand
 
         _output.WriteLine($"Building plugin at {path} ({config})...");
 
-        // In a real implementation, this would invoke dotnet build
-        _output.WriteLine("Running: dotnet build -c " + config);
-        _output.WriteSuccess("Build completed successfully");
+        // Invoke dotnet build with the specified configuration
+        try
+        {
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "dotnet",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+                WorkingDirectory = Path.GetFullPath(path)
+            };
+            startInfo.ArgumentList.Add("build");
+            startInfo.ArgumentList.Add("-c");
+            startInfo.ArgumentList.Add(config ?? "Release");
 
-        return Task.FromResult(0);
+            using var process = Process.Start(startInfo);
+            if (process == null)
+            {
+                _output.WriteError("Failed to start 'dotnet build' process. Ensure .NET SDK is installed.");
+                return Task.FromResult(1);
+            }
+
+            var stdout = process.StandardOutput.ReadToEnd();
+            var stderr = process.StandardError.ReadToEnd();
+            process.WaitForExit();
+
+            _output.WriteLine(stdout);
+            if (process.ExitCode != 0)
+            {
+                _output.WriteError(stderr);
+                _output.WriteError($"Build failed with exit code {process.ExitCode}");
+                return Task.FromResult(process.ExitCode);
+            }
+
+            _output.WriteSuccess("Build completed successfully");
+            return Task.FromResult(0);
+        }
+        catch (Exception ex)
+        {
+            _output.WriteError($"Build failed: {ex.Message}");
+            return Task.FromResult(1);
+        }
     }
 }
 
@@ -640,16 +674,51 @@ public sealed class PluginTestCommand : ICliCommand
 
         _output.WriteLine($"Running tests for plugin at {path}...");
 
-        var command = "dotnet test";
-        if (!string.IsNullOrEmpty(filter))
+        try
         {
-            command += $" --filter \"{filter}\"";
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "dotnet",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+                WorkingDirectory = Path.GetFullPath(path)
+            };
+            startInfo.ArgumentList.Add("test");
+            if (!string.IsNullOrEmpty(filter))
+            {
+                startInfo.ArgumentList.Add("--filter");
+                startInfo.ArgumentList.Add(filter);
+            }
+
+            using var process = Process.Start(startInfo);
+            if (process == null)
+            {
+                _output.WriteError("Failed to start 'dotnet test' process. Ensure .NET SDK is installed.");
+                return Task.FromResult(1);
+            }
+
+            var stdout = process.StandardOutput.ReadToEnd();
+            var stderr = process.StandardError.ReadToEnd();
+            process.WaitForExit();
+
+            _output.WriteLine(stdout);
+            if (process.ExitCode != 0)
+            {
+                _output.WriteError(stderr);
+                _output.WriteError($"Tests failed with exit code {process.ExitCode}");
+                return Task.FromResult(process.ExitCode);
+            }
+
+            _output.WriteSuccess("All tests passed");
+            return Task.FromResult(0);
         }
-
-        _output.WriteLine($"Running: {command}");
-        _output.WriteSuccess("All tests passed");
-
-        return Task.FromResult(0);
+        catch (Exception ex)
+        {
+            _output.WriteError($"Test execution failed: {ex.Message}");
+            return Task.FromResult(1);
+        }
     }
 }
 
@@ -728,16 +797,38 @@ public sealed class PluginListCommand : ICliCommand
 
     public Task<int> ExecuteAsync(CommandContext context)
     {
-        var format = context.GetOption("format", "table");
+        var pluginsPath = context.GetOption("path", "./plugins") ?? "./plugins";
 
-        _output.WriteLine("Installed plugins:");
+        var fullPath = Path.GetFullPath(pluginsPath);
+        if (!Directory.Exists(fullPath))
+        {
+            _output.WriteError($"Plugins directory not found: {fullPath}");
+            _output.WriteLine("Specify a plugins directory with --path <directory>");
+            return Task.FromResult(1);
+        }
+
+        var dlls = Directory.GetFiles(fullPath, "DataWarehouse.Plugins.*.dll", SearchOption.AllDirectories);
+        if (dlls.Length == 0)
+        {
+            _output.WriteLine($"No plugin assemblies found in {fullPath}");
+            return Task.FromResult(0);
+        }
+
+        _output.WriteLine($"Plugin assemblies in {fullPath}:");
         _output.WriteLine();
-        _output.WriteLine("  NAME                   VERSION    CATEGORY     STATUS");
-        _output.WriteLine("  ─────────────────────  ─────────  ───────────  ───────");
-        _output.WriteLine("  LocalStorage           1.0.0      Storage      Active");
-        _output.WriteLine("  Encryption             1.0.0      Pipeline     Active");
-        _output.WriteLine("  Compression            1.0.0      Pipeline     Active");
-        _output.WriteLine("  OpenTelemetry          1.0.0      Observability Active");
+        _output.WriteLine("  ASSEMBLY                                           SIZE");
+        _output.WriteLine("  ─────────────────────────────────────────────────  ──────────");
+
+        foreach (var dll in dlls.OrderBy(d => d))
+        {
+            var fi = new FileInfo(dll);
+            var name = fi.Name;
+            var sizeKb = fi.Length / 1024;
+            _output.WriteLine($"  {name,-50}  {sizeKb,8} KB");
+        }
+
+        _output.WriteLine();
+        _output.WriteLine($"  Total: {dlls.Length} plugin assembly(ies)");
 
         return Task.FromResult(0);
     }
@@ -777,17 +868,13 @@ public sealed class KernelRunCommand : ICliCommand
         var mode = context.GetOption("mode", "workstation");
         var pluginsDir = context.GetOption("plugins");
 
-        _output.WriteLine($"Starting DataWarehouse kernel in {mode} mode...");
+        _output.WriteError(
+            "kernel:run is not yet integrated with the DataWarehouse kernel runtime. " +
+            "To start the kernel, use the DataWarehouse.Host executable or integrate " +
+            "DataWarehouseKernel programmatically via the SDK. " +
+            $"Requested mode: {mode}, plugins: {pluginsDir ?? "(default)"}");
 
-        if (!string.IsNullOrEmpty(pluginsDir))
-        {
-            _output.WriteLine($"Loading plugins from: {pluginsDir}");
-        }
-
-        _output.WriteSuccess("Kernel started successfully");
-        _output.WriteLine("Press Ctrl+C to stop");
-
-        return Task.FromResult(0);
+        return Task.FromResult(1);
     }
 }
 
@@ -821,27 +908,12 @@ public sealed class KernelHealthCommand : ICliCommand
 
     public Task<int> ExecuteAsync(CommandContext context)
     {
-        var detailed = context.HasOption("detailed");
+        _output.WriteError(
+            "kernel:health is not yet integrated with the DataWarehouse kernel runtime. " +
+            "Health check requires a running kernel instance. Use the DataWarehouse.Host " +
+            "health endpoint or integrate DataWarehouseKernel.GetHealthAsync() programmatically.");
 
-        _output.WriteSuccess("● Kernel Status: Healthy");
-        _output.WriteLine();
-        _output.WriteLine("Components:");
-        _output.WriteLine("  ● Message Bus:      Healthy");
-        _output.WriteLine("  ● Pipeline:         Healthy");
-        _output.WriteLine("  ● Storage:          Healthy");
-        _output.WriteLine("  ● Plugins (24):     Healthy");
-
-        if (detailed)
-        {
-            _output.WriteLine();
-            _output.WriteLine("Metrics:");
-            _output.WriteLine("  Memory:             256 MB");
-            _output.WriteLine("  CPU:                12%");
-            _output.WriteLine("  Active Connections: 5");
-            _output.WriteLine("  Uptime:             2h 34m");
-        }
-
-        return Task.FromResult(0);
+        return Task.FromResult(1);
     }
 }
 
@@ -882,34 +954,100 @@ public sealed class ConfigCommand : ICliCommand
         }
 
         var subcommand = context.Arguments[0].ToLowerInvariant();
+        var isGlobal = context.HasOption("global");
+        var configPath = isGlobal
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".datawarehouse", "config.json")
+            : Path.Combine(Directory.GetCurrentDirectory(), "dw-config.json");
 
         switch (subcommand)
         {
             case "list":
-                _output.WriteLine("Configuration:");
-                _output.WriteLine("  storage.provider = local");
-                _output.WriteLine("  storage.path = ./data");
-                _output.WriteLine("  pipeline.default = compress,encrypt");
-                _output.WriteLine("  logging.level = info");
+            {
+                if (!File.Exists(configPath))
+                {
+                    _output.WriteLine($"No configuration file found at {configPath}");
+                    return Task.FromResult(0);
+                }
+
+                var json = File.ReadAllText(configPath);
+                var config = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json);
+                if (config == null || config.Count == 0)
+                {
+                    _output.WriteLine("Configuration is empty.");
+                    return Task.FromResult(0);
+                }
+
+                _output.WriteLine($"Configuration ({configPath}):");
+                foreach (var kvp in config.OrderBy(k => k.Key))
+                {
+                    _output.WriteLine($"  {kvp.Key} = {kvp.Value}");
+                }
                 break;
+            }
 
             case "get":
+            {
                 if (context.Arguments.Count < 2)
                 {
                     _output.WriteError("Key required");
                     return Task.FromResult(1);
                 }
-                _output.WriteLine($"{context.Arguments[1]} = value");
+
+                var key = context.Arguments[1];
+                if (!File.Exists(configPath))
+                {
+                    _output.WriteError($"Configuration file not found: {configPath}");
+                    return Task.FromResult(1);
+                }
+
+                var json = File.ReadAllText(configPath);
+                var config = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json);
+                if (config != null && config.TryGetValue(key, out var value))
+                {
+                    _output.WriteLine($"{key} = {value}");
+                }
+                else
+                {
+                    _output.WriteError($"Key not found: {key}");
+                    return Task.FromResult(1);
+                }
                 break;
+            }
 
             case "set":
+            {
                 if (context.Arguments.Count < 3)
                 {
                     _output.WriteError("Key and value required");
                     return Task.FromResult(1);
                 }
-                _output.WriteSuccess($"Set {context.Arguments[1]} = {context.Arguments[2]}");
+
+                var key = context.Arguments[1];
+                var val = context.Arguments[2];
+
+                Dictionary<string, JsonElement> config;
+                if (File.Exists(configPath))
+                {
+                    var existingJson = File.ReadAllText(configPath);
+                    config = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(existingJson) ?? new();
+                }
+                else
+                {
+                    config = new();
+                    var dir = Path.GetDirectoryName(configPath);
+                    if (dir != null) Directory.CreateDirectory(dir);
+                }
+
+                // Parse value as JSON element
+                var newValue = JsonSerializer.Deserialize<JsonElement>($"\"{val}\"");
+                config[key] = newValue;
+
+                var outputJson = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(configPath, outputJson);
+
+                _output.WriteSuccess($"Set {key} = {val} (saved to {configPath})");
                 break;
+            }
 
             default:
                 _output.WriteError($"Unknown subcommand: {subcommand}");
@@ -1190,7 +1328,12 @@ public sealed class GraphQLGateway : IAsyncDisposable
 
     private GraphQLDocument ParseQuery(string query)
     {
-        // Simplified parser - in production, use a proper GraphQL parser
+        // WARNING: Simplified parser for development/prototyping only.
+        // Production deployments MUST replace this with a proper GraphQL parser
+        // (e.g., HotChocolate, GraphQL.NET, or graphql-parser) that handles:
+        // - Nested selections, aliases, fragments, directives, variables
+        // - Proper error recovery and source location tracking
+        // - Query validation against schema
         var document = new GraphQLDocument
         {
             Operations = new List<GraphQLOperationDefinition>()

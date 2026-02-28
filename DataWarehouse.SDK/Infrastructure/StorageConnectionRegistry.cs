@@ -618,8 +618,12 @@ public sealed class StorageConnectionInstance<TConfig> : IAsyncDisposable where 
     {
         if (connection is IAsyncDisposable asyncDisposable)
         {
-            // Fire-and-forget — prefer DisposeConnectionAsync for proper async disposal
-            asyncDisposable.DisposeAsync().AsTask().ContinueWith(_ => { }, TaskContinuationOptions.ExecuteSynchronously);
+            // Observe disposal failures to prevent silent resource leaks
+            asyncDisposable.DisposeAsync().AsTask().ContinueWith(t =>
+            {
+                if (t.IsFaulted)
+                    System.Diagnostics.Debug.WriteLine($"Connection disposal failed: {t.Exception?.GetBaseException().Message}");
+            }, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously);
         }
         else if (connection is IDisposable disposable)
         {

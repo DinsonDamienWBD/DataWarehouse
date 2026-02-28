@@ -28,11 +28,9 @@ public static class PresetSelector
         var ramGb = EstimateRamGb(devices);
 
         // Decision logic based on detected hardware
-        if (hasHsm || hasTpm)
-        {
-            // HSM/TPM detected - paranoid preset for security-critical environments
-            return ("paranoid", ConfigurationPresets.CreateParanoid());
-        }
+        // HSM/TPM presence upgrades security profile but does NOT override resource tier.
+        // A 512-core GPU workstation with TPM should get god-tier, not paranoid.
+        var hasSecurityModule = hasHsm || hasTpm;
 
         if (hasGpu && ramGb >= 128)
         {
@@ -42,17 +40,24 @@ public static class PresetSelector
 
         if (cpuCores >= 16 && ramGb >= 32)
         {
-            // High resources (16+ cores, 32+ GB RAM) - secure preset
+            // High resources (16+ cores, 32+ GB RAM)
+            // With HSM/TPM: paranoid; without: secure
+            if (hasSecurityModule)
+                return ("paranoid", ConfigurationPresets.CreateParanoid());
             return ("secure", ConfigurationPresets.CreateSecure());
         }
 
         if (cpuCores >= 4 && ramGb >= 8)
         {
-            // Standard resources (4-16 cores, 8-32GB RAM) - standard preset
+            // Standard resources (4-16 cores, 8-32GB RAM)
+            // With HSM/TPM: secure (upgrade from standard); without: standard
+            if (hasSecurityModule)
+                return ("secure", ConfigurationPresets.CreateSecure());
             return ("standard", ConfigurationPresets.CreateStandard());
         }
 
         // Low resources (< 4 cores, < 8GB RAM) - minimal preset
+        // HSM/TPM on low-resource: still minimal to avoid overloading
         return ("minimal", ConfigurationPresets.CreateMinimal());
     }
 

@@ -73,9 +73,8 @@ public sealed class TamperIncidentReport
     /// <summary>
     /// Access log entries related to this incident.
     /// Used for attribution analysis and forensic investigation.
-    /// Note: This will reference AccessLogEntry when that type is available.
     /// </summary>
-    public List<object>? RelatedAccessLogs { get; init; }
+    public List<AccessLogEntry>? RelatedAccessLogs { get; init; }
 
     /// <summary>
     /// Estimated earliest time the tampering could have occurred.

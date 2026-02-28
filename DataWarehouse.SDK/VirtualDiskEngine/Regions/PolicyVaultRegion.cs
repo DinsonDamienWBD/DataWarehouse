@@ -78,6 +78,8 @@ public sealed class PolicyDefinition
         var createdUtcTicks = BinaryPrimitives.ReadInt64LittleEndian(buffer.Slice(offset + 20));
         var modifiedUtcTicks = BinaryPrimitives.ReadInt64LittleEndian(buffer.Slice(offset + 28));
         var dataLength = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(offset + 36));
+        if (dataLength < 0 || offset + FixedHeaderSize + dataLength > buffer.Length)
+            throw new InvalidDataException($"PolicyDefinition dataLength {dataLength} is negative or exceeds buffer bounds.");
         var data = buffer.Slice(offset + FixedHeaderSize, dataLength).ToArray();
 
         return (new PolicyDefinition(policyId, policyType, version, createdUtcTicks, modifiedUtcTicks, data),
@@ -108,8 +110,10 @@ public sealed class PolicyVaultRegion
     /// <summary>Monotonic generation number for torn-write detection.</summary>
     public uint Generation { get; set; }
 
-    /// <summary>32-byte HMAC-SHA256 key used to seal/verify the vault.</summary>
-    public byte[] HmacKey { get; }
+    /// <summary>32-byte HMAC-SHA256 key used to seal/verify the vault (defensive copy).</summary>
+    private readonly byte[] _hmacKey;
+    /// <summary>Gets a copy of the HMAC key. Returns a new array each call to prevent external mutation.</summary>
+    public byte[] HmacKey => (byte[])_hmacKey.Clone();
 
     /// <summary>Number of policies currently in the vault.</summary>
     public int PolicyCount => _policies.Count;
@@ -124,7 +128,7 @@ public sealed class PolicyVaultRegion
         if (hmacKey is null) throw new ArgumentNullException(nameof(hmacKey));
         if (hmacKey.Length != HmacHashSize)
             throw new ArgumentException($"HMAC key must be exactly {HmacHashSize} bytes.", nameof(hmacKey));
-        HmacKey = hmacKey;
+        _hmacKey = (byte[])hmacKey.Clone();
     }
 
     /// <summary>
@@ -210,7 +214,7 @@ public sealed class PolicyVaultRegion
         var block1 = buffer.Slice(blockSize, blockSize);
 
         // Compute HMAC-SHA256 over block 0 payload [0..blockSize-16)
-        using var hmac = new HMACSHA256(HmacKey);
+        using var hmac = new HMACSHA256(_hmacKey);
         byte[] hash = hmac.ComputeHash(block0.Slice(0, payloadSize).ToArray());
         hash.AsSpan().CopyTo(block1);
 

@@ -329,6 +329,18 @@ namespace DataWarehouse.SDK.Contracts
         /// <exception cref="InvalidOperationException">If target level is not lower than current level.</exception>
         public async Task<byte[]> DowngradeAsync(byte[] data, SecurityLabel currentLabel, ClassificationLevel targetLevel, string authorizationCode)
         {
+            ArgumentNullException.ThrowIfNull(data);
+            ArgumentNullException.ThrowIfNull(currentLabel);
+
+            // Authorization code is mandatory for declassification — unauthorized downgrade is a security violation
+            if (string.IsNullOrWhiteSpace(authorizationCode))
+            {
+                throw new ArgumentException(
+                    "Authorization code is required for classification downgrade. " +
+                    "Declassification requires documented approval from a designated authority.",
+                    nameof(authorizationCode));
+            }
+
             // Validate that this is actually a downgrade (target must be lower than current)
             if (targetLevel >= currentLabel.Level)
             {

@@ -471,32 +471,73 @@ public sealed class PluginReloadManager : IPluginReloader, IAsyncDisposable
         return _reloadStatus.TryGetValue(pluginId, out var phase) ? phase : null;
     }
 
-    private async Task<VersionCompatibility> CheckVersionCompatibilityAsync(
+    private Task<VersionCompatibility> CheckVersionCompatibilityAsync(
         string pluginId, string assemblyPath, CancellationToken ct)
     {
-        await Task.CompletedTask; // Placeholder for actual version checking logic
+        ct.ThrowIfCancellationRequested();
 
-        // In production, this would:
-        // 1. Load assembly metadata without loading the assembly
-        // 2. Check SDK version compatibility
-        // 3. Verify interface contracts haven't broken
-        return new VersionCompatibility { IsCompatible = true };
+        try
+        {
+            // Load assembly metadata via reflection-only context to check SDK version compatibility
+            // without loading the assembly into the execution context
+            var assemblyName = AssemblyName.GetAssemblyName(assemblyPath);
+            if (assemblyName.Version == null)
+            {
+                return Task.FromResult(new VersionCompatibility
+                {
+                    IsCompatible = false,
+                    IncompatibilityReason = $"Plugin '{pluginId}' assembly has no version metadata."
+                });
+            }
+
+            // Check if existing loaded assembly has same or older version (backward compat)
+            if (_loadedAssemblies.TryGetValue(pluginId, out var weakRef) &&
+                weakRef.TryGetTarget(out var currentAssembly))
+            {
+                var currentVersion = currentAssembly.GetName().Version;
+                if (currentVersion != null && assemblyName.Version < currentVersion)
+                {
+                    return Task.FromResult(new VersionCompatibility
+                    {
+                        IsCompatible = false,
+                        IncompatibilityReason = $"Cannot downgrade plugin '{pluginId}' from v{currentVersion} to v{assemblyName.Version}."
+                    });
+                }
+            }
+
+            return Task.FromResult(new VersionCompatibility { IsCompatible = true });
+        }
+        catch (Exception ex)
+        {
+            return Task.FromResult(new VersionCompatibility
+            {
+                IsCompatible = false,
+                IncompatibilityReason = $"Failed to read assembly metadata: {ex.Message}"
+            });
+        }
     }
 
     private async Task DrainPluginConnectionsAsync(string pluginId, CancellationToken ct)
     {
-        // Allow plugin to drain active connections
-        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeoutCts.CancelAfter(_drainTimeout);
-
-        try
+        // Find IReloadablePlugin instance from loaded assembly and call PrepareForUnloadAsync
+        var plugin = FindReloadablePlugin(pluginId);
+        if (plugin != null)
         {
-            // In production, this would signal the plugin to drain connections
-            await Task.Delay(100, timeoutCts.Token);
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeoutCts.CancelAfter(_drainTimeout);
+            try
+            {
+                await plugin.PrepareForUnloadAsync(_drainTimeout, timeoutCts.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                System.Diagnostics.Debug.WriteLine($"Plugin '{pluginId}' drain timed out after {_drainTimeout}; proceeding with unload.");
+            }
         }
-        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        else
         {
-            // Drain timeout - continue anyway
+            // No IReloadablePlugin — brief delay for graceful shutdown
+            await Task.Delay(100, ct).ConfigureAwait(false);
         }
     }
 
@@ -504,25 +545,61 @@ public sealed class PluginReloadManager : IPluginReloader, IAsyncDisposable
     {
         try
         {
-            // In production, this would call IReloadablePlugin.ExportStateAsync
-            // For now, just mark that we attempted state preservation
-            _preservedState[pluginId] = Array.Empty<byte>();
-            await Task.CompletedTask;
+            var plugin = FindReloadablePlugin(pluginId);
+            if (plugin != null)
+            {
+                var state = await plugin.ExportStateAsync(ct).ConfigureAwait(false);
+                _preservedState[pluginId] = state;
+            }
+            else
+            {
+                _preservedState[pluginId] = Array.Empty<byte>();
+            }
             return true;
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Debug.WriteLine($"Failed to preserve state for plugin '{pluginId}': {ex.Message}");
             return false;
         }
     }
 
     private async Task TryRestoreStateAsync(string pluginId, CancellationToken ct)
     {
-        if (_preservedState.TryRemove(pluginId, out var state))
+        if (_preservedState.TryRemove(pluginId, out var state) && state.Length > 0)
         {
-            // In production, this would call IReloadablePlugin.ImportStateAsync
-            await Task.CompletedTask;
+            var plugin = FindReloadablePlugin(pluginId);
+            if (plugin != null)
+            {
+                await plugin.ImportStateAsync(state, ct).ConfigureAwait(false);
+            }
         }
+    }
+
+    /// <summary>
+    /// Finds an IReloadablePlugin instance from the loaded assembly for the given plugin ID.
+    /// Returns null if the plugin doesn't implement IReloadablePlugin.
+    /// </summary>
+    private IReloadablePlugin? FindReloadablePlugin(string pluginId)
+    {
+        if (_loadedAssemblies.TryGetValue(pluginId, out var weakRef) &&
+            weakRef.TryGetTarget(out var assembly))
+        {
+            try
+            {
+                var reloadableType = assembly.GetTypes()
+                    .FirstOrDefault(t => typeof(IReloadablePlugin).IsAssignableFrom(t) && !t.IsAbstract);
+                if (reloadableType != null)
+                {
+                    return Activator.CreateInstance(reloadableType) as IReloadablePlugin;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to find IReloadablePlugin in '{pluginId}': {ex.Message}");
+            }
+        }
+        return null;
     }
 
     private async Task TryRollbackAsync(string pluginId, PluginAssemblyLoadContext oldContext, CancellationToken ct)

@@ -194,15 +194,61 @@ public sealed class NumaAllocator : INumaAllocator
             return null;
         }
 
-        // Multi-node NUMA detected, but detailed topology parsing requires:
-        // - Parsing /sys/devices/system/node/node*/meminfo for memory info
-        // - Parsing /sys/devices/system/node/node*/cpulist for CPU affinity
-        // - Parsing /sys/devices/system/node/node*/distance for distance matrix
-        //
-        // Since full parsing implementation requires testing on multi-socket hardware,
-        // return null to gracefully degrade to standard allocation until full implementation.
+        // Multi-node NUMA detected - build basic topology from sysfs
+        try
+        {
+            var nodes = new List<NumaNode>();
+            foreach (var nodeDir in nodeDirs)
+            {
+                var nodeName = System.IO.Path.GetFileName(nodeDir);
+                if (!nodeName.StartsWith("node", StringComparison.Ordinal) ||
+                    !int.TryParse(nodeName.AsSpan(4), out int nodeId))
+                    continue;
 
-        return null; // Graceful degradation until multi-socket hardware testing
+                long memoryBytes = 0;
+                var meminfoPath = System.IO.Path.Combine(nodeDir, "meminfo");
+                if (System.IO.File.Exists(meminfoPath))
+                {
+                    try
+                    {
+                        foreach (var line in System.IO.File.ReadLines(meminfoPath))
+                        {
+                            if (line.Contains("MemTotal"))
+                            {
+                                var parts = line.Split(':', StringSplitOptions.TrimEntries);
+                                if (parts.Length == 2)
+                                {
+                                    var kbStr = parts[1].Replace("kB", "").Trim();
+                                    if (long.TryParse(kbStr, out long kb))
+                                        memoryBytes = kb * 1024;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    catch { /* Best-effort parsing */ }
+                }
+
+                nodes.Add(new NumaNode
+                {
+                    NodeId = nodeId,
+                    TotalMemoryBytes = memoryBytes,
+                    CpuCores = Array.Empty<int>()
+                });
+            }
+
+            if (nodes.Count <= 1) return null;
+
+            return new NumaTopology
+            {
+                NodeCount = nodes.Count,
+                Nodes = nodes.ToArray()
+            };
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <inheritdoc/>
@@ -247,21 +293,38 @@ public sealed class NumaAllocator : INumaAllocator
         if (!_isNumaAware || _topology is null)
             return 0; // Non-NUMA system — default node
 
-        // Device NUMA node detection:
-        //
-        // Windows: Query PCI device properties via SetupAPI to get DEVPKEY_Device_Numa_Node.
-        // Use SetupDiGetClassDevs, SetupDiEnumDeviceInfo, SetupDiGetDeviceProperty APIs.
-        //
-        // Linux: Parse /sys/block/{device}/device/numa_node or /sys/class/nvme/{device}/device/numa_node.
-        // Extract device name from path (e.g., "/dev/nvme0n1" → "nvme0n1"), then read the numa_node file.
-        //
-        // If the device NUMA node cannot be determined (driver doesn't expose it, or it's a
-        // virtual device), return 0 (default node) to ensure allocation proceeds without error.
-        //
-        // For production use with multi-socket systems, implement platform-specific detection.
-        // Current implementation: return default node (0) until full detection is tested on
-        // multi-socket hardware with actual NVMe devices on different NUMA nodes.
+        // Linux: read numa_node from sysfs
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            try
+            {
+                // Extract device name: "/dev/nvme0n1" → "nvme0n1", "/dev/sda" → "sda"
+                var devName = System.IO.Path.GetFileName(devicePath);
 
-        return 0; // Default node until multi-socket hardware testing
+                // Try /sys/block/{device}/device/numa_node (block devices)
+                var numaNodePath = $"/sys/block/{devName}/device/numa_node";
+                if (System.IO.File.Exists(numaNodePath))
+                {
+                    var content = System.IO.File.ReadAllText(numaNodePath).Trim();
+                    if (int.TryParse(content, out int node) && node >= 0)
+                        return node;
+                }
+
+                // Try /sys/class/nvme/{device}/device/numa_node (NVMe controllers)
+                numaNodePath = $"/sys/class/nvme/{devName}/device/numa_node";
+                if (System.IO.File.Exists(numaNodePath))
+                {
+                    var content = System.IO.File.ReadAllText(numaNodePath).Trim();
+                    if (int.TryParse(content, out int node) && node >= 0)
+                        return node;
+                }
+            }
+            catch
+            {
+                // Best-effort — return default node on failure
+            }
+        }
+
+        return 0; // Default node for Windows (SetupAPI not yet implemented) or unknown devices
     }
 }

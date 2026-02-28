@@ -226,14 +226,11 @@ public sealed class HostedOptimizer
 
         if (blockSize.HasValue)
         {
-            _logger.LogInformation(
-                "I/O alignment configured: {BlockSize} bytes (filesystem block size). " +
-                "This reduces read-modify-write cycles for optimal performance.",
+            _logger.LogWarning(
+                "I/O alignment detected: {BlockSize} bytes (filesystem block size). " +
+                "VDE storage layer alignment configuration requires IBlockDevice integration. " +
+                "Currently using default alignment; I/O may not be optimal.",
                 blockSize.Value);
-
-            // In a real implementation, this would configure the VDE storage layer
-            // to align I/O operations to the detected block size
-            // For now, just log the recommendation
         }
         else
         {

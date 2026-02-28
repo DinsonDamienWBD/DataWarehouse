@@ -56,7 +56,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
     {
         private IntPtr _tpmContext = IntPtr.Zero; // Windows TBS context
         private FileStream? _tpmDevice = null; // Linux /dev/tpmrm0
-        private bool _isAvailable = false;
+        private volatile bool _isAvailable = false;
         private readonly Dictionary<string, byte[]> _keyHandles = new(); // keyId -> TPM handle (placeholder)
         private readonly object _lock = new();
 

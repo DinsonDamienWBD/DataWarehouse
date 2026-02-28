@@ -54,8 +54,13 @@ public sealed class IoUringBlockDevice : IBlockDevice
     // NVMe passthrough support
     private readonly bool _isNvmeDevice;
 
+    // Buffer registration state — when false, use non-registered I/O
+    #pragma warning disable CS0414 // Field is assigned but never used (will be used when registered buffer I/O path is implemented)
+    private bool _buffersRegistered;
+    #pragma warning restore CS0414
+
     // Dispose tracking
-    private bool _disposed;
+    private volatile int _disposed; // 0=not disposed, 1=disposed; use Interlocked for thread-safe check
 
     /// <inheritdoc/>
     public int BlockSize => _blockSize;
@@ -133,7 +138,14 @@ public sealed class IoUringBlockDevice : IBlockDevice
             int ret = IoUringBindings.RegisterBuffers(ref _sharedRing, (nint)iov, (uint)_queueDepth);
             if (ret < 0)
             {
-                // Non-fatal: fall back to non-registered buffer I/O
+                // Registration failed — must use non-registered I/O (PrepRead/PrepWrite instead of PrepReadFixed/PrepWriteFixed)
+                _buffersRegistered = false;
+                System.Diagnostics.Debug.WriteLine(
+                    $"[IoUringBlockDevice] Buffer registration failed (ret={ret}), falling back to non-registered I/O");
+            }
+            else
+            {
+                _buffersRegistered = true;
             }
         }
     }
@@ -220,7 +232,7 @@ public sealed class IoUringBlockDevice : IBlockDevice
     /// <inheritdoc/>
     public async Task ReadBlockAsync(long blockNumber, Memory<byte> buffer, CancellationToken ct = default)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectDisposedException.ThrowIf(_disposed != 0, this);
         ArgumentOutOfRangeException.ThrowIfNegative(blockNumber);
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(blockNumber, BlockCount);
 
@@ -304,7 +316,7 @@ public sealed class IoUringBlockDevice : IBlockDevice
     /// <inheritdoc/>
     public async Task WriteBlockAsync(long blockNumber, ReadOnlyMemory<byte> data, CancellationToken ct = default)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectDisposedException.ThrowIf(_disposed != 0, this);
         ArgumentOutOfRangeException.ThrowIfNegative(blockNumber);
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(blockNumber, BlockCount);
 
@@ -392,7 +404,7 @@ public sealed class IoUringBlockDevice : IBlockDevice
     /// <param name="ct">Cancellation token.</param>
     public async Task ReadBlocksAsync(long[] blockNumbers, Memory<byte>[] buffers, CancellationToken ct = default)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectDisposedException.ThrowIf(_disposed != 0, this);
         ArgumentNullException.ThrowIfNull(blockNumbers);
         ArgumentNullException.ThrowIfNull(buffers);
 
@@ -510,7 +522,7 @@ public sealed class IoUringBlockDevice : IBlockDevice
     /// <exception cref="NotSupportedException">Thrown if not on an NVMe device.</exception>
     public async Task NvmePassthroughAsync(byte[] command, byte[] data, CancellationToken ct = default)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectDisposedException.ThrowIf(_disposed != 0, this);
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(data);
 
@@ -575,7 +587,7 @@ public sealed class IoUringBlockDevice : IBlockDevice
     /// <inheritdoc/>
     public Task FlushAsync(CancellationToken ct = default)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectDisposedException.ThrowIf(_disposed != 0, this);
         // io_uring with O_DIRECT bypasses page cache; explicit flush is a no-op.
         // Data is persisted on write completion.
         return Task.CompletedTask;
@@ -630,12 +642,10 @@ public sealed class IoUringBlockDevice : IBlockDevice
     /// <inheritdoc/>
     public unsafe ValueTask DisposeAsync()
     {
-        if (_disposed)
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
         {
             return ValueTask.CompletedTask;
         }
-
-        _disposed = true;
 
         // Unregister buffers from shared ring
         if (_sharedRingInitialized)

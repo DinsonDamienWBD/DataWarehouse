@@ -21,6 +21,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
     public sealed class InMemoryPolicyPersistence : PolicyPersistenceBase
     {
         private readonly ConcurrentDictionary<string, (string FeatureId, PolicyLevel Level, string Path, byte[] Data)> _policies = new();
+        private readonly object _capacityLock = new();
         private byte[]? _profileData;
         private readonly int _maxCapacity;
 
@@ -72,14 +73,17 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
         /// <inheritdoc />
         protected override Task SaveCoreAsync(string key, string featureId, PolicyLevel level, string path, byte[] serializedPolicy, CancellationToken ct)
         {
-            // Check capacity only when adding a new key (updates are always allowed)
-            if (!_policies.ContainsKey(key) && _policies.Count >= _maxCapacity)
-                throw new InvalidOperationException($"InMemory persistence capacity exceeded ({_maxCapacity}).");
+            // Atomic capacity check + insert under lock to prevent exceeding capacity
+            lock (_capacityLock)
+            {
+                if (!_policies.ContainsKey(key) && _policies.Count >= _maxCapacity)
+                    throw new InvalidOperationException($"InMemory persistence capacity exceeded ({_maxCapacity}).");
 
-            _policies.AddOrUpdate(
-                key,
-                _ => (featureId, level, path, serializedPolicy),
-                (_, _) => (featureId, level, path, serializedPolicy));
+                _policies.AddOrUpdate(
+                    key,
+                    _ => (featureId, level, path, serializedPolicy),
+                    (_, _) => (featureId, level, path, serializedPolicy));
+            }
 
             return Task.CompletedTask;
         }

@@ -513,7 +513,7 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Index a manifest.
         /// </summary>
-        public virtual async Task IndexManifestAsync(Manifest manifest)
+        public virtual async Task IndexManifestAsync(Manifest manifest, CancellationToken ct = default)
         {
             var metadata = new Dictionary<string, object>
             {
@@ -538,7 +538,7 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Search manifests with optional vector.
         /// </summary>
-        public virtual Task<string[]> SearchAsync(string query, float[]? vector, int limit)
+        public virtual Task<string[]> SearchAsync(string query, float[]? vector, int limit, CancellationToken ct = default)
         {
             return SearchIndexAsync(query, limit);
         }
@@ -572,7 +572,7 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Update last access time for a manifest.
         /// </summary>
-        public virtual Task UpdateLastAccessAsync(string id, long timestamp)
+        public virtual Task UpdateLastAccessAsync(string id, long timestamp, CancellationToken ct = default)
         {
             if (_indexStore.TryGetValue(id, out var metadata))
             {

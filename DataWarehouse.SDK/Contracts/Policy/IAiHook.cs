@@ -114,16 +114,61 @@ public sealed class RecommendationReceiver
     /// </summary>
     /// <param name="handler">The handler to invoke when a recommendation is received.</param>
     /// <returns>A disposable subscription handle.</returns>
+    private readonly List<Func<PolicyRecommendation, CancellationToken, Task>> _handlers = new();
+    private readonly object _handlersLock = new();
+
     public IDisposable Subscribe(Func<PolicyRecommendation, CancellationToken, Task> handler)
     {
-        // Phase 77 will implement the full subscription pipeline.
-        return new NoOpDisposable();
+        ArgumentNullException.ThrowIfNull(handler);
+        lock (_handlersLock)
+        {
+            _handlers.Add(handler);
+        }
+        return new SubscriptionHandle(this, handler);
     }
 
-    private sealed class NoOpDisposable : IDisposable
+    /// <summary>
+    /// Delivers a recommendation to all subscribers.
+    /// </summary>
+    /// <param name="recommendation">The recommendation to deliver.</param>
+    /// <param name="ct">Cancellation token.</param>
+    internal async Task DeliverAsync(PolicyRecommendation recommendation, CancellationToken ct = default)
     {
-        public void Dispose() { }
+        Func<PolicyRecommendation, CancellationToken, Task>[] snapshot;
+        lock (_handlersLock)
+        {
+            snapshot = _handlers.ToArray();
+        }
+
+        foreach (var handler in snapshot)
+        {
+            ct.ThrowIfCancellationRequested();
+            await handler(recommendation, ct).ConfigureAwait(false);
+        }
     }
+
+    private sealed class SubscriptionHandle : IDisposable
+    {
+        private readonly RecommendationReceiver _receiver;
+        private readonly Func<PolicyRecommendation, CancellationToken, Task> _handler;
+
+        public SubscriptionHandle(
+            RecommendationReceiver receiver,
+            Func<PolicyRecommendation, CancellationToken, Task> handler)
+        {
+            _receiver = receiver;
+            _handler = handler;
+        }
+
+        public void Dispose()
+        {
+            lock (_receiver._handlersLock)
+            {
+                _receiver._handlers.Remove(_handler);
+            }
+        }
+    }
+
 }
 
 /// <summary>

@@ -60,6 +60,7 @@ public sealed class MerkleIntegrityVerifier
 
     private readonly IBlockDevice _device;
     private readonly long _integrityTreeRegionStart;
+    private readonly long _integrityTreeRegionEnd;
     private readonly int _blockSize;
 
     /// <summary>
@@ -72,6 +73,7 @@ public sealed class MerkleIntegrityVerifier
     {
         _device = device ?? throw new ArgumentNullException(nameof(device));
         _integrityTreeRegionStart = integrityTreeRegionStart;
+        _integrityTreeRegionEnd = device.BlockCount; // Conservative upper bound
         _blockSize = blockSize;
     }
 
@@ -447,7 +449,15 @@ public sealed class MerkleIntegrityVerifier
         // Simple deterministic mapping: each object gets a fixed-size slot
         // Slot size accommodates trees for objects up to ~64K blocks
         const int maxBlocksPerTree = 2048;
-        return _integrityTreeRegionStart + objectInodeNumber * maxBlocksPerTree;
+        ArgumentOutOfRangeException.ThrowIfNegative(objectInodeNumber);
+
+        long baseBlock = _integrityTreeRegionStart + objectInodeNumber * maxBlocksPerTree;
+        if (baseBlock < _integrityTreeRegionStart || baseBlock + maxBlocksPerTree > _integrityTreeRegionEnd)
+        {
+            throw new ArgumentOutOfRangeException(nameof(objectInodeNumber),
+                $"Inode {objectInodeNumber} maps to block {baseBlock} which is outside the integrity tree region [{_integrityTreeRegionStart}, {_integrityTreeRegionEnd}).");
+        }
+        return baseBlock;
     }
 
     /// <summary>

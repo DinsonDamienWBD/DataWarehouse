@@ -62,7 +62,7 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Whether knowledge has been registered.
         /// </summary>
-        private bool _knowledgeRegistered;
+        private volatile bool _knowledgeRegistered;
 
         /// <summary>
         /// Whether this plugin has been disposed.

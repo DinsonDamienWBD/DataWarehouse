@@ -32,7 +32,7 @@ namespace DataWarehouse.SDK.Federation.Catalog;
 [SdkCompatibility("3.0.0", Notes = "Phase 34: Raft state machine for manifest")]
 internal sealed class ManifestStateMachine : IDisposable
 {
-    private bool _disposed;
+    private volatile bool _disposed;
     private readonly BoundedDictionary<ObjectIdentity, ObjectLocationEntry> _index;
     private readonly ReaderWriterLockSlim _lock;
 

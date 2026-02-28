@@ -145,7 +145,9 @@ public sealed class PerExtentEncryptor : IDisposable
 
         // Use HKDF to derive a 12-byte nonce (AES-GCM nonce size)
         byte[] nonce = new byte[NonceSize];
-        HKDF.DeriveKey(HashAlgorithmName.SHA256, input.ToArray(), nonce, ReadOnlySpan<byte>.Empty, "VDE-Extent-Nonce"u8);
+        // Use volume key material as salt for HKDF to prevent nonce prediction across volumes.
+        // If no volume-specific salt is available, use the info string as domain separator.
+        HKDF.DeriveKey(HashAlgorithmName.SHA256, input.ToArray(), nonce, "VDE-Extent-Salt-v1"u8, "VDE-Extent-Nonce"u8);
 
         return nonce;
     }

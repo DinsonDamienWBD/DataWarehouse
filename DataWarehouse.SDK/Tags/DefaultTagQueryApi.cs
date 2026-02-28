@@ -300,13 +300,15 @@ public sealed class DefaultTagQueryApi : ITagQueryApi
     /// </summary>
     private async Task<HashSet<string>> CompileNotAsync(NotExpression not, CancellationToken ct)
     {
+        const int MaxNotScanKeys = 10_000;
+
         _logger.LogWarning(
             "NOT expression compilation requires full-scan subtraction. " +
             "Consider restructuring the query to avoid NOT for better performance. " +
             "Inner expression: {InnerExpression}", not.Inner);
 
-        // Get all known objects from the index distribution
-        var distribution = await _index.GetTagDistributionAsync(int.MaxValue, ct).ConfigureAwait(false);
+        // Get known objects from the index distribution (bounded to prevent OOM)
+        var distribution = await _index.GetTagDistributionAsync(MaxNotScanKeys, ct).ConfigureAwait(false);
 
         // Collect all object keys from the index by querying each known tag
         var allObjects = new HashSet<string>(StringComparer.Ordinal);

@@ -37,14 +37,24 @@ namespace DataWarehouse.SDK.Infrastructure.InMemory
         {
             ct.ThrowIfCancellationRequested();
 
-            // Evict oldest if at capacity
+            // Evict oldest if at capacity (O(n) scan instead of O(n log n) sort)
             while (_messages.Count >= _maxCapacity)
             {
-                var oldest = _messages.OrderBy(kv => kv.Value.FailedAt).FirstOrDefault();
-                if (oldest.Key != null)
+                string? oldestKey = null;
+                DateTimeOffset oldestTime = DateTimeOffset.MaxValue;
+                foreach (var kv in _messages)
                 {
-                    _messages.TryRemove(oldest.Key, out _);
+                    if (kv.Value.FailedAt < oldestTime)
+                    {
+                        oldestTime = kv.Value.FailedAt;
+                        oldestKey = kv.Key;
+                    }
                 }
+                if (oldestKey != null)
+                {
+                    _messages.TryRemove(oldestKey, out _);
+                }
+                else break;
             }
 
             _messages[message.MessageId] = message;
@@ -75,8 +85,18 @@ namespace DataWarehouse.SDK.Infrastructure.InMemory
         public Task<DeadLetterMessage?> DequeueAsync(CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
-            var oldest = _messages.OrderBy(kv => kv.Value.FailedAt).FirstOrDefault();
-            if (oldest.Key != null && _messages.TryRemove(oldest.Key, out var message))
+            // Find oldest via O(n) scan instead of O(n log n) sort
+            string? oldestKey = null;
+            DateTimeOffset oldestTime = DateTimeOffset.MaxValue;
+            foreach (var kv in _messages)
+            {
+                if (kv.Value.FailedAt < oldestTime)
+                {
+                    oldestTime = kv.Value.FailedAt;
+                    oldestKey = kv.Key;
+                }
+            }
+            if (oldestKey != null && _messages.TryRemove(oldestKey, out var message))
             {
                 return Task.FromResult<DeadLetterMessage?>(message);
             }

@@ -179,8 +179,9 @@ public static class ParquetVdeIntegration
                 var stats = new ParquetRowGroupStatistics(
                     rowGroupIndex, batch.RowCount, currentRow, columnStats);
 
-                // Estimate extent start block (base + metadata + previous row groups)
-                long extentStartBlock = 100 + rowGroupIndex * batch.ColumnCount;
+                // Compute extent start block from region metadata block offset
+                // Each row group occupies columns.Length blocks, starting after the metadata block
+                long extentStartBlock = 1 + rowGroupIndex * (long)batch.ColumnCount;
 
                 await PopulateZoneMapsFromParquet(
                     zoneMap, stats, tableName, extentStartBlock, batch.ColumnCount, ct)

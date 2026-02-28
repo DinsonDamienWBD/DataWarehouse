@@ -282,7 +282,8 @@ public static class VdeCreator
         nextBlock += bitmapBlocks;
 
         // Inode Table
-        long inodeBlocks = Math.Min(InodeTableDefaultBlocks, totalBlocks / InodeTableFractionDivisor);
+        // Scale inode table with volume size: use fraction of total blocks, with InodeTableDefaultBlocks as minimum
+        long inodeBlocks = Math.Max(InodeTableDefaultBlocks, totalBlocks / InodeTableFractionDivisor);
         inodeBlocks = Math.Max(1, inodeBlocks);
         regions["InodeTable"] = (nextBlock, inodeBlocks);
         nextBlock += inodeBlocks;

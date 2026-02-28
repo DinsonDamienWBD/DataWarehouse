@@ -57,9 +57,9 @@ public sealed class NvmePassthrough : INvmePassthrough
     private IntPtr _deviceHandle = IntPtr.Zero; // Windows handle
     private int _deviceFd = -1; // Linux file descriptor
     private int _controllerId;
-    private bool _isAvailable = false;
+    private volatile bool _isAvailable = false;
     private readonly object _lock = new();
-    private bool _disposed = false;
+    private volatile bool _disposed = false;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="NvmePassthrough"/> class.

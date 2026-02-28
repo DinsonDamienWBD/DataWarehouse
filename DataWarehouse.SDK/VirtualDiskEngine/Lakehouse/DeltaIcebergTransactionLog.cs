@@ -149,7 +149,7 @@ public sealed class DeltaIcebergTransactionLog : IDisposable
     private readonly ILogger? _logger;
     private readonly ConcurrentDictionary<string, SortedList<long, TransactionCommit>> _tables = new();
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _tableLocks = new();
-    private bool _disposed;
+    private volatile bool _disposed;
 
     /// <summary>
     /// Initializes a new instance of the transaction log.
@@ -245,6 +245,7 @@ public sealed class DeltaIcebergTransactionLog : IDisposable
             .ToList();
 
         var acquiredLocks = new List<SemaphoreSlim>();
+        var committedVersions = new List<(string TableId, long Version)>();
         try
         {
             // Acquire locks in sorted order
@@ -257,7 +258,6 @@ public sealed class DeltaIcebergTransactionLog : IDisposable
 
             var timestamp = DateTimeOffset.UtcNow;
             long representativeVersion = -1;
-            var committedVersions = new List<(string TableId, long Version)>();
 
             // Commit all tables atomically
             foreach (var (tableId, entries) in transaction.TableCommits)
@@ -292,11 +292,21 @@ public sealed class DeltaIcebergTransactionLog : IDisposable
 
             return representativeVersion;
         }
-        catch (Exception) when (acquiredLocks.Count > 0)
+        catch (Exception ex) when (acquiredLocks.Count > 0)
         {
-            // Rollback: remove any partially committed versions
-            // (in practice, if an exception occurs mid-commit, the partially added entries
-            // are already in the sorted list; remove them to restore consistency)
+            // Rollback: remove partially committed versions to restore atomicity
+            foreach (var committed in committedVersions)
+            {
+                if (_tables.TryGetValue(committed.TableId, out var table))
+                {
+                    lock (table)
+                    {
+                        table.Remove(committed.Version);
+                    }
+                }
+            }
+            System.Diagnostics.Debug.WriteLine(
+                $"[DeltaIcebergTransactionLog] Multi-table commit rolled back {committedVersions.Count} versions: {ex.Message}");
             throw;
         }
         finally
@@ -507,6 +517,11 @@ public sealed class DeltaIcebergTransactionLog : IDisposable
 
     private SemaphoreSlim GetOrCreateTableLock(string tableId)
     {
-        return _tableLocks.GetOrAdd(tableId, _ => new SemaphoreSlim(1, 1));
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return _tableLocks.GetOrAdd(tableId, _ =>
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return new SemaphoreSlim(1, 1);
+        });
     }
 }

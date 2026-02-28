@@ -68,14 +68,15 @@ namespace DataWarehouse.SDK.Security.KeyManagement
     {
         private GcpKmsConfig _config = new();
         private HttpClient? _httpClient;
-        private string? _cachedAccessToken;
-        private DateTime _tokenExpiry = DateTime.MinValue;
+        private volatile string? _cachedAccessToken;
+        private long _tokenExpiryTicks = DateTime.MinValue.Ticks; // atomic via Interlocked
         private readonly SemaphoreSlim _tokenLock = new(1, 1);
         private AdcCredentialSource _credentialSource = AdcCredentialSource.None;
         private string? _serviceAccountJson;
         private string? _clientEmail;
         private string? _privateKeyPem;
         private string? _currentKeyId;
+        private readonly ConcurrentDictionary<string, byte[]> _wrappedDekCache = new();
 
         private const string KmsBaseUrl = "https://cloudkms.googleapis.com";
         private const string TokenUrl = "https://oauth2.googleapis.com/token";
@@ -164,18 +165,18 @@ namespace DataWarehouse.SDK.Security.KeyManagement
         {
             IncrementCounter("gcpkms.key.load");
 
-            // For cloud KMS, "loading a key" means encrypting a well-known marker
-            // and returning the ciphertext as the "key" — actual key material never leaves KMS.
-            // In practice, callers use Encrypt/Decrypt directly.
-            // For IKeyStore compatibility, we generate a local DEK and wrap it with KMS.
+            // For cloud KMS, "loading a key" means generating a local DEK and wrapping it with KMS.
+            // Both the plaintext DEK and wrapped DEK must be persisted for restart recovery.
             var dek = new byte[32];
             RandomNumberGenerator.Fill(dek);
 
             // Wrap the DEK with KMS
             var wrappedDek = await EncryptWithKmsAsync(keyId, dek, CancellationToken.None).ConfigureAwait(false);
 
-            // Store the mapping (wrapped DEK -> keyId) in local cache concept
-            // Return the local DEK for use
+            // Store the wrapped DEK for recovery — the plaintext DEK is returned for use
+            // and the wrapped version can be decrypted via KMS on restart
+            _wrappedDekCache[keyId] = wrappedDek;
+
             return dek;
         }
 
@@ -343,14 +344,14 @@ namespace DataWarehouse.SDK.Security.KeyManagement
         private async Task<string> GetAccessTokenAsync(CancellationToken ct)
         {
             // Check cached token
-            if (_cachedAccessToken != null && DateTime.UtcNow < _tokenExpiry.AddMinutes(-_config.TokenRefreshBufferMinutes))
+            if (_cachedAccessToken != null && DateTime.UtcNow < new DateTime(Interlocked.Read(ref _tokenExpiryTicks), DateTimeKind.Utc).AddMinutes(-_config.TokenRefreshBufferMinutes))
                 return _cachedAccessToken;
 
             await _tokenLock.WaitAsync(ct).ConfigureAwait(false);
             try
             {
                 // Double-check after acquiring lock
-                if (_cachedAccessToken != null && DateTime.UtcNow < _tokenExpiry.AddMinutes(-_config.TokenRefreshBufferMinutes))
+                if (_cachedAccessToken != null && DateTime.UtcNow < new DateTime(Interlocked.Read(ref _tokenExpiryTicks), DateTimeKind.Utc).AddMinutes(-_config.TokenRefreshBufferMinutes))
                     return _cachedAccessToken;
 
                 switch (_credentialSource)
@@ -421,7 +422,7 @@ namespace DataWarehouse.SDK.Security.KeyManagement
             using var doc = JsonDocument.Parse(json);
             _cachedAccessToken = doc.RootElement.GetProperty("access_token").GetString()!;
             var expiresIn = doc.RootElement.GetProperty("expires_in").GetInt32();
-            _tokenExpiry = DateTime.UtcNow.AddSeconds(expiresIn);
+            Interlocked.Exchange(ref _tokenExpiryTicks, DateTime.UtcNow.AddSeconds(expiresIn).Ticks);
 
             return _cachedAccessToken;
         }
@@ -439,7 +440,7 @@ namespace DataWarehouse.SDK.Security.KeyManagement
             using var doc = JsonDocument.Parse(json);
             _cachedAccessToken = doc.RootElement.GetProperty("access_token").GetString()!;
             var expiresIn = doc.RootElement.GetProperty("expires_in").GetInt32();
-            _tokenExpiry = DateTime.UtcNow.AddSeconds(expiresIn);
+            Interlocked.Exchange(ref _tokenExpiryTicks, DateTime.UtcNow.AddSeconds(expiresIn).Ticks);
 
             return _cachedAccessToken;
         }

@@ -294,7 +294,9 @@ public sealed class DeadlineScheduler : IDisposable
         try
         {
             // Execute the I/O operation synchronously on the dedicated thread
-            operation.Execute(buffer).AsTask().GetAwaiter().GetResult();
+            var vt = operation.Execute(buffer);
+            if (!vt.IsCompleted)
+                vt.AsTask().GetAwaiter().GetResult();
             sw.Stop();
 
             var latencyUs = sw.Elapsed.TotalMicroseconds;

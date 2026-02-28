@@ -414,6 +414,19 @@ public sealed class ExtentDeltaReplicator
             int dataLength = BinaryPrimitives.ReadInt32LittleEndian(data.Slice(offset + 32, 4));
             offset += ExtentHeaderSize;
 
+            // Validate dataLength against reasonable bounds: must be non-negative and match expected block count
+            if (dataLength < 0)
+            {
+                throw new InvalidOperationException(
+                    $"Invalid extent data length {dataLength} at extent {i}.");
+            }
+            int expectedSize = blockCount * _blockSize;
+            if (dataLength > expectedSize)
+            {
+                throw new InvalidOperationException(
+                    $"Extent data length {dataLength} exceeds expected size {expectedSize} (blockCount={blockCount}, blockSize={_blockSize}) at extent {i}.");
+            }
+
             if (offset + dataLength > data.Length)
             {
                 throw new InvalidOperationException(

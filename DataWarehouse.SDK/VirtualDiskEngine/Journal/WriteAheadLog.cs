@@ -493,9 +493,17 @@ public sealed class WriteAheadLog : IWriteAheadLog, IAsyncDisposable
 
         _disposed = true;
 
+        // Flush any pending entries before disposing to prevent data loss on restart
+        try
+        {
+            await FlushAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[WriteAheadLog.DisposeAsync] Flush during dispose failed: {ex.Message}");
+        }
+
         _appendLock.Dispose();
         _flushLock.Dispose();
-
-        await Task.CompletedTask;
     }
 }

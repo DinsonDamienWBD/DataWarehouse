@@ -67,6 +67,11 @@ public sealed record VdeHealthReport
     public required DateTimeOffset GeneratedAtUtc { get; init; }
 
     /// <summary>
+    /// Block size in bytes for this VDE instance.
+    /// </summary>
+    public required int BlockSize { get; init; }
+
+    /// <summary>
     /// Converts this VDE health report to the SDK's StorageHealthInfo format
     /// for compatibility with IStorageStrategy.
     /// </summary>
@@ -85,9 +90,9 @@ public sealed record VdeHealthReport
         {
             Status = status,
             LatencyMs = 0, // Will be filled by the base class metrics
-            AvailableCapacity = FreeBlocks * 4096, // Assuming 4K blocks; should use actual BlockSize
-            TotalCapacity = TotalBlocks * 4096,
-            UsedCapacity = UsedBlocks * 4096,
+            AvailableCapacity = FreeBlocks * BlockSize,
+            TotalCapacity = TotalBlocks * BlockSize,
+            UsedCapacity = UsedBlocks * BlockSize,
             Message = $"WAL: {WalUtilizationPercent:F1}%, Snapshots: {SnapshotCount}, Checksum errors: {ChecksumErrorCount}",
             CheckedAt = GeneratedAtUtc.UtcDateTime
         };

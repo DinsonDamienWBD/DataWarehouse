@@ -96,38 +96,37 @@ internal sealed class LinuxMtdFlashDevice : IFlashDevice
 
     public Task EraseBlockAsync(long blockNumber, CancellationToken ct = default)
     {
-        // Stub: MEMERASE ioctl
-        // Real: ioctl(_handle, MEMERASE, &erase_info)
-        return Task.CompletedTask;
+        throw new PlatformNotSupportedException(
+            $"Linux MTD ioctl (MEMERASE) not available for '{_devicePath}'. " +
+            "Requires Linux with MTD subsystem and P/Invoke bindings for ioctl syscall.");
     }
 
     public Task ReadPageAsync(long blockNumber, int pageOffset, Memory<byte> buffer, CancellationToken ct = default)
     {
-        // Stub: pread at block offset + page offset
-        // Real: pread(_handle, buffer, size, block * _eraseBlockSize + pageOffset)
-        buffer.Span.Clear();
-        return Task.CompletedTask;
+        throw new PlatformNotSupportedException(
+            $"Linux MTD pread not available for '{_devicePath}'. " +
+            "Requires Linux with MTD subsystem and P/Invoke bindings.");
     }
 
     public Task WritePageAsync(long blockNumber, int pageOffset, ReadOnlyMemory<byte> data, CancellationToken ct = default)
     {
-        // Stub: pwrite at block offset + page offset
-        // Real: pwrite(_handle, data, size, block * _eraseBlockSize + pageOffset)
-        return Task.CompletedTask;
+        throw new PlatformNotSupportedException(
+            $"Linux MTD pwrite not available for '{_devicePath}'. " +
+            "Requires Linux with MTD subsystem and P/Invoke bindings.");
     }
 
     public Task<bool> IsBlockBadAsync(long blockNumber, CancellationToken ct = default)
     {
-        // Stub: MEMGETBADBLOCK ioctl
-        // Real: ioctl(_handle, MEMGETBADBLOCK, &block_offset) returns 0 (good) or 1 (bad)
-        return Task.FromResult(false);
+        throw new PlatformNotSupportedException(
+            $"Linux MTD ioctl (MEMGETBADBLOCK) not available for '{_devicePath}'. " +
+            "Requires Linux with MTD subsystem and P/Invoke bindings.");
     }
 
     public Task MarkBlockBadAsync(long blockNumber, CancellationToken ct = default)
     {
-        // Stub: MEMSETBADBLOCK ioctl
-        // Real: ioctl(_handle, MEMSETBADBLOCK, &block_offset)
-        return Task.CompletedTask;
+        throw new PlatformNotSupportedException(
+            $"Linux MTD ioctl (MEMSETBADBLOCK) not available for '{_devicePath}'. " +
+            "Requires Linux with MTD subsystem and P/Invoke bindings.");
     }
 
     public ValueTask DisposeAsync()

@@ -218,6 +218,7 @@ public sealed class VdeFeatureStore
 
     // Model versions keyed by "{ModelId}:{Version}"
     private readonly ConcurrentDictionary<string, ModelVersion> _models = new();
+    private readonly object _modelRegistrationLock = new();
 
     // Training data lineage keyed by "{ModelId}:{Version}:{DatasetId}"
     private readonly ConcurrentDictionary<string, TrainingDataLineage> _lineage = new();
@@ -292,20 +293,23 @@ public sealed class VdeFeatureStore
         ArgumentNullException.ThrowIfNull(model);
         ct.ThrowIfCancellationRequested();
 
-        // Check monotonically increasing version
-        var existingVersions = _models
-            .Where(kvp => kvp.Key.StartsWith($"{model.ModelId}:", StringComparison.Ordinal))
-            .Select(kvp => kvp.Value.Version)
-            .ToList();
-
-        if (existingVersions.Count > 0 && model.Version <= existingVersions.Max())
+        lock (_modelRegistrationLock)
         {
-            throw new InvalidOperationException(
-                $"Model version {model.Version} for '{model.ModelId}' must be greater than existing max {existingVersions.Max()}.");
-        }
+            // Check monotonically increasing version (atomic with insert under lock)
+            var existingVersions = _models
+                .Where(kvp => kvp.Key.StartsWith($"{model.ModelId}:", StringComparison.Ordinal))
+                .Select(kvp => kvp.Value.Version)
+                .ToList();
 
-        var key = $"{model.ModelId}:{model.Version}";
-        _models[key] = model;
+            if (existingVersions.Count > 0 && model.Version <= existingVersions.Max())
+            {
+                throw new InvalidOperationException(
+                    $"Model version {model.Version} for '{model.ModelId}' must be greater than existing max {existingVersions.Max()}.");
+            }
+
+            var key = $"{model.ModelId}:{model.Version}";
+            _models[key] = model;
+        }
 
         _logger.LogInformation(
             "Registered model {ModelId} v{Version} ({Algorithm}, status={Status}).",

@@ -15,13 +15,23 @@ namespace DataWarehouse.SDK.Storage.Services;
 /// </summary>
 public sealed class DefaultStorageIndex : IStorageIndex
 {
-    private readonly BoundedDictionary<string, StorageObjectMetadata> _index = new BoundedDictionary<string, StorageObjectMetadata>(1000);
+    private static readonly int DefaultMaxIndexSize = 100_000;
+    private readonly BoundedDictionary<string, StorageObjectMetadata> _index;
 
     /// <summary>
     /// Maximum number of entries in the index. Default: 100,000.
-    /// Set to 0 for unlimited (not recommended for production).
     /// </summary>
-    public int MaxIndexSize { get; set; } = 100_000;
+    public int MaxIndexSize { get; }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DefaultStorageIndex"/> class.
+    /// </summary>
+    /// <param name="maxIndexSize">Maximum entries. Default: 100,000.</param>
+    public DefaultStorageIndex(int maxIndexSize = 100_000)
+    {
+        MaxIndexSize = maxIndexSize > 0 ? maxIndexSize : DefaultMaxIndexSize;
+        _index = new BoundedDictionary<string, StorageObjectMetadata>(MaxIndexSize);
+    }
 
     /// <inheritdoc/>
     public Task IndexAsync(string key, StorageObjectMetadata metadata, CancellationToken ct = default)
@@ -30,17 +40,7 @@ public sealed class DefaultStorageIndex : IStorageIndex
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
         ArgumentNullException.ThrowIfNull(metadata);
 
-        // Enforce bounded index
-        if (MaxIndexSize > 0 && !_index.ContainsKey(key) && _index.Count >= MaxIndexSize)
-        {
-            // Evict oldest entry
-            var oldest = _index.MinBy(kv => kv.Value.Modified);
-            if (oldest.Key != null)
-            {
-                _index.TryRemove(oldest.Key, out _);
-            }
-        }
-
+        // BoundedDictionary handles LRU eviction atomically when at capacity
         _index[key] = metadata;
         return Task.CompletedTask;
     }

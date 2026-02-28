@@ -159,7 +159,8 @@ public readonly struct CompactInode64 : IEquatable<CompactInode64>
         && Type == other.Type
         && Flags == other.Flags
         && InlineDataSize == other.InlineDataSize
-        && OwnerId == other.OwnerId;
+        && OwnerId == other.OwnerId
+        && InlineData.AsSpan(0, InlineDataSize).SequenceEqual(other.InlineData.AsSpan(0, other.InlineDataSize));
 
     /// <inheritdoc />
     public override bool Equals(object? obj) => obj is CompactInode64 other && Equals(other);

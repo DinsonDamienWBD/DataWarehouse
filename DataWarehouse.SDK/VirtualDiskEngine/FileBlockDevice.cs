@@ -16,7 +16,7 @@ public sealed class FileBlockDevice : IBlockDevice
 {
     private readonly SafeFileHandle _handle;
     private readonly SemaphoreSlim _writeLock = new(1, 1);
-    private bool _disposed;
+    private volatile bool _disposed;
 
     /// <inheritdoc/>
     public int BlockSize { get; }

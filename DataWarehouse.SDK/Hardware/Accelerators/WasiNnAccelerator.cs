@@ -70,7 +70,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
     public sealed class ModelHandle : IDisposable
     {
         private readonly IInferenceSession? _session;
-        private bool _disposed;
+        private volatile bool _disposed;
 
         /// <summary>
         /// Gets the model file path.
@@ -219,10 +219,10 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         private readonly BoundedDictionary<Guid, ModelHandle> _loadedModels = new BoundedDictionary<Guid, ModelHandle>(1000);
         private readonly List<InferenceBackend> _availableBackends = new();
         private InferenceBackend _bestBackend = InferenceBackend.CPU;
-        private bool _initialized;
+        private volatile bool _initialized;
         private long _inferencesCompleted;
         private readonly object _lock = new();
-        private bool _disposed;
+        private volatile bool _disposed;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="WasiNnAccelerator"/> class.

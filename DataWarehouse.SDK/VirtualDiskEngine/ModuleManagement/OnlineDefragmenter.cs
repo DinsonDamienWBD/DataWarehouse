@@ -430,13 +430,13 @@ public sealed class OnlineDefragmenter
                     long logicalBlock = move.CurrentStartBlock + offset + b;
                     long targetPhysical = move.TargetStartBlock + offset + b;
 
-                    // Read from current physical location
+                    // Read from current physical location (async to avoid blocking thread pool)
                     long sourceOffset = logicalBlock * _blockSize;
                     _vdeStream.Seek(sourceOffset, SeekOrigin.Begin);
                     int totalRead = 0;
                     while (totalRead < _blockSize)
                     {
-                        int bytesRead = _vdeStream.Read(buffer, totalRead, _blockSize - totalRead);
+                        int bytesRead = await _vdeStream.ReadAsync(buffer.AsMemory(totalRead, _blockSize - totalRead), ct);
                         if (bytesRead == 0) break;
                         totalRead += bytesRead;
                     }
@@ -494,7 +494,7 @@ public sealed class OnlineDefragmenter
             int totalRead = 0;
             while (totalRead < dirSize)
             {
-                int bytesRead = _vdeStream.Read(dirBuffer, totalRead, dirSize - totalRead);
+                int bytesRead = await _vdeStream.ReadAsync(dirBuffer.AsMemory(totalRead, dirSize - totalRead), ct);
                 if (bytesRead == 0) break;
                 totalRead += bytesRead;
             }
@@ -543,7 +543,7 @@ public sealed class OnlineDefragmenter
             int totalRead = 0;
             while (totalRead < _blockSize)
             {
-                int bytesRead = _vdeStream.Read(rptBuffer, totalRead, _blockSize - totalRead);
+                int bytesRead = await _vdeStream.ReadAsync(rptBuffer.AsMemory(totalRead, _blockSize - totalRead), ct);
                 if (bytesRead == 0) break;
                 totalRead += bytesRead;
             }

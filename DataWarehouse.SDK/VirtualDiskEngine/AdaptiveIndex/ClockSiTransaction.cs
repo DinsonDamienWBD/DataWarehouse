@@ -109,17 +109,21 @@ public sealed class WriteRecord
     /// <summary>Gets the value being written.</summary>
     public long Value { get; }
 
+    /// <summary>Gets the value at snapshot time for conflict detection. Null if key did not exist at snapshot.</summary>
+    public long? SnapshotValue { get; }
+
     /// <summary>Gets the target shard ID for this write.</summary>
     public int TargetShardId { get; }
 
     /// <summary>
     /// Initializes a new <see cref="WriteRecord"/>.
     /// </summary>
-    public WriteRecord(byte[] key, long value, int targetShardId)
+    public WriteRecord(byte[] key, long value, int targetShardId, long? snapshotValue = null)
     {
         Key = key ?? throw new ArgumentNullException(nameof(key));
         Value = value;
         TargetShardId = targetShardId;
+        SnapshotValue = snapshotValue;
     }
 }
 
@@ -424,10 +428,15 @@ public sealed class ClockSiTransaction : IDisposable
         foreach (var write in writes)
         {
             var currentValue = await shard.LookupAsync(write.Key, ct).ConfigureAwait(false);
-            // In a full implementation, we would check the version timestamp.
-            // For this implementation, prepare always succeeds (optimistic).
-            // Conflicts are detected at the shard level if implemented.
-            _ = currentValue;
+            // Conflict detection: if the current value differs from the snapshot value,
+            // another transaction modified this key — write-write conflict.
+            if (currentValue.HasValue && write.SnapshotValue.HasValue &&
+                currentValue.Value != write.SnapshotValue.Value)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"[ClockSiTransaction.PrepareShardAsync] Write-write conflict detected on key (snapshot={write.SnapshotValue}, current={currentValue})");
+                return false;
+            }
         }
 
         return true;

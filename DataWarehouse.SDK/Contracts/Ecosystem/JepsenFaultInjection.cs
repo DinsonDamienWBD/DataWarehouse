@@ -121,6 +121,7 @@ public sealed class NetworkPartitionFault : IFaultInjector
         {
             foreach (var peer in reachable)
             {
+                ValidateIpAddress(peer.IpAddress);
                 await DockerExecAsync(
                     isolated.ContainerName,
                     $"iptables -A INPUT -s {peer.IpAddress} -j DROP",
@@ -149,6 +150,7 @@ public sealed class NetworkPartitionFault : IFaultInjector
             {
                 try
                 {
+                    ValidateIpAddress(peer.IpAddress);
                     await DockerExecAsync(
                         isolated.ContainerName,
                         $"iptables -D INPUT -s {peer.IpAddress} -j DROP",
@@ -159,9 +161,9 @@ public sealed class NetworkPartitionFault : IFaultInjector
                         $"iptables -D OUTPUT -d {peer.IpAddress} -j DROP",
                         ct).ConfigureAwait(false);
                 }
-                catch
+                catch (InvalidOperationException)
                 {
-                    // Rule may not exist if injection was partial
+                    // Rule may not exist if injection was partial — docker exec non-zero exit is expected
                 }
             }
         }
@@ -198,14 +200,33 @@ public sealed class NetworkPartitionFault : IFaultInjector
         return (partitioned, reachable);
     }
 
+    /// <summary>
+    /// Validates that a string is a well-formed IPv4 or IPv6 address to prevent command injection.
+    /// </summary>
+    private static void ValidateIpAddress(string ipAddress)
+    {
+        if (string.IsNullOrWhiteSpace(ipAddress))
+            throw new ArgumentException("IP address must not be empty.", nameof(ipAddress));
+        if (!System.Net.IPAddress.TryParse(ipAddress, out _))
+            throw new ArgumentException($"Invalid IP address format: '{ipAddress}'", nameof(ipAddress));
+    }
+
     private static async Task DockerExecAsync(string containerName, string command, CancellationToken ct)
     {
+        // Validate inputs to prevent shell injection
+        if (string.IsNullOrWhiteSpace(containerName))
+            throw new ArgumentException("Container name must not be empty.", nameof(containerName));
+        if (containerName.IndexOfAny(new[] { ';', '&', '|', '$', '`', '\n', '\r', '"', '\'' }) >= 0)
+            throw new ArgumentException("Container name contains invalid characters.", nameof(containerName));
+        if (string.IsNullOrWhiteSpace(command))
+            throw new ArgumentException("Command must not be empty.", nameof(command));
+
+        // Use ArgumentList to avoid shell interpretation of container name
         using var process = new Process
         {
             StartInfo = new ProcessStartInfo
             {
                 FileName = "docker",
-                Arguments = $"exec {containerName} /bin/sh -c \"{command}\"",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
@@ -213,8 +234,22 @@ public sealed class NetworkPartitionFault : IFaultInjector
             }
         };
 
+        process.StartInfo.ArgumentList.Add("exec");
+        process.StartInfo.ArgumentList.Add(containerName);
+        process.StartInfo.ArgumentList.Add("/bin/sh");
+        process.StartInfo.ArgumentList.Add("-c");
+        process.StartInfo.ArgumentList.Add(command);
+
         process.Start();
         await process.WaitForExitAsync(ct).ConfigureAwait(false);
+
+        // Check exit code to detect silent failures
+        if (process.ExitCode != 0)
+        {
+            var stderr = await process.StandardError.ReadToEndAsync(ct).ConfigureAwait(false);
+            throw new InvalidOperationException(
+                $"Docker exec failed with exit code {process.ExitCode} on container '{containerName}': {stderr}");
+        }
     }
 }
 
@@ -381,12 +416,20 @@ public sealed class ClockSkewFault : IFaultInjector
 
     private static async Task DockerExecAsync(string containerName, string command, CancellationToken ct)
     {
+        // Validate inputs to prevent shell injection
+        if (string.IsNullOrWhiteSpace(containerName))
+            throw new ArgumentException("Container name must not be empty.", nameof(containerName));
+        if (containerName.IndexOfAny(new[] { ';', '&', '|', '$', '`', '\n', '\r', '"', '\'' }) >= 0)
+            throw new ArgumentException("Container name contains invalid characters.", nameof(containerName));
+        if (string.IsNullOrWhiteSpace(command))
+            throw new ArgumentException("Command must not be empty.", nameof(command));
+
+        // Use ArgumentList to avoid shell interpretation of container name
         using var process = new Process
         {
             StartInfo = new ProcessStartInfo
             {
                 FileName = "docker",
-                Arguments = $"exec {containerName} /bin/sh -c \"{command}\"",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
@@ -394,8 +437,22 @@ public sealed class ClockSkewFault : IFaultInjector
             }
         };
 
+        process.StartInfo.ArgumentList.Add("exec");
+        process.StartInfo.ArgumentList.Add(containerName);
+        process.StartInfo.ArgumentList.Add("/bin/sh");
+        process.StartInfo.ArgumentList.Add("-c");
+        process.StartInfo.ArgumentList.Add(command);
+
         process.Start();
         await process.WaitForExitAsync(ct).ConfigureAwait(false);
+
+        // Check exit code to detect silent failures
+        if (process.ExitCode != 0)
+        {
+            var stderr = await process.StandardError.ReadToEndAsync(ct).ConfigureAwait(false);
+            throw new InvalidOperationException(
+                $"Docker exec failed with exit code {process.ExitCode} on container '{containerName}': {stderr}");
+        }
     }
 }
 
@@ -457,12 +514,20 @@ public sealed class DiskCorruptionFault : IFaultInjector
 
     private static async Task DockerExecAsync(string containerName, string command, CancellationToken ct)
     {
+        // Validate inputs to prevent shell injection
+        if (string.IsNullOrWhiteSpace(containerName))
+            throw new ArgumentException("Container name must not be empty.", nameof(containerName));
+        if (containerName.IndexOfAny(new[] { ';', '&', '|', '$', '`', '\n', '\r', '"', '\'' }) >= 0)
+            throw new ArgumentException("Container name contains invalid characters.", nameof(containerName));
+        if (string.IsNullOrWhiteSpace(command))
+            throw new ArgumentException("Command must not be empty.", nameof(command));
+
+        // Use ArgumentList to avoid shell interpretation of container name
         using var process = new Process
         {
             StartInfo = new ProcessStartInfo
             {
                 FileName = "docker",
-                Arguments = $"exec {containerName} /bin/sh -c \"{command}\"",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
@@ -470,8 +535,22 @@ public sealed class DiskCorruptionFault : IFaultInjector
             }
         };
 
+        process.StartInfo.ArgumentList.Add("exec");
+        process.StartInfo.ArgumentList.Add(containerName);
+        process.StartInfo.ArgumentList.Add("/bin/sh");
+        process.StartInfo.ArgumentList.Add("-c");
+        process.StartInfo.ArgumentList.Add(command);
+
         process.Start();
         await process.WaitForExitAsync(ct).ConfigureAwait(false);
+
+        // Check exit code to detect silent failures
+        if (process.ExitCode != 0)
+        {
+            var stderr = await process.StandardError.ReadToEndAsync(ct).ConfigureAwait(false);
+            throw new InvalidOperationException(
+                $"Docker exec failed with exit code {process.ExitCode} on container '{containerName}': {stderr}");
+        }
     }
 }
 

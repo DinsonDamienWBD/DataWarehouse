@@ -28,8 +28,8 @@ namespace DataWarehouse.SDK.Security.IncidentResponse
         private readonly BoundedDictionary<string, Incident> _incidents = new BoundedDictionary<string, Incident>(1000);
         private readonly BoundedDictionary<string, AutoResponseRule> _autoResponseRules = new BoundedDictionary<string, AutoResponseRule>(1000);
         private readonly BoundedDictionary<string, ConcurrentQueue<DateTimeOffset>> _eventWindows = new BoundedDictionary<string, ConcurrentQueue<DateTimeOffset>>(1000);
-        private readonly List<IDisposable> _subscriptions = new();
-        private bool _disposed;
+        private readonly ConcurrentBag<IDisposable> _subscriptions = new();
+        private int _disposed;
 
         /// <summary>
         /// Creates a new incident response engine.
@@ -265,6 +265,18 @@ namespace DataWarehouse.SDK.Security.IncidentResponse
         public void RegisterAutoResponseRule(AutoResponseRule rule)
         {
             ArgumentNullException.ThrowIfNull(rule);
+
+            // Validate regex at registration time to prevent ReDoS during event processing
+            try
+            {
+                _ = new Regex(rule.EventPattern, RegexOptions.None, TimeSpan.FromMilliseconds(100));
+            }
+            catch (ArgumentException ex)
+            {
+                throw new ArgumentException(
+                    $"Auto-response rule '{rule.Name}' has invalid regex pattern: {ex.Message}", nameof(rule), ex);
+            }
+
             if (!_autoResponseRules.TryAdd(rule.Name, rule))
             {
                 throw new InvalidOperationException($"Auto-response rule '{rule.Name}' is already registered.");
@@ -280,7 +292,7 @@ namespace DataWarehouse.SDK.Security.IncidentResponse
         /// </summary>
         public void StartMonitoring()
         {
-            if (_disposed) throw new ObjectDisposedException(nameof(IncidentResponseEngine));
+            if (Volatile.Read(ref _disposed) != 0) throw new ObjectDisposedException(nameof(IncidentResponseEngine));
 
             // Subscribe to critical alerts for auto-incident creation
             var alertSub = _messageBus.SubscribePattern("security.alert.critical", async msg =>
@@ -407,14 +419,12 @@ namespace DataWarehouse.SDK.Security.IncidentResponse
         /// <inheritdoc />
         public void Dispose()
         {
-            if (_disposed) return;
-            _disposed = true;
+            if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0) return;
 
-            foreach (var sub in _subscriptions)
+            while (_subscriptions.TryTake(out var sub))
             {
                 sub.Dispose();
             }
-            _subscriptions.Clear();
         }
     }
 

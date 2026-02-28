@@ -24,17 +24,21 @@ namespace DataWarehouse.SDK.IO
 
             _pumpingTask = Task.Run(async () =>
             {
+                Exception? pumpError = null;
                 try
                 {
                     await source.CopyToAsync(transformStream, _cts.Token);
                     transformStream.Close();
                     await _pipeWriterStream.FlushAsync();
                 }
-                catch (Exception ex) { await pipe.Writer.CompleteAsync(ex); }
+                catch (Exception ex)
+                {
+                    pumpError = ex;
+                }
                 finally
                 {
-                    await pipe.Writer.CompleteAsync();
-                    await transformStream.DisposeAsync();
+                    try { await transformStream.DisposeAsync(); } catch { /* best-effort */ }
+                    await pipe.Writer.CompleteAsync(pumpError);
                 }
             });
         }

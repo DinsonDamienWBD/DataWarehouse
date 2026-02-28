@@ -18,7 +18,13 @@ public sealed class CostBasedQueryPlanner : IQueryPlanner
     private const double ProjectCostPerRow = 0.05;
 
     private readonly QueryOptimizer _optimizer = new();
-    private ITableStatisticsProvider? _stats;
+
+    /// <summary>
+    /// Per-thread statistics provider used during planning.
+    /// ThreadStatic ensures concurrent Plan() calls on different threads don't share state.
+    /// </summary>
+    [ThreadStatic]
+    private static ITableStatisticsProvider? _stats;
 
     /// <inheritdoc />
     public QueryPlanNode Plan(SelectStatement statement, ITableStatisticsProvider? stats = null)

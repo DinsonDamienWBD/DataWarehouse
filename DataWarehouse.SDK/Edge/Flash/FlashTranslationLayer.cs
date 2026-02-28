@@ -34,6 +34,7 @@ public sealed class FlashTranslationLayer : IFlashTranslationLayer
     private readonly Dictionary<long, long> _logicalToPhysical = new(); // Logical block -> physical block
     private readonly HashSet<long> _freeBlocks = new();
     private readonly HashSet<long> _dirtyBlocks = new(); // Blocks with invalidated pages
+    private readonly object _ftlLock = new(); // Guards L2P map, free/dirty sets
     private long _writeCount;
     private long _eraseCount;
 
@@ -117,10 +118,14 @@ public sealed class FlashTranslationLayer : IFlashTranslationLayer
         if (buffer.Length < BlockSize)
             throw new ArgumentException("Buffer too small", nameof(buffer));
 
-        if (!_logicalToPhysical.TryGetValue(blockNumber, out var physicalBlock))
+        long physicalBlock;
+        lock (_ftlLock)
         {
-            buffer.Span.Clear(); // Unwritten block returns zeros
-            return;
+            if (!_logicalToPhysical.TryGetValue(blockNumber, out physicalBlock))
+            {
+                buffer.Span.Clear(); // Unwritten block returns zeros
+                return;
+            }
         }
 
         await _flashDevice.ReadPageAsync(physicalBlock, 0, buffer, ct);
@@ -141,38 +146,50 @@ public sealed class FlashTranslationLayer : IFlashTranslationLayer
         if (data.Length != BlockSize)
             throw new ArgumentException($"Data must be exactly {BlockSize} bytes", nameof(data));
 
-        // Flash write requires erase-before-write. If block is already mapped, mark old physical block dirty.
-        if (_logicalToPhysical.TryGetValue(blockNumber, out var oldPhysical))
+        long newPhysical;
+        lock (_ftlLock)
         {
-            _dirtyBlocks.Add(oldPhysical);
+            // Flash write requires erase-before-write. If block is already mapped, mark old physical block dirty.
+            if (_logicalToPhysical.TryGetValue(blockNumber, out var oldPhysical))
+            {
+                _dirtyBlocks.Add(oldPhysical);
+            }
         }
 
         // Check if GC needed (low free space)
-        if (_freeBlocks.Count < TotalBlocks * 0.1) // Trigger GC when <10% free
+        bool needsGc;
+        lock (_ftlLock) { needsGc = _freeBlocks.Count < TotalBlocks * 0.1; }
+        if (needsGc)
         {
             await GarbageCollectAsync(ct);
         }
 
-        if (_freeBlocks.Count == 0)
+        lock (_ftlLock)
         {
-            throw new InvalidOperationException("No free blocks available. Garbage collection failed to reclaim space.");
-        }
+            if (_freeBlocks.Count == 0)
+            {
+                throw new InvalidOperationException("No free blocks available. Garbage collection failed to reclaim space.");
+            }
 
-        // Allocate new physical block via wear-leveling
-        var newPhysical = _wearLeveling.SelectBlockForWrite(_freeBlocks);
-        _freeBlocks.Remove(newPhysical);
+            // Allocate new physical block via wear-leveling
+            newPhysical = _wearLeveling.SelectBlockForWrite(_freeBlocks);
+            _freeBlocks.Remove(newPhysical);
+        }
 
         try
         {
             // Erase block before write (NAND requirement)
             await _flashDevice.EraseBlockAsync(newPhysical, ct);
-            _eraseCount++;
+            Interlocked.Increment(ref _eraseCount);
 
             // Write data
             await _flashDevice.WritePageAsync(newPhysical, 0, data, ct);
-            _writeCount++;
+            Interlocked.Increment(ref _writeCount);
 
-            _logicalToPhysical[blockNumber] = newPhysical;
+            lock (_ftlLock)
+            {
+                _logicalToPhysical[blockNumber] = newPhysical;
+            }
         }
         catch (Exception)
         {

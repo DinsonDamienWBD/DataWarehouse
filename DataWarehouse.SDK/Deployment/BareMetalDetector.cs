@@ -30,6 +30,7 @@ namespace DataWarehouse.SDK.Deployment;
 [SdkCompatibility("3.0.0", Notes = "Phase 37: Bare metal environment detection (ENV-03)")]
 public sealed class BareMetalDetector : IDeploymentDetector
 {
+    private static readonly HttpClient SharedMetadataClient = new() { Timeout = TimeSpan.FromMilliseconds(500) };
     private readonly IHypervisorDetector? _hypervisorDetector;
     private readonly IHardwareProbe? _hardwareProbe;
 
@@ -88,9 +89,9 @@ public sealed class BareMetalDetector : IDeploymentDetector
             }
 
             // Step 4: Check for SPDK availability
-            // In production, this would check if Phase 35 NvmePassthroughStrategy is available
-            // For now, assume SPDK available if NVMe present
-            bool spdkAvailable = nvmeControllerCount > 0 && nvmeNamespaceCount > 0;
+            // SPDK requires explicit opt-in (library must be installed and hardware driver unbound).
+            // NVMe presence alone does NOT imply SPDK availability.
+            bool spdkAvailable = false; // Requires explicit Phase 35 NvmePassthroughStrategy registration
 
             // Step 5: Construct DeploymentContext
             var metadata = new Dictionary<string, string>
@@ -124,8 +125,7 @@ public sealed class BareMetalDetector : IDeploymentDetector
         {
             // Quick check for cloud metadata endpoint (169.254.169.254)
             // If this responds, we're in a cloud VM, not bare metal
-            using var httpClient = new HttpClient { Timeout = TimeSpan.FromMilliseconds(100) };
-            using var response = await httpClient.GetAsync("http://169.254.169.254/", ct);
+            using var response = await SharedMetadataClient.GetAsync("http://169.254.169.254/", ct);
             return response.IsSuccessStatusCode;
         }
         catch

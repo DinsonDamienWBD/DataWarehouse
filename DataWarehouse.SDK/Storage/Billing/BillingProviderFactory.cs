@@ -15,6 +15,8 @@ namespace DataWarehouse.SDK.Storage.Billing;
 [SdkCompatibility("5.0.0", Notes = "Phase 58: Billing API integration")]
 public static class BillingProviderFactory
 {
+    private static readonly HttpClient SharedHttpClient = new() { Timeout = TimeSpan.FromSeconds(30) };
+
     /// <summary>
     /// Creates a billing provider for the specified cloud provider.
     /// Credentials are loaded from environment variables if not provided in config.
@@ -30,7 +32,7 @@ public static class BillingProviderFactory
         HttpClient? httpClient = null,
         IDictionary<string, string>? config = null)
     {
-        var client = httpClient ?? new HttpClient();
+        var client = httpClient ?? SharedHttpClient;
         config ??= new Dictionary<string, string>();
 
         return provider switch

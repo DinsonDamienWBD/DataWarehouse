@@ -53,7 +53,7 @@ internal sealed class InMemoryPermissionCache : IPermissionCache, IDisposable
     public InMemoryPermissionCache(PermissionCacheConfiguration? config = null)
     {
         _config = config ?? new PermissionCacheConfiguration();
-        _cache = new BoundedDictionary<string, PermissionCacheEntry>(1000);
+        _cache = new BoundedDictionary<string, PermissionCacheEntry>(_config.MaxEntries);
         _cleanupLock = new SemaphoreSlim(1, 1);
         _cleanupTimer = new PeriodicTimer(TimeSpan.FromMinutes(1));
         _cleanupCts = new CancellationTokenSource();

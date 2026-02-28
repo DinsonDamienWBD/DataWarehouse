@@ -27,7 +27,8 @@ public sealed class BTree : IBTreeIndex, IAsyncDisposable
     private readonly IBlockAllocator _allocator;
     private readonly IWriteAheadLog _wal;
     private readonly int _blockSize;
-    private readonly ReaderWriterLockSlim _lock;
+    private readonly SemaphoreSlim _writeLock = new(1, 1);
+    private readonly SemaphoreSlim _readLock = new(int.MaxValue, int.MaxValue);
     private readonly BoundedDictionary<long, (BTreeNode Node, DateTime AccessTime)> _nodeCache;
     private const int MaxCachedNodes = 1000;
 
@@ -53,7 +54,6 @@ public sealed class BTree : IBTreeIndex, IAsyncDisposable
         _wal = wal ?? throw new ArgumentNullException(nameof(wal));
         _blockSize = blockSize;
         _rootBlockNumber = rootBlockNumber;
-        _lock = new ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion);
         _nodeCache = new BoundedDictionary<long, (BTreeNode, DateTime)>(1000);
     }
 
@@ -64,7 +64,7 @@ public sealed class BTree : IBTreeIndex, IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(key);
 
-        _lock.EnterReadLock();
+        await _readLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             var node = await ReadNodeAsync(_rootBlockNumber, ct).ConfigureAwait(false);
@@ -92,7 +92,7 @@ public sealed class BTree : IBTreeIndex, IAsyncDisposable
         }
         finally
         {
-            _lock.ExitReadLock();
+            _readLock.Release();
         }
     }
 
@@ -103,7 +103,7 @@ public sealed class BTree : IBTreeIndex, IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(key);
 
-        _lock.EnterWriteLock();
+        await _writeLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             var txn = await _wal.BeginTransactionAsync(ct).ConfigureAwait(false);
@@ -137,6 +137,7 @@ public sealed class BTree : IBTreeIndex, IAsyncDisposable
                     await WriteNodeAsync(root, txn, ct).ConfigureAwait(false);
                     await WriteNodeAsync(newRoot, txn, ct).ConfigureAwait(false);
 
+                    await _wal.FlushAsync(ct).ConfigureAwait(false);
                     _rootBlockNumber = newRoot.BlockNumber;
                     root = newRoot;
                 }
@@ -144,15 +145,16 @@ public sealed class BTree : IBTreeIndex, IAsyncDisposable
                 await InsertNonFullAsync(root, key, value, txn, ct).ConfigureAwait(false);
                 await _wal.FlushAsync(ct).ConfigureAwait(false);
             }
-            catch
+            catch (Exception ex)
             {
-                // Rollback: in a full implementation, would revert changes
+                // WAL provides crash recovery — uncommitted entries are discarded on next replay
+                System.Diagnostics.Debug.WriteLine($"[BTree.InsertAsync] Insert failed, WAL will handle rollback: {ex.Message}");
                 throw;
             }
         }
         finally
         {
-            _lock.ExitWriteLock();
+            _writeLock.Release();
         }
     }
 
@@ -163,7 +165,7 @@ public sealed class BTree : IBTreeIndex, IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(key);
 
-        _lock.EnterWriteLock();
+        await _writeLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             var node = await ReadNodeAsync(_rootBlockNumber, ct).ConfigureAwait(false);
@@ -193,7 +195,7 @@ public sealed class BTree : IBTreeIndex, IAsyncDisposable
         }
         finally
         {
-            _lock.ExitWriteLock();
+            _writeLock.Release();
         }
     }
 
@@ -204,7 +206,7 @@ public sealed class BTree : IBTreeIndex, IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(key);
 
-        _lock.EnterWriteLock();
+        await _writeLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             var txn = await _wal.BeginTransactionAsync(ct).ConfigureAwait(false);
@@ -229,7 +231,7 @@ public sealed class BTree : IBTreeIndex, IAsyncDisposable
         }
         finally
         {
-            _lock.ExitWriteLock();
+            _writeLock.Release();
         }
     }
 
@@ -241,7 +243,7 @@ public sealed class BTree : IBTreeIndex, IAsyncDisposable
         byte[]? endKey,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        _lock.EnterReadLock();
+        await _readLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             // Find the starting leaf node
@@ -277,7 +279,7 @@ public sealed class BTree : IBTreeIndex, IAsyncDisposable
         }
         finally
         {
-            _lock.ExitReadLock();
+            _readLock.Release();
         }
     }
 
@@ -286,7 +288,7 @@ public sealed class BTree : IBTreeIndex, IAsyncDisposable
     /// </summary>
     public async Task<long> CountAsync(CancellationToken ct = default)
     {
-        _lock.EnterReadLock();
+        await _readLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             long count = 0;
@@ -309,7 +311,7 @@ public sealed class BTree : IBTreeIndex, IAsyncDisposable
         }
         finally
         {
-            _lock.ExitReadLock();
+            _readLock.Release();
         }
     }
 
@@ -548,6 +550,14 @@ public sealed class BTree : IBTreeIndex, IAsyncDisposable
             header.KeyCount--;
             node.Header = header;
             await WriteNodeAsync(node, txn, ct).ConfigureAwait(false);
+
+            // Check for underflow and log warning — full rebalance would require parent tracking
+            if (node.IsUnderflow)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"[BTree.DeleteFromNodeAsync] Node {node.BlockNumber} underflow ({node.Header.KeyCount}/{node.MinKeys} min keys). Rebalancing deferred.");
+            }
+
             return true;
         }
         else
@@ -555,8 +565,93 @@ public sealed class BTree : IBTreeIndex, IAsyncDisposable
             // Internal node: descend to child
             int childIndex = index >= 0 ? index + 1 : ~index;
             var child = await ReadNodeAsync(node.ChildPointers[childIndex], ct).ConfigureAwait(false);
-            return await DeleteFromNodeAsync(child, key, txn, ct).ConfigureAwait(false);
+            bool deleted = await DeleteFromNodeAsync(child, key, txn, ct).ConfigureAwait(false);
+
+            // After deletion, check child for underflow and attempt rebalance
+            if (deleted && child.IsUnderflow)
+            {
+                await TryRebalanceChildAsync(node, childIndex, txn, ct).ConfigureAwait(false);
+            }
+
+            return deleted;
         }
+    }
+
+    /// <summary>
+    /// Attempts to rebalance an underflowed child by borrowing from a sibling or merging.
+    /// </summary>
+    private async Task TryRebalanceChildAsync(BTreeNode parent, int childIndex, WalTransaction txn, CancellationToken ct)
+    {
+        var child = await ReadNodeAsync(parent.ChildPointers[childIndex], ct).ConfigureAwait(false);
+
+        // Try borrowing from left sibling
+        if (childIndex > 0)
+        {
+            var leftSibling = await ReadNodeAsync(parent.ChildPointers[childIndex - 1], ct).ConfigureAwait(false);
+            if (leftSibling.Header.KeyCount > leftSibling.MinKeys)
+            {
+                // Rotate right: move key from left sibling through parent into child
+                // Shift child keys right
+                for (int i = child.Header.KeyCount; i > 0; i--)
+                {
+                    child.Keys[i] = child.Keys[i - 1];
+                    child.Values[i] = child.Values[i - 1];
+                }
+                child.Keys[0] = parent.Keys[childIndex - 1];
+                child.Values[0] = parent.Values[childIndex - 1];
+                var ch = child.Header;
+                ch.KeyCount++;
+                child.Header = ch;
+
+                int lastIdx = leftSibling.Header.KeyCount - 1;
+                parent.Keys[childIndex - 1] = leftSibling.Keys[lastIdx];
+                parent.Values[childIndex - 1] = leftSibling.Values[lastIdx];
+                var lh = leftSibling.Header;
+                lh.KeyCount--;
+                leftSibling.Header = lh;
+
+                await WriteNodeAsync(child, txn, ct).ConfigureAwait(false);
+                await WriteNodeAsync(leftSibling, txn, ct).ConfigureAwait(false);
+                await WriteNodeAsync(parent, txn, ct).ConfigureAwait(false);
+                return;
+            }
+        }
+
+        // Try borrowing from right sibling
+        if (childIndex < parent.Header.KeyCount)
+        {
+            var rightSibling = await ReadNodeAsync(parent.ChildPointers[childIndex + 1], ct).ConfigureAwait(false);
+            if (rightSibling.Header.KeyCount > rightSibling.MinKeys)
+            {
+                // Rotate left: move key from right sibling through parent into child
+                child.Keys[child.Header.KeyCount] = parent.Keys[childIndex];
+                child.Values[child.Header.KeyCount] = parent.Values[childIndex];
+                var ch = child.Header;
+                ch.KeyCount++;
+                child.Header = ch;
+
+                parent.Keys[childIndex] = rightSibling.Keys[0];
+                parent.Values[childIndex] = rightSibling.Values[0];
+
+                for (int i = 0; i < rightSibling.Header.KeyCount - 1; i++)
+                {
+                    rightSibling.Keys[i] = rightSibling.Keys[i + 1];
+                    rightSibling.Values[i] = rightSibling.Values[i + 1];
+                }
+                var rh = rightSibling.Header;
+                rh.KeyCount--;
+                rightSibling.Header = rh;
+
+                await WriteNodeAsync(child, txn, ct).ConfigureAwait(false);
+                await WriteNodeAsync(rightSibling, txn, ct).ConfigureAwait(false);
+                await WriteNodeAsync(parent, txn, ct).ConfigureAwait(false);
+                return;
+            }
+        }
+
+        // Cannot borrow — merge is needed (complex operation, log for now)
+        System.Diagnostics.Debug.WriteLine(
+            $"[BTree.TryRebalanceChildAsync] Child {child.BlockNumber} needs merge (no sibling can donate). Full merge deferred.");
     }
 
     /// <summary>
@@ -587,9 +682,11 @@ public sealed class BTree : IBTreeIndex, IAsyncDisposable
         return node;
     }
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
-        _lock?.Dispose();
-        await Task.CompletedTask;
+        _writeLock?.Dispose();
+        _readLock?.Dispose();
+        _nodeCache?.Dispose();
+        return ValueTask.CompletedTask;
     }
 }

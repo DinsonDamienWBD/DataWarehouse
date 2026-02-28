@@ -41,7 +41,7 @@ public sealed class InvertedTagIndex : ITagIndex, IDisposable
     /// </summary>
     private readonly ReaderWriterLockSlim[] _locks;
 
-    private volatile bool _disposed;
+    private int _disposed; // 0=not disposed, 1=disposed (atomic via Interlocked)
 
     /// <summary>
     /// Initializes a new <see cref="InvertedTagIndex"/> with the specified shard count.
@@ -146,6 +146,8 @@ public sealed class InvertedTagIndex : ITagIndex, IDisposable
     public Task<TagIndexResult> QueryAsync(TagIndexQuery query, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(query);
+        if (query.Skip < 0)
+            throw new ArgumentOutOfRangeException(nameof(query), "Skip must be non-negative.");
 
         var sw = Stopwatch.StartNew();
 
@@ -343,8 +345,7 @@ public sealed class InvertedTagIndex : ITagIndex, IDisposable
     /// <inheritdoc />
     public void Dispose()
     {
-        if (_disposed) return;
-        _disposed = true;
+        if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0) return;
 
         for (int i = 0; i < _shardCount; i++)
         {

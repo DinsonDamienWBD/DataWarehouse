@@ -403,7 +403,7 @@ namespace DataWarehouse.SDK.Infrastructure.Scaling
         private sealed class TopicPartition
         {
             public readonly ConcurrentQueue<PluginMessage> Queue = new();
-            public MessageRingBuffer? RingBuffer;
+            public volatile MessageRingBuffer? RingBuffer;
             public long EnqueuedCount;
             public int SubscriberCount;
             public long FallbackCount;

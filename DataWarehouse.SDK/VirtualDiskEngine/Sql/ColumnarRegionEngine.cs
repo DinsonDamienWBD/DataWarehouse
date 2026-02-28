@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
+using System.IO.Hashing;
 using System.Runtime.CompilerServices;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.VirtualDiskEngine.Format;
@@ -91,6 +92,7 @@ public sealed class ColumnarRegionEngine
 
     // In-memory table metadata cache
     private readonly ConcurrentDictionary<string, TableMetadata> _tables = new();
+    private readonly object _appendLock = new();
 
     /// <summary>
     /// Creates a new columnar region engine.
@@ -158,8 +160,8 @@ public sealed class ColumnarRegionEngine
 
         await _device.WriteBlockAsync(startBlock, metadataBlock, ct).ConfigureAwait(false);
 
-        // Cache table metadata
-        var meta = new TableMetadata(tableName, columns, startBlock, initialRegionBlocks, 0);
+        // Cache table metadata (NextFreeBlock starts at metadata block + 1)
+        var meta = new TableMetadata(tableName, columns, startBlock, initialRegionBlocks, 0, startBlock + 1);
         _tables[tableName] = meta;
     }
 
@@ -179,11 +181,12 @@ public sealed class ColumnarRegionEngine
             throw new ArgumentException($"Expected {meta.Columns.Length} columns, got {columnData.Length}.", nameof(columnData));
 
         // Determine the next available block for this row group
-        // metadata block + existing row groups
-        long nextBlock = meta.RegionStartBlock + 1 + meta.RowGroupCount * meta.Columns.Length;
+        // Use NextFreeBlock to properly track multi-block columns
+        long nextBlock = meta.NextFreeBlock;
 
-        // Encode and write each column chunk
+        // Encode and write each column chunk, tracking actual block offsets
         var zoneMapEntries = new List<ZoneMapEntry>();
+        long writeOffset = nextBlock;
 
         for (int colIdx = 0; colIdx < meta.Columns.Length; colIdx++)
         {
@@ -227,23 +230,28 @@ public sealed class ColumnarRegionEngine
             BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(5, 4), encodedData.Length);
             encodedData.CopyTo(payload, headerSize);
 
-            // Write blocks
+            // Write blocks at current write offset (handles multi-block columns correctly)
             for (int b = 0; b < blocksNeeded; b++)
             {
                 await _device.WriteBlockAsync(
-                    nextBlock + colIdx * blocksNeeded + b,
+                    writeOffset + b,
                     payload.AsMemory(b * _blockSize, _blockSize),
                     ct).ConfigureAwait(false);
             }
 
             // Create zone map entry for this column chunk
-            var zoneEntry = BuildZoneMapEntry(rawData, valueWidth, rowCount, nextBlock + colIdx * blocksNeeded, blocksNeeded);
+            var zoneEntry = BuildZoneMapEntry(rawData, valueWidth, rowCount, writeOffset, blocksNeeded);
             zoneMapEntries.Add(zoneEntry);
+
+            writeOffset += blocksNeeded;
         }
 
-        // Update row group count in metadata
-        meta = meta with { RowGroupCount = meta.RowGroupCount + 1 };
-        _tables[tableName] = meta;
+        // Atomically update row group count in metadata (lock protects concurrent appends)
+        lock (_appendLock)
+        {
+            meta = meta with { RowGroupCount = meta.RowGroupCount + 1, NextFreeBlock = writeOffset };
+            _tables[tableName] = meta;
+        }
 
         // Update metadata block with new row group count
         var metaBlock = new byte[_blockSize];
@@ -448,10 +456,9 @@ public sealed class ColumnarRegionEngine
             }
             else
             {
-                // For strings/binary, hash to long
-                var h = new HashCode();
-                h.AddBytes(valueSlice);
-                val = h.ToHashCode();
+                // For strings/binary, use XxHash64 for deterministic persistent hashing
+                // (HashCode is randomized per-process and unsuitable for persistent zone maps)
+                val = (long)System.IO.Hashing.XxHash64.HashToUInt64(valueSlice);
             }
 
             if (val < minVal) minVal = val;
@@ -481,5 +488,6 @@ public sealed class ColumnarRegionEngine
         ColumnDefinition[] Columns,
         long RegionStartBlock,
         long RegionBlockCount,
-        int RowGroupCount);
+        int RowGroupCount,
+        long NextFreeBlock);
 }

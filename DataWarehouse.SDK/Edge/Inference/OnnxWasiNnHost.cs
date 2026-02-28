@@ -37,8 +37,10 @@ namespace DataWarehouse.SDK.Edge.Inference
     [SdkCompatibility("3.0.0", Notes = "Phase 36: ONNX Runtime WASI-NN host (EDGE-04)")]
     public sealed class OnnxWasiNnHost : IWasiNnHost
     {
-        private readonly BoundedDictionary<string, OnnxInferenceSession> _sessionCache = new BoundedDictionary<string, OnnxInferenceSession>(1000);
+        private readonly BoundedDictionary<string, OnnxInferenceSession> _sessionCache;
         private readonly int _maxCachedSessions;
+        private readonly object _cacheLock = new();
+        private volatile bool _disposed;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="OnnxWasiNnHost"/> class.
@@ -47,75 +49,79 @@ namespace DataWarehouse.SDK.Edge.Inference
         public OnnxWasiNnHost(int maxCachedSessions = 5)
         {
             _maxCachedSessions = maxCachedSessions;
+            _sessionCache = new BoundedDictionary<string, OnnxInferenceSession>(_maxCachedSessions);
         }
 
         /// <summary>
         /// Loads an ML model and creates an inference session.
         /// </summary>
-        public async Task<IInferenceSession> LoadModelAsync(string modelPath, InferenceSettings settings, CancellationToken ct = default)
+        public Task<IInferenceSession> LoadModelAsync(string modelPath, InferenceSettings settings, CancellationToken ct = default)
         {
             ArgumentException.ThrowIfNullOrEmpty(modelPath, nameof(modelPath));
             ArgumentNullException.ThrowIfNull(settings, nameof(settings));
 
-            // Check cache
-            if (_sessionCache.TryGetValue(modelPath, out var cached))
-                return cached;
-
-            // Create session options
-            var sessionOptions = new SessionOptions();
-
-            // Configure execution provider
-            switch (settings.Provider)
+            lock (_cacheLock)
             {
-                case ExecutionProvider.CUDA:
-                    sessionOptions.AppendExecutionProvider_CUDA();
-                    break;
-                case ExecutionProvider.DirectML:
-                    sessionOptions.AppendExecutionProvider_DML();
-                    break;
-                case ExecutionProvider.TensorRT:
-                    sessionOptions.AppendExecutionProvider_Tensorrt();
-                    break;
-                default:
-                    sessionOptions.AppendExecutionProvider_CPU();
-                    break;
-            }
+                // Check cache atomically
+                if (_sessionCache.TryGetValue(modelPath, out var cached))
+                    return Task.FromResult<IInferenceSession>(cached);
 
-            // Load model (wrap in try/catch to prevent session leak on failure)
-            Microsoft.ML.OnnxRuntime.InferenceSession onnxSession;
-            try
-            {
-                onnxSession = new Microsoft.ML.OnnxRuntime.InferenceSession(modelPath, sessionOptions);
-            }
-            catch
-            {
-                sessionOptions.Dispose();
-                throw;
-            }
-            var session = new OnnxInferenceSession(modelPath, onnxSession);
+                // Create session options
+                using var sessionOptions = new SessionOptions();
 
-            // Evict oldest session if cache is full
-            if (_sessionCache.Count >= _maxCachedSessions)
-            {
-                var oldest = _sessionCache.First();
-                _sessionCache.TryRemove(oldest.Key, out var removed);
-                removed?.Dispose();
-            }
+                // Configure execution provider
+                switch (settings.Provider)
+                {
+                    case ExecutionProvider.CUDA:
+                        sessionOptions.AppendExecutionProvider_CUDA();
+                        break;
+                    case ExecutionProvider.DirectML:
+                        sessionOptions.AppendExecutionProvider_DML();
+                        break;
+                    case ExecutionProvider.TensorRT:
+                        sessionOptions.AppendExecutionProvider_Tensorrt();
+                        break;
+                    default:
+                        sessionOptions.AppendExecutionProvider_CPU();
+                        break;
+                }
 
-            // Cache session
-            _sessionCache[modelPath] = session;
-            return await Task.FromResult<IInferenceSession>(session);
+                // Load model
+                var onnxSession = new Microsoft.ML.OnnxRuntime.InferenceSession(modelPath, sessionOptions);
+                var session = new OnnxInferenceSession(modelPath, onnxSession);
+
+                // BoundedDictionary handles LRU eviction automatically; register eviction handler for disposal
+                _sessionCache.OnEvicted += (key, evicted) => evicted?.Dispose();
+
+                // Cache session atomically
+                _sessionCache[modelPath] = session;
+                return Task.FromResult<IInferenceSession>(session);
+            }
         }
 
         /// <summary>
         /// Runs inference on a single input tensor.
         /// </summary>
-        public async Task<float[]> InferAsync(IInferenceSession session, float[] input, CancellationToken ct = default)
+        public Task<float[]> InferAsync(IInferenceSession session, float[] input, CancellationToken ct = default)
         {
             ArgumentNullException.ThrowIfNull(session, nameof(session));
             ArgumentNullException.ThrowIfNull(input, nameof(input));
 
-            var onnxSession = ((OnnxInferenceSession)session).UnderlyingSession;
+            if (input.Length == 0)
+                throw new ArgumentException("Input array must not be empty.", nameof(input));
+
+            if (session is not OnnxInferenceSession onnxInferenceSession)
+                throw new ArgumentException(
+                    $"Session must be an OnnxInferenceSession but was {session.GetType().Name}. " +
+                    "Ensure the session was created by this OnnxWasiNnHost instance.",
+                    nameof(session));
+
+            var onnxSession = onnxInferenceSession.UnderlyingSession;
+
+            if (session.InputNames == null || session.InputNames.Count == 0)
+                throw new InvalidOperationException(
+                    "ONNX model has no input names. The model may be malformed or not loaded correctly.");
+
             var inputName = session.InputNames[0];
 
             // Create input tensor (1D or 2D depending on model)
@@ -126,7 +132,7 @@ namespace DataWarehouse.SDK.Edge.Inference
             using var results = onnxSession.Run(inputs);
             var output = results.First().AsEnumerable<float>().ToArray();
 
-            return await Task.FromResult(output);
+            return Task.FromResult(output);
         }
 
         /// <summary>
@@ -137,12 +143,10 @@ namespace DataWarehouse.SDK.Edge.Inference
             ArgumentNullException.ThrowIfNull(session, nameof(session));
             ArgumentNullException.ThrowIfNull(inputs, nameof(inputs));
 
-            // Simplified batch implementation: run each input sequentially
-            // Production optimization: use ONNX Runtime's native batch support
-            var results = new List<float[]>();
+            var results = new List<float[]>(inputs.Length);
             foreach (var input in inputs)
             {
-                results.Add(await InferAsync(session, input, ct));
+                results.Add(await InferAsync(session, input, ct).ConfigureAwait(false));
             }
             return results.ToArray();
         }
@@ -152,9 +156,19 @@ namespace DataWarehouse.SDK.Edge.Inference
         /// </summary>
         public void Dispose()
         {
-            foreach (var session in _sessionCache.Values)
+            if (_disposed) return;
+            _disposed = true;
+
+            // Take snapshot under lock to avoid concurrent modification
+            List<OnnxInferenceSession> sessions;
+            lock (_cacheLock)
+            {
+                sessions = _sessionCache.Values.ToList();
+                _sessionCache.Clear();
+            }
+
+            foreach (var session in sessions)
                 session?.Dispose();
-            _sessionCache.Clear();
         }
     }
 }

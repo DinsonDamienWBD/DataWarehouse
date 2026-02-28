@@ -215,12 +215,16 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                 process.StartInfo = new ProcessStartInfo
                 {
                     FileName = _tritonCompilerPath!,
-                    Arguments = $"\"{tritonSourcePath}\" --kernel-name {entryPoint} -o \"{outputPath}\"",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
                     CreateNoWindow = true,
                 };
+                process.StartInfo.ArgumentList.Add(tritonSourcePath);
+                process.StartInfo.ArgumentList.Add("--kernel-name");
+                process.StartInfo.ArgumentList.Add(entryPoint);
+                process.StartInfo.ArgumentList.Add("-o");
+                process.StartInfo.ArgumentList.Add(outputPath);
 
                 process.Start();
 
@@ -300,11 +304,11 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         private readonly IPlatformCapabilityRegistry _registry;
         private readonly TritonKernelLoader _kernelLoader;
         private int _deviceCount;
-        private bool _isAvailable;
-        private bool _initialized;
+        private volatile bool _isAvailable;
+        private volatile bool _initialized;
         private long _operationsCompleted;
         private readonly object _lock = new();
-        private bool _disposed;
+        private volatile bool _disposed;
         private bool _cudaDriverAvailable;
 
         /// <summary>
@@ -325,7 +329,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         public bool IsAvailable => _isAvailable;
 
         /// <inheritdoc/>
-        public bool IsCpuFallback => _isAvailable;
+        public bool IsCpuFallback => !_cudaDriverAvailable;
 
         /// <inheritdoc/>
         public GpuRuntime Runtime => GpuRuntime.Triton;

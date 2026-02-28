@@ -66,11 +66,17 @@ public sealed class ObjectPool<T> where T : class
 
         _reset?.Invoke(obj);
 
-        if (_count < _maxSize)
+        // Atomic check-and-increment to prevent exceeding _maxSize under concurrency
+        int currentCount;
+        do
         {
-            _objects.Add(obj);
-            Interlocked.Increment(ref _count);
+            currentCount = _count;
+            if (currentCount >= _maxSize)
+                return; // Pool full — discard object
         }
+        while (Interlocked.CompareExchange(ref _count, currentCount + 1, currentCount) != currentCount);
+
+        _objects.Add(obj);
     }
 
     /// <summary>
@@ -214,7 +220,7 @@ public sealed class BatchProcessor<T> : IAsyncDisposable
     /// <summary>
     /// Gets the current batch count.
     /// </summary>
-    public int CurrentBatchCount => _currentBatch.Count;
+    public int CurrentBatchCount { get { try { return _currentBatch.Count; } catch { return 0; } } }
 
     /// <summary>
     /// Adds an item to the batch for processing.
@@ -295,6 +301,7 @@ public sealed class BatchProcessor<T> : IAsyncDisposable
         if (_disposed)
             return;
 
+        _disposed = true;
         _cts.Cancel();
 
         try
@@ -306,10 +313,14 @@ public sealed class BatchProcessor<T> : IAsyncDisposable
             // Expected
         }
 
-        await FlushAsync();
-
-        _cts.Dispose();
-        _semaphore.Dispose();
-        _disposed = true;
+        try
+        {
+            await FlushAsync();
+        }
+        finally
+        {
+            _cts.Dispose();
+            _semaphore.Dispose();
+        }
     }
 }

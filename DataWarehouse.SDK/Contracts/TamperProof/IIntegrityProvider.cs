@@ -96,8 +96,7 @@ public abstract class IntegrityProviderPluginBase : IntegrityPluginBase, IIntegr
     /// <inheritdoc/>
     public override async Task<byte[]> ComputeHashAsync(Stream data, CancellationToken ct = default)
     {
-        using var sha = System.Security.Cryptography.SHA256.Create();
-        return await Task.FromResult(sha.ComputeHash(data));
+        return await System.Security.Cryptography.SHA256.HashDataAsync(data, ct).ConfigureAwait(false);
     }
 
     #region Intelligence Socket

@@ -191,9 +191,9 @@ public static class NativeInteropExports
         if (!handle.IsConnected) return (InteropErrorCode.NotInitialized, null);
         if (string.IsNullOrEmpty(uri)) return (InteropErrorCode.InvalidArgument, null);
 
-        // Delegate to storage engine through handle's connection
-        // In production, this would route through the kernel's storage pipeline
-        return (InteropErrorCode.Ok, Array.Empty<byte>());
+        // C ABI storage operations require kernel pipeline integration.
+        // Returning empty success would silently lose data; return NotInitialized instead.
+        return (InteropErrorCode.NotInitialized, null);
     }
 
     /// <summary>
@@ -208,7 +208,8 @@ public static class NativeInteropExports
         if (string.IsNullOrEmpty(uri)) return InteropErrorCode.InvalidArgument;
         if (data == null) return InteropErrorCode.InvalidArgument;
 
-        return InteropErrorCode.Ok;
+        // C ABI write operations require kernel pipeline integration.
+        return InteropErrorCode.NotInitialized;
     }
 
     /// <summary>
@@ -222,7 +223,8 @@ public static class NativeInteropExports
         if (!handle.IsConnected) return InteropErrorCode.NotInitialized;
         if (string.IsNullOrEmpty(uri)) return InteropErrorCode.InvalidArgument;
 
-        return InteropErrorCode.Ok;
+        // C ABI delete operations require kernel pipeline integration.
+        return InteropErrorCode.NotInitialized;
     }
 
     /// <summary>
@@ -628,18 +630,28 @@ public sealed class AppPlatformRegistry
     private bool CheckRateLimit(string appId, int limitPerMinute)
     {
         var now = DateTimeOffset.UtcNow;
-        var entry = _rateLimits.GetOrAdd(appId, _ => (0, now));
 
-        if ((now - entry.WindowStart).TotalMinutes >= 1)
-        {
-            _rateLimits[appId] = (1, now);
-            return true;
-        }
-
-        if (entry.Count >= limitPerMinute) return false;
-
-        _rateLimits[appId] = (entry.Count + 1, entry.WindowStart);
-        return true;
+        // Atomic update via AddOrUpdate to prevent TOCTOU race
+        bool allowed = false;
+        _rateLimits.AddOrUpdate(
+            appId,
+            _ => { allowed = true; return (1, now); },
+            (_, existing) =>
+            {
+                if ((now - existing.WindowStart).TotalMinutes >= 1)
+                {
+                    allowed = true;
+                    return (1, now);
+                }
+                if (existing.Count >= limitPerMinute)
+                {
+                    allowed = false;
+                    return existing;
+                }
+                allowed = true;
+                return (existing.Count + 1, existing.WindowStart);
+            });
+        return allowed;
     }
 
     private static bool MatchesGlob(string value, string pattern)

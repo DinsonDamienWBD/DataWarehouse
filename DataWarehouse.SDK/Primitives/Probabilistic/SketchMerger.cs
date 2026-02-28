@@ -48,12 +48,12 @@ public static class SketchMerger
             return list[0].Clone();
 
         // Tree reduction: merge pairs in parallel
+        using var semaphore = new SemaphoreSlim(maxParallelism);
         while (list.Count > 1)
         {
             ct.ThrowIfCancellationRequested();
 
             var tasks = new List<Task<T>>();
-            var semaphore = new SemaphoreSlim(maxParallelism);
 
             for (int i = 0; i < list.Count; i += 2)
             {

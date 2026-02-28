@@ -116,6 +116,8 @@ public readonly record struct ComputeModuleEntry
 
         ushort entryPointLen = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(offset));
         offset += 2;
+        if (entryPointLen > MaxEntryPointNameLength || offset + entryPointLen > buffer.Length)
+            throw new InvalidDataException($"ComputeModuleEntry entryPointLen {entryPointLen} exceeds maximum {MaxEntryPointNameLength} or buffer bounds.");
         byte[] entryPointName = buffer.Slice(offset, entryPointLen).ToArray();
         offset += entryPointLen;
 

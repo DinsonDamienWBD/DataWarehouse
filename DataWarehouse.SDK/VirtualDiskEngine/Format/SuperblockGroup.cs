@@ -42,7 +42,7 @@ public sealed class SuperblockGroup
 
     // ── Block type tags for each block position ─────────────────────────
 
-    private static readonly uint[] BlockTags = [BlockTypeTags.SUPB, BlockTypeTags.RMAP, BlockTypeTags.SUPB, BlockTypeTags.SUPB];
+    private static readonly uint[] BlockTags = [BlockTypeTags.SUPB, BlockTypeTags.RMAP, BlockTypeTags.EXMD, BlockTypeTags.IANT];
 
     // ── Serialization ───────────────────────────────────────────────────
 

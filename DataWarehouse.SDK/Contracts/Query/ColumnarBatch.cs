@@ -227,6 +227,7 @@ public sealed class ColumnarBatchBuilder
     private readonly int _capacity;
     private readonly List<ColumnDef> _columns = new();
     private int _maxRowIndex = -1;
+    private readonly object _syncRoot = new();
 
     private sealed class ColumnDef
     {
@@ -268,16 +269,21 @@ public sealed class ColumnarBatchBuilder
         _capacity = capacity;
     }
 
-    /// <summary>Add a column definition.</summary>
+    /// <summary>Add a column definition. Thread-safe.</summary>
     public ColumnarBatchBuilder AddColumn(string name, ColumnDataType dataType)
     {
-        _columns.Add(new ColumnDef(name, dataType, _capacity));
+        lock (_syncRoot)
+        {
+            _columns.Add(new ColumnDef(name, dataType, _capacity));
+        }
         return this;
     }
 
-    /// <summary>Set a value at (column index, row index).</summary>
+    /// <summary>Set a value at (column index, row index). Thread-safe.</summary>
     public ColumnarBatchBuilder SetValue(int col, int row, object? value)
     {
+        lock (_syncRoot)
+        {
         if (col < 0 || col >= _columns.Count)
             throw new ArgumentOutOfRangeException(nameof(col));
         if (row < 0 || row >= _capacity)
@@ -309,6 +315,7 @@ public sealed class ColumnarBatchBuilder
             default: break;
         }
         return this;
+        } // lock
     }
 
     /// <summary>Build the batch. Row count = highest row index + 1.</summary>

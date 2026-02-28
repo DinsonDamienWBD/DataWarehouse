@@ -22,7 +22,7 @@ namespace DataWarehouse.SDK.Hardware
         private IReadOnlyList<HardwareDevice>? _lastDiscovery;
         private FileSystemWatcher? _devWatcher;
         private Timer? _debounceTimer;
-        private bool _disposed;
+        private volatile bool _disposed;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="LinuxHardwareProbe"/> class.
@@ -149,10 +149,13 @@ namespace DataWarehouse.SDK.Hardware
 
         private void OnDeviceFileChanged(object sender, FileSystemEventArgs e)
         {
+            if (_disposed) return;
+
             // Debounce rapid events (USB plug/unplug can cause floods)
-            _debounceTimer?.Dispose();
+            var oldTimer = _debounceTimer;
             _debounceTimer = new Timer(_ =>
             {
+                if (_disposed) return;
                 // Fire change event after debounce period.
                 // Device details from /dev path are limited; notify with a generic device entry.
                 var changeType = e.ChangeType == WatcherChangeTypes.Created
@@ -171,6 +174,7 @@ namespace DataWarehouse.SDK.Hardware
                     ChangeType = changeType
                 });
             }, null, TimeSpan.FromMilliseconds(500), Timeout.InfiniteTimeSpan);
+            oldTimer?.Dispose();
         }
 
         private static async Task<IEnumerable<HardwareDevice>> DiscoverPciDevicesAsync(CancellationToken ct)

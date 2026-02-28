@@ -125,10 +125,12 @@ public sealed class PreparedQuery
     public DateTimeOffset CachedUtc { get; }
 
     /// <summary>How many times this cached plan has been reused.</summary>
-    public long ExecutionCount { get; private set; }
+    public long ExecutionCount => Interlocked.Read(ref _executionCount);
+    private long _executionCount;
 
     /// <summary>Rolling average execution time across all uses.</summary>
-    public TimeSpan AverageExecutionTime { get; private set; }
+    public TimeSpan AverageExecutionTime => TimeSpan.FromTicks(Interlocked.Read(ref _averageExecutionTimeTicks));
+    private long _averageExecutionTimeTicks;
 
     /// <summary>
     /// Initializes a new prepared query.
@@ -147,20 +149,25 @@ public sealed class PreparedQuery
     /// <param name="elapsed">The elapsed time for this execution.</param>
     public void RecordExecution(TimeSpan elapsed)
     {
-        long count = ExecutionCount;
+        // Atomic rolling average update using compare-and-swap loop
+        long count = Interlocked.Read(ref _executionCount);
         if (count == 0)
         {
-            AverageExecutionTime = elapsed;
+            Interlocked.Exchange(ref _averageExecutionTimeTicks, elapsed.Ticks);
         }
         else
         {
             // Rolling average: avg = avg + (new - avg) / (count + 1)
-            double currentTicks = AverageExecutionTime.Ticks;
-            double newTicks = currentTicks + (elapsed.Ticks - currentTicks) / (count + 1);
-            AverageExecutionTime = TimeSpan.FromTicks((long)newTicks);
+            long currentTicks;
+            long newTicks;
+            do
+            {
+                currentTicks = Interlocked.Read(ref _averageExecutionTimeTicks);
+                newTicks = (long)(currentTicks + (double)(elapsed.Ticks - currentTicks) / (count + 1));
+            } while (Interlocked.CompareExchange(ref _averageExecutionTimeTicks, newTicks, currentTicks) != currentTicks);
         }
 
-        ExecutionCount = count + 1;
+        Interlocked.Increment(ref _executionCount);
     }
 }
 
@@ -267,11 +274,11 @@ public sealed class PreparedQueryCache
                 // Move to front (most recently used)
                 _lruList.Remove(node);
                 _lruList.AddFirst(node);
-                Interlocked.Increment(ref _hits);
+                _hits++;
                 return node.Value.Plan;
             }
 
-            Interlocked.Increment(ref _misses);
+            _misses++;
             return null;
         }
     }
@@ -304,7 +311,7 @@ public sealed class PreparedQueryCache
                 {
                     _lookup.Remove(last.Value.Fingerprint);
                     _lruList.RemoveLast();
-                    Interlocked.Increment(ref _evictions);
+                    _evictions++;
                 }
             }
 
@@ -372,9 +379,9 @@ public sealed class PreparedQueryCache
         {
             return new PreparedQueryCacheStats
             {
-                Hits = Interlocked.Read(ref _hits),
-                Misses = Interlocked.Read(ref _misses),
-                Evictions = Interlocked.Read(ref _evictions),
+                Hits = _hits,
+                Misses = _misses,
+                Evictions = _evictions,
                 EntryCount = _lruList.Count,
             };
         }

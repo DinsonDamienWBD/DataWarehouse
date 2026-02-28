@@ -379,15 +379,31 @@ public sealed class PredicatePushdownPlanner
 
     private static bool EvaluateSinglePredicate(byte[] columnData, int rowIndex, QueryPredicate predicate)
     {
-        // Determine value width (assume int32 = 4 bytes as default)
-        int valueWidth = 4;
+        // Determine value width from predicate value type
+        int valueWidth = predicate.Value switch
+        {
+            long => 8,
+            double => 8,
+            float => 4,
+            int => 4,
+            short => 2,
+            byte => 1,
+            bool => 1,
+            DateTime => 8,
+            _ => 4,
+        };
         int offset = rowIndex * valueWidth;
 
         if (offset + valueWidth > columnData.Length)
             return true; // Beyond data bounds -- include row
 
-        long rowValue = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(
-            columnData.AsSpan(offset, valueWidth));
+        long rowValue = valueWidth switch
+        {
+            1 => columnData[offset],
+            2 => System.Buffers.Binary.BinaryPrimitives.ReadInt16LittleEndian(columnData.AsSpan(offset, 2)),
+            8 => System.Buffers.Binary.BinaryPrimitives.ReadInt64LittleEndian(columnData.AsSpan(offset, 8)),
+            _ => System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(columnData.AsSpan(offset, 4)),
+        };
         long predValue = predicate.ValueAsLong();
 
         return predicate.Op switch
@@ -410,26 +426,43 @@ public sealed class PredicatePushdownPlanner
     {
         if (rowGroupData.Length == 0) return 0;
 
-        // Assume int32 (4 bytes per value) as the default width
-        int valueWidth = 4;
-        return rowGroupData[0].Length / valueWidth;
+        // Estimate rows from first column data length and a default value width
+        // Use the minimum plausible width to avoid under-counting
+        int minValueWidth = 1;
+        for (int i = 0; i < rowGroupData.Length; i++)
+        {
+            if (rowGroupData[i].Length > 0)
+            {
+                // Estimate based on data length divisible by common widths
+                if (rowGroupData[i].Length % 8 == 0) return rowGroupData[i].Length / 8;
+                if (rowGroupData[i].Length % 4 == 0) return rowGroupData[i].Length / 4;
+                return rowGroupData[i].Length / minValueWidth;
+            }
+        }
+        return 0;
     }
 
     private static byte[] ExtractRow(byte[][] rowGroupData, int columnCount, int rowIndex)
     {
         // Build a row by extracting each column value for this row
-        int valueWidth = 4;
-        var row = new byte[columnCount * valueWidth];
-
+        // Use actual column data length to determine value width per column
+        using var ms = new System.IO.MemoryStream();
         for (int col = 0; col < columnCount && col < rowGroupData.Length; col++)
         {
+            int totalLen = rowGroupData[col].Length;
+            // Estimate value width from total data and estimated row count
+            int estimatedRows = totalLen >= 8 && totalLen % 8 == 0 ? totalLen / 8 :
+                                totalLen >= 4 && totalLen % 4 == 0 ? totalLen / 4 : totalLen;
+            int valueWidth = estimatedRows > 0 ? totalLen / estimatedRows : 4;
+            if (valueWidth < 1) valueWidth = 4;
+
             int srcOffset = rowIndex * valueWidth;
-            if (srcOffset + valueWidth <= rowGroupData[col].Length)
+            if (srcOffset + valueWidth <= totalLen)
             {
-                rowGroupData[col].AsSpan(srcOffset, valueWidth).CopyTo(row.AsSpan(col * valueWidth, valueWidth));
+                ms.Write(rowGroupData[col], srcOffset, valueWidth);
             }
         }
 
-        return row;
+        return ms.ToArray();
     }
 }

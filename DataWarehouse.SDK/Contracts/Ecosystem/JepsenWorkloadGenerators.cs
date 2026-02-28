@@ -83,6 +83,10 @@ public sealed class RegisterWorkload : IWorkloadGenerator
             var startTime = DateTimeOffset.UtcNow;
             var roll = random.NextDouble();
             OperationHistoryEntry entry;
+            // Track the actual operation type for accurate error recording
+            var actualOpType = roll < ReadProbability ? OperationType.Read
+                : roll < ReadProbability + CasProbability ? OperationType.Cas
+                : OperationType.Write;
 
             try
             {
@@ -158,7 +162,7 @@ public sealed class RegisterWorkload : IWorkloadGenerator
                     SequenceId = JepsenTestHarness.NextSequenceId(),
                     NodeId = node.NodeId,
                     ClientId = clientName,
-                    Type = OperationType.Read,
+                    Type = actualOpType,
                     Key = key,
                     StartTime = startTime,
                     EndTime = DateTimeOffset.UtcNow,
@@ -172,7 +176,7 @@ public sealed class RegisterWorkload : IWorkloadGenerator
                     SequenceId = JepsenTestHarness.NextSequenceId(),
                     NodeId = node.NodeId,
                     ClientId = clientName,
-                    Type = OperationType.Read,
+                    Type = actualOpType,
                     Key = key,
                     StartTime = startTime,
                     EndTime = DateTimeOffset.UtcNow,
@@ -264,10 +268,12 @@ public sealed class SetWorkload : IWorkloadGenerator
 
             var startTime = DateTimeOffset.UtcNow;
             OperationHistoryEntry entry;
+            var readRoll = random.NextDouble();
+            var actualOpType = readRoll < ReadProbability ? OperationType.Read : OperationType.Append;
 
             try
             {
-                if (random.NextDouble() < ReadProbability)
+                if (readRoll < ReadProbability)
                 {
                     // Read the entire set
                     var setContents = await ExecuteSetReadAsync(node, key, ct).ConfigureAwait(false);
@@ -313,7 +319,7 @@ public sealed class SetWorkload : IWorkloadGenerator
                     SequenceId = JepsenTestHarness.NextSequenceId(),
                     NodeId = node.NodeId,
                     ClientId = clientName,
-                    Type = OperationType.Read,
+                    Type = actualOpType,
                     Key = key,
                     StartTime = startTime,
                     EndTime = DateTimeOffset.UtcNow,
@@ -327,7 +333,7 @@ public sealed class SetWorkload : IWorkloadGenerator
                     SequenceId = JepsenTestHarness.NextSequenceId(),
                     NodeId = node.NodeId,
                     ClientId = clientName,
-                    Type = OperationType.Read,
+                    Type = actualOpType,
                     Key = key,
                     StartTime = startTime,
                     EndTime = DateTimeOffset.UtcNow,
@@ -410,10 +416,12 @@ public sealed class ListAppendWorkload : IWorkloadGenerator
 
             var startTime = DateTimeOffset.UtcNow;
             OperationHistoryEntry entry;
+            var readRoll = random.NextDouble();
+            var actualOpType = readRoll < ReadProbability ? OperationType.Read : OperationType.Append;
 
             try
             {
-                if (random.NextDouble() < ReadProbability)
+                if (readRoll < ReadProbability)
                 {
                     // Read the entire list
                     var listContents = await ExecuteListReadAsync(node, key, ct).ConfigureAwait(false);
@@ -459,7 +467,7 @@ public sealed class ListAppendWorkload : IWorkloadGenerator
                     SequenceId = JepsenTestHarness.NextSequenceId(),
                     NodeId = node.NodeId,
                     ClientId = clientName,
-                    Type = OperationType.Read,
+                    Type = actualOpType,
                     Key = key,
                     StartTime = startTime,
                     EndTime = DateTimeOffset.UtcNow,
@@ -473,7 +481,7 @@ public sealed class ListAppendWorkload : IWorkloadGenerator
                     SequenceId = JepsenTestHarness.NextSequenceId(),
                     NodeId = node.NodeId,
                     ClientId = clientName,
-                    Type = OperationType.Read,
+                    Type = actualOpType,
                     Key = key,
                     StartTime = startTime,
                     EndTime = DateTimeOffset.UtcNow,

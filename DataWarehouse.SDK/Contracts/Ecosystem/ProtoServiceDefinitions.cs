@@ -90,7 +90,7 @@ public sealed record ProtoStoreRequest
         var key = ReadString(data, ref offset);
         var payload = ReadBytes(data, ref offset);
         var contentType = ReadString(data, ref offset);
-        var metaCount = ReadInt32(data, ref offset);
+        var metaCount = ReadCount(data, ref offset);
         var metadata = new Dictionary<string, string>(metaCount);
         for (int i = 0; i < metaCount; i++)
         {
@@ -243,7 +243,7 @@ public sealed record ProtoRetrieveChunk
         var chunkData = ReadBytes(data, ref offset);
         var chunkIndex = ReadInt32(data, ref offset);
         var totalChunks = ReadInt32(data, ref offset);
-        var metaCount = ReadInt32(data, ref offset);
+        var metaCount = ReadCount(data, ref offset);
         var metadata = new Dictionary<string, string>(metaCount);
         for (int i = 0; i < metaCount; i++)
             metadata[ReadString(data, ref offset)] = ReadString(data, ref offset);
@@ -360,7 +360,7 @@ public sealed record ProtoQueryResultBatch
     public static ProtoQueryResultBatch FromBytes(ReadOnlySpan<byte> data)
     {
         int offset = 0;
-        var colCount = ReadInt32(data, ref offset);
+        var colCount = ReadCount(data, ref offset);
         var columns = new ProtoColumnDescriptor[colCount];
         for (int i = 0; i < colCount; i++)
             columns[i] = new ProtoColumnDescriptor
@@ -369,11 +369,11 @@ public sealed record ProtoQueryResultBatch
                 DataType = (ProtoColumnType)ReadInt32(data, ref offset),
                 Nullable = ReadBool(data, ref offset)
             };
-        var rowCount = ReadInt32(data, ref offset);
+        var rowCount = ReadCount(data, ref offset);
         var rows = new ProtoRowData[rowCount];
         for (int i = 0; i < rowCount; i++)
         {
-            var valCount = ReadInt32(data, ref offset);
+            var valCount = ReadCount(data, ref offset);
             var values = new byte[valCount][];
             for (int j = 0; j < valCount; j++)
                 values[j] = ReadBytes(data, ref offset);
@@ -499,7 +499,7 @@ public sealed record ProtoSearchResult
         int offset = 0;
         var key = ReadString(data, ref offset);
         var score = BitConverter.Int64BitsToDouble(ReadInt64(data, ref offset));
-        var metaCount = ReadInt32(data, ref offset);
+        var metaCount = ReadCount(data, ref offset);
         var metadata = new Dictionary<string, string>(metaCount);
         for (int i = 0; i < metaCount; i++)
             metadata[ReadString(data, ref offset)] = ReadString(data, ref offset);
@@ -558,7 +558,7 @@ public sealed record ProtoHealthResponse
         var status = ReadInt32(data, ref offset);
         var uptime = ReadInt64(data, ref offset);
         var version = ReadString(data, ref offset);
-        var compCount = ReadInt32(data, ref offset);
+        var compCount = ReadCount(data, ref offset);
         var components = new Dictionary<string, ProtoComponentHealth>(compCount);
         for (int i = 0; i < compCount; i++)
         {
@@ -631,7 +631,7 @@ public sealed record ProtoCapabilitiesResponse
     public static ProtoCapabilitiesResponse FromBytes(ReadOnlySpan<byte> data)
     {
         int offset = 0;
-        var capCount = ReadInt32(data, ref offset);
+        var capCount = ReadCount(data, ref offset);
         var capabilities = new ProtoCapability[capCount];
         for (int i = 0; i < capCount; i++)
         {
@@ -839,9 +839,14 @@ internal static class ProtoSerializationHelpers
         buffer.Add(value ? (byte)1 : (byte)0);
     }
 
+    /// <summary>Maximum element count allowed in deserialized collections to prevent unbounded allocation.</summary>
+    private const int MaxCollectionCount = 10_000;
+
     internal static string ReadString(ReadOnlySpan<byte> data, ref int offset)
     {
         var length = ReadInt32(data, ref offset);
+        if (length < 0 || offset + length > data.Length)
+            throw new InvalidOperationException($"Invalid string length {length} at offset {offset - 4}.");
         var result = Encoding.UTF8.GetString(data.Slice(offset, length));
         offset += length;
         return result;
@@ -850,13 +855,26 @@ internal static class ProtoSerializationHelpers
     internal static byte[] ReadBytes(ReadOnlySpan<byte> data, ref int offset)
     {
         var length = ReadInt32(data, ref offset);
+        if (length < 0 || offset + length > data.Length)
+            throw new InvalidOperationException($"Invalid byte array length {length} at offset {offset - 4}.");
         var result = data.Slice(offset, length).ToArray();
         offset += length;
         return result;
     }
 
+    /// <summary>Reads a count value that will be used to allocate a collection, with bounds checking.</summary>
+    internal static int ReadCount(ReadOnlySpan<byte> data, ref int offset)
+    {
+        var value = ReadInt32(data, ref offset);
+        if (value < 0 || value > MaxCollectionCount)
+            throw new InvalidOperationException($"Collection count {value} exceeds maximum allowed ({MaxCollectionCount}).");
+        return value;
+    }
+
     internal static int ReadInt32(ReadOnlySpan<byte> data, ref int offset)
     {
+        if (offset + 4 > data.Length)
+            throw new InvalidOperationException($"Insufficient data to read Int32 at offset {offset}.");
         var value = BinaryPrimitives.ReadInt32LittleEndian(data.Slice(offset, 4));
         offset += 4;
         return value;

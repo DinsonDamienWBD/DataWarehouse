@@ -23,6 +23,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
     {
         private readonly ConcurrentDictionary<string, FeaturePolicy> _policies = new();
         private readonly ConcurrentDictionary<string, int> _locationCounts = new();
+        private readonly object _capacityLock = new();
         private readonly int _maxCapacity;
 
         /// <summary>
@@ -67,15 +68,18 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
             var key = BuildKey(featureId, level, path);
             var locationKey = BuildLocationKey(level, path);
 
-            var isNew = !_policies.ContainsKey(key);
-            if (isNew && _policies.Count >= _maxCapacity)
-                throw new InvalidOperationException($"InMemoryPolicyStore capacity exceeded ({_maxCapacity}).");
-
-            _policies.AddOrUpdate(key, _ => policy, (_, _) => policy);
-
-            if (isNew)
+            lock (_capacityLock)
             {
-                _locationCounts.AddOrUpdate(locationKey, _ => 1, (_, count) => count + 1);
+                var isNew = !_policies.ContainsKey(key);
+                if (isNew && _policies.Count >= _maxCapacity)
+                    throw new InvalidOperationException($"InMemoryPolicyStore capacity exceeded ({_maxCapacity}).");
+
+                _policies.AddOrUpdate(key, _ => policy, (_, _) => policy);
+
+                if (isNew)
+                {
+                    _locationCounts.AddOrUpdate(locationKey, _ => 1, (_, count) => count + 1);
+                }
             }
 
             return Task.CompletedTask;

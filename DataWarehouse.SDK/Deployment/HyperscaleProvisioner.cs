@@ -224,9 +224,10 @@ public sealed class HyperscaleProvisioner : IDisposable
 
         var instanceId = await _cloudProvider.ProvisionVmAsync(vmSpec, ct);
 
-        _logger.LogInformation("New node provisioned: {InstanceId}. Waiting for cluster join...", instanceId);
-
-        // In production: Wait for new node to join cluster (poll cluster API, max 10 minutes)
+        _logger.LogWarning(
+            "New node provisioned: {InstanceId}. Cluster join verification not yet implemented. " +
+            "Node may not be accepting traffic yet. Monitor cluster membership before routing requests.",
+            instanceId);
     }
 
     private async Task DeprovisionLeastLoadedNodeAsync(IReadOnlyList<string> managedResources, CancellationToken ct)
@@ -256,9 +257,12 @@ public sealed class HyperscaleProvisioner : IDisposable
             leastLoadedNode,
             lowestUtilization);
 
-        // In production: Drain node (move data to other nodes using Phase 34 federated rebalancing)
+        _logger.LogWarning(
+            "Node drain not yet implemented for {NodeId}. Data migration to other nodes " +
+            "requires federation rebalancing integration. Deprovisioning without drain may cause data loss.",
+            leastLoadedNode);
 
-        _logger.LogInformation("Node drained. Deprovisioning {NodeId}...", leastLoadedNode);
+        _logger.LogInformation("Deprovisioning {NodeId}...", leastLoadedNode);
 
         await _cloudProvider.DeprovisionAsync(leastLoadedNode, ct);
 

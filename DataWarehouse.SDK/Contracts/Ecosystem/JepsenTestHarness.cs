@@ -849,9 +849,44 @@ public sealed class JepsenTestHarness
                 if (writer != null && writer != op.ClientId)
                 {
                     // This client now has a causal dependency on the writer's operations.
-                    // All subsequent reads by this client of keys the writer wrote
-                    // must see at least those values (or newer).
-                    // This is a simplified check — full causal requires vector clocks.
+                    // Track that this client has observed the writer's state at this point.
+                    if (lastWriteByClient.TryGetValue(writer, out var writerWrites))
+                    {
+                        // Merge writer's known writes into causal dependencies for this client.
+                        if (!lastWriteByClient.TryGetValue(op.ClientId, out var clientWrites))
+                        {
+                            clientWrites = new Dictionary<string, string?>();
+                            lastWriteByClient[op.ClientId] = clientWrites;
+                        }
+
+                        // For each key the writer has written, check if this client
+                        // subsequently reads a stale (older) value for that key.
+                        foreach (var writerKv in writerWrites)
+                        {
+                            // Check subsequent reads by this client for the same key
+                            var laterReads = history
+                                .Where(e => e.ClientId == op.ClientId
+                                    && e.SequenceId > op.SequenceId
+                                    && e.Type == OperationType.Read
+                                    && e.Key == writerKv.Key
+                                    && e.Result == OperationResult.Ok
+                                    && e.Value != null
+                                    && e.Value != writerKv.Value)
+                                .Take(1);
+
+                            foreach (var staleRead in laterReads)
+                            {
+                                violations.Add(new ConsistencyViolation
+                                {
+                                    Type = ConsistencyViolationType.CausalViolation,
+                                    Description = $"Client '{op.ClientId}' read stale value for key '{writerKv.Key}' " +
+                                        $"(got '{staleRead.Value}', expected at least '{writerKv.Value}' from causal dependency on '{writer}')",
+                                    Entry1 = op,
+                                    Entry2 = staleRead
+                                });
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -917,17 +952,37 @@ public sealed class JepsenTestHarness
         IReadOnlyDictionary<string, string>? envVars, string nodeId, int totalNodes)
     {
         var sb = new StringBuilder();
-        sb.Append($"-e DW_NODE_ID={nodeId} -e DW_CLUSTER_SIZE={totalNodes}");
+        sb.Append($"-e DW_NODE_ID={EscapeDockerEnvValue(nodeId)} -e DW_CLUSTER_SIZE={totalNodes}");
 
         if (envVars != null)
         {
             foreach (var kv in envVars)
             {
-                sb.Append($" -e {kv.Key}={kv.Value}");
+                // Validate env var key: must be alphanumeric + underscore (POSIX env var naming)
+                if (string.IsNullOrWhiteSpace(kv.Key) ||
+                    kv.Key.Any(c => !char.IsLetterOrDigit(c) && c != '_'))
+                {
+                    throw new ArgumentException(
+                        $"Invalid environment variable name: '{kv.Key}'. Only alphanumeric and underscore allowed.");
+                }
+
+                sb.Append($" -e {kv.Key}={EscapeDockerEnvValue(kv.Value)}");
             }
         }
 
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// Escapes a value for safe use in docker -e arguments by wrapping in single quotes
+    /// and escaping embedded single quotes.
+    /// </summary>
+    private static string EscapeDockerEnvValue(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return "''";
+        // Replace single quotes with '\'' (end quote, escaped quote, start quote)
+        return "'" + value.Replace("'", "'\\''") + "'";
     }
 
     private static async Task WaitForClusterHealthAsync(
