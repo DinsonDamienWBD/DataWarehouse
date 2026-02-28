@@ -212,7 +212,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                 if (progressCallback != null)
                 {
                     var elapsed = DateTime.UtcNow - startTime;
-                    var speed = bytesRebuilt / elapsed.TotalSeconds;
+                    var speed = elapsed.TotalSeconds > 0 ? bytesRebuilt / elapsed.TotalSeconds : bytesRebuilt;
                     var remaining = speed > 0 ? (long)((totalBytes - bytesRebuilt) / speed) : 0;
 
                     progressCallback.Report(new RebuildProgress(
@@ -683,7 +683,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                 if (progressCallback != null)
                 {
                     var elapsed = DateTime.UtcNow - startTime;
-                    var speed = bytesRebuilt / elapsed.TotalSeconds;
+                    var speed = elapsed.TotalSeconds > 0 ? bytesRebuilt / elapsed.TotalSeconds : bytesRebuilt;
                     var remaining = speed > 0 ? (long)((totalBytes - bytesRebuilt) / speed) : 0;
 
                     progressCallback.Report(new RebuildProgress(
@@ -1044,7 +1044,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                 if (progressCallback != null)
                 {
                     var elapsed = DateTime.UtcNow - startTime;
-                    var speed = bytesRebuilt / elapsed.TotalSeconds;
+                    var speed = elapsed.TotalSeconds > 0 ? bytesRebuilt / elapsed.TotalSeconds : bytesRebuilt;
                     var remaining = speed > 0 ? (long)((totalBytes - bytesRebuilt) / speed) : 0;
 
                     progressCallback.Report(new RebuildProgress(

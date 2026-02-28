@@ -119,7 +119,7 @@ public sealed class CompoundTransitStrategy : TransitEncryptionPluginBase
             ["EncryptedAt"] = DateTime.UtcNow
         };
 
-        return await Task.FromResult((combined, metadata));
+        return (combined, metadata);
     }
 
     /// <inheritdoc/>
@@ -201,11 +201,11 @@ public sealed class CompoundTransitStrategy : TransitEncryptionPluginBase
         CryptographicOperations.ZeroMemory(secondaryKey);
         CryptographicOperations.ZeroMemory(primaryLayerData);
 
-        return await Task.FromResult(plaintext);
+        return plaintext;
     }
 
     /// <inheritdoc/>
-    public override async Task<EndpointCapabilities> GetCapabilitiesAsync(CancellationToken cancellationToken = default)
+    public override Task<EndpointCapabilities> GetCapabilitiesAsync(CancellationToken cancellationToken = default)
     {
         var capabilities = new EndpointCapabilities(
             SupportedCipherPresets: new List<string>

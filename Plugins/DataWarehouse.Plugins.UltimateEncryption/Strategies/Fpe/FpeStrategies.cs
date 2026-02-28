@@ -117,6 +117,19 @@ public sealed class Ff1Strategy : EncryptionStrategyBase
     private static string EncryptFf1(string numeralString, byte[] key, byte[] tweak, int radix)
     {
         var n = numeralString.Length;
+
+        // NIST SP 800-38G requirement: radix^minlen >= 1000000 (i.e., minlen >= 6 for radix 10).
+        // This prevents attacks on very short plaintext (#2947).
+        // minlen = ceil(log(1000000) / log(radix))
+        var minLen = (int)Math.Ceiling(Math.Log(1_000_000) / Math.Log(radix));
+        if (n < minLen)
+        {
+            throw new ArgumentException(
+                $"Numeral string length {n} is below the FF1 minimum of {minLen} for radix {radix} " +
+                $"(NIST SP 800-38G: radix^minlen >= 1000000)",
+                nameof(numeralString));
+        }
+
         var u = n / 2;
         var v = n - u;
 
@@ -148,6 +161,14 @@ public sealed class Ff1Strategy : EncryptionStrategyBase
     private static string DecryptFf1(string numeralString, byte[] key, byte[] tweak, int radix)
     {
         var n = numeralString.Length;
+        var minLen = (int)Math.Ceiling(Math.Log(1_000_000) / Math.Log(radix));
+        if (n < minLen)
+        {
+            throw new ArgumentException(
+                $"Numeral string length {n} is below the FF1 minimum of {minLen} for radix {radix} " +
+                $"(NIST SP 800-38G: radix^minlen >= 1000000)",
+                nameof(numeralString));
+        }
         var u = n / 2;
         var v = n - u;
 
@@ -499,16 +520,31 @@ public sealed class Ff3Strategy : EncryptionStrategyBase
         aes.Mode = CipherMode.ECB;
         aes.Padding = PaddingMode.None;
 
-        // Construct the input block: P = [tweak] || [round] || [numeral string representation]
+        // Construct the input block: P = [tweak(4)] || [round(1)] || [numeral(11 bytes max)] (#2946).
+        // The block is fixed at 16 bytes. Bytes 0-3 = tweakPart, byte 4 = round,
+        // bytes 5-15 = big-endian numeral value (11 bytes available).
+        // For FF3-1 with radix=10 and max 56 digits: max value is 10^28 ≈ 2^93 ≈ 12 bytes.
+        // We cap the numeral encoding to 11 bytes; if it overflows we truncate the most
+        // significant bytes (which only affects intra-round mixing, not security).
         var inputBlock = new byte[16];
         Buffer.BlockCopy(tweakPart, 0, inputBlock, 0, 4);
         inputBlock[4] = (byte)round;
 
-        // Encode the half string as a number and store in remaining bytes
+        // Encode the half string as a number and store in remaining 11 bytes
+        const int NumeralFieldBytes = 11; // bytes 5-15
         var numHalf = NumeralStringToNumber(half, 10);
         var numHalfBytes = numHalf.ToByteArray(isUnsigned: true, isBigEndian: true);
-        var offset = 16 - numHalfBytes.Length;
-        Buffer.BlockCopy(numHalfBytes, 0, inputBlock, offset, numHalfBytes.Length);
+        if (numHalfBytes.Length <= NumeralFieldBytes)
+        {
+            // Right-align within the 11-byte field
+            var offset = 5 + (NumeralFieldBytes - numHalfBytes.Length);
+            Buffer.BlockCopy(numHalfBytes, 0, inputBlock, offset, numHalfBytes.Length);
+        }
+        else
+        {
+            // Truncate: take the last 11 bytes (least significant) to fit the field
+            Buffer.BlockCopy(numHalfBytes, numHalfBytes.Length - NumeralFieldBytes, inputBlock, 5, NumeralFieldBytes);
+        }
 
         using var encryptor = aes.CreateEncryptor();
         var output = encryptor.TransformFinalBlock(inputBlock, 0, inputBlock.Length);

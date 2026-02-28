@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Net.Http;
+using System.Text.Json;
 
 namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.CarbonAwareness;
 
@@ -224,10 +226,38 @@ public sealed class CarbonIntensityTrackingStrategy : SustainabilityStrategyBase
 
     private async Task<double> FetchCarbonIntensityFromApiAsync()
     {
-        // Simulate API call - in production, use HttpClient
-        await Task.Delay(10);
-        var baseIntensity = GetEstimatedIntensity(Region);
-        return ApplyTimeOfDayVariation(baseIntensity);
+        if (string.IsNullOrEmpty(ApiEndpoint) || string.IsNullOrEmpty(ApiKey))
+            return ApplyTimeOfDayVariation(GetEstimatedIntensity(Region));
+
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        http.DefaultRequestHeaders.Add("auth-token", ApiKey);
+
+        var url = ApiEndpoint.TrimEnd('/');
+        // Support Electricity Maps format: /carbon-intensity/latest?zone={Region}
+        if (!url.Contains('?'))
+            url = $"{url}?zone={Uri.EscapeDataString(Region)}";
+
+        using var response = await http.GetAsync(url);
+        if (!response.IsSuccessStatusCode)
+            return ApplyTimeOfDayVariation(GetEstimatedIntensity(Region));
+
+        var content = await response.Content.ReadAsStringAsync();
+        var json = JsonSerializer.Deserialize<JsonElement>(content);
+
+        // Try common field names used by Electricity Maps and compatible APIs
+        if (json.TryGetProperty("carbonIntensity", out var ci))
+            return ci.GetDouble();
+        if (json.TryGetProperty("carbon_intensity", out var ci2))
+            return ci2.GetDouble();
+        if (json.TryGetProperty("intensity", out var ci3))
+        {
+            if (ci3.ValueKind == JsonValueKind.Number)
+                return ci3.GetDouble();
+            if (ci3.TryGetProperty("actual", out var actual))
+                return actual.GetDouble();
+        }
+
+        return ApplyTimeOfDayVariation(GetEstimatedIntensity(Region));
     }
 
     private static double GetEstimatedIntensity(string region)

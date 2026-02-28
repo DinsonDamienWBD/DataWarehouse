@@ -423,10 +423,38 @@ public sealed class CpuFrequencyScalingStrategy : SustainabilityStrategyBase
         }
     }
 
-    private Task<bool> SetWindowsProcessorThrottleAsync(int maxPercent, CancellationToken ct)
+    private async Task<bool> SetWindowsProcessorThrottleAsync(int maxPercent, CancellationToken ct)
     {
-        // Would use powercfg to set processor max state
-        return Task.FromResult(true);
+        try
+        {
+            // Set processor max state using powercfg for the active power scheme
+            maxPercent = Math.Max(1, Math.Min(100, maxPercent));
+
+            using var setProc = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "powercfg",
+                Arguments = $"/setacvalueindex SCHEME_CURRENT SUB_PROCESSOR PROCTHROTTLEMAX {maxPercent}",
+                UseShellExecute = false,
+                CreateNoWindow = true
+            });
+            if (setProc != null) await setProc.WaitForExitAsync(ct);
+
+            // Apply the new settings
+            using var applyProc = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "powercfg",
+                Arguments = "/setactive SCHEME_CURRENT",
+                UseShellExecute = false,
+                CreateNoWindow = true
+            });
+            if (applyProc != null) await applyProc.WaitForExitAsync(ct);
+
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static FrequencyGovernor ParseLinuxGovernor(string governor)

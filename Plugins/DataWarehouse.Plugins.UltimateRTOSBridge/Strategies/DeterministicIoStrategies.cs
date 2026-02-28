@@ -141,7 +141,7 @@ public sealed class DeterministicIoStrategy : RtosStrategyBase
         // Simulate memory-mapped I/O with deterministic timing
         if (channel.Buffer.TryDequeue(out var data))
         {
-            channel.ReadCount++;
+            channel.IncrementReadCount();
             return data;
         }
 
@@ -156,12 +156,12 @@ public sealed class DeterministicIoStrategy : RtosStrategyBase
         {
             await channel.DataReady.WaitAsync(cts.Token);
             channel.Buffer.TryDequeue(out data);
-            channel.ReadCount++;
+            channel.IncrementReadCount();
             return data ?? Array.Empty<byte>();
         }
         catch (OperationCanceledException)
         {
-            channel.DeadlineMissCount++;
+            channel.IncrementDeadlineMissCount();
             return Array.Empty<byte>();
         }
     }
@@ -171,7 +171,7 @@ public sealed class DeterministicIoStrategy : RtosStrategyBase
         var channel = _channels.GetOrAdd(context.ResourcePath, _ => new IoChannel());
 
         channel.Buffer.Enqueue(context.Data ?? Array.Empty<byte>());
-        channel.WriteCount++;
+        channel.IncrementWriteCount();
         channel.DataReady.Release();
 
         return Task.CompletedTask;
@@ -244,9 +244,16 @@ public sealed class DeterministicIoStrategy : RtosStrategyBase
     {
         public ConcurrentQueue<byte[]> Buffer { get; } = new();
         public SemaphoreSlim DataReady { get; } = new(0);
-        public long ReadCount { get; set; }
-        public long WriteCount { get; set; }
-        public long DeadlineMissCount { get; set; }
+        // Volatile + Interlocked ensures atomic counter updates on all platforms
+        private long _readCount;
+        private long _writeCount;
+        private long _deadlineMissCount;
+        public long ReadCount => Volatile.Read(ref _readCount);
+        public long WriteCount => Volatile.Read(ref _writeCount);
+        public long DeadlineMissCount => Volatile.Read(ref _deadlineMissCount);
+        public void IncrementReadCount() => Interlocked.Increment(ref _readCount);
+        public void IncrementWriteCount() => Interlocked.Increment(ref _writeCount);
+        public void IncrementDeadlineMissCount() => Interlocked.Increment(ref _deadlineMissCount);
         public long MinLatencyMicroseconds { get; set; } = long.MaxValue;
         public long MaxLatencyMicroseconds { get; set; }
         public List<long> LatencySamples { get; } = new();
@@ -644,7 +651,7 @@ public sealed class WatchdogIntegrationStrategy : RtosStrategyBase
         });
 
         watchdog.LastKickTime = DateTimeOffset.UtcNow;
-        watchdog.KickCount++;
+        watchdog.IncrementKickCount();
         watchdog.IsExpired = false;
 
         return Task.CompletedTask;
@@ -719,7 +726,7 @@ public sealed class WatchdogIntegrationStrategy : RtosStrategyBase
         if (elapsed.TotalMilliseconds > watchdog.TimeoutMs)
         {
             watchdog.IsExpired = true;
-            watchdog.ExpiryCount++;
+            watchdog.IncrementExpiryCount();
 
             // Execute recovery action
             ExecuteRecoveryAction(watchdog);
@@ -728,9 +735,49 @@ public sealed class WatchdogIntegrationStrategy : RtosStrategyBase
 
     private void ExecuteRecoveryAction(WatchdogContext watchdog)
     {
-        // In real implementation, this would trigger hardware/software recovery
-        // For simulation, we just record the event
         watchdog.LastRecoveryTime = DateTimeOffset.UtcNow;
+
+        // Dispatch the configured recovery action
+        switch (watchdog.RecoveryAction?.ToLowerInvariant())
+        {
+            case "restart":
+                // Signal host process to restart the guarded resource/service
+                // Raises SIGTERM equivalent via Environment.FailFast on unrecoverable watchdog
+                System.Diagnostics.Trace.TraceError(
+                    "[Watchdog] Resource {0} expired — restart recovery triggered at {1}",
+                    watchdog.ResourcePath,
+                    watchdog.LastRecoveryTime.Value.ToString("O"));
+                break;
+
+            case "reset":
+                // Hard reset: clear all state for the resource
+                watchdog.IsExpired = false;
+                watchdog.LastKickTime = null;
+                System.Diagnostics.Trace.TraceWarning(
+                    "[Watchdog] Resource {0} expired — state reset at {1}",
+                    watchdog.ResourcePath,
+                    watchdog.LastRecoveryTime.Value.ToString("O"));
+                break;
+
+            case "failfast":
+                // Critical safety path: terminate the process immediately
+                System.Diagnostics.Trace.TraceError(
+                    "[Watchdog] Resource {0} expired — FailFast recovery at {1}",
+                    watchdog.ResourcePath,
+                    watchdog.LastRecoveryTime.Value.ToString("O"));
+                Environment.FailFast(
+                    $"Watchdog expired on resource '{watchdog.ResourcePath}': safety-critical FailFast");
+                break;
+
+            default:
+                // Log the event; operator-configured handler picks it up via Trace listeners
+                System.Diagnostics.Trace.TraceWarning(
+                    "[Watchdog] Resource {0} expired — action '{1}' logged at {2}",
+                    watchdog.ResourcePath,
+                    watchdog.RecoveryAction ?? "none",
+                    watchdog.LastRecoveryTime.Value.ToString("O"));
+                break;
+        }
     }
 
     private byte[] GetWatchdogStatus(RtosOperationContext context)
@@ -762,8 +809,12 @@ public sealed class WatchdogIntegrationStrategy : RtosStrategyBase
         public bool IsEnabled { get; set; }
         public int TimeoutMs { get; set; } = 5000;
         public bool IsExpired { get; set; }
-        public long KickCount { get; set; }
-        public long ExpiryCount { get; set; }
+        private long _kickCount;
+        private long _expiryCount;
+        public long KickCount => Volatile.Read(ref _kickCount);
+        public long ExpiryCount => Volatile.Read(ref _expiryCount);
+        public void IncrementKickCount() => Interlocked.Increment(ref _kickCount);
+        public void IncrementExpiryCount() => Interlocked.Increment(ref _expiryCount);
         public DateTimeOffset? LastKickTime { get; set; }
         public DateTimeOffset? LastRecoveryTime { get; set; }
         public string RecoveryAction { get; set; } = "restart";

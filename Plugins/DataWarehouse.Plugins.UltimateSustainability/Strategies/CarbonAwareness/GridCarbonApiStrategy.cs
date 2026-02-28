@@ -312,17 +312,106 @@ public sealed class GridCarbonApiStrategy : SustainabilityStrategyBase
         }
     }
 
-    private Task<GridCarbonData> FetchCarbonAwareSdkDataAsync(CancellationToken ct)
+    private async Task<GridCarbonData> FetchCarbonAwareSdkDataAsync(CancellationToken ct)
     {
-        // Green Software Foundation Carbon Aware SDK integration
-        return Task.FromResult(GetFallbackData());
+        // Green Software Foundation Carbon Aware SDK — REST API v1
+        // Spec: https://carbon-aware-sdk.greensoftware.foundation/api
+        if (_httpClient == null) return GetFallbackData();
+
+        try
+        {
+            // The Carbon Aware SDK API endpoint for current emissions
+            var url = $"https://carbon-aware-sdk.azurewebsites.net/emissions/bylocation?location={Uri.EscapeDataString(Region)}";
+            using var response = await _httpClient.GetAsync(url, ct);
+            if (!response.IsSuccessStatusCode)
+                return GetFallbackData();
+
+            var content = await response.Content.ReadAsStringAsync(ct);
+            var json = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(content);
+
+            // The SDK returns an array; take the latest entry
+            if (json.ValueKind == System.Text.Json.JsonValueKind.Array)
+            {
+                foreach (var item in json.EnumerateArray())
+                {
+                    if (item.TryGetProperty("rating", out var rating))
+                    {
+                        return new GridCarbonData
+                        {
+                            Timestamp = DateTimeOffset.UtcNow,
+                            CarbonIntensity = rating.GetDouble(),
+                            Region = Region,
+                            Provider = "CarbonAwareSDK",
+                            Confidence = 0.85
+                        };
+                    }
+                }
+            }
+
+            return GetFallbackData();
+        }
+        catch
+        {
+            return GetFallbackData();
+        }
     }
 
     private async Task<IReadOnlyList<GridCarbonForecast>> FetchWattTimeForecastAsync(int hours, CancellationToken ct)
     {
-        // Simplified - in production would fetch actual forecast
-        await Task.Delay(10, ct);
-        return GenerateFallbackForecast(hours);
+        if (_httpClient == null || string.IsNullOrEmpty(WattTimeUsername))
+            return GenerateFallbackForecast(hours);
+
+        try
+        {
+            // WattTime v3 forecast endpoint
+            // Authenticate first
+            var authRequest = new HttpRequestMessage(HttpMethod.Get, "https://api.watttime.org/login");
+            authRequest.Headers.Add("Authorization", $"Basic {Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{WattTimeUsername}:{WattTimePassword}"))}");
+
+            var authResponse = await _httpClient.SendAsync(authRequest, ct);
+            if (!authResponse.IsSuccessStatusCode)
+                return GenerateFallbackForecast(hours);
+
+            var tokenJson = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(
+                await authResponse.Content.ReadAsStringAsync(ct));
+            var token = tokenJson.GetProperty("token").GetString();
+            if (string.IsNullOrEmpty(token))
+                return GenerateFallbackForecast(hours);
+
+            // Fetch MOER forecast
+            var forecastUrl = $"https://api.watttime.org/v3/forecast?region={Uri.EscapeDataString(Region)}&horizon_hours={Math.Min(hours, 72)}";
+            var forecastRequest = new HttpRequestMessage(HttpMethod.Get, forecastUrl);
+            forecastRequest.Headers.Add("Authorization", $"Bearer {token}");
+
+            var forecastResponse = await _httpClient.SendAsync(forecastRequest, ct);
+            if (!forecastResponse.IsSuccessStatusCode)
+                return GenerateFallbackForecast(hours);
+
+            var content = await forecastResponse.Content.ReadAsStringAsync(ct);
+            var json = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(content);
+
+            var forecasts = new List<GridCarbonForecast>();
+            if (json.TryGetProperty("data", out var data))
+            {
+                foreach (var item in data.EnumerateArray())
+                {
+                    var timestamp = item.GetProperty("point_time").GetDateTimeOffset();
+                    var moer = item.GetProperty("value").GetDouble();
+                    forecasts.Add(new GridCarbonForecast
+                    {
+                        Timestamp = timestamp,
+                        CarbonIntensity = moer,
+                        Confidence = 0.9
+                    });
+                }
+            }
+
+            return forecasts.Count > 0 ? forecasts.Take(hours).ToList().AsReadOnly() : GenerateFallbackForecast(hours);
+        }
+        catch
+        {
+            return GenerateFallbackForecast(hours);
+        }
     }
 
     private async Task<IReadOnlyList<GridCarbonForecast>> FetchElectricityMapsForecastAsync(int hours, CancellationToken ct)

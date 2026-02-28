@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+
 namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.ResourceEfficiency;
 
 /// <summary>
@@ -31,8 +33,24 @@ public sealed class DiskSpinDownStrategy : SustainabilityStrategyBase
     /// <summary>APM level (1-254, lower = more aggressive).</summary>
     public int ApmLevel { get; set; } = 128;
 
-    /// <summary>Disk states.</summary>
-    public IReadOnlyDictionary<string, DiskState> Disks { get { lock (_lock) return new Dictionary<string, DiskState>(_disks); } }
+    /// <summary>Disk states (snapshot copy — thread-safe).</summary>
+    public IReadOnlyDictionary<string, DiskState> Disks
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _disks.ToDictionary(kvp => kvp.Key, kvp => new DiskState
+                {
+                    Id = kvp.Value.Id,
+                    Type = kvp.Value.Type,
+                    IsSpunDown = kvp.Value.IsSpunDown,
+                    IdleSeconds = kvp.Value.IdleSeconds,
+                    LastSpinDown = kvp.Value.LastSpinDown
+                });
+            }
+        }
+    }
 
     /// <inheritdoc/>
     protected override Task InitializeCoreAsync(CancellationToken ct)
@@ -52,41 +70,132 @@ public sealed class DiskSpinDownStrategy : SustainabilityStrategyBase
     /// <summary>Forces a disk to spin down.</summary>
     public async Task SpinDownAsync(string diskId, CancellationToken ct = default)
     {
-        if (_disks.TryGetValue(diskId, out var disk) && disk.Type == DiskType.HDD)
+        DiskState? disk;
+        lock (_lock)
         {
-            // Would use hdparm -y on Linux
-            disk.IsSpunDown = true;
-            disk.LastSpinDown = DateTimeOffset.UtcNow;
-            RecordOptimizationAction();
-            RecordEnergySaved(5); // ~5Wh per hour of spin-down
+            _disks.TryGetValue(diskId, out disk);
         }
-        await Task.CompletedTask;
+
+        if (disk == null || disk.Type != DiskType.HDD) return;
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            try
+            {
+                // Use hdparm -y to spin down the disk immediately
+                using var proc = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "hdparm",
+                    Arguments = $"-y /dev/{diskId}",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardError = true
+                });
+                if (proc != null) await proc.WaitForExitAsync(ct);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[DiskSpinDown] hdparm failed for {diskId}: {ex.Message}");
+            }
+        }
+
+        lock (_lock)
+        {
+            if (_disks.TryGetValue(diskId, out var d))
+            {
+                d.IsSpunDown = true;
+                d.LastSpinDown = DateTimeOffset.UtcNow;
+            }
+        }
+
+        RecordOptimizationAction();
+        RecordEnergySaved(5); // ~5Wh per hour of spin-down
     }
 
     private void DiscoverDisks()
     {
-        // Discover from /sys/block on Linux
-        _disks["sda"] = new DiskState { Id = "sda", Type = DiskType.SSD, IsSpunDown = false, IdleSeconds = 0 };
-        _disks["sdb"] = new DiskState { Id = "sdb", Type = DiskType.HDD, IsSpunDown = false, IdleSeconds = 0 };
+        var discovered = new Dictionary<string, DiskState>();
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            try
+            {
+                var sysBlockPath = "/sys/block";
+                if (Directory.Exists(sysBlockPath))
+                {
+                    foreach (var deviceDir in Directory.GetDirectories(sysBlockPath))
+                    {
+                        var deviceName = Path.GetFileName(deviceDir);
+                        // Skip loopback, ram, and device-mapper devices
+                        if (deviceName.StartsWith("loop", StringComparison.Ordinal) ||
+                            deviceName.StartsWith("ram", StringComparison.Ordinal) ||
+                            deviceName.StartsWith("dm-", StringComparison.Ordinal))
+                            continue;
+
+                        // Determine disk type from rotational flag
+                        var rotationalPath = Path.Combine(deviceDir, "queue", "rotational");
+                        var diskType = DiskType.SSD;
+                        if (File.Exists(rotationalPath))
+                        {
+                            var rotational = File.ReadAllText(rotationalPath).Trim();
+                            diskType = rotational == "1" ? DiskType.HDD : DiskType.SSD;
+                        }
+
+                        // Check for NVMe
+                        if (deviceName.StartsWith("nvme", StringComparison.Ordinal))
+                            diskType = DiskType.NVMe;
+
+                        discovered[deviceName] = new DiskState
+                        {
+                            Id = deviceName,
+                            Type = diskType,
+                            IsSpunDown = false,
+                            IdleSeconds = 0
+                        };
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[DiskSpinDown] Discovery failed: {ex.Message}");
+            }
+        }
+
+        // If discovery returned nothing (non-Linux or error), use a conservative empty set
+        // so the strategy doesn't pretend to manage disks it can't reach.
+        lock (_lock)
+        {
+            foreach (var kvp in discovered)
+                _disks[kvp.Key] = kvp.Value;
+        }
     }
 
     private void MonitorDisks()
     {
-        foreach (var disk in _disks.Values)
+        List<(string Id, bool ShouldSpinDown)> actions;
+        lock (_lock)
         {
-            disk.IdleSeconds += 60;
-            if (disk.Type == DiskType.HDD && disk.IdleSeconds >= SpinDownSeconds && !disk.IsSpunDown)
+            foreach (var disk in _disks.Values)
             {
-                _ = SpinDownAsync(disk.Id);
+                disk.IdleSeconds += 60;
             }
+            actions = _disks.Values
+                .Where(d => d.Type == DiskType.HDD && d.IdleSeconds >= SpinDownSeconds && !d.IsSpunDown)
+                .Select(d => (d.Id, true))
+                .ToList();
         }
+
+        foreach (var (id, _) in actions)
+            _ = SpinDownAsync(id);
+
         UpdateRecommendations();
     }
 
     private void UpdateRecommendations()
     {
         ClearRecommendations();
-        var activeHdds = _disks.Values.Count(d => d.Type == DiskType.HDD && !d.IsSpunDown);
+        int activeHdds;
+        lock (_lock) { activeHdds = _disks.Values.Count(d => d.Type == DiskType.HDD && !d.IsSpunDown); }
         if (activeHdds > 0)
         {
             AddRecommendation(new SustainabilityRecommendation

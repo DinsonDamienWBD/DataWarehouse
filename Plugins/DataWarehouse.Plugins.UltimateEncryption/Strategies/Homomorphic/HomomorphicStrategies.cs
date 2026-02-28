@@ -160,6 +160,17 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Homomorphic
                     nSquared = _nSquared!.Value;
                     lambda = _lambda!.Value;
                     mu = _mu!.Value;
+
+                    // Null out instance fields so GC can collect the backing uint[] arrays sooner.
+                    // BigInteger is an immutable managed struct; CryptographicOperations.ZeroMemory
+                    // cannot reach its internal buffer. This is the best mitigation available in
+                    // managed .NET code (#2943). The local BigInteger copies in this Task closure
+                    // will be eligible for GC once the closure completes.
+                    _lambda = null;
+                    _mu = null;
+                    _n = null;
+                    _nSquared = null;
+                    _g = null;
                 }
 
                 // Convert ciphertext to BigInteger
@@ -523,6 +534,15 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Homomorphic
                     ParsePrivateKey(key);
                     p = _p!.Value;
                     x = _x!.Value;
+
+                    // Null out instance fields to allow GC to collect backing uint[] arrays sooner.
+                    // BigInteger is a managed immutable struct; zeroing its memory is not possible
+                    // in managed .NET code (#2943). Local copies in this closure are GC-eligible
+                    // once the closure completes.
+                    _x = null;
+                    _p = null;
+                    _g = null;
+                    _y = null;
                 }
 
                 using var ms = new System.IO.MemoryStream(ciphertext);

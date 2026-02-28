@@ -93,16 +93,40 @@ public sealed class BatchJobOptimizationStrategy : SustainabilityStrategyBase
             };
         }
 
-        // Otherwise, suggest waiting (in real implementation, would use forecast)
-        var bestTime = DateTimeOffset.UtcNow.AddHours(Math.Min(job.MaxDelay.TotalHours * 0.5, 4));
+        // Use time-of-day patterns to find a better window within the allowed delay.
+        // Solar generation peaks around 12-15h UTC (lower carbon), off-peak pricing 22-07h.
+        var now = DateTimeOffset.UtcNow;
+        var maxDelayHours = Math.Min(job.MaxDelay.TotalHours, 24);
+
+        // Find the best hour in the future within the delay window based on historical patterns
+        var bestCarbonFactor = 1.0;
+        var bestHoursOffset = maxDelayHours * 0.5; // Default: middle of delay window
+
+        for (double h = 0.5; h <= maxDelayHours; h += 0.5)
+        {
+            var candidate = now.AddHours(h);
+            var hour = candidate.Hour;
+            // Solar generation bonus (10-16h UTC) and off-peak price bonus (22-07h)
+            var carbonFactor = (hour >= 10 && hour <= 16) ? 0.75 : (hour >= 22 || hour <= 7) ? 0.85 : 0.95;
+            if (carbonFactor < bestCarbonFactor)
+            {
+                bestCarbonFactor = carbonFactor;
+                bestHoursOffset = h;
+            }
+        }
+
+        var bestTime = now.AddHours(bestHoursOffset);
+        var expectedCarbon = currentCarbon * bestCarbonFactor;
+        // Off-peak price periods overlap with low-carbon windows
+        var priceFactor = bestTime.Hour >= 22 || bestTime.Hour <= 7 ? 0.7 : 0.9;
         return new ScheduleRecommendation
         {
             JobId = jobId,
             Success = true,
             RecommendedExecutionTime = bestTime,
-            ExpectedCarbonIntensity = currentCarbon * 0.7, // Estimate
-            ExpectedPrice = currentPrice * 0.8,
-            Reason = $"Defer to {bestTime:HH:mm} for lower carbon intensity"
+            ExpectedCarbonIntensity = expectedCarbon,
+            ExpectedPrice = currentPrice * priceFactor,
+            Reason = $"Defer to {bestTime:HH:mm} UTC — estimated {(1 - bestCarbonFactor) * 100:F0}% lower carbon intensity"
         };
     }
 

@@ -6,7 +6,7 @@ namespace DataWarehouse.Plugins.UltimateDeployment.Strategies.DeploymentPatterns
 /// </summary>
 public sealed class BlueGreenStrategy : DeploymentStrategyBase
 {
-    private readonly Dictionary<string, (string Active, string Standby)> _environmentPairs = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (string Active, string Standby)> _environmentPairs = new();
 
     public override DeploymentCharacteristics Characteristics { get; } = new()
     {
@@ -99,7 +99,7 @@ public sealed class BlueGreenStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
-        IncrementCounter("blue_green.deploy");
+        IncrementCounter("blue_green.rollback");
         // Blue-green rollback is instant - just switch traffic back
         var activeEnv = currentState.Metadata.TryGetValue("activeEnvironment", out var ae) ? ae?.ToString() : null;
         var standbyEnv = currentState.Metadata.TryGetValue("standbyEnvironment", out var se) ? se?.ToString() : null;
@@ -176,6 +176,22 @@ public sealed class BlueGreenStrategy : DeploymentStrategyBase
 
     protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct)
     {
+        // Derive environment from deploymentId: deploymentId typically equals the environment name
+        if (_environmentPairs.TryGetValue(deploymentId, out var pair))
+        {
+            return Task.FromResult(new DeploymentState
+            {
+                DeploymentId = deploymentId,
+                Version = "active",
+                Health = DeploymentHealth.Healthy,
+                Metadata = new Dictionary<string, object>
+                {
+                    ["activeEnvironment"] = pair.Active,
+                    ["standbyEnvironment"] = pair.Standby
+                }
+            });
+        }
+
         return Task.FromResult(new DeploymentState
         {
             DeploymentId = deploymentId,
@@ -206,14 +222,35 @@ public sealed class BlueGreenStrategy : DeploymentStrategyBase
             };
             await MessageBus.PublishAsync("deployment.environment.deploy", message, ct);
 
-            // Wait for deployment acknowledgment
+            // Wait for deployment acknowledgment via message bus status query
             var timeout = TimeSpan.FromMinutes(config.DeploymentTimeoutMinutes);
             var deadline = DateTimeOffset.UtcNow.Add(timeout);
             while (DateTimeOffset.UtcNow < deadline)
             {
                 await Task.Delay(TimeSpan.FromSeconds(2), ct);
-                // In production, check deployment status via message bus or API
-                break; // Simulated completion
+                // Check deployment status via message bus
+                var statusMsg = new DataWarehouse.SDK.Utilities.PluginMessage
+                {
+                    Type = "deployment.environment.status",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["Environment"] = environment,
+                        ["Version"] = config.Version
+                    }
+                };
+                var statusResponse = await MessageBus.SendAsync("deployment.environment.status", statusMsg, ct);
+                if (statusResponse?.Success == true
+                    && statusResponse.Payload is Dictionary<string, object> sp
+                    && sp.TryGetValue("Ready", out var ready) && ready is true)
+                {
+                    break;
+                }
+                if (statusResponse?.Success == false)
+                {
+                    // Deployment failed on orchestrator side
+                    throw new InvalidOperationException(
+                        $"Deployment to environment '{environment}' failed: {statusResponse.ErrorMessage}");
+                }
             }
         }
         else
@@ -223,57 +260,56 @@ public sealed class BlueGreenStrategy : DeploymentStrategyBase
         }
     }
 
+    // Shared HttpClient per instance: avoids socket exhaustion from per-call creation
+    private static readonly HttpClient _sharedHttpClient = new() { Timeout = TimeSpan.FromSeconds(30) };
+
     private async Task<HealthCheckResult[]> RunHealthChecksAsync(string environment, DeploymentConfig config, CancellationToken ct)
     {
         var results = new List<HealthCheckResult>();
-        var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(config.HealthCheckTimeoutSeconds) };
+        var timeout = TimeSpan.FromSeconds(config.HealthCheckTimeoutSeconds > 0 ? config.HealthCheckTimeoutSeconds : 5);
 
-        try
+        for (int instance = 0; instance < config.TargetInstances; instance++)
         {
-            for (int instance = 0; instance < config.TargetInstances; instance++)
+            // In production: actual instance URLs from service discovery
+            var instanceUrl = $"http://{environment}-instance-{instance}:8080{config.HealthCheckPath}";
+
+            var maxRetries = 3;
+            for (int attempt = 0; attempt < maxRetries; attempt++)
             {
-                // In production: actual instance URLs from service discovery
-                var instanceUrl = $"http://{environment}-instance-{instance}:8080{config.HealthCheckPath}";
-
-                var maxRetries = 3;
-                for (int attempt = 0; attempt < maxRetries; attempt++)
+                try
                 {
-                    try
-                    {
-                        var sw = System.Diagnostics.Stopwatch.StartNew();
-                        using var response = await httpClient.GetAsync(instanceUrl, ct);
-                        sw.Stop();
+                    using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    cts.CancelAfter(timeout);
 
-                        results.Add(new HealthCheckResult
-                        {
-                            InstanceId = $"{environment}-{instance}",
-                            IsHealthy = response.IsSuccessStatusCode,
-                            StatusCode = (int)response.StatusCode,
-                            ResponseTimeMs = sw.ElapsedMilliseconds
-                        });
-                        break;
-                    }
-                    catch (Exception) when (attempt < maxRetries - 1)
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
+                    using var response = await _sharedHttpClient.GetAsync(instanceUrl, cts.Token);
+                    sw.Stop();
+
+                    results.Add(new HealthCheckResult
                     {
-                        await Task.Delay(TimeSpan.FromSeconds(1), ct);
-                    }
-                    catch (Exception ex)
+                        InstanceId = $"{environment}-{instance}",
+                        IsHealthy = response.IsSuccessStatusCode,
+                        StatusCode = (int)response.StatusCode,
+                        ResponseTimeMs = sw.ElapsedMilliseconds
+                    });
+                    break;
+                }
+                catch (Exception) when (attempt < maxRetries - 1)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(1), ct);
+                }
+                catch (Exception ex)
+                {
+                    results.Add(new HealthCheckResult
                     {
-                        results.Add(new HealthCheckResult
-                        {
-                            InstanceId = $"{environment}-{instance}",
-                            IsHealthy = false,
-                            StatusCode = 503,
-                            ResponseTimeMs = 0,
-                            Details = new Dictionary<string, object> { ["error"] = ex.Message }
-                        });
-                    }
+                        InstanceId = $"{environment}-{instance}",
+                        IsHealthy = false,
+                        StatusCode = 503,
+                        ResponseTimeMs = 0,
+                        Details = new Dictionary<string, object> { ["error"] = ex.Message }
+                    });
                 }
             }
-        }
-        finally
-        {
-            httpClient.Dispose();
         }
 
         return results.Count > 0 ? results.ToArray() : new[]

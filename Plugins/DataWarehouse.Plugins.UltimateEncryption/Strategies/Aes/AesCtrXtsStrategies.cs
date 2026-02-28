@@ -303,6 +303,9 @@ public sealed class AesXtsStrategy : EncryptionStrategyBase
             var blockCount = plaintext.Length / 16;
             var remainderBytes = plaintext.Length % 16;
 
+            // Track alpha_{n-1} for ciphertext stealing (alpha before the last multiply).
+            var penultimateAlpha = new byte[16];
+
             // Process full blocks
             for (int i = 0; i < blockCount; i++)
             {
@@ -322,34 +325,35 @@ public sealed class AesXtsStrategy : EncryptionStrategyBase
 
                 Buffer.BlockCopy(encrypted, 0, ciphertext, offset, 16);
 
+                // Save alpha before multiplying (used for ciphertext stealing re-encrypt)
+                Buffer.BlockCopy(alpha, 0, penultimateAlpha, 0, 16);
+
                 // Multiply alpha by 2 in GF(2^128)
                 MultiplyAlphaByTwo(alpha);
             }
 
-            // Handle ciphertext stealing for non-block-aligned data
+            // Handle ciphertext stealing for non-block-aligned data (IEEE P1619).
+            // After the loop: alpha = alpha_{blockCount}, penultimateAlpha = alpha_{blockCount-1}.
+            // The steal block (which becomes the new final output block) uses penultimateAlpha.
+            // The partial fragment (output at blockCount*16) steals bytes from that block.
             if (remainderBytes > 0)
             {
                 var lastFullBlockOffset = (blockCount - 1) * 16;
                 var remainderOffset = blockCount * 16;
 
-                // Copy remainder bytes from last full ciphertext block
+                // Step 1: Copy remainder bytes from last full ciphertext block (ciphertext stealing)
                 Buffer.BlockCopy(ciphertext, lastFullBlockOffset, ciphertext, remainderOffset, remainderBytes);
 
-                // Re-encrypt the last full block with remainder plaintext
+                // Step 2: Re-encrypt the last full block position using penultimateAlpha (alpha_{n-1}).
+                // Build the block: remainder plaintext bytes + stolen ciphertext bytes.
                 var finalBlock = new byte[16];
                 Buffer.BlockCopy(plaintext, remainderOffset, finalBlock, 0, remainderBytes);
                 Buffer.BlockCopy(ciphertext, lastFullBlockOffset, finalBlock, remainderBytes, 16 - remainderBytes);
 
-                // Back up alpha
-                var previousAlpha = new byte[16];
-                Buffer.BlockCopy(alpha, 0, previousAlpha, 0, 16);
-                MultiplyAlphaByTwo(alpha);
-                Buffer.BlockCopy(previousAlpha, 0, alpha, 0, 16);
-
-                XorBlocks(finalBlock, alpha);
+                XorBlocks(finalBlock, penultimateAlpha);
                 var encrypted = new byte[16];
                 encryptor1.TransformBlock(finalBlock, 0, 16, encrypted, 0);
-                XorBlocks(encrypted, alpha);
+                XorBlocks(encrypted, penultimateAlpha);
 
                 Buffer.BlockCopy(encrypted, 0, ciphertext, lastFullBlockOffset, 16);
             }
@@ -406,7 +410,10 @@ public sealed class AesXtsStrategy : EncryptionStrategyBase
             var blockCount = encryptedData.Length / 16;
             var remainderBytes = encryptedData.Length % 16;
 
-            // Process full blocks
+            // Track alpha_{n-1} for ciphertext-stealing decryption.
+            var penultimateAlpha = new byte[16];
+
+            // Process full blocks (except the last, which may be involved in stealing)
             for (int i = 0; i < blockCount; i++)
             {
                 var offset = i * 16;
@@ -422,31 +429,50 @@ public sealed class AesXtsStrategy : EncryptionStrategyBase
 
                 Buffer.BlockCopy(decrypted, 0, plaintext, offset, 16);
 
+                // Save alpha before multiplying (needed for ciphertext stealing)
+                Buffer.BlockCopy(alpha, 0, penultimateAlpha, 0, 16);
+
                 MultiplyAlphaByTwo(alpha);
             }
 
-            // Handle ciphertext stealing for decryption
+            // Handle ciphertext stealing for decryption (IEEE P1619).
+            // After loop: alpha = alpha_{blockCount}, penultimateAlpha = alpha_{blockCount-1}.
+            // Step 1: Decrypt the last full ciphertext block (index blockCount-1) using penultimateAlpha.
+            //         This gives us the partial plaintext + stolen bytes intermixed.
+            // Step 2: Reconstruct plaintext bytes for the remainder, then re-decrypt the penultimate
+            //         ciphertext block (index blockCount-2 output) using the stolen bytes.
             if (remainderBytes > 0)
             {
                 var lastFullBlockOffset = (blockCount - 1) * 16;
                 var remainderOffset = blockCount * 16;
 
-                var previousAlpha = new byte[16];
-                Buffer.BlockCopy(alpha, 0, previousAlpha, 0, 16);
-                MultiplyAlphaByTwo(alpha);
-                Buffer.BlockCopy(previousAlpha, 0, alpha, 0, 16);
+                // Step 1: Decrypt the "Cn" block (last full ciphertext block) with penultimateAlpha.
+                var blockCn = new byte[16];
+                Buffer.BlockCopy(encryptedData, lastFullBlockOffset, blockCn, 0, 16);
+                XorBlocks(blockCn, penultimateAlpha);
+                var decryptedCn = new byte[16];
+                decryptor1.TransformBlock(blockCn, 0, 16, decryptedCn, 0);
+                XorBlocks(decryptedCn, penultimateAlpha);
 
-                var block = new byte[16];
-                Buffer.BlockCopy(encryptedData, lastFullBlockOffset, block, 0, 16);
+                // The remainder plaintext bytes are the first `remainderBytes` of decryptedCn.
+                Buffer.BlockCopy(decryptedCn, 0, plaintext, remainderOffset, remainderBytes);
 
-                XorBlocks(block, alpha);
-                var decrypted = new byte[16];
-                decryptor1.TransformBlock(block, 0, 16, decrypted, 0);
-                XorBlocks(decrypted, alpha);
+                // Step 2: Reconstruct Cm* by combining the partial ciphertext (remainderOffset bytes)
+                // with the stolen bytes from decryptedCn.
+                var blockCm = new byte[16];
+                Buffer.BlockCopy(encryptedData, remainderOffset, blockCm, 0, remainderBytes);
+                Buffer.BlockCopy(decryptedCn, remainderBytes, blockCm, remainderBytes, 16 - remainderBytes);
 
-                Buffer.BlockCopy(decrypted, 0, plaintext, remainderOffset, remainderBytes);
-                Buffer.BlockCopy(decrypted, remainderBytes, plaintext, lastFullBlockOffset, 16 - remainderBytes);
-                Buffer.BlockCopy(encryptedData, remainderOffset, plaintext, lastFullBlockOffset + 16 - remainderBytes, remainderBytes);
+                // Decrypt Cm* with alpha_{blockCount-1} (same alpha used for Cn above in our loop).
+                // NOTE: Cm uses the penultimate alpha. alpha after loop is blockCount which is correct
+                // for the "second-to-last" block in IEEE P1619 numbering when len is not block-aligned.
+                // Specifically: encrypt uses penultimateAlpha for the steal block, so we must use it here too.
+                XorBlocks(blockCm, penultimateAlpha);
+                var decryptedCm = new byte[16];
+                decryptor1.TransformBlock(blockCm, 0, 16, decryptedCm, 0);
+                XorBlocks(decryptedCm, penultimateAlpha);
+
+                Buffer.BlockCopy(decryptedCm, 0, plaintext, lastFullBlockOffset, 16);
             }
         }
 

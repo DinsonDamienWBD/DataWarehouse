@@ -61,45 +61,58 @@ public sealed class CarbonAwareRegionSelectionStrategy : SustainabilityStrategyB
         int? maxLatencyMs = null,
         bool prioritizeCarbon = true)
     {
-        var candidates = _regionData.Values
-            .Where(r => r.Provider == provider)
-            .Where(r => maxLatencyMs == null || r.LatencyMs <= maxLatencyMs)
+        // Take a thread-safe snapshot of each region's mutable carbon intensity before scoring.
+        // UpdateCarbonDataAsync writes CarbonIntensity/LastUpdated under the region lock,
+        // so we must read under the same lock to avoid torn reads.
+        var snapshot = _regionData.Values
+            .Select(r =>
+            {
+                double carbonIntensity;
+                lock (r) { carbonIntensity = r.CarbonIntensity; }
+                return (r.Provider, r.RegionId, r.LatencyMs, r.CostMultiplier, CarbonIntensity: carbonIntensity, Source: r);
+            })
+            .Where(s => s.Provider == provider)
+            .Where(s => maxLatencyMs == null || s.LatencyMs <= maxLatencyMs)
             .ToList();
 
         if (preferredRegions != null)
         {
-            var preferred = candidates.Where(r => preferredRegions.Contains(r.RegionId)).ToList();
-            if (preferred.Any()) candidates = preferred;
+            var preferred = snapshot.Where(s => preferredRegions.Contains(s.RegionId)).ToList();
+            if (preferred.Any()) snapshot = preferred;
         }
 
-        if (!candidates.Any())
+        if (!snapshot.Any())
             return new RegionSelectionResult { Success = false, Reason = "No suitable regions found" };
 
-        // Score each region
-        var maxCarbon = candidates.Max(r => r.CarbonIntensity);
-        var minCarbon = candidates.Min(r => r.CarbonIntensity);
-        var maxLatency = candidates.Max(r => r.LatencyMs);
-        var maxCost = candidates.Max(r => r.CostMultiplier);
+        // Score each region using the snapshot values
+        var maxCarbon = snapshot.Max(s => s.CarbonIntensity);
+        var minCarbon = snapshot.Min(s => s.CarbonIntensity);
+        var maxLatency = snapshot.Max(s => s.LatencyMs);
+        var maxCost = snapshot.Max(s => s.CostMultiplier);
 
-        var scored = candidates.Select(r =>
+        // Reconstruct a list of RegionCarbonData using snapshot carbon values for consistent scoring
+        var candidates = snapshot.Select(s => s.Source).ToList();
+
+        var scored = snapshot.Select(s =>
         {
-            var carbonScore = maxCarbon > minCarbon ? 1 - (r.CarbonIntensity - minCarbon) / (maxCarbon - minCarbon) : 1;
-            var latencyScore = maxLatency > 0 ? 1 - r.LatencyMs / maxLatency : 1;
-            var costScore = maxCost > 0 ? 1 - (r.CostMultiplier - 1) / (maxCost - 1) : 1;
+            var carbonScore = maxCarbon > minCarbon ? 1 - (s.CarbonIntensity - minCarbon) / (maxCarbon - minCarbon) : 1;
+            var latencyScore = maxLatency > 0 ? 1 - (double)s.LatencyMs / maxLatency : 1;
+            var costScore = maxCost > 0 ? 1 - (s.CostMultiplier - 1) / (maxCost - 1) : 1;
 
             var cw = prioritizeCarbon ? CarbonWeight : CarbonWeight * 0.5;
             var lw = prioritizeCarbon ? LatencyWeight : LatencyWeight * 1.5;
 
             return new
             {
-                Region = r,
+                Region = s.Source,
+                SnapshotCarbon = s.CarbonIntensity,
                 Score = carbonScore * cw + latencyScore * lw + costScore * CostWeight
             };
         }).OrderByDescending(x => x.Score).ToList();
 
         var selected = scored.First().Region;
-        var baseline = candidates.OrderBy(r => r.LatencyMs).First();
-        var carbonSaved = baseline.CarbonIntensity - selected.CarbonIntensity;
+        var baseline = snapshot.OrderBy(s => s.LatencyMs).First();
+        var carbonSaved = baseline.CarbonIntensity - scored.First().SnapshotCarbon;
 
         RecordOptimizationAction();
         if (carbonSaved > 0) RecordCarbonAvoided(carbonSaved);
@@ -109,7 +122,7 @@ public sealed class CarbonAwareRegionSelectionStrategy : SustainabilityStrategyB
             Success = true,
             SelectedRegion = selected.RegionId,
             Provider = provider,
-            CarbonIntensity = selected.CarbonIntensity,
+            CarbonIntensity = scored.First().SnapshotCarbon,
             LatencyMs = selected.LatencyMs,
             CostMultiplier = selected.CostMultiplier,
             CarbonSavedGCO2ePerKwh = carbonSaved,
@@ -163,15 +176,21 @@ public sealed class CarbonAwareRegionSelectionStrategy : SustainabilityStrategyB
 
     private async Task UpdateCarbonDataAsync()
     {
-        // Would fetch real-time carbon data from APIs
-        // Simulating time-of-day variation
+        // Apply time-of-day variation using a local snapshot to avoid data races.
+        // RegionCarbonData fields are mutated under a per-region lock so that SelectRegion
+        // (which reads the same fields) doesn't observe torn state.
         var hour = DateTime.UtcNow.Hour;
         var solarFactor = hour >= 10 && hour <= 16 ? 0.8 : 1.1;
+        var now = DateTimeOffset.UtcNow;
 
-        foreach (var region in _regionData.Values)
+        foreach (var kvp in _regionData)
         {
-            region.CarbonIntensity *= solarFactor;
-            region.LastUpdated = DateTimeOffset.UtcNow;
+            var region = kvp.Value;
+            lock (region)
+            {
+                region.CarbonIntensity *= solarFactor;
+                region.LastUpdated = now;
+            }
         }
 
         await Task.CompletedTask;
@@ -181,13 +200,18 @@ public sealed class CarbonAwareRegionSelectionStrategy : SustainabilityStrategyB
     private void UpdateRecommendations()
     {
         ClearRecommendations();
-        var greenestRegion = _regionData.Values.OrderBy(r => r.CarbonIntensity).First();
+        if (!_regionData.Any()) return;
+
+        // Read CarbonIntensity under lock to avoid racing with UpdateCarbonDataAsync
+        var snapshots = _regionData.Values.Select(r => { double ci; lock (r) { ci = r.CarbonIntensity; } return (r.Name, ci); }).ToList();
+        var greenest = snapshots.OrderBy(s => s.ci).First();
+
         AddRecommendation(new SustainabilityRecommendation
         {
             RecommendationId = $"{StrategyId}-greenest",
             Type = "GreenestRegion",
             Priority = 5,
-            Description = $"Greenest region: {greenestRegion.Name} ({greenestRegion.CarbonIntensity:F0} gCO2e/kWh)",
+            Description = $"Greenest region: {greenest.Name} ({greenest.ci:F0} gCO2e/kWh)",
             CanAutoApply = false
         });
     }

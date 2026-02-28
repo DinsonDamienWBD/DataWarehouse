@@ -226,23 +226,108 @@ public sealed class WorkloadConsolidationStrategy : SustainabilityStrategyBase
 
     private async Task UpdateCoreUtilizationAsync()
     {
-        // Would read from /proc/stat on Linux or performance counters on Windows
-        // Using simulated data
-        await Task.Delay(1);
+        // Read real per-core CPU utilization from /proc/stat (Linux) or fall back to
+        // aggregate system utilization distributed across active cores.
+        var perCoreUtils = await ReadPerCoreUtilizationAsync();
+        var now = DateTimeOffset.UtcNow;
 
-        var random = Random.Shared;
         foreach (var core in _coreStates.Values)
         {
             if (core.IsActive)
             {
-                core.Utilization = random.NextDouble() * 50 + 10; // 10-60%
+                core.Utilization = perCoreUtils.TryGetValue(core.CoreId, out var util) ? util : 0;
             }
             else
             {
                 core.Utilization = 0;
             }
-            core.LastUpdated = DateTimeOffset.UtcNow;
+            core.LastUpdated = now;
         }
+    }
+
+    private static async Task<Dictionary<int, double>> ReadPerCoreUtilizationAsync()
+    {
+        var result = new Dictionary<int, double>();
+
+        if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Linux))
+        {
+            try
+            {
+                // Read /proc/stat twice with a 200ms window to compute per-CPU utilization
+                static Dictionary<int, long[]> ReadCpuLines()
+                {
+                    var lines = File.ReadAllLines("/proc/stat");
+                    var map = new Dictionary<int, long[]>();
+                    foreach (var line in lines)
+                    {
+                        if (!line.StartsWith("cpu", StringComparison.Ordinal)) continue;
+                        var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                        if (parts.Length < 5 || parts[0] == "cpu") continue;
+                        if (int.TryParse(parts[0].AsSpan(3), out var coreId))
+                            map[coreId] = parts.Skip(1).Select(long.Parse).ToArray();
+                    }
+                    return map;
+                }
+
+                var first = ReadCpuLines();
+                await Task.Delay(200);
+                var second = ReadCpuLines();
+
+                foreach (var kvp in second)
+                {
+                    if (!first.TryGetValue(kvp.Key, out var f)) continue;
+                    var s = kvp.Value;
+                    var totalDiff = s.Sum() - f.Sum();
+                    var idleDiff = (s.Length > 3 ? s[3] : 0) - (f.Length > 3 ? f[3] : 0);
+                    result[kvp.Key] = totalDiff > 0 ? 100.0 * (totalDiff - idleDiff) / totalDiff : 0;
+                }
+
+                return result;
+            }
+            catch { }
+        }
+
+        if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
+        {
+            try
+            {
+                using var proc = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "powershell",
+                    Arguments = "-NoProfile -Command \"(Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average).Average\"",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    CreateNoWindow = true
+                });
+                if (proc != null)
+                {
+                    var output = await proc.StandardOutput.ReadToEndAsync();
+                    await proc.WaitForExitAsync();
+                    if (double.TryParse(output.Trim(), out var avgUtil))
+                    {
+                        // Distribute average across core IDs
+                        for (int i = 0; i < Environment.ProcessorCount; i++)
+                            result[i] = avgUtil;
+                    }
+                }
+                return result;
+            }
+            catch { }
+        }
+
+        // Fallback: use process-level CPU time as an estimate
+        var cpuUsage = System.Diagnostics.Process.GetCurrentProcess().TotalProcessorTime;
+        var wallClock = DateTimeOffset.UtcNow;
+        await Task.Delay(200);
+        var cpuUsage2 = System.Diagnostics.Process.GetCurrentProcess().TotalProcessorTime;
+        var elapsed = 0.2; // seconds
+        var cpuPercent = (cpuUsage2 - cpuUsage).TotalSeconds / (elapsed * Environment.ProcessorCount) * 100.0;
+        cpuPercent = Math.Min(100, Math.Max(0, cpuPercent));
+
+        for (int i = 0; i < Environment.ProcessorCount; i++)
+            result[i] = cpuPercent;
+
+        return result;
     }
 
     private int CalculateOptimalCoreCount()

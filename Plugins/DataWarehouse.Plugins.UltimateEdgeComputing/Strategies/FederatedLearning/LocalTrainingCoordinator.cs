@@ -68,8 +68,9 @@ public sealed class LocalTrainingCoordinator
                 var batchLoss = ComputeLoss(currentWeights, batchData, batchLabels);
                 cumulativeLoss += batchLoss;
 
-                // Simulate training delay
-                await Task.Delay(5, ct);
+                // Yield control to allow cancellation checks without artificial latency
+                if (ct.IsCancellationRequested) break;
+                await Task.Yield();
             }
         }
 

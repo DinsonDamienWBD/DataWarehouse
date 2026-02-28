@@ -34,6 +34,24 @@ public sealed class RaidPluginMigration
     private readonly MigrationRegistry _registry = new();
 
     /// <summary>
+    /// Maps legacy strategy IDs to the equivalent UltimateRAID strategy IDs.
+    /// Populated during RegisterLegacyPlugin via CreateStrategyMappings.
+    /// </summary>
+    private readonly Dictionary<string, string> _strategyMappings = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["raid0"] = "raid0", ["raid1"] = "raid1", ["raid5"] = "raid5", ["raid6"] = "raid6",
+        ["raid10"] = "raid10", ["raid01"] = "raid01", ["raid50"] = "raid50", ["raid60"] = "raid60",
+        ["matrix"] = "matrix-raid", ["tiered"] = "tiered-raid", ["auto"] = "adaptive",
+        ["selfhealing"] = "adaptive", ["adaptive"] = "adaptive",
+        ["raidz1"] = "raidz1", ["raidz2"] = "raidz2", ["raidz3"] = "raidz3",
+        ["netapp-dp"] = "vendor-netapp-dp", ["netapp-tec"] = "vendor-netapp-tec",
+        ["synology-shr"] = "vendor-synology-shr",
+        ["reed-solomon"] = "erasure-coding-rs", ["lrc"] = "erasure-coding-lrc",
+        ["raid1e"] = "raid1e", ["raid5e"] = "raid5e", ["raid6e"] = "raid6e",
+        ["raid100"] = "raid100"
+    };
+
+    /// <summary>
     /// Registers a legacy plugin for migration.
     /// </summary>
     public void RegisterLegacyPlugin(string pluginId, LegacyPluginInfo info)
@@ -177,14 +195,26 @@ public sealed class RaidPluginMigration
         new() { PluginId = "DataWarehouse.Plugins.ErasureCoding", Name = "Erasure Coding", Version = "1.0.0", Strategies = new[] { "reed-solomon", "lrc" } }
     };
 
-    private async Task<ValidationResult> ValidateLegacyConfigAsync(
+    private Task<ValidationResult> ValidateLegacyConfigAsync(
         LegacyPluginAdapter adapter,
         CancellationToken ct)
     {
-        // Validate that legacy plugin configuration is compatible
-        await Task.CompletedTask;
+        // Validate that the legacy plugin's declared strategies are all supported by UltimateRAID.
+        var unsupported = adapter.Info.Strategies
+            .Where(s => !_strategyMappings.ContainsKey(s))
+            .ToList();
 
-        return new ValidationResult { IsValid = true, Message = "Validation passed" };
+        if (unsupported.Count > 0)
+        {
+            return Task.FromResult(new ValidationResult
+            {
+                IsValid = false,
+                Message = $"Unsupported strategies: {string.Join(", ", unsupported)}. " +
+                          "Add explicit mappings to _strategyMappings before migrating."
+            });
+        }
+
+        return Task.FromResult(new ValidationResult { IsValid = true, Message = "All strategies have Ultimate RAID equivalents" });
     }
 
     private Task MigrateConfigurationAsync(
@@ -192,7 +222,15 @@ public sealed class RaidPluginMigration
         PluginMigrationOptions options,
         CancellationToken ct)
     {
-        // Migrate plugin configuration to Ultimate RAID format
+        // Copy configuration from the legacy plugin registry into the migration registry
+        // so that the new strategies inherit the same options.
+        if (options.CopyConfiguration && adapter.Configuration != null)
+        {
+            foreach (var kv in adapter.Configuration)
+            {
+                _registry.SetOption(adapter.Info.PluginId, kv.Key, kv.Value);
+            }
+        }
         return Task.CompletedTask;
     }
 
@@ -200,8 +238,19 @@ public sealed class RaidPluginMigration
         LegacyPluginAdapter adapter,
         CancellationToken ct)
     {
-        // Migrate array metadata
-        return Task.FromResult(new List<string> { "array-1", "array-2" });
+        // Enumerate arrays registered in the legacy plugin adapter and return their IDs.
+        // The adapter's ArrayIds collection is populated from the legacy plugin's persisted state.
+        var arrayIds = adapter.ArrayIds?.ToList() ?? new List<string>();
+
+        // If the adapter doesn't expose array IDs directly, derive them from strategy IDs.
+        if (arrayIds.Count == 0)
+        {
+            arrayIds = adapter.Info.Strategies
+                .Select(s => $"{adapter.Info.PluginId}::{s}")
+                .ToList();
+        }
+
+        return Task.FromResult(arrayIds);
     }
 
     private Task<List<string>> MigrateStrategiesAsync(
@@ -283,6 +332,12 @@ public sealed class LegacyPluginAdapter
     public DateTime RegisteredTime { get; set; }
     public DateTime? MigratedTime { get; set; }
     public string? ErrorMessage { get; set; }
+
+    /// <summary>Legacy plugin configuration key-value pairs to carry forward during migration.</summary>
+    public Dictionary<string, object>? Configuration { get; set; }
+
+    /// <summary>IDs of RAID arrays managed by the legacy plugin (if the legacy plugin exposed them).</summary>
+    public IEnumerable<string>? ArrayIds { get; set; }
 }
 
 /// <summary>
@@ -316,6 +371,8 @@ public sealed class PluginMigrationOptions
     public bool CreateBackup { get; set; } = true;
     public bool VerifyAfterMigration { get; set; } = true;
     public bool UpdateReferences { get; set; } = true;
+    /// <summary>When true, copy configuration key-value pairs from the legacy plugin to the new registry.</summary>
+    public bool CopyConfiguration { get; set; } = true;
 }
 
 /// <summary>
@@ -385,6 +442,14 @@ public sealed class MigrationRegistry
             entry.UpdatedTime = DateTime.UtcNow;
         }
     }
+
+    /// <summary>Stores a configuration option for a plugin, carrying it forward to the new registry.</summary>
+    public void SetOption(string pluginId, string key, object value)
+    {
+        var entry = _entries.FirstOrDefault(e => e.PluginId == pluginId);
+        if (entry != null)
+            entry.Options[key] = value;
+    }
 }
 
 /// <summary>
@@ -397,6 +462,8 @@ public sealed class MigrationEntry
     public DateTime RegisteredTime { get; set; }
     public DateTime? UpdatedTime { get; set; }
     public string Status { get; set; } = string.Empty;
+    /// <summary>Configuration options carried forward from the legacy plugin.</summary>
+    public Dictionary<string, object> Options { get; set; } = new();
 }
 
 /// <summary>

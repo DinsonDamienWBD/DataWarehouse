@@ -95,6 +95,8 @@ public sealed class CarbonDashboardDataStrategy : SustainabilityStrategyBase
 
     // Green score tracking
     private readonly ConcurrentBag<TimeSeriesPoint> _greenScorePoints = new();
+    // Lock for atomic drain-and-refill during pruning (#4414)
+    private readonly object _greenScorePruneLock = new();
 
     private IDisposable? _energySubscription;
     private IDisposable? _budgetSubscription;
@@ -512,10 +514,16 @@ public sealed class CarbonDashboardDataStrategy : SustainabilityStrategyBase
             }
         }
 
-        // Prune green score points
+        // Prune green score points. ConcurrentBag doesn't support atomic clear/replace,
+        // so we drain the bag and re-add only fresh entries under a lock to prevent
+        // unbounded growth (#4414).
         var freshGreenScores = _greenScorePoints.Where(p => p.Timestamp >= cutoff).ToList();
-        // Note: ConcurrentBag does not support clear/replace atomically, but this is
-        // acceptable for monitoring data where minor data loss during pruning is non-critical.
+        lock (_greenScorePruneLock)
+        {
+            while (_greenScorePoints.TryTake(out _)) { }
+            foreach (var point in freshGreenScores)
+                _greenScorePoints.Add(point);
+        }
     }
 
     private static double ExtractDouble(Dictionary<string, object> payload, string key)

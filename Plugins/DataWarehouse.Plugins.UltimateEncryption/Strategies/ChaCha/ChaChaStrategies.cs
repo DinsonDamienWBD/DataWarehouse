@@ -232,7 +232,7 @@ public sealed class ChaCha20Strategy : EncryptionStrategyBase
 {
     private const int KeySize = 32;
     private const int NonceSize = 12;
-    private const int MacSize = 32; // HMAC-SHA256
+    private const int MacSize = 48; // Poly1305(16) + HMAC-SHA256(32) — dual authentication (#2941)
 
     /// <inheritdoc/>
     public override string StrategyId => "chacha20";
@@ -270,24 +270,43 @@ public sealed class ChaCha20Strategy : EncryptionStrategyBase
         var nonce = GenerateIv();
         var macKey = SHA256.HashData(key);
 
-        // ChaCha20 encryption using Poly1305 with zero tag area
+        // Encrypt with ChaCha20-Poly1305. The Poly1305 tag IS used as the authentication tag
+        // stored in the output envelope so that decrypt can verify it directly (#2941).
         var ciphertext = new byte[plaintext.Length];
-        var tempTag = new byte[16];
+        var poly1305Tag = new byte[16];
 
         using (var chacha = new ChaCha20Poly1305(key))
         {
-            chacha.Encrypt(nonce, plaintext, ciphertext, tempTag);
+            chacha.Encrypt(nonce, plaintext, ciphertext, poly1305Tag, associatedData);
         }
 
-        // Compute HMAC for authentication
-        var dataToMac = new byte[nonce.Length + ciphertext.Length];
-        Buffer.BlockCopy(nonce, 0, dataToMac, 0, nonce.Length);
-        Buffer.BlockCopy(ciphertext, 0, dataToMac, nonce.Length, ciphertext.Length);
+        // Also compute HMAC-SHA256 over nonce + ciphertext (+ associated data) for a second
+        // authentication layer that covers the nonce and any associated data.
+        byte[] dataToMac;
+        if (associatedData != null && associatedData.Length > 0)
+        {
+            dataToMac = new byte[nonce.Length + ciphertext.Length + associatedData.Length];
+            Buffer.BlockCopy(nonce, 0, dataToMac, 0, nonce.Length);
+            Buffer.BlockCopy(ciphertext, 0, dataToMac, nonce.Length, ciphertext.Length);
+            Buffer.BlockCopy(associatedData, 0, dataToMac, nonce.Length + ciphertext.Length, associatedData.Length);
+        }
+        else
+        {
+            dataToMac = new byte[nonce.Length + ciphertext.Length];
+            Buffer.BlockCopy(nonce, 0, dataToMac, 0, nonce.Length);
+            Buffer.BlockCopy(ciphertext, 0, dataToMac, nonce.Length, ciphertext.Length);
+        }
 
-        var tag = HMACSHA256.HashData(macKey, dataToMac);
+        var hmacTag = HMACSHA256.HashData(macKey, dataToMac);
         CryptographicOperations.ZeroMemory(macKey);
 
-        return Task.FromResult(CombineIvAndCiphertext(nonce, ciphertext, tag));
+        // Output: nonce | ciphertext | poly1305Tag(16) | hmacTag(32)
+        // CombineIvAndCiphertext appends the tag; we build a combined tag from both MACs.
+        var combinedTag = new byte[poly1305Tag.Length + hmacTag.Length]; // 48 bytes
+        Buffer.BlockCopy(poly1305Tag, 0, combinedTag, 0, poly1305Tag.Length);
+        Buffer.BlockCopy(hmacTag, 0, combinedTag, poly1305Tag.Length, hmacTag.Length);
+
+        return Task.FromResult(CombineIvAndCiphertext(nonce, ciphertext, combinedTag));
     }
 
     /// <inheritdoc/>
@@ -298,37 +317,50 @@ public sealed class ChaCha20Strategy : EncryptionStrategyBase
         CancellationToken cancellationToken)
     {
         var macKey = SHA256.HashData(key);
-        var (nonce, encryptedData, tag) = SplitCiphertext(ciphertext);
+        var (nonce, encryptedData, combinedTag) = SplitCiphertext(ciphertext);
 
-        // Verify HMAC
-        var dataToMac = new byte[nonce.Length + encryptedData.Length];
-        Buffer.BlockCopy(nonce, 0, dataToMac, 0, nonce.Length);
-        Buffer.BlockCopy(encryptedData, 0, dataToMac, nonce.Length, encryptedData.Length);
-
-        var expectedTag = HMACSHA256.HashData(macKey, dataToMac);
-        if (!CryptographicOperations.FixedTimeEquals(expectedTag, tag))
+        if (combinedTag == null || combinedTag.Length < 48)
         {
             CryptographicOperations.ZeroMemory(macKey);
-            throw new CryptographicException("MAC verification failed");
+            throw new CryptographicException("Invalid ciphertext: authentication tag too short");
         }
 
-        // Decrypt using ChaCha20-Poly1305 with known tag
-        var plaintext = new byte[encryptedData.Length];
+        // Split combined tag: first 16 bytes = Poly1305, next 32 = HMAC-SHA256
+        var poly1305Tag = new byte[16];
+        var storedHmac = new byte[32];
+        Buffer.BlockCopy(combinedTag, 0, poly1305Tag, 0, 16);
+        Buffer.BlockCopy(combinedTag, 16, storedHmac, 0, 32);
 
-        // Re-encrypt to get the keystream, then XOR to decrypt
-        var tempCiphertext = new byte[encryptedData.Length];
-        var tempTag = new byte[16];
-        using (var chacha = new ChaCha20Poly1305(key))
+        // Verify HMAC-SHA256 first (covers nonce + ciphertext + optional AAD)
+        byte[] dataToMac;
+        if (associatedData != null && associatedData.Length > 0)
         {
-            chacha.Encrypt(nonce, new byte[encryptedData.Length], tempCiphertext, tempTag);
+            dataToMac = new byte[nonce.Length + encryptedData.Length + associatedData.Length];
+            Buffer.BlockCopy(nonce, 0, dataToMac, 0, nonce.Length);
+            Buffer.BlockCopy(encryptedData, 0, dataToMac, nonce.Length, encryptedData.Length);
+            Buffer.BlockCopy(associatedData, 0, dataToMac, nonce.Length + encryptedData.Length, associatedData.Length);
+        }
+        else
+        {
+            dataToMac = new byte[nonce.Length + encryptedData.Length];
+            Buffer.BlockCopy(nonce, 0, dataToMac, 0, nonce.Length);
+            Buffer.BlockCopy(encryptedData, 0, dataToMac, nonce.Length, encryptedData.Length);
         }
 
-        for (int i = 0; i < encryptedData.Length; i++)
+        var expectedHmac = HMACSHA256.HashData(macKey, dataToMac);
+        if (!CryptographicOperations.FixedTimeEquals(expectedHmac, storedHmac))
         {
-            plaintext[i] = (byte)(encryptedData[i] ^ tempCiphertext[i]);
+            CryptographicOperations.ZeroMemory(macKey);
+            throw new CryptographicException("HMAC-SHA256 verification failed");
         }
 
         CryptographicOperations.ZeroMemory(macKey);
+
+        // Decrypt using ChaCha20-Poly1305 which also verifies the Poly1305 tag.
+        var plaintext = new byte[encryptedData.Length];
+        using var chacha = new ChaCha20Poly1305(key);
+        chacha.Decrypt(nonce, encryptedData, poly1305Tag, plaintext, associatedData);
+
         return Task.FromResult(plaintext);
     }
 }

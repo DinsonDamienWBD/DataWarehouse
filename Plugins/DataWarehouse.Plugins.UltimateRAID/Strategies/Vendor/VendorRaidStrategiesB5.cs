@@ -110,13 +110,13 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
             // Add to cache (async write-back)
             _writeCache.Enqueue(writeOp);
 
-            // If cache is getting full, flush oldest entries
-            while (_writeCache.Count > _cacheMaxSize)
+            // If cache is getting full, flush oldest entries.
+            // Use TryDequeue in a lock-free loop: the count check and dequeue are each individually
+            // safe on ConcurrentQueue.  Multiple concurrent flushers are fine because TryDequeue is
+            // idempotent — each operation is flushed exactly once.
+            while (_writeCache.Count > _cacheMaxSize && _writeCache.TryDequeue(out var oldOp))
             {
-                if (_writeCache.TryDequeue(out var oldOp))
-                {
-                    await FlushWriteOperationAsync(oldOp, diskList, cancellationToken);
-                }
+                await FlushWriteOperationAsync(oldOp, diskList, cancellationToken);
             }
 
             // Calculate multiple parity sets asynchronously
@@ -272,7 +272,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
                 if (progressCallback != null)
                 {
                     var elapsed = DateTime.UtcNow - startTime;
-                    var speed = bytesRebuilt / elapsed.TotalSeconds;
+                    var speed = elapsed.TotalSeconds > 0 ? bytesRebuilt / elapsed.TotalSeconds : bytesRebuilt;
                     var remaining = speed > 0 ? (long)((totalBytes - bytesRebuilt) / speed) : 0;
 
                     progressCallback.Report(new RebuildProgress(
@@ -493,6 +493,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
         private long _currentSnapshotId;
         private DateTime _lastSnapshotTime;
         private readonly TimeSpan _snapshotInterval;
+        // Thread-safe set of logical block offsets written since the last snapshot.
+        private readonly System.Collections.Concurrent.ConcurrentBag<long> _dirtyBlocks = new();
 
         /// <summary>
         /// Initializes FlexRAID FR strategy with configurable snapshot interval.
@@ -688,7 +690,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
                 if (progressCallback != null)
                 {
                     var elapsed = DateTime.UtcNow - startTime;
-                    var speed = bytesRebuilt / elapsed.TotalSeconds;
+                    var speed = elapsed.TotalSeconds > 0 ? bytesRebuilt / elapsed.TotalSeconds : bytesRebuilt;
                     var remaining = speed > 0 ? (long)((totalBytes - bytesRebuilt) / speed) : 0;
 
                     progressCallback.Report(new RebuildProgress(
@@ -731,8 +733,10 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
 
         private void RecordDirtyBlock(long offset, int blockCount)
         {
-            // Track blocks that need parity update at next snapshot
-            // In production, this would be persisted to maintain consistency
+            // Track blocks written since the last snapshot so UpdateParityForDirtyBlocksAsync
+            // can recompute parity for exactly those stripes at snapshot time.
+            for (int i = 0; i < blockCount; i++)
+                _dirtyBlocks.Add(offset + (long)i * _chunkSize);
         }
 
         private SnapshotInfo? GetLatestSnapshot()
@@ -777,9 +781,32 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
             StripeInfo stripeInfo,
             CancellationToken cancellationToken)
         {
-            // In production, iterate through dirty block list and update parity
-            // For simulation, we'll just acknowledge the update
-            await Task.Yield();
+            // Drain the dirty block set, recompute XOR parity for each dirty stripe,
+            // and flush the new parity to the parity disk.
+            if (_dirtyBlocks.IsEmpty || stripeInfo.ParityDisks.Length == 0) return;
+
+            var parityDisk = disks[stripeInfo.ParityDisks[0]];
+            var processed = new System.Collections.Generic.HashSet<long>();
+
+            // Drain: take all currently-recorded dirty offsets.
+            while (_dirtyBlocks.TryTake(out var offset))
+            {
+                if (!processed.Add(offset)) continue;
+                cancellationToken.ThrowIfCancellationRequested();
+
+                // Read each data disk's chunk for this stripe.
+                var parity = new byte[_chunkSize];
+                foreach (var diskIndex in stripeInfo.DataDisks)
+                {
+                    if (diskIndex >= disks.Count) continue;
+                    var chunk = await ReadFromDiskAsync(disks[diskIndex], offset, _chunkSize, cancellationToken);
+                    for (int i = 0; i < _chunkSize && i < chunk.Length; i++)
+                        parity[i] ^= chunk[i];
+                }
+
+                // Write updated parity to the parity disk.
+                await WriteToDiskAsync(parityDisk, parity, offset, cancellationToken);
+            }
         }
 
         private byte[] CalculateXorParity(List<byte[]> chunks)

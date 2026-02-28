@@ -308,10 +308,53 @@ public sealed class GrafanaTemplates
 }
 
 /// <summary>
+/// Provides read-only access to live RAID array state for the CLI and REST API.
+/// </summary>
+public interface IRaidStateProvider
+{
+    IReadOnlyList<ArraySummary> GetArraySummaries();
+    ArraySummary? GetArray(string arrayId);
+    ArrayMetricsSummary GetMetrics();
+}
+
+/// <summary>Summary of a RAID array for CLI/REST responses.</summary>
+public sealed class ArraySummary
+{
+    public string ArrayId { get; set; } = string.Empty;
+    public string RaidLevel { get; set; } = string.Empty;
+    public string HealthStatus { get; set; } = string.Empty;
+    public int TotalDisks { get; set; }
+    public int HealthyDisks { get; set; }
+    public long CapacityBytes { get; set; }
+    public long UsedBytes { get; set; }
+}
+
+/// <summary>Aggregate metrics snapshot for CLI/REST responses.</summary>
+public sealed class ArrayMetricsSummary
+{
+    public double ReadIops { get; set; }
+    public double WriteIops { get; set; }
+    public double ThroughputReadMBps { get; set; }
+    public double ThroughputWriteMBps { get; set; }
+    public double LatencyReadMs { get; set; }
+    public double LatencyWriteMs { get; set; }
+}
+
+/// <summary>
 /// 91.H2.1: CLI Commands - Comprehensive RAID CLI.
+/// Uses <see cref="IRaidStateProvider"/> to report actual array state rather than fabricated values.
 /// </summary>
 public sealed class RaidCliCommands
 {
+    private readonly IRaidStateProvider? _stateProvider;
+
+    public RaidCliCommands() { }
+
+    public RaidCliCommands(IRaidStateProvider stateProvider)
+    {
+        _stateProvider = stateProvider;
+    }
+
     public CliResult Execute(string command, string[] args)
     {
         var parts = command.Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -338,43 +381,100 @@ public sealed class RaidCliCommands
 
     private CliResult GetStatus(string[] args)
     {
-        var arrayId = args.FirstOrDefault() ?? "all";
-        return new CliResult
+        var arrayId = args.FirstOrDefault();
+        if (_stateProvider != null)
         {
-            Success = true,
-            Output = $"Array: {arrayId}\nStatus: Healthy\nDisks: 4/4\nCapacity: 4TB\nUsed: 2TB (50%)"
-        };
+            if (arrayId != null && arrayId != "all")
+            {
+                var arr = _stateProvider.GetArray(arrayId);
+                if (arr == null)
+                    return new CliResult { Success = false, Output = $"Array not found: {arrayId}" };
+                return new CliResult
+                {
+                    Success = true,
+                    Output = $"Array: {arr.ArrayId}\nStatus: {arr.HealthStatus}\nLevel: {arr.RaidLevel}\n" +
+                             $"Disks: {arr.HealthyDisks}/{arr.TotalDisks}\n" +
+                             $"Capacity: {arr.CapacityBytes / 1024 / 1024 / 1024} GB\n" +
+                             $"Used: {arr.UsedBytes / 1024 / 1024 / 1024} GB " +
+                             $"({(arr.CapacityBytes > 0 ? arr.UsedBytes * 100 / arr.CapacityBytes : 0)}%)"
+                };
+            }
+
+            var summaries = _stateProvider.GetArraySummaries();
+            if (summaries.Count == 0)
+                return new CliResult { Success = true, Output = "No arrays configured." };
+            var sb = new StringBuilder();
+            foreach (var a in summaries)
+                sb.AppendLine($"  {a.ArrayId} ({a.RaidLevel}, {a.HealthStatus}, {a.HealthyDisks}/{a.TotalDisks} disks)");
+            return new CliResult { Success = true, Output = sb.ToString().TrimEnd() };
+        }
+        return new CliResult { Success = false, Output = "No state provider configured. Wire IRaidStateProvider to enable live status." };
     }
 
-    private CliResult ListArrays(string[] args) =>
-        new() { Success = true, Output = "Arrays:\n  array-1 (RAID5, Healthy)\n  array-2 (RAID10, Degraded)" };
+    private CliResult ListArrays(string[] args)
+    {
+        if (_stateProvider != null)
+        {
+            var arrays = _stateProvider.GetArraySummaries();
+            if (arrays.Count == 0)
+                return new CliResult { Success = true, Output = "No arrays configured." };
+            var sb = new StringBuilder("Arrays:\n");
+            foreach (var a in arrays)
+                sb.AppendLine($"  {a.ArrayId} ({a.RaidLevel}, {a.HealthStatus})");
+            return new CliResult { Success = true, Output = sb.ToString().TrimEnd() };
+        }
+        return new CliResult { Success = false, Output = "No state provider configured." };
+    }
 
     private CliResult CreateArray(string[] args) =>
-        new() { Success = true, Output = $"Created array: {args.FirstOrDefault() ?? "new-array"}" };
+        new() { Success = true, Output = $"Array creation requested: {args.FirstOrDefault() ?? "new-array"}. Initiate via RaidConfiguration API." };
 
     private CliResult DeleteArray(string[] args) =>
-        new() { Success = true, Output = $"Deleted array: {args.FirstOrDefault()}" };
+        new() { Success = true, Output = $"Array deletion requested: {args.FirstOrDefault()}. Confirm via RaidConfiguration API." };
 
     private CliResult StartRebuild(string[] args) =>
-        new() { Success = true, Output = "Rebuild started" };
+        new() { Success = true, Output = "Rebuild requested. Initiate via IRaidStrategy.RebuildAsync()." };
 
     private CliResult StartScrub(string[] args) =>
-        new() { Success = true, Output = "Scrub started" };
+        new() { Success = true, Output = "Scrub requested. Initiate via IRaidStrategy.ScrubAsync()." };
 
     private CliResult AddDisk(string[] args) =>
-        new() { Success = true, Output = "Disk added" };
+        new() { Success = true, Output = "Disk add requested. Initiate via IRaidStrategy.AddDiskAsync()." };
 
     private CliResult RemoveDisk(string[] args) =>
-        new() { Success = true, Output = "Disk removed" };
+        new() { Success = true, Output = "Disk remove requested. Initiate via IRaidStrategy.RemoveDiskAsync()." };
 
     private CliResult ReplaceDisk(string[] args) =>
-        new() { Success = true, Output = "Disk replacement initiated" };
+        new() { Success = true, Output = "Disk replacement requested. Initiate via IRaidStrategy.ReplaceDiskAsync()." };
 
-    private CliResult GetHealth(string[] args) =>
-        new() { Success = true, Output = "All arrays healthy" };
+    private CliResult GetHealth(string[] args)
+    {
+        if (_stateProvider != null)
+        {
+            var arrays = _stateProvider.GetArraySummaries();
+            var degraded = arrays.Where(a => a.HealthStatus != "Healthy").ToList();
+            return degraded.Count == 0
+                ? new CliResult { Success = true, Output = $"All {arrays.Count} array(s) healthy." }
+                : new CliResult { Success = true, Output = $"{degraded.Count} array(s) degraded: {string.Join(", ", degraded.Select(a => $"{a.ArrayId}({a.HealthStatus})"))}" };
+        }
+        return new CliResult { Success = false, Output = "No state provider configured." };
+    }
 
-    private CliResult GetMetrics(string[] args) =>
-        new() { Success = true, Output = "IOPS: 15000\nThroughput: 500 MB/s\nLatency: 2ms" };
+    private CliResult GetMetrics(string[] args)
+    {
+        if (_stateProvider != null)
+        {
+            var m = _stateProvider.GetMetrics();
+            return new CliResult
+            {
+                Success = true,
+                Output = $"Read IOPS: {m.ReadIops:F0}\nWrite IOPS: {m.WriteIops:F0}\n" +
+                         $"Read Throughput: {m.ThroughputReadMBps:F1} MB/s\nWrite Throughput: {m.ThroughputWriteMBps:F1} MB/s\n" +
+                         $"Read Latency: {m.LatencyReadMs:F2} ms\nWrite Latency: {m.LatencyWriteMs:F2} ms"
+            };
+        }
+        return new CliResult { Success = false, Output = "No state provider configured." };
+    }
 
     private CliResult ShowHelp(string[] args) =>
         new() { Success = true, Output = "Commands: status, list, create, delete, rebuild, scrub, add-disk, remove-disk, replace-disk, health, metrics, help" };
@@ -382,9 +482,19 @@ public sealed class RaidCliCommands
 
 /// <summary>
 /// 91.H2.2: REST API - RAID management via REST.
+/// Uses <see cref="IRaidStateProvider"/> to return live array state.
 /// </summary>
 public sealed class RaidRestApi
 {
+    private readonly IRaidStateProvider? _stateProvider;
+
+    public RaidRestApi() { }
+
+    public RaidRestApi(IRaidStateProvider stateProvider)
+    {
+        _stateProvider = stateProvider;
+    }
+
     public ApiResponse HandleRequest(string method, string path, string? body = null)
     {
         return (method.ToUpper(), path.ToLower()) switch
@@ -401,29 +511,53 @@ public sealed class RaidRestApi
         };
     }
 
-    private ApiResponse GetArrays() =>
-        new() { StatusCode = 200, Body = JsonSerializer.Serialize(new { arrays = new[] { "array-1", "array-2" } }) };
+    private ApiResponse GetArrays()
+    {
+        if (_stateProvider == null)
+            return new ApiResponse { StatusCode = 503, Body = JsonSerializer.Serialize(new { error = "State provider not configured" }) };
+        var arrays = _stateProvider.GetArraySummaries().Select(a => new { a.ArrayId, a.RaidLevel, a.HealthStatus, a.TotalDisks, a.HealthyDisks });
+        return new() { StatusCode = 200, Body = JsonSerializer.Serialize(new { arrays }) };
+    }
 
-    private ApiResponse GetArray(string id) =>
-        new() { StatusCode = 200, Body = JsonSerializer.Serialize(new { id, status = "healthy", level = "raid5" }) };
+    private ApiResponse GetArray(string id)
+    {
+        if (_stateProvider == null)
+            return new ApiResponse { StatusCode = 503, Body = JsonSerializer.Serialize(new { error = "State provider not configured" }) };
+        var arr = _stateProvider.GetArray(id);
+        if (arr == null)
+            return new ApiResponse { StatusCode = 404, Body = JsonSerializer.Serialize(new { error = $"Array '{id}' not found" }) };
+        return new() { StatusCode = 200, Body = JsonSerializer.Serialize(new { arr.ArrayId, arr.RaidLevel, arr.HealthStatus, arr.TotalDisks, arr.HealthyDisks, arr.CapacityBytes, arr.UsedBytes }) };
+    }
 
     private ApiResponse CreateArray(string? body) =>
-        new() { StatusCode = 201, Body = JsonSerializer.Serialize(new { id = "new-array", created = true }) };
+        new() { StatusCode = 202, Body = JsonSerializer.Serialize(new { status = "accepted", message = "Array creation must be initiated via IRaidStrategy.InitializeAsync()" }) };
 
     private ApiResponse DeleteArray(string id) =>
-        new() { StatusCode = 200, Body = JsonSerializer.Serialize(new { id, deleted = true }) };
+        new() { StatusCode = 202, Body = JsonSerializer.Serialize(new { status = "accepted", message = $"Array '{id}' deletion must be confirmed via management API" }) };
 
     private ApiResponse StartRebuild(string path) =>
-        new() { StatusCode = 202, Body = JsonSerializer.Serialize(new { status = "rebuild_started" }) };
+        new() { StatusCode = 202, Body = JsonSerializer.Serialize(new { status = "accepted", message = "Rebuild must be initiated via IRaidStrategy.RebuildAsync()" }) };
 
     private ApiResponse StartScrub(string path) =>
-        new() { StatusCode = 202, Body = JsonSerializer.Serialize(new { status = "scrub_started" }) };
+        new() { StatusCode = 202, Body = JsonSerializer.Serialize(new { status = "accepted", message = "Scrub must be initiated via IRaidStrategy.ScrubAsync()" }) };
 
-    private ApiResponse GetMetrics() =>
-        new() { StatusCode = 200, Body = JsonSerializer.Serialize(new { iops = 15000, throughput_mbps = 500 }) };
+    private ApiResponse GetMetrics()
+    {
+        if (_stateProvider == null)
+            return new ApiResponse { StatusCode = 503, Body = JsonSerializer.Serialize(new { error = "State provider not configured" }) };
+        var m = _stateProvider.GetMetrics();
+        return new() { StatusCode = 200, Body = JsonSerializer.Serialize(new { read_iops = m.ReadIops, write_iops = m.WriteIops, read_throughput_mbps = m.ThroughputReadMBps, write_throughput_mbps = m.ThroughputWriteMBps, read_latency_ms = m.LatencyReadMs, write_latency_ms = m.LatencyWriteMs }) };
+    }
 
-    private ApiResponse GetHealth() =>
-        new() { StatusCode = 200, Body = JsonSerializer.Serialize(new { status = "healthy", arrays = 2, degraded = 0 }) };
+    private ApiResponse GetHealth()
+    {
+        if (_stateProvider == null)
+            return new ApiResponse { StatusCode = 503, Body = JsonSerializer.Serialize(new { error = "State provider not configured" }) };
+        var arrays = _stateProvider.GetArraySummaries();
+        var degraded = arrays.Count(a => a.HealthStatus != "Healthy");
+        var status = degraded == 0 ? "healthy" : "degraded";
+        return new() { StatusCode = 200, Body = JsonSerializer.Serialize(new { status, total_arrays = arrays.Count, degraded_arrays = degraded }) };
+    }
 }
 
 /// <summary>
@@ -472,8 +606,44 @@ public sealed class ScheduledOperations
 
     private DateTime CalculateNextRun(string cronExpression)
     {
-        // Simplified - in production would use NCrontab or similar
-        return DateTime.UtcNow.Date.AddDays(1).AddHours(2); // Default: 2 AM tomorrow
+        // Parse a 5-field cron expression (minute hour dom month dow).
+        // Supports numeric values and '*' wildcards.
+        var now = DateTime.UtcNow;
+        var parts = cronExpression.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 5)
+        {
+            // Malformed cron - default to 1 hour from now.
+            return now.AddHours(1);
+        }
+
+        int ParseField(string field, int current, int min, int max)
+        {
+            if (field == "*") return current;
+            if (int.TryParse(field, out var v) && v >= min && v <= max) return v;
+            return current;
+        }
+
+        var minute = ParseField(parts[0], now.Minute, 0, 59);
+        var hour = ParseField(parts[1], now.Hour, 0, 23);
+        var dom = ParseField(parts[2], now.Day, 1, 31);
+
+        // Build the next candidate run time.
+        var candidate = new DateTime(now.Year, now.Month,
+            Math.Min(dom, DateTime.DaysInMonth(now.Year, now.Month)),
+            hour, minute, 0, DateTimeKind.Utc);
+
+        // Advance by one period (day if dom-based, otherwise minute-granularity).
+        if (candidate <= now)
+        {
+            if (parts[2] == "*" && parts[1] != "*")
+                candidate = candidate.AddDays(1);  // Daily job: next day same time
+            else if (parts[0] != "*" && parts[1] == "*")
+                candidate = candidate.AddHours(1); // Hourly job: next hour
+            else
+                candidate = candidate.AddDays(1);  // Default: advance by 1 day
+        }
+
+        return candidate;
     }
 }
 
@@ -576,34 +746,61 @@ public sealed class ComplianceReporter
         return report;
     }
 
-    private List<ComplianceCheck> CheckSoc2Compliance(IReadOnlyList<AuditEntry> entries) =>
-        new()
-        {
-            new() { Name = "Access Control", Passed = true, Description = "All operations logged with user ID" },
-            new() { Name = "Data Integrity", Passed = true, Description = "All write operations verified" },
-            new() { Name = "Availability", Passed = entries.All(e => e.Result == AuditResult.Success), Description = "System availability" }
-        };
+    private List<ComplianceCheck> CheckSoc2Compliance(IReadOnlyList<AuditEntry> entries)
+    {
+        var hasUserIds = entries.Count == 0 || entries.All(e => !string.IsNullOrWhiteSpace(e.UserId));
+        var failedOps = entries.Where(e => e.Result == AuditResult.Failure).ToList();
+        var successRate = entries.Count > 0 ? (double)(entries.Count - failedOps.Count) / entries.Count : 1.0;
+        var availabilityPassed = successRate >= 0.995; // 99.5% minimum for SOC 2 Type II
 
-    private List<ComplianceCheck> CheckHipaaCompliance(IReadOnlyList<AuditEntry> entries) =>
-        new()
+        return new()
         {
-            new() { Name = "Access Logging", Passed = true, Description = "PHI access logged" },
-            new() { Name = "Encryption", Passed = true, Description = "Data at rest encrypted" }
+            new() { Name = "Access Control", Passed = hasUserIds, Description = hasUserIds ? "All operations logged with user ID" : $"{entries.Count(e => string.IsNullOrWhiteSpace(e.UserId))} operations missing user ID" },
+            new() { Name = "Data Integrity", Passed = failedOps.Count == 0, Description = failedOps.Count == 0 ? "All write operations succeeded" : $"{failedOps.Count} failed operations detected" },
+            new() { Name = "Availability", Passed = availabilityPassed, Description = $"Success rate: {successRate:P2} (required >= 99.5%)" }
         };
+    }
 
-    private List<ComplianceCheck> CheckGdprCompliance(IReadOnlyList<AuditEntry> entries) =>
-        new()
-        {
-            new() { Name = "Data Processing", Passed = true, Description = "Processing activities logged" },
-            new() { Name = "Right to Access", Passed = true, Description = "Audit trail available" }
-        };
+    private List<ComplianceCheck> CheckHipaaCompliance(IReadOnlyList<AuditEntry> entries)
+    {
+        // HIPAA requires audit logs to record who accessed PHI and when.
+        var allLogged = entries.Count == 0 || entries.All(e => !string.IsNullOrWhiteSpace(e.UserId) && e.Timestamp != default);
+        var unauthorizedAccess = entries.Any(e => e.Result == AuditResult.Failure && e.Operation.Contains("read", StringComparison.OrdinalIgnoreCase));
 
-    private List<ComplianceCheck> CheckPciCompliance(IReadOnlyList<AuditEntry> entries) =>
-        new()
+        return new()
         {
-            new() { Name = "Cardholder Data", Passed = true, Description = "Access restricted and logged" },
-            new() { Name = "Security Controls", Passed = true, Description = "Controls in place" }
+            new() { Name = "Access Logging", Passed = allLogged, Description = allLogged ? "All PHI access logged with user and timestamp" : "Some access entries are missing user ID or timestamp" },
+            new() { Name = "No Unauthorized Access", Passed = !unauthorizedAccess, Description = unauthorizedAccess ? "Unauthorized read attempts detected" : "No unauthorized read attempts" }
         };
+    }
+
+    private List<ComplianceCheck> CheckGdprCompliance(IReadOnlyList<AuditEntry> entries)
+    {
+        // GDPR requires data processing activities to be logged and auditable.
+        var processingLogged = entries.Count == 0 || entries.Any(e => e.Operation.Contains("write", StringComparison.OrdinalIgnoreCase) || e.Operation.Contains("delete", StringComparison.OrdinalIgnoreCase));
+        var auditTrailAvailable = entries.Count > 0;
+
+        return new()
+        {
+            new() { Name = "Data Processing", Passed = processingLogged, Description = processingLogged ? "Data processing activities are logged" : "No processing activities found in audit log" },
+            new() { Name = "Right to Access", Passed = auditTrailAvailable, Description = auditTrailAvailable ? $"Audit trail available ({entries.Count} entries)" : "No audit trail available — GDPR data subject requests cannot be fulfilled" }
+        };
+    }
+
+    private List<ComplianceCheck> CheckPciCompliance(IReadOnlyList<AuditEntry> entries)
+    {
+        // PCI DSS requires restricted access logging and no failed auth attempts beyond threshold.
+        var failedAuthAttempts = entries.Count(e => e.Result == AuditResult.Failure && e.Operation.Contains("auth", StringComparison.OrdinalIgnoreCase));
+        var pciFailedAuthThreshold = 6; // PCI DSS: lock account after 6 attempts
+        var authPassed = failedAuthAttempts < pciFailedAuthThreshold;
+        var allAccessLogged = entries.Count == 0 || entries.All(e => e.Timestamp != default);
+
+        return new()
+        {
+            new() { Name = "Cardholder Data Access", Passed = allAccessLogged, Description = allAccessLogged ? "All access events have timestamps" : "Some events missing timestamps" },
+            new() { Name = "Authentication Controls", Passed = authPassed, Description = authPassed ? $"Failed auth attempts ({failedAuthAttempts}) within threshold" : $"Failed auth attempts ({failedAuthAttempts}) exceed PCI DSS threshold ({pciFailedAuthThreshold})" }
+        };
+    }
 }
 
 /// <summary>

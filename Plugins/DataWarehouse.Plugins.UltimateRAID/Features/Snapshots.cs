@@ -197,11 +197,13 @@ public sealed class RaidSnapshots
 
         if (cowResult.WasShared)
         {
-            clone.SharedBlocks--;
-            clone.UniqueBlocks++;
+            // Use Interlocked to avoid lost-update races on concurrent CoW writes to the same clone.
+            Interlocked.Decrement(ref clone._sharedBlocks);
+            Interlocked.Increment(ref clone._uniqueBlocks);
         }
 
-        clone.LastModified = DateTime.UtcNow;
+        // Volatile write to timestamp is fine — last-write wins, no ordering dependency.
+        Volatile.Write(ref clone._lastModifiedTicks, DateTime.UtcNow.Ticks);
     }
 
     /// <summary>
@@ -596,57 +598,127 @@ public sealed class CowBlockManager
 {
     public const int BlockSize = 4096;
     private readonly BoundedDictionary<string, CowState> _states = new BoundedDictionary<string, CowState>(1000);
+    // stateId -> set of block indexes that have been copied to private storage
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, System.Collections.Concurrent.ConcurrentDictionary<long, byte[]>> _privateBlocks = new();
 
     public CowState CreateCowState(string arrayId, string snapshotId)
     {
+        // BlockCount is determined at runtime from the actual array capacity.
+        // It will be updated when the array is associated with a device path.
         var state = new CowState
         {
             StateId = Guid.NewGuid().ToString(),
             ArrayId = arrayId,
             SnapshotId = snapshotId,
             CreatedTime = DateTime.UtcNow,
-            BlockCount = 1000000, // Simulated
-            DataSize = 1000000L * BlockSize
+            BlockCount = 0, // Real count set externally via SetBlockCount
+            DataSize = 0
         };
         _states[state.StateId] = state;
+        _privateBlocks[state.StateId] = new System.Collections.Concurrent.ConcurrentDictionary<long, byte[]>();
         return state;
+    }
+
+    /// <summary>Updates the block count for a CoW state once the array size is known.</summary>
+    public void SetBlockCount(string stateId, long blockCount)
+    {
+        if (_states.TryGetValue(stateId, out var state))
+        {
+            state.BlockCount = blockCount;
+            state.DataSize = blockCount * BlockSize;
+        }
     }
 
     public CowState CreateCloneCowState(string arrayId, string cloneId, string sourceSnapshotId)
     {
         var state = CreateCowState(arrayId, cloneId);
-        state.ParentStateId = _states.Values.FirstOrDefault(s => s.SnapshotId == sourceSnapshotId)?.StateId;
+        var parentState = _states.Values.FirstOrDefault(s => s.SnapshotId == sourceSnapshotId);
+        state.ParentStateId = parentState?.StateId;
+        if (parentState != null)
+        {
+            // Clone starts with the same block count as its parent snapshot.
+            state.BlockCount = parentState.BlockCount;
+            state.DataSize = parentState.DataSize;
+        }
         return state;
     }
 
     public CowState? GetCowState(string stateId) =>
         _states.TryGetValue(stateId, out var state) ? state : null;
 
-    public void ReleaseCowState(string stateId) =>
+    public void ReleaseCowState(string stateId)
+    {
         _states.TryRemove(stateId, out _);
+        _privateBlocks.TryRemove(stateId, out _);
+    }
 
+    /// <summary>Returns block indexes that have been privately modified (CoW-copied) for this state.</summary>
     public IEnumerable<long> GetModifiedBlocks(string stateId) =>
-        Enumerable.Range(0, 1000).Select(i => (long)i);
+        _privateBlocks.TryGetValue(stateId, out var blocks) ? blocks.Keys : Enumerable.Empty<long>();
 
-    public IEnumerable<long> GetSharedBlocks(string stateId) =>
-        Enumerable.Range(0, 100).Select(i => (long)i);
+    /// <summary>Returns block indexes that are still shared with the parent snapshot (not yet CoW-copied).</summary>
+    public IEnumerable<long> GetSharedBlocks(string stateId)
+    {
+        if (!_states.TryGetValue(stateId, out var state) || state.BlockCount == 0)
+            return Enumerable.Empty<long>();
+        var modifiedSet = _privateBlocks.TryGetValue(stateId, out var mb) ? mb : null;
+        return Enumerable.Range(0, (int)Math.Min(state.BlockCount, int.MaxValue))
+            .Select(i => (long)i)
+            .Where(i => modifiedSet == null || !modifiedSet.ContainsKey(i));
+    }
 
-    public List<long> GetDeltaBlocks(string fromSnapshotId, string toSnapshotId) =>
-        Enumerable.Range(0, 50).Select(i => (long)i).ToList();
+    /// <summary>Returns block indexes that differ between two snapshots.</summary>
+    public List<long> GetDeltaBlocks(string fromStateId, string toStateId)
+    {
+        var fromBlocks = _privateBlocks.TryGetValue(fromStateId, out var fb) ? fb : null;
+        var toBlocks = _privateBlocks.TryGetValue(toStateId, out var tb) ? tb : null;
+        if (toBlocks == null) return new List<long>();
+        return toBlocks.Keys
+            .Where(k => fromBlocks == null || !fromBlocks.ContainsKey(k) ||
+                        !fromBlocks[k].AsSpan().SequenceEqual(toBlocks[k]))
+            .ToList();
+    }
 
-    public List<long> GetAllBlocks(string stateId) =>
-        Enumerable.Range(0, 1000).Select(i => (long)i).ToList();
+    public List<long> GetAllBlocks(string stateId)
+    {
+        if (!_states.TryGetValue(stateId, out var state) || state.BlockCount == 0)
+            return new List<long>();
+        return Enumerable.Range(0, (int)Math.Min(state.BlockCount, int.MaxValue))
+            .Select(i => (long)i).ToList();
+    }
 
     public Task<CowWriteResult> CopyOnWriteAsync(string stateId, long blockIndex, byte[] data, CancellationToken ct)
     {
-        return Task.FromResult(new CowWriteResult { WasShared = true });
+        var blocks = _privateBlocks.GetOrAdd(stateId,
+            _ => new System.Collections.Concurrent.ConcurrentDictionary<long, byte[]>());
+
+        // True if this block was previously shared (not yet privately modified).
+        bool wasShared = !blocks.ContainsKey(blockIndex);
+
+        // Make a private copy of the data for this CoW state.
+        var privateCopy = new byte[BlockSize];
+        Array.Copy(data, privateCopy, Math.Min(data.Length, BlockSize));
+        blocks[blockIndex] = privateCopy;
+
+        return Task.FromResult(new CowWriteResult { WasShared = wasShared });
     }
 
-    public Task MaterializeBlockAsync(string stateId, long blockIndex, CancellationToken ct) =>
-        Task.CompletedTask;
+    public Task MaterializeBlockAsync(string stateId, long blockIndex, CancellationToken ct)
+    {
+        // Ensure the block has a private copy (materializes a zero block if not yet written).
+        var blocks = _privateBlocks.GetOrAdd(stateId,
+            _ => new System.Collections.Concurrent.ConcurrentDictionary<long, byte[]>());
+        blocks.TryAdd(blockIndex, new byte[BlockSize]);
+        return Task.CompletedTask;
+    }
 
-    public Task<byte[]> ReadBlockAsync(string stateId, long blockIndex, CancellationToken ct) =>
-        Task.FromResult(new byte[BlockSize]);
+    public Task<byte[]> ReadBlockAsync(string stateId, long blockIndex, CancellationToken ct)
+    {
+        if (_privateBlocks.TryGetValue(stateId, out var blocks) && blocks.TryGetValue(blockIndex, out var data))
+            return Task.FromResult((byte[])data.Clone());
+        // Block not privately modified — return a zeroed block; caller should read from parent array.
+        return Task.FromResult(new byte[BlockSize]);
+    }
 }
 
 /// <summary>
@@ -787,10 +859,30 @@ public sealed class Clone
     public string SourceSnapshotId { get; set; } = string.Empty;
     public string CowStateId { get; set; } = string.Empty;
     public DateTime CreatedTime { get; set; }
-    public DateTime? LastModified { get; set; }
     public CloneStatus Status { get; set; }
-    public long SharedBlocks { get; set; }
-    public long UniqueBlocks { get; set; }
+
+    // Backing fields accessed via Interlocked for thread-safe CoW counter updates.
+    internal long _sharedBlocks;
+    internal long _uniqueBlocks;
+    internal long _lastModifiedTicks;
+
+    public long SharedBlocks
+    {
+        get => Interlocked.Read(ref _sharedBlocks);
+        set => Interlocked.Exchange(ref _sharedBlocks, value);
+    }
+
+    public long UniqueBlocks
+    {
+        get => Interlocked.Read(ref _uniqueBlocks);
+        set => Interlocked.Exchange(ref _uniqueBlocks, value);
+    }
+
+    public DateTime? LastModified
+    {
+        get { var ticks = Volatile.Read(ref _lastModifiedTicks); return ticks == 0 ? null : new DateTime(ticks, DateTimeKind.Utc); }
+        set => Volatile.Write(ref _lastModifiedTicks, value?.Ticks ?? 0);
+    }
 }
 
 /// <summary>

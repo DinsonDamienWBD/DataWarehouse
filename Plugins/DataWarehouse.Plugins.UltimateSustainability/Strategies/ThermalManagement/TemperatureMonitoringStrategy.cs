@@ -96,8 +96,8 @@ public sealed class TemperatureMonitoringStrategy : SustainabilityStrategyBase
                 }
                 else
                 {
-                    // Simulate temperature
-                    zone.CurrentTempC = 40 + Random.Shared.NextDouble() * 20;
+                    // No sysfs path configured for this zone — retain last known value.
+                    // Callers should register zones with valid SysPath for live readings.
                 }
                 zone.LastUpdated = DateTimeOffset.UtcNow;
                 if (zone.CurrentTempC > zone.MaxTempC) zone.MaxTempC = zone.CurrentTempC;

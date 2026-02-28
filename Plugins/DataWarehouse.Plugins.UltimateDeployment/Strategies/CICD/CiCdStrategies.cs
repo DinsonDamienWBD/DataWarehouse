@@ -471,7 +471,7 @@ public sealed class ArgoCdStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
-        IncrementCounter("argo_cd.deploy");
+        IncrementCounter("argo_cd.rollback");
         var appName = currentState.Metadata.TryGetValue("appName", out var an) ? an?.ToString() : "";
 
         await RollbackApplicationAsync(appName!, targetVersion, ct);

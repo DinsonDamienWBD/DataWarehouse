@@ -282,12 +282,23 @@ public sealed class CarbonBudgetStore : IDisposable, IAsyncDisposable
         _debounceSaveTimer?.Dispose();
         _debounceSaveTimer = null;
 
-        // Final save if dirty — Dispose() is synchronous; use Task.Run to avoid
-        // deadlocks on synchronization-context-bound threads. Prefer DisposeAsync()
-        // for callers that can await.
+        // Final save if dirty — fire-and-forget via Task.Run so we don't block or deadlock.
+        // Callers that need guaranteed persistence should use DisposeAsync() instead.
+        // We intentionally do NOT block here to prevent ThreadPool starvation or
+        // ASP.NET synchronization context deadlocks (#4413).
         if (_dirty)
         {
-            Task.Run(() => SaveAsync(CancellationToken.None)).ConfigureAwait(false).GetAwaiter().GetResult();
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await SaveAsync(CancellationToken.None).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[CarbonBudgetStore] Background save on Dispose failed: {ex.Message}");
+                }
+            });
         }
 
         _fileLock.Dispose();

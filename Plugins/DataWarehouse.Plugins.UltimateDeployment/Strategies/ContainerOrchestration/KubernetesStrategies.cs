@@ -9,8 +9,26 @@ public sealed class KubernetesDeploymentStrategy : DeploymentStrategyBase
 {
     private readonly BoundedDictionary<string, long> _counters = new BoundedDictionary<string, long>(1000);
     private readonly BoundedDictionary<string, DeploymentState> _k8sStates = new BoundedDictionary<string, DeploymentState>(1000);
-    private DateTimeOffset? _lastHealthCheck;
-    private bool _lastHealthCheckResult = true;
+    private volatile int _lastHealthCheckResultInt = 1; // 1=true, 0=false
+    private long _lastHealthCheckTicks = 0; // Interlocked-backed DateTimeOffset ticks
+
+    private bool _lastHealthCheckResult
+    {
+        get => _lastHealthCheckResultInt != 0;
+        set => _lastHealthCheckResultInt = value ? 1 : 0;
+    }
+    private DateTimeOffset? _lastHealthCheck
+    {
+        get
+        {
+            var ticks = System.Threading.Interlocked.Read(ref _lastHealthCheckTicks);
+            return ticks == 0 ? (DateTimeOffset?)null : new DateTimeOffset(ticks, TimeSpan.Zero);
+        }
+        set
+        {
+            System.Threading.Interlocked.Exchange(ref _lastHealthCheckTicks, value?.UtcTicks ?? 0);
+        }
+    }
 
     public override DeploymentCharacteristics Characteristics { get; } = new()
     {
@@ -225,6 +243,9 @@ public sealed class KubernetesDeploymentStrategy : DeploymentStrategyBase
 
     protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct)
     {
+        if (_k8sStates.TryGetValue(deploymentId, out var cached))
+            return Task.FromResult(cached);
+
         return Task.FromResult(new DeploymentState
         {
             DeploymentId = deploymentId,

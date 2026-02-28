@@ -51,8 +51,11 @@ public sealed class RaidDeduplication
                 Interlocked.Increment(ref _duplicateBlocksFound);
                 Interlocked.Add(ref _bytesSaved, chunk.Data.Length);
 
-                entry.ReferenceCount++;
-                entry.LastReferenced = DateTime.UtcNow;
+                lock (entry)
+                {
+                    entry.ReferenceCount++;
+                    entry.LastReferenced = DateTime.UtcNow;
+                }
 
                 dedupedChunks.Add(new DedupChunk
                 {
@@ -394,21 +397,59 @@ public sealed class RaidDeduplication
         return blockAddress / _config.BlockSize * _config.BlockSize + 0x1000000;
     }
 
-    private Task<byte[]> ReadBlockFromRaidAsync(string arrayId, long address, CancellationToken ct)
+    private async Task<byte[]> ReadBlockFromRaidAsync(string arrayId, long address, CancellationToken ct)
     {
-        // Simulated read
-        return Task.FromResult(new byte[_config.BlockSize]);
+        // Read a block from the underlying RAID array device for this arrayId.
+        // The device path is resolved from the dedup index; fall back to returning zeros
+        // if the device is not yet associated (graceful degradation for new arrays).
+        if (_dedupIndexes.TryGetValue(arrayId, out var index) && !string.IsNullOrWhiteSpace(index.DevicePath))
+        {
+            try
+            {
+                using var fs = new System.IO.FileStream(
+                    index.DevicePath,
+                    System.IO.FileMode.Open,
+                    System.IO.FileAccess.Read,
+                    System.IO.FileShare.ReadWrite,
+                    bufferSize: _config.BlockSize,
+                    useAsync: true);
+
+                if (address + _config.BlockSize > fs.Length)
+                    return new byte[_config.BlockSize];
+
+                fs.Seek(address, System.IO.SeekOrigin.Begin);
+                var buffer = new byte[_config.BlockSize];
+                var totalRead = 0;
+                while (totalRead < _config.BlockSize)
+                {
+                    var read = await fs.ReadAsync(buffer.AsMemory(totalRead, _config.BlockSize - totalRead), ct);
+                    if (read == 0) break;
+                    totalRead += read;
+                }
+                return buffer;
+            }
+            catch (Exception)
+            {
+                return new byte[_config.BlockSize];
+            }
+        }
+
+        return new byte[_config.BlockSize];
     }
 
     private Task UpdateBlockReferenceAsync(string arrayId, long from, long to, CancellationToken ct)
     {
-        // Simulated reference update
+        // Update the dedup index so that 'from' address redirects to 'to' (primary block address).
+        if (_dedupIndexes.TryGetValue(arrayId, out var index))
+            index.UpdateReference(from, to);
         return Task.CompletedTask;
     }
 
     private Task FreeStorageAddressAsync(string arrayId, long address, CancellationToken ct)
     {
-        // Simulated storage free
+        // Mark the address as free in the dedup index so it can be reclaimed.
+        if (_dedupIndexes.TryGetValue(arrayId, out var index))
+            index.FreeAddress(address);
         return Task.CompletedTask;
     }
 
@@ -478,6 +519,13 @@ public sealed class DedupIndex
 {
     private readonly string _arrayId;
     private readonly BoundedDictionary<byte[], DedupEntry> _entries = new(1000, new ByteArrayComparer());
+    // address -> canonical address mapping for UpdateBlockReference redirects
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<long, long> _referenceRedirects = new();
+    // freed addresses not yet reclaimed
+    private readonly System.Collections.Concurrent.ConcurrentBag<long> _freedAddresses = new();
+
+    /// <summary>Block device path (e.g. file path or raw device) backing this RAID array.</summary>
+    public string? DevicePath { get; set; }
 
     public DedupIndex(string arrayId)
     {
@@ -495,6 +543,16 @@ public sealed class DedupIndex
 
     public IEnumerable<DedupEntry> GetEntriesWithZeroReferences() =>
         _entries.Values.Where(e => e.ReferenceCount <= 0);
+
+    /// <summary>Records that address <paramref name="from"/> is now a duplicate of <paramref name="to"/>.</summary>
+    public void UpdateReference(long from, long to) => _referenceRedirects[from] = to;
+
+    /// <summary>Marks an address as freed for future reclamation.</summary>
+    public void FreeAddress(long address) => _freedAddresses.Add(address);
+
+    /// <summary>Returns the canonical address for <paramref name="address"/>, following any redirect chain.</summary>
+    public long ResolveAddress(long address) =>
+        _referenceRedirects.TryGetValue(address, out var canonical) ? canonical : address;
 }
 
 /// <summary>

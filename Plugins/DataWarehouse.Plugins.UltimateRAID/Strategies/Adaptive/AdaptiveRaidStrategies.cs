@@ -207,68 +207,71 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
             _workloadMetrics["WriteCount"] = 0;
         }
 
-        private Task WriteWithCurrentStrategy(
+        private async Task WriteWithCurrentStrategy(
             ReadOnlyMemory<byte> data,
             List<DiskInfo> disks,
             StripeInfo stripeInfo,
             CancellationToken cancellationToken)
         {
             var chunks = DistributeData(data, stripeInfo);
+            var stripeOffset = (long)stripeInfo.StripeIndex * stripeInfo.ChunkSize;
 
             switch (_currentLevel)
             {
                 case RaidLevel.Raid0:
-                    // Stripe data across all disks - no parity
-                    foreach (var kvp in chunks)
-                    {
-                        var diskIndex = kvp.Key;
-                        var chunk = kvp.Value;
-                        // In production, would write: disks[diskIndex].Write(chunk)
-                    }
+                    // Stripe data across all data disks - no parity
+                    var writeTasks0 = chunks
+                        .Select(kvp => WriteToDiskAsync(disks[kvp.Key], kvp.Value.ToArray(), stripeOffset, cancellationToken))
+                        .ToList();
+                    await Task.WhenAll(writeTasks0);
                     break;
 
                 case RaidLevel.Raid5:
-                    // Write data chunks and calculate/write XOR parity
+                    // Write data chunks and XOR parity
                     var parity5 = CalculateXorParity(chunks.Values);
-                    var parityDisk5 = stripeInfo.ParityDisks[0];
-                    // In production: disks[parityDisk5].Write(parity5)
-                    foreach (var kvp in chunks)
-                    {
-                        // In production: disks[kvp.Key].Write(kvp.Value)
-                    }
+                    var writeTasks5 = chunks
+                        .Select(kvp => WriteToDiskAsync(disks[kvp.Key], kvp.Value.ToArray(), stripeOffset, cancellationToken))
+                        .Append(WriteToDiskAsync(disks[stripeInfo.ParityDisks[0]], parity5.ToArray(), stripeOffset, cancellationToken))
+                        .ToList();
+                    await Task.WhenAll(writeTasks5);
                     break;
 
                 case RaidLevel.Raid6:
-                    // Write data chunks and calculate/write dual parity (P+Q)
+                    // Write data chunks and dual parity (P+Q)
                     var parityP = CalculateXorParity(chunks.Values);
-                    var chunksList = chunks.Values.ToList();
-                    var parityQ = CalculateQParity(chunksList);
-                    var parityDisks6 = stripeInfo.ParityDisks;
-                    // In production: disks[parityDisks6[0]].Write(parityP)
-                    // In production: disks[parityDisks6[1]].Write(parityQ)
-                    foreach (var kvp in chunks)
-                    {
-                        // In production: disks[kvp.Key].Write(kvp.Value)
-                    }
+                    var parityQ = CalculateQParity(chunks.Values.ToList());
+                    var writeTasks6 = chunks
+                        .Select(kvp => WriteToDiskAsync(disks[kvp.Key], kvp.Value.ToArray(), stripeOffset, cancellationToken))
+                        .Append(WriteToDiskAsync(disks[stripeInfo.ParityDisks[0]], parityP.ToArray(), stripeOffset, cancellationToken))
+                        .Append(WriteToDiskAsync(disks[stripeInfo.ParityDisks[1]], parityQ.ToArray(), stripeOffset, cancellationToken))
+                        .ToList();
+                    await Task.WhenAll(writeTasks6);
                     break;
 
                 case RaidLevel.Raid10:
-                    // Write to primary disks and mirror to secondary
+                    // Write to primary disks and mirrors
                     var halfCount = disks.Count / 2;
+                    var writeTasks10 = new List<Task>();
                     foreach (var kvp in chunks)
                     {
-                        var primaryDisk = kvp.Key;
-                        var mirrorDisk = primaryDisk + halfCount;
-                        // In production: disks[primaryDisk].Write(kvp.Value)
-                        // In production: disks[mirrorDisk].Write(kvp.Value)
+                        var chunkData = kvp.Value.ToArray();
+                        writeTasks10.Add(WriteToDiskAsync(disks[kvp.Key], chunkData, stripeOffset, cancellationToken));
+                        var mirrorIdx = kvp.Key + halfCount;
+                        if (mirrorIdx < disks.Count)
+                            writeTasks10.Add(WriteToDiskAsync(disks[mirrorIdx], chunkData, stripeOffset, cancellationToken));
                     }
+                    await Task.WhenAll(writeTasks10);
+                    break;
+
+                default:
+                    // For unrecognised levels, fall back to writing all chunks to data disks.
+                    await Task.WhenAll(chunks.Select(kvp =>
+                        WriteToDiskAsync(disks[kvp.Key], kvp.Value.ToArray(), stripeOffset, cancellationToken)));
                     break;
             }
-
-            return Task.CompletedTask;
         }
 
-        private Task<ReadOnlyMemory<byte>> ReadWithCurrentStrategy(
+        private async Task<ReadOnlyMemory<byte>> ReadWithCurrentStrategy(
             List<DiskInfo> disks,
             StripeInfo stripeInfo,
             long offset,
@@ -276,81 +279,136 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
             CancellationToken cancellationToken)
         {
             var result = new byte[length];
+            var stripeOffset = (long)stripeInfo.StripeIndex * stripeInfo.ChunkSize;
+            var failedDisks = disks.Select((d, i) => (d, i)).Where(t => t.d.HealthStatus != SdkDiskHealthStatus.Healthy).Select(t => t.i).ToHashSet();
 
             switch (_currentLevel)
             {
                 case RaidLevel.Raid0:
-                    // Read striped data from all disks
-                    var position0 = 0;
-                    foreach (var diskIndex in stripeInfo.DataDisks)
+                {
+                    var position = 0;
+                    var readTasks = stripeInfo.DataDisks
+                        .Select(diskIndex => ReadFromDiskAsync(disks[diskIndex], stripeOffset, Math.Min(stripeInfo.ChunkSize, length - position), cancellationToken))
+                        .ToList();
+                    var chunks = await Task.WhenAll(readTasks);
+                    position = 0;
+                    foreach (var chunk in chunks)
                     {
-                        var chunkSize = Math.Min(stripeInfo.ChunkSize, length - position0);
-                        if (chunkSize <= 0) break;
-                        // In production: var chunk = disks[diskIndex].Read(offset, chunkSize)
-                        // Array.Copy(chunk, 0, result, position0, chunkSize)
-                        position0 += chunkSize;
+                        var copy = Math.Min(chunk.Length, length - position);
+                        if (copy <= 0) break;
+                        Array.Copy(chunk, 0, result, position, copy);
+                        position += copy;
                     }
                     break;
+                }
 
                 case RaidLevel.Raid5:
                 case RaidLevel.Raid6:
-                    // Read from data disks, reconstruct from parity if needed
+                {
                     var position = 0;
-                    var failedDisks = disks.Where(d => d.HealthStatus != SdkDiskHealthStatus.Healthy).ToList();
-
                     if (failedDisks.Count > 0)
                     {
-                        // Reconstruct using parity
-                        var chunks = new List<ReadOnlyMemory<byte>>();
-                        foreach (var diskIndex in stripeInfo.DataDisks)
+                        // Reconstruct missing chunks from XOR parity
+                        var healthyChunks = new Dictionary<int, byte[]>();
+                        foreach (var diskIndex in stripeInfo.DataDisks.Where(d => !failedDisks.Contains(d)))
                         {
-                            if (disks[diskIndex].HealthStatus == SdkDiskHealthStatus.Healthy)
-                            {
-                                // In production: chunks.Add(disks[diskIndex].Read(offset, stripeInfo.ChunkSize))
-                            }
+                            var chunkSize = stripeInfo.ChunkSize;
+                            healthyChunks[diskIndex] = await ReadFromDiskAsync(disks[diskIndex], stripeOffset, chunkSize, cancellationToken);
                         }
-                        // In production: var parity = disks[stripeInfo.ParityDisks[0]].Read(offset, stripeInfo.ChunkSize)
-                        // var reconstructed = ReconstructFromXorParity(parity, chunks)
+                        var parity = await ReadFromDiskAsync(disks[stripeInfo.ParityDisks[0]], stripeOffset, stripeInfo.ChunkSize, cancellationToken);
+                        // XOR all healthy chunks and parity to reconstruct missing chunk
+                        var reconstructed = (byte[])parity.Clone();
+                        foreach (var chunk in healthyChunks.Values)
+                            for (int i = 0; i < reconstructed.Length && i < chunk.Length; i++)
+                                reconstructed[i] ^= chunk[i];
+                        Array.Copy(reconstructed, 0, result, 0, Math.Min(reconstructed.Length, length));
                     }
                     else
                     {
-                        // Normal read from healthy disks
                         foreach (var diskIndex in stripeInfo.DataDisks)
                         {
                             var chunkSize = Math.Min(stripeInfo.ChunkSize, length - position);
                             if (chunkSize <= 0) break;
-                            // In production: var chunk = disks[diskIndex].Read(offset, chunkSize)
+                            var chunk = await ReadFromDiskAsync(disks[diskIndex], stripeOffset, chunkSize, cancellationToken);
+                            Array.Copy(chunk, 0, result, position, Math.Min(chunk.Length, chunkSize));
                             position += chunkSize;
                         }
                     }
                     break;
+                }
 
                 case RaidLevel.Raid10:
-                    // Read from primary or mirror depending on availability
-                    var position10 = 0;
-                    var halfCount10 = disks.Count / 2;
+                {
+                    var position = 0;
+                    var halfCount = disks.Count / 2;
                     foreach (var diskIndex in stripeInfo.DataDisks)
                     {
-                        var chunkSize = Math.Min(stripeInfo.ChunkSize, length - position10);
+                        var chunkSize = Math.Min(stripeInfo.ChunkSize, length - position);
                         if (chunkSize <= 0) break;
-
-                        var primaryDisk = disks[diskIndex];
-                        if (primaryDisk.HealthStatus == SdkDiskHealthStatus.Healthy)
-                        {
-                            // In production: var chunk = disks[diskIndex].Read(offset, chunkSize)
-                        }
-                        else
-                        {
-                            // Read from mirror
-                            var mirrorDisk = diskIndex + halfCount10;
-                            // In production: var chunk = disks[mirrorDisk].Read(offset, chunkSize)
-                        }
-                        position10 += chunkSize;
+                        // Read from primary or fall back to mirror
+                        var sourceIndex = !failedDisks.Contains(diskIndex) ? diskIndex
+                            : (diskIndex + halfCount < disks.Count ? diskIndex + halfCount : diskIndex);
+                        var chunk = await ReadFromDiskAsync(disks[sourceIndex], stripeOffset, chunkSize, cancellationToken);
+                        Array.Copy(chunk, 0, result, position, Math.Min(chunk.Length, chunkSize));
+                        position += chunkSize;
                     }
                     break;
+                }
+
+                default:
+                {
+                    // Generic: read from first healthy data disk
+                    var sourceDisk = stripeInfo.DataDisks.FirstOrDefault(i => !failedDisks.Contains(i));
+                    if (sourceDisk >= 0 && sourceDisk < disks.Count)
+                    {
+                        var chunk = await ReadFromDiskAsync(disks[sourceDisk], stripeOffset, length, cancellationToken);
+                        Array.Copy(chunk, 0, result, 0, Math.Min(chunk.Length, length));
+                    }
+                    break;
+                }
             }
 
-            return Task.FromResult<ReadOnlyMemory<byte>>(result);
+            return result;
+        }
+
+        private static async Task WriteToDiskAsync(DiskInfo disk, byte[] data, long offset, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(disk.Location)) return;
+            using var fs = new System.IO.FileStream(
+                disk.Location, System.IO.FileMode.OpenOrCreate,
+                System.IO.FileAccess.Write, System.IO.FileShare.Read,
+                bufferSize: 65536, useAsync: true);
+            fs.Seek(offset, System.IO.SeekOrigin.Begin);
+            await fs.WriteAsync(data, ct);
+            await fs.FlushAsync(ct);
+        }
+
+        private static async Task<byte[]> ReadFromDiskAsync(DiskInfo disk, long offset, int length, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(disk.Location) || !System.IO.File.Exists(disk.Location))
+                return new byte[length];
+            using var fs = new System.IO.FileStream(
+                disk.Location, System.IO.FileMode.Open,
+                System.IO.FileAccess.Read, System.IO.FileShare.ReadWrite,
+                bufferSize: 65536, useAsync: true);
+            if (offset >= fs.Length) return new byte[length];
+            var actualLength = (int)Math.Min(length, fs.Length - offset);
+            fs.Seek(offset, System.IO.SeekOrigin.Begin);
+            var buffer = new byte[actualLength];
+            var totalRead = 0;
+            while (totalRead < actualLength)
+            {
+                var read = await fs.ReadAsync(buffer.AsMemory(totalRead, actualLength - totalRead), ct);
+                if (read == 0) break;
+                totalRead += read;
+            }
+            if (totalRead < length)
+            {
+                var padded = new byte[length];
+                Array.Copy(buffer, padded, totalRead);
+                return padded;
+            }
+            return buffer;
         }
 
         private ReadOnlyMemory<byte> CalculateQParity(List<ReadOnlyMemory<byte>> chunks)

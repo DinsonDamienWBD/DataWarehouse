@@ -154,6 +154,11 @@ public sealed class XtsAes256Strategy : EncryptionStrategyBase
         aesKey1.Padding = PaddingMode.None;
 
         using var encryptor1 = aesKey1.CreateEncryptor();
+        // Use TransformBlock (not TransformFinalBlock) for all blocks inside the loop.
+        // TransformFinalBlock resets internal ICryptoTransform state after each call, which
+        // makes the next call independent (correct for ECB mode), but is ~2x slower than
+        // TransformBlock and has unnecessary overhead for multi-block processing (#2944).
+        var encBuf = new byte[AesBlockSize];
 
         for (int i = 0; i < blockCount; i++)
         {
@@ -164,13 +169,13 @@ public sealed class XtsAes256Strategy : EncryptionStrategyBase
             // XOR plaintext with tweak
             XorBlocks(plaintextBlock, tweak);
 
-            // Encrypt with AES
-            var encryptedBlock = encryptor1.TransformFinalBlock(plaintextBlock, 0, AesBlockSize);
+            // Encrypt with AES using TransformBlock for efficiency
+            encryptor1.TransformBlock(plaintextBlock, 0, AesBlockSize, encBuf, 0);
 
             // XOR result with tweak
-            XorBlocks(encryptedBlock, tweak);
+            XorBlocks(encBuf, tweak);
 
-            Buffer.BlockCopy(encryptedBlock, 0, ciphertext, blockOffset, AesBlockSize);
+            Buffer.BlockCopy(encBuf, 0, ciphertext, blockOffset, AesBlockSize);
 
             // Multiply tweak by alpha (primitive element in GF(2^128))
             MultiplyTweakByAlpha(tweak);
@@ -191,12 +196,12 @@ public sealed class XtsAes256Strategy : EncryptionStrategyBase
             Buffer.BlockCopy(lastFullBlock, 0, ciphertext, blockCount * AesBlockSize, remainder);
             Buffer.BlockCopy(partialBlock, 0, lastFullBlock, 0, remainder);
 
-            // Re-encrypt the modified last block
+            // Re-encrypt the modified last block using TransformBlock
             XorBlocks(lastFullBlock, tweak);
-            var finalBlock = encryptor1.TransformFinalBlock(lastFullBlock, 0, AesBlockSize);
-            XorBlocks(finalBlock, tweak);
+            encryptor1.TransformBlock(lastFullBlock, 0, AesBlockSize, encBuf, 0);
+            XorBlocks(encBuf, tweak);
 
-            Buffer.BlockCopy(finalBlock, 0, ciphertext, (blockCount - 1) * AesBlockSize, AesBlockSize);
+            Buffer.BlockCopy(encBuf, 0, ciphertext, (blockCount - 1) * AesBlockSize, AesBlockSize);
         }
 
         return ciphertext;
@@ -239,6 +244,7 @@ public sealed class XtsAes256Strategy : EncryptionStrategyBase
         aesKey1.Padding = PaddingMode.None;
 
         using var decryptor = aesKey1.CreateDecryptor();
+        var decBuf = new byte[AesBlockSize];
 
         for (int i = 0; i < blockCount; i++)
         {
@@ -247,10 +253,11 @@ public sealed class XtsAes256Strategy : EncryptionStrategyBase
             Buffer.BlockCopy(ciphertext, blockOffset, ciphertextBlock, 0, AesBlockSize);
 
             XorBlocks(ciphertextBlock, tweak);
-            var decryptedBlock = decryptor.TransformFinalBlock(ciphertextBlock, 0, AesBlockSize);
-            XorBlocks(decryptedBlock, tweak);
+            // Use TransformBlock for efficiency (#2944)
+            decryptor.TransformBlock(ciphertextBlock, 0, AesBlockSize, decBuf, 0);
+            XorBlocks(decBuf, tweak);
 
-            Buffer.BlockCopy(decryptedBlock, 0, plaintext, blockOffset, AesBlockSize);
+            Buffer.BlockCopy(decBuf, 0, plaintext, blockOffset, AesBlockSize);
             MultiplyTweakByAlpha(tweak);
         }
 
@@ -268,10 +275,10 @@ public sealed class XtsAes256Strategy : EncryptionStrategyBase
             Buffer.BlockCopy(partialBlock, 0, lastFullBlock, 0, remainder);
 
             XorBlocks(lastFullBlock, tweak);
-            var finalBlock = decryptor.TransformFinalBlock(lastFullBlock, 0, AesBlockSize);
-            XorBlocks(finalBlock, tweak);
+            decryptor.TransformBlock(lastFullBlock, 0, AesBlockSize, decBuf, 0);
+            XorBlocks(decBuf, tweak);
 
-            Buffer.BlockCopy(finalBlock, 0, plaintext, (blockCount - 1) * AesBlockSize, AesBlockSize);
+            Buffer.BlockCopy(decBuf, 0, plaintext, (blockCount - 1) * AesBlockSize, AesBlockSize);
         }
 
         return plaintext;
@@ -499,10 +506,16 @@ public sealed class AdiantumStrategy : EncryptionStrategyBase
             }
         }
 
-        // Return first 16 bytes of hash
+        // Return 16 bytes of hash using both halves of the accumulator (#2945).
+        // The previous code wrote (accumulator >> 32) zero-extended to 64 bits into bytes 8-15,
+        // making the high word always zero. We now write the two 32-bit halves independently.
         var hashBytes = new byte[16];
         BitConverter.TryWriteBytes(hashBytes.AsSpan(0, 8), accumulator);
-        BitConverter.TryWriteBytes(hashBytes.AsSpan(8, 8), accumulator >> 32);
+        // Bytes 8-11: high 32 bits of accumulator; bytes 12-15: low 32 bits for mixing
+        uint hi32 = (uint)(accumulator >> 32);
+        uint lo32 = (uint)(accumulator & 0xFFFFFFFFu);
+        BitConverter.TryWriteBytes(hashBytes.AsSpan(8, 4), hi32);
+        BitConverter.TryWriteBytes(hashBytes.AsSpan(12, 4), lo32 ^ hi32); // simple diffusion
         return hashBytes;
     }
 

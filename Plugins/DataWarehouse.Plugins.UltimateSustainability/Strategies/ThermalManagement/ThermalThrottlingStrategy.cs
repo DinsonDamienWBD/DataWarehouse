@@ -62,19 +62,35 @@ public sealed class ThermalThrottlingStrategy : SustainabilityStrategyBase
 
     private async Task CheckAndThrottleAsync()
     {
-        var temp = _temperatureProvider != null ? await _temperatureProvider() : 50 + Random.Shared.NextDouble() * 30;
-        lock (_lock) _currentTemp = temp;
+        // If no provider is configured, read temperature from hwmon sysfs (Linux)
+        // or return the last known temperature (stable, no simulation).
+        double temp;
+        if (_temperatureProvider != null)
+        {
+            temp = await _temperatureProvider();
+        }
+        else
+        {
+            temp = ReadTemperatureFromSysFs() ?? _currentTemp;
+        }
+
+        ThrottleLevel prevLevel;
+        lock (_lock)
+        {
+            _currentTemp = temp;
+            prevLevel = _currentLevel;
+        }
 
         var newLevel = temp switch
         {
             >= 100 => ThrottleLevel.Emergency,
-            >= 92 => ThrottleLevel.Heavy,
-            >= 85 => ThrottleLevel.Moderate,
-            >= 75 => ThrottleLevel.Light,
-            _ => ThrottleLevel.None
+            >= 92  => ThrottleLevel.Heavy,
+            >= 85  => ThrottleLevel.Moderate,
+            >= 75  => ThrottleLevel.Light,
+            _      => ThrottleLevel.None
         };
 
-        if (newLevel != _currentLevel)
+        if (newLevel != prevLevel)
         {
             await ApplyThrottleLevelAsync(newLevel);
             lock (_lock) _currentLevel = newLevel;
@@ -83,6 +99,39 @@ public sealed class ThermalThrottlingStrategy : SustainabilityStrategyBase
         }
 
         UpdateRecommendations();
+    }
+
+    private static double? ReadTemperatureFromSysFs()
+    {
+        if (!System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Linux))
+            return null;
+
+        try
+        {
+            // Read first available CPU thermal zone
+            var thermalBase = "/sys/class/thermal";
+            if (!Directory.Exists(thermalBase)) return null;
+
+            foreach (var zoneDir in Directory.GetDirectories(thermalBase, "thermal_zone*"))
+            {
+                var typePath = Path.Combine(zoneDir, "type");
+                var tempPath = Path.Combine(zoneDir, "temp");
+                if (!File.Exists(tempPath)) continue;
+
+                // Prefer x86_pkg_temp or cpu-thermal zones
+                var type = File.Exists(typePath) ? File.ReadAllText(typePath).Trim() : string.Empty;
+                if (!type.Contains("cpu", StringComparison.OrdinalIgnoreCase) &&
+                    !type.Contains("pkg", StringComparison.OrdinalIgnoreCase) &&
+                    !type.Contains("thermal", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                if (int.TryParse(File.ReadAllText(tempPath).Trim(), out var tempMilliC))
+                    return tempMilliC / 1000.0;
+            }
+        }
+        catch { /* Sysfs not accessible */ }
+
+        return null;
     }
 
     private async Task ApplyThrottleLevelAsync(ThrottleLevel level)

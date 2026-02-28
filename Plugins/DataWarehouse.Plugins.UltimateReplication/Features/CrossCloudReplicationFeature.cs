@@ -136,8 +136,14 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
                 {
                     Interlocked.Add(ref _totalBytesReplicated, data.Length);
                     var egressCost = EstimateEgressCost(data.Length, sourceProvider, targetProvider);
-                    Interlocked.Exchange(ref _totalEgressCostEstimate,
-                        Volatile.Read(ref _totalEgressCostEstimate) + egressCost);
+                    // CAS retry loop for atomic double accumulation
+                    double prev, updated;
+                    do
+                    {
+                        prev = Volatile.Read(ref _totalEgressCostEstimate);
+                        updated = prev + egressCost;
+                    }
+                    while (Interlocked.CompareExchange(ref _totalEgressCostEstimate, updated, prev) != prev);
                 }
 
                 providerResults[targetProvider] = new CloudProviderResult

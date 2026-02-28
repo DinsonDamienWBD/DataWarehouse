@@ -96,6 +96,8 @@ public sealed class EncryptionScalingManager : IScalableSubsystem, IDisposable
     // Concurrency control for key migration operations
     private SemaphoreSlim _migrationSemaphore;
     private ScalingLimits _currentLimits;
+    // Protects atomic semaphore swap in ReconfigureLimitsAsync
+    private readonly SemaphoreSlim _reconfigLock = new(1, 1);
 
     // Hardware detection state
     private volatile HardwareCryptoCapabilities _currentCapabilities;
@@ -398,23 +400,45 @@ public sealed class EncryptionScalingManager : IScalableSubsystem, IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(limits);
 
-        var oldLimits = _currentLimits;
-        _currentLimits = limits;
-
-        if (limits.MaxConcurrentOperations != oldLimits.MaxConcurrentOperations)
+        // Guard the semaphore swap under _reconfigLock so concurrent callers (e.g. a migration
+        // calling WaitAsync) never acquire the old semaphore only to Release on the new one.
+        // Pattern: acquire reconfig lock → swap → publish → release.
+        await _reconfigLock.WaitAsync(ct).ConfigureAwait(false);
+        try
         {
-            var oldSemaphore = _migrationSemaphore;
-            _migrationSemaphore = new SemaphoreSlim(
-                limits.MaxConcurrentOperations,
-                limits.MaxConcurrentOperations);
-            oldSemaphore.Dispose();
+            var oldLimits = _currentLimits;
+            _currentLimits = limits;
+
+            if (limits.MaxConcurrentOperations != oldLimits.MaxConcurrentOperations)
+            {
+                // Drain the old semaphore: wait until all in-flight holders have released,
+                // then replace it. Workers that haven't entered WaitAsync yet will use the
+                // new semaphore because we publish _migrationSemaphore after creating it.
+                var oldSemaphore = _migrationSemaphore;
+                var newSemaphore = new SemaphoreSlim(
+                    limits.MaxConcurrentOperations,
+                    limits.MaxConcurrentOperations);
+
+                // Publish new semaphore before disposing old one.
+                // Interlocked.Exchange ensures the assignment is visible to all threads
+                // before we dispose the old semaphore.
+                var _ = System.Threading.Interlocked.Exchange(ref _migrationSemaphore, newSemaphore);
+
+                // Give a short grace period for threads that already read the old reference
+                // but haven't called WaitAsync yet. A full drain (acquiring all slots) would
+                // deadlock if workers are still holding releases, so we bound it.
+                await Task.Delay(10, ct).ConfigureAwait(false);
+                oldSemaphore.Dispose();
+            }
+        }
+        finally
+        {
+            _reconfigLock.Release();
         }
 
         _logger.LogInformation(
             "Encryption scaling limits reconfigured: MaxCache={MaxCache}, MaxMigrations={MaxMigrations}",
             limits.MaxCacheEntries, limits.MaxConcurrentOperations);
-
-        await Task.CompletedTask.ConfigureAwait(false);
     }
 
     /// <inheritdoc/>

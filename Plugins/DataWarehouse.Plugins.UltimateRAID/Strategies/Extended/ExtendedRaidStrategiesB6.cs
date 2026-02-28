@@ -451,7 +451,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
                 if (progressCallback != null)
                 {
                     var elapsed = DateTime.UtcNow - startTime;
-                    var speed = bytesRebuilt / elapsed.TotalSeconds;
+                    var speed = elapsed.TotalSeconds > 0 ? bytesRebuilt / elapsed.TotalSeconds : bytesRebuilt;
                     progressCallback.Report(new RebuildProgress((double)bytesRebuilt / totalBytes, bytesRebuilt, totalBytes,
                         TimeSpan.FromSeconds((totalBytes - bytesRebuilt) / speed), (long)speed));
                 }

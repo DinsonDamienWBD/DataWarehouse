@@ -1013,21 +1013,27 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Kdf
             byte[]? associatedData,
             CancellationToken cancellationToken)
         {
-            var password = plaintext;
-            var salt = key.Length >= 32 ? key : RandomNumberGenerator.GetBytes(32);
+            // Run the 600K-iteration PBKDF2 on a thread-pool thread to avoid stalling the
+            // calling thread (which may be an ASP.NET request thread or I/O completion port).
+            // Argon2 already does this; we match the pattern for consistency (#2996).
+            return Task.Run(() =>
+            {
+                var password = plaintext;
+                var salt = key.Length >= 32 ? key : RandomNumberGenerator.GetBytes(32);
 
-            var derivedKey = Rfc2898DeriveBytes.Pbkdf2(
-                password,
-                salt,
-                _iterations,
-                HashAlgorithmName.SHA256,
-                32);
+                var derivedKey = Rfc2898DeriveBytes.Pbkdf2(
+                    password,
+                    salt,
+                    _iterations,
+                    HashAlgorithmName.SHA256,
+                    32);
 
-            var result = new byte[salt.Length + derivedKey.Length];
-            Buffer.BlockCopy(salt, 0, result, 0, salt.Length);
-            Buffer.BlockCopy(derivedKey, 0, result, salt.Length, derivedKey.Length);
+                var result = new byte[salt.Length + derivedKey.Length];
+                Buffer.BlockCopy(salt, 0, result, 0, salt.Length);
+                Buffer.BlockCopy(derivedKey, 0, result, salt.Length, derivedKey.Length);
 
-            return Task.FromResult(result);
+                return result;
+            }, cancellationToken);
         }
 
         protected override Task<byte[]> DecryptCoreAsync(
@@ -1122,21 +1128,27 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Kdf
             byte[]? associatedData,
             CancellationToken cancellationToken)
         {
-            var password = plaintext;
-            var salt = key.Length >= 64 ? key : RandomNumberGenerator.GetBytes(64);
+            // Run the 210K-iteration PBKDF2 on a thread-pool thread to avoid stalling the
+            // calling thread (which may be an ASP.NET request thread or I/O completion port).
+            // Matches the pattern used by Pbkdf2Sha256Strategy (#2996).
+            return Task.Run(() =>
+            {
+                var password = plaintext;
+                var salt = key.Length >= 64 ? key : RandomNumberGenerator.GetBytes(64);
 
-            var derivedKey = Rfc2898DeriveBytes.Pbkdf2(
-                password,
-                salt,
-                _iterations,
-                HashAlgorithmName.SHA512,
-                64);
+                var derivedKey = Rfc2898DeriveBytes.Pbkdf2(
+                    password,
+                    salt,
+                    _iterations,
+                    HashAlgorithmName.SHA512,
+                    64);
 
-            var result = new byte[salt.Length + derivedKey.Length];
-            Buffer.BlockCopy(salt, 0, result, 0, salt.Length);
-            Buffer.BlockCopy(derivedKey, 0, result, salt.Length, derivedKey.Length);
+                var result = new byte[salt.Length + derivedKey.Length];
+                Buffer.BlockCopy(salt, 0, result, 0, salt.Length);
+                Buffer.BlockCopy(derivedKey, 0, result, salt.Length, derivedKey.Length);
 
-            return Task.FromResult(result);
+                return result;
+            }, cancellationToken);
         }
 
         protected override Task<byte[]> DecryptCoreAsync(

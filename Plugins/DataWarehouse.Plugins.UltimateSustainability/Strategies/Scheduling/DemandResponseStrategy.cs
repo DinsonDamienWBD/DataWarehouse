@@ -75,30 +75,83 @@ public sealed class DemandResponseStrategy : SustainabilityStrategyBase
         UpdateRecommendations();
     }
 
+    /// <summary>
+    /// DR API endpoint. When set, CheckForEventsAsync will attempt HTTP polling.
+    /// </summary>
+    public string? DrApiEndpoint { get; set; }
+
+    /// <summary>
+    /// DR API key for authentication.
+    /// </summary>
+    public string? DrApiKey { get; set; }
+
     private async Task CheckForEventsAsync()
     {
-        // Would poll DR aggregator API
-        // Simulate occasional events
-        if (Random.Shared.NextDouble() < 0.01 && _activeEvent == null)
-        {
-            var drEvent = new DemandResponseEvent
-            {
-                EventId = Guid.NewGuid().ToString("N"),
-                StartTime = DateTimeOffset.UtcNow,
-                EndTime = DateTimeOffset.UtcNow.AddHours(2),
-                RequestedReductionPercent = 20,
-                IncentivePerKwh = 0.50
-            };
-
-            if (AutoRespond)
-            {
-                await RespondToEventAsync(drEvent);
-            }
-        }
-
+        // Check if current active event has ended first
         if (_activeEvent != null && DateTimeOffset.UtcNow >= _activeEvent.EndTime)
         {
             EndParticipation();
+        }
+
+        // Poll DR aggregator API if configured
+        if (!string.IsNullOrEmpty(DrApiEndpoint) && _activeEvent == null)
+        {
+            await PollDrApiAsync();
+        }
+    }
+
+    private async Task PollDrApiAsync()
+    {
+        try
+        {
+            using var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+            if (!string.IsNullOrEmpty(DrApiKey))
+                http.DefaultRequestHeaders.Add("Authorization", $"Bearer {DrApiKey}");
+
+            using var response = await http.GetAsync(DrApiEndpoint);
+            if (!response.IsSuccessStatusCode) return;
+
+            var content = await response.Content.ReadAsStringAsync();
+            var json = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(content);
+
+            // Parse standard DR notification format (OpenADR-compatible JSON)
+            if (json.TryGetProperty("event", out var eventObj) &&
+                eventObj.TryGetProperty("eventId", out var eventId))
+            {
+                var start = eventObj.TryGetProperty("startTime", out var st)
+                    ? st.GetDateTimeOffset()
+                    : DateTimeOffset.UtcNow;
+                var end = eventObj.TryGetProperty("endTime", out var et)
+                    ? et.GetDateTimeOffset()
+                    : start.AddHours(2);
+                var reduction = eventObj.TryGetProperty("reductionPercent", out var rp)
+                    ? rp.GetInt32()
+                    : 20;
+                var incentive = eventObj.TryGetProperty("incentivePerKwh", out var ip)
+                    ? ip.GetDouble()
+                    : 0.0;
+
+                if (DateTimeOffset.UtcNow < end)
+                {
+                    var drEvent = new DemandResponseEvent
+                    {
+                        EventId = eventId.GetString() ?? Guid.NewGuid().ToString("N"),
+                        StartTime = start,
+                        EndTime = end,
+                        RequestedReductionPercent = reduction,
+                        IncentivePerKwh = incentive
+                    };
+
+                    if (AutoRespond)
+                    {
+                        await RespondToEventAsync(drEvent);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[DemandResponse] API poll failed: {ex.Message}");
         }
     }
 

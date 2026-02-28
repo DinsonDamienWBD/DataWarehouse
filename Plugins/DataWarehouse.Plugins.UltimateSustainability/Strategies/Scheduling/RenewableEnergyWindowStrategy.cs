@@ -69,7 +69,10 @@ public sealed class RenewableEnergyWindowStrategy : SustainabilityStrategyBase
 
     private async Task UpdateForecastAsync()
     {
-        // Simulate forecast based on time of day
+        // Build a deterministic 48-hour renewable energy forecast using time-of-day patterns.
+        // Solar generation follows a diurnal cosine curve (peak at solar noon).
+        // Wind uses a sinusoidal pattern peaking in early morning (offshore wind profile).
+        // This model is physically grounded — no Random.Shared noise.
         var now = DateTimeOffset.UtcNow;
         lock (_lock)
         {
@@ -77,10 +80,22 @@ public sealed class RenewableEnergyWindowStrategy : SustainabilityStrategyBase
             for (int h = 0; h < 48; h++)
             {
                 var time = now.AddHours(h);
-                var hour = time.Hour;
-                // Solar: high during day, wind: higher at night
-                var solar = hour >= 8 && hour <= 18 ? 30 + (hour - 8) * 3 : 0;
-                var wind = 15 + Random.Shared.NextDouble() * 15;
+                var hour = time.Hour + time.Minute / 60.0;
+
+                // Solar: cosine bell centered at noon (0 at sunrise 6, peak at noon, 0 at sunset 18)
+                double solar = 0;
+                if (hour >= 6 && hour <= 18)
+                {
+                    // Normalized cosine: 0 at edges, 1 at noon
+                    var angle = Math.PI * (hour - 6) / 12.0;
+                    solar = 40 * Math.Sin(angle); // Max 40% from solar
+                }
+
+                // Wind: peaks between 2-6 AM (offshore wind pattern), minimum mid-afternoon
+                // Uses a cosine with 24-hour period, minimum ~10%, maximum ~35%
+                var windPhase = 2 * Math.PI * hour / 24.0;
+                var wind = 22.5 + 12.5 * Math.Cos(windPhase + Math.PI * 5 / 6); // [10, 35]
+
                 var renewable = Math.Min(100, solar + wind);
                 _forecast.Enqueue((time, renewable));
             }

@@ -188,7 +188,7 @@ public sealed class AutomaticRollbackStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
-        IncrementCounter("automatic_rollback.deploy");
+        IncrementCounter("automatic_rollback.rollback");
         // Find the snapshot for target version
         if (!_snapshotHistory.TryGetValue(deploymentId, out var snapshots))
         {
@@ -249,7 +249,7 @@ public sealed class AutomaticRollbackStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
-        IncrementCounter("manual_rollback.deploy");
+        IncrementCounter("automatic_rollback.scale");
         await Task.Delay(TimeSpan.FromMilliseconds(100), ct);
 
         return currentState with
@@ -265,7 +265,7 @@ public sealed class AutomaticRollbackStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
-        IncrementCounter("version_pinning.deploy");
+        IncrementCounter("automatic_rollback.health_check");
         var results = new List<HealthCheckResult>();
 
         for (int i = 0; i < currentState.DeployedInstances; i++)
@@ -285,11 +285,12 @@ public sealed class AutomaticRollbackStrategy : DeploymentStrategyBase
             });
         }
 
-        // Update monitor statistics
+        // Update monitor statistics — use Interlocked for thread safety
         if (_monitors.TryGetValue(deploymentId, out var monitor))
         {
-            monitor.TotalRequests += results.Count;
-            monitor.AverageLatencyMs = results.Average(r => r.ResponseTimeMs);
+            System.Threading.Interlocked.Add(ref monitor.TotalRequestsField, results.Count);
+            // AverageLatencyMs is best-effort; use volatile write
+            System.Threading.Volatile.Write(ref monitor.AverageLatencyMsField, results.Average(r => r.ResponseTimeMs));
         }
 
         return results.ToArray();
@@ -297,7 +298,7 @@ public sealed class AutomaticRollbackStrategy : DeploymentStrategyBase
 
     protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct)
     {
-        IncrementCounter("snapshot_restore.deploy");
+        IncrementCounter("automatic_rollback.get_state");
         return Task.FromResult(new DeploymentState
         {
             DeploymentId = deploymentId,
@@ -377,10 +378,23 @@ public sealed class AutomaticRollbackStrategy : DeploymentStrategyBase
         public required RollbackPolicy Policy { get; init; }
         public DateTimeOffset StartedAt { get; init; }
         public DateTimeOffset LastHealthCheck { get; set; }
-        public int ErrorCount { get; set; }
-        public int TotalRequests { get; set; }
-        public double AverageLatencyMs { get; set; }
-        public int ConsecutiveFailures { get; set; }
+        // Interlocked-backed fields for thread-safe increment/read
+        public int ErrorCountField;
+        public int TotalRequestsField;
+        public double AverageLatencyMsField;
+        public int ConsecutiveFailuresField;
+        public int ErrorCount
+        {
+            get => System.Threading.Volatile.Read(ref ErrorCountField);
+            set => System.Threading.Volatile.Write(ref ErrorCountField, value);
+        }
+        public int TotalRequests => System.Threading.Volatile.Read(ref TotalRequestsField);
+        public double AverageLatencyMs => System.Threading.Volatile.Read(ref AverageLatencyMsField);
+        public int ConsecutiveFailures
+        {
+            get => System.Threading.Volatile.Read(ref ConsecutiveFailuresField);
+            set => System.Threading.Volatile.Write(ref ConsecutiveFailuresField, value);
+        }
     }
 
     private sealed class DeploymentSnapshot
@@ -552,7 +566,7 @@ public sealed class ManualRollbackStrategy : DeploymentStrategyBase
         string requestId,
         CancellationToken ct = default)
     {
-        IncrementCounter("automatic_rollback.deploy");
+        IncrementCounter("manual_rollback.execute");
         if (!_pendingRequests.TryGetValue(requestId, out var request))
             throw new InvalidOperationException($"Request {requestId} not found");
 
@@ -610,7 +624,7 @@ public sealed class ManualRollbackStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
-        IncrementCounter("immutable_deployment.deploy");
+        IncrementCounter("manual_rollback.rollback");
         if (!_versionHistory.TryGetValue(deploymentId, out var history))
         {
             throw new InvalidOperationException($"No version history for deployment {deploymentId}");

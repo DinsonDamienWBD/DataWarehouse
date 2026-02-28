@@ -6,7 +6,7 @@ namespace DataWarehouse.Plugins.UltimateDeployment.Strategies.DeploymentPatterns
 /// </summary>
 public sealed class CanaryStrategy : DeploymentStrategyBase
 {
-    private readonly Dictionary<string, CanaryState> _canaryStates = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, CanaryState> _canaryStates = new();
 
     public override DeploymentCharacteristics Characteristics { get; } = new()
     {
@@ -149,7 +149,7 @@ public sealed class CanaryStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
-        IncrementCounter("canary.deploy");
+        IncrementCounter("canary.rollback");
         // Route all traffic back to stable version
         await RouteTrafficAsync(deploymentId, 0, ct);
 
@@ -340,11 +340,12 @@ public sealed class CanaryStrategy : DeploymentStrategyBase
                     ["RequestedAt"] = DateTime.UtcNow
                 }
             };
-            await MessageBus.SendAsync("metrics.collect.canary", message, ct);
+            var response = await MessageBus.SendAsync("metrics.collect.canary", message, ct);
 
-            // Extract metrics from response
-            var errorRate = message.Payload.TryGetValue("ErrorRate", out var er) ? Convert.ToDouble(er) : 0.005;
-            var latencyP95 = message.Payload.TryGetValue("LatencyP95", out var l95) ? Convert.ToDouble(l95) : 20.0;
+            // Extract metrics from response payload
+            var payload = response?.Payload as Dictionary<string, object>;
+            var errorRate = payload?.TryGetValue("ErrorRate", out var er) == true ? Convert.ToDouble(er) : 0.005;
+            var latencyP95 = payload?.TryGetValue("LatencyP95", out var l95) == true ? Convert.ToDouble(l95) : 20.0;
 
             return (errorRate, latencyP95);
         }
