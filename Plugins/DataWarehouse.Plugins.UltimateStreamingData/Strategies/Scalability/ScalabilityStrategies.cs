@@ -332,14 +332,22 @@ public sealed class AutoScalingStrategy : StreamingDataStrategyBase
         var config = scaler.Config;
         var now = DateTimeOffset.UtcNow;
 
+        int currentInstances;
+        DateTimeOffset lastScaleTime;
+        lock (scaler.ScalingLock)
+        {
+            currentInstances = scaler.CurrentInstances;
+            lastScaleTime = scaler.LastScaleTime;
+        }
+
         // Check cooldown
-        if ((now - scaler.LastScaleTime) < config.ScaleCooldown)
+        if ((now - lastScaleTime) < config.ScaleCooldown)
         {
             return Task.FromResult(new ScalingDecision
             {
                 Action = ScalingAction.None,
                 Reason = "In cooldown period",
-                CurrentInstances = scaler.CurrentInstances
+                CurrentInstances = currentInstances
             });
         }
 
@@ -358,7 +366,7 @@ public sealed class AutoScalingStrategy : StreamingDataStrategyBase
             {
                 Action = ScalingAction.None,
                 Reason = "No metrics available",
-                CurrentInstances = scaler.CurrentInstances
+                CurrentInstances = currentInstances
             });
         }
 
@@ -370,16 +378,16 @@ public sealed class AutoScalingStrategy : StreamingDataStrategyBase
         if (avgCpuUtilization > config.ScaleUpCpuThreshold ||
             avgBacklog > config.ScaleUpBacklogThreshold)
         {
-            if (scaler.CurrentInstances < config.MaxInstances)
+            if (currentInstances < config.MaxInstances)
             {
                 var newInstances = Math.Min(
-                    scaler.CurrentInstances + config.ScaleUpIncrement,
+                    currentInstances + config.ScaleUpIncrement,
                     config.MaxInstances);
 
                 return Task.FromResult(new ScalingDecision
                 {
                     Action = ScalingAction.ScaleUp,
-                    CurrentInstances = scaler.CurrentInstances,
+                    CurrentInstances = currentInstances,
                     TargetInstances = newInstances,
                     Reason = $"High load: CPU={avgCpuUtilization:P}, Backlog={avgBacklog}"
                 });
@@ -390,16 +398,16 @@ public sealed class AutoScalingStrategy : StreamingDataStrategyBase
         if (avgCpuUtilization < config.ScaleDownCpuThreshold &&
             avgBacklog < config.ScaleDownBacklogThreshold)
         {
-            if (scaler.CurrentInstances > config.MinInstances)
+            if (currentInstances > config.MinInstances)
             {
                 var newInstances = Math.Max(
-                    scaler.CurrentInstances - config.ScaleDownDecrement,
+                    currentInstances - config.ScaleDownDecrement,
                     config.MinInstances);
 
                 return Task.FromResult(new ScalingDecision
                 {
                     Action = ScalingAction.ScaleDown,
-                    CurrentInstances = scaler.CurrentInstances,
+                    CurrentInstances = currentInstances,
                     TargetInstances = newInstances,
                     Reason = $"Low load: CPU={avgCpuUtilization:P}, Backlog={avgBacklog}"
                 });
@@ -410,7 +418,7 @@ public sealed class AutoScalingStrategy : StreamingDataStrategyBase
         {
             Action = ScalingAction.None,
             Reason = "Load within normal range",
-            CurrentInstances = scaler.CurrentInstances
+            CurrentInstances = currentInstances
         });
     }
 
@@ -432,18 +440,21 @@ public sealed class AutoScalingStrategy : StreamingDataStrategyBase
             return Task.CompletedTask;
         }
 
-        var previousInstances = scaler.CurrentInstances;
-        scaler.CurrentInstances = decision.TargetInstances;
-        scaler.LastScaleTime = DateTimeOffset.UtcNow;
-
-        scaler.ScalingHistory.Add(new ScalingEvent
+        lock (scaler.ScalingLock)
         {
-            Timestamp = DateTimeOffset.UtcNow,
-            Action = decision.Action,
-            PreviousInstances = previousInstances,
-            NewInstances = decision.TargetInstances,
-            Reason = decision.Reason
-        });
+            var previousInstances = scaler.CurrentInstances;
+            scaler.CurrentInstances = decision.TargetInstances;
+            scaler.LastScaleTime = DateTimeOffset.UtcNow;
+
+            scaler.ScalingHistory.Add(new ScalingEvent
+            {
+                Timestamp = DateTimeOffset.UtcNow,
+                Action = decision.Action,
+                PreviousInstances = previousInstances,
+                NewInstances = decision.TargetInstances,
+                Reason = decision.Reason
+            });
+        }
 
         return Task.CompletedTask;
     }
@@ -492,6 +503,8 @@ internal sealed class AutoScaler
     public required string ScalerId { get; init; }
     public required string JobId { get; init; }
     public required AutoScaleConfig Config { get; init; }
+    /// <summary>Guards CurrentInstances, LastScaleTime, and ScalingHistory mutations.</summary>
+    public readonly object ScalingLock = new();
     public int CurrentInstances { get; set; }
     public required List<ScalingMetrics> MetricsHistory { get; init; }
     public required List<ScalingEvent> ScalingHistory { get; init; }
@@ -656,29 +669,39 @@ public sealed class BackpressureStrategy : StreamingDataStrategyBase
             }
         }
 
-        // Rate limiting
+        // Rate limiting — window reset and counter increment must be atomic.
         if (config.RateLimitPerSecond.HasValue)
         {
-            var elapsed = DateTimeOffset.UtcNow - controller.RateLimitWindowStart;
-            if (elapsed < TimeSpan.FromSeconds(1))
+            bool rateLimited = false;
+            lock (controller.RateLimitLock)
             {
+                var elapsed = DateTimeOffset.UtcNow - controller.RateLimitWindowStart;
+                if (elapsed >= TimeSpan.FromSeconds(1))
+                {
+                    controller.RateLimitWindowStart = DateTimeOffset.UtcNow;
+                    controller.RateLimitCounter = 0;
+                }
+
                 if (controller.RateLimitCounter >= config.RateLimitPerSecond.Value)
                 {
-                    Interlocked.Increment(ref controller.RateLimitedCount);
-                    return Task.FromResult(new SubmitResult
-                    {
-                        Accepted = false,
-                        Action = BackpressureAction.RateLimited,
-                        Reason = "Rate limit exceeded"
-                    });
+                    rateLimited = true;
+                }
+                else
+                {
+                    controller.RateLimitCounter++;
                 }
             }
-            else
+
+            if (rateLimited)
             {
-                controller.RateLimitWindowStart = DateTimeOffset.UtcNow;
-                controller.RateLimitCounter = 0;
+                Interlocked.Increment(ref controller.RateLimitedCount);
+                return Task.FromResult(new SubmitResult
+                {
+                    Accepted = false,
+                    Action = BackpressureAction.RateLimited,
+                    Reason = "Rate limit exceeded"
+                });
             }
-            Interlocked.Increment(ref controller.RateLimitCounter);
         }
 
         // Accept event
@@ -796,6 +819,8 @@ internal sealed class BackpressureController
     public long BlockedCount;
     public long RateLimitedCount;
     public long SampledOutCount;
+    /// <summary>Guards RateLimitWindowStart and RateLimitCounter against concurrent reset+increment races.</summary>
+    public readonly object RateLimitLock = new();
     public DateTimeOffset RateLimitWindowStart = DateTimeOffset.UtcNow;
     public long RateLimitCounter;
 }

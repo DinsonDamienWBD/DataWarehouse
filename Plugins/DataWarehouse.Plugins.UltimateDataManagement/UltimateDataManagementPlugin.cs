@@ -47,6 +47,8 @@ public sealed class UltimateDataManagementPlugin : DataManagementPluginBase, IDi
 
     // Statistics
     private long _totalOperations;
+    private long _totalBytesManaged;
+    private long _totalFailures;
 
     /// <inheritdoc/>
     public override string Id => "com.datawarehouse.datamanagement.ultimate";
@@ -251,31 +253,49 @@ public sealed class UltimateDataManagementPlugin : DataManagementPluginBase, IDi
         metadata["IndexingStrategies"] = GetStrategiesByCategory(DataManagementCategory.Indexing).Count;
         metadata["VersioningStrategies"] = GetStrategiesByCategory(DataManagementCategory.Versioning).Count;
         metadata["TotalOperations"] = Interlocked.Read(ref _totalOperations);
-        metadata["TotalBytesManaged"] = 0L;
-        metadata["TotalFailures"] = 0L;
+        metadata["TotalBytesManaged"] = Interlocked.Read(ref _totalBytesManaged);
+        metadata["TotalFailures"] = Interlocked.Read(ref _totalFailures);
         return metadata;
     }
 
     /// <inheritdoc/>
-    public override Task OnMessageAsync(PluginMessage message)
+    public override async Task OnMessageAsync(PluginMessage message)
     {
-        return message.Type switch
+        try
         {
-            "data-management.deduplicate" => HandleDeduplicateAsync(message),
-            "data-management.apply-retention" => HandleApplyRetentionAsync(message),
-            "data-management.version" => HandleVersionAsync(message),
-            "data-management.tier" => HandleTierAsync(message),
-            "data-management.shard" => HandleShardAsync(message),
-            "data-management.lifecycle" => HandleLifecycleAsync(message),
-            "data-management.cache" => HandleCacheAsync(message),
-            "data-management.index" => HandleIndexAsync(message),
-            "data-management.optimize" => HandleOptimizeAsync(message),
-            "data-management.list-strategies" => HandleListStrategiesAsync(message),
-            "data-management.stats" => HandleStatsAsync(message),
-            "data-management.create-policy" => HandleCreatePolicyAsync(message),
-            "data-management.apply-policy" => HandleApplyPolicyAsync(message),
-            _ => base.OnMessageAsync(message)
-        };
+            await (message.Type switch
+            {
+                "data-management.deduplicate" => HandleDeduplicateAsync(message),
+                "data-management.apply-retention" => HandleApplyRetentionAsync(message),
+                "data-management.version" => HandleVersionAsync(message),
+                "data-management.tier" => HandleTierAsync(message),
+                "data-management.shard" => HandleShardAsync(message),
+                "data-management.lifecycle" => HandleLifecycleAsync(message),
+                "data-management.cache" => HandleCacheAsync(message),
+                "data-management.index" => HandleIndexAsync(message),
+                "data-management.optimize" => HandleOptimizeAsync(message),
+                "data-management.list-strategies" => HandleListStrategiesAsync(message),
+                "data-management.stats" => HandleStatsAsync(message),
+                "data-management.create-policy" => HandleCreatePolicyAsync(message),
+                "data-management.apply-policy" => HandleApplyPolicyAsync(message),
+                _ => base.OnMessageAsync(message)
+            });
+
+            // Accumulate bytes managed from strategy statistics after each operation
+            if (message.Payload.TryGetValue("operationStats", out var statsObj) &&
+                statsObj is Dictionary<string, object> opStats)
+            {
+                if (opStats.TryGetValue("totalBytesWritten", out var bw) && bw is long bytesWritten)
+                    Interlocked.Add(ref _totalBytesManaged, bytesWritten);
+                if (opStats.TryGetValue("totalBytesRead", out var br) && br is long bytesRead)
+                    Interlocked.Add(ref _totalBytesManaged, bytesRead);
+            }
+        }
+        catch
+        {
+            Interlocked.Increment(ref _totalFailures);
+            throw;
+        }
     }
 
     #region Message Handlers
@@ -552,8 +572,8 @@ public sealed class UltimateDataManagementPlugin : DataManagementPluginBase, IDi
     private Task HandleStatsAsync(PluginMessage message)
     {
         message.Payload["totalOperations"] = Interlocked.Read(ref _totalOperations);
-        message.Payload["totalBytesManaged"] = 0L;
-        message.Payload["totalFailures"] = 0L;
+        message.Payload["totalBytesManaged"] = Interlocked.Read(ref _totalBytesManaged);
+        message.Payload["totalFailures"] = Interlocked.Read(ref _totalFailures);
         message.Payload["registeredStrategies"] = _registry.Count;
         message.Payload["activePolicies"] = _policies.Count;
 

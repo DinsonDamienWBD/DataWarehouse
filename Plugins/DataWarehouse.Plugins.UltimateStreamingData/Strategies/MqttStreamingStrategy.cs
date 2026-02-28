@@ -49,7 +49,14 @@ namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies
     {
         private readonly IMqttClient _mqttClient;
         private readonly MqttConnectionSettings _connectionSettings;
-        private readonly ConcurrentQueue<MqttMessage> _incomingMessages = new();
+        private readonly System.Threading.Channels.Channel<MqttMessage> _incomingMessages =
+            System.Threading.Channels.Channel.CreateBounded<MqttMessage>(
+                new System.Threading.Channels.BoundedChannelOptions(10_000)
+                {
+                    FullMode = System.Threading.Channels.BoundedChannelFullMode.DropOldest,
+                    SingleReader = false,
+                    SingleWriter = false
+                });
         private readonly List<string> _subscribedTopics = new();
         private readonly object _topicsLock = new();
         private bool _disposed;
@@ -64,10 +71,10 @@ namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies
             _connectionSettings = connectionSettings ?? throw new ArgumentNullException(nameof(connectionSettings));
             _mqttClient = new SDK.Edge.Protocols.MqttClient();
 
-            // Wire up message reception
+            // Wire up message reception — write to the bounded channel; excess drops oldest.
             _mqttClient.OnMessageReceived += (sender, args) =>
             {
-                _incomingMessages.Enqueue(args.Message);
+                _incomingMessages.Writer.TryWrite(args.Message);
             };
         }
 
@@ -166,29 +173,18 @@ namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies
                 _subscribedTopics.Add(streamName);
             }
 
-            // Consume messages from queue
-            while (!ct.IsCancellationRequested)
+            // Consume messages via channel reader — no spin-loop, pure push-based async.
+            await foreach (var mqttMsg in _incomingMessages.Reader.ReadAllAsync(ct).ConfigureAwait(false))
             {
-                if (_incomingMessages.TryDequeue(out var mqttMsg))
+                yield return new StreamMessage
                 {
-                    // Map MqttMessage to StreamMessage
-                    var streamMsg = new StreamMessage
-                    {
-                        MessageId = Guid.NewGuid().ToString(),
-                        Key = mqttMsg.Topic,
-                        Data = mqttMsg.Payload,
-                        Headers = mqttMsg.UserProperties,
-                        Timestamp = DateTime.UtcNow,
-                        ContentType = "application/octet-stream"
-                    };
-
-                    yield return streamMsg;
-                }
-                else
-                {
-                    // Wait for messages
-                    await Task.Delay(10, ct);
-                }
+                    MessageId = Guid.NewGuid().ToString(),
+                    Key = mqttMsg.Topic,
+                    Data = mqttMsg.Payload,
+                    Headers = mqttMsg.UserProperties,
+                    Timestamp = DateTime.UtcNow,
+                    ContentType = "application/octet-stream"
+                };
             }
         }
 

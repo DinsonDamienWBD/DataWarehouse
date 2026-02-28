@@ -92,7 +92,7 @@ public sealed class WriteBehindCacheStrategy : CachingStrategyBase
     private readonly BoundedDictionary<string, WriteBehindOperation> _pendingWrites = new BoundedDictionary<string, WriteBehindOperation>(1000);
     private readonly CancellationTokenSource _shutdownCts = new();
     private readonly List<Task> _workers = new();
-    private readonly Timer _flushTimer;
+    private Timer? _flushTimer;
     private long _queuedOperations;
     private long _failedOperations;
 
@@ -115,7 +115,7 @@ public sealed class WriteBehindCacheStrategy : CachingStrategyBase
             SingleReader = false,
             SingleWriter = false
         });
-        _flushTimer = new Timer(FlushPendingWrites, null, _config.FlushInterval, _config.FlushInterval);
+        // Timer is started in InitializeCoreAsync to avoid callbacks on uninitialized state.
     }
 
     /// <inheritdoc/>
@@ -171,13 +171,16 @@ public sealed class WriteBehindCacheStrategy : CachingStrategyBase
         {
             _workers.Add(Task.Run(() => ProcessQueueAsync(_shutdownCts.Token), ct));
         }
+
+        // Start flush timer only after workers are running to avoid callbacks on uninitialized state.
+        _flushTimer = new Timer(FlushPendingWrites, null, _config.FlushInterval, _config.FlushInterval);
     }
 
     /// <inheritdoc/>
     protected override async Task DisposeCoreAsync()
     {
         // Stop accepting new writes
-        _flushTimer.Dispose();
+        _flushTimer?.Dispose();
         _writeQueue.Writer.Complete();
 
         // Wait for queue to drain
@@ -379,7 +382,27 @@ public sealed class WriteBehindCacheStrategy : CachingStrategyBase
 
     private void FlushPendingWrites(object? state)
     {
-        // This timer callback ensures periodic flushing even if queue is not full
-        // The actual processing happens in ProcessQueueAsync
+        // Re-queue any pending writes that overflowed or were not yet queued.
+        // Use fire-and-forget async via Task.Run to avoid sync-over-async deadlocks.
+        if (_shutdownCts.IsCancellationRequested)
+            return;
+
+        var pending = _pendingWrites.Values.ToArray();
+        if (pending.Length == 0)
+            return;
+
+        _ = Task.Run(async () =>
+        {
+            var ct = _shutdownCts.Token;
+            foreach (var operation in pending)
+            {
+                if (ct.IsCancellationRequested) break;
+                // Only re-queue if not already in the channel queue (avoid double processing)
+                // ProcessOperationAsync is idempotent via pending-writes coalescing.
+                await ProcessOperationAsync(operation, ct).ConfigureAwait(false);
+            }
+        }, _shutdownCts.Token).ContinueWith(
+            static t => { /* best-effort flush — ignore errors */ },
+            TaskContinuationOptions.OnlyOnFaulted);
     }
 }

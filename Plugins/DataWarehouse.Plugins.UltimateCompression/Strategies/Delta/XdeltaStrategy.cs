@@ -313,6 +313,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
                         long savedPos = output.Position;
                         output.Position = copyPos + i;
                         int b = output.ReadByte();
+                        if (b < 0)
+                            throw new InvalidDataException("COPY references position beyond current output.");
                         output.Position = savedPos;
                         output.WriteByte((byte)b);
                     }

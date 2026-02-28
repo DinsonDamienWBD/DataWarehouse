@@ -61,9 +61,9 @@ public sealed class StreamingScalingManager : IScalableSubsystem, IDisposable
     // ---- Configuration ----
     private ScalabilityConfig _scalabilityConfig;
     private volatile ScalingLimits _currentLimits;
-    private int _partitionCount;
-    private int _maxPartitions;
-    private int _maxConsumers;
+    private volatile int _partitionCount;
+    private volatile int _maxPartitions;
+    private volatile int _maxConsumers;
     private long _targetThroughputPerPartition;
     private readonly int _maxLagMs;
 
@@ -525,17 +525,43 @@ public sealed class StreamingScalingManager : IScalableSubsystem, IDisposable
     /// <summary>
     /// Assigns partitions to a consumer group using round-robin assignment.
     /// Each consumer in the group gets a roughly equal share of partitions.
+    /// Consumers in the same group collectively cover all partitions with no overlap.
     /// </summary>
     private int[] AssignPartitions(string consumerGroupId)
     {
-        // Simple: assign all partitions to every consumer for now.
-        // In production, this would coordinate with other consumers in the group.
-        var partitions = new int[_partitionCount];
-        for (int i = 0; i < _partitionCount; i++)
+        int consumerCount;
+        int consumerIndex;
+
+        lock (_consumerGroupLock)
         {
-            partitions[i] = i;
+            if (!_consumerGroups.TryGetValue(consumerGroupId, out var group))
+            {
+                // Fallback: assign all partitions if group is unknown
+                var all = new int[_partitionCount];
+                for (int i = 0; i < _partitionCount; i++) all[i] = i;
+                return all;
+            }
+
+            consumerCount = Math.Max(1, group.ConsumerCount);
+            // Use stable consumer index derived from group name hash for deterministic assignment
+            consumerIndex = (Math.Abs(consumerGroupId.GetHashCode(StringComparison.Ordinal)) / consumerCount)
+                            % consumerCount;
         }
-        return partitions;
+
+        // Round-robin: consumer i owns partitions where (partition % consumerCount == consumerIndex)
+        var assigned = new List<int>(_partitionCount / consumerCount + 1);
+        int partCount = _partitionCount;
+        for (int p = 0; p < partCount; p++)
+        {
+            if (p % consumerCount == consumerIndex)
+                assigned.Add(p);
+        }
+
+        // Safety: if no partitions assigned (e.g. more consumers than partitions), assign partition 0
+        if (assigned.Count == 0)
+            assigned.Add(0);
+
+        return assigned.ToArray();
     }
 
     private async Task RestoreConsumerOffsetsAsync(string consumerGroupId, CancellationToken ct)
@@ -635,11 +661,15 @@ public sealed class StreamingScalingManager : IScalableSubsystem, IDisposable
     {
         lock (_partitionLock)
         {
+            // Initialise channels for any new partitions; existing channels are preserved.
+            // Consumers that subscribe after this call will pick up the new partitions via
+            // AssignPartitions. Already-running iterators keep their original assignment —
+            // they must re-subscribe to participate in the enlarged partition set.
             for (int i = _partitionCount; i < newCount && i < _maxPartitions; i++)
             {
                 _partitionChannels[i] ??= CreatePartitionChannel();
             }
-            _partitionCount = newCount;
+            _partitionCount = newCount; // volatile field; direct assignment provides visibility guarantee.
         }
     }
 

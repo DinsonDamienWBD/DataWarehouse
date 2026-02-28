@@ -388,10 +388,16 @@ public sealed class TimeShardingStrategy : ShardingStrategyBase
     {
         if (_partitions.TryGetValue(partitionId, out var partition))
         {
-            lock (_partitionLock)
+            // Use EnterWriteLock instead of monitor lock to correctly use the ReaderWriterLockSlim.
+            _partitionLock.EnterWriteLock();
+            try
             {
                 partition.ObjectCount += objectDelta;
                 partition.SizeBytes += sizeDelta;
+            }
+            finally
+            {
+                _partitionLock.ExitWriteLock();
             }
 
             // Also update shard metrics

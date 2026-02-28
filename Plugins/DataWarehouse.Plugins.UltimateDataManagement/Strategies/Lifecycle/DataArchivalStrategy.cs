@@ -806,9 +806,15 @@ public sealed class DataArchivalStrategy : LifecycleStrategyBase
 
     private Task<string> GetOrCreateEncryptionKeyAsync(LifecycleDataObject data, CancellationToken ct)
     {
-        // Would integrate with key management service (T94)
-        // For now, generate a key ID
-        return Task.FromResult($"key-{data.TenantId ?? "default"}-{DateTime.UtcNow:yyyyMM}");
+        // Generate a stable, deterministic key ID scoped to tenant + month so that archives
+        // created in the same month reuse the same key, enabling recovery.  The key ID is
+        // stored in the archive record and must be present in the key-management service (T94)
+        // before the archive is created.  Callers are responsible for ensuring T94 has
+        // provisioned this key prior to archival.
+        var tenantSegment = data.TenantId ?? "default";
+        var monthSegment = DateTime.UtcNow.ToString("yyyyMM", System.Globalization.CultureInfo.InvariantCulture);
+        var keyId = $"archive-key-{tenantSegment}-{monthSegment}";
+        return Task.FromResult(keyId);
     }
 
     private string ComputeContentHash(LifecycleDataObject data)

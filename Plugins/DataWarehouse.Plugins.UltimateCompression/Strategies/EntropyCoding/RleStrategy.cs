@@ -57,7 +57,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
             DecompressionSpeed = 10,
             CompressionMemoryUsage = 4L * 1024 * 1024,
             DecompressionMemoryUsage = 4L * 1024 * 1024,
-            SupportsStreaming = true,
+            SupportsStreaming = false, // Streaming header length placeholder is never back-patched
             SupportsParallelCompression = false,
             SupportsParallelDecompression = false,
             SupportsRandomAccess = false,

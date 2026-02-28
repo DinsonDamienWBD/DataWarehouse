@@ -57,7 +57,13 @@ public sealed class BandwidthAwareSyncMonitor : IDisposable
         _adjuster = new SyncParameterAdjuster();
         _syncQueue = new SyncPriorityQueue();
         _probeTimer = new Timer(
-            async _ => await ProbeAndClassifyAsync(),
+            _ =>
+            {
+                _ = ProbeAndClassifyAsync().ContinueWith(
+                    t => System.Diagnostics.Debug.WriteLine(
+                        $"[BandwidthAwareSyncMonitor] Probe failed: {t.Exception?.GetBaseException().Message}"),
+                    System.Threading.Tasks.TaskContinuationOptions.OnlyOnFaulted);
+            },
             null,
             Timeout.Infinite,
             Timeout.Infinite);

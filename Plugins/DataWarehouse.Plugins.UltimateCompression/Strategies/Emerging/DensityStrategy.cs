@@ -302,10 +302,16 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
             DensityMode mode = (DensityMode)reader.ReadByte();
             int compressedLength = reader.ReadInt32();
 
+            if (compressedLength < 0 || compressedLength > input.Length)
+                throw new InvalidDataException("Invalid compressed length in Density header.");
+
+            // Header: magic(4) + originalLength(4) + mode(1) + compressedLength(4) = 13 bytes
+            long compressedDataEnd = 13 + compressedLength;
+
             // Decompress
             using var output = new MemoryStream(originalLength);
 
-            while (output.Length < originalLength && stream.Position < stream.Length)
+            while (output.Length < originalLength && stream.Position < compressedDataEnd)
             {
                 byte flag = reader.ReadByte();
 

@@ -350,13 +350,15 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
                     if (matchPos < 0)
                         throw new InvalidDataException("Invalid match position.");
 
-                    for (int i = 0; i < matchLen && output.Length < originalLength; i++)
+                    long writePos = output.Position;
+                    for (int i = 0; i < matchLen && writePos < originalLength; i++, writePos++)
                     {
                         output.Position = matchPos + i;
-                        byte b = (byte)output.ReadByte();
-
-                        output.Position = output.Length;
-                        output.WriteByte(b);
+                        int b = output.ReadByte();
+                        if (b < 0)
+                            throw new InvalidDataException("Match references position beyond current output.");
+                        output.Position = writePos;
+                        output.WriteByte((byte)b);
                     }
                 }
             }

@@ -53,7 +53,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
             DecompressionSpeed = 10,
             CompressionMemoryUsage = 4L * 1024 * 1024,
             DecompressionMemoryUsage = 4L * 1024 * 1024,
-            SupportsStreaming = true,
+            SupportsStreaming = false, // Header length placeholder is never back-patched in streaming mode
             SupportsParallelCompression = false,
             SupportsParallelDecompression = false,
             SupportsRandomAccess = false,

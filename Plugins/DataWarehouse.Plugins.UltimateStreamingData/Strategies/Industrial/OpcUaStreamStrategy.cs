@@ -438,8 +438,12 @@ internal sealed class OpcUaStreamStrategy : StreamingDataStrategyBase
     }
 
     /// <summary>
-    /// Simulates incoming data notifications for a subscription (used for internal data generation).
-    /// In production, this would be driven by the OPC UA server's publish responses.
+    /// Enqueues incoming data notifications for a subscription.
+    /// In a live deployment this method is called by the OPC UA transport layer when the
+    /// server sends a Publish response containing monitored-item notifications.
+    /// Callers that integrate a real OPC UA SDK (e.g. UA-.NETStandard) should wire the
+    /// SDK's notification callback to this method rather than polling.
+    /// In unit-test and simulation scenarios the caller may inject data values directly.
     /// </summary>
     /// <param name="subscriptionId">The subscription identifier.</param>
     /// <param name="values">Data values to enqueue.</param>

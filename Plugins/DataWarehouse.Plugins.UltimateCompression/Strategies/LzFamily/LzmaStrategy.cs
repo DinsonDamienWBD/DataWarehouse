@@ -122,20 +122,10 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
             var sizeBytes = BitConverter.GetBytes((long)input.Length);
             outputStream.Write(sizeBytes, 0, 8);
 
-            // Use LzmaStream for compression if available, otherwise use SharpCompress public API
-            try
-            {
-                // Try using SharpCompress's LzmaStream with default properties
-                var props = new LzmaEncoderProperties();
-                using var lzmaStream = LzmaStream.Create(props, false, outputStream);
-                lzmaStream.Write(input, 0, input.Length);
-            }
-            catch
-            {
-                // Fallback: Use DeflateStream as LZMA internal APIs are not accessible in SharpCompress 0.38.x
-                using var deflateStream = new DeflateStream(outputStream, System.IO.Compression.CompressionLevel.Optimal, leaveOpen: true);
-                deflateStream.Write(input, 0, input.Length);
-            }
+            // Use SharpCompress LzmaStream for compression
+            var props = new LzmaEncoderProperties();
+            using var lzmaStream = LzmaStream.Create(props, false, outputStream);
+            lzmaStream.Write(input, 0, input.Length);
 
             return outputStream.ToArray();
         }
@@ -171,24 +161,14 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
 
             using var outputStream = new MemoryStream((int)uncompressedSize);
 
-            try
-            {
-                // Try using SharpCompress's LzmaStream for decompression
-                var remainingBytes = new byte[input.Length - 12];
-                inputStream.Read(remainingBytes, 0, remainingBytes.Length);
+            // Use SharpCompress LzmaStream for decompression
+            var remainingBytes = new byte[input.Length - 12];
+            inputStream.Read(remainingBytes, 0, remainingBytes.Length);
 
-                // Read properties (first 5 bytes of compressed data)
-                using var compressedStream = new MemoryStream(remainingBytes);
-                using var lzmaStream = LzmaStream.Create(remainingBytes.AsSpan(0, 5).ToArray(), compressedStream, uncompressedSize, false);
-                lzmaStream.CopyTo(outputStream);
-            }
-            catch
-            {
-                // Fallback: Use DeflateStream as LZMA internal APIs are not accessible
-                inputStream.Position = 12; // Reset to start of compressed data
-                using var deflateStream = new DeflateStream(inputStream, System.IO.Compression.CompressionMode.Decompress);
-                deflateStream.CopyTo(outputStream);
-            }
+            // Read properties (first 5 bytes of compressed data)
+            using var compressedStream = new MemoryStream(remainingBytes);
+            using var lzmaDecompStream = LzmaStream.Create(remainingBytes.AsSpan(0, 5).ToArray(), compressedStream, uncompressedSize, false);
+            lzmaDecompStream.CopyTo(outputStream);
 
             return outputStream.ToArray();
         }

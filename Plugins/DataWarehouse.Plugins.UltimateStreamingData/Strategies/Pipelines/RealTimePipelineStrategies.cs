@@ -154,14 +154,102 @@ public sealed class RealTimeEtlPipelineStrategy : StreamingDataStrategyBase
     {
         return transform.Type switch
         {
-            TransformType.Filter => data, // Simplified - would apply filter predicate
+            TransformType.Filter => ApplyFilterTransform(transform, data),
             TransformType.Map => transform.MapFunction?.Invoke(data) ?? data,
             TransformType.Enrich => EnrichData(data, transform.EnrichmentSource),
-            TransformType.Aggregate => data, // Would accumulate in state
+            TransformType.Aggregate => ApplyAggregateTransform(transform, data),
             TransformType.Flatten => FlattenData(data),
             TransformType.Normalize => NormalizeData(data, transform.Schema),
             _ => data
         };
+    }
+
+    private static Dictionary<string, object> ApplyFilterTransform(EtlTransform transform, Dictionary<string, object> data)
+    {
+        // FilterPredicate is an expression string of the form "field op value"
+        // e.g. "amount > 100" or "status == active".
+        // Returns data unchanged if the predicate passes; empty dict signals drop.
+        if (string.IsNullOrWhiteSpace(transform.FilterPredicate))
+            return data;
+
+        // Parse "field operator value" predicate.
+        var parts = transform.FilterPredicate.Split(' ', 3, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 3 &&
+            data.TryGetValue(parts[0], out var fieldVal) &&
+            double.TryParse(parts[2], System.Globalization.NumberStyles.Any,
+                System.Globalization.CultureInfo.InvariantCulture, out var threshold))
+        {
+            var fieldDouble = fieldVal switch
+            {
+                double d => d,
+                int i => (double)i,
+                long l => (double)l,
+                float f => (double)f,
+                string s when double.TryParse(s, System.Globalization.NumberStyles.Any,
+                    System.Globalization.CultureInfo.InvariantCulture, out var parsed) => parsed,
+                _ => double.NaN
+            };
+
+            if (!double.IsNaN(fieldDouble))
+            {
+                bool passes = parts[1] switch
+                {
+                    ">" => fieldDouble > threshold,
+                    ">=" => fieldDouble >= threshold,
+                    "<" => fieldDouble < threshold,
+                    "<=" => fieldDouble <= threshold,
+                    "==" or "=" => Math.Abs(fieldDouble - threshold) < 1e-10,
+                    "!=" => Math.Abs(fieldDouble - threshold) >= 1e-10,
+                    _ => true
+                };
+                return passes ? data : new Dictionary<string, object>();
+            }
+        }
+
+        // String equality: "field == value"
+        if (parts.Length == 3 && data.TryGetValue(parts[0], out var strVal))
+        {
+            var strComp = strVal?.ToString() ?? string.Empty;
+            bool passes = parts[1] switch
+            {
+                "==" or "=" => string.Equals(strComp, parts[2], StringComparison.OrdinalIgnoreCase),
+                "!=" => !string.Equals(strComp, parts[2], StringComparison.OrdinalIgnoreCase),
+                _ => true
+            };
+            return passes ? data : new Dictionary<string, object>();
+        }
+
+        return data;
+    }
+
+    private static Dictionary<string, object> ApplyAggregateTransform(EtlTransform transform, Dictionary<string, object> data)
+    {
+        // Aggregate all numeric fields: compute sum, count, and mean over the record values.
+        var result = new Dictionary<string, object>(data);
+        var numericValues = data.Values
+            .Select(v => v switch
+            {
+                double d => (double?)d,
+                int i => (double?)i,
+                long l => (double?)l,
+                float f => (double?)f,
+                string s when double.TryParse(s, System.Globalization.NumberStyles.Any,
+                    System.Globalization.CultureInfo.InvariantCulture, out var parsed) => parsed,
+                _ => null
+            })
+            .Where(v => v.HasValue)
+            .Select(v => v!.Value)
+            .ToList();
+
+        if (numericValues.Count > 0)
+        {
+            result["_aggregate_sum"] = numericValues.Sum();
+            result["_aggregate_count"] = (double)numericValues.Count;
+            result["_aggregate_mean"] = numericValues.Sum() / numericValues.Count;
+            result["_aggregate_min"] = numericValues.Min();
+            result["_aggregate_max"] = numericValues.Max();
+        }
+        return result;
     }
 
     private Dictionary<string, object> EnrichData(Dictionary<string, object> data, string? source)

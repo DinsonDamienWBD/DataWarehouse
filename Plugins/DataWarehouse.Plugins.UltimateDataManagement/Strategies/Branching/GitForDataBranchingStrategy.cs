@@ -310,7 +310,8 @@ public sealed class GitForDataBranchingStrategy : BranchingStrategyBase
         if (!store.Branches.TryGetValue(branchName, out var branch))
             return Task.FromResult<byte[]?>(null);
 
-        if (!branch.BlockIds.Contains(blockId))
+        // Use BlockIdToHash (O(1)) to check existence rather than List.Contains (O(n)).
+        if (!store.BlockIdToHash.ContainsKey(blockId))
             return Task.FromResult<byte[]?>(null);
 
         if (!store.BlockIdToHash.TryGetValue(blockId, out var hash))
@@ -445,7 +446,6 @@ public sealed class GitForDataBranchingStrategy : BranchingStrategyBase
         {
             aAncestors.Add(current.BranchId);
             if (current.ParentBranchId == null) break;
-            store.Branches.Values.FirstOrDefault(br => br.BranchId == current.ParentBranchId);
             current = store.Branches.Values.FirstOrDefault(br => br.BranchId == current.ParentBranchId);
         }
 

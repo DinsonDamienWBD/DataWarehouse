@@ -131,7 +131,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
             writer.Write(input.Length);
 
             // Compress using LZMA
-            var lzmaStream = new MemoryStream(input.Length);
+            using var lzmaStream = new MemoryStream(input.Length);
 
             // LZMA encoder: SharpCompress's LzmaStream for compression
             var props = new LzmaEncoderProperties();

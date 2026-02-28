@@ -177,8 +177,8 @@ public sealed class DataBranch
     /// <summary>Description of the branch purpose.</summary>
     public string? Description { get; init; }
 
-    /// <summary>Block IDs in this branch (ordered).</summary>
-    public List<string> BlockIds { get; } = [];
+    /// <summary>Block IDs in this branch (HashSet for O(1) lookup).</summary>
+    public HashSet<string> BlockIds { get; } = [];
 
     /// <summary>Tags applied to this branch.</summary>
     public Dictionary<string, string> Tags { get; } = [];

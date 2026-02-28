@@ -264,7 +264,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
         private static int FindMatchLength(byte[] data, int pos1, int pos2)
         {
             int len = 0;
-            int maxLen = Math.Min(MaxMatchLength, data.Length - pos2);
+            int maxLen = Math.Min(MaxMatchLength, Math.Min(data.Length - pos1, data.Length - pos2));
 
             while (len < maxLen && data[pos1 + len] == data[pos2 + len])
             {
@@ -346,18 +346,20 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
                     } while (b == 255);
                 }
 
-                // Copy match
+                // Copy match (handles overlapping / run-length copies correctly)
                 long matchPos = output.Position - offset;
                 if (matchPos < 0)
                     throw new InvalidDataException("Invalid match offset.");
 
-                for (int i = 0; i < matchLen && output.Length < originalLength; i++)
+                long writePos = output.Position;
+                for (int i = 0; i < matchLen && writePos < originalLength; i++, writePos++)
                 {
                     output.Position = matchPos + i;
-                    byte b = (byte)output.ReadByte();
-
-                    output.Position = output.Length;
-                    output.WriteByte(b);
+                    int b = output.ReadByte();
+                    if (b < 0)
+                        throw new InvalidDataException("Match references position beyond current output.");
+                    output.Position = writePos;
+                    output.WriteByte((byte)b);
                 }
             }
 

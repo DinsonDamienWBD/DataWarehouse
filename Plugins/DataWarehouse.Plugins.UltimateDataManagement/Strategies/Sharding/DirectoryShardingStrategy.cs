@@ -58,7 +58,7 @@ public sealed class DirectoryShardingStrategy : ShardingStrategyBase
     private readonly int _cacheMaxSize;
     private readonly string? _persistencePath;
     private readonly Timer? _persistenceTimer;
-    private bool _isDirty;
+    private volatile bool _isDirty;
     private string _defaultShardId = "shard-default";
 
     /// <summary>

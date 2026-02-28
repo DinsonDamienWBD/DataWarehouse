@@ -326,10 +326,29 @@ internal sealed class LoRaWanStreamStrategy : StreamingDataStrategyBase, IStream
     /// Derives a session key from DevEUI using AES-128.
     /// In production, keys are derived during OTAA join procedure.
     /// </summary>
-    private static byte[] DeriveSessionKey(string devEui, string keyType)
+    private byte[] DeriveSessionKey(string devEui, string keyType)
     {
-        var input = Encoding.UTF8.GetBytes($"{devEui}:{keyType}");
-        return SHA256.HashData(input)[..16]; // AES-128 = 16 bytes
+        // Look up the device's secret AppKey. If the device is not yet registered
+        // (first seen), use an ephemeral random secret — the device will be registered
+        // on the next GetOrAdd call inside WriteAsync.
+        if (!_devices.TryGetValue(devEui, out var device))
+        {
+            // Ephemeral path: generate a random 16-byte key for this call only.
+            // The key will be consistent once the device is registered.
+            return System.Security.Cryptography.RandomNumberGenerator.GetBytes(16);
+        }
+
+        // RFC 4493-style CMAC-based key derivation:
+        // SessionKey = AES-128-CMAC(AppKey, [keyType_byte | NetID | AppNonce | DevNonce])
+        // Approximated here with HMAC-SHA256 over the AppKey as the CMAC secret, truncated
+        // to 16 bytes (AES-128 key length).
+        var keyTypeId = keyType == "nwk" ? (byte)0x01 : (byte)0x02;
+        var context = new byte[1 + Encoding.UTF8.GetByteCount(devEui)];
+        context[0] = keyTypeId;
+        Encoding.UTF8.GetBytes(devEui, context.AsSpan(1));
+
+        using var hmac = new System.Security.Cryptography.HMACSHA256(device.AppKey);
+        return hmac.ComputeHash(context)[..16];
     }
 
     /// <summary>
@@ -387,6 +406,13 @@ internal sealed class LoRaWanStreamStrategy : StreamingDataStrategyBase, IStream
         public LoRaWanActivation ActivationMode { get; init; }
         public DateTime LastSeen { get; init; }
         public long FrameCounterUp { get; init; }
+        /// <summary>
+        /// Per-device 128-bit application key (AppKey) used as the secret root for session
+        /// key derivation. Generated with a CSPRNG at device registration time.
+        /// In a production LoRaWAN network server this value is provisioned during device
+        /// onboarding and stored in the device registry.
+        /// </summary>
+        public byte[] AppKey { get; init; } = System.Security.Cryptography.RandomNumberGenerator.GetBytes(16);
     }
 
     private sealed record LoRaWanGatewayState

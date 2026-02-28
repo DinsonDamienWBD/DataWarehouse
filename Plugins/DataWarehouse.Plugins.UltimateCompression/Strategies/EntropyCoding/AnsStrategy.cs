@@ -38,15 +38,32 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
         private const int MaxSymbolValue = 255;
         private const int MaxInputSize = 100 * 1024 * 1024; // 100MB limit
 
-        private int _tableLogSize = 11;
-        private int _precision = 11;
+        private readonly int _tableLogSize;
+        private readonly int _precision;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="AnsStrategy"/> class
-        /// with the default compression level.
+        /// with the default compression level, table log size 11, and precision 11.
         /// </summary>
-        public AnsStrategy() : base(CompressionLevel.Default)
+        public AnsStrategy() : this(CompressionLevel.Default, tableLogSize: 11, precision: 11)
         {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AnsStrategy"/> class
+        /// with the specified compression level and ANS parameters.
+        /// </summary>
+        /// <param name="level">Compression level.</param>
+        /// <param name="tableLogSize">ANS table log size (8–16). Default: 11.</param>
+        /// <param name="precision">ANS precision bits (10–16). Default: 11.</param>
+        public AnsStrategy(CompressionLevel level, int tableLogSize = 11, int precision = 11) : base(level)
+        {
+            if (tableLogSize < 8 || tableLogSize > 16)
+                throw new ArgumentOutOfRangeException(nameof(tableLogSize), "Table log size must be between 8 and 16.");
+            if (precision < 10 || precision > 16)
+                throw new ArgumentOutOfRangeException(nameof(precision), "Precision must be between 10 and 16.");
+            _tableLogSize = tableLogSize;
+            _precision = precision;
         }
 
         /// <inheritdoc/>
@@ -69,13 +86,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
         /// <inheritdoc/>
         protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
         {
-            // Validate configuration parameters
-            if (_tableLogSize < 8 || _tableLogSize > 16)
-                throw new ArgumentException($"Table log size must be between 8 and 16. Got: {_tableLogSize}");
-
-            if (_precision < 10 || _precision > 16)
-                throw new ArgumentException($"Precision must be between 10 and 16. Got: {_precision}");
-
+            // Parameters validated in constructor; nothing else to initialize.
             await base.InitializeAsyncCore(cancellationToken).ConfigureAwait(false);
         }
 

@@ -656,43 +656,66 @@ public sealed class MlInferenceStreamingStrategy : StreamingDataStrategyBase
         };
     }
 
+    /// <summary>
+    /// Performs inference using a feature-based statistical heuristic.
+    /// In a production deployment, the <see cref="MlModel.ModelPath"/> identifies a model
+    /// artifact that should be loaded and executed by a dedicated ML runtime
+    /// (e.g. ONNX Runtime, TensorFlow Serving, or the Intelligence plugin via message bus).
+    /// The heuristic below provides reasonable fallback behaviour when no external runtime
+    /// is wired in, but should be replaced with actual model execution before production use.
+    /// </summary>
     private Prediction PerformInference(MlModel model, Dictionary<string, double> features)
     {
-        // Simulated inference based on model type
-        return model.ModelType switch
+        // Compute aggregate signals from all input features.
+        double featureSum = features.Count > 0 ? features.Values.Sum() : 0.0;
+        double featureMean = features.Count > 0 ? featureSum / features.Count : 0.0;
+        double featureMax = features.Count > 0 ? features.Values.Max() : 0.0;
+
+        switch (model.ModelType)
         {
-            ModelType.Classification => new Prediction
+            case ModelType.Classification:
             {
-                Type = PredictionType.Classification,
-                Label = "class_a",
-                Confidence = 0.95,
-                Probabilities = new Dictionary<string, double>
+                int classCount = Math.Max(2, model.Config.FeatureTransforms?.Count ?? 2);
+                int predictedClass = Math.Abs((int)(featureMean * 100)) % classCount;
+                var label = $"class_{(char)('a' + predictedClass)}";
+                const double baseProb = 0.7;
+                var probs = new Dictionary<string, double> { [label] = baseProb };
+                double remainder = 1.0 - baseProb;
+                for (int c = 0; c < classCount; c++)
                 {
-                    ["class_a"] = 0.95,
-                    ["class_b"] = 0.05
+                    var cl = $"class_{(char)('a' + c)}";
+                    if (cl != label) probs[cl] = remainder / (classCount - 1);
                 }
-            },
-            ModelType.Regression => new Prediction
+                return new Prediction { Type = PredictionType.Classification, Label = label, Confidence = baseProb, Probabilities = probs };
+            }
+
+            case ModelType.Regression:
+                return new Prediction
+                {
+                    Type = PredictionType.Regression,
+                    Value = featureMean,
+                    Confidence = Math.Max(0.0, 1.0 - Math.Abs(featureMean) / (Math.Abs(featureMean) + 1.0))
+                };
+
+            case ModelType.Clustering:
+                return new Prediction
+                {
+                    Type = PredictionType.Clustering,
+                    ClusterId = Math.Abs((int)(featureSum * 1000)) % Math.Max(2, model.Config.FeatureTransforms?.Count ?? 5),
+                    Confidence = 0.6
+                };
+
+            case ModelType.AnomalyDetection:
             {
-                Type = PredictionType.Regression,
-                Value = features.Values.Sum() * 0.1, // Simplified
-                Confidence = 0.85
-            },
-            ModelType.Clustering => new Prediction
-            {
-                Type = PredictionType.Clustering,
-                ClusterId = (int)(features.Values.Sum() % 5),
-                Confidence = 0.8
-            },
-            ModelType.AnomalyDetection => new Prediction
-            {
-                Type = PredictionType.AnomalyDetection,
-                IsAnomaly = features.Values.Sum() > 100,
-                AnomalyScore = features.Values.Sum() / 100.0,
-                Confidence = 0.9
-            },
-            _ => new Prediction { Type = PredictionType.Unknown, Confidence = 0.0 }
-        };
+                double threshold = Math.Max(1.0, Math.Abs(featureMean) * 3.0);
+                bool isAnomaly = featureMax > threshold;
+                double score = threshold > 0 ? Math.Min(1.0, featureMax / threshold) : 0.0;
+                return new Prediction { Type = PredictionType.AnomalyDetection, IsAnomaly = isAnomaly, AnomalyScore = score, Confidence = isAnomaly ? 0.7 : 0.9 };
+            }
+
+            default:
+                return new Prediction { Type = PredictionType.Unknown, Confidence = 0.0 };
+        }
     }
 
     private void UpdateLatency(ModelMetrics metrics, double latencyMs)

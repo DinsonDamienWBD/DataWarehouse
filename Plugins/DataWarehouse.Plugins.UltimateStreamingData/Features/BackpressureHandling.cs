@@ -134,12 +134,9 @@ internal sealed class BackpressureHandling : IDisposable
         _config = config ?? new BackpressureConfig();
         _messageBus = messageBus;
 
-        _rateAdjustmentTimer = new Timer(
-            AdjustRates,
-            null,
-            _config.RateAdjustmentInterval,
-            _config.RateAdjustmentInterval);
-
+        // Create both timers before starting either so a constructor failure after
+        // the first timer is created cannot leak the first timer.
+        _rateAdjustmentTimer = new Timer(AdjustRates, null, Timeout.Infinite, Timeout.Infinite);
         _metricsTimer = new Timer(
             _ =>
             {
@@ -153,8 +150,12 @@ internal sealed class BackpressureHandling : IDisposable
                 }
             },
             null,
-            _config.MetricsInterval,
-            _config.MetricsInterval);
+            Timeout.Infinite,
+            Timeout.Infinite);
+
+        // Start both timers only after both are successfully constructed.
+        _rateAdjustmentTimer.Change(_config.RateAdjustmentInterval, _config.RateAdjustmentInterval);
+        _metricsTimer.Change(_config.MetricsInterval, _config.MetricsInterval);
     }
 
     /// <summary>Gets the total events accepted globally.</summary>

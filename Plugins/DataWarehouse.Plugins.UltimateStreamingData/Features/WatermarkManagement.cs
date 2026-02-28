@@ -218,53 +218,57 @@ internal sealed class WatermarkManagement : IDisposable
         });
 
         var eventTime = evt.EventTime ?? evt.Timestamp;
-        var timeliness = ClassifyEvent(state, eventTime);
         bool watermarkAdvanced = false;
         List<string>? triggeredWindows = null;
+        EventTimeliness timeliness;
 
-        switch (timeliness)
+        DateTimeOffset watermarkSnapshot = default;
+        lock (state.Lock)
         {
-            case EventTimeliness.OnTime:
-                // Update max observed event time
-                if (eventTime > state.MaxObservedEventTime)
-                {
-                    state.MaxObservedEventTime = eventTime;
-                }
-                Interlocked.Increment(ref state.EventsProcessed);
-
-                // Check if watermark should advance
-                watermarkAdvanced = TryAdvanceWatermark(state, out var newWatermark);
-                if (watermarkAdvanced)
-                {
-                    state.CurrentWatermark = newWatermark;
-                    Interlocked.Increment(ref _watermarkAdvances);
-                    triggeredWindows = CheckWindowTriggers(state);
-
-                    if (_messageBus != null)
+            timeliness = ClassifyEvent(state, eventTime);
+            switch (timeliness)
+            {
+                case EventTimeliness.OnTime:
+                    if (eventTime > state.MaxObservedEventTime)
                     {
-                        await PublishWatermarkAdvanceAsync(partitionId, newWatermark, ct);
+                        state.MaxObservedEventTime = eventTime;
                     }
-                }
-                break;
+                    Interlocked.Increment(ref state.EventsProcessed);
 
-            case EventTimeliness.Late:
-                Interlocked.Increment(ref _totalLateEvents);
-                Interlocked.Increment(ref state.LateEventsAccepted);
-                Interlocked.Increment(ref state.EventsProcessed);
+                    watermarkAdvanced = TryAdvanceWatermark(state, out var newWatermark);
+                    if (watermarkAdvanced)
+                    {
+                        state.CurrentWatermark = newWatermark;
+                        Interlocked.Increment(ref _watermarkAdvances);
+                        triggeredWindows = CheckWindowTriggers(state);
+                        watermarkSnapshot = newWatermark;
+                    }
+                    break;
 
-                if (_messageBus != null)
-                {
-                    await PublishLateEventAsync(partitionId, evt, eventTime, state.CurrentWatermark, ct);
-                }
-                break;
+                case EventTimeliness.Late:
+                    Interlocked.Increment(ref _totalLateEvents);
+                    Interlocked.Increment(ref state.LateEventsAccepted);
+                    Interlocked.Increment(ref state.EventsProcessed);
+                    watermarkSnapshot = state.CurrentWatermark;
+                    break;
 
-            case EventTimeliness.TooLate:
-                Interlocked.Increment(ref _totalDiscardedEvents);
-                Interlocked.Increment(ref state.EventsDiscarded);
-                break;
+                case EventTimeliness.TooLate:
+                    Interlocked.Increment(ref _totalDiscardedEvents);
+                    Interlocked.Increment(ref state.EventsDiscarded);
+                    break;
+            }
+            state.LastUpdated = DateTimeOffset.UtcNow;
         }
 
-        state.LastUpdated = DateTimeOffset.UtcNow;
+        // Publish notifications outside the lock to avoid holding it during async I/O
+        if (watermarkAdvanced && _messageBus != null)
+        {
+            await PublishWatermarkAdvanceAsync(partitionId, watermarkSnapshot, ct);
+        }
+        else if (timeliness == EventTimeliness.Late && _messageBus != null)
+        {
+            await PublishLateEventAsync(partitionId, evt, eventTime, watermarkSnapshot, ct);
+        }
 
         return new WatermarkEventResult
         {
@@ -286,16 +290,19 @@ internal sealed class WatermarkManagement : IDisposable
         if (!_partitions.TryGetValue(partitionId, out var state))
             return null;
 
-        return new WatermarkState
+        lock (state.Lock)
         {
-            PartitionId = partitionId,
-            CurrentWatermark = state.CurrentWatermark,
-            MaxObservedEventTime = state.MaxObservedEventTime,
-            EventsProcessed = Interlocked.Read(ref state.EventsProcessed),
-            LateEventsAccepted = Interlocked.Read(ref state.LateEventsAccepted),
-            EventsDiscarded = Interlocked.Read(ref state.EventsDiscarded),
-            LastUpdated = state.LastUpdated
-        };
+            return new WatermarkState
+            {
+                PartitionId = partitionId,
+                CurrentWatermark = state.CurrentWatermark,
+                MaxObservedEventTime = state.MaxObservedEventTime,
+                EventsProcessed = Interlocked.Read(ref state.EventsProcessed),
+                LateEventsAccepted = Interlocked.Read(ref state.LateEventsAccepted),
+                EventsDiscarded = Interlocked.Read(ref state.EventsDiscarded),
+                LastUpdated = state.LastUpdated
+            };
+        }
     }
 
     /// <summary>
@@ -403,11 +410,14 @@ internal sealed class WatermarkManagement : IDisposable
     {
         foreach (var (partitionId, state) in _partitions)
         {
-            if (TryAdvanceWatermark(state, out var newWatermark))
+            lock (state.Lock)
             {
-                state.CurrentWatermark = newWatermark;
-                Interlocked.Increment(ref _watermarkAdvances);
-                state.LastUpdated = DateTimeOffset.UtcNow;
+                if (TryAdvanceWatermark(state, out var newWatermark))
+                {
+                    state.CurrentWatermark = newWatermark;
+                    Interlocked.Increment(ref _watermarkAdvances);
+                    state.LastUpdated = DateTimeOffset.UtcNow;
+                }
             }
         }
     }
@@ -494,6 +504,8 @@ internal sealed class WatermarkManagement : IDisposable
     /// </summary>
     private sealed class PartitionWatermarkState
     {
+        /// <summary>Protects the 16-byte DateTimeOffset fields from torn reads on 32-bit platforms.</summary>
+        public readonly object Lock = new();
         public DateTimeOffset CurrentWatermark;
         public DateTimeOffset MaxObservedEventTime;
         public long EventsProcessed;

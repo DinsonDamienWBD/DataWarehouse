@@ -24,7 +24,7 @@ public sealed class SemanticDeduplicationStrategy : DeduplicationStrategyBase
     private readonly BoundedDictionary<string, SemanticGroup> _semanticGroups = new BoundedDictionary<string, SemanticGroup>(1000);
     private readonly double _similarityThreshold;
     private readonly int _embeddingDimension;
-    private readonly Func<byte[], CancellationToken, Task<float[]>>? _embeddingProvider;
+    private Func<byte[], CancellationToken, Task<float[]>>? _embeddingProvider;
 
     /// <summary>
     /// Initializes with default 0.95 similarity threshold.
@@ -96,12 +96,14 @@ public sealed class SemanticDeduplicationStrategy : DeduplicationStrategyBase
 
     /// <summary>
     /// Sets the embedding provider for external embedding generation.
+    /// Replaces any previously configured provider.
     /// </summary>
     /// <param name="provider">Embedding provider function.</param>
     public void SetEmbeddingProvider(Func<byte[], CancellationToken, Task<float[]>> provider)
     {
-        // Note: Can't reassign readonly field, would need different design
-        // This is a configuration method that should be called before use
+        ArgumentNullException.ThrowIfNull(provider);
+        // Use Interlocked exchange for thread-safe provider swap.
+        Interlocked.Exchange(ref _embeddingProvider, provider);
     }
 
     /// <inheritdoc/>

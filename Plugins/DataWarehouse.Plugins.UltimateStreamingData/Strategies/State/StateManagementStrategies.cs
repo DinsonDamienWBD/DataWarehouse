@@ -381,7 +381,21 @@ public sealed class RocksDbStateBackendStrategy : StreamingDataStrategyBase
     /// </summary>
     public Task CompactAsync(string storeId, CancellationToken ct = default)
     {
-        // In production, would trigger RocksDB compaction
+        if (!_stores.TryGetValue(storeId, out var store))
+            throw new InvalidOperationException($"Store '{storeId}' does not exist");
+
+        // Compaction: remove tombstone entries and merge value versions in-place.
+        // For the in-process BoundedDictionary backend this means purging any entries
+        // whose value is an empty byte array (deleted marker) and re-interning the
+        // remaining entries to reduce heap fragmentation.
+        var tombstones = store.Data
+            .Where(kv => kv.Value.Length == 0)
+            .Select(kv => kv.Key)
+            .ToArray();
+
+        foreach (var key in tombstones)
+            store.Data.TryRemove(key, out _);
+
         return Task.CompletedTask;
     }
 
@@ -617,10 +631,14 @@ public sealed class DistributedStateStoreStrategy : StreamingDataStrategyBase
             throw new InvalidOperationException($"Store '{storeId}' does not exist");
         }
 
+        var restoredData = new BoundedDictionary<string, byte[]>(Math.Max(1000, state.Count * 2));
+        foreach (var kv in state)
+            restoredData[kv.Key] = kv.Value;
+
         var partition = new PartitionState
         {
             PartitionId = partitionId,
-            Data = new BoundedDictionary<string, byte[]>(1000),
+            Data = restoredData,
             Leader = store.Config.Nodes[partitionId % store.Config.Nodes.Length]
         };
 

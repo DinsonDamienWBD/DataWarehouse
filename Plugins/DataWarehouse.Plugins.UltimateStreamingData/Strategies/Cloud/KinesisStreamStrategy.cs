@@ -78,6 +78,12 @@ public sealed record KinesisStream
     /// <summary>Whether enhanced fan-out is enabled.</summary>
     public bool EnhancedFanOutEnabled { get; init; }
 
+    /// <summary>
+    /// AWS account ID that owns this stream (12-digit numeric string).
+    /// Required for constructing accurate consumer ARNs for enhanced fan-out.
+    /// </summary>
+    public string? AwsAccountId { get; init; }
+
     /// <summary>Stream mode: ON_DEMAND or PROVISIONED.</summary>
     public string StreamMode { get; init; } = "PROVISIONED";
 }
@@ -516,7 +522,10 @@ internal sealed class KinesisStreamStrategy : StreamingDataStrategyBase
         if (!_streams.TryGetValue(streamName, out var stream))
             throw new InvalidOperationException($"Stream '{streamName}' not found.");
 
-        var consumerArn = $"arn:aws:kinesis:{stream.Region}:123456789012:stream/{streamName}/consumer/{consumerName}";
+        // Use the configured AWS account ID from the stream; fall back to a placeholder
+        // that is clearly not a valid AWS account number (all-zeros).
+        var accountId = string.IsNullOrWhiteSpace(stream.AwsAccountId) ? "000000000000" : stream.AwsAccountId;
+        var consumerArn = $"arn:aws:kinesis:{stream.Region}:{accountId}:stream/{streamName}/consumer/{consumerName}";
 
         var consumer = new KinesisConsumer
         {

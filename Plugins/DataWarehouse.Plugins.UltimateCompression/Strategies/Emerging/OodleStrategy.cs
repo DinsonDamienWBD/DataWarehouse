@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using DataWarehouse.SDK.Contracts.Compression;
 
 using System.Threading;
@@ -30,6 +31,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
         private const int BlockSize = 256 * 1024;
         private const int MinMatchLength = 3;
         private const int MaxMatchDistance = 524288; // 512KB
+        // Maximum hash chain length to prevent O(n²) on repetitive input (e.g., all-zeros).
+        private const int MaxChainLength = 32;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="OodleStrategy"/> class
@@ -155,11 +158,12 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
 
                     if (hashTable.TryGetValue(hash, out var candidates))
                     {
-                        // Find best match
+                        // Find best match (scan only the capped tail of the chain)
                         int bestMatchPos = -1;
                         int bestMatchLen = 0;
 
-                        foreach (int candidate in candidates)
+                        int startIdx = Math.Max(0, candidates.Count - MaxChainLength);
+                        foreach (int candidate in candidates.Skip(startIdx))
                         {
                             if (pos - candidate > MaxMatchDistance)
                                 continue;
@@ -184,15 +188,20 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
 
                             foundMatch = true;
 
-                            // Update hash table for matched region
+                            // Update hash table for matched region (with chain-length cap)
                             for (int i = 0; i < bestMatchLen && pos + i < count; i++)
                             {
                                 if (pos + i + MinMatchLength <= count)
                                 {
                                     uint h = ComputeHash(input, offset + pos + i, MinMatchLength);
-                                    if (!hashTable.ContainsKey(h))
-                                        hashTable[h] = new List<int>();
-                                    hashTable[h].Add(pos + i);
+                                    if (!hashTable.TryGetValue(h, out var chain))
+                                    {
+                                        chain = new List<int>();
+                                        hashTable[h] = chain;
+                                    }
+                                    chain.Add(pos + i);
+                                    if (chain.Count > MaxChainLength * 2)
+                                        chain.RemoveRange(0, chain.Count - MaxChainLength);
                                 }
                             }
 
@@ -207,13 +216,18 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
                     commands.WriteByte(0); // Literal command
                     literals.WriteByte(input[offset + pos]);
 
-                    // Update hash table
+                    // Update hash table (with chain-length cap)
                     if (pos + MinMatchLength <= count)
                     {
                         uint h = ComputeHash(input, offset + pos, MinMatchLength);
-                        if (!hashTable.ContainsKey(h))
-                            hashTable[h] = new List<int>();
-                        hashTable[h].Add(pos);
+                        if (!hashTable.TryGetValue(h, out var chain))
+                        {
+                            chain = new List<int>();
+                            hashTable[h] = chain;
+                        }
+                        chain.Add(pos);
+                        if (chain.Count > MaxChainLength * 2)
+                            chain.RemoveRange(0, chain.Count - MaxChainLength);
                     }
 
                     pos++;
@@ -360,13 +374,15 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
                     if (matchPos < 0)
                         throw new InvalidDataException("Invalid match distance.");
 
-                    for (uint i = 0; i < length; i++)
+                    long writePos = output.Position;
+                    for (uint i = 0; i < length; i++, writePos++)
                     {
                         output.Position = matchPos + i;
-                        byte b = (byte)output.ReadByte();
-
-                        output.Position = output.Length;
-                        output.WriteByte(b);
+                        int b = output.ReadByte();
+                        if (b < 0)
+                            throw new InvalidDataException("Match references position beyond current output.");
+                        output.Position = writePos;
+                        output.WriteByte((byte)b);
                     }
                 }
             }

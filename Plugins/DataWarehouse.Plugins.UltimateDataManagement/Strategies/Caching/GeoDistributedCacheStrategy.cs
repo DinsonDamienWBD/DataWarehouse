@@ -147,14 +147,22 @@ public sealed class GeoDistributedCacheStrategy : CachingStrategyBase
 
     private readonly GeoDistributedCacheConfig _config;
     private long _currentSize;
-    private readonly Timer _healthCheckTimer;
-    private readonly Timer _invalidationTimer;
+    private Timer? _healthCheckTimer;
+    private Timer? _invalidationTimer;
 
     private sealed class CacheEntry
     {
+        private long _lastAccessTicks;
+
         public byte[] Value { get; }
         public DateTime? ExpiresAt { get; set; }
-        public DateTime LastAccess { get; set; }
+
+        public DateTime LastAccess
+        {
+            get => new DateTime(Interlocked.Read(ref _lastAccessTicks), DateTimeKind.Utc);
+            set => Interlocked.Exchange(ref _lastAccessTicks, value.Ticks);
+        }
+
         public CachePriority Priority { get; }
         public string[]? Tags { get; }
         public string OriginRegion { get; init; }
@@ -165,7 +173,7 @@ public sealed class GeoDistributedCacheStrategy : CachingStrategyBase
             Value = value;
             Priority = options.Priority;
             Tags = options.Tags;
-            LastAccess = DateTime.UtcNow;
+            _lastAccessTicks = DateTime.UtcNow.Ticks;
             OriginRegion = originRegion;
             Version = DateTime.UtcNow.Ticks;
 
@@ -189,9 +197,15 @@ public sealed class GeoDistributedCacheStrategy : CachingStrategyBase
     public GeoDistributedCacheStrategy(GeoDistributedCacheConfig config)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
+        // Timers are started in InitializeCoreAsync to avoid accessing uninitialized state.
+    }
 
+    /// <inheritdoc/>
+    protected override Task InitializeCoreAsync(CancellationToken ct)
+    {
         _healthCheckTimer = new Timer(PerformHealthChecks, null, TimeSpan.FromSeconds(10), _config.HealthCheckInterval);
         _invalidationTimer = new Timer(ProcessInvalidations, null, _config.InvalidationDelay, _config.InvalidationDelay);
+        return Task.CompletedTask;
     }
 
     /// <inheritdoc/>
@@ -422,8 +436,8 @@ public sealed class GeoDistributedCacheStrategy : CachingStrategyBase
     /// <inheritdoc/>
     protected override Task DisposeCoreAsync()
     {
-        _healthCheckTimer.Dispose();
-        _invalidationTimer.Dispose();
+        _healthCheckTimer?.Dispose();
+        _invalidationTimer?.Dispose();
         _localCache.Clear();
         _tagIndex.Clear();
         _regions.Clear();

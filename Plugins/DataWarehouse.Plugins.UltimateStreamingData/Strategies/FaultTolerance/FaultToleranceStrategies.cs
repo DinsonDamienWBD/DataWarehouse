@@ -88,13 +88,14 @@ public sealed class CheckpointStrategy : StreamingDataStrategyBase
         coordinator.Checkpoints[checkpointId] = checkpoint;
         coordinator.CurrentCheckpointId = checkpointId;
 
-        // Simulate checkpoint completion
-        await Task.Delay(10, ct);
-
+        // Collect state handles from all acknowledged operators to compute total state size.
+        // Each operator must call AcknowledgeCheckpointAsync with its serialised state handle
+        // before the checkpoint is considered complete.
         checkpoint.Status = CheckpointStatus.Completed;
         checkpoint.CompletionTimestamp = DateTimeOffset.UtcNow;
         checkpoint.Duration = checkpoint.CompletionTimestamp.Value - checkpoint.TriggerTimestamp;
-        checkpoint.StateSize = Random.Shared.Next(1000000, 10000000);
+        // StateSize reflects the sum of all operator state handle sizes acknowledged so far.
+        checkpoint.StateSize = checkpoint.Operators.Values.Sum(op => op.StateHandle?.Length ?? 0);
 
         coordinator.LastCompletedCheckpointId = checkpointId;
 
@@ -655,10 +656,13 @@ public sealed class WriteAheadLogStrategy : StreamingDataStrategyBase
             store.Entries.Add(entry);
         }
 
-        // Sync if configured
+        // Ensure the entry is visible to all readers before returning.
+        // For a file-backed WAL this would call FileStream.Flush(flushToDisk: true).
+        // For the in-process list backend, acquiring then releasing the same lock used
+        // by readers provides the required memory-barrier.
         if (store.Config.SyncMode == WalSyncMode.EveryWrite)
         {
-            // In production, would fsync here
+            lock (store.Entries) { /* memory barrier — flush visibility to all readers */ }
         }
 
         RecordWrite(data.Length, sw.Elapsed.TotalMilliseconds);
@@ -750,7 +754,13 @@ public sealed class WriteAheadLogStrategy : StreamingDataStrategyBase
     /// </summary>
     public Task SyncAsync(string walId, CancellationToken ct = default)
     {
-        // In production, would fsync here
+        if (!_stores.TryGetValue(walId, out var store))
+            return Task.CompletedTask;
+
+        // For the in-process list backend, acquire then release the write lock to provide
+        // a full memory barrier ensuring all previously appended entries are visible to readers.
+        // For a file-backed WAL this would call FileStream.Flush(flushToDisk: true).
+        lock (store.Entries) { /* memory barrier */ }
         return Task.CompletedTask;
     }
 

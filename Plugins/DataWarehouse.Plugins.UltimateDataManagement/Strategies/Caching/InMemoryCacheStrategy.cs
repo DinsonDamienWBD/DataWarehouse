@@ -144,21 +144,17 @@ public sealed class InMemoryCacheStrategy : CachingStrategyBase
         // Check if we need to evict entries
         EnsureCapacity(value.Length);
 
-        if (_cache.TryGetValue(key, out var existing))
+        // Atomically update or add: remove old entry size, then set new entry.
+        if (_cache.TryRemove(key, out var existing))
         {
-            RemoveEntry(key, existing);
+            Interlocked.Add(ref _currentSize, -existing.Value.Length);
+            RemoveFromTagIndex(key, existing.Tags);
         }
 
-        if (_cache.TryAdd(key, entry))
-        {
-            Interlocked.Add(ref _currentSize, value.Length);
-            AddToTagIndex(key, options.Tags);
-        }
-        else
-        {
-            // Key was added concurrently, update it
-            _cache[key] = entry;
-        }
+        // AddOrUpdate ensures no lost-update: the last writer wins atomically.
+        _cache[key] = entry;
+        Interlocked.Add(ref _currentSize, value.Length);
+        AddToTagIndex(key, options.Tags);
 
         return Task.CompletedTask;
     }

@@ -294,7 +294,7 @@ public sealed class PredictiveTieringStrategy : TieringStrategyBase
         {
             var dayOfWeek = (int)evt.Timestamp.DayOfWeek;
             weekdayCounts[dayOfWeek]++;
-            weekdayTotals[dayOfWeek] = 1;
+            weekdayTotals[dayOfWeek]++;
         }
 
         for (int i = 0; i < 7; i++)
@@ -310,7 +310,7 @@ public sealed class PredictiveTieringStrategy : TieringStrategyBase
         {
             var hour = evt.Timestamp.Hour;
             hourlyCounts[hour]++;
-            hourlyTotals[hour] = 1;
+            hourlyTotals[hour]++;
         }
 
         for (int i = 0; i < 24; i++)

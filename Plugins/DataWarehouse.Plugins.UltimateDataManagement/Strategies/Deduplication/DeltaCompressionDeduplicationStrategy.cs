@@ -310,68 +310,103 @@ public sealed class DeltaCompressionDeduplicationStrategy : DeduplicationStrateg
         return (storedSize, chunkRefs.Count, duplicateChunks);
     }
 
+    private const int MinMatchLength = 8;
+    private const int HashBlockSize = 4;
+
     private byte[] ComputeDelta(byte[] oldData, byte[] newData)
     {
-        // Simple XOR-based delta for demonstration
-        // In production, use a proper delta algorithm like xdelta or bsdiff
-        using var deltaStream = new MemoryStream(65536);
+        // O(n+m) delta using a 4-byte fingerprint hash table for match discovery.
+        // Build a hash table: fingerprint(oldData[i..i+4]) -> list of offsets in oldData.
+        // Then for each position in newData, look up potential matches in O(1) amortized.
+        using var deltaStream = new MemoryStream(Math.Max(65536, newData.Length / 4));
         using var writer = new BinaryWriter(deltaStream);
 
-        // Write header
         writer.Write(oldData.Length);
         writer.Write(newData.Length);
 
-        // Find matching and differing regions
-        int newPos = 0;
-
-        while (newPos < newData.Length)
+        if (oldData.Length < HashBlockSize || newData.Length == 0)
         {
-            // Try to find a match in old data
-            var matchLength = 0;
-            var matchOffset = -1;
+            // No matches possible; emit newData as one literal block
+            writer.Write((byte)0);
+            writer.Write(newData.Length);
+            writer.Write(newData, 0, newData.Length);
+            return deltaStream.ToArray();
+        }
 
-            for (int searchPos = 0; searchPos < oldData.Length - 4; searchPos++)
+        // Build fingerprint index for oldData
+        var hashIndex = new Dictionary<int, List<int>>(oldData.Length);
+        for (int i = 0; i <= oldData.Length - HashBlockSize; i++)
+        {
+            var fp = FourByteFingerprint(oldData, i);
+            if (!hashIndex.TryGetValue(fp, out var offsets))
             {
-                var len = GetMatchLength(oldData, searchPos, newData, newPos);
-                if (len > matchLength && len >= 4)
+                offsets = new List<int>(4);
+                hashIndex[fp] = offsets;
+            }
+            offsets.Add(i);
+        }
+
+        int newPos = 0;
+        int literalStart = 0;
+
+        while (newPos <= newData.Length - HashBlockSize)
+        {
+            var fp = FourByteFingerprint(newData, newPos);
+            var bestLen = 0;
+            var bestOff = -1;
+
+            if (hashIndex.TryGetValue(fp, out var candidates))
+            {
+                foreach (var cand in candidates)
                 {
-                    matchLength = len;
-                    matchOffset = searchPos;
+                    var len = GetMatchLength(oldData, cand, newData, newPos);
+                    if (len > bestLen)
+                    {
+                        bestLen = len;
+                        bestOff = cand;
+                        if (len >= 256) break; // good enough
+                    }
                 }
             }
 
-            if (matchLength >= 8)
+            if (bestLen >= MinMatchLength)
             {
-                // Write copy instruction
-                writer.Write((byte)1); // Copy op
-                writer.Write(matchOffset);
-                writer.Write(matchLength);
-                newPos += matchLength;
+                // Flush preceding literals
+                if (newPos > literalStart)
+                {
+                    var litLen = newPos - literalStart;
+                    writer.Write((byte)0);
+                    writer.Write(litLen);
+                    writer.Write(newData, literalStart, litLen);
+                }
+
+                writer.Write((byte)1);
+                writer.Write(bestOff);
+                writer.Write(bestLen);
+                newPos += bestLen;
+                literalStart = newPos;
             }
             else
             {
-                // Write literal
-                var literalEnd = newPos + 1;
-                while (literalEnd < newData.Length && literalEnd - newPos < 256)
-                {
-                    var nextMatch = 0;
-                    for (int s = 0; s < oldData.Length - 4; s++)
-                    {
-                        nextMatch = Math.Max(nextMatch, GetMatchLength(oldData, s, newData, literalEnd));
-                    }
-                    if (nextMatch >= 8) break;
-                    literalEnd++;
-                }
-
-                var literalLength = literalEnd - newPos;
-                writer.Write((byte)0); // Literal op
-                writer.Write(literalLength);
-                writer.Write(newData, newPos, literalLength);
-                newPos = literalEnd;
+                newPos++;
             }
         }
 
+        // Flush any remaining bytes as literal
+        var remaining = newData.Length - literalStart;
+        if (remaining > 0)
+        {
+            writer.Write((byte)0);
+            writer.Write(remaining);
+            writer.Write(newData, literalStart, remaining);
+        }
+
         return deltaStream.ToArray();
+    }
+
+    private static int FourByteFingerprint(byte[] data, int offset)
+    {
+        return (data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3];
     }
 
     private static int GetMatchLength(byte[] source, int sourcePos, byte[] target, int targetPos)

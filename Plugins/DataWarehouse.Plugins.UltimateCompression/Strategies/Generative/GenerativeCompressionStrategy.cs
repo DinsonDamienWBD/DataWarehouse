@@ -1870,10 +1870,15 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Generative
             return CpuMatrixMultiply(input, weights, inputSize, outputSize);
         }
 
+        /// <remarks>
+        /// GPU acceleration is not implemented in this release.
+        /// GPU matrix multiplication requires an external GPGPU library (e.g., CUDA, OpenCL, or Vulkan compute shaders)
+        /// which is outside the current dependency set. Falls back to CPU implementation.
+        /// To enable GPU acceleration, inject a custom <c>IGpuComputeProvider</c> and override this method.
+        /// </remarks>
         private static float[] GpuMatrixMultiply(float[] input, float[] weights, int inputSize, int outputSize)
         {
-            // GPU implementation would use compute shaders
-            // For now, use optimized CPU with SIMD hints
+            // GPU acceleration unavailable — CPU fallback (see remarks on this method).
             return CpuMatrixMultiply(input, weights, inputSize, outputSize);
         }
 

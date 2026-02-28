@@ -297,23 +297,28 @@ public sealed class EventStoreStrategy : DataManagementStrategyBase
         try
         {
             var stream = _streams.GetOrAdd(streamId, _ => new List<StoredEvent>());
-            var currentVersion = _streamVersions.GetOrAdd(streamId, -1);
-
-            // Optimistic concurrency check
-            if (expectedVersion.HasValue && currentVersion != expectedVersion.Value)
-            {
-                return Task.FromResult(new AppendResult
-                {
-                    Success = false,
-                    Error = $"Concurrency conflict: expected version {expectedVersion}, actual {currentVersion}",
-                    NextExpectedVersion = currentVersion
-                });
-            }
+            _streamVersions.GetOrAdd(streamId, -1);
 
             var appendedEvents = new List<StoredEvent>();
+            long currentVersion;
 
+            // Acquire stream-level lock BEFORE reading version to eliminate TOCTOU race.
             lock (stream)
             {
+                // Re-read version inside the lock so the check and append are atomic.
+                currentVersion = _streamVersions.GetOrAdd(streamId, -1);
+
+                // Optimistic concurrency check (inside lock)
+                if (expectedVersion.HasValue && currentVersion != expectedVersion.Value)
+                {
+                    return Task.FromResult(new AppendResult
+                    {
+                        Success = false,
+                        Error = $"Concurrency conflict: expected version {expectedVersion}, actual {currentVersion}",
+                        NextExpectedVersion = currentVersion
+                    });
+                }
+
                 _globalLogLock.EnterWriteLock();
                 try
                 {
