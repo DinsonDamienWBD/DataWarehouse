@@ -139,7 +139,7 @@ public sealed class TDigest : IProbabilisticStructure, IMergeable<TDigest>, ICon
         {
             // Try to merge with nearest centroid
             var nearest = _centroids[index];
-            var q = Quantile(nearest);
+            var q = QuantileAtIndex(index); // Use index-based lookup to avoid float equality (finding P2-558)
             var maxSize = MaxCentroidSize(q);
 
             if (nearest.Weight + weight <= maxSize)
@@ -444,6 +444,19 @@ public sealed class TDigest : IProbabilisticStructure, IMergeable<TDigest>, ICon
     {
         // k-size function: allows larger centroids at extreme quantiles
         return 4 * _count * q * (1 - q) / _compression;
+    }
+
+    /// <summary>
+    /// Returns the approximate quantile of the centroid at the given index.
+    /// Uses index directly to avoid float equality comparison (finding P2-558).
+    /// </summary>
+    private double QuantileAtIndex(int index)
+    {
+        double weight = 0;
+        for (int i = 0; i < index; i++)
+            weight += _centroids[i].Weight;
+        var c = _centroids[index];
+        return _count > 0 ? (weight + c.Weight / 2.0) / _count : 0.5;
     }
 
     private double Quantile(Centroid centroid)

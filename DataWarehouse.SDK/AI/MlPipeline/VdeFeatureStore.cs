@@ -216,9 +216,15 @@ public sealed class VdeFeatureStore
     // Feature vectors keyed by "{FeatureSetId}:{EntityId}"
     private readonly ConcurrentDictionary<string, FeatureVector> _features = new();
 
+    // Secondary index: featureSetId → set of composite keys (finding P2-6, avoids O(n) prefix scan)
+    private readonly ConcurrentDictionary<string, ConcurrentBag<string>> _featureSetIndex = new();
+
     // Model versions keyed by "{ModelId}:{Version}"
     private readonly ConcurrentDictionary<string, ModelVersion> _models = new();
     private readonly object _modelRegistrationLock = new();
+
+    // Secondary index: modelId → set of composite keys (finding P2-6, avoids O(n) prefix scan)
+    private readonly ConcurrentDictionary<string, ConcurrentBag<string>> _modelIndex = new();
 
     // Training data lineage keyed by "{ModelId}:{Version}:{DatasetId}"
     private readonly ConcurrentDictionary<string, TrainingDataLineage> _lineage = new();
@@ -248,6 +254,9 @@ public sealed class VdeFeatureStore
         var key = $"{vector.FeatureSetId}:{vector.EntityId}";
         _features[key] = vector;
 
+        // Maintain secondary index for O(1) feature-set lookups (finding P2-6)
+        _featureSetIndex.GetOrAdd(vector.FeatureSetId, _ => new ConcurrentBag<string>()).Add(key);
+
         _logger.LogDebug("Stored feature vector {Key} ({Dims} dimensions).", key, vector.Values.Length);
         return ValueTask.CompletedTask;
     }
@@ -273,12 +282,17 @@ public sealed class VdeFeatureStore
     {
         ct.ThrowIfCancellationRequested();
 
-        var prefix = $"{featureSetId}:";
-        var results = _features
-            .Where(kvp => kvp.Key.StartsWith(prefix, StringComparison.Ordinal))
-            .Select(kvp => kvp.Value)
-            .Take(limit)
-            .ToList();
+        // Use secondary index for O(1) feature-set lookup instead of O(n) prefix scan (finding P2-6)
+        if (!_featureSetIndex.TryGetValue(featureSetId, out var keys))
+            return ValueTask.FromResult<IReadOnlyList<FeatureVector>>(Array.Empty<FeatureVector>());
+
+        var results = new List<FeatureVector>();
+        foreach (var key in keys)
+        {
+            if (results.Count >= limit) break;
+            if (_features.TryGetValue(key, out var vector))
+                results.Add(vector);
+        }
 
         return ValueTask.FromResult<IReadOnlyList<FeatureVector>>(results);
     }
@@ -295,20 +309,26 @@ public sealed class VdeFeatureStore
 
         lock (_modelRegistrationLock)
         {
-            // Check monotonically increasing version (atomic with insert under lock)
-            var existingVersions = _models
-                .Where(kvp => kvp.Key.StartsWith($"{model.ModelId}:", StringComparison.Ordinal))
-                .Select(kvp => kvp.Value.Version)
-                .ToList();
+            // Use secondary index for O(1) model lookup instead of O(n) prefix scan (finding P2-6)
+            var modelKeys = _modelIndex.GetOrAdd(model.ModelId, _ => new ConcurrentBag<string>());
 
-            if (existingVersions.Count > 0 && model.Version <= existingVersions.Max())
+            // Check monotonically increasing version (atomic with insert under lock)
+            int maxVersion = int.MinValue;
+            foreach (var existingKey in modelKeys)
+            {
+                if (_models.TryGetValue(existingKey, out var existingModel))
+                    maxVersion = Math.Max(maxVersion, existingModel.Version);
+            }
+
+            if (maxVersion != int.MinValue && model.Version <= maxVersion)
             {
                 throw new InvalidOperationException(
-                    $"Model version {model.Version} for '{model.ModelId}' must be greater than existing max {existingVersions.Max()}.");
+                    $"Model version {model.Version} for '{model.ModelId}' must be greater than existing max {maxVersion}.");
             }
 
             var key = $"{model.ModelId}:{model.Version}";
             _models[key] = model;
+            modelKeys.Add(key);
         }
 
         _logger.LogInformation(
@@ -325,12 +345,19 @@ public sealed class VdeFeatureStore
     {
         ct.ThrowIfCancellationRequested();
 
-        var active = _models
-            .Where(kvp => kvp.Key.StartsWith($"{modelId}:", StringComparison.Ordinal)
-                          && kvp.Value.Status == ModelStatus.Active)
-            .OrderByDescending(kvp => kvp.Value.Version)
-            .Select(kvp => kvp.Value)
-            .FirstOrDefault();
+        // Use secondary index for O(1) model lookup instead of O(n) prefix scan (finding P2-6)
+        if (!_modelIndex.TryGetValue(modelId, out var keys))
+            return ValueTask.FromResult<ModelVersion?>(null);
+
+        ModelVersion? active = null;
+        foreach (var key in keys)
+        {
+            if (_models.TryGetValue(key, out var m) && m.Status == ModelStatus.Active)
+            {
+                if (active is null || m.Version > active.Version)
+                    active = m;
+            }
+        }
 
         return ValueTask.FromResult<ModelVersion?>(active);
     }
@@ -343,11 +370,17 @@ public sealed class VdeFeatureStore
     {
         ct.ThrowIfCancellationRequested();
 
-        var history = _models
-            .Where(kvp => kvp.Key.StartsWith($"{modelId}:", StringComparison.Ordinal))
-            .Select(kvp => kvp.Value)
-            .OrderBy(m => m.Version)
-            .ToList();
+        // Use secondary index for O(1) model lookup instead of O(n) prefix scan (finding P2-6)
+        if (!_modelIndex.TryGetValue(modelId, out var keys))
+            return ValueTask.FromResult<IReadOnlyList<ModelVersion>>(Array.Empty<ModelVersion>());
+
+        var history = new List<ModelVersion>();
+        foreach (var key in keys)
+        {
+            if (_models.TryGetValue(key, out var m))
+                history.Add(m);
+        }
+        history.Sort((x, y) => x.Version.CompareTo(y.Version));
 
         return ValueTask.FromResult<IReadOnlyList<ModelVersion>>(history);
     }
@@ -359,31 +392,35 @@ public sealed class VdeFeatureStore
     {
         ct.ThrowIfCancellationRequested();
 
-        var key = $"{modelId}:{version}";
-        if (!_models.TryGetValue(key, out var model))
-            throw new KeyNotFoundException($"Model '{modelId}' version {version} not found.");
-
-        // Retire all currently active versions
-        var activeKeys = _models
-            .Where(kvp => kvp.Key.StartsWith($"{modelId}:", StringComparison.Ordinal)
-                          && kvp.Value.Status == ModelStatus.Active)
-            .Select(kvp => kvp.Key)
-            .ToList();
-
-        foreach (var activeKey in activeKeys)
+        // Perform promote+retire atomically under _modelRegistrationLock (finding P2-8)
+        // Use secondary index for O(1) model lookup instead of O(n) prefix scan (finding P2-6)
+        lock (_modelRegistrationLock)
         {
-            if (_models.TryGetValue(activeKey, out var activeModel))
+            var key = $"{modelId}:{version}";
+            if (!_models.TryGetValue(key, out var model))
+                throw new KeyNotFoundException($"Model '{modelId}' version {version} not found.");
+
+            // Retire all currently active versions using index
+            if (_modelIndex.TryGetValue(modelId, out var keys))
             {
-                _models[activeKey] = activeModel with { Status = ModelStatus.Retired };
+                foreach (var activeKey in keys)
+                {
+                    if (_models.TryGetValue(activeKey, out var activeModel)
+                        && activeModel.Status == ModelStatus.Active
+                        && activeKey != key)
+                    {
+                        _models[activeKey] = activeModel with { Status = ModelStatus.Retired };
+                    }
+                }
             }
+
+            // Promote the target version
+            _models[key] = model with { Status = ModelStatus.Active };
         }
 
-        // Promote the target version
-        _models[key] = model with { Status = ModelStatus.Active };
-
         _logger.LogInformation(
-            "Promoted model {ModelId} v{Version} to Active. Retired {Count} previous version(s).",
-            modelId, version, activeKeys.Count);
+            "Promoted model {ModelId} v{Version} to Active.",
+            modelId, version);
 
         return ValueTask.CompletedTask;
     }
@@ -471,19 +508,32 @@ public sealed class VdeFeatureStore
     /// </summary>
     public FeatureStoreStats GetStats()
     {
-        var featureSets = _features.Keys
-            .Select(k => k.Substring(0, k.IndexOf(':', StringComparison.Ordinal)))
-            .Distinct()
-            .Count();
+        // Use secondary indexes for O(1) count queries instead of O(n) full scans (finding P2-7)
+        int featureSets = _featureSetIndex.Count;
+        int modelCount = _modelIndex.Count;
 
-        var modelIds = _models.Values.Select(m => m.ModelId).Distinct().ToList();
-        var activeModels = _models.Values.Count(m => m.Status == ModelStatus.Active);
+        // Count active models: iterate _modelIndex keys (one bag per modelId), check active per model
+        int activeModels = 0;
+        foreach (var modelId in _modelIndex.Keys)
+        {
+            if (_modelIndex.TryGetValue(modelId, out var keys))
+            {
+                foreach (var key in keys)
+                {
+                    if (_models.TryGetValue(key, out var m) && m.Status == ModelStatus.Active)
+                    {
+                        activeModels++;
+                        break; // At most one active per modelId
+                    }
+                }
+            }
+        }
 
         return new FeatureStoreStats
         {
             TotalVectors = _features.Count,
             FeatureSets = featureSets,
-            Models = modelIds.Count,
+            Models = modelCount,
             ActiveModels = activeModels,
             CachedInferences = _inferenceCache.Count
         };

@@ -387,6 +387,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         private bool _isAvailable;
         private bool _initialized;
         private long _operationsCompleted;
+        private long _totalProcessingTicks; // accumulated via Interlocked.Add (finding P2-371)
         private readonly object _lock = new();
         private bool _disposed;
 
@@ -401,7 +402,8 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         }
 
         /// <inheritdoc/>
-        public AcceleratorType Type => AcceleratorType.NvidiaGpu | AcceleratorType.AmdGpu;
+        // WebGPU is a cross-vendor API — not NVIDIA/AMD specific (finding P2-370)
+        public AcceleratorType Type => AcceleratorType.WebGpu;
 
         /// <inheritdoc/>
         public bool IsAvailable => _isAvailable;
@@ -524,7 +526,10 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                 throw new ArgumentException("Matrix dimensions incompatible for multiplication");
 
             // WGSL GEMM kernel with workgroup tiling for shared memory optimization
+            if (M > 4096 || N > 4096 || K > 4096)
+                throw new ArgumentException($"Matrix dimensions too large for CPU fallback: {M}x{K} * {K}x{N}. Max 4096 per dimension (finding P2-372).");
             float[] result = new float[M * N];
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             await Task.Run(() =>
             {
                 for (int i = 0; i < M; i++)
@@ -536,7 +541,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                         result[i * N + j] = sum;
                     }
             });
-
+            Interlocked.Add(ref _totalProcessingTicks, System.Diagnostics.Stopwatch.GetTimestamp() - t0);
             Interlocked.Increment(ref _operationsCompleted);
             return result;
         }
@@ -586,9 +591,11 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             return Task.FromResult(new AcceleratorStatistics(
                 Type: Type,
                 OperationsCompleted: Interlocked.Read(ref _operationsCompleted),
-                AverageThroughputMBps: 0.0,
+                AverageThroughputMBps: 0.0, // Requires WebGPU perf counters (finding P2-371)
                 CurrentUtilization: 0.0,
-                TotalProcessingTime: TimeSpan.Zero
+                TotalProcessingTime: Interlocked.Read(ref _totalProcessingTicks) > 0
+                    ? TimeSpan.FromSeconds((double)Interlocked.Read(ref _totalProcessingTicks) / System.Diagnostics.Stopwatch.Frequency)
+                    : TimeSpan.Zero
             ));
         }
 

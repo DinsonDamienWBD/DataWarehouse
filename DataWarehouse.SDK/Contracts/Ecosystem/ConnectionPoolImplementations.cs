@@ -543,18 +543,23 @@ public sealed class TcpConnectionPool : ConnectionPoolBase<TcpPooledStream>
 
         public ValueTask DestroyAsync(TcpPooledStream connection, CancellationToken ct = default)
         {
-            try
-            {
-                connection.Stream.Dispose();
-                connection.Socket.Shutdown(SocketShutdown.Both);
-            }
+            // Dispose stream first (finding P2-50: ensure stream is always disposed even if Shutdown throws)
+            try { connection.Stream.Dispose(); }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[TcpConnectionFactory.DestroyAsync] {ex.GetType().Name}: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[TcpConnectionFactory.DestroyAsync] Stream.Dispose: {ex.GetType().Name}: {ex.Message}");
             }
-            finally
+
+            try { connection.Socket.Shutdown(SocketShutdown.Both); }
+            catch (Exception ex)
             {
-                connection.Socket.Dispose();
+                System.Diagnostics.Debug.WriteLine($"[TcpConnectionFactory.DestroyAsync] Socket.Shutdown: {ex.GetType().Name}: {ex.Message}");
+            }
+
+            try { connection.Socket.Dispose(); }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[TcpConnectionFactory.DestroyAsync] Socket.Dispose: {ex.GetType().Name}: {ex.Message}");
             }
 
             return default;

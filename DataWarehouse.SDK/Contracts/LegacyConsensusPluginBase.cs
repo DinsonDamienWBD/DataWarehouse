@@ -130,14 +130,35 @@ namespace DataWarehouse.SDK.Contracts
 
         /// <summary>
         /// Gets cluster health information aggregated across all consensus groups.
-        /// Override for detailed per-group health reporting.
+        /// Default implementation derives health from <see cref="GetClusterStateAsync"/>;
+        /// override for detailed per-group health reporting.
         /// </summary>
         /// <param name="ct">Cancellation token.</param>
         /// <returns>Aggregated health information.</returns>
-        public virtual Task<ClusterHealthInfo> GetClusterHealthAsync(CancellationToken ct)
+        public virtual async Task<ClusterHealthInfo> GetClusterHealthAsync(CancellationToken ct)
         {
             ct.ThrowIfCancellationRequested();
-            return Task.FromResult(new ClusterHealthInfo(0, 0, new Dictionary<string, string>()));
+            // Derive basic health from GetClusterStateAsync instead of returning hardcoded zeros
+            // (finding P2-139).
+            ClusterState state;
+            try
+            {
+                state = await GetClusterStateAsync().ConfigureAwait(false);
+            }
+            catch
+            {
+                return new ClusterHealthInfo(0, 0, new Dictionary<string, string>());
+            }
+
+            var nodeStates = new Dictionary<string, string>(StringComparer.Ordinal);
+            if (state.LeaderId != null)
+                nodeStates[state.LeaderId] = "leader";
+
+            // IsHealthy=true and having a leader counts as 1 healthy node minimum.
+            int total = Math.Max(state.NodeCount, nodeStates.Count);
+            int healthy = state.IsHealthy ? Math.Max(1, total) : 0;
+
+            return new ClusterHealthInfo(total, healthy, nodeStates);
         }
 
         #endregion

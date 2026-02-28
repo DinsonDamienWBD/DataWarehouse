@@ -434,13 +434,16 @@ namespace DataWarehouse.SDK.Contracts
     public abstract class GpuAcceleratorPluginBase : HardwareAcceleratorPluginBase, IGpuAccelerator
     {
         /// <summary>
-        /// Gets the accelerator type. Returns NvidiaGpu or AmdGpu based on runtime.
+        /// Gets the accelerator type. Returns NvidiaGpu, AmdGpu, AppleGpu, VulkanGpu, or WebGpu based on runtime.
         /// </summary>
         public override AcceleratorType Type => Runtime switch
         {
             GpuRuntime.Cuda => AcceleratorType.NvidiaGpu,
             GpuRuntime.RoCm => AcceleratorType.AmdGpu,
-            _ => AcceleratorType.NvidiaGpu | AcceleratorType.AmdGpu
+            GpuRuntime.Metal => AcceleratorType.AppleGpu,
+            GpuRuntime.Vulkan => AcceleratorType.VulkanGpu,
+            GpuRuntime.WebGpu => AcceleratorType.WebGpu,
+            _ => AcceleratorType.None  // finding P2-370: do not return NvidiaGpu|AmdGpu for unknown runtimes
         };
 
         /// <summary>

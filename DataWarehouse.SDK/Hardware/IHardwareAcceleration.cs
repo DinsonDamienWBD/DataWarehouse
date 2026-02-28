@@ -57,7 +57,16 @@ namespace DataWarehouse.SDK.Hardware
         Triton = 4096,
 
         /// <summary>CANN - Huawei Ascend NPU acceleration.</summary>
-        Cann = 8192
+        Cann = 8192,
+
+        /// <summary>Apple Metal - GPU compute on macOS/iOS via Metal API.</summary>
+        AppleGpu = 16384,
+
+        /// <summary>Vulkan Compute - Cross-vendor GPU compute via Vulkan API.</summary>
+        VulkanGpu = 32768,
+
+        /// <summary>WebGPU - Browser and native GPU compute via WebGPU API.</summary>
+        WebGpu = 65536
     }
 
     /// <summary>
@@ -226,7 +235,13 @@ namespace DataWarehouse.SDK.Hardware
         Cann,
 
         /// <summary>Apple Metal runtime.</summary>
-        Metal
+        Metal,
+
+        /// <summary>Vulkan Compute runtime (cross-vendor).</summary>
+        Vulkan,
+
+        /// <summary>WebGPU runtime (browser and native cross-platform).</summary>
+        WebGpu
     }
 
     /// <summary>

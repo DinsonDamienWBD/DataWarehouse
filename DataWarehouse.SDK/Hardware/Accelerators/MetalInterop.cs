@@ -184,8 +184,10 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         private bool _isAvailable;
         private bool _initialized;
         private long _operationsCompleted;
+        private long _totalProcessingTicks; // accumulated via Interlocked.Add (finding P2-371)
         private readonly object _lock = new();
         private bool _disposed;
+        private readonly long _initTicks = System.Diagnostics.Stopwatch.GetTimestamp();
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MetalAccelerator"/> class.
@@ -198,7 +200,8 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         }
 
         /// <inheritdoc/>
-        public AcceleratorType Type => AcceleratorType.NvidiaGpu | AcceleratorType.AmdGpu;
+        // Metal is Apple's GPU API — not NVIDIA/AMD specific (finding P2-370)
+        public AcceleratorType Type => AcceleratorType.AppleGpu;
 
         /// <inheritdoc/>
         public bool IsAvailable => _isAvailable;
@@ -301,12 +304,13 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             //
             // CPU fallback to establish API contract
             float[] result = new float[a.Length];
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             await Task.Run(() =>
             {
                 for (int i = 0; i < a.Length; i++)
                     result[i] = a[i] * b[i];
             });
-
+            Interlocked.Add(ref _totalProcessingTicks, System.Diagnostics.Stopwatch.GetTimestamp() - t0);
             Interlocked.Increment(ref _operationsCompleted);
             return result;
         }
@@ -328,7 +332,10 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
 
             // Metal Performance Shaders (MPS) provides optimized GEMM via MPSMatrixMultiplication
             // For custom kernels, use threadgroup memory tiling in MSL
+            if (M > 4096 || N > 4096 || K > 4096)
+                throw new ArgumentException($"Matrix dimensions too large for CPU fallback: {M}x{K} * {K}x{N}. Max 4096 per dimension (finding P2-372).");
             float[] result = new float[M * N];
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             await Task.Run(() =>
             {
                 for (int i = 0; i < M; i++)
@@ -340,7 +347,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                         result[i * N + j] = sum;
                     }
             });
-
+            Interlocked.Add(ref _totalProcessingTicks, System.Diagnostics.Stopwatch.GetTimestamp() - t0);
             Interlocked.Increment(ref _operationsCompleted);
             return result;
         }
@@ -362,6 +369,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
 
             // Metal GEMV: y = W^T * x via MPS or custom MSL kernel
             float[] result = new float[E];
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             await Task.Run(() =>
             {
                 for (int j = 0; j < E; j++)
@@ -372,7 +380,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                     result[j] = sum;
                 }
             });
-
+            Interlocked.Add(ref _totalProcessingTicks, System.Diagnostics.Stopwatch.GetTimestamp() - t0);
             Interlocked.Increment(ref _operationsCompleted);
             return result;
         }
@@ -387,12 +395,18 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// <inheritdoc/>
         public Task<AcceleratorStatistics> GetStatisticsAsync()
         {
+            long ops = Interlocked.Read(ref _operationsCompleted);
+            long ticks = Interlocked.Read(ref _totalProcessingTicks);
+            var processingTime = ticks > 0
+                ? TimeSpan.FromSeconds((double)ticks / System.Diagnostics.Stopwatch.Frequency)
+                : TimeSpan.Zero;
+            // Hardware utilization requires metal-specific perf counters — not available via P/Invoke (finding P2-371)
             return Task.FromResult(new AcceleratorStatistics(
                 Type: Type,
-                OperationsCompleted: Interlocked.Read(ref _operationsCompleted),
+                OperationsCompleted: ops,
                 AverageThroughputMBps: 0.0,
                 CurrentUtilization: 0.0,
-                TotalProcessingTime: TimeSpan.Zero
+                TotalProcessingTime: processingTime
             ));
         }
 

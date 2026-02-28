@@ -51,6 +51,7 @@ public sealed class QatAccelerator : IQatAccelerator, IDisposable
     private volatile bool _isAvailable = false;
     private volatile bool _initialized = false;
     private long _operationsCompleted = 0;
+    private long _totalProcessingTicks = 0; // accumulated via Interlocked.Add (finding P2-371)
     private readonly object _lock = new();
     private IntPtr _libraryHandle = IntPtr.Zero;
 
@@ -445,9 +446,11 @@ public sealed class QatAccelerator : IQatAccelerator, IDisposable
         var stats = new AcceleratorStatistics(
             Type: AcceleratorType.IntelQAT,
             OperationsCompleted: Interlocked.Read(ref _operationsCompleted),
-            AverageThroughputMBps: 0.0, // Requires hardware-specific query API for real metrics
+            AverageThroughputMBps: 0.0, // Requires hardware-specific query API for real metrics (finding P2-371)
             CurrentUtilization: 0.0,     // QAT doesn't expose utilization via public API
-            TotalProcessingTime: TimeSpan.Zero // Requires tracking per-operation timing
+            TotalProcessingTime: Interlocked.Read(ref _totalProcessingTicks) > 0
+                ? TimeSpan.FromSeconds((double)Interlocked.Read(ref _totalProcessingTicks) / System.Diagnostics.Stopwatch.Frequency)
+                : TimeSpan.Zero
         );
 
         return Task.FromResult(stats);
