@@ -2756,6 +2756,24 @@ private sealed class XzCompressionStream : Stream
     public override void SetLength(long value);;
 }
 ```
+```csharp
+private sealed class XzDecompressionStream : Stream
+{
+}
+    public XzDecompressionStream(Stream source, bool leaveOpen, XzStrategy owner);
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+    public override int Read(byte[] buffer, int offset, int count);
+    public override void Flush();
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+    public override void Write(byte[] buffer, int offset, int count);;
+    protected override void Dispose(bool disposing);
+}
+```
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateCompression/Strategies/Archive/TarStrategy.cs
 ```csharp
