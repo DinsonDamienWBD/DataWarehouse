@@ -34,7 +34,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            _instanceName = GetConfiguration<string>(config, "Instance", "dev12345");
+            _instanceName = GetConfiguration<string>(config, "Instance", ""); if (string.IsNullOrEmpty(_instanceName) || _instanceName == "dev12345") throw new ArgumentException("ServiceNow instance name is required");
             _username = GetConfiguration<string>(config, "Username", "");
             _password = GetConfiguration<string>(config, "Password", "");
 

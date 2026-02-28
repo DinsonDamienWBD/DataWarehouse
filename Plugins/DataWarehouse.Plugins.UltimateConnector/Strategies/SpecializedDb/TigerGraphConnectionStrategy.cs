@@ -40,7 +40,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             if (_httpClient == null) return false;
-            try { var response = await _httpClient.GetAsync("/echo", ct); return response.IsSuccessStatusCode; }
+            try { using var response = await _httpClient.GetAsync("/echo", ct); return response.IsSuccessStatusCode; }
             catch { return false; /* Connection validation - failure acceptable */ }
         }
 

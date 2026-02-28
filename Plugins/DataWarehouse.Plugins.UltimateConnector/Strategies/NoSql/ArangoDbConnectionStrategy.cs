@@ -13,7 +13,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
     /// </summary>
     public class ArangoDbConnectionStrategy : DatabaseConnectionStrategyBase
     {
-        private HttpClient? _httpClient;
+        private volatile HttpClient? _httpClient;
 
         public override string StrategyId => "arangodb";
         public override string DisplayName => "ArangoDB";

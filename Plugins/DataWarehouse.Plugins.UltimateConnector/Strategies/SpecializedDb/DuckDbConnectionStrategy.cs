@@ -9,7 +9,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
 {
     public class DuckDbConnectionStrategy : DatabaseConnectionStrategyBase
     {
-        private string? _filePath;
+        private volatile string? _filePath;
 
         public override string StrategyId => "duckdb";
         public override string DisplayName => "DuckDB";

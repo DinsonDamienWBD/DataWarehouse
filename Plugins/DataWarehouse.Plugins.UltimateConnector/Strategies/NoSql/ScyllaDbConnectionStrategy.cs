@@ -13,7 +13,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
     /// </summary>
     public class ScyllaDbConnectionStrategy : DatabaseConnectionStrategyBase
     {
-        private TcpClient? _tcpClient;
+        private volatile TcpClient? _tcpClient;
 
         public override string StrategyId => "scylladb";
         public override string DisplayName => "ScyllaDB";
@@ -21,7 +21,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
         public override string[] Tags => new[] { "nosql", "scylladb", "cassandra-compatible", "distributed", "high-performance" };
 
         public override ConnectionStrategyCapabilities Capabilities => new(
-            SupportsPooling: true,
+            SupportsPooling: false,
             SupportsStreaming: true,
             SupportsTransactions: false,
             SupportsBulkOperations: true,

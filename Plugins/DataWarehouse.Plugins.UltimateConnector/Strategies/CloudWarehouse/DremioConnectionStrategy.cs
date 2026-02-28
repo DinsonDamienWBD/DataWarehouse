@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
 {
     public class DremioConnectionStrategy : DatabaseConnectionStrategyBase
     {
-        private HttpClient? _httpClient;
+        private volatile HttpClient? _httpClient;
         public override string StrategyId => "dremio";
         public override string DisplayName => "Dremio";
         public override string SemanticDescription => "Data lakehouse platform providing unified analytics across data lakes and warehouses";

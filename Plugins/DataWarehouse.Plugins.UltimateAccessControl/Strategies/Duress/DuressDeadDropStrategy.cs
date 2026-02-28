@@ -33,6 +33,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
     public sealed class DuressDeadDropStrategy : AccessControlStrategyBase
     {
         private readonly ILogger _logger;
+        private readonly System.Net.Http.HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(30) };
 
         public DuressDeadDropStrategy(ILogger? logger = null)
         {
@@ -136,12 +137,16 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
 
         private async Task<byte[]> EncryptEvidenceAsync(byte[] evidence, CancellationToken cancellationToken)
         {
+            if (!Configuration.TryGetValue("EncryptionKey", out var keyObj) || keyObj is not string keyStr || string.IsNullOrEmpty(keyStr))
+            {
+                throw new InvalidOperationException(
+                    "EncryptionKey must be configured for dead drop encryption. " +
+                    "Without a pre-shared key, the recipient cannot decrypt the evidence.");
+            }
+
+            var keyBytes = Convert.FromBase64String(keyStr);
             try
             {
-                var keyBytes = Configuration.TryGetValue("EncryptionKey", out var keyObj) && keyObj is string keyStr
-                    ? Convert.FromBase64String(keyStr)
-                    : RandomNumberGenerator.GetBytes(32);
-
                 using var aes = new AesGcm(keyBytes, AesGcm.TagByteSizes.MaxSize);
                 var nonce = RandomNumberGenerator.GetBytes(AesGcm.NonceByteSizes.MaxSize);
                 var ciphertext = new byte[evidence.Length];
@@ -157,10 +162,9 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
 
                 return await Task.FromResult(result);
             }
-            catch (Exception ex)
+            finally
             {
-                _logger.LogError(ex, "Failed to encrypt evidence");
-                return evidence; // Fallback to unencrypted
+                CryptographicOperations.ZeroMemory(keyBytes);
             }
         }
 
@@ -170,6 +174,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
             {
                 // Embed in carrier image if configured
                 if (Configuration.TryGetValue("CarrierImagePath", out var carrierObj) && carrierObj is string carrierPath &&
+                    !string.IsNullOrEmpty(carrierPath) &&
+                    Path.GetFullPath(carrierPath) == carrierPath && // Reject relative/traversal paths
                     File.Exists(carrierPath))
                 {
                     var stegoImage = await EmbedInCarrierAsync(carrierPath, evidence, cancellationToken);
@@ -230,9 +236,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
                 location.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
             {
                 // HTTP upload
-                using var client = new System.Net.Http.HttpClient();
                 using var content = new System.Net.Http.ByteArrayContent(data);
-                await client.PostAsync(location, content, cancellationToken);
+                await _httpClient.PostAsync(location, content, cancellationToken);
             }
             else if (location.StartsWith("ftp://", StringComparison.OrdinalIgnoreCase))
             {
@@ -241,8 +246,13 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
             }
             else
             {
-                // Local file system
-                var fullPath = Path.Combine(location, filename);
+                // Local file system - canonicalize path to prevent traversal
+                var fullPath = Path.GetFullPath(Path.Combine(location, filename));
+                var canonicalLocation = Path.GetFullPath(location);
+                if (!fullPath.StartsWith(canonicalLocation, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException("Path traversal detected in dead drop location");
+                }
                 await File.WriteAllBytesAsync(fullPath, data, cancellationToken);
             }
         }

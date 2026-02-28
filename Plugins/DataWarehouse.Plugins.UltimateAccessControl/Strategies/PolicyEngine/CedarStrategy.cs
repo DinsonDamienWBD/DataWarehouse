@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Utilities;
@@ -218,14 +219,29 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
         /// </summary>
         private bool EvaluateCondition(string condition, AccessContext context)
         {
-            // Simplified condition evaluation
-            // In production, implement proper Cedar condition parser
-
             // Example: "context.time < '2024-12-31'"
             if (condition.Contains("context.time"))
             {
-                // Simplified time-based condition
-                return true; // Always allow for now
+                // Parse time comparison from condition
+                var match = Regex.Match(condition, @"context\.time\s*(<|>|<=|>=)\s*'([^']+)'");
+                if (match.Success)
+                {
+                    var op = match.Groups[1].Value;
+                    if (DateTime.TryParse(match.Groups[2].Value, out var conditionTime))
+                    {
+                        var now = DateTime.UtcNow;
+                        return op switch
+                        {
+                            "<" => now < conditionTime,
+                            ">" => now > conditionTime,
+                            "<=" => now <= conditionTime,
+                            ">=" => now >= conditionTime,
+                            _ => false
+                        };
+                    }
+                }
+                // Unparseable time condition - fail-closed
+                return false;
             }
 
             // Example: "principal.department == 'Engineering'"
@@ -237,7 +253,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
                 }
             }
 
-            return true; // Default allow if condition can't be evaluated
+            // Unrecognized condition - fail-closed (deny by default)
+            return false;
         }
 
         /// <inheritdoc/>

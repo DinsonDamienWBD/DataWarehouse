@@ -231,7 +231,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             var sslOptions = new SslClientAuthenticationOptions
             {
                 RemoteCertificateValidationCallback = (sender, cert, chain, errors) =>
-                    errors == SslPolicyErrors.None
+                    errors == SslPolicyErrors.None && chain?.ChainElements.Count > 0
             };
 
             if (!string.IsNullOrEmpty(certPath))
@@ -253,7 +253,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
         {
             return new Dictionary<string, string>
             {
-                ["device_id"] = Environment.MachineName + "-" + Environment.UserName,
+                ["device_id"] = Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(Environment.MachineName + "-" + Environment.UserName))),
                 ["os_version"] = Environment.OSVersion.ToString(),
                 ["runtime_version"] = Environment.Version.ToString(),
                 ["process_id"] = Environment.ProcessId.ToString(),

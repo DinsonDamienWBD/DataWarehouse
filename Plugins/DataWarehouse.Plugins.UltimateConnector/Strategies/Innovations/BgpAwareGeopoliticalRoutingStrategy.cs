@@ -84,6 +84,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
 
             var policy = GetConfiguration<string>(config, "sovereignty_policy", "unrestricted");
             var lookingGlassUrl = GetConfiguration<string>(config, "bgp_looking_glass_url", "https://stat.ripe.net/data/bgp-state/data.json");
+            // Validate URL to prevent SSRF attacks
+            if (Uri.TryCreate(lookingGlassUrl, UriKind.Absolute, out var bgpUri))
+            { if (bgpUri.Host == "169.254.169.254" || bgpUri.Host == "metadata.google.internal" || bgpUri.Host == "localhost" || bgpUri.Host == "127.0.0.1") throw new ArgumentException("BGP looking glass URL points to a blocked internal endpoint (SSRF protection)"); }
+            else throw new ArgumentException($"Invalid BGP looking glass URL: {lookingGlassUrl}");
             var enforcePolicy = GetConfiguration<bool>(config, "enforce_policy", true);
             var targetIp = GetConfiguration<string>(config, "target_ip", ExtractHostFromEndpoint(targetEndpoint));
 

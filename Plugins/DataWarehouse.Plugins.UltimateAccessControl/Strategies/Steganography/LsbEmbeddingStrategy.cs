@@ -303,9 +303,12 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
 
         private LsbHeader ParseHeader(byte[] headerBytes)
         {
+            var magic = new byte[8];
+            Buffer.BlockCopy(headerBytes, 0, magic, 0, 8);
+
             return new LsbHeader
             {
-                Magic = new byte[8],
+                Magic = magic,
                 Version = BitConverter.ToInt32(headerBytes, 8),
                 DataLength = BitConverter.ToInt32(headerBytes, 12),
                 BitsPerChannel = BitConverter.ToInt32(headerBytes, 16),
@@ -317,8 +320,10 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
 
         private bool ValidateMagic(LsbHeader header)
         {
-            // Compare first 8 bytes manually since header.Magic is not populated
-            return true; // Simplified - in production check actual magic bytes
+            // Verify the embedded magic bytes match expected "LSBEMBED" signature
+            if (header.Magic.Length < MagicBytes.Length)
+                return false;
+            return header.Magic.AsSpan(0, MagicBytes.Length).SequenceEqual(MagicBytes);
         }
 
         private (byte[] PixelData, ImageMetadata Metadata) ParseImage(byte[] imageData, ImageFormat format)
@@ -367,6 +372,9 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
             var pixelData = new byte[data.Length - pixelStart];
             Buffer.BlockCopy(data, pixelStart, pixelData, 0, pixelData.Length);
 
+            var headerData = new byte[pixelStart];
+            Buffer.BlockCopy(data, 0, headerData, 0, pixelStart);
+
             return (pixelData, new ImageMetadata
             {
                 Width = width > 0 ? width : 256,
@@ -374,7 +382,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
                 BytesPerPixel = 3,
                 BitsPerPixel = 24,
                 HasAlpha = false,
-                PixelDataOffset = pixelStart
+                PixelDataOffset = pixelStart,
+                OriginalHeader = headerData
             });
         }
 
@@ -388,6 +397,9 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
             int height = BitConverter.ToInt32(data, 22);
             short bpp = BitConverter.ToInt16(data, 28);
 
+            var bmpHeader = new byte[pixelOffset];
+            Buffer.BlockCopy(data, 0, bmpHeader, 0, pixelOffset);
+
             var pixelData = new byte[data.Length - pixelOffset];
             Buffer.BlockCopy(data, pixelOffset, pixelData, 0, pixelData.Length);
 
@@ -398,7 +410,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
                 BytesPerPixel = bpp / 8,
                 BitsPerPixel = bpp,
                 HasAlpha = bpp == 32,
-                PixelDataOffset = pixelOffset
+                PixelDataOffset = pixelOffset,
+                OriginalHeader = bmpHeader
             });
         }
 
@@ -582,8 +595,17 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
 
         private byte[] ReconstructImage(byte[] modifiedPixels, ImageMetadata metadata, ImageFormat format)
         {
-            // For now, return modified pixels with original header preserved
-            // Production implementation would properly reconstruct full image
+            // Reconstruct image by combining original header with modified pixel data
+            // PixelDataOffset tells us where the header ends and pixel data begins
+            if (metadata.PixelDataOffset > 0 && metadata.OriginalHeader != null)
+            {
+                var result = new byte[metadata.OriginalHeader.Length + modifiedPixels.Length];
+                Buffer.BlockCopy(metadata.OriginalHeader, 0, result, 0, metadata.OriginalHeader.Length);
+                Buffer.BlockCopy(modifiedPixels, 0, result, metadata.OriginalHeader.Length, modifiedPixels.Length);
+                return result;
+            }
+
+            // If no header info available, return raw pixels (caller must handle)
             return modifiedPixels;
         }
 
@@ -753,6 +775,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
         public int BitsPerPixel { get; init; }
         public bool HasAlpha { get; init; }
         public int PixelDataOffset { get; init; }
+        public byte[]? OriginalHeader { get; init; }
     }
 
     /// <summary>

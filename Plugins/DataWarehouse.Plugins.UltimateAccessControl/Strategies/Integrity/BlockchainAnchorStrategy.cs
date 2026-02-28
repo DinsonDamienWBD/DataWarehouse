@@ -88,8 +88,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
                 BlockchainNetwork = blockchainNetwork,
                 AnchorId = Guid.NewGuid().ToString("N"),
                 TransactionId = $"tx_{Guid.NewGuid():N}",
-                BlockHeight = 0, // Would be set by actual blockchain API
-                Status = "pending"
+                BlockHeight = 0,
+                Status = "local-only" // Not submitted to blockchain - local hash anchor only
             };
 
             _anchors[resourceId] = anchor;

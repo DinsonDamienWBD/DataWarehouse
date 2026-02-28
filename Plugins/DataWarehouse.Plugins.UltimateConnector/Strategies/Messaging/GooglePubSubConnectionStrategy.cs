@@ -28,7 +28,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
                 httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", config.AuthCredential);
             return new DefaultConnectionHandle(httpClient, new Dictionary<string, object> { ["Endpoint"] = "https://pubsub.googleapis.com", ["ProjectId"] = projectId ?? "" });
         }
-        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { try { var response = await handle.GetConnection<HttpClient>().GetAsync("/v1/projects", ct); return response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable; } catch { return false; } }
+        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { try { var response = await handle.GetConnection<HttpClient>().GetAsync("/v1/projects", ct); return response.IsSuccessStatusCode; } catch { return false; } }
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<HttpClient>()?.Dispose(); await Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, isHealthy ? "Google Pub/Sub is reachable" : "Google Pub/Sub is not responding", sw.Elapsed, DateTimeOffset.UtcNow); }
 
@@ -84,7 +84,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
                                 {
                                     var base64 = data.GetString();
                                     if (!string.IsNullOrEmpty(base64))
-                                        collectedMessages.Add(Convert.FromBase64String(base64));
+                                        try { collectedMessages.Add(Convert.FromBase64String(base64)); } catch (FormatException) { System.Diagnostics.Debug.WriteLine($"Malformed base64 in PubSub message, skipping"); }
                                 }
                             }
                         }

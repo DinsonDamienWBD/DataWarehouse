@@ -72,9 +72,9 @@ public sealed class MariaDbConnectionStrategy : DatabaseConnectionStrategyBase
             ["State"] = "Connected"
         };
 
-        var mockConnection = new MariaDbTcpConnection(host, port, connectionString);
+        var tcpConnection = new MariaDbTcpConnection(host, port, connectionString);
 
-        return new DefaultConnectionHandle(mockConnection, connectionInfo);
+        return new DefaultConnectionHandle(tcpConnection, connectionInfo);
     }
 
     /// <inheritdoc/>
@@ -82,11 +82,11 @@ public sealed class MariaDbConnectionStrategy : DatabaseConnectionStrategyBase
     {
         try
         {
-            var mockConnection = handle.GetConnection<MariaDbTcpConnection>();
+            var tcpConnection = handle.GetConnection<MariaDbTcpConnection>();
 
             // Test TCP connectivity
             using var tcpClient = new TcpClient();
-            await tcpClient.ConnectAsync(mockConnection.Host, mockConnection.Port, ct);
+            await tcpClient.ConnectAsync(tcpConnection.Host, tcpConnection.Port, ct);
 
             return true;
         }
@@ -114,16 +114,16 @@ public sealed class MariaDbConnectionStrategy : DatabaseConnectionStrategyBase
 
         try
         {
-            var mockConnection = handle.GetConnection<MariaDbTcpConnection>();
+            var tcpConnection = handle.GetConnection<MariaDbTcpConnection>();
 
             // Test TCP connectivity and measure latency
             using var tcpClient = new TcpClient();
-            await tcpClient.ConnectAsync(mockConnection.Host, mockConnection.Port, ct);
+            await tcpClient.ConnectAsync(tcpConnection.Host, tcpConnection.Port, ct);
             sw.Stop();
 
             return new ConnectionHealth(
                 IsHealthy: true,
-                StatusMessage: $"MariaDB TCP connection active - {mockConnection.Host}:{mockConnection.Port}",
+                StatusMessage: $"MariaDB TCP connection active - {tcpConnection.Host}:{tcpConnection.Port}",
                 Latency: sw.Elapsed,
                 CheckedAt: DateTimeOffset.UtcNow);
         }

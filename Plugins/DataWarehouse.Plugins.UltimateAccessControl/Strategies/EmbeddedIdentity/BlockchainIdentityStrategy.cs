@@ -54,17 +54,32 @@ protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessCont
             IncrementCounter("blockchain.identity.evaluate");
             await Task.Yield();
 
-            var hasValidIdentity = context.SubjectId.Length > 0;
+            // Require a blockchain credential (DID document, signed transaction hash, etc.)
+            var hasCredential = context.SubjectAttributes.TryGetValue("blockchain_credential", out var credObj)
+                && credObj is string credential && credential.Length >= 32;
+
+            // Verify the credential is registered in configuration
+            var isRegistered = hasCredential &&
+                Configuration.TryGetValue("RegisteredIdentities", out var regObj) &&
+                regObj is IEnumerable<string> registered &&
+                registered.Contains(context.SubjectId);
+
+            var isGranted = hasCredential && isRegistered;
 
             return new AccessDecision
             {
-                IsGranted = hasValidIdentity,
-                Reason = hasValidIdentity ? "Blockchain Identity Strategy verified" : "Authentication failed",
+                IsGranted = isGranted,
+                Reason = !hasCredential
+                    ? "Blockchain credential required (provide blockchain_credential attribute)"
+                    : !isRegistered
+                        ? "Subject not registered in blockchain identity store"
+                        : "Blockchain identity verified",
                 ApplicablePolicies = new[] { "blockchain-identity-policy" },
                 Metadata = new Dictionary<string, object>
                 {
-                    ["storage_type"] = "distributed-ledger",
-                    ["strategy_type"] = "EmbeddedIdentity"
+                    ["strategy_type"] = "EmbeddedIdentity",
+                    ["credential_provided"] = hasCredential,
+                    ["identity_registered"] = isRegistered
                 }
             };
         }

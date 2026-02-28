@@ -67,10 +67,13 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Advanced
             if (string.IsNullOrWhiteSpace(challengeContext))
                 throw new ArgumentException("Challenge context cannot be null or empty", nameof(challengeContext));
 
+            // Make a local copy of the private key so we don't zero the caller's buffer
+            var localKey = new byte[privateKey.Length];
+            Array.Copy(privateKey, localKey, privateKey.Length);
             try
             {
                 using var ecdsa = ECDsa.Create();
-                ecdsa.ImportPkcs8PrivateKey(privateKey, out _);
+                ecdsa.ImportPkcs8PrivateKey(localKey, out _);
 
                 var timestamp = DateTimeOffset.UtcNow;
                 var message = BuildMessage(challengeContext, timestamp);
@@ -101,8 +104,9 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Advanced
             }
             finally
             {
-                // Zero out the private key from memory (CRYPTO-01 compliance)
-                CryptographicOperations.ZeroMemory(privateKey);
+                // Zero out the local copy from memory (CRYPTO-01 compliance)
+                // Caller retains ownership of their buffer
+                CryptographicOperations.ZeroMemory(localKey);
             }
         }
 

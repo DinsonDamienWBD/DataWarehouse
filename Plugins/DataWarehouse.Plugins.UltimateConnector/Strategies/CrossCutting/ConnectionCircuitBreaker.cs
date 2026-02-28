@@ -253,7 +253,12 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
         public long TotalFailures;
         public long SuccessCount;
         public long RejectedCount;
-        public DateTimeOffset? OpenedAt;
+        private long _openedAtTicks;
+        public DateTimeOffset? OpenedAt
+        {
+            get { var ticks = Interlocked.Read(ref _openedAtTicks); return ticks == 0 ? null : new DateTimeOffset(ticks, TimeSpan.Zero); }
+            set { Interlocked.Exchange(ref _openedAtTicks, value?.UtcTicks ?? 0); }
+        }
 
         public CircuitState(CircuitBreakerConfiguration config)
         {

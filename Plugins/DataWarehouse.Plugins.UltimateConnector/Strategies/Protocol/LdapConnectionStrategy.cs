@@ -42,7 +42,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
         /// <inheritdoc/>
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var parts = config.ConnectionString.Split(':');
+            var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':');
             var host = parts[0];
             var useTls = GetConfiguration(config, "UseTls", false);
             var port = parts.Length > 1 ? int.Parse(parts[1]) : (useTls ? 636 : 389);

@@ -50,13 +50,45 @@ protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext co
             var objectLevel = GetLevel(context.ResourceAttributes.TryGetValue("SecurityLevel", out var ol) ? ol?.ToString() : "U");
 
             // Bell-LaPadula: no read up, no write down
-            var canRead = context.Action == "read" && subjectLevel >= objectLevel;
-            var canWrite = context.Action == "write" && subjectLevel <= objectLevel;
+            // Map additional actions to read/write semantics
+            var action = context.Action?.ToLowerInvariant() ?? "";
+            bool isGranted;
+            string reason;
+
+            switch (action)
+            {
+                case "read" or "view" or "get" or "list":
+                    isGranted = subjectLevel >= objectLevel;
+                    reason = isGranted ? "MLS read-down policy satisfied" : "MLS violation: subject clearance insufficient for read";
+                    break;
+                case "write" or "create" or "update" or "modify":
+                    isGranted = subjectLevel <= objectLevel;
+                    reason = isGranted ? "MLS write-up policy satisfied" : "MLS violation: subject clearance too high for write (no write-down)";
+                    break;
+                case "delete":
+                    isGranted = subjectLevel >= objectLevel; // Delete requires dominance
+                    reason = isGranted ? "MLS delete policy satisfied" : "MLS violation: insufficient clearance for delete";
+                    break;
+                case "execute" or "run":
+                    isGranted = subjectLevel >= objectLevel; // Execute treated like read
+                    reason = isGranted ? "MLS execute policy satisfied" : "MLS violation: insufficient clearance for execute";
+                    break;
+                default:
+                    isGranted = false;
+                    reason = $"MLS policy: unrecognized action '{action}' denied (only read/write/delete/execute supported)";
+                    break;
+            }
 
             return Task.FromResult(new AccessDecision
             {
-                IsGranted = canRead || canWrite,
-                Reason = (canRead || canWrite) ? "MLS policy satisfied" : "MLS policy violation"
+                IsGranted = isGranted,
+                Reason = reason,
+                Metadata = new Dictionary<string, object>
+                {
+                    ["subject_level"] = subjectLevel,
+                    ["object_level"] = objectLevel,
+                    ["action"] = action
+                }
             });
         }
 

@@ -245,7 +245,12 @@ protected override async Task<AccessDecision> EvaluateAccessCoreAsync(
             var now = DateTime.UtcNow;
             var windowStart = now.AddMinutes(-RateLimitPeriodMinutes);
 
-            if (_rateLimits.TryGetValue(userId, out var rateLimitData))
+            var rateLimitData = _rateLimits.GetOrAdd(userId, _ => new RateLimitData
+            {
+                Timestamps = new List<DateTime>()
+            });
+
+            lock (rateLimitData.Timestamps)
             {
                 // Remove expired timestamps
                 rateLimitData.Timestamps.RemoveAll(t => t < windowStart);
@@ -258,14 +263,6 @@ protected override async Task<AccessDecision> EvaluateAccessCoreAsync(
 
                 // Add current timestamp
                 rateLimitData.Timestamps.Add(now);
-            }
-            else
-            {
-                // Create new rate limit data
-                _rateLimits[userId] = new RateLimitData
-                {
-                    Timestamps = new List<DateTime> { now }
-                };
             }
 
             return true;

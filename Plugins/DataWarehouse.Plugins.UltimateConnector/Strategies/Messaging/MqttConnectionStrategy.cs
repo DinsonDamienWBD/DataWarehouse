@@ -18,11 +18,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
         public override ConnectionStrategyCapabilities Capabilities => new();
         public override string SemanticDescription => "Connects to MQTT broker using TCP protocol on port 1883 (or 8883 for TLS) for IoT messaging.";
         public override string[] Tags => new[] { "mqtt", "iot", "messaging", "tcp", "pubsub" };
-        private ushort _packetId = 1;
+        private int _packetId = 1;
         public MqttConnectionStrategy(ILogger? logger = null) : base(logger) { }
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var parts = config.ConnectionString.Split(':');
+            var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':');
             var host = parts[0];
             var port = parts.Length > 1 ? int.Parse(parts[1]) : 1883;
             var tcpClient = new TcpClient();
@@ -61,7 +61,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
                 throw new InvalidOperationException("MQTT connection is not established");
             var stream = client.GetStream();
             // Send SUBSCRIBE packet
-            var subscribePacket = BuildMqttSubscribePacket(topic, _packetId++);
+            var subscribePacket = BuildMqttSubscribePacket(topic, (ushort)Interlocked.Increment(ref _packetId));
             await stream.WriteAsync(subscribePacket, 0, subscribePacket.Length, ct);
             await stream.FlushAsync(ct);
             // Read SUBACK
@@ -157,8 +157,12 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
         {
             var multiplier = 1;
             var value = 0;
+            var bytesRead = 0;
             byte encodedByte;
-            do { var buffer = new byte[1]; await stream.ReadExactlyAsync(buffer, 0, 1, ct); encodedByte = buffer[0]; value += (encodedByte & 127) * multiplier; multiplier *= 128; } while ((encodedByte & 128) != 0);
+            do {
+                if (bytesRead >= 4) throw new InvalidDataException("MQTT remaining length exceeds 4-byte maximum (malformed packet)");
+                var buffer = new byte[1]; await stream.ReadExactlyAsync(buffer, 0, 1, ct); encodedByte = buffer[0]; value += (encodedByte & 127) * multiplier; multiplier *= 128; bytesRead++;
+            } while ((encodedByte & 128) != 0);
             return value;
         }
     }

@@ -30,7 +30,10 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
                 AssessAuditLogging(context)
             };
 
-            var overallScore = dimensions.Average(d => d.Score);
+            var totalWeight = dimensions.Sum(d => d.Weight);
+            var overallScore = totalWeight > 0
+                ? dimensions.Sum(d => d.Score * d.Weight) / totalWeight
+                : dimensions.Average(d => d.Score);
             var gaps = dimensions.Where(d => d.Score < 70).ToList();
             var criticalGaps = dimensions.Where(d => d.Score < 50).ToList();
 

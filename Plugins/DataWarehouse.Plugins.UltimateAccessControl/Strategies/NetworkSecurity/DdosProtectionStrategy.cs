@@ -62,18 +62,17 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.NetworkSecurity
             var clientIp = context.ClientIpAddress ?? "unknown";
             var now = DateTime.UtcNow;
 
-            var entry = _rateLimits.GetOrAdd(clientIp, _ => new RateLimitEntry { LastReset = now, RequestCount = 0 });
-
-            if ((now - entry.LastReset).TotalMinutes >= 1)
-            {
-                entry = new RateLimitEntry { LastReset = now, RequestCount = 1 };
-                _rateLimits[clientIp] = entry;
-            }
-            else
-            {
-                entry = entry with { RequestCount = entry.RequestCount + 1 };
-                _rateLimits[clientIp] = entry;
-            }
+            // Atomic update using AddOrUpdate to prevent TOCTOU race
+            var entry = _rateLimits.AddOrUpdate(clientIp,
+                _ => new RateLimitEntry { LastReset = now, RequestCount = 1 },
+                (_, existing) =>
+                {
+                    if ((now - existing.LastReset).TotalMinutes >= 1)
+                    {
+                        return new RateLimitEntry { LastReset = now, RequestCount = 1 };
+                    }
+                    return existing with { RequestCount = existing.RequestCount + 1 };
+                });
 
             var isRateLimited = entry.RequestCount > _maxRequestsPerMinute;
 

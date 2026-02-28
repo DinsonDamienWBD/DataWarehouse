@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
 {
     public class RedshiftConnectionStrategy : DatabaseConnectionStrategyBase
     {
-        private TcpClient? _tcpClient;
+        private volatile TcpClient? _tcpClient;
         public override string StrategyId => "redshift";
         public override string DisplayName => "AWS Redshift";
         public override string SemanticDescription => "Fast, scalable data warehouse on AWS using PostgreSQL-compatible query language";

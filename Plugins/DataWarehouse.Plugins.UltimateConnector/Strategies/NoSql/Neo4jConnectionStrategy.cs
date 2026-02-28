@@ -15,7 +15,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
     /// </summary>
     public class Neo4jConnectionStrategy : DatabaseConnectionStrategyBase
     {
-        private HttpClient? _httpClient;
+        private volatile HttpClient? _httpClient;
         private TcpClient? _tcpClient;
 
         public override string StrategyId => "neo4j";

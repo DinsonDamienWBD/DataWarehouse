@@ -23,7 +23,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Healthcare
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var parts = config.ConnectionString.Split(':');
+            var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':');
             var client = new TcpClient();
             await client.ConnectAsync(parts[0], parts.Length > 1 ? int.Parse(parts[1]) : 104, ct);
             return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "DICOM" });

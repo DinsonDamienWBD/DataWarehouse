@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
 {
     public class FireboltConnectionStrategy : DatabaseConnectionStrategyBase
     {
-        private HttpClient? _httpClient;
+        private volatile HttpClient? _httpClient;
         public override string StrategyId => "firebolt";
         public override string DisplayName => "Firebolt";
         public override string SemanticDescription => "Cloud data warehouse designed for sub-second analytics on massive datasets";

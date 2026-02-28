@@ -120,37 +120,42 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
         /// <summary>
         /// Appends an entry to the ledger.
         /// </summary>
+        private readonly object _appendLock = new();
+
         public LedgerEntry AppendEntry(string ledgerId, string eventType, string eventData, string subjectId)
         {
-            if (!_ledgers.TryGetValue(ledgerId, out var ledger))
-                throw new InvalidOperationException($"Ledger {ledgerId} does not exist");
-
-            if (ledger.IsSealed)
-                throw new InvalidOperationException($"Ledger {ledgerId} is sealed and cannot be modified");
-
-            var lastEntry = ledger.Entries[^1];
-            var newEntry = new LedgerEntry
+            lock (_appendLock)
             {
-                EntryId = Guid.NewGuid().ToString("N"),
-                Sequence = lastEntry.Sequence + 1,
-                Timestamp = DateTime.UtcNow,
-                EventType = eventType,
-                EventData = eventData,
-                SubjectId = subjectId,
-                PreviousHash = lastEntry.EntryHash,
-                EntryHash = Array.Empty<byte>()
-            };
+                if (!_ledgers.TryGetValue(ledgerId, out var ledger))
+                    throw new InvalidOperationException($"Ledger {ledgerId} does not exist");
 
-            newEntry = newEntry with { EntryHash = ComputeEntryHash(newEntry) };
+                if (ledger.IsSealed)
+                    throw new InvalidOperationException($"Ledger {ledgerId} is sealed and cannot be modified");
 
-            // Create updated ledger with new entry
-            var updatedLedger = ledger with
-            {
-                Entries = ledger.Entries.Concat(new[] { newEntry }).ToList()
-            };
+                var lastEntry = ledger.Entries[^1];
+                var newEntry = new LedgerEntry
+                {
+                    EntryId = Guid.NewGuid().ToString("N"),
+                    Sequence = lastEntry.Sequence + 1,
+                    Timestamp = DateTime.UtcNow,
+                    EventType = eventType,
+                    EventData = eventData,
+                    SubjectId = subjectId,
+                    PreviousHash = lastEntry.EntryHash,
+                    EntryHash = Array.Empty<byte>()
+                };
 
-            _ledgers[ledgerId] = updatedLedger;
-            return newEntry;
+                newEntry = newEntry with { EntryHash = ComputeEntryHash(newEntry) };
+
+                // Create updated ledger with new entry
+                var updatedLedger = ledger with
+                {
+                    Entries = ledger.Entries.Concat(new[] { newEntry }).ToList()
+                };
+
+                _ledgers[ledgerId] = updatedLedger;
+                return newEntry;
+            }
         }
 
         /// <summary>

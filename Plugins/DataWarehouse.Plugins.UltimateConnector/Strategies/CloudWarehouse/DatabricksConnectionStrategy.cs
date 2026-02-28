@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
 {
     public class DatabricksConnectionStrategy : DatabaseConnectionStrategyBase
     {
-        private HttpClient? _httpClient;
+        private volatile HttpClient? _httpClient;
         public override string StrategyId => "databricks";
         public override string DisplayName => "Databricks";
         public override string SemanticDescription => "Unified analytics platform built on Apache Spark for big data and machine learning";

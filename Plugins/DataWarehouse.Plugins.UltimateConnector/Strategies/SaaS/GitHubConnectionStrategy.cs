@@ -18,7 +18,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
     public class GitHubConnectionStrategy : SaaSConnectionStrategyBase
     {
         private string _personalAccessToken = "";
-        private int _rateLimitRemaining = 5000;
+        private volatile int _rateLimitRemaining = 5000;
         private DateTimeOffset _rateLimitReset = DateTimeOffset.UtcNow;
 
         public override string StrategyId => "github";
@@ -236,7 +236,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
         private void UpdateRateLimits(HttpResponseMessage response)
         {
             if (response.Headers.TryGetValues("X-RateLimit-Remaining", out var remaining))
-                int.TryParse(System.Linq.Enumerable.FirstOrDefault(remaining), out _rateLimitRemaining);
+            { if (int.TryParse(System.Linq.Enumerable.FirstOrDefault(remaining), out var remainingVal)) _rateLimitRemaining = remainingVal; }
             if (response.Headers.TryGetValues("X-RateLimit-Reset", out var reset))
             {
                 if (long.TryParse(System.Linq.Enumerable.FirstOrDefault(reset), out var resetEpoch))

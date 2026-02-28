@@ -40,7 +40,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
 
         /// <summary>
         /// Establishes a connection to GlusterFS management API.
-        /// ConnectionString format: endpoint:port (e.g., "http://localhost:24007")
+        /// ConnectionString format: endpoint:port (e.g., "https://localhost:24007")
         /// Properties: "VolumeName" (optional, for volume-specific operations)
         /// </summary>
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
@@ -48,10 +48,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
             var endpoint = config.ConnectionString;
             var volumeName = GetConfiguration<string>(config, "VolumeName", "");
 
-            if (!endpoint.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+            if (!endpoint.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
                 !endpoint.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
             {
-                endpoint = $"http://{endpoint}";
+                endpoint = $"https://{endpoint}";
             }
 
             var httpClient = new HttpClient

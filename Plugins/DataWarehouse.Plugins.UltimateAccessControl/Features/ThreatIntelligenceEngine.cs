@@ -49,9 +49,18 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
 
             foreach (var indicator in indicators)
             {
-                indicator.FeedId = feedId;
-                indicator.AddedAt = DateTime.UtcNow;
-                _indicators[indicator.Value] = indicator;
+                // Store a defensive copy to prevent external mutation of stored data
+                var storedIndicator = new ThreatIndicator
+                {
+                    Value = indicator.Value,
+                    Type = indicator.Type,
+                    Severity = indicator.Severity,
+                    ThreatType = indicator.ThreatType,
+                    FeedId = feedId,
+                    Description = indicator.Description,
+                    AddedAt = DateTime.UtcNow
+                };
+                _indicators[storedIndicator.Value] = storedIndicator;
             }
         }
 

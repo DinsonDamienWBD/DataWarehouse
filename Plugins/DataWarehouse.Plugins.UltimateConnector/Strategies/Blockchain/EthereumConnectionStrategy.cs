@@ -21,7 +21,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Blockchain
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var parts = config.ConnectionString.Split(':');
+            var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string is required")).Split(':');
             var client = new HttpClient { BaseAddress = new Uri($"http://{parts[0]}:{(parts.Length > 1 ? parts[1] : "8545")}") };
             var rpcRequest = @"{""jsonrpc"":""2.0"",""method"":""eth_blockNumber"",""params"":[],""id"":1}";
             using var response = await client.PostAsync("/", new StringContent(rpcRequest, Encoding.UTF8, "application/json"), ct);

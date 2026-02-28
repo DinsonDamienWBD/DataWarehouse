@@ -22,7 +22,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
         public ActiveMqConnectionStrategy(ILogger? logger = null) : base(logger) { }
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var parts = config.ConnectionString.Split(':');
+            var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':');
             var host = parts[0];
             var port = parts.Length > 1 ? int.Parse(parts[1]) : 61616;
             var tcpClient = new TcpClient();

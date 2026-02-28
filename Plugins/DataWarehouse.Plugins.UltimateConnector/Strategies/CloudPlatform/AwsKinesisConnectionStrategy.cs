@@ -50,7 +50,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
             try
             {
                 using var response = await httpClient.PostAsync("/", new StringContent("{\"StreamName\":\"test\"}", System.Text.Encoding.UTF8, "application/x-amz-json-1.1"), ct);
-                return response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable;
+                return response.IsSuccessStatusCode;
             }
             catch
             {

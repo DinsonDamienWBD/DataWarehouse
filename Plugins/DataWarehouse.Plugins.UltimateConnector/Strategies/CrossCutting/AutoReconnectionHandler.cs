@@ -88,12 +88,15 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
             ArgumentNullException.ThrowIfNull(handle);
             ArgumentNullException.ThrowIfNull(connectionConfig);
 
-            _currentHandle = handle;
-            _connectionConfig = connectionConfig;
+            lock (_reconnectLock)
+            {
+                _currentHandle = handle;
+                _connectionConfig = connectionConfig;
 
-            _monitorCts?.Cancel();
-            _monitorCts?.Dispose();
-            _monitorCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                _monitorCts?.Cancel();
+                _monitorCts?.Dispose();
+                _monitorCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            }
 
             _ = MonitorConnectionAsync(_monitorCts.Token);
         }
@@ -244,6 +247,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
             _disposed = true;
 
             _monitorCts?.Cancel();
+            // Allow monitor loop to observe cancellation before disposing handle
+            await Task.Delay(50);
             _monitorCts?.Dispose();
 
             if (_currentHandle != null)

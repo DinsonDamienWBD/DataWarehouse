@@ -118,12 +118,15 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
             foreach (var (_, bucket) in _buckets)
             {
                 var now = Stopwatch.GetTimestamp();
-                var elapsed = Stopwatch.GetElapsedTime(bucket.LastReplenishTimestamp, now);
+                var lastReplenish = Interlocked.Read(ref bucket.LastReplenishTimestamp);
+                var elapsed = Stopwatch.GetElapsedTime(lastReplenish, now);
                 var tokensToAdd = (int)(elapsed.TotalSeconds * bucket.Config.TokensPerSecond);
 
                 if (tokensToAdd <= 0) continue;
 
-                bucket.LastReplenishTimestamp = now;
+                // CAS to prevent double replenishment from concurrent timer callbacks
+                if (Interlocked.CompareExchange(ref bucket.LastReplenishTimestamp, now, lastReplenish) != lastReplenish)
+                    continue;
 
                 var currentCount = bucket.Semaphore.CurrentCount;
                 var canAdd = Math.Min(tokensToAdd, bucket.Config.BurstSize - currentCount);

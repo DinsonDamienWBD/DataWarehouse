@@ -95,7 +95,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 SslOptions = new SslClientAuthenticationOptions
                 {
                     RemoteCertificateValidationCallback = (sender, cert, chain, errors) =>
-                        errors == SslPolicyErrors.None,
+                        errors == SslPolicyErrors.None && chain?.ChainElements.Count > 0 && chain?.ChainElements.Count > 0,
                     EnabledSslProtocols = System.Security.Authentication.SslProtocols.Tls13
                 }
             };

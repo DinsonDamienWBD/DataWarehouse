@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
 {
     public class SnowflakeConnectionStrategy : DatabaseConnectionStrategyBase
     {
-        private HttpClient? _httpClient;
+        private volatile HttpClient? _httpClient;
         public override string StrategyId => "snowflake";
         public override string DisplayName => "Snowflake";
         public override string SemanticDescription => "Cloud data warehouse with elastic scaling and multi-cloud support for analytics workloads";

@@ -35,6 +35,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
             _host = GetConfiguration<string>(config, "Host", "");
+            if (string.IsNullOrEmpty(_host)) throw new ArgumentException("SAP host is required in Properties[Host]");
             _client = GetConfiguration<string>(config, "SapClient", "100");
             var username = GetConfiguration<string>(config, "Username", "");
             var password = GetConfiguration<string>(config, "Password", "");

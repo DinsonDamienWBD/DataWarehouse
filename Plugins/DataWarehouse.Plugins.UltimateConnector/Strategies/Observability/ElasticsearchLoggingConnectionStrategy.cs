@@ -20,7 +20,7 @@ public sealed class ElasticsearchLoggingConnectionStrategy : ObservabilityConnec
     public override string DisplayName => "Elasticsearch Logging";
     public override ConnectionStrategyCapabilities Capabilities => new();
     public override string SemanticDescription => "Elasticsearch for log storage and analysis. Full-text search, aggregations, and analytics. Ideal for centralized logging and log analytics.";
-    public override string[] Tags => ["elasticsearch", "logs", "full-text-search", "analytics", "elk-stack"];
+    public override string[] Tags => ["elasticsearch", "logging", "full-text-search", "analytics", "elk-stack"];
 
     public ElasticsearchLoggingConnectionStrategy(ILogger? logger = null) : base(logger) { }
 
@@ -58,7 +58,8 @@ public sealed class ElasticsearchLoggingConnectionStrategy : ObservabilityConnec
         var bulkData = new StringBuilder();
         foreach (var log in logs)
         {
-            bulkData.AppendLine(JsonSerializer.Serialize(new { index = new { _index = "logs" } }));
+            var indexName = handle.ConnectionInfo.GetValueOrDefault("IndexName")?.ToString() ?? "logs";
+            bulkData.AppendLine(JsonSerializer.Serialize(new { index = new { _index = indexName } }));
             bulkData.AppendLine(JsonSerializer.Serialize(log));
         }
         var content = new StringContent(bulkData.ToString(), Encoding.UTF8, "application/x-ndjson");

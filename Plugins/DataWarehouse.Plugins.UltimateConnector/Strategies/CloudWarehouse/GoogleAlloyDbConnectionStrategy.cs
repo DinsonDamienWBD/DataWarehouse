@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
 {
     public class GoogleAlloyDbConnectionStrategy : DatabaseConnectionStrategyBase
     {
-        private TcpClient? _tcpClient;
+        private volatile TcpClient? _tcpClient;
         public override string StrategyId => "alloydb";
         public override string DisplayName => "Google AlloyDB";
         public override string SemanticDescription => "Fully managed PostgreSQL-compatible database for demanding transactional and analytical workloads";

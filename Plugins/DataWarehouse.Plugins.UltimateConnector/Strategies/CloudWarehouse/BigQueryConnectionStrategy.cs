@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
 {
     public class BigQueryConnectionStrategy : DatabaseConnectionStrategyBase
     {
-        private HttpClient? _httpClient;
+        private volatile HttpClient? _httpClient;
         public override string StrategyId => "bigquery";
         public override string DisplayName => "Google BigQuery";
         public override string SemanticDescription => "Serverless, highly scalable data warehouse for large-scale analytics on Google Cloud";

@@ -695,55 +695,43 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
                 if (isES256)
                 {
                     // ES256: ECDSA P-256 signature verification
-                    // Signature format: r || s (each 32 bytes)
-                    // Public key: x || y coordinates (each 32 bytes)
+                    if (signature.Length < 64 || publicKeyBytes.Length < 64)
+                        return false;
 
-                    // Production implementation:
-                    // using (var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256))
-                    // {
-                    //     var pubKey = new ECParameters
-                    //     {
-                    //         Curve = ECCurve.NamedCurves.nistP256,
-                    //         Q = new ECPoint { X = xBytes, Y = yBytes }
-                    //     };
-                    //     ecdsa.ImportParameters(pubKey);
-                    //     return ecdsa.VerifyData(signedData, signature, HashAlgorithmName.SHA256);
-                    // }
+                    // Extract x,y coordinates from COSE key (skip CBOR overhead, take last 64 bytes as x||y)
+                    var keyData = publicKeyBytes.Length >= 77
+                        ? publicKeyBytes[^64..]  // Standard COSE EC2 key: skip header
+                        : publicKeyBytes[^64..]; // Raw coordinates
 
-                    // For now, validate structure and length
-                    return signature.Length >= 64 && signedData.Length > 0;
+                    using var ecdsa = System.Security.Cryptography.ECDsa.Create(
+                        System.Security.Cryptography.ECCurve.NamedCurves.nistP256);
+                    var pubKey = new System.Security.Cryptography.ECParameters
+                    {
+                        Curve = System.Security.Cryptography.ECCurve.NamedCurves.nistP256,
+                        Q = new System.Security.Cryptography.ECPoint
+                        {
+                            X = keyData[..32],
+                            Y = keyData[32..64]
+                        }
+                    };
+                    ecdsa.ImportParameters(pubKey);
+                    return ecdsa.VerifyData(signedData, signature, System.Security.Cryptography.HashAlgorithmName.SHA256);
                 }
                 else if (isRS256)
                 {
-                    // RS256: RSA signature verification with SHA-256
-                    // Production implementation:
-                    // using (var rsa = RSA.Create())
-                    // {
-                    //     var pubKey = new RSAParameters { Modulus = nBytes, Exponent = eBytes };
-                    //     rsa.ImportParameters(pubKey);
-                    //     return rsa.VerifyData(signedData, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-                    // }
-
-                    // For now, validate structure and length
-                    return signature.Length >= 256 && signedData.Length > 0;
+                    // RS256: RSA signature verification - requires extracting modulus/exponent from COSE key
+                    // Without proper CBOR parser, fail-closed
+                    return false;
                 }
                 else if (isEdDSA)
                 {
-                    // EdDSA: Ed25519 signature verification
-                    // Signature: 64 bytes
-                    // Public key: 32 bytes
-
-                    // Production implementation requires Ed25519 library
-                    // (e.g., Chaos.NaCl, NSec, or .NET 9+ EdDSA support)
-
-                    // For now, validate structure and length
-                    return signature.Length == 64 && signedData.Length > 0;
+                    // EdDSA: Ed25519 signature verification - requires Ed25519 library
+                    // Without NSec or .NET 9+ EdDSA support, fail-closed
+                    return false;
                 }
 
-                // Unknown algorithm or unable to determine
-                // In production, this should fail closed (return false)
-                // For phase 31.1, we accept if structure is valid
-                return signature.Length >= 32 && signedData.Length > 0;
+                // Unknown algorithm - fail-closed
+                return false;
             }
             catch
             {

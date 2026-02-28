@@ -454,6 +454,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
 
         private class BreakerState
         {
+            public readonly object SyncRoot = new();
             public CircuitState State { get; set; }
             public int FailureCount { get; set; }
             public int SuccessCount { get; set; }

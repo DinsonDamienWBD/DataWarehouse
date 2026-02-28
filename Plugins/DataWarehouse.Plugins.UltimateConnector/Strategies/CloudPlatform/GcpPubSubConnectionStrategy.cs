@@ -79,7 +79,7 @@ public sealed class GcpPubSubConnectionStrategy : SaaSConnectionStrategyBase
             connectionInfo);
     }
 
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
     {
         try
         {
@@ -88,9 +88,9 @@ public sealed class GcpPubSubConnectionStrategy : SaaSConnectionStrategyBase
             // ListTopics will throw on network failures or permission errors that
             // prevent any communication (e.g. UNAVAILABLE, DEADLINE_EXCEEDED).
             var projectName = $"projects/{wrapper.ProjectId}";
-            var page = wrapper.PublisherClient.ListTopics(projectName).ReadPage(1);
+            var page = await wrapper.PublisherClient.ListTopicsAsync(projectName).ReadPageAsync(1);
             _ = page; // result consumed; connection is healthy
-            return Task.FromResult(true);
+            return true;
         }
         catch (Grpc.Core.RpcException ex) when (
             ex.StatusCode == Grpc.Core.StatusCode.PermissionDenied ||
@@ -98,11 +98,11 @@ public sealed class GcpPubSubConnectionStrategy : SaaSConnectionStrategyBase
         {
             // Authentication/authorisation errors mean the transport is reachable
             // but credentials are wrong — report as unhealthy so callers know.
-            return Task.FromResult(false);
+            return false;
         }
         catch
         {
-            return Task.FromResult(false);
+            return false;
         }
     }
 

@@ -204,16 +204,6 @@ protected override async Task<AccessDecision> EvaluateAccessCoreAsync(
                 // Get or create user templates list
                 var userTemplates = _userTemplates.GetOrAdd(userId, _ => new List<BiometricTemplate>());
 
-                // Check template limit
-                if (userTemplates.Count >= MaxTemplatesPerUser)
-                {
-                    return new BiometricEnrollmentResult
-                    {
-                        Success = false,
-                        Message = $"Maximum {MaxTemplatesPerUser} templates per user reached"
-                    };
-                }
-
                 // Create template
                 var template = new BiometricTemplate
                 {
@@ -224,8 +214,17 @@ protected override async Task<AccessDecision> EvaluateAccessCoreAsync(
                     EnrolledAt = DateTime.UtcNow
                 };
 
+                // Atomic check-and-add under single lock to prevent TOCTOU race
                 lock (userTemplates)
                 {
+                    if (userTemplates.Count >= MaxTemplatesPerUser)
+                    {
+                        return new BiometricEnrollmentResult
+                        {
+                            Success = false,
+                            Message = $"Maximum {MaxTemplatesPerUser} templates per user reached"
+                        };
+                    }
                     userTemplates.Add(template);
                 }
 

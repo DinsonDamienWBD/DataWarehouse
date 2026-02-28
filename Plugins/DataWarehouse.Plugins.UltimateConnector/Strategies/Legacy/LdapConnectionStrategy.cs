@@ -29,7 +29,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var host = GetConfiguration<string>(config, "Host", config.ConnectionString.Split(':')[0]);
+            var host = GetConfiguration<string>(config, "Host", (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':')[0]);
             var port = GetConfiguration(config, "Port", 389);
             var baseDn = GetConfiguration<string>(config, "BaseDN", "");
             var bindDn = GetConfiguration<string>(config, "BindDN", "");
@@ -210,7 +210,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
 
             return Task.FromResult(new LdapBindResult
             {
-                Success = !string.IsNullOrEmpty(dn),
+                Success = false /* LDAP Bind requires real LDAP connection */,
                 BindDn = dn,
                 AuthenticationType = "Simple"
             });

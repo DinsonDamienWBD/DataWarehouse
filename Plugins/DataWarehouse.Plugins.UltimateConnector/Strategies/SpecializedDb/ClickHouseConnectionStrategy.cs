@@ -93,7 +93,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             if (_httpClient == null) return new List<Dictionary<string, object?>>();
             try
             {
-                var encodedQuery = Uri.EscapeDataString(query + " FORMAT JSONEachRow");
+                var encodedQuery = Uri.EscapeDataString(query + (query.Contains("FORMAT", StringComparison.OrdinalIgnoreCase) ? "" : " FORMAT JSONEachRow"));
                 using var response = await _httpClient.GetAsync($"/?query={encodedQuery}", ct);
                 if (!response.IsSuccessStatusCode) return new List<Dictionary<string, object?>>();
                 var json = await response.Content.ReadAsStringAsync(ct);

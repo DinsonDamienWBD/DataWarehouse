@@ -302,6 +302,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
 
         private class PoolMetrics
         {
+            public readonly object SyncRoot = new();
             public int PoolSize { get; set; }
             public int ActiveConnections { get; set; }
             public double DegradationThresholdMs { get; set; }

@@ -463,18 +463,55 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
                 var samlBytes = Convert.FromBase64String(token);
                 var samlXml = Encoding.UTF8.GetString(samlBytes);
 
-                // Parse SAML assertion (simplified - production would use a proper SAML library)
-                // This is a placeholder for SAML validation logic
+                // Parse SAML assertion - extract NameID and Issuer from SAML XML
+                if (!samlXml.Contains("<saml", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new TokenValidationResult
+                    {
+                        IsValid = false,
+                        Error = "Invalid SAML assertion: not valid SAML XML",
+                        ErrorCode = TokenValidationError.ValidationFailed
+                    };
+                }
+
+                // Extract NameID from SAML assertion
+                var nameIdMatch = System.Text.RegularExpressions.Regex.Match(samlXml, @"<saml[^:]*:NameID[^>]*>([^<]+)</");
+                var issuerMatch = System.Text.RegularExpressions.Regex.Match(samlXml, @"<saml[^:]*:Issuer[^>]*>([^<]+)</");
+
+                var subjectId = nameIdMatch.Success ? nameIdMatch.Groups[1].Value : null;
+                var assertionIssuer = issuerMatch.Success ? issuerMatch.Groups[1].Value : null;
+
+                if (string.IsNullOrEmpty(subjectId))
+                {
+                    return new TokenValidationResult
+                    {
+                        IsValid = false,
+                        Error = "SAML assertion missing NameID element",
+                        ErrorCode = TokenValidationError.ValidationFailed
+                    };
+                }
+
+                // Validate issuer matches configured IdP
+                if (!string.IsNullOrEmpty(idp.Issuer) && assertionIssuer != idp.Issuer)
+                {
+                    return new TokenValidationResult
+                    {
+                        IsValid = false,
+                        Error = $"SAML issuer mismatch: expected '{idp.Issuer}', got '{assertionIssuer}'",
+                        ErrorCode = TokenValidationError.InvalidIssuer
+                    };
+                }
+
                 var claims = new List<FederatedClaim>
                 {
-                    new() { Type = ClaimTypes.NameIdentifier, Value = "saml-subject", Issuer = idp.Issuer ?? idp.Id }
+                    new() { Type = ClaimTypes.NameIdentifier, Value = subjectId, Issuer = assertionIssuer ?? idp.Id }
                 };
 
                 return new TokenValidationResult
                 {
                     IsValid = true,
                     IdpId = idp.Id,
-                    SubjectId = "saml-subject",
+                    SubjectId = subjectId,
                     Claims = claims.AsReadOnly(),
                     TokenType = TokenType.SamlAssertion
                 };
@@ -492,15 +529,67 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
 
         private TokenValidationResult ValidateWsFederationToken(string token, IdentityProvider idp)
         {
-            // WS-Federation token validation (simplified)
-            return new TokenValidationResult
+            // WS-Federation tokens are typically SAML assertions wrapped in WS-Trust envelope
+            // Validate the token is not empty and has expected structure
+            if (string.IsNullOrWhiteSpace(token))
             {
-                IsValid = true,
-                IdpId = idp.Id,
-                SubjectId = "ws-fed-subject",
-                Claims = new List<FederatedClaim>().AsReadOnly(),
-                TokenType = TokenType.WsFederation
-            };
+                return new TokenValidationResult
+                {
+                    IsValid = false,
+                    Error = "Empty WS-Federation token",
+                    ErrorCode = TokenValidationError.ValidationFailed
+                };
+            }
+
+            try
+            {
+                var tokenBytes = Convert.FromBase64String(token);
+                var tokenXml = Encoding.UTF8.GetString(tokenBytes);
+
+                // Validate it contains WS-Trust/SAML elements
+                if (!tokenXml.Contains("RequestSecurityTokenResponse", StringComparison.OrdinalIgnoreCase) &&
+                    !tokenXml.Contains("saml", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new TokenValidationResult
+                    {
+                        IsValid = false,
+                        Error = "Invalid WS-Federation token format: missing expected XML elements",
+                        ErrorCode = TokenValidationError.ValidationFailed
+                    };
+                }
+
+                // Extract subject from inner SAML assertion
+                var nameIdMatch = System.Text.RegularExpressions.Regex.Match(tokenXml, @"<saml[^:]*:NameID[^>]*>([^<]+)</");
+                var subjectId = nameIdMatch.Success ? nameIdMatch.Groups[1].Value : null;
+
+                if (string.IsNullOrEmpty(subjectId))
+                {
+                    return new TokenValidationResult
+                    {
+                        IsValid = false,
+                        Error = "WS-Federation token missing subject identifier",
+                        ErrorCode = TokenValidationError.ValidationFailed
+                    };
+                }
+
+                return new TokenValidationResult
+                {
+                    IsValid = true,
+                    IdpId = idp.Id,
+                    SubjectId = subjectId,
+                    Claims = new List<FederatedClaim>().AsReadOnly(),
+                    TokenType = TokenType.WsFederation
+                };
+            }
+            catch (Exception ex)
+            {
+                return new TokenValidationResult
+                {
+                    IsValid = false,
+                    Error = $"WS-Federation token validation failed: {ex.Message}",
+                    ErrorCode = TokenValidationError.ValidationFailed
+                };
+            }
         }
 
         private async Task<OidcDiscoveryDocument> FetchOidcDiscoveryAsync(string metadataUrl, CancellationToken cancellationToken)

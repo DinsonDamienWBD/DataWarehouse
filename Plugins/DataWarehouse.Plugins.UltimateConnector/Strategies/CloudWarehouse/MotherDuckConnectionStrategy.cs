@@ -9,7 +9,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
 {
     public class MotherDuckConnectionStrategy : DatabaseConnectionStrategyBase
     {
-        private string? _token;
+        private volatile string? _token;
         public override string StrategyId => "motherduck";
         public override string DisplayName => "MotherDuck";
         public override string SemanticDescription => "Serverless analytics platform built on DuckDB for cloud-scale data analytics";

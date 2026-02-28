@@ -15,7 +15,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
         public override string DisplayName => "FoundationDB";
         public override string SemanticDescription => "Distributed database providing scalability and fault tolerance with ACID guarantees";
         public override string[] Tags => new[] { "specialized", "foundationdb", "distributed", "acid", "key-value" };
-        public override ConnectionStrategyCapabilities Capabilities => new(SupportsPooling: true, SupportsStreaming: true, SupportsTransactions: true, SupportsBulkOperations: true, SupportsSchemaDiscovery: false, SupportsSsl: true, SupportsCompression: false, SupportsAuthentication: false, MaxConcurrentConnections: 100, SupportedAuthMethods: new[] { "none" });
+        public override ConnectionStrategyCapabilities Capabilities => new(SupportsPooling: false, SupportsStreaming: true, SupportsTransactions: true, SupportsBulkOperations: false, SupportsSchemaDiscovery: false, SupportsSsl: true, SupportsCompression: false, SupportsAuthentication: false, MaxConcurrentConnections: 100, SupportedAuthMethods: new[] { "none" });
         public FoundationDbConnectionStrategy(ILogger<FoundationDbConnectionStrategy>? logger = null) : base(logger) { }
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {

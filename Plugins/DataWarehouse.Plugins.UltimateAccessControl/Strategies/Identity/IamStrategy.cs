@@ -477,7 +477,10 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
             var key = userId ?? "anonymous";
             _auditLog.AddOrUpdate(key, new List<AuditEvent> { evt }, (k, list) =>
             {
-                list.Add(evt);
+                lock (list)
+                {
+                    list.Add(evt);
+                }
                 return list;
             });
         }

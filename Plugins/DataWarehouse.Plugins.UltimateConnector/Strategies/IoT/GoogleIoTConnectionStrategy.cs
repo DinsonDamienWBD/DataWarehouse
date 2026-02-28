@@ -32,7 +32,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
         {
             var client = handle.GetConnection<HttpClient>();
             using var response = await client.GetAsync("/", ct);
-            return response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable;
+            return response.IsSuccessStatusCode;
         }
 
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)

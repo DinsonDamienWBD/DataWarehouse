@@ -330,8 +330,9 @@ protected override async Task<AccessDecision> EvaluateAccessCoreAsync(
             public required Dictionary<string, object> Context { get; init; }
             public required DateTime CreatedAt { get; init; }
             public required DateTime ExpiresAt { get; init; }
-            public bool Responded { get; set; }
-            public bool Approved { get; set; }
+            // Use volatile for cross-thread visibility (polled by WaitForResponseAsync)
+            public volatile bool Responded;
+            public volatile bool Approved;
             public DateTime RespondedAt { get; set; }
         }
     }

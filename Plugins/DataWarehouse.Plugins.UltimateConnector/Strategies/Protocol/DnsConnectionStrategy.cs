@@ -45,7 +45,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
             if (string.IsNullOrWhiteSpace(config.ConnectionString))
                 throw new ArgumentException("ConnectionString must be 'host' or 'host:port' for DNS.", nameof(config));
 
-            var parts = config.ConnectionString.Split(':');
+            var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':');
             var host = parts[0];
             if (string.IsNullOrWhiteSpace(host))
                 throw new ArgumentException("Host portion of ConnectionString is empty for DNS.", nameof(config));

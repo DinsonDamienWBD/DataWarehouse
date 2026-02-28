@@ -26,6 +26,11 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
             string deviceId,
             CancellationToken cancellationToken = default)
         {
+            if (string.IsNullOrWhiteSpace(userId))
+                throw new ArgumentException("User ID cannot be null or empty", nameof(userId));
+            if (string.IsNullOrWhiteSpace(deviceId))
+                throw new ArgumentException("Device ID cannot be null or empty", nameof(deviceId));
+
             var isTrusted = _trustedDevices.TryGetValue($"{userId}:{deviceId}", out var device) &&
                             device.TrustedUntil > DateTime.UtcNow;
 
@@ -54,12 +59,19 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
         /// <summary>
         /// Initiates MFA challenge.
         /// </summary>
-        public Task<MfaChallenge> InitiateChallengeAsync(
+        public Task<MfaChallengeResult> InitiateChallengeAsync(
             string userId,
             MfaMethodType methodType,
             CancellationToken cancellationToken = default)
         {
+            if (string.IsNullOrWhiteSpace(userId))
+                throw new ArgumentException("User ID cannot be null or empty", nameof(userId));
+
             var challengeId = Guid.NewGuid().ToString("N");
+            var code = GenerateCode(methodType);
+
+            // Store hash of the code, not the plaintext code
+            var codeHash = ComputeCodeHash(code);
             var challenge = new MfaChallenge
             {
                 ChallengeId = challengeId,
@@ -68,12 +80,19 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
                 CreatedAt = DateTime.UtcNow,
                 ExpiresAt = DateTime.UtcNow.AddMinutes(5),
                 Status = ChallengeStatus.Pending,
-                Code = GenerateCode(methodType)
+                CodeHash = codeHash
             };
 
             _activeChallenges[challengeId] = challenge;
 
-            return Task.FromResult(challenge);
+            // Return the code to the caller for delivery (e.g., via SMS, email)
+            // but do NOT store it in the challenge object
+            return Task.FromResult(new MfaChallengeResult
+            {
+                ChallengeId = challengeId,
+                Code = code,
+                ExpiresAt = challenge.ExpiresAt
+            });
         }
 
         /// <summary>
@@ -93,10 +112,11 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
                 return Task.FromResult(false);
             }
 
-            var codeBytes = System.Text.Encoding.UTF8.GetBytes(challenge.Code);
-            var responseBytes = System.Text.Encoding.UTF8.GetBytes(response);
-            var isValid = codeBytes.Length == responseBytes.Length &&
-                          CryptographicOperations.FixedTimeEquals(codeBytes, responseBytes);
+            var responseHash = ComputeCodeHash(response);
+            var storedHashBytes = System.Text.Encoding.UTF8.GetBytes(challenge.CodeHash);
+            var responseHashBytes = System.Text.Encoding.UTF8.GetBytes(responseHash);
+            var isValid = storedHashBytes.Length == responseHashBytes.Length &&
+                          CryptographicOperations.FixedTimeEquals(storedHashBytes, responseHashBytes);
             challenge.Status = isValid ? ChallengeStatus.Verified : ChallengeStatus.Failed;
             challenge.VerifiedAt = DateTime.UtcNow;
 
@@ -132,6 +152,13 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
             var methods = _userMethods.GetOrAdd(userId, _ => new List<MfaMethod>());
             methods.Add(method);
             return Task.CompletedTask;
+        }
+
+        private static string ComputeCodeHash(string code)
+        {
+            var hashBytes = System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(code));
+            return Convert.ToHexString(hashBytes);
         }
 
         private static string GenerateCode(MfaMethodType methodType)
@@ -199,8 +226,20 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
         public required DateTime CreatedAt { get; init; }
         public required DateTime ExpiresAt { get; init; }
         public required ChallengeStatus Status { get; set; }
-        public required string Code { get; init; }
+        /// <summary>SHA-256 hash of the MFA code. Plaintext code is never stored.</summary>
+        public required string CodeHash { get; init; }
         public DateTime? VerifiedAt { get; set; }
+    }
+
+    /// <summary>
+    /// Result of initiating an MFA challenge. Contains the plaintext code for delivery.
+    /// </summary>
+    public sealed class MfaChallengeResult
+    {
+        public required string ChallengeId { get; init; }
+        /// <summary>Plaintext code for delivery via SMS/email/push. Not stored in the challenge.</summary>
+        public required string Code { get; init; }
+        public required DateTime ExpiresAt { get; init; }
     }
 
     public enum ChallengeStatus

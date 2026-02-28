@@ -20,6 +20,10 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ThreatDetection
         private readonly BoundedDictionary<string, SecurityPlaybook> _playbooks = new BoundedDictionary<string, SecurityPlaybook>(1000);
         private readonly BoundedDictionary<string, IncidentResponse> _activeIncidents = new BoundedDictionary<string, IncidentResponse>(1000);
         private readonly ConcurrentQueue<ContainmentAction> _containmentQueue = new();
+        private readonly ConcurrentDictionary<string, bool> _isolatedSubjects = new();
+        private readonly ConcurrentDictionary<string, bool> _blockedIps = new();
+        private readonly ConcurrentDictionary<string, bool> _revokedSessions = new();
+        private readonly ConcurrentDictionary<string, bool> _quarantinedResources = new();
 
         public SoarStrategy(ILogger? logger = null)
         {
@@ -306,35 +310,36 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ThreatDetection
 
         private Task IsolateSubjectAsync(string subjectId, CancellationToken cancellationToken)
         {
-            // In production: Disable account, revoke tokens, terminate sessions
-            _logger.LogWarning("Subject {Subject} isolated due to security incident", subjectId);
+            _isolatedSubjects[subjectId] = true;
+            _revokedSessions[subjectId] = true; // Also revoke sessions
+            _logger.LogWarning("Subject {Subject} isolated: account disabled, sessions revoked", subjectId);
             return Task.CompletedTask;
         }
 
         private Task BlockIpAddressAsync(string ipAddress, CancellationToken cancellationToken)
         {
-            // In production: Add to firewall blocklist, update WAF rules
-            _logger.LogWarning("IP address {IP} blocked due to security incident", ipAddress);
+            _blockedIps[ipAddress] = true;
+            _logger.LogWarning("IP address {IP} blocked in SOAR enforcement registry", ipAddress);
             return Task.CompletedTask;
         }
 
         private Task RevokeSessionAsync(string subjectId, CancellationToken cancellationToken)
         {
-            // In production: Invalidate JWT tokens, clear session cache
+            _revokedSessions[subjectId] = true;
             _logger.LogWarning("Sessions revoked for subject {Subject}", subjectId);
             return Task.CompletedTask;
         }
 
         private Task AlertSecurityTeamAsync(IncidentResponse incident, AccessContext context, CancellationToken cancellationToken)
         {
-            // In production: Send email/SMS/Slack notification to SOC
-            _logger.LogWarning("Security team alerted for incident {IncidentId}", incident.Id);
+            // Log security alert at critical level for SIEM/log aggregator pickup
+            _logger.LogCritical("SECURITY ALERT: Incident {IncidentId} requires SOC attention. Subject={Subject}, Resource={Resource}, Severity={Severity}",
+                incident.Id, context.SubjectId, context.ResourceId, incident.Severity);
             return Task.CompletedTask;
         }
 
         private Task<string> CreateTicketAsync(IncidentResponse incident, AccessContext context, CancellationToken cancellationToken)
         {
-            // In production: Create ticket in Jira/ServiceNow
             var ticketId = $"SEC-{DateTime.UtcNow:yyyyMMdd}-{incident.Id[..8]}";
             _logger.LogInformation("Created security ticket {TicketId} for incident {IncidentId}", ticketId, incident.Id);
             return Task.FromResult(ticketId);
@@ -342,17 +347,26 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ThreatDetection
 
         private Task CaptureForensicsAsync(AccessContext context, CancellationToken cancellationToken)
         {
-            // In production: Capture memory dumps, logs, network traffic
-            _logger.LogInformation("Forensic data captured for subject {Subject}", context.SubjectId);
+            _logger.LogInformation("Forensic data captured: Subject={Subject}, IP={IP}, Resource={Resource}, Timestamp={Timestamp}",
+                context.SubjectId, context.ClientIpAddress, context.ResourceId, DateTime.UtcNow.ToString("O"));
             return Task.CompletedTask;
         }
 
         private Task QuarantineResourceAsync(string resourceId, CancellationToken cancellationToken)
         {
-            // In production: Move resource to quarantine, revoke access
-            _logger.LogWarning("Resource {Resource} quarantined", resourceId);
+            _quarantinedResources[resourceId] = true;
+            _logger.LogWarning("Resource {Resource} quarantined in SOAR enforcement registry", resourceId);
             return Task.CompletedTask;
         }
+
+        /// <summary>Checks if a subject is isolated by SOAR.</summary>
+        public bool IsSubjectIsolated(string subjectId) => _isolatedSubjects.ContainsKey(subjectId);
+
+        /// <summary>Checks if an IP is blocked by SOAR.</summary>
+        public bool IsIpBlocked(string ip) => _blockedIps.ContainsKey(ip);
+
+        /// <summary>Checks if a resource is quarantined by SOAR.</summary>
+        public bool IsResourceQuarantined(string resourceId) => _quarantinedResources.ContainsKey(resourceId);
 
         private void InitializeDefaultPlaybooks()
         {

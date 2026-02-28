@@ -30,8 +30,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
     public sealed class OAuth2Strategy : AccessControlStrategyBase
     {
         private readonly HttpClient _httpClient;
-        private readonly Dictionary<string, CachedTokenInfo> _tokenCache = new();
-        private readonly Dictionary<string, CachedJwks> _jwksCache = new();
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, CachedTokenInfo> _tokenCache = new();
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, CachedJwks> _jwksCache = new();
 
         private string? _introspectionEndpoint;
         private string? _clientId;

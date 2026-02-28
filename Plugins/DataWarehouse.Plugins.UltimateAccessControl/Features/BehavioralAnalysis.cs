@@ -229,39 +229,42 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
 
         private void UpdateProfile(UserProfile profile, UserBehavior behavior)
         {
-            profile.LastActivityAt = DateTime.UtcNow;
-            profile.BehaviorSamples.Add(behavior.Timestamp);
-
-            // Update login times (sliding window)
-            profile.LoginTimes.Add(behavior.LoginTime);
-            if (profile.LoginTimes.Count > 100)
-                profile.LoginTimes.RemoveAt(0);
-
-            // Update session durations
-            if (behavior.SessionDurationMinutes > 0)
+            lock (profile)
             {
-                profile.SessionDurations.Add(behavior.SessionDurationMinutes);
-                if (profile.SessionDurations.Count > 100)
-                    profile.SessionDurations.RemoveAt(0);
+                profile.LastActivityAt = DateTime.UtcNow;
+                profile.BehaviorSamples.Add(behavior.Timestamp);
+
+                // Update login times (sliding window)
+                profile.LoginTimes.Add(behavior.LoginTime);
+                if (profile.LoginTimes.Count > 100)
+                    profile.LoginTimes.RemoveAt(0);
+
+                // Update session durations
+                if (behavior.SessionDurationMinutes > 0)
+                {
+                    profile.SessionDurations.Add(behavior.SessionDurationMinutes);
+                    if (profile.SessionDurations.Count > 100)
+                        profile.SessionDurations.RemoveAt(0);
+                }
+
+                // Update actions per hour
+                profile.ActionsPerHour.Add(behavior.ActionsPerHour);
+                if (profile.ActionsPerHour.Count > 100)
+                    profile.ActionsPerHour.RemoveAt(0);
+
+                // Update locations
+                if (!string.IsNullOrEmpty(behavior.Location))
+                {
+                    profile.Locations.Add(behavior.Location);
+                    if (profile.Locations.Count > 50)
+                        profile.Locations.RemoveAt(0);
+                }
+
+                // Update failed login attempts
+                profile.FailedLoginAttempts.Add(behavior.FailedLoginAttempts);
+                if (profile.FailedLoginAttempts.Count > 100)
+                    profile.FailedLoginAttempts.RemoveAt(0);
             }
-
-            // Update actions per hour
-            profile.ActionsPerHour.Add(behavior.ActionsPerHour);
-            if (profile.ActionsPerHour.Count > 100)
-                profile.ActionsPerHour.RemoveAt(0);
-
-            // Update locations
-            if (!string.IsNullOrEmpty(behavior.Location))
-            {
-                profile.Locations.Add(behavior.Location);
-                if (profile.Locations.Count > 50)
-                    profile.Locations.RemoveAt(0);
-            }
-
-            // Update failed login attempts
-            profile.FailedLoginAttempts.Add(behavior.FailedLoginAttempts);
-            if (profile.FailedLoginAttempts.Count > 100)
-                profile.FailedLoginAttempts.RemoveAt(0);
         }
 
         /// <summary>

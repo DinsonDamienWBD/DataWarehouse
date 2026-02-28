@@ -50,15 +50,25 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.DataProtection
             _reverseVault.Clear();
             return base.ShutdownAsyncCore(cancellationToken);
         }
-public string Tokenize(string sensitiveData)
+private readonly object _tokenizeLock = new();
+
+        public string Tokenize(string sensitiveData)
         {
+            // Use lock to ensure atomic check-and-add across both dictionaries
             if (_reverseVault.TryGetValue(sensitiveData, out var existingToken))
                 return existingToken;
 
-            var token = "TOK-" + Guid.NewGuid().ToString("N").Substring(0, 16);
-            _tokenVault[token] = sensitiveData;
-            _reverseVault[sensitiveData] = token;
-            return token;
+            lock (_tokenizeLock)
+            {
+                // Double-check after acquiring lock
+                if (_reverseVault.TryGetValue(sensitiveData, out existingToken))
+                    return existingToken;
+
+                var token = "TOK-" + Guid.NewGuid().ToString("N").Substring(0, 16);
+                _tokenVault[token] = sensitiveData;
+                _reverseVault[sensitiveData] = token;
+                return token;
+            }
         }
 
         public string? Detokenize(string token)

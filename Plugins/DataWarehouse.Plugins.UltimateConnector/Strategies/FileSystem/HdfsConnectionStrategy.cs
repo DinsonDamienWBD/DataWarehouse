@@ -21,7 +21,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var parts = config.ConnectionString.Split(':');
+            var parts = (config.ConnectionString ?? throw new ArgumentException("HDFS connection string required")).Split(':');
             var client = new HttpClient { BaseAddress = new Uri($"http://{parts[0]}:{(parts.Length > 1 ? parts[1] : "9870")}") };
             try
             {

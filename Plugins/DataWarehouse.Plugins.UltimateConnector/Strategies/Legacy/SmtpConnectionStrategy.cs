@@ -17,11 +17,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
     /// </summary>
     public class SmtpConnectionStrategy : LegacyConnectionStrategyBase
     {
-        private string _host = "";
-        private int _port = 587;
-        private string _username = "";
-        private string _password = "";
-        private bool _useSsl = true;
+        private volatile string _host = "";
+        private volatile int _port = 587;
+        private volatile string _username = "";
+        private volatile string _password = "";
+        private volatile bool _useSsl = true;
 
         public override string StrategyId => "smtp";
         public override string DisplayName => "SMTP";
@@ -33,7 +33,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            _host = GetConfiguration<string>(config, "Host", config.ConnectionString.Split(':')[0]);
+            _host = GetConfiguration<string>(config, "Host", (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':')[0]);
             _port = GetConfiguration(config, "Port", 587);
             _username = GetConfiguration<string>(config, "Username", "");
             _password = GetConfiguration<string>(config, "Password", "");

@@ -71,9 +71,9 @@ public sealed class OracleConnectionStrategy : DatabaseConnectionStrategyBase
             ["State"] = "Connected"
         };
 
-        var mockConnection = new OracleTcpConnection(host, port, connectionString);
+        var tcpConnection = new OracleTcpConnection(host, port, connectionString);
 
-        return new DefaultConnectionHandle(mockConnection, connectionInfo);
+        return new DefaultConnectionHandle(tcpConnection, connectionInfo);
     }
 
     /// <inheritdoc/>
@@ -81,11 +81,11 @@ public sealed class OracleConnectionStrategy : DatabaseConnectionStrategyBase
     {
         try
         {
-            var mockConnection = handle.GetConnection<OracleTcpConnection>();
+            var tcpConnection = handle.GetConnection<OracleTcpConnection>();
 
             // Test TCP connectivity
             using var tcpClient = new TcpClient();
-            await tcpClient.ConnectAsync(mockConnection.Host, mockConnection.Port, ct);
+            await tcpClient.ConnectAsync(tcpConnection.Host, tcpConnection.Port, ct);
 
             return true;
         }
@@ -113,16 +113,16 @@ public sealed class OracleConnectionStrategy : DatabaseConnectionStrategyBase
 
         try
         {
-            var mockConnection = handle.GetConnection<OracleTcpConnection>();
+            var tcpConnection = handle.GetConnection<OracleTcpConnection>();
 
             // Test TCP connectivity and measure latency
             using var tcpClient = new TcpClient();
-            await tcpClient.ConnectAsync(mockConnection.Host, mockConnection.Port, ct);
+            await tcpClient.ConnectAsync(tcpConnection.Host, tcpConnection.Port, ct);
             sw.Stop();
 
             return new ConnectionHealth(
                 IsHealthy: true,
-                StatusMessage: $"Oracle Database TCP connection active - {mockConnection.Host}:{mockConnection.Port}",
+                StatusMessage: $"Oracle Database TCP connection active - {tcpConnection.Host}:{tcpConnection.Port}",
                 Latency: sw.Elapsed,
                 CheckedAt: DateTimeOffset.UtcNow);
         }

@@ -44,7 +44,7 @@ public sealed class UltimateConnectorPlugin : DataWarehouse.SDK.Contracts.Hierar
 {
     private readonly ConnectionStrategyRegistry _registry;
     private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
-    private bool _initialized;
+    private volatile bool _initialized;
 
     /// <inheritdoc/>
     public override string Id => "com.datawarehouse.connector.ultimate";

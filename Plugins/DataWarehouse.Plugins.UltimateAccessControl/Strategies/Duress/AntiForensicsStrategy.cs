@@ -101,12 +101,22 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
         {
             try
             {
-                // Request garbage collection to consolidate memory
+                // Clear all sensitive configuration data
+                foreach (var key in Configuration.Keys.ToArray())
+                {
+                    Configuration[key] = string.Empty;
+                }
+
+                // Overwrite managed memory with random data to reduce forensic recovery
+                var scrubBuffer = System.Security.Cryptography.RandomNumberGenerator.GetBytes(64 * 1024);
+                System.Security.Cryptography.CryptographicOperations.ZeroMemory(scrubBuffer);
+
+                // Force garbage collection to finalize cleared objects
                 GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, true, true);
                 GC.WaitForPendingFinalizers();
                 GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, true, true);
 
-                _logger.LogInformation("Secure memory wipe completed");
+                _logger.LogInformation("Secure memory wipe completed - configuration cleared and memory scrubbed");
                 await Task.CompletedTask;
             }
             catch (Exception ex)

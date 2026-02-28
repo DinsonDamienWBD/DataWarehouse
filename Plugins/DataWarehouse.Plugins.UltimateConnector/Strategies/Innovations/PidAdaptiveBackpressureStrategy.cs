@@ -381,6 +381,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
 
         private class PidConnectionState
         {
+            public readonly object SyncRoot = new();
             public double TargetAckRate { get; set; }
             public double MeasuredAckRate { get; set; }
             public int CurrentWindowKb { get; set; }

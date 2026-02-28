@@ -69,22 +69,31 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
 
             await pool.Semaphore.WaitAsync(ct);
 
-            if (pool.Connections.TryDequeue(out var entry))
+            try
             {
-                if (entry.Handle.IsConnected && !entry.IsExpired(pool.Config.IdleTimeout))
+                if (pool.Connections.TryDequeue(out var entry))
                 {
-                    Interlocked.Increment(ref pool.HitCount);
-                    entry.LastUsed = DateTimeOffset.UtcNow;
-                    return entry.Handle;
+                    if (entry.Handle.IsConnected && !entry.IsExpired(pool.Config.IdleTimeout))
+                    {
+                        Interlocked.Increment(ref pool.HitCount);
+                        Interlocked.Increment(ref pool.ActiveCount);
+                        entry.LastUsed = DateTimeOffset.UtcNow;
+                        return entry.Handle;
+                    }
+
+                    await SafeDisposeAsync(entry.Handle);
                 }
 
-                await SafeDisposeAsync(entry.Handle);
+                Interlocked.Increment(ref pool.MissCount);
+                var handle = await factory(ct);
+                Interlocked.Increment(ref pool.ActiveCount);
+                return handle;
             }
-
-            Interlocked.Increment(ref pool.MissCount);
-            var handle = await factory(ct);
-            Interlocked.Increment(ref pool.ActiveCount);
-            return handle;
+            catch
+            {
+                pool.Semaphore.Release();
+                throw;
+            }
         }
 
         /// <summary>

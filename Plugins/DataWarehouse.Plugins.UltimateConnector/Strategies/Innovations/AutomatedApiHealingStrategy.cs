@@ -171,7 +171,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             var client = handle.GetConnection<HttpClient>();
-            var sessionId = handle.ConnectionInfo["session_id"]?.ToString();
+            var sessionId = handle.ConnectionInfo.GetValueOrDefault("session_id")?.ToString() ?? throw new InvalidOperationException("session_id is required in ConnectionInfo");
 
             using var response = await client.GetAsync($"/api/v1/healing/sessions/{sessionId}/status", ct);
             if (!response.IsSuccessStatusCode) return false;
@@ -184,7 +184,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             var client = handle.GetConnection<HttpClient>();
-            var sessionId = handle.ConnectionInfo["session_id"]?.ToString();
+            var sessionId = handle.ConnectionInfo.GetValueOrDefault("session_id")?.ToString() ?? throw new InvalidOperationException("session_id is required in ConnectionInfo");
 
             try
             {
@@ -204,7 +204,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
         {
             var sw = Stopwatch.StartNew();
             var client = handle.GetConnection<HttpClient>();
-            var sessionId = handle.ConnectionInfo["session_id"]?.ToString();
+            var sessionId = handle.ConnectionInfo.GetValueOrDefault("session_id")?.ToString() ?? throw new InvalidOperationException("session_id is required in ConnectionInfo");
 
             using var response = await client.GetAsync($"/api/v1/healing/sessions/{sessionId}/health", ct);
             sw.Stop();

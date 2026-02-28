@@ -91,19 +91,22 @@ protected override async Task<AccessDecision> EvaluateAccessCoreAsync(
 
                 if (isValid)
                 {
-                    // Replay protection: ensure time step not reused
-                    if (_lastUsedTimeSteps.TryGetValue(context.SubjectId, out var lastStep) && lastStep == currentTimeStep)
+                    // Atomic replay protection: check-and-set under lock to prevent TOCTOU race
+                    lock (_lastUsedTimeSteps)
                     {
-                        return new AccessDecision
+                        if (_lastUsedTimeSteps.TryGetValue(context.SubjectId, out var lastStep) && lastStep == currentTimeStep)
                         {
-                            IsGranted = false,
-                            Reason = "TOTP code already used (replay attack detected)",
-                            ApplicablePolicies = new[] { "totp-replay-protection" }
-                        };
-                    }
+                            return new AccessDecision
+                            {
+                                IsGranted = false,
+                                Reason = "TOTP code already used (replay attack detected)",
+                                ApplicablePolicies = new[] { "totp-replay-protection" }
+                            };
+                        }
 
-                    // Store current time step
-                    _lastUsedTimeSteps[context.SubjectId] = currentTimeStep;
+                        // Store current time step
+                        _lastUsedTimeSteps[context.SubjectId] = currentTimeStep;
+                    }
 
                     return new AccessDecision
                     {

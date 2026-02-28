@@ -42,10 +42,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
         {
             // Translate JSON to EDI X12 format placeholder
             var segments = new System.Text.StringBuilder();
-            segments.AppendLine($"ISA*00*          *00*          *ZZ*SENDER         *ZZ*RECEIVER       *{DateTime.Now:yyMMdd}*{DateTime.Now:HHmm}*U*00401*000000001*0*P*:~");
-            segments.AppendLine($"GS*PO*SENDER*RECEIVER*{DateTime.Now:yyyyMMdd}*{DateTime.Now:HHmm}*1*X*004010~");
+            segments.AppendLine($"ISA*00*          *00*          *ZZ*SENDER         *ZZ*RECEIVER       *{DateTime.UtcNow:yyMMdd}*{DateTime.UtcNow:HHmm}*U*00401*000000001*0*P*:~");
+            segments.AppendLine($"GS*PO*SENDER*RECEIVER*{DateTime.UtcNow:yyyyMMdd}*{DateTime.UtcNow:HHmm}*1*X*004010~");
             segments.AppendLine($"ST*850*0001~");
-            segments.AppendLine($"BEG*00*NE*{modernCommand}*{DateTime.Now:yyyyMMdd}~");
+            segments.AppendLine($"BEG*00*NE*{modernCommand}*{DateTime.UtcNow:yyyyMMdd}~");
             segments.AppendLine("SE*4*0001~");
             segments.AppendLine("GE*1*1~");
             segments.AppendLine("IEA*1*000000001~");

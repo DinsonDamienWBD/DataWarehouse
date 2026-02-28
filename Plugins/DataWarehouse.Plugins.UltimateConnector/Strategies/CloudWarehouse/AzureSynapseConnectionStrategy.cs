@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
 {
     public class AzureSynapseConnectionStrategy : DatabaseConnectionStrategyBase
     {
-        private TcpClient? _tcpClient;
+        private volatile TcpClient? _tcpClient;
         public override string StrategyId => "synapse";
         public override string DisplayName => "Azure Synapse Analytics";
         public override string SemanticDescription => "Limitless analytics service bringing together data integration, enterprise data warehousing, and big data analytics";

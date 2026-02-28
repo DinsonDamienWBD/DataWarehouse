@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Net.Http;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,11 +15,13 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
     /// <summary>
     /// SIEM event forwarding connector supporting multiple formats (Splunk, Elastic, Azure Sentinel, Syslog).
     /// </summary>
-    public sealed class SiemConnector
+    public sealed class SiemConnector : IDisposable
     {
         private readonly BoundedDictionary<string, SiemEndpoint> _endpoints = new BoundedDictionary<string, SiemEndpoint>(1000);
         private readonly ConcurrentQueue<ForwardedEvent> _eventHistory = new();
+        private readonly HttpClient _httpClient = new();
         private readonly int _maxHistorySize = 1000;
+        private bool _disposed;
 
         /// <summary>
         /// Registers SIEM endpoint.
@@ -49,7 +54,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
                 try
                 {
                     var formatted = FormatEvent(securityEvent, endpoint.Format);
-                    await SimulateForwardAsync(endpoint, formatted, cancellationToken);
+                    await ForwardToEndpointAsync(endpoint, formatted, cancellationToken);
 
                     results.Add(new EndpointResult
                     {
@@ -181,9 +186,9 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
             var appName = "datawarehouse-ac";
             var msgId = securityEvent.EventId;
 
-            var structuredData = $"[event eventType=\"{securityEvent.EventType}\" userId=\"{securityEvent.UserId}\" " +
-                                 $"resourceId=\"{securityEvent.ResourceId}\" action=\"{securityEvent.Action}\" " +
-                                 $"result=\"{securityEvent.Result}\"]";
+            var structuredData = $"[event eventType=\"{EscapeSyslogSd(securityEvent.EventType)}\" userId=\"{EscapeSyslogSd(securityEvent.UserId)}\" " +
+                                 $"resourceId=\"{EscapeSyslogSd(securityEvent.ResourceId)}\" action=\"{EscapeSyslogSd(securityEvent.Action)}\" " +
+                                 $"result=\"{EscapeSyslogSd(securityEvent.Result)}\"]";
 
             return $"<{priority}>1 {timestamp} {hostname} {appName} - {msgId} {structuredData} {securityEvent.Message}";
         }
@@ -203,11 +208,43 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
             return (4 * 8) + severityLevel; // Facility * 8 + Severity
         }
 
-        private Task SimulateForwardAsync(SiemEndpoint endpoint, string formattedEvent, CancellationToken cancellationToken)
+        private async Task ForwardToEndpointAsync(SiemEndpoint endpoint, string formattedEvent, CancellationToken cancellationToken)
         {
-            // In production, would make actual HTTP/TCP connections here
-            // For now, simulate successful forward
-            return Task.CompletedTask;
+            if (string.IsNullOrWhiteSpace(endpoint.Url))
+                throw new InvalidOperationException($"Endpoint '{endpoint.EndpointId}' has no URL configured");
+
+            var request = new HttpRequestMessage(HttpMethod.Post, endpoint.Url)
+            {
+                Content = new StringContent(formattedEvent, Encoding.UTF8, "application/json")
+            };
+
+            // Add API key if configured
+            if (!string.IsNullOrEmpty(endpoint.ApiKey))
+                request.Headers.TryAddWithoutValidation("Authorization", $"Bearer {endpoint.ApiKey}");
+
+            // Add custom headers
+            foreach (var header in endpoint.Headers)
+                request.Headers.TryAddWithoutValidation(header.Key, header.Value);
+
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            response.EnsureSuccessStatusCode();
+        }
+
+        /// <summary>
+        /// Escapes a string value for RFC 5424 structured data (SD-VALUE).
+        /// Characters '"', '\', and ']' must be escaped with a backslash.
+        /// </summary>
+        private static string EscapeSyslogSd(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return value;
+            return value.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("]", "\\]");
+        }
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _httpClient.Dispose();
         }
 
         private void RecordForwardedEvent(string endpointId, string eventId, bool success)

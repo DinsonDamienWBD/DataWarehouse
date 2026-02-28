@@ -98,6 +98,21 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
             string? jitGrantId = null,
             CancellationToken cancellationToken = default)
         {
+            // Validate JIT grant if provided
+            if (!string.IsNullOrEmpty(jitGrantId))
+            {
+                if (!_jitGrants.TryGetValue(jitGrantId, out var grant))
+                    throw new InvalidOperationException($"JIT grant '{jitGrantId}' not found");
+                if (grant.Status != JitAccessStatus.Active)
+                    throw new InvalidOperationException($"JIT grant '{jitGrantId}' is not active (status: {grant.Status})");
+                if (DateTime.UtcNow > grant.ExpiresAt)
+                {
+                    grant.Status = JitAccessStatus.Expired;
+                    grant.RevokedAt = DateTime.UtcNow;
+                    throw new InvalidOperationException($"JIT grant '{jitGrantId}' has expired");
+                }
+            }
+
             var sessionId = Guid.NewGuid().ToString("N");
             var session = new PrivilegedSession
             {

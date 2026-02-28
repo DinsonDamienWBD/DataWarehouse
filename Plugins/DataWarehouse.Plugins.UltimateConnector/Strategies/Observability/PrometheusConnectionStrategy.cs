@@ -126,6 +126,11 @@ public sealed class PrometheusConnectionStrategy : ObservabilityConnectionStrate
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Uses JSON format via /api/v1/import/prometheus for VictoriaMetrics-compatible endpoints.
+    /// Native Prometheus remote_write requires Protobuf+Snappy which needs additional dependencies.
+    /// For native Prometheus, use a Protobuf-based client library.
+    /// </remarks>
     public override async Task PushMetricsAsync(
         IConnectionHandle handle,
         IReadOnlyList<Dictionary<string, object>> metrics,
@@ -133,9 +138,11 @@ public sealed class PrometheusConnectionStrategy : ObservabilityConnectionStrate
     {
         var httpClient = handle.GetConnection<HttpClient>();
         var json = JsonSerializer.Serialize(new { series = metrics });
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
+        using var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        using var response = await httpClient.PostAsync("/api/v1/write", content, ct);
+        // Use JSON import endpoint (compatible with VictoriaMetrics, Cortex, Mimir)
+        // Native Prometheus remote_write requires Protobuf+Snappy serialization
+        using var response = await httpClient.PostAsync("/api/v1/import", content, ct);
         response.EnsureSuccessStatusCode();
     }
 

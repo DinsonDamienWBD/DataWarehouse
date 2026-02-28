@@ -29,17 +29,17 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
         /// <summary>
         /// Maximum allowed query depth. Queries exceeding this depth are rejected (NET-08).
         /// </summary>
-        private int _maxQueryDepth = 10;
+        private volatile int _maxQueryDepth = 10;
 
         /// <summary>
         /// Maximum allowed query complexity cost. Queries exceeding this cost are rejected.
         /// </summary>
-        private int _maxQueryComplexity = 1000;
+        private volatile int _maxQueryComplexity = 1000;
 
         /// <summary>
         /// Whether introspection queries are allowed. Should be false in production (NET-08).
         /// </summary>
-        private bool _enableIntrospection;
+        private volatile bool _enableIntrospection;
 
         /// <inheritdoc/>
         public override string StrategyId => "graphql";

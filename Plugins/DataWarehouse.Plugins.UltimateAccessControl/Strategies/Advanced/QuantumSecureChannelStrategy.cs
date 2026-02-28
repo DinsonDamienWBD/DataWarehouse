@@ -16,7 +16,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Advanced
     {
         private readonly ILogger _logger;
         private bool _qkdHardwareAvailable;
-        private readonly Dictionary<string, byte[]> _quantumKeys = new();
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte[]> _quantumKeys = new();
 
         public QuantumSecureChannelStrategy(ILogger? logger = null)
         {

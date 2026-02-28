@@ -130,7 +130,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
                 try
                 {
                     // Check if TPM device exists
-                    var tpmExists = System.IO.Directory.Exists("C:\\Windows\\System32\\tpm.sys");
+                    var tpmExists = System.IO.File.Exists("C:\\Windows\\System32\\tpm.sys");
                     return await Task.FromResult(tpmExists);
                 }
                 catch
@@ -204,6 +204,18 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
                             TpmSealed = false
                         });
                     }
+                }
+                else
+                {
+                    // No stored measurement exists (first boot or TPM unavailable)
+                    // Fail-secure: do not trust without baseline measurement
+                    _logger.LogWarning("No stored boot measurement found - fail-secure: denying integrity verification");
+                    return await Task.FromResult(new IntegrityCheckResult
+                    {
+                        IsValid = false,
+                        Reason = "No baseline boot measurement available - cannot verify integrity (fail-secure)",
+                        TpmSealed = false
+                    });
                 }
 
                 return await Task.FromResult(new IntegrityCheckResult

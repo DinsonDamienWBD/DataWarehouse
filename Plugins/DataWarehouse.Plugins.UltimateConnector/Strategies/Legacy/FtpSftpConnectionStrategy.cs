@@ -31,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var host = GetConfiguration<string>(config, "Host", config.ConnectionString.Split(':')[0]);
+            var host = GetConfiguration<string>(config, "Host", (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':')[0]);
             var port = GetConfiguration(config, "Port", 21);
             var username = GetConfiguration<string>(config, "Username", "anonymous");
             var password = GetConfiguration<string>(config, "Password", "");
@@ -147,12 +147,32 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
             return new FtpListResult { Success = true, Entries = entries };
         }
 
+        private static string SanitizeRemotePath(string path)
+        {
+            if (string.IsNullOrEmpty(path)) throw new ArgumentException("Remote path cannot be empty");
+            if (path.Contains("..")) throw new ArgumentException("Path traversal sequences (..) are not allowed in remote paths");
+            if (!path.StartsWith('/')) path = "/" + path;
+            return path;
+        }
+
+        private static string SanitizeLocalPath(string path, string baseDir)
+        {
+            if (string.IsNullOrEmpty(path)) throw new ArgumentException("Local path cannot be empty");
+            var fullPath = Path.GetFullPath(path);
+            var fullBase = Path.GetFullPath(baseDir);
+            if (!fullPath.StartsWith(fullBase, StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException($"Local path must be within the base directory: {baseDir}");
+            return fullPath;
+        }
+
         /// <summary>
         /// Downloads a file from the FTP server.
         /// </summary>
         public async Task<FtpTransferResult> DownloadFileAsync(IConnectionHandle handle, string remotePath,
             string localPath, CancellationToken ct = default)
         {
+            remotePath = SanitizeRemotePath(remotePath);
+            localPath = SanitizeLocalPath(localPath, Environment.CurrentDirectory);
             var info = handle.GetConnection<FtpConnectionInfo>();
             try
             {
@@ -189,6 +209,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
         public async Task<FtpTransferResult> UploadFileAsync(IConnectionHandle handle, string localPath,
             string remotePath, CancellationToken ct = default)
         {
+            remotePath = SanitizeRemotePath(remotePath);
+            localPath = SanitizeLocalPath(localPath, Environment.CurrentDirectory);
             var info = handle.GetConnection<FtpConnectionInfo>();
             try
             {

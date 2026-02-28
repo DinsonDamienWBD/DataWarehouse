@@ -33,7 +33,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            _instance = GetConfiguration<string>(config, "Instance", "example");
+            _instance = GetConfiguration<string>(config, "Instance", ""); if (string.IsNullOrEmpty(_instance) || _instance == "example") throw new ArgumentException("Jira instance name is required, 'example' is not valid");
             _email = GetConfiguration<string>(config, "Email", "");
             _apiToken = GetConfiguration<string>(config, "ApiToken", "");
 

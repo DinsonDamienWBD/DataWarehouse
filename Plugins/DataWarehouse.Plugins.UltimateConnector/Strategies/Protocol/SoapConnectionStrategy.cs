@@ -52,12 +52,12 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
             var soapEnvelope = @"<?xml version=""1.0"" encoding=""utf-8""?>
 <soap:Envelope xmlns:soap=""http://schemas.xmlsoap.org/soap/envelope/"">
   <soap:Body>
-    <GetStatus xmlns=""http://tempuri.org/""/>
+    <GetStatus xmlns=""""/>
   </soap:Body>
 </soap:Envelope>";
 
             var content = new StringContent(soapEnvelope, Encoding.UTF8, "text/xml");
-            content.Headers.Add("SOAPAction", "\"http://tempuri.org/GetStatus\"");
+            content.Headers.Add("SOAPAction", "\"GetStatus\"");
 
             using var response = await client.PostAsync("", content, ct);
             response.EnsureSuccessStatusCode();

@@ -159,7 +159,7 @@ public sealed class CosmosDbConnectionStrategy : DatabaseConnectionStrategyBase
 
         var client = handle.GetConnection<CosmosClient>();
         var databaseId = parameters?.GetValueOrDefault("database")?.ToString()
-            ?? GetConfiguration<string?>(null!, "Database", "default");
+            ?? handle.ConnectionInfo.GetValueOrDefault("Database")?.ToString() ?? "default";
         var containerId = parameters?.GetValueOrDefault("container")?.ToString()
             ?? parameters?.GetValueOrDefault("collection")?.ToString()
             ?? "items";

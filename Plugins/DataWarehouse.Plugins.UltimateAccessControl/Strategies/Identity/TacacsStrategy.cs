@@ -127,7 +127,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
                 using var stream = client.GetStream();
 
                 // Build TACACS+ Authentication START packet (Version 12.0+)
-                var sessionId = (uint)Random.Shared.Next();
+                var sessionIdBytes = System.Security.Cryptography.RandomNumberGenerator.GetBytes(4);
+                var sessionId = BitConverter.ToUInt32(sessionIdBytes, 0);
                 var packet = BuildAuthenticationStartPacket(sessionId, username);
 
                 // Send packet

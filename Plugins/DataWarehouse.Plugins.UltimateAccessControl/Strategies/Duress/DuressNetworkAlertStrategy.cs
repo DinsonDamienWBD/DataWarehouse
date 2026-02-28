@@ -129,9 +129,19 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
             {
                 await Task.WhenAll(alertTasks);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                _logger.LogError(ex, "Error sending duress network alerts");
+                // Log all exceptions from all failed tasks, not just the first
+                foreach (var task in alertTasks.Where(t => t.IsFaulted))
+                {
+                    if (task.Exception != null)
+                    {
+                        foreach (var innerEx in task.Exception.InnerExceptions)
+                        {
+                            _logger.LogError(innerEx, "Error sending duress network alert");
+                        }
+                    }
+                }
             }
 
             // Grant access silently to avoid suspicion

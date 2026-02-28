@@ -19,7 +19,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
         public override string SemanticDescription => "Connects to ZeroMQ using TCP socket for high-performance asynchronous messaging.";
         public override string[] Tags => new[] { "zeromq", "zmq", "messaging", "tcp", "high-performance" };
         public ZeroMqConnectionStrategy(ILogger? logger = null) : base(logger) { }
-        protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct) { var parts = config.ConnectionString.Split(':'); var host = parts[0]; var port = parts.Length > 1 ? int.Parse(parts[1]) : 5555; var tcpClient = new TcpClient(); await tcpClient.ConnectAsync(host, port, ct); return new DefaultConnectionHandle(tcpClient, new Dictionary<string, object> { ["Host"] = host, ["Port"] = port }); }
+        protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct) { var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':'); var host = parts[0]; var port = parts.Length > 1 ? int.Parse(parts[1]) : 5555; var tcpClient = new TcpClient(); await tcpClient.ConnectAsync(host, port, ct); return new DefaultConnectionHandle(tcpClient, new Dictionary<string, object> { ["Host"] = host, ["Port"] = port }); }
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { try { return handle.GetConnection<TcpClient>()?.Connected ?? false; } catch { return false; } }
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<TcpClient>()?.Close(); await Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, isHealthy ? "ZeroMQ is connected" : "ZeroMQ is disconnected", sw.Elapsed, DateTimeOffset.UtcNow); }
@@ -75,30 +75,54 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
 
         private static async Task WriteZmqFrame(NetworkStream stream, byte[] data, bool hasMore, CancellationToken ct)
         {
-            var moreFlag = (byte)(hasMore ? 0x01 : 0x00);
-            var size = (ulong)data.Length;
-            await stream.WriteAsync(new[] { moreFlag }, 0, 1, ct);
-            var sizeBytes = BitConverter.GetBytes(size);
-            if (BitConverter.IsLittleEndian) Array.Reverse(sizeBytes);
-            await stream.WriteAsync(sizeBytes, 0, 8, ct);
+            // ZMTP 3.x: use short frame format (flags + 1-byte size) for frames <= 255 bytes
+            if (data.Length <= 255)
+            {
+                var flags = (byte)(hasMore ? 0x01 : 0x00);
+                await stream.WriteAsync(new[] { flags, (byte)data.Length }, 0, 2, ct);
+            }
+            else
+            {
+                // Long frame format: flags | 0x02 + 8-byte size
+                var flags = (byte)((hasMore ? 0x01 : 0x00) | 0x02);
+                var sizeBytes = BitConverter.GetBytes((long)data.Length);
+                if (BitConverter.IsLittleEndian) Array.Reverse(sizeBytes);
+                await stream.WriteAsync(new[] { flags }, 0, 1, ct);
+                await stream.WriteAsync(sizeBytes, 0, 8, ct);
+            }
             await stream.WriteAsync(data, 0, data.Length, ct);
         }
 
         private static async Task<(byte[]? Frame, bool HasMore)> ReadZmqFrame(NetworkStream stream, CancellationToken ct)
         {
-            var header = new byte[9];
-            var read = await stream.ReadAsync(header, 0, 9, ct);
-            if (read < 9) return (null, false);
-            var hasMore = header[0] == 0x01;
-            var sizeBytes = header[1..9];
-            if (BitConverter.IsLittleEndian) Array.Reverse(sizeBytes);
-            var size = BitConverter.ToUInt64(sizeBytes, 0);
-            if (size > 10 * 1024 * 1024) return (null, false);
-            var frame = new byte[size];
-            var totalRead = 0;
-            while (totalRead < (int)size)
+            var flagBuf = new byte[1];
+            var read = await stream.ReadAsync(flagBuf, 0, 1, ct);
+            if (read < 1) return (null, false);
+            var flags = flagBuf[0];
+            var hasMore = (flags & 0x01) != 0;
+            var isLong = (flags & 0x02) != 0;
+            int frameSize;
+            if (isLong)
             {
-                var chunk = await stream.ReadAsync(frame, totalRead, (int)size - totalRead, ct);
+                var sizeBytes = new byte[8];
+                read = await stream.ReadAsync(sizeBytes, 0, 8, ct);
+                if (read < 8) return (null, false);
+                if (BitConverter.IsLittleEndian) Array.Reverse(sizeBytes);
+                frameSize = (int)BitConverter.ToInt64(sizeBytes);
+            }
+            else
+            {
+                var sizeBuf = new byte[1];
+                read = await stream.ReadAsync(sizeBuf, 0, 1, ct);
+                if (read < 1) return (null, false);
+                frameSize = sizeBuf[0];
+            }
+            if (frameSize > 10 * 1024 * 1024) return (null, false);
+            var frame = new byte[frameSize];
+            var totalRead = 0;
+            while (totalRead < frameSize)
+            {
+                var chunk = await stream.ReadAsync(frame, totalRead, frameSize - totalRead, ct);
                 if (chunk == 0) break;
                 totalRead += chunk;
             }

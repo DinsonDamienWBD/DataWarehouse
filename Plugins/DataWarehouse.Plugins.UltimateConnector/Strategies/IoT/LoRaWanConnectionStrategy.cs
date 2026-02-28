@@ -32,7 +32,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var parts = config.ConnectionString.Split(':');
+            var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':');
             var host = parts[0];
             var port = parts.Length > 1 ? int.Parse(parts[1]) : 1700;
             var client = new TcpClient();
@@ -175,7 +175,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
             if (!_devices.TryGetValue(devEui, out var device))
                 return new LoRaUplinkResult { Success = false, Reason = "Device not registered" };
 
-            device.FrameCounterUp++;
+            lock (device) { device.FrameCounterUp++; }
             device.LastRssi = rssi;
             device.LastSnr = snr;
             device.DataRate = dataRate;

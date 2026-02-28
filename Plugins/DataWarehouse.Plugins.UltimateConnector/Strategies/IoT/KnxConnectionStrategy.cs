@@ -23,7 +23,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var parts = config.ConnectionString.Split(':');
+            var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':');
             var client = new UdpClient();
             client.Connect(parts[0], parts.Length > 1 ? int.Parse(parts[1]) : 3671);
             await Task.Delay(10, ct);

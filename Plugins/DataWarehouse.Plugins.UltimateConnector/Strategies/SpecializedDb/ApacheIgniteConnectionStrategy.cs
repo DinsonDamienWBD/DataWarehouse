@@ -25,7 +25,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             response.EnsureSuccessStatusCode();
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object> { ["host"] = host, ["port"] = port });
         }
-        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { if (_httpClient == null) return false; try { var response = await _httpClient.GetAsync("/ignite?cmd=version", ct); return response.IsSuccessStatusCode; } catch { return false; } }
+        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { if (_httpClient == null) return false; try { using var response = await _httpClient.GetAsync("/ignite?cmd=version", ct); return response.IsSuccessStatusCode; } catch { return false; } }
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { _httpClient?.Dispose(); _httpClient = null; await Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var isHealthy = await TestCoreAsync(handle, ct); return new ConnectionHealth(isHealthy, isHealthy ? "Ignite healthy" : "Ignite unhealthy", TimeSpan.FromMilliseconds(8), DateTimeOffset.UtcNow); }
         public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
@@ -34,7 +34,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             try
             {
                 var encodedQuery = Uri.EscapeDataString(query);
-                using var response = await _httpClient.GetAsync($"/ignite?cmd=qryfldexe&pageSize=1000&qry={encodedQuery}", ct);
+                using var response = await _httpClient.GetAsync($"/ignite?cmd=qryfld&cacheName=" + Uri.EscapeDataString(parameters?.GetValueOrDefault("cacheName")?.ToString() ?? "default") + "&exe&pageSize=1000&qry={encodedQuery}", ct);
                 if (!response.IsSuccessStatusCode) return new List<Dictionary<string, object?>>();
                 var json = await response.Content.ReadAsStringAsync(ct);
                 using var doc = System.Text.Json.JsonDocument.Parse(json);
@@ -59,7 +59,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             try
             {
                 var encodedCmd = Uri.EscapeDataString(command);
-                using var response = await _httpClient.GetAsync($"/ignite?cmd=qryfldexe&qry={encodedCmd}", ct);
+                using var response = await _httpClient.GetAsync($"/ignite?cmd=qryfld&cacheName=" + Uri.EscapeDataString(parameters?.GetValueOrDefault("cacheName")?.ToString() ?? "default") + "&exe&qry={encodedCmd}", ct);
                 return response.IsSuccessStatusCode ? 1 : 0;
             }
             catch { return 0; /* Operation failed - return zero */ }

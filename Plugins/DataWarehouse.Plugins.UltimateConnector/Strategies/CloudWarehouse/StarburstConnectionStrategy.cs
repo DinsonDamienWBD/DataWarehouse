@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
 {
     public class StarburstConnectionStrategy : DatabaseConnectionStrategyBase
     {
-        private HttpClient? _httpClient;
+        private volatile HttpClient? _httpClient;
         public override string StrategyId => "starburst";
         public override string DisplayName => "Starburst";
         public override string SemanticDescription => "Analytics engine based on Trino/Presto for querying data across multiple sources";

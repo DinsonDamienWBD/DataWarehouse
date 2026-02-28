@@ -117,18 +117,21 @@ protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessCont
                 _logger.LogInformation("Statistical threat prediction: {PredictedLevel}", predictedThreatLevel);
             }
 
-            // Record event
-            history.Add(new ThreatEvent
+            // Record event (synchronized since list is shared across concurrent calls)
+            lock (history)
             {
-                Timestamp = DateTime.UtcNow,
-                ThreatLevel = predictedThreatLevel,
-                Source = analysisSource
-            });
+                history.Add(new ThreatEvent
+                {
+                    Timestamp = DateTime.UtcNow,
+                    ThreatLevel = predictedThreatLevel,
+                    Source = analysisSource
+                });
 
-            // Prune old events
-            if (history.Count > 1000)
-            {
-                history.RemoveRange(0, history.Count - 1000);
+                // Prune old events
+                if (history.Count > 1000)
+                {
+                    history.RemoveRange(0, history.Count - 1000);
+                }
             }
 
             var threatThreshold = Configuration.TryGetValue("predictive_threat_threshold", out var threshold) && threshold is double t ? t : 0.6;

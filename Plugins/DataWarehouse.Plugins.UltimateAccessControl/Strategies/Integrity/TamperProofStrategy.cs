@@ -124,31 +124,36 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
         /// <summary>
         /// Appends a new block to the chain.
         /// </summary>
+        private readonly object _appendBlockLock = new();
+
         public TamperProofBlock AppendBlock(string chainId, string data)
         {
-            if (!_chains.TryGetValue(chainId, out var chain))
-                throw new InvalidOperationException($"Chain {chainId} does not exist");
-
-            var lastBlock = chain.Blocks[^1];
-            var newBlock = new TamperProofBlock
+            lock (_appendBlockLock)
             {
-                Index = lastBlock.Index + 1,
-                Timestamp = DateTime.UtcNow,
-                Data = data,
-                PreviousHash = lastBlock.Hash,
-                Hash = Array.Empty<byte>()
-            };
+                if (!_chains.TryGetValue(chainId, out var chain))
+                    throw new InvalidOperationException($"Chain {chainId} does not exist");
 
-            newBlock = newBlock with { Hash = ComputeBlockHash(newBlock) };
+                var lastBlock = chain.Blocks[^1];
+                var newBlock = new TamperProofBlock
+                {
+                    Index = lastBlock.Index + 1,
+                    Timestamp = DateTime.UtcNow,
+                    Data = data,
+                    PreviousHash = lastBlock.Hash,
+                    Hash = Array.Empty<byte>()
+                };
 
-            // Create new chain with appended block
-            var updatedChain = chain with
-            {
-                Blocks = chain.Blocks.Concat(new[] { newBlock }).ToList()
-            };
+                newBlock = newBlock with { Hash = ComputeBlockHash(newBlock) };
 
-            _chains[chainId] = updatedChain;
-            return newBlock;
+                // Create new chain with appended block
+                var updatedChain = chain with
+                {
+                    Blocks = chain.Blocks.Concat(new[] { newBlock }).ToList()
+                };
+
+                _chains[chainId] = updatedChain;
+                return newBlock;
+            }
         }
 
         /// <summary>

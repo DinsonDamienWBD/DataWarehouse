@@ -105,8 +105,9 @@ protected override async Task<AccessDecision> EvaluateAccessCoreAsync(
                     };
                 }
 
-                // Check max attempts
-                if (session.AttemptsUsed >= MaxAttemptsPerSession)
+                // Atomically check and increment attempts to prevent concurrent bypass
+                var currentAttempts = Interlocked.Increment(ref session.AttemptsUsed);
+                if (currentAttempts > MaxAttemptsPerSession)
                 {
                     _activeSessions.TryRemove(context.SubjectId, out _);
                     return new AccessDecision
@@ -116,9 +117,6 @@ protected override async Task<AccessDecision> EvaluateAccessCoreAsync(
                         ApplicablePolicies = new[] { "email-otp-max-attempts" }
                     };
                 }
-
-                // Increment attempts
-                session.AttemptsUsed++;
 
                 // Validate code (constant-time comparison)
                 if (ConstantTimeEquals(code, session.Code))
@@ -247,7 +245,12 @@ protected override async Task<AccessDecision> EvaluateAccessCoreAsync(
             var now = DateTime.UtcNow;
             var windowStart = now.AddMinutes(-RateLimitPeriodMinutes);
 
-            if (_rateLimits.TryGetValue(userId, out var rateLimitData))
+            var rateLimitData = _rateLimits.GetOrAdd(userId, _ => new RateLimitData
+            {
+                Timestamps = new List<DateTime>()
+            });
+
+            lock (rateLimitData.Timestamps)
             {
                 // Remove expired timestamps
                 rateLimitData.Timestamps.RemoveAll(t => t < windowStart);
@@ -260,14 +263,6 @@ protected override async Task<AccessDecision> EvaluateAccessCoreAsync(
 
                 // Add current timestamp
                 rateLimitData.Timestamps.Add(now);
-            }
-            else
-            {
-                // Create new rate limit data
-                _rateLimits[userId] = new RateLimitData
-                {
-                    Timestamps = new List<DateTime> { now }
-                };
             }
 
             return true;
@@ -397,7 +392,7 @@ Do not share this code with anyone.
             public required string EmailAddress { get; init; }
             public required DateTime CreatedAt { get; init; }
             public required DateTime ExpiresAt { get; init; }
-            public int AttemptsUsed { get; set; }
+            public int AttemptsUsed;
         }
 
         /// <summary>

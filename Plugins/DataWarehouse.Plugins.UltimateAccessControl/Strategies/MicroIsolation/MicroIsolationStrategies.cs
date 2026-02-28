@@ -174,17 +174,19 @@ public sealed class PerFileIsolationStrategy : AccessControlStrategyBase
             throw new InvalidOperationException($"File '{fileId}' is not isolated");
         }
 
-        using var aes = Aes.Create();
-        aes.Key = context.FileKey;
-        aes.GenerateIV();
+        // Use AES-GCM for authenticated encryption (prevents padding oracle attacks)
+        using var aesGcm = new AesGcm(context.FileKey, AesGcm.TagByteSizes.MaxSize);
+        var nonce = RandomNumberGenerator.GetBytes(AesGcm.NonceByteSizes.MaxSize);
+        var ciphertext = new byte[data.Length];
+        var tag = new byte[AesGcm.TagByteSizes.MaxSize];
 
-        using var encryptor = aes.CreateEncryptor();
-        var encrypted = encryptor.TransformFinalBlock(data, 0, data.Length);
+        aesGcm.Encrypt(nonce, data, ciphertext, tag);
 
-        // Prepend IV
-        var result = new byte[aes.IV.Length + encrypted.Length];
-        Buffer.BlockCopy(aes.IV, 0, result, 0, aes.IV.Length);
-        Buffer.BlockCopy(encrypted, 0, result, aes.IV.Length, encrypted.Length);
+        // Format: nonce + tag + ciphertext
+        var result = new byte[nonce.Length + tag.Length + ciphertext.Length];
+        Buffer.BlockCopy(nonce, 0, result, 0, nonce.Length);
+        Buffer.BlockCopy(tag, 0, result, nonce.Length, tag.Length);
+        Buffer.BlockCopy(ciphertext, 0, result, nonce.Length + tag.Length, ciphertext.Length);
 
         return await Task.FromResult(result);
     }
@@ -199,21 +201,28 @@ public sealed class PerFileIsolationStrategy : AccessControlStrategyBase
             throw new InvalidOperationException($"File '{fileId}' is not isolated");
         }
 
-        using var aes = Aes.Create();
-        aes.Key = context.FileKey;
+        var nonceSize = AesGcm.NonceByteSizes.MaxSize;
+        var tagSize = AesGcm.TagByteSizes.MaxSize;
+        var minLength = nonceSize + tagSize;
 
-        // Extract IV
-        var iv = new byte[16];
-        Buffer.BlockCopy(encryptedData, 0, iv, 0, 16);
-        aes.IV = iv;
+        if (encryptedData.Length < minLength)
+        {
+            throw new ArgumentException($"Encrypted data too short (minimum {minLength} bytes required)");
+        }
 
-        var ciphertext = new byte[encryptedData.Length - 16];
-        Buffer.BlockCopy(encryptedData, 16, ciphertext, 0, ciphertext.Length);
+        var nonce = new byte[nonceSize];
+        var tag = new byte[tagSize];
+        var ciphertext = new byte[encryptedData.Length - minLength];
 
-        using var decryptor = aes.CreateDecryptor();
-        var decrypted = decryptor.TransformFinalBlock(ciphertext, 0, ciphertext.Length);
+        Buffer.BlockCopy(encryptedData, 0, nonce, 0, nonceSize);
+        Buffer.BlockCopy(encryptedData, nonceSize, tag, 0, tagSize);
+        Buffer.BlockCopy(encryptedData, minLength, ciphertext, 0, ciphertext.Length);
 
-        return await Task.FromResult(decrypted);
+        using var aesGcm = new AesGcm(context.FileKey, AesGcm.TagByteSizes.MaxSize);
+        var plaintext = new byte[ciphertext.Length];
+        aesGcm.Decrypt(nonce, ciphertext, tag, plaintext);
+
+        return await Task.FromResult(plaintext);
     }
 
     private FileIsolationContext CreateFileIsolationContext(string fileId)
@@ -483,19 +492,20 @@ public sealed class SgxEnclaveStrategy : AccessControlStrategyBase
         // Derive sealing key from enclave measurement
         var sealingKey = DeriveSealingKey(enclave);
 
-        using var aes = Aes.Create();
-        aes.Key = sealingKey;
-        aes.GenerateIV();
+        // Use AES-GCM for authenticated encryption
+        using var aesGcm = new AesGcm(sealingKey, AesGcm.TagByteSizes.MaxSize);
+        var nonce = RandomNumberGenerator.GetBytes(AesGcm.NonceByteSizes.MaxSize);
+        var ciphertext = new byte[data.Length];
+        var tag = new byte[AesGcm.TagByteSizes.MaxSize];
+        aesGcm.Encrypt(nonce, data, ciphertext, tag);
 
-        using var encryptor = aes.CreateEncryptor();
-        var encrypted = encryptor.TransformFinalBlock(data, 0, data.Length);
-
-        // Format: EnclaveId (32) + IV (16) + Ciphertext
-        var enclaveIdBytes = Encoding.UTF8.GetBytes(enclaveId.PadRight(32).Substring(0, 32));
-        var result = new byte[32 + 16 + encrypted.Length];
+        // Format: EnclaveId hash (32) + nonce (12) + tag (16) + Ciphertext
+        var enclaveIdBytes = SHA256.HashData(Encoding.UTF8.GetBytes(enclaveId));
+        var result = new byte[32 + nonce.Length + tag.Length + ciphertext.Length];
         Buffer.BlockCopy(enclaveIdBytes, 0, result, 0, 32);
-        Buffer.BlockCopy(aes.IV, 0, result, 32, 16);
-        Buffer.BlockCopy(encrypted, 0, result, 48, encrypted.Length);
+        Buffer.BlockCopy(nonce, 0, result, 32, nonce.Length);
+        Buffer.BlockCopy(tag, 0, result, 32 + nonce.Length, tag.Length);
+        Buffer.BlockCopy(ciphertext, 0, result, 32 + nonce.Length + tag.Length, ciphertext.Length);
 
         var sealedId = $"sealed:{enclaveId}:{Guid.NewGuid():N}";
         _sealedData[sealedId] = result;
@@ -513,36 +523,57 @@ public sealed class SgxEnclaveStrategy : AccessControlStrategyBase
             throw new InvalidOperationException($"Enclave '{enclaveId}' not found");
         }
 
-        // Verify enclave ID matches
-        var embeddedEnclaveId = Encoding.UTF8.GetString(sealedData, 0, 32).Trim();
-        if (embeddedEnclaveId != enclaveId)
+        var nonceSize = AesGcm.NonceByteSizes.MaxSize; // 12
+        var tagSize = AesGcm.TagByteSizes.MaxSize; // 16
+        var headerSize = 32 + nonceSize + tagSize; // 60
+
+        if (sealedData.Length < headerSize)
+        {
+            throw new ArgumentException($"Sealed data too short (minimum {headerSize} bytes required)");
+        }
+
+        // Verify enclave ID hash matches
+        var expectedIdHash = SHA256.HashData(Encoding.UTF8.GetBytes(enclaveId));
+        var embeddedIdHash = new byte[32];
+        Buffer.BlockCopy(sealedData, 0, embeddedIdHash, 0, 32);
+        if (!CryptographicOperations.FixedTimeEquals(embeddedIdHash, expectedIdHash))
         {
             throw new InvalidOperationException("Sealed data does not belong to this enclave");
         }
 
         var sealingKey = DeriveSealingKey(enclave);
 
-        using var aes = Aes.Create();
-        aes.Key = sealingKey;
+        var nonce = new byte[nonceSize];
+        var tag = new byte[tagSize];
+        Buffer.BlockCopy(sealedData, 32, nonce, 0, nonceSize);
+        Buffer.BlockCopy(sealedData, 32 + nonceSize, tag, 0, tagSize);
 
-        var iv = new byte[16];
-        Buffer.BlockCopy(sealedData, 32, iv, 0, 16);
-        aes.IV = iv;
+        var ciphertext = new byte[sealedData.Length - headerSize];
+        Buffer.BlockCopy(sealedData, headerSize, ciphertext, 0, ciphertext.Length);
 
-        var ciphertext = new byte[sealedData.Length - 48];
-        Buffer.BlockCopy(sealedData, 48, ciphertext, 0, ciphertext.Length);
+        using var aesGcm = new AesGcm(sealingKey, AesGcm.TagByteSizes.MaxSize);
+        var plaintext = new byte[ciphertext.Length];
+        aesGcm.Decrypt(nonce, ciphertext, tag, plaintext);
 
-        using var decryptor = aes.CreateDecryptor();
-        var decrypted = decryptor.TransformFinalBlock(ciphertext, 0, ciphertext.Length);
-
-        return await Task.FromResult(decrypted);
+        return await Task.FromResult(plaintext);
     }
 
     private bool CheckSgxAvailability()
     {
-        // In real implementation, check for SGX support
-        // For simulation, return true
-        return true;
+        // Check for SGX support via CPUID (leaf 0x12)
+        // On Linux: check /dev/sgx_enclave or /dev/isgx
+        // On Windows: check for SGX driver
+        if (OperatingSystem.IsLinux())
+        {
+            return System.IO.Directory.Exists("/dev/sgx") ||
+                   System.IO.File.Exists("/dev/sgx_enclave") ||
+                   System.IO.File.Exists("/dev/isgx");
+        }
+        if (OperatingSystem.IsWindows())
+        {
+            return System.IO.File.Exists(@"C:\Windows\System32\drivers\sgx_lc_msr.sys");
+        }
+        return false;
     }
 
     private string GenerateAttestationToken(SgxEnclaveContext enclave)
@@ -553,8 +584,13 @@ public sealed class SgxEnclaveStrategy : AccessControlStrategyBase
 
     private byte[] DeriveSealingKey(SgxEnclaveContext enclave)
     {
-        var keyMaterial = $"sgx-seal:{enclave.EnclaveId}:{enclave.MeasurementHash}";
-        return SHA256.HashData(Encoding.UTF8.GetBytes(keyMaterial));
+        // Use HKDF with salt for proper key derivation (not bare SHA-256)
+        var ikm = Encoding.UTF8.GetBytes($"sgx-seal:{enclave.EnclaveId}:{enclave.MeasurementHash}");
+        var salt = SHA256.HashData(Encoding.UTF8.GetBytes($"sgx-salt:{enclave.EnclaveId}"));
+        var info = Encoding.UTF8.GetBytes("sgx-sealing-key-v1");
+        var derivedKey = System.Security.Cryptography.HKDF.DeriveKey(
+            System.Security.Cryptography.HashAlgorithmName.SHA256, ikm, 32, salt, info);
+        return derivedKey;
     }
 }
 
@@ -760,16 +796,18 @@ public sealed class TpmBindingStrategy : AccessControlStrategyBase
             throw new InvalidOperationException($"Resource '{resourceId}' not TPM-bound");
         }
 
-        using var aes = Aes.Create();
-        aes.Key = resource.SealingKey;
-        aes.GenerateIV();
+        // Use AES-GCM for authenticated encryption
+        using var aesGcm = new AesGcm(resource.SealingKey, AesGcm.TagByteSizes.MaxSize);
+        var nonce = RandomNumberGenerator.GetBytes(AesGcm.NonceByteSizes.MaxSize);
+        var ciphertext = new byte[data.Length];
+        var tag = new byte[AesGcm.TagByteSizes.MaxSize];
+        aesGcm.Encrypt(nonce, data, ciphertext, tag);
 
-        using var encryptor = aes.CreateEncryptor();
-        var encrypted = encryptor.TransformFinalBlock(data, 0, data.Length);
-
-        var result = new byte[aes.IV.Length + encrypted.Length];
-        Buffer.BlockCopy(aes.IV, 0, result, 0, aes.IV.Length);
-        Buffer.BlockCopy(encrypted, 0, result, aes.IV.Length, encrypted.Length);
+        // Format: nonce + tag + ciphertext
+        var result = new byte[nonce.Length + tag.Length + ciphertext.Length];
+        Buffer.BlockCopy(nonce, 0, result, 0, nonce.Length);
+        Buffer.BlockCopy(tag, 0, result, nonce.Length, tag.Length);
+        Buffer.BlockCopy(ciphertext, 0, result, nonce.Length + tag.Length, ciphertext.Length);
 
         return await Task.FromResult(result);
     }
@@ -794,26 +832,44 @@ public sealed class TpmBindingStrategy : AccessControlStrategyBase
             }
         }
 
-        using var aes = Aes.Create();
-        aes.Key = resource.SealingKey;
+        var nonceSize = AesGcm.NonceByteSizes.MaxSize;
+        var tagSize = AesGcm.TagByteSizes.MaxSize;
+        var minLength = nonceSize + tagSize;
 
-        var iv = new byte[16];
-        Buffer.BlockCopy(sealedData, 0, iv, 0, 16);
-        aes.IV = iv;
+        if (sealedData.Length < minLength)
+        {
+            throw new ArgumentException($"Sealed data too short (minimum {minLength} bytes required)");
+        }
 
-        var ciphertext = new byte[sealedData.Length - 16];
-        Buffer.BlockCopy(sealedData, 16, ciphertext, 0, ciphertext.Length);
+        var nonce = new byte[nonceSize];
+        var tag = new byte[tagSize];
+        Buffer.BlockCopy(sealedData, 0, nonce, 0, nonceSize);
+        Buffer.BlockCopy(sealedData, nonceSize, tag, 0, tagSize);
 
-        using var decryptor = aes.CreateDecryptor();
-        var decrypted = decryptor.TransformFinalBlock(ciphertext, 0, ciphertext.Length);
+        var ciphertext = new byte[sealedData.Length - minLength];
+        Buffer.BlockCopy(sealedData, minLength, ciphertext, 0, ciphertext.Length);
 
-        return await Task.FromResult(decrypted);
+        using var aesGcm = new AesGcm(resource.SealingKey, AesGcm.TagByteSizes.MaxSize);
+        var plaintext = new byte[ciphertext.Length];
+        aesGcm.Decrypt(nonce, ciphertext, tag, plaintext);
+
+        return await Task.FromResult(plaintext);
     }
 
     private bool CheckTpmAvailability()
     {
-        // In real implementation, check for TPM 2.0 availability
-        return true;
+        // Check for TPM 2.0 availability
+        if (OperatingSystem.IsLinux())
+        {
+            return System.IO.Directory.Exists("/sys/class/tpm") ||
+                   System.IO.File.Exists("/dev/tpm0") ||
+                   System.IO.File.Exists("/dev/tpmrm0");
+        }
+        if (OperatingSystem.IsWindows())
+        {
+            return System.IO.File.Exists(@"C:\Windows\System32\tpm.sys");
+        }
+        return false;
     }
 
     private byte[] GenerateTpmSealingKey()
@@ -823,11 +879,29 @@ public sealed class TpmBindingStrategy : AccessControlStrategyBase
 
     private Dictionary<int, byte[]> GetCurrentPcrValues()
     {
-        // Simulate PCR values (in real impl, read from TPM)
+        // Read PCR values from TPM if available
+        // On Linux: read from /sys/class/tpm/tpm0/pcr-sha256/
+        if (OperatingSystem.IsLinux())
+        {
+            var pcrValues = new Dictionary<int, byte[]>();
+            foreach (var pcrIndex in new[] { 0, 7 })
+            {
+                var pcrPath = $"/sys/class/tpm/tpm0/pcr-sha256/{pcrIndex}";
+                if (System.IO.File.Exists(pcrPath))
+                {
+                    var hexValue = System.IO.File.ReadAllText(pcrPath).Trim();
+                    pcrValues[pcrIndex] = Convert.FromHexString(hexValue);
+                }
+            }
+            if (pcrValues.Count > 0) return pcrValues;
+        }
+
+        // Fallback: compute deterministic machine-specific PCR approximation
+        var machineId = $"{Environment.MachineName}:{Environment.OSVersion}:{Environment.ProcessorCount}";
         return new Dictionary<int, byte[]>
         {
-            [0] = SHA256.HashData(Encoding.UTF8.GetBytes("pcr0-value")),
-            [7] = SHA256.HashData(Encoding.UTF8.GetBytes("pcr7-value"))
+            [0] = SHA256.HashData(Encoding.UTF8.GetBytes($"pcr0:{machineId}")),
+            [7] = SHA256.HashData(Encoding.UTF8.GetBytes($"pcr7:{machineId}"))
         };
     }
 
@@ -1053,16 +1127,17 @@ public sealed class ConfidentialComputingStrategy : AccessControlStrategyBase
             throw new InvalidOperationException("Context must be attested before encryption");
         }
 
-        using var aes = Aes.Create();
-        aes.Key = context.EncryptionKey;
-        aes.GenerateIV();
+        // Use AES-GCM for authenticated encryption
+        using var aesGcm = new AesGcm(context.EncryptionKey, AesGcm.TagByteSizes.MaxSize);
+        var nonce = RandomNumberGenerator.GetBytes(AesGcm.NonceByteSizes.MaxSize);
+        var ciphertext = new byte[data.Length];
+        var tag = new byte[AesGcm.TagByteSizes.MaxSize];
+        aesGcm.Encrypt(nonce, data, ciphertext, tag);
 
-        using var encryptor = aes.CreateEncryptor();
-        var encrypted = encryptor.TransformFinalBlock(data, 0, data.Length);
-
-        var result = new byte[aes.IV.Length + encrypted.Length];
-        Buffer.BlockCopy(aes.IV, 0, result, 0, aes.IV.Length);
-        Buffer.BlockCopy(encrypted, 0, result, aes.IV.Length, encrypted.Length);
+        var result = new byte[nonce.Length + tag.Length + ciphertext.Length];
+        Buffer.BlockCopy(nonce, 0, result, 0, nonce.Length);
+        Buffer.BlockCopy(tag, 0, result, nonce.Length, tag.Length);
+        Buffer.BlockCopy(ciphertext, 0, result, nonce.Length + tag.Length, ciphertext.Length);
 
         return await Task.FromResult(result);
     }
