@@ -346,9 +346,11 @@ public static class SecurityRules
         RegexOptions.Compiled,
         TimeSpan.FromMilliseconds(100));
 
-    // Command injection patterns
+    // Command injection patterns — deliberately excludes SQL-safe characters (';', '|', '&')
+    // to avoid false positives on legitimate SQL input (finding 701).
+    // Detection focuses on shell metacharacters and OS command execution functions.
     private static readonly Regex CommandInjectionPattern = new(
-        @"([;&|`$]|\$\(|`.*`|\|{1,2}|>{1,2}|<{1,2}|\beval\b|\bexec\b|\bsystem\b|\bshell_exec\b)",
+        @"(`|\$\(|`[^`]*`|>{1,2}|<{1,2}|\beval\b|\bshell_exec\b|\bpassthru\b|\bpopen\b)",
         RegexOptions.IgnoreCase | RegexOptions.Compiled,
         TimeSpan.FromMilliseconds(100));
 

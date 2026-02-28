@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts;
@@ -27,6 +28,23 @@ namespace DataWarehouse.SDK.Tags
         {
             ArgumentNullException.ThrowIfNull(schema);
             ArgumentException.ThrowIfNullOrWhiteSpace(schema.SchemaId);
+
+            // Validate that any Pattern constraints are syntactically valid regexes at registration time
+            // so consumers don't encounter ArgumentException at query time (finding 682).
+            foreach (var version in schema.Versions)
+            {
+                var pattern = version.Constraints.Pattern;
+                if (pattern is not null)
+                {
+                    try { _ = new Regex(pattern, RegexOptions.None, TimeSpan.FromSeconds(1)); }
+                    catch (ArgumentException ex)
+                    {
+                        throw new ArgumentException(
+                            $"TagSchema '{schema.SchemaId}' version '{version.Version}' has an invalid Pattern regex: {ex.Message}",
+                            nameof(schema), ex);
+                    }
+                }
+            }
 
             if (!_schemas.TryAdd(schema.SchemaId, schema))
             {

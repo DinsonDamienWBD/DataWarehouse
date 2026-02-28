@@ -310,13 +310,11 @@ protected override async Task<AccessDecision> EvaluateAccessCoreAsync(
         /// </summary>
         private double ComputeSimilarity(byte[] template1, byte[] template2)
         {
+            // Templates of different lengths represent fundamentally incompatible biometric data;
+            // truncating one template produces a misleading (inflated) similarity score, so we
+            // return 0 to ensure authentication fails rather than granting access on a bad match.
             if (template1.Length != template2.Length)
-            {
-                // Different length templates - resize to smaller length
-                var minLength = Math.Min(template1.Length, template2.Length);
-                template1 = template1.Take(minLength).ToArray();
-                template2 = template2.Take(minLength).ToArray();
-            }
+                return 0.0;
 
             // Compute Hamming distance
             int matchingBits = 0;

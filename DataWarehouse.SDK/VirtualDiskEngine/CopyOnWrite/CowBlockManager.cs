@@ -287,6 +287,8 @@ public sealed class CowBlockManager : ICowEngine
 
     /// <summary>
     /// Encodes a block number as a B-Tree key (8-byte big-endian for correct ordering).
+    /// NOTE (P2-781): allocates 8 bytes per call. B-tree Lookup/Insert/Update APIs require byte[]
+    /// (cannot accept Span or ArrayPool<byte> without API changes). Acceptable cost for correctness.
     /// </summary>
     private static byte[] EncodeBlockNumberKey(long blockNumber)
     {

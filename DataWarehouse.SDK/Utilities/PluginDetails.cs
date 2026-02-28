@@ -282,8 +282,9 @@ namespace DataWarehouse.SDK.Utilities
             if (type == typeof(Dictionary<string, object>))
                 return true;
 
-            // Allow IReadOnlyList<string> and similar
-            if (value is IReadOnlyList<string> || value is IEnumerable<string>)
+            // Allow known-safe string collection types only — not arbitrary IEnumerable<string>
+            // implementations that could carry arbitrary state (finding P2-684).
+            if (value is string[] || value is List<string> || value is IReadOnlyList<string>)
                 return true;
 
             return false;

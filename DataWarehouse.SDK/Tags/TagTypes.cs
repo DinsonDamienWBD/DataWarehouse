@@ -153,11 +153,12 @@ public sealed class TagCollection : IEnumerable<Tag>
     public Tag? Get(string ns, string name) => this[new TagKey(ns, name)];
 
     /// <summary>
-    /// Returns all tags in the specified namespace (case-insensitive match).
+    /// Returns all tags in the specified namespace (ordinal case-sensitive match,
+    /// consistent with <see cref="TagKey"/> equality semantics).
     /// </summary>
     /// <param name="ns">The namespace to filter by.</param>
     public IEnumerable<Tag> GetByNamespace(string ns) =>
-        _tags.Values.Where(t => t.Key.Namespace.Equals(ns, StringComparison.OrdinalIgnoreCase));
+        _tags.Values.Where(t => t.Key.Namespace.Equals(ns, StringComparison.Ordinal));
 
     /// <summary>
     /// Returns all tags whose source matches the specified <see cref="TagSource"/> flags.

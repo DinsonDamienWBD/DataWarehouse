@@ -181,11 +181,10 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
             if (context.Action.Equals("write", StringComparison.OrdinalIgnoreCase) ||
                 context.Action.Equals("delete", StringComparison.OrdinalIgnoreCase))
             {
-                // Record modification attempt
-                _records[context.ResourceId] = record with
-                {
-                    ModificationAttempts = record.ModificationAttempts + 1
-                };
+                // Record modification attempt (update first, then check and report updated count)
+                var updatedAttempts = record.ModificationAttempts + 1;
+                var updatedRecord = record with { ModificationAttempts = updatedAttempts };
+                _records[context.ResourceId] = updatedRecord;
 
                 var canModify = CanModify(context.ResourceId);
 
@@ -204,7 +203,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
                             ["WormStatus"] = "Protected",
                             ["ExpiresAt"] = record.ExpiresAt,
                             ["LegalHoldActive"] = record.LegalHoldActive,
-                            ["ModificationAttempts"] = record.ModificationAttempts
+                            ["ModificationAttempts"] = updatedAttempts
                         }
                     };
                 }

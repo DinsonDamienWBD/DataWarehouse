@@ -472,7 +472,11 @@ public sealed class InvertedTagIndex : ITagIndex, IDisposable
     }
 
     /// <summary>
-    /// Collects all object keys across all shards (used for NotExists).
+    /// Collects all object keys across all shards (used for NotExists filter).
+    /// NOTE (P2-666): NotExists requires scanning all shards because inverted indexes track
+    /// "which objects have this tag", not "which objects exist". For deployments with millions
+    /// of objects, consider maintaining a forward index (objectId → tags) alongside this
+    /// inverted index to make NotExists O(1) per tag.
     /// </summary>
     private void CollectAllObjectKeys(HashSet<string> results)
     {
