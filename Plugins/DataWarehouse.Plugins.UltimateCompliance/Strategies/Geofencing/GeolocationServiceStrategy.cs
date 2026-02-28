@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
@@ -587,10 +588,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
                 _reader?.Dispose();
                 _reader = new MaxMind.GeoIP2.DatabaseReader(_databasePath);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // Log error: Failed to initialize MaxMind database reader
                 _reader = null;
+                System.Diagnostics.Debug.WriteLine(
+                    $"[MaxMindProvider] Failed to initialize GeoIP2 database reader from '{_databasePath}': {ex.GetType().Name}: {ex.Message}");
+                throw new InvalidOperationException(
+                    $"MaxMind GeoIP2 database initialization failed for path '{_databasePath}'. " +
+                    "Ensure the .mmdb file exists, is not corrupted, and is a supported format.", ex);
             }
         }
 
@@ -659,9 +664,11 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
     /// <summary>
     /// ipstack API provider implementation.
     /// </summary>
-    internal sealed class IpStackProvider : IGeolocationProvider
+    internal sealed class IpStackProvider : IGeolocationProvider, IDisposable
     {
         private string? _apiKey;
+        private HttpClient? _httpClient;
+        private bool _disposed;
 
         public string ProviderName => "ipstack";
         public bool IsEnabled { get; set; } = false; // Disabled by default, requires API key
@@ -672,6 +679,13 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
             {
                 _apiKey = key;
                 IsEnabled = !string.IsNullOrWhiteSpace(key);
+                if (IsEnabled && _httpClient == null)
+                {
+                    _httpClient = new HttpClient
+                    {
+                        Timeout = TimeSpan.FromSeconds(10)
+                    };
+                }
             }
         }
 
@@ -682,25 +696,70 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
                 return null;
             }
 
+            if (_httpClient == null)
+            {
+                throw new InvalidOperationException("IpStack provider is enabled but HttpClient is not initialized. Call Configure first.");
+            }
+
             try
             {
-                // Production would make HTTP call to ipstack API
-                // API endpoint: http://api.ipstack.com/{ip}?access_key={key}
-                await Task.Delay(1, cancellationToken); // Simulated network call
+                // ipstack API uses HTTP (HTTPS requires paid plan); use HTTPS where possible
+                var requestUri = $"http://api.ipstack.com/{Uri.EscapeDataString(ipAddress)}?access_key={Uri.EscapeDataString(_apiKey)}&output=json&fields=country_code,country_name,success";
+
+                using var response = await _httpClient.GetAsync(requestUri, cancellationToken).ConfigureAwait(false);
+                response.EnsureSuccessStatusCode();
+
+                var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                // Check for API-level errors (invalid key, quota exceeded, etc.)
+                if (root.TryGetProperty("success", out var successProp) && successProp.ValueKind == System.Text.Json.JsonValueKind.False)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[IpStackProvider] API returned error for IP {ipAddress}");
+                    return null;
+                }
+
+                var countryCode = root.TryGetProperty("country_code", out var ccProp) && ccProp.ValueKind == System.Text.Json.JsonValueKind.String
+                    ? ccProp.GetString()
+                    : null;
+
+                if (string.IsNullOrEmpty(countryCode))
+                {
+                    return null;
+                }
+
+                var countryName = root.TryGetProperty("country_name", out var cnProp) && cnProp.ValueKind == System.Text.Json.JsonValueKind.String
+                    ? cnProp.GetString()
+                    : null;
 
                 return new GeolocationResult
                 {
                     IpAddress = ipAddress,
-                    CountryCode = "US",
+                    CountryCode = countryCode,
+                    CountryName = countryName,
                     Confidence = 0.85,
                     ProviderName = ProviderName,
                     IsReliable = true
                 };
             }
-            catch
+            catch (OperationCanceledException)
             {
+                throw; // Propagate cancellation
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[IpStackProvider] Lookup failed for {ipAddress}: {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
+        }
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _httpClient?.Dispose();
+            _httpClient = null;
+            _disposed = true;
         }
     }
 

@@ -32,6 +32,32 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Conversational;
 /// </remarks>
 internal sealed class DiscordChannelStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
+    private volatile byte[]? _discordPublicKey;
+
+    /// <summary>
+    /// Configures the Discord application public key used for Ed25519 signature verification.
+    /// Must be called before handling requests. The public key is available in the Discord
+    /// Developer Portal under your application's "General Information" tab.
+    /// </summary>
+    /// <param name="publicKeyHex">The Discord application public key as a hex string (64 chars = 32 bytes).</param>
+    /// <exception cref="ArgumentException">Thrown when publicKeyHex is null, empty, or not a valid 32-byte hex string.</exception>
+    public void ConfigurePublicKey(string publicKeyHex)
+    {
+        if (string.IsNullOrWhiteSpace(publicKeyHex))
+            throw new ArgumentException("Discord public key must not be null or empty.", nameof(publicKeyHex));
+        if (publicKeyHex.Length != 64)
+            throw new ArgumentException("Discord public key must be 64 hex characters (32 bytes).", nameof(publicKeyHex));
+
+        try
+        {
+            _discordPublicKey = Convert.FromHexString(publicKeyHex);
+        }
+        catch (FormatException ex)
+        {
+            throw new ArgumentException("Discord public key must be a valid hex string.", nameof(publicKeyHex), ex);
+        }
+    }
+
     // IPluginInterfaceStrategy metadata
     public override string StrategyId => "discord";
     public string DisplayName => "Discord Channel";
@@ -257,13 +283,29 @@ internal sealed class DiscordChannelStrategy : SdkInterface.InterfaceStrategyBas
     /// <param name="signature">The X-Signature-Ed25519 header value (hex-encoded).</param>
     /// <param name="timestamp">The X-Signature-Timestamp header value.</param>
     /// <returns>True if signature is valid; otherwise, false.</returns>
+    /// <summary>
+    /// Verifies Discord request signature using Ed25519.
+    /// </summary>
+    /// <remarks>
+    /// Ed25519 is not natively available in .NET's System.Security.Cryptography.
+    /// This method requires the Discord application public key to be configured
+    /// and a platform that supports Ed25519 via libsodium or a managed implementation.
+    /// Rather than silently returning true (auth bypass), this throws if the
+    /// cryptographic primitive is unavailable.
+    /// </remarks>
+    /// <param name="body">The raw request body.</param>
+    /// <param name="signature">The X-Signature-Ed25519 header value (hex-encoded, 128 chars).</param>
+    /// <param name="timestamp">The X-Signature-Timestamp header value.</param>
+    /// <returns>True if signature is valid; otherwise, false.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when the Discord public key is not configured.</exception>
+    /// <exception cref="PlatformNotSupportedException">Thrown when Ed25519 verification is not available on this platform.</exception>
     private bool VerifyEd25519Signature(ReadOnlyMemory<byte> body, string signature, string timestamp)
     {
-        // In production, this would:
-        // 1. Concatenate timestamp + body
-        // 2. Decode signature from hex
-        // 3. Verify Ed25519 signature using Discord application public key
-        // For now, perform structural validation only
+        var publicKey = _discordPublicKey
+            ?? throw new InvalidOperationException(
+                "Discord application public key not configured. Call ConfigurePublicKey() before handling requests.");
+
+        // Structural validation
         if (string.IsNullOrWhiteSpace(signature) || signature.Length != 128) // 64 bytes = 128 hex chars
         {
             return false;
@@ -274,6 +316,34 @@ internal sealed class DiscordChannelStrategy : SdkInterface.InterfaceStrategyBas
             return false;
         }
 
-        return true;
+        // Decode signature from hex
+        byte[] signatureBytes;
+        try
+        {
+            signatureBytes = Convert.FromHexString(signature);
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+
+        if (signatureBytes.Length != 64)
+        {
+            return false;
+        }
+
+        // Construct message: timestamp + body
+        var timestampBytes = Encoding.UTF8.GetBytes(timestamp);
+        var message = new byte[timestampBytes.Length + body.Length];
+        timestampBytes.CopyTo(message, 0);
+        body.Span.CopyTo(message.AsSpan(timestampBytes.Length));
+
+        // Ed25519 is not available in .NET's built-in crypto; fail-closed rather than bypass.
+        // Production deployments must provide libsodium (e.g., via NSec or libsodium-net NuGet package)
+        // and override this strategy or inject a verification delegate.
+        throw new PlatformNotSupportedException(
+            "Ed25519 signature verification requires a native cryptography library (e.g., libsodium via " +
+            "NSec or Sodium.Core NuGet package). Install the library and configure the Ed25519 verifier. " +
+            "Returning true without verification is an authentication bypass vulnerability.");
     }
 }

@@ -37,6 +37,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
         private TimeSpan _minimumDelay = TimeSpan.FromHours(1);
         private TimeSpan _commitmentTimeout = TimeSpan.FromHours(24);
         private string? _auditChainHash;
+        private byte[]? _signingKey;
 
         /// <inheritdoc/>
         public override string StrategyId => "admin-override-prevention";
@@ -65,7 +66,19 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
                 _commitmentTimeout = TimeSpan.FromHours(timeoutHours);
             }
 
-            InitializeProtectedOperations();
+            // Configure HMAC signing key for approval signature verification
+            if (configuration.TryGetValue("SigningKey", out var signingKeyObj) && signingKeyObj is string signingKeyB64
+                && !string.IsNullOrWhiteSpace(signingKeyB64))
+            {
+                _signingKey = Convert.FromBase64String(signingKeyB64);
+            }
+            else
+            {
+                // Generate a random signing key if none configured — ensures signatures are always verified cryptographically
+                _signingKey = RandomNumberGenerator.GetBytes(32);
+            }
+
+            InitializeProtectedOperations(configuration);
             InitializeAuditChain();
 
             return base.InitializeAsync(configuration, cancellationToken);
@@ -519,41 +532,77 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
             });
         }
 
-        private void InitializeProtectedOperations()
+        private void InitializeProtectedOperations(Dictionary<string, object> configuration)
         {
+            // Load authorized initiators from configuration.
+            // Key format: "AuthorizedInitiators:<OperationType>" -> List<string> or comma-separated string
+            List<string> GetInitiators(string operationType)
+            {
+                var key = $"AuthorizedInitiators:{operationType}";
+                if (configuration.TryGetValue(key, out var initiatorsObj))
+                {
+                    if (initiatorsObj is List<string> list)
+                    {
+                        return list;
+                    }
+                    if (initiatorsObj is string csv && !string.IsNullOrWhiteSpace(csv))
+                    {
+                        return csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+                    }
+                }
+                // Also check a global fallback list
+                if (configuration.TryGetValue("AuthorizedInitiators", out var globalObj))
+                {
+                    if (globalObj is List<string> globalList)
+                    {
+                        return globalList;
+                    }
+                    if (globalObj is string globalCsv && !string.IsNullOrWhiteSpace(globalCsv))
+                    {
+                        return globalCsv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+                    }
+                }
+                return new List<string>();
+            }
+
             _protectedOperations["DELETE_ALL_DATA"] = new ProtectedOperation
             {
                 OperationType = "DELETE_ALL_DATA",
                 MinimumApprovals = 3,
-                MinimumDelay = TimeSpan.FromHours(24)
+                MinimumDelay = TimeSpan.FromHours(24),
+                AuthorizedInitiators = GetInitiators("DELETE_ALL_DATA")
             };
 
             _protectedOperations["MODIFY_SOVEREIGNTY_RULES"] = new ProtectedOperation
             {
                 OperationType = "MODIFY_SOVEREIGNTY_RULES",
                 MinimumApprovals = 2,
-                MinimumDelay = TimeSpan.FromHours(4)
+                MinimumDelay = TimeSpan.FromHours(4),
+                AuthorizedInitiators = GetInitiators("MODIFY_SOVEREIGNTY_RULES")
             };
 
             _protectedOperations["EXPORT_TO_PROHIBITED_REGION"] = new ProtectedOperation
             {
                 OperationType = "EXPORT_TO_PROHIBITED_REGION",
                 MinimumApprovals = 4,
-                MinimumDelay = TimeSpan.FromHours(48)
+                MinimumDelay = TimeSpan.FromHours(48),
+                AuthorizedInitiators = GetInitiators("EXPORT_TO_PROHIBITED_REGION")
             };
 
             _protectedOperations["DISABLE_ENCRYPTION"] = new ProtectedOperation
             {
                 OperationType = "DISABLE_ENCRYPTION",
                 MinimumApprovals = 3,
-                MinimumDelay = TimeSpan.FromHours(24)
+                MinimumDelay = TimeSpan.FromHours(24),
+                AuthorizedInitiators = GetInitiators("DISABLE_ENCRYPTION")
             };
 
             _protectedOperations["EMERGENCY_DATA_ACCESS"] = new ProtectedOperation
             {
                 OperationType = "EMERGENCY_DATA_ACCESS",
                 MinimumApprovals = 2,
-                MinimumDelay = TimeSpan.FromMinutes(30)
+                MinimumDelay = TimeSpan.FromMinutes(30),
+                AuthorizedInitiators = GetInitiators("EMERGENCY_DATA_ACCESS")
             };
         }
 
@@ -565,9 +614,19 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
 
         private bool ValidateInitiator(string initiatorId, ProtectedOperation protection)
         {
-            // In production, validate against authorization system
-            // Initiators must be in a specific role
-            return !string.IsNullOrEmpty(initiatorId);
+            if (string.IsNullOrEmpty(initiatorId))
+            {
+                return false;
+            }
+
+            // Validate against the configured allowlist of authorized initiators for this operation.
+            // If no initiators are configured, deny by default (fail-closed).
+            if (protection.AuthorizedInitiators.Count == 0)
+            {
+                return false;
+            }
+
+            return protection.AuthorizedInitiators.Contains(initiatorId, StringComparer.OrdinalIgnoreCase);
         }
 
         private CryptographicCommitment CreateCommitment(AuthorizationRequest request)
@@ -591,19 +650,82 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
 
         private bool VerifyApprovalSignature(MultiPartyAuthorization authorization, string approverId, string signature)
         {
-            // In production, verify cryptographic signature
-            // This validates the approver's identity and intent
-            var expectedData = $"{authorization.AuthorizationId}:{approverId}:{authorization.CommitmentHash}";
-            var expectedHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(expectedData)));
+            if (_signingKey == null || string.IsNullOrEmpty(signature))
+            {
+                return false;
+            }
 
-            // Simplified verification - in production use proper PKI
-            return signature.Length >= 32;
+            // Compute HMAC-SHA256 over the canonical approval data
+            var expectedData = $"{authorization.AuthorizationId}:{approverId}:{authorization.CommitmentHash}";
+            var expectedMac = ComputeHmac(_signingKey, Encoding.UTF8.GetBytes(expectedData));
+            var expectedSignature = Convert.ToHexString(expectedMac);
+
+            // Constant-time comparison to prevent timing attacks
+            return CryptographicOperations.FixedTimeEquals(
+                Encoding.UTF8.GetBytes(signature.ToUpperInvariant()),
+                Encoding.UTF8.GetBytes(expectedSignature));
+        }
+
+        /// <summary>
+        /// Computes the HMAC-SHA256 signature for approval data.
+        /// Callers use this to generate the signature that VerifyApprovalSignature expects.
+        /// </summary>
+        public string ComputeApprovalSignature(string authorizationId, string approverId, string commitmentHash)
+        {
+            if (_signingKey == null)
+            {
+                throw new InvalidOperationException("Signing key not configured. Initialize the strategy first.");
+            }
+
+            var data = $"{authorizationId}:{approverId}:{commitmentHash}";
+            var mac = ComputeHmac(_signingKey, Encoding.UTF8.GetBytes(data));
+            return Convert.ToHexString(mac);
+        }
+
+        private static byte[] ComputeHmac(byte[] key, byte[] data)
+        {
+            using var hmac = new HMACSHA256(key);
+            return hmac.ComputeHash(data);
         }
 
         private bool VerifyCommitment(CryptographicCommitment commitment, Dictionary<string, object>? operationData)
         {
-            // In production, verify the commitment matches the operation data
-            return !string.IsNullOrEmpty(commitment.CommitmentHash);
+            if (string.IsNullOrEmpty(commitment.CommitmentHash) || string.IsNullOrEmpty(commitment.Nonce))
+            {
+                return false;
+            }
+
+            // The commitment was created by hashing (operationData + nonce).
+            // To verify: we cannot re-derive the full preimage because CreateCommitment includes
+            // ephemeral data (timestamps, GUIDs). Instead, verify structural integrity:
+            // 1. The commitment hash must be a valid 64-char hex SHA-256
+            // 2. The nonce must decode to exactly 32 bytes
+            // 3. The commitment must not have expired
+            if (commitment.CommitmentHash.Length != 64)
+            {
+                return false;
+            }
+
+            try
+            {
+                var nonceBytes = Convert.FromBase64String(commitment.Nonce);
+                if (nonceBytes.Length != 32)
+                {
+                    return false;
+                }
+            }
+            catch (FormatException)
+            {
+                return false;
+            }
+
+            // Verify the commitment has not expired (24-hour default timeout)
+            if (commitment.CreatedAt.Add(_commitmentTimeout) < DateTime.UtcNow)
+            {
+                return false;
+            }
+
+            return true;
         }
 
         private string GenerateExecutionProof(MultiPartyAuthorization authorization)

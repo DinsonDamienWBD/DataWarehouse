@@ -32,6 +32,22 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Conversational;
 /// </remarks>
 internal sealed class GenericWebhookStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
+    private volatile byte[]? _webhookSecret;
+
+    /// <summary>
+    /// Configures the webhook shared secret used for HMAC-SHA256 signature verification.
+    /// Must be called before handling signed requests. The secret should be a cryptographically
+    /// random value shared between the webhook sender and this receiver.
+    /// </summary>
+    /// <param name="secret">The webhook shared secret (non-empty).</param>
+    /// <exception cref="ArgumentException">Thrown when secret is null or empty.</exception>
+    public void ConfigureWebhookSecret(string secret)
+    {
+        if (string.IsNullOrWhiteSpace(secret))
+            throw new ArgumentException("Webhook secret must not be null or empty.", nameof(secret));
+        _webhookSecret = Encoding.UTF8.GetBytes(secret);
+    }
+
     // IPluginInterfaceStrategy metadata
     public override string StrategyId => "webhook";
     public string DisplayName => "Generic Webhook";
@@ -232,6 +248,10 @@ internal sealed class GenericWebhookStrategy : SdkInterface.InterfaceStrategyBas
     /// <returns>True if signature is valid; otherwise, false.</returns>
     private bool VerifyHmacSignature(ReadOnlyMemory<byte> body, string signature)
     {
+        var secret = _webhookSecret
+            ?? throw new InvalidOperationException(
+                "Webhook secret not configured. Call ConfigureWebhookSecret() before handling signed requests.");
+
         // Validate signature format
         if (!signature.StartsWith("sha256=", StringComparison.OrdinalIgnoreCase))
         {
@@ -240,25 +260,19 @@ internal sealed class GenericWebhookStrategy : SdkInterface.InterfaceStrategyBas
 
         var signatureHex = signature.Substring(7);
 
-        // In production, this would:
-        // 1. Load the webhook secret from configuration
-        // 2. Compute HMAC-SHA256(secret, body)
-        // 3. Compare computed hash with provided signature (constant-time comparison)
-        // For now, perform structural validation only
         if (string.IsNullOrWhiteSpace(signatureHex) || signatureHex.Length != 64) // SHA-256 = 64 hex chars
         {
             return false;
         }
 
-        // In production:
-        // using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
-        // var computedHash = hmac.ComputeHash(body);
-        // var computedHex = BitConverter.ToString(computedHash).Replace("-", "").ToLowerInvariant();
-        // return CryptographicOperations.FixedTimeEquals(
-        //     Encoding.UTF8.GetBytes(computedHex),
-        //     Encoding.UTF8.GetBytes(signatureHex.ToLowerInvariant())
-        // );
+        // Compute HMAC-SHA256 with the configured webhook secret
+        using var hmac = new HMACSHA256(secret);
+        var computedHash = hmac.ComputeHash(body.ToArray());
+        var computedHex = Convert.ToHexString(computedHash).ToLowerInvariant();
 
-        return true; // Structural validation passed
+        // Timing-safe comparison to prevent timing attacks
+        return CryptographicOperations.FixedTimeEquals(
+            Encoding.UTF8.GetBytes(computedHex),
+            Encoding.UTF8.GetBytes(signatureHex.ToLowerInvariant()));
     }
 }
