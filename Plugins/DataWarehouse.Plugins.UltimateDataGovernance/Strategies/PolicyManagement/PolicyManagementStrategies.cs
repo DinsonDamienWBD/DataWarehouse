@@ -138,11 +138,10 @@ public sealed class PolicyEnforcementStrategy : DataGovernanceStrategyBase
                 Violations = violations
             };
 
-            if (!_violations.ContainsKey(resourceId))
-            {
-                _violations[resourceId] = new List<PolicyViolation>();
-            }
-            _violations[resourceId].Add(violation);
+            _violations.AddOrUpdate(
+                resourceId,
+                _ => new List<PolicyViolation> { violation },
+                (_, list) => { lock (list) { list.Add(violation); } return list; });
         }
 
         return new PolicyEnforcementResult

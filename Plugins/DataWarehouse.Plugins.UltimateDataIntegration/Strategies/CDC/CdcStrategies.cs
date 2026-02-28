@@ -263,7 +263,10 @@ public sealed class TriggerBasedCdcStrategy : DataIntegrationStrategyBase
             ChangeTimestamp = DateTime.UtcNow
         };
 
-        changeTable.Add(record);
+        lock (changeTable)
+        {
+            changeTable.Add(record);
+        }
         RecordOperation("FireTrigger");
         return Task.FromResult(record);
     }
@@ -280,9 +283,13 @@ public sealed class TriggerBasedCdcStrategy : DataIntegrationStrategyBase
         if (!_changeTables.TryGetValue(tableName, out var changeTable))
             throw new KeyNotFoundException($"No change table for {tableName}");
 
-        var changes = since.HasValue
-            ? changeTable.Where(c => c.ChangeTimestamp > since.Value).Take(limit).ToList()
-            : changeTable.TakeLast(limit).ToList();
+        List<ChangeRecord> changes;
+        lock (changeTable)
+        {
+            changes = since.HasValue
+                ? changeTable.Where(c => c.ChangeTimestamp > since.Value).Take(limit).ToList()
+                : changeTable.TakeLast(limit).ToList();
+        }
 
         RecordOperation("GetChanges");
         return Task.FromResult(changes);
@@ -610,22 +617,27 @@ public sealed class EventSourcingCdcStrategy : DataIntegrationStrategyBase
         if (!_events.TryGetValue(streamId, out var events))
             throw new InvalidOperationException($"Event store not found for stream {streamId}");
 
-        if (expectedVersion.HasValue && stream.Version != expectedVersion.Value)
-            throw new ConcurrencyException($"Expected version {expectedVersion}, but stream is at version {stream.Version}");
-
-        stream.Version++;
-
-        var domainEvent = new DomainEvent
+        DomainEvent domainEvent;
+        lock (events)
         {
-            EventId = Guid.NewGuid().ToString("N"),
-            StreamId = streamId,
-            EventType = eventType,
-            EventData = eventData,
-            Version = stream.Version,
-            Timestamp = DateTime.UtcNow
-        };
+            if (expectedVersion.HasValue && stream.Version != expectedVersion.Value)
+                throw new ConcurrencyException($"Expected version {expectedVersion}, but stream is at version {stream.Version}");
 
-        events.Add(domainEvent);
+            stream.Version++;
+
+            domainEvent = new DomainEvent
+            {
+                EventId = Guid.NewGuid().ToString("N"),
+                StreamId = streamId,
+                EventType = eventType,
+                EventData = eventData,
+                Version = stream.Version,
+                Timestamp = DateTime.UtcNow
+            };
+
+            events.Add(domainEvent);
+        }
+
         RecordOperation("AppendEvent");
         return Task.FromResult(domainEvent);
     }

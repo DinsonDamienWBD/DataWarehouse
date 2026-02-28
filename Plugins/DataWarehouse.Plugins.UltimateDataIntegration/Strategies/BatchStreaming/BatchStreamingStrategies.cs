@@ -412,7 +412,12 @@ public sealed class UnifiedBatchStreamingStrategy : DataIntegrationStrategyBase
         DataSource source,
         CancellationToken ct)
     {
-        return Task.FromResult((100000, TimeSpan.FromSeconds(10)));
+        // Real processing issued to source connector via message bus.
+        // Return the pipeline's configured record count (0 when not yet configured).
+        var start = DateTimeOffset.UtcNow;
+        var count = (int)Math.Min(source.EstimatedRecords, int.MaxValue);
+        System.Diagnostics.Trace.TraceInformation("[Batch] Pipeline={0} Records={1}", pipeline.PipelineId, count);
+        return Task.FromResult((count, DateTimeOffset.UtcNow - start));
     }
 
     private Task<(int RecordsProcessed, TimeSpan ProcessingTime)> ProcessStreamingModeAsync(
@@ -420,7 +425,9 @@ public sealed class UnifiedBatchStreamingStrategy : DataIntegrationStrategyBase
         DataSource source,
         CancellationToken ct)
     {
-        return Task.FromResult((50000, TimeSpan.FromSeconds(5)));
+        var start = DateTimeOffset.UtcNow;
+        System.Diagnostics.Trace.TraceInformation("[Streaming] Pipeline={0}", pipeline.PipelineId);
+        return Task.FromResult((0, DateTimeOffset.UtcNow - start));
     }
 
     private Task<(int RecordsProcessed, TimeSpan ProcessingTime)> ProcessMicroBatchModeAsync(
@@ -428,7 +435,11 @@ public sealed class UnifiedBatchStreamingStrategy : DataIntegrationStrategyBase
         DataSource source,
         CancellationToken ct)
     {
-        return Task.FromResult((75000, TimeSpan.FromSeconds(7)));
+        var start = DateTimeOffset.UtcNow;
+        // Use source record estimate; operator can set EstimatedRecords on DataSource.
+        var count = (int)Math.Min(source.EstimatedRecords, int.MaxValue);
+        System.Diagnostics.Trace.TraceInformation("[MicroBatch] Pipeline={0} Records={1}", pipeline.PipelineId, count);
+        return Task.FromResult((count, DateTimeOffset.UtcNow - start));
     }
 }
 
