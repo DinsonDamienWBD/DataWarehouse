@@ -178,6 +178,12 @@ public sealed class ExtentTree
         }
     }
 
+    /// <summary>
+    /// Returns a non-destructive snapshot of all free extents ordered by start block.
+    /// This enumerates the internal sorted set directly without modifying tree state.
+    /// </summary>
+    public FreeExtent[] GetAllExtents() => [.. _extentsByStart];
+
     private void AddExtentInternal(FreeExtent extent)
     {
         _extentsByStart.Add(extent);

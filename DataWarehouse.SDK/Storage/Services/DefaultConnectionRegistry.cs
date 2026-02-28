@@ -76,7 +76,8 @@ public sealed class DefaultConnectionRegistry<TConfig> : IConnectionRegistry<TCo
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionId);
 
-        return _connections.TryGetValue(connectionId, out var entry) ? entry.Config : null;
+        // TryPeek avoids LRU write-lock promotion on the hot read path (finding 655).
+        return _connections.TryPeek(connectionId, out var entry) ? entry.Config : null;
     }
 
     /// <inheritdoc/>

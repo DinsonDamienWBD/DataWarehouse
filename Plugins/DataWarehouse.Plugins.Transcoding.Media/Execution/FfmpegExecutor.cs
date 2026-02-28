@@ -244,7 +244,8 @@ public sealed class FfmpegExecutor
 
         try
         {
-            process.Start();
+            if (!process.Start())
+                throw new InvalidOperationException("FFmpeg process could not be started (process.Start() returned false — process may already be running).");
             process.BeginErrorReadLine();
 
             // Write input data to stdin if provided

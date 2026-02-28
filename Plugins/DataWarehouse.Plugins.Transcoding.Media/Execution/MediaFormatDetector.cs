@@ -62,7 +62,7 @@ public static class MediaFormatDetector
                 if (headerStr.Contains("webm")) return true;
             }
 
-            return true; // Assume WebM if EBML header present
+            return false; // EBML header alone is not sufficient — must confirm "webm" DocType
         }
 
         return false;

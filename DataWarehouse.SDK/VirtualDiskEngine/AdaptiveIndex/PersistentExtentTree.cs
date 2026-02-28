@@ -677,32 +677,15 @@ public sealed class PersistentExtentTree : IAsyncDisposable
 
     private (long start, int count)[] SnapshotExtents()
     {
-        // Walk the inner tree by attempting to find extents of all sizes
-        // We rebuild from the tree by scanning through known extents
-        var result = new System.Collections.Generic.List<(long, int)>();
-        int extentCount = _inner.ExtentCount;
+        // Non-destructive snapshot: enumerate the sorted set directly without modifying tree state.
+        var extents = _inner.GetAllExtents();
+        if (extents.Length == 0) return Array.Empty<(long, int)>();
 
-        if (extentCount == 0) return Array.Empty<(long, int)>();
+        var result = new (long start, int count)[extents.Length];
+        for (int i = 0; i < extents.Length; i++)
+            result[i] = (extents[i].StartBlock, extents[i].BlockCount);
 
-        // Use FindExtent with minBlocks=1 to get the smallest, then remove and re-add
-        // This is a snapshot approach: we temporarily extract all, then put them back
-        var extracted = new System.Collections.Generic.List<FreeExtent>();
-
-        while (true)
-        {
-            var extent = _inner.FindExtent(1);
-            if (extent == null) break;
-            extracted.Add(extent);
-            _inner.RemoveExtent(extent);
-        }
-
-        foreach (var ext in extracted)
-        {
-            result.Add((ext.StartBlock, ext.BlockCount));
-            _inner.AddFreeExtent(ext.StartBlock, ext.BlockCount);
-        }
-
-        return result.ToArray();
+        return result;
     }
 
     /// <inheritdoc/>

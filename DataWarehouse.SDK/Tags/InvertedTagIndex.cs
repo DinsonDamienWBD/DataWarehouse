@@ -209,11 +209,16 @@ public sealed class InvertedTagIndex : ITagIndex, IDisposable
         }
         else
         {
-            resultKeys = candidates
-                .OrderBy(k => k, StringComparer.Ordinal)
-                .Skip(query.Skip)
-                .Take(effectiveTake)
-                .ToList();
+            // Sort to a temporary array, then slice — avoids multiple LINQ enumerator allocations.
+            // For small take values relative to N, a full sort is still O(N log N), but this path
+            // eliminates per-element LINQ overhead and keeps a single allocation.
+            var sorted = candidates.ToArray();
+            Array.Sort(sorted, StringComparer.Ordinal);
+            int skip = Math.Min(query.Skip, sorted.Length);
+            int take = Math.Min(effectiveTake, sorted.Length - skip);
+            resultKeys = take > 0
+                ? new ArraySegment<string>(sorted, skip, take).ToArray()
+                : Array.Empty<string>();
         }
 
         sw.Stop();

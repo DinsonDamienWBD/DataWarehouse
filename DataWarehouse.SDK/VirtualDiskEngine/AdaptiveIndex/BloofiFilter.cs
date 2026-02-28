@@ -33,7 +33,8 @@ public sealed class BloofiFilter
     private readonly int _filterByteCount;
     private BloofiNode _root;
     private readonly Dictionary<int, BloofiNode> _leafByShard = new();
-    private readonly object _lock = new();
+    // ReaderWriterLockSlim allows concurrent reads — fixes single-global-lock serialization (finding P2-704).
+    private readonly System.Threading.ReaderWriterLockSlim _rwLock = new(System.Threading.LockRecursionPolicy.NoRecursion);
 
     /// <summary>
     /// Gets the number of bits in each bloom filter.
@@ -50,7 +51,7 @@ public sealed class BloofiFilter
     /// </summary>
     public BloofiNode Root
     {
-        get { lock (_lock) return _root; }
+        get { _rwLock.EnterReadLock(); try { return _root; } finally { _rwLock.ExitReadLock(); } }
     }
 
     /// <summary>
@@ -58,7 +59,7 @@ public sealed class BloofiFilter
     /// </summary>
     public int ShardCount
     {
-        get { lock (_lock) return _leafByShard.Count; }
+        get { _rwLock.EnterReadLock(); try { return _leafByShard.Count; } finally { _rwLock.ExitReadLock(); } }
     }
 
     /// <summary>
@@ -86,7 +87,8 @@ public sealed class BloofiFilter
     {
         ArgumentNullException.ThrowIfNull(key);
 
-        lock (_lock)
+        _rwLock.EnterWriteLock();
+        try
         {
             if (!_leafByShard.TryGetValue(shardId, out var leaf))
             {
@@ -98,6 +100,7 @@ public sealed class BloofiFilter
             SetBits(leaf.Filter, key);
             PropagateOrToRoot(leaf);
         }
+        finally { _rwLock.ExitWriteLock(); }
     }
 
     /// <summary>
@@ -112,13 +115,15 @@ public sealed class BloofiFilter
 
         var result = new List<int>();
 
-        lock (_lock)
+        _rwLock.EnterReadLock();
+        try
         {
             if (!MayContain(_root.Filter, key))
                 return result;
 
             QueryRecursive(_root, key, result);
         }
+        finally { _rwLock.ExitReadLock(); }
 
         return result;
     }
@@ -130,7 +135,8 @@ public sealed class BloofiFilter
     /// <returns>True if the shard was found and removed.</returns>
     public bool Remove(int shardId)
     {
-        lock (_lock)
+        _rwLock.EnterWriteLock();
+        try
         {
             if (!_leafByShard.TryGetValue(shardId, out var leaf))
                 return false;
@@ -161,6 +167,7 @@ public sealed class BloofiFilter
 
             return true;
         }
+        finally { _rwLock.ExitWriteLock(); }
     }
 
     /// <summary>
@@ -171,10 +178,9 @@ public sealed class BloofiFilter
     {
         ArgumentNullException.ThrowIfNull(node);
 
-        lock (_lock)
-        {
-            RebuildNodeInternal(node);
-        }
+        _rwLock.EnterWriteLock();
+        try { RebuildNodeInternal(node); }
+        finally { _rwLock.ExitWriteLock(); }
     }
 
     /// <summary>
@@ -198,7 +204,8 @@ public sealed class BloofiFilter
     /// <returns>Serialized Bloofi state.</returns>
     public byte[] Serialize()
     {
-        lock (_lock)
+        _rwLock.EnterReadLock();
+        try
         {
             int leafCount = _leafByShard.Count;
             int headerSize = 12; // 3 ints
@@ -220,6 +227,7 @@ public sealed class BloofiFilter
 
             return result;
         }
+        finally { _rwLock.ExitReadLock(); }
     }
 
     /// <summary>
