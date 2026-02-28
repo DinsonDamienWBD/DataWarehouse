@@ -2466,6 +2466,7 @@ public sealed class ComplianceReportingStrategy : ComplianceStrategyBase
     protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override void Dispose(bool disposing);
 }
 ```
 ```csharp
@@ -2585,6 +2586,7 @@ public sealed class AuditTrailGenerationStrategy : ComplianceStrategyBase
     protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override void Dispose(bool disposing);
 }
 ```
 ```csharp
@@ -2630,6 +2632,7 @@ public sealed class AutomatedComplianceCheckingStrategy : ComplianceStrategyBase
     protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override void Dispose(bool disposing);
 }
 ```
 ```csharp
@@ -2679,6 +2682,7 @@ public sealed class RemediationWorkflowsStrategy : ComplianceStrategyBase
     protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override void Dispose(bool disposing);
 }
 ```
 ```csharp
@@ -2744,6 +2748,7 @@ public sealed class ContinuousComplianceMonitoringStrategy : ComplianceStrategyB
     protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override void Dispose(bool disposing);
 }
 ```
 ```csharp
