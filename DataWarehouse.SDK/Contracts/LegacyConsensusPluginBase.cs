@@ -38,13 +38,14 @@ namespace DataWarehouse.SDK.Contracts
         /// Propose a state change to the cluster. Returns when quorum is reached.
         /// Must be implemented by derived classes.
         /// </summary>
-        public abstract Task<bool> ProposeAsync(Proposal proposal);
+        public abstract Task<bool> ProposeAsync(Proposal proposal, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Subscribe to committed entries from other nodes.
+        /// Returns a registration token that can be disposed to unsubscribe.
         /// Must be implemented by derived classes.
         /// </summary>
-        public abstract void OnCommit(Action<Proposal> handler);
+        public abstract IDisposable OnCommit(Action<Proposal> handler);
 
         /// <summary>
         /// Get current cluster state. Override for custom state reporting.
@@ -85,7 +86,7 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Propose raw data to the consensus cluster. Routes to appropriate group in Multi-Raft.
         /// Default implementation wraps data in a <see cref="Proposal"/> and delegates to
-        /// <see cref="ProposeAsync(Proposal)"/>.
+        /// <see cref="ProposeAsync(Proposal, CancellationToken)"/>.
         /// </summary>
         /// <param name="data">Binary data to propose.</param>
         /// <param name="ct">Cancellation token.</param>
@@ -94,7 +95,7 @@ namespace DataWarehouse.SDK.Contracts
         {
             ct.ThrowIfCancellationRequested();
             var proposal = new Proposal { Payload = data };
-            var success = await ProposeAsync(proposal).ConfigureAwait(false);
+            var success = await ProposeAsync(proposal, ct).ConfigureAwait(false);
             return new ConsensusResult(success, null, 0, success ? null : "Proposal not committed by quorum");
         }
 

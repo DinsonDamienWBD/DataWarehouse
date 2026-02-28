@@ -1,3 +1,4 @@
+using System.Threading;
 using DataWarehouse.SDK.AI;
 
 namespace DataWarehouse.SDK.Contracts;
@@ -13,11 +14,33 @@ public record KnowledgeEntry
     /// <summary>When stored.</summary>
     public DateTimeOffset StoredAt { get; init; } = DateTimeOffset.UtcNow;
 
-    /// <summary>When last accessed.</summary>
-    public DateTimeOffset LastAccessedAt { get; set; }
+    /// <summary>
+    /// When last accessed. Stored as UTC ticks for atomic 64-bit writes via Interlocked.
+    /// Use <see cref="RecordAccess"/> to update atomically.
+    /// </summary>
+    private long _lastAccessedAtTicks;
+    public DateTimeOffset LastAccessedAt
+    {
+        get => new DateTimeOffset(Interlocked.Read(ref _lastAccessedAtTicks), TimeSpan.Zero);
+        set => Interlocked.Exchange(ref _lastAccessedAtTicks, value.UtcTicks);
+    }
 
-    /// <summary>Access count (for caching decisions).</summary>
-    public long AccessCount { get; set; }
+    /// <summary>Access count (for caching decisions). Use Interlocked.Increment for thread-safe updates.</summary>
+    private long _accessCount;
+    public long AccessCount
+    {
+        get => Interlocked.Read(ref _accessCount);
+        set => Interlocked.Exchange(ref _accessCount, value);
+    }
+
+    /// <summary>
+    /// Atomically records an access, incrementing the counter and updating the timestamp.
+    /// </summary>
+    public void RecordAccess()
+    {
+        Interlocked.Increment(ref _accessCount);
+        Interlocked.Exchange(ref _lastAccessedAtTicks, DateTimeOffset.UtcNow.UtcTicks);
+    }
 
     /// <summary>Time-to-live (null = permanent).</summary>
     public TimeSpan? TimeToLive { get; init; }

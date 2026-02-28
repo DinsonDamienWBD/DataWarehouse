@@ -437,7 +437,7 @@ namespace DataWarehouse.SDK.Contracts.Compression
         /// Gets the average decompression throughput in bytes per second.
         /// </summary>
         public double AverageDecompressionThroughput =>
-            TotalDecompressionTimeMs > 0 ? (TotalBytesOut / TotalDecompressionTimeMs) * 1000.0 : 0;
+            TotalDecompressionTimeMs > 0 ? (TotalBytesIn / TotalDecompressionTimeMs) * 1000.0 : 0;
 
         /// <summary>
         /// Backing field for compression failures, enabling Interlocked operations.

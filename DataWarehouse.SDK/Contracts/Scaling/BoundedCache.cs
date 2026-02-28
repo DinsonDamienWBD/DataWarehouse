@@ -238,6 +238,9 @@ namespace DataWarehouse.SDK.Contracts.Scaling
         /// <returns>The value if found; otherwise <c>default</c>.</returns>
         public TValue? GetOrDefault(TKey key)
         {
+            // LRU/ARC Get promotes the accessed item (mutation), requiring a write lock.
+            // For LRU this serialises all concurrent reads; use a dedicated read-through
+            // cache if read concurrency is a bottleneck.
             _lock.EnterWriteLock();
             try
             {

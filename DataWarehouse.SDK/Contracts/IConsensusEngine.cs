@@ -42,12 +42,15 @@
         /// Propose a state change to the cluster.
         /// Returns only when Quorum is reached.
         /// </summary>
-        Task<bool> ProposeAsync(Proposal proposal);
+        /// <param name="proposal">The proposal to commit.</param>
+        /// <param name="cancellationToken">Token to cancel the consensus round-trip.</param>
+        Task<bool> ProposeAsync(Proposal proposal, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Subscribe to committed entries from other nodes.
+        /// Returns a registration token that can be disposed to unsubscribe and prevent memory leaks.
         /// </summary>
-        void OnCommit(Action<Proposal> handler);
+        IDisposable OnCommit(Action<Proposal> handler);
     }
 
     #region Geo-Distributed Consensus Types

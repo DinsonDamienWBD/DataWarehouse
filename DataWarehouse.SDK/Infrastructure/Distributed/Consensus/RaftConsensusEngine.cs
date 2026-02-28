@@ -138,14 +138,14 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         public string? LeaderId => _leaderId;
 
         /// <inheritdoc />
-        public async Task<bool> ProposeAsync(Proposal proposal)
+        public async Task<bool> ProposeAsync(Proposal proposal, CancellationToken cancellationToken = default)
         {
             if (_role != RaftRole.Leader)
             {
                 throw new InvalidOperationException("Not the leader. Only the leader can propose state changes.");
             }
 
-            await _stateLock.WaitAsync().ConfigureAwait(false);
+            await _stateLock.WaitAsync(cancellationToken).ConfigureAwait(false);
             RaftLogEntry entry;
             try
             {
@@ -196,9 +196,31 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         }
 
         /// <inheritdoc />
-        public void OnCommit(Action<Proposal> handler)
+        public IDisposable OnCommit(Action<Proposal> handler)
         {
             _commitHandlers.Add(handler);
+            return new CommitHandlerRegistration(_commitHandlers, handler);
+        }
+
+        private sealed class CommitHandlerRegistration : IDisposable
+        {
+            private readonly List<Action<Proposal>> _handlers;
+            private readonly Action<Proposal> _handler;
+            private int _disposed;
+
+            public CommitHandlerRegistration(List<Action<Proposal>> handlers, Action<Proposal> handler)
+            {
+                _handlers = handlers;
+                _handler = handler;
+            }
+
+            public void Dispose()
+            {
+                if (Interlocked.Exchange(ref _disposed, 1) == 0)
+                {
+                    _handlers.Remove(_handler);
+                }
+            }
         }
 
         #endregion

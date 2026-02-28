@@ -199,6 +199,8 @@ public readonly record struct FederationEntry
 
         ushort nsLen = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(offset));
         offset += 2;
+        if (nsLen > MaxNamespacePathLength || offset + nsLen > buffer.Length)
+            throw new InvalidDataException($"FederationEntry nsLen {nsLen} exceeds MaxNamespacePathLength {MaxNamespacePathLength} or buffer bounds.");
 
         byte[] namespacePath = nsLen > 0
             ? buffer.Slice(offset, nsLen).ToArray()

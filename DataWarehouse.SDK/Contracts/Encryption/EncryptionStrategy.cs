@@ -389,7 +389,7 @@ namespace DataWarehouse.SDK.Contracts.Encryption
         private long _decryptionFailures;
         private long _authenticationFailures;
         private readonly DateTime _startTime;
-        private DateTime _lastUpdateTime;
+        private long _lastUpdateTimeTicks; // DateTime.UtcNow.Ticks stored via Interlocked for thread safety
 
         /// <summary>
         /// Thread-safe dictionary for tracking key access patterns (keyId -> access count).
@@ -428,7 +428,7 @@ namespace DataWarehouse.SDK.Contracts.Encryption
         protected EncryptionStrategyBase()
         {
             _startTime = DateTime.UtcNow;
-            _lastUpdateTime = DateTime.UtcNow;
+            Interlocked.Exchange(ref _lastUpdateTimeTicks, DateTime.UtcNow.Ticks);
         }
 
         /// <inheritdoc/>
@@ -488,7 +488,7 @@ namespace DataWarehouse.SDK.Contracts.Encryption
                 DecryptionFailures = Interlocked.Read(ref _decryptionFailures),
                 AuthenticationFailures = Interlocked.Read(ref _authenticationFailures),
                 StartTime = _startTime,
-                LastUpdateTime = _lastUpdateTime
+                LastUpdateTime = new DateTime(Interlocked.Read(ref _lastUpdateTimeTicks), DateTimeKind.Utc)
             };
         }
 
@@ -502,7 +502,7 @@ namespace DataWarehouse.SDK.Contracts.Encryption
             Interlocked.Exchange(ref _encryptionFailures, 0);
             Interlocked.Exchange(ref _decryptionFailures, 0);
             Interlocked.Exchange(ref _authenticationFailures, 0);
-            _lastUpdateTime = DateTime.UtcNow;
+            Interlocked.Exchange(ref _lastUpdateTimeTicks, DateTime.UtcNow.Ticks);
             KeyAccessLog.Clear();
         }
 
@@ -531,7 +531,7 @@ namespace DataWarehouse.SDK.Contracts.Encryption
                 // Update statistics
                 Interlocked.Increment(ref _encryptionCount);
                 Interlocked.Add(ref _totalBytesEncrypted, plaintext.Length);
-                _lastUpdateTime = DateTime.UtcNow;
+                Interlocked.Exchange(ref _lastUpdateTimeTicks, DateTime.UtcNow.Ticks);
 
                 return result;
             }
@@ -576,7 +576,7 @@ namespace DataWarehouse.SDK.Contracts.Encryption
                 // Update statistics
                 Interlocked.Increment(ref _decryptionCount);
                 Interlocked.Add(ref _totalBytesDecrypted, result.Length);
-                _lastUpdateTime = DateTime.UtcNow;
+                Interlocked.Exchange(ref _lastUpdateTimeTicks, DateTime.UtcNow.Ticks);
 
                 return result;
             }
@@ -881,8 +881,8 @@ namespace DataWarehouse.SDK.Contracts.Encryption
         /// <summary>KEK identifier for envelope mode.</summary>
         public string? KekId { get; init; }
 
-        /// <summary>Timestamp when encryption occurred.</summary>
-        public DateTime EncryptedAt { get; init; } = DateTime.UtcNow;
+        /// <summary>Timestamp when encryption occurred. Set by the encryptor; do not rely on the default value.</summary>
+        public DateTime EncryptedAt { get; init; }
 
         /// <summary>Additional metadata for compliance and auditing.</summary>
         public IReadOnlyDictionary<string, string> Metadata { get; init; } =

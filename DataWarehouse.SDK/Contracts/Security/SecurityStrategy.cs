@@ -538,6 +538,11 @@ namespace DataWarehouse.SDK.Contracts.Security
 
                 return decision;
             }
+            catch (OperationCanceledException)
+            {
+                // Preserve standard cancellation semantics — do not wrap in SecurityException
+                throw;
+            }
             catch (Exception ex)
             {
                 IncrementErrorCount();

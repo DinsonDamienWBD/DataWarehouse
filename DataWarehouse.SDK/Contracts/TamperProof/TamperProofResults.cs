@@ -897,11 +897,14 @@ public class IntegrityHash
             throw new ArgumentException($"Invalid hash algorithm: {parts[0]}");
         }
 
+        // ComputedAt is deliberately not set during Parse — the parsed hash represents a
+        // previously computed value whose original timestamp is unknown. Setting it to UtcNow
+        // would fabricate an audit timestamp. Callers that need a timestamp should set it explicitly.
         return new IntegrityHash
         {
             Algorithm = algorithm,
             HashValue = parts[1],
-            ComputedAt = DateTimeOffset.UtcNow
+            ComputedAt = DateTimeOffset.MinValue // Indicates "unknown / parsed from string"
         };
     }
 }
@@ -1118,11 +1121,22 @@ public class AuditChain
     public int LatestVersion => Entries.Count > 0 ? Entries[^1].Version : 0;
 
     /// <summary>
-    /// Gets entry for a specific version.
+    /// Gets entry for a specific version using binary search on the version-ordered list.
+    /// O(log n) instead of O(n) linear scan.
     /// </summary>
     public AuditChainEntry? GetVersion(int version)
     {
-        return Entries.FirstOrDefault(e => e.Version == version);
+        // Binary search: Entries is ordered by Version ascending
+        int lo = 0, hi = Entries.Count - 1;
+        while (lo <= hi)
+        {
+            int mid = lo + ((hi - lo) >> 1);
+            int cmp = Entries[mid].Version.CompareTo(version);
+            if (cmp == 0) return Entries[mid];
+            if (cmp < 0) lo = mid + 1;
+            else hi = mid - 1;
+        }
+        return null;
     }
 
     /// <summary>

@@ -102,9 +102,10 @@ public sealed class ReplicationAwareRouter : IStorageRouter
             };
         }
 
-        // Attempt read with fallback
+        // Attempt read with fallback — track tried nodes to avoid retrying the same failing replica
         var attempt = 0;
         var currentNodeId = selection.NodeId;
+        var triedNodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { currentNodeId };
 
         while (attempt < _config.MaxFallbackAttempts)
         {
@@ -129,21 +130,24 @@ public sealed class ReplicationAwareRouter : IStorageRouter
             if (response.Success)
                 return response;
 
-            // Failure -- try fallback
+            // Failure -- try next untried fallback replica
             attempt++;
             var fallbackChain = await _replicaSelector.GetFallbackChainAsync(objectId, currentNodeId, ct).ConfigureAwait(false);
 
-            if (fallbackChain.Count == 0)
+            // Skip replicas already attempted
+            var nextNode = fallbackChain.FirstOrDefault(n => !triedNodes.Contains(n));
+            if (nextNode == null)
             {
                 return new StorageResponse
                 {
                     Success = false,
                     NodeId = currentNodeId,
-                    ErrorMessage = $"Read failed, no fallback replicas available after {attempt} attempts"
+                    ErrorMessage = $"Read failed, all {triedNodes.Count} known replicas exhausted after {attempt} attempts"
                 };
             }
 
-            currentNodeId = fallbackChain[0];
+            triedNodes.Add(nextNode);
+            currentNodeId = nextNode;
         }
 
         return new StorageResponse

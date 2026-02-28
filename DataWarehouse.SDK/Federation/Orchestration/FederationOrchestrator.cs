@@ -90,6 +90,16 @@ public sealed class FederationOrchestrator : IFederationOrchestrator, ITopologyP
     /// <inheritdoc />
     public async Task RegisterNodeAsync(NodeRegistration registration, CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(registration);
+
+        // Validate required fields before inserting phantom nodes
+        if (string.IsNullOrWhiteSpace(registration.NodeId))
+            throw new ArgumentException("NodeId must not be null or empty.", nameof(registration));
+        if (string.IsNullOrWhiteSpace(registration.Address))
+            throw new ArgumentException("Address must not be null or empty.", nameof(registration));
+        if (registration.Port is <= 0 or > 65535)
+            throw new ArgumentException($"Port {registration.Port} is out of valid range 1-65535.", nameof(registration));
+
         var nodeTopology = new NodeTopology
         {
             NodeId = registration.NodeId,
@@ -115,7 +125,9 @@ public sealed class FederationOrchestrator : IFederationOrchestrator, ITopologyP
                 Command = "topology-update",
                 Payload = JsonSerializer.SerializeToUtf8Bytes(command)
             };
-            await _raft.ProposeAsync(proposal).ConfigureAwait(false);
+            await _raft.ProposeAsync(proposal, ct).ConfigureAwait(false);
+            // Update local topology immediately so the leader's routing is not stale
+            _topology.AddOrUpdateNode(nodeTopology);
         }
         else
         {

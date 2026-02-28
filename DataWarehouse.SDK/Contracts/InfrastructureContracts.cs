@@ -148,7 +148,7 @@ namespace DataWarehouse.SDK.Contracts
         public string? Remediation { get; init; }
         public string? RemediationAdvice { get; init; }
         public string? Regulation { get; init; }
-        public object? ViolationSeverity { get; init; }
+        public ViolationSeverity? ViolationSeverity { get; init; }
     }
 
     /// <summary>
@@ -279,10 +279,19 @@ namespace DataWarehouse.SDK.Contracts
     /// <summary>
     /// Authentication request.
     /// </summary>
+    /// <remarks>
+    /// <b>Security note:</b> <see cref="Password"/> is stored as a plain <c>string</c>
+    /// and cannot be zeroed from memory. Prefer token-based authentication where possible,
+    /// or clear the reference promptly after use to allow GC collection.
+    /// </remarks>
     public class AuthenticationRequest
     {
         public string Method { get; init; } = "password";
         public string? Username { get; init; }
+        /// <summary>
+        /// Password for credential-based auth. Prefer token-based auth where possible;
+        /// plain strings cannot be securely zeroed. Null out the reference promptly after use.
+        /// </summary>
         public string? Password { get; init; }
         public string? Token { get; init; }
         public string? Provider { get; init; }

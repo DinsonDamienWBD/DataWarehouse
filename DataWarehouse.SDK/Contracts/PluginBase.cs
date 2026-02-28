@@ -869,7 +869,11 @@ namespace DataWarehouse.SDK.Contracts
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[PluginBase.SubscribeToKnowledgeRequests] {ex.GetType().Name}: {ex.Message}");
+                // Log via Trace so the failure is visible in production diagnostics.
+                // Re-throw so callers know subscriptions are missing and can mark the plugin unhealthy.
+                System.Diagnostics.Trace.TraceError(
+                    $"[PluginBase.SubscribeToKnowledgeRequests] Failed to subscribe: {ex.GetType().Name}: {ex.Message}");
+                throw;
             }
         }
 
@@ -1271,7 +1275,7 @@ namespace DataWarehouse.SDK.Contracts
         protected BoundedDictionary<TKey, TValue> CreateBoundedDictionary<TKey, TValue>(
             string collectionName, int maxCapacity) where TKey : notnull
         {
-            var dict = new BoundedDictionary<TKey, TValue>(1000);
+            var dict = new BoundedDictionary<TKey, TValue>(maxCapacity);
             _trackedCollections.Add(dict);
             return dict;
         }

@@ -158,22 +158,39 @@ namespace DataWarehouse.SDK.Contracts
             // Any exceptions from individual providers will propagate via AggregateException
         }
 
-        public virtual Task<StoragePoolHealth> GetHealthAsync(CancellationToken ct = default)
+        public virtual async Task<StoragePoolHealth> GetHealthAsync(CancellationToken ct = default)
         {
-            var details = _providers.Select(kvp => new ProviderHealth
+            var healthTasks = _providers.Select(async kvp =>
             {
-                ProviderId = kvp.Key,
-                Role = kvp.Value.Role,
-                IsHealthy = true
-            }).ToList();
+                bool healthy;
+                try
+                {
+                    ct.ThrowIfCancellationRequested();
+                    // Basic liveness probe: attempt a trivial existence check using a known sentinel key
+                    await kvp.Value.Provider.ExistsAsync(new Uri("dw://internal/.healthcheck"))
+                        .ConfigureAwait(false);
+                    healthy = true;
+                }
+                catch (OperationCanceledException) { throw; }
+                catch { healthy = false; }
 
-            return Task.FromResult(new StoragePoolHealth
+                return new ProviderHealth
+                {
+                    ProviderId = kvp.Key,
+                    Role = kvp.Value.Role,
+                    IsHealthy = healthy
+                };
+            });
+
+            var details = (await Task.WhenAll(healthTasks).ConfigureAwait(false)).ToList();
+
+            return new StoragePoolHealth
             {
                 IsHealthy = details.All(p => p.IsHealthy),
                 TotalProviders = details.Count,
                 HealthyProviders = details.Count(p => p.IsHealthy),
                 ProviderDetails = details
-            });
+            };
         }
 
         public virtual Task<RepairResult> RepairAsync(string? targetProviderId = null, CancellationToken ct = default)

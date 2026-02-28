@@ -426,6 +426,11 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Search the index with a text query.
         /// </summary>
+        /// <remarks>
+        /// <b>Performance warning:</b> This implementation is O(N×M) where N is the number of
+        /// indexed documents and M is the number of metadata values per document. It will degrade
+        /// severely at large scale. Override with a proper inverted index in production subclasses.
+        /// </remarks>
         public virtual Task<string[]> SearchIndexAsync(string query, int limit = 100, CancellationToken ct = default)
         {
             var queryLower = query.ToLowerInvariant();
@@ -532,7 +537,7 @@ namespace DataWarehouse.SDK.Contracts
                 }
             }
 
-            await IndexDocumentAsync(manifest.Id, metadata);
+            await IndexDocumentAsync(manifest.Id, metadata, ct);
         }
 
         /// <summary>
@@ -564,8 +569,8 @@ namespace DataWarehouse.SDK.Contracts
                     Metadata = kv.Value.Where(x => !x.Key.StartsWith("_"))
                         .ToDictionary(x => x.Key, x => x.Value?.ToString() ?? "")
                 };
-
-                await Task.Yield();
+                // No Task.Yield() per item — this is an in-memory enumeration and yielding
+                // every item causes needless thread-pool context switches.
             }
         }
 

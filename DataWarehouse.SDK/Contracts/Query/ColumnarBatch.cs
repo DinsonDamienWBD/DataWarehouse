@@ -196,6 +196,19 @@ public sealed class ColumnarBatch
 
     public ColumnarBatch(int rowCount, IReadOnlyList<ColumnVector> columns)
     {
+        ArgumentNullException.ThrowIfNull(columns);
+        if (rowCount < 0) throw new ArgumentOutOfRangeException(nameof(rowCount), rowCount, "rowCount must be non-negative.");
+
+        // Validate that every column vector length matches rowCount to prevent silent data corruption
+        for (int i = 0; i < columns.Count; i++)
+        {
+            if (columns[i].Length != rowCount)
+                throw new ArgumentException(
+                    $"Column '{columns[i].Name}' (index {i}) has length {columns[i].Length} " +
+                    $"but rowCount is {rowCount}. All column vectors must have the same length.",
+                    nameof(columns));
+        }
+
         RowCount = rowCount;
         Columns = columns;
         _columnIndex = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);

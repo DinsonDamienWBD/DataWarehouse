@@ -59,6 +59,28 @@ public record TimeLockPolicy
     /// Required for Maximum vaccination level; optional for other levels.
     /// </summary>
     public required bool RequirePqcSignature { get; init; }
+
+    /// <summary>
+    /// Validates the policy for internal consistency.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown if <see cref="MinLockDuration"/> is greater than <see cref="MaxLockDuration"/>,
+    /// if <see cref="DefaultLockDuration"/> is outside the min/max range,
+    /// or if <see cref="AllowedUnlockConditions"/> is empty.
+    /// </exception>
+    public void Validate()
+    {
+        if (MinLockDuration > MaxLockDuration)
+            throw new InvalidOperationException(
+                $"TimeLockPolicy: MinLockDuration ({MinLockDuration}) must not exceed MaxLockDuration ({MaxLockDuration}).");
+        if (DefaultLockDuration < MinLockDuration || DefaultLockDuration > MaxLockDuration)
+            throw new InvalidOperationException(
+                $"TimeLockPolicy: DefaultLockDuration ({DefaultLockDuration}) must be in range " +
+                $"[{MinLockDuration}, {MaxLockDuration}].");
+        if (AllowedUnlockConditions == null || AllowedUnlockConditions.Length == 0)
+            throw new InvalidOperationException(
+                "TimeLockPolicy: AllowedUnlockConditions must contain at least one entry.");
+    }
 }
 
 /// <summary>

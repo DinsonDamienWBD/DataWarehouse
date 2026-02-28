@@ -262,7 +262,7 @@ namespace DataWarehouse.SDK.Contracts.Compliance
         /// <summary>
         /// Gets the timestamp when this violation was detected.
         /// </summary>
-        public DateTime DetectedAt { get; init; } = DateTime.UtcNow;
+        public DateTimeOffset DetectedAt { get; init; } = DateTimeOffset.UtcNow;
 
         /// <summary>
         /// Gets the deadline for remediation based on severity.
@@ -365,7 +365,7 @@ namespace DataWarehouse.SDK.Contracts.Compliance
         /// <summary>
         /// Gets the timestamp when this assessment was performed.
         /// </summary>
-        public DateTime AssessmentTime { get; init; } = DateTime.UtcNow;
+        public DateTimeOffset AssessmentTime { get; init; } = DateTimeOffset.UtcNow;
 
         /// <summary>
         /// Gets the next assessment due date.

@@ -21,7 +21,7 @@ namespace DataWarehouse.SDK.Contracts.Consciousness
         Task<ValueScore> ScoreValueAsync(
             string objectId,
             byte[] data,
-            Dictionary<string, object> metadata,
+            IReadOnlyDictionary<string, object> metadata,
             CancellationToken ct = default);
     }
 
@@ -42,7 +42,7 @@ namespace DataWarehouse.SDK.Contracts.Consciousness
         Task<LiabilityScore> ScoreLiabilityAsync(
             string objectId,
             byte[] data,
-            Dictionary<string, object> metadata,
+            IReadOnlyDictionary<string, object> metadata,
             CancellationToken ct = default);
     }
 
@@ -64,7 +64,7 @@ namespace DataWarehouse.SDK.Contracts.Consciousness
         Task<ConsciousnessScore> ScoreAsync(
             string objectId,
             byte[] data,
-            Dictionary<string, object> metadata,
+            IReadOnlyDictionary<string, object> metadata,
             CancellationToken ct = default);
 
         /// <summary>

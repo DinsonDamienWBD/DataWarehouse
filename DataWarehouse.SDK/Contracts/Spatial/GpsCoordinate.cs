@@ -71,10 +71,16 @@ public readonly struct GpsCoordinate : IEquatable<GpsCoordinate>
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Uses a tolerance of 1 nanodegree (~0.11 mm at equator) for latitude/longitude
+    /// and 1 mm for altitude to avoid IEEE 754 false negatives for computed coordinates.
+    /// For exact bit-for-bit comparison (e.g., stored coordinates), use
+    /// <c>BitConverter.DoubleToInt64Bits</c> comparison directly.
+    /// </remarks>
     public bool Equals(GpsCoordinate other) =>
-        Latitude == other.Latitude &&
-        Longitude == other.Longitude &&
-        Altitude == other.Altitude;
+        Math.Abs(Latitude - other.Latitude) < 1e-9 &&
+        Math.Abs(Longitude - other.Longitude) < 1e-9 &&
+        Math.Abs((Altitude ?? 0) - (other.Altitude ?? 0)) < 0.001;
 
     /// <inheritdoc/>
     public override bool Equals(object? obj) => obj is GpsCoordinate other && Equals(other);

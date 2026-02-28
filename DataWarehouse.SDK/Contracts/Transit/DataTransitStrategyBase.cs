@@ -70,7 +70,7 @@ namespace DataWarehouse.SDK.Contracts.Transit
         private long _failures;
         private long _activeTransfers;
         private readonly DateTime _startTime;
-        private DateTime _lastUpdateTime;
+        private long _lastUpdateTimeTicks; // Stored as UTC ticks for Interlocked thread-safety
 
         /// <summary>
         /// Thread-safe dictionary tracking active transfer cancellation tokens.
@@ -84,7 +84,7 @@ namespace DataWarehouse.SDK.Contracts.Transit
         protected DataTransitStrategyBase()
         {
             _startTime = DateTime.UtcNow;
-            _lastUpdateTime = DateTime.UtcNow;
+            Interlocked.Exchange(ref _lastUpdateTimeTicks, DateTime.UtcNow.Ticks);
         }
 
         /// <inheritdoc/>
@@ -157,7 +157,7 @@ namespace DataWarehouse.SDK.Contracts.Transit
         {
             Interlocked.Increment(ref _transferCount);
             Interlocked.Add(ref _bytesTransferred, bytesTransferred);
-            _lastUpdateTime = DateTime.UtcNow;
+            Interlocked.Exchange(ref _lastUpdateTimeTicks, DateTime.UtcNow.Ticks);
         }
 
         /// <summary>
@@ -166,7 +166,7 @@ namespace DataWarehouse.SDK.Contracts.Transit
         protected void RecordTransferFailure()
         {
             Interlocked.Increment(ref _failures);
-            _lastUpdateTime = DateTime.UtcNow;
+            Interlocked.Exchange(ref _lastUpdateTimeTicks, DateTime.UtcNow.Ticks);
         }
 
         /// <summary>
@@ -198,7 +198,7 @@ namespace DataWarehouse.SDK.Contracts.Transit
                 Failures = Interlocked.Read(ref _failures),
                 ActiveTransfers = Interlocked.Read(ref _activeTransfers),
                 StartTime = _startTime,
-                LastUpdateTime = _lastUpdateTime
+                LastUpdateTime = new DateTime(Interlocked.Read(ref _lastUpdateTimeTicks), DateTimeKind.Utc)
             };
         }
 
@@ -211,7 +211,7 @@ namespace DataWarehouse.SDK.Contracts.Transit
             Interlocked.Exchange(ref _bytesTransferred, 0);
             Interlocked.Exchange(ref _failures, 0);
             Interlocked.Exchange(ref _activeTransfers, 0);
-            _lastUpdateTime = DateTime.UtcNow;
+            Interlocked.Exchange(ref _lastUpdateTimeTicks, DateTime.UtcNow.Ticks);
         }
     }
 }
