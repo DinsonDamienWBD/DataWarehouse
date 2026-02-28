@@ -220,8 +220,8 @@ public sealed class UltimateConsensusPlugin : ConsensusPluginBase, IDisposable
     public int GroupCount;;
     public UltimateConsensusPlugin(int groupCount = 3, int votersPerGroup = 3);
     public override async Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request);
-    public override async Task<bool> ProposeAsync(Proposal proposal);
-    public override void OnCommit(Action<Proposal> handler);
+    public override async Task<bool> ProposeAsync(Proposal proposal, CancellationToken cancellationToken = default);
+    public override IDisposable OnCommit(Action<Proposal> handler);
     public override Task<ClusterState> GetClusterStateAsync();
     public override async Task<ConsensusResult> ProposeAsync(byte[] data, CancellationToken ct);
     public async Task<ConsensusResult> ProposeToGroupAsync(byte[] data, int groupId, CancellationToken ct);
@@ -236,6 +236,14 @@ public sealed class UltimateConsensusPlugin : ConsensusPluginBase, IDisposable
     protected override List<PluginCapabilityDescriptor> GetCapabilities();
     protected override Dictionary<string, object> GetMetadata();
     protected override void Dispose(bool disposing);
+}
+```
+```csharp
+private sealed class CommitHandlerRegistration : IDisposable
+{
+}
+    public CommitHandlerRegistration(List<Action<Proposal>> handlers, object handlerLock, Action<Proposal> handler);
+    public void Dispose();
 }
 ```
 

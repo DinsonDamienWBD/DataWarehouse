@@ -972,7 +972,7 @@ public sealed class ConsciousnessScoringEngine : ConsciousnessStrategyBase, ICon
     public override string SemanticDescription;;
     public override string[] Tags;;
     public ConsciousnessScoringEngine(IValueScorer valueScorer, ILiabilityScorer liabilityScorer, ConsciousnessScoringConfig? config = null);
-    public async Task<ConsciousnessScore> ScoreAsync(string objectId, byte[] data, Dictionary<string, object> metadata, CancellationToken ct = default);
+    public async Task<ConsciousnessScore> ScoreAsync(string objectId, byte[] data, IReadOnlyDictionary<string, object> metadata, CancellationToken ct = default);
     public async Task<IReadOnlyList<ConsciousnessScore>> ScoreBatchAsync(IReadOnlyList<(string objectId, byte[] data, Dictionary<string, object> metadata)> batch, CancellationToken ct = default);
     public static ConsciousnessScoringEngine CreateDefault(ConsciousnessScoringConfig? config = null);
 }
@@ -1010,7 +1010,7 @@ public sealed class PIILiabilityStrategy : ConsciousnessStrategyBase
     public override ConsciousnessCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public Task<(double Score, List<string> DetectedTypes, List<string> Factors)> ScoreAsync(byte[] data, Dictionary<string, object> metadata, CancellationToken ct = default);
+    public Task<(double Score, List<string> DetectedTypes, List<string> Factors)> ScoreAsync(byte[] data, IReadOnlyDictionary<string, object> metadata, CancellationToken ct = default);
 }
 ```
 ```csharp
@@ -1023,7 +1023,7 @@ public sealed class PHILiabilityStrategy : ConsciousnessStrategyBase
     public override ConsciousnessCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public Task<(double Score, List<string> Factors)> ScoreAsync(byte[] data, Dictionary<string, object> metadata, CancellationToken ct = default);
+    public Task<(double Score, List<string> Factors)> ScoreAsync(byte[] data, IReadOnlyDictionary<string, object> metadata, CancellationToken ct = default);
 }
 ```
 ```csharp
@@ -1036,7 +1036,7 @@ public sealed class PCILiabilityStrategy : ConsciousnessStrategyBase
     public override ConsciousnessCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public Task<(double Score, List<string> Factors)> ScoreAsync(byte[] data, Dictionary<string, object> metadata, CancellationToken ct = default);
+    public Task<(double Score, List<string> Factors)> ScoreAsync(byte[] data, IReadOnlyDictionary<string, object> metadata, CancellationToken ct = default);
 }
 ```
 ```csharp
@@ -1049,7 +1049,7 @@ public sealed class ClassificationLiabilityStrategy : ConsciousnessStrategyBase
     public override ConsciousnessCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public Task<(double Score, List<string> Factors)> ScoreAsync(Dictionary<string, object> metadata, CancellationToken ct = default);
+    public Task<(double Score, List<string> Factors)> ScoreAsync(IReadOnlyDictionary<string, object> metadata, CancellationToken ct = default);
 }
 ```
 ```csharp
@@ -1062,7 +1062,7 @@ public sealed class RetentionLiabilityStrategy : ConsciousnessStrategyBase
     public override ConsciousnessCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public Task<(double Score, List<string> Factors)> ScoreAsync(Dictionary<string, object> metadata, CancellationToken ct = default);
+    public Task<(double Score, List<string> Factors)> ScoreAsync(IReadOnlyDictionary<string, object> metadata, CancellationToken ct = default);
 }
 ```
 ```csharp
@@ -1075,7 +1075,7 @@ public sealed class RegulatoryExposureLiabilityStrategy : ConsciousnessStrategyB
     public override ConsciousnessCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public Task<(double Score, List<string> ApplicableRegulations, List<string> Factors)> ScoreAsync(Dictionary<string, object> metadata, CancellationToken ct = default);
+    public Task<(double Score, List<string> ApplicableRegulations, List<string> Factors)> ScoreAsync(IReadOnlyDictionary<string, object> metadata, CancellationToken ct = default);
 }
 ```
 ```csharp
@@ -1088,7 +1088,7 @@ public sealed class BreachRiskLiabilityStrategy : ConsciousnessStrategyBase
     public override ConsciousnessCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public Task<(double Score, List<string> Factors)> ScoreAsync(Dictionary<string, object> metadata, CancellationToken ct = default);
+    public Task<(double Score, List<string> Factors)> ScoreAsync(IReadOnlyDictionary<string, object> metadata, CancellationToken ct = default);
 }
 ```
 ```csharp
@@ -1102,7 +1102,7 @@ public sealed class CompositeLiabilityScoringStrategy : ConsciousnessStrategyBas
     public override string SemanticDescription;;
     public override string[] Tags;;
     public void Configure(ConsciousnessScoringConfig? config);
-    public async Task<LiabilityScore> ScoreLiabilityAsync(string objectId, byte[] data, Dictionary<string, object> metadata, CancellationToken ct = default);
+    public async Task<LiabilityScore> ScoreLiabilityAsync(string objectId, byte[] data, IReadOnlyDictionary<string, object> metadata, CancellationToken ct = default);
 }
 ```
 
@@ -1268,7 +1268,7 @@ public sealed class AccessFrequencyValueStrategy : ConsciousnessStrategyBase
     public override ConsciousnessCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public double Score(Dictionary<string, object> metadata);
+    public double Score(IReadOnlyDictionary<string, object> metadata);
 }
 ```
 ```csharp
@@ -1281,7 +1281,7 @@ public sealed class LineageDepthValueStrategy : ConsciousnessStrategyBase
     public override ConsciousnessCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public double Score(Dictionary<string, object> metadata);
+    public double Score(IReadOnlyDictionary<string, object> metadata);
 }
 ```
 ```csharp
@@ -1294,7 +1294,7 @@ public sealed class UniquenessValueStrategy : ConsciousnessStrategyBase
     public override ConsciousnessCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public double Score(Dictionary<string, object> metadata);
+    public double Score(IReadOnlyDictionary<string, object> metadata);
 }
 ```
 ```csharp
@@ -1307,7 +1307,7 @@ public sealed class FreshnessValueStrategy : ConsciousnessStrategyBase
     public override ConsciousnessCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public double Score(Dictionary<string, object> metadata);
+    public double Score(IReadOnlyDictionary<string, object> metadata);
 }
 ```
 ```csharp
@@ -1320,7 +1320,7 @@ public sealed class BusinessCriticalityValueStrategy : ConsciousnessStrategyBase
     public override ConsciousnessCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public double Score(Dictionary<string, object> metadata);
+    public double Score(IReadOnlyDictionary<string, object> metadata);
 }
 ```
 ```csharp
@@ -1333,7 +1333,7 @@ public sealed class ComplianceValueStrategy : ConsciousnessStrategyBase
     public override ConsciousnessCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public double Score(Dictionary<string, object> metadata);
+    public double Score(IReadOnlyDictionary<string, object> metadata);
 }
 ```
 ```csharp
@@ -1347,7 +1347,7 @@ public sealed class CompositeValueScoringStrategy : ConsciousnessStrategyBase, I
     public override string SemanticDescription;;
     public override string[] Tags;;
     public void Configure(ConsciousnessScoringConfig config);
-    public Task<ValueScore> ScoreValueAsync(string objectId, byte[] data, Dictionary<string, object> metadata, CancellationToken ct = default);
+    public Task<ValueScore> ScoreValueAsync(string objectId, byte[] data, IReadOnlyDictionary<string, object> metadata, CancellationToken ct = default);
 }
 ```
 
