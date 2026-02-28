@@ -479,11 +479,15 @@ public sealed class CosmosDbStateStrategy : ServerlessStrategyBase
 /// </summary>
 public sealed class DurableObjectsStateStrategy : ServerlessStrategyBase
 {
+    // In-process state store — a real Cloudflare Durable Objects implementation
+    // would persist state on the Cloudflare edge and requires the Workers runtime.
+    private readonly BoundedDictionary<string, object> _objectStore = new BoundedDictionary<string, object>(10000);
+
     public override string StrategyId => "state-durable-objects";
     public override string DisplayName => "Cloudflare Durable Objects";
     public override ServerlessCategory Category => ServerlessCategory.StateManagement;
     public override ServerlessPlatform? TargetPlatform => ServerlessPlatform.CloudflareWorkers;
-    public override bool IsProductionReady => false; // Requires Cloudflare Workers runtime
+    public override bool IsProductionReady => false; // Requires Cloudflare Workers runtime for edge persistence
 
     public override ServerlessStrategyCapabilities Capabilities => new() { SupportsSyncInvocation = true, SupportsAsyncInvocation = false };
 
@@ -496,12 +500,22 @@ public sealed class DurableObjectsStateStrategy : ServerlessStrategyBase
     public Task<object?> GetStateAsync(string objectId, CancellationToken ct = default)
     {
         RecordOperation("GetState");
-        return Task.FromResult<object?>(null);
+        _objectStore.TryGetValue(objectId, out var state);
+        return Task.FromResult<object?>(state);
     }
 
     public Task PutStateAsync(string objectId, object state, CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(state);
+        _objectStore[objectId] = state;
         RecordOperation("PutState");
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteStateAsync(string objectId, CancellationToken ct = default)
+    {
+        _objectStore.TryRemove(objectId, out _);
+        RecordOperation("DeleteState");
         return Task.CompletedTask;
     }
 }
@@ -511,11 +525,14 @@ public sealed class DurableObjectsStateStrategy : ServerlessStrategyBase
 /// </summary>
 public sealed class FirestoreStateStrategy : ServerlessStrategyBase
 {
+    // In-process document store — production use requires Google Cloud Firestore SDK + credentials.
+    private readonly BoundedDictionary<string, string> _documents = new BoundedDictionary<string, string>(10000);
+
     public override string StrategyId => "state-firestore";
     public override string DisplayName => "Firestore State";
     public override ServerlessCategory Category => ServerlessCategory.StateManagement;
     public override ServerlessPlatform? TargetPlatform => ServerlessPlatform.GoogleCloudFunctions;
-    public override bool IsProductionReady => false; // Requires Google Cloud Firestore SDK
+    public override bool IsProductionReady => false; // Requires Google Cloud Firestore SDK + credentials
 
     public override ServerlessStrategyCapabilities Capabilities => new() { SupportsSyncInvocation = true, SupportsEventTriggers = true };
 
@@ -527,13 +544,35 @@ public sealed class FirestoreStateStrategy : ServerlessStrategyBase
 
     public Task<T?> GetDocumentAsync<T>(string collection, string documentId, CancellationToken ct = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(collection);
+        ArgumentException.ThrowIfNullOrWhiteSpace(documentId);
         RecordOperation("GetDocument");
+        var key = $"{collection}/{documentId}";
+        if (_documents.TryGetValue(key, out var json))
+        {
+            try { return Task.FromResult(JsonSerializer.Deserialize<T>(json)); }
+            catch (JsonException) { }
+        }
         return Task.FromResult<T?>(default);
     }
 
     public Task SetDocumentAsync<T>(string collection, string documentId, T data, CancellationToken ct = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(collection);
+        ArgumentException.ThrowIfNullOrWhiteSpace(documentId);
+        ArgumentNullException.ThrowIfNull(data);
+        var key = $"{collection}/{documentId}";
+        _documents[key] = JsonSerializer.Serialize(data);
         RecordOperation("SetDocument");
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteDocumentAsync(string collection, string documentId, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(collection);
+        ArgumentException.ThrowIfNullOrWhiteSpace(documentId);
+        _documents.TryRemove($"{collection}/{documentId}", out _);
+        RecordOperation("DeleteDocument");
         return Task.CompletedTask;
     }
 }
@@ -543,11 +582,15 @@ public sealed class FirestoreStateStrategy : ServerlessStrategyBase
 /// </summary>
 public sealed class VercelKvStateStrategy : ServerlessStrategyBase
 {
+    // In-process KV store — production use requires Vercel KV SDK + credentials.
+    private readonly BoundedDictionary<string, (string json, DateTimeOffset? expiry)> _kvStore
+        = new BoundedDictionary<string, (string json, DateTimeOffset? expiry)>(10000);
+
     public override string StrategyId => "state-vercel-kv";
     public override string DisplayName => "Vercel KV";
     public override ServerlessCategory Category => ServerlessCategory.StateManagement;
     public override ServerlessPlatform? TargetPlatform => ServerlessPlatform.VercelFunctions;
-    public override bool IsProductionReady => false; // Requires Vercel KV SDK
+    public override bool IsProductionReady => false; // Requires Vercel KV SDK + credentials
 
     public override ServerlessStrategyCapabilities Capabilities => new() { SupportsSyncInvocation = true };
 
@@ -559,12 +602,27 @@ public sealed class VercelKvStateStrategy : ServerlessStrategyBase
 
     public Task<T?> GetAsync<T>(string key, CancellationToken ct = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
         RecordOperation("Get");
+        if (_kvStore.TryGetValue(key, out var entry))
+        {
+            if (entry.expiry.HasValue && entry.expiry.Value < DateTimeOffset.UtcNow)
+            {
+                _kvStore.TryRemove(key, out _);
+                return Task.FromResult<T?>(default);
+            }
+            try { return Task.FromResult(JsonSerializer.Deserialize<T>(entry.json)); }
+            catch (JsonException) { }
+        }
         return Task.FromResult<T?>(default);
     }
 
     public Task SetAsync<T>(string key, T value, int? exSeconds = null, CancellationToken ct = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        ArgumentNullException.ThrowIfNull(value);
+        var expiry = exSeconds.HasValue ? DateTimeOffset.UtcNow.AddSeconds(exSeconds.Value) : (DateTimeOffset?)null;
+        _kvStore[key] = (JsonSerializer.Serialize(value), expiry);
         RecordOperation("Set");
         return Task.CompletedTask;
     }
