@@ -83,6 +83,9 @@ public sealed class FilesystemScalingManager : IScalableSubsystem, IDisposable
     // ---- Backpressure ----
     private volatile BackpressureState _backpressureState = BackpressureState.Normal;
 
+    // ---- Concurrency control ----
+    private readonly SemaphoreSlim _ioConcurrencySemaphore;
+
     // ---- Disposal ----
     private bool _disposed;
 
@@ -144,6 +147,10 @@ public sealed class FilesystemScalingManager : IScalableSubsystem, IDisposable
             DefaultTtl = TimeSpan.FromHours(1)
         };
         _callerQuotas = new BoundedCache<string, IoQuotaInfo>(quotaCacheOptions);
+
+        // Initialize concurrency limiter for I/O dispatch
+        var maxConcurrentIo = Environment.ProcessorCount * 2;
+        _ioConcurrencySemaphore = new SemaphoreSlim(maxConcurrentIo, maxConcurrentIo);
 
         // Start priority dispatch loop
         _dispatchCts = new CancellationTokenSource();
@@ -382,7 +389,9 @@ public sealed class FilesystemScalingManager : IScalableSubsystem, IDisposable
                     _normalPriorityQueue.Reader.TryRead(out op) ||
                     _lowPriorityQueue.Reader.TryRead(out op))
                 {
-                    _ = ExecuteIoOperationAsync(op, ct);
+                    // Acquire concurrency slot before dispatching — limits unbounded parallelism
+                    await _ioConcurrencySemaphore.WaitAsync(ct).ConfigureAwait(false);
+                    _ = ExecuteIoOperationWithConcurrencyLimitAsync(op, ct);
                     continue;
                 }
 
@@ -400,6 +409,27 @@ public sealed class FilesystemScalingManager : IScalableSubsystem, IDisposable
                 // Continue dispatch loop on errors
                 System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
+        }
+    }
+
+    /// <summary>
+    /// Executes an I/O operation with concurrency limiting. Releases the semaphore slot
+    /// when the operation completes (success or failure) and logs any exceptions.
+    /// </summary>
+    private async Task ExecuteIoOperationWithConcurrencyLimitAsync(IoOperation op, CancellationToken ct)
+    {
+        try
+        {
+            await ExecuteIoOperationAsync(op, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            // Log but do not propagate — dispatch loop must continue
+            System.Diagnostics.Debug.WriteLine($"[FilesystemScaling] I/O operation failed: {ex.GetType().Name}: {ex.Message}");
+        }
+        finally
+        {
+            _ioConcurrencySemaphore.Release();
         }
     }
 
@@ -578,6 +608,7 @@ public sealed class FilesystemScalingManager : IScalableSubsystem, IDisposable
         _kernelBypassRedetectTimer.Dispose();
         _strategyQueueDepths.Dispose();
         _callerQuotas.Dispose();
+        _ioConcurrencySemaphore.Dispose();
 
         _highPriorityQueue.Writer.TryComplete();
         _normalPriorityQueue.Writer.TryComplete();

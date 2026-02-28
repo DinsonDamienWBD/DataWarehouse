@@ -109,14 +109,20 @@ public sealed class DevicePoolStrategy : FilesystemStrategyBase
         throw new NotSupportedException("Use device.pool.* message topics");
 
     /// <inheritdoc/>
-    public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default)
+    public override async Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default)
     {
-        var poolCount = _poolManager?.GetAllPoolsAsync().GetAwaiter().GetResult().Count ?? 0;
-        return Task.FromResult(new FilesystemMetadata
+        var poolCount = 0;
+        if (_poolManager != null)
+        {
+            var pools = await _poolManager.GetAllPoolsAsync().ConfigureAwait(false);
+            poolCount = pools.Count;
+        }
+
+        return new FilesystemMetadata
         {
             FilesystemType = "device-pool",
             IsReadOnly = false
-        });
+        };
     }
 
     // ========================================================================

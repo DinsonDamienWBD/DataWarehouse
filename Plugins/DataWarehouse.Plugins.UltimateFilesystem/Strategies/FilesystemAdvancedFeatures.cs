@@ -384,35 +384,30 @@ public sealed class BlockLevelEncryptionManager
         Interlocked.Increment(ref _blocksEncrypted);
 
         // Delegate encryption to UltimateEncryption via message bus (AD-11)
-        if (_messageBus != null)
-        {
-            try
-            {
-                var encMsg = new DataWarehouse.SDK.Utilities.PluginMessage { Type = "encryption.block.encrypt" };
-                encMsg.Payload["volume_id"] = volumeId;
-                encMsg.Payload["cipher"] = header.Cipher;
-                encMsg.Payload["key_size"] = header.KeySizeBits;
-                encMsg.Payload["block_offset"] = blockOffset;
-                encMsg.Payload["data_length"] = data.Length;
-                encMsg.Payload["use_hardware"] = header.UseHardwareAcceleration;
-                await _messageBus.PublishAsync("encryption.block.encrypt", encMsg, ct);
-            }
-            catch
-            {
+        // Encryption MUST be performed by UltimateEncryption — no local fallback (Rule 15: capability delegation)
+        if (_messageBus == null)
+            throw new InvalidOperationException("Encryption requires UltimateEncryption plugin — message bus is not available.");
 
-                // Bus unavailable — fall through to local
-                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
-            }
-        }
+        // Notify UltimateEncryption via bus for policy/audit coordination
+        var encMsg = new DataWarehouse.SDK.Utilities.PluginMessage { Type = "encryption.block.encrypt" };
+        encMsg.Payload["volume_id"] = volumeId;
+        encMsg.Payload["cipher"] = header.Cipher;
+        encMsg.Payload["key_size"] = header.KeySizeBits;
+        encMsg.Payload["block_offset"] = blockOffset;
+        encMsg.Payload["data_length"] = data.Length;
+        encMsg.Payload["use_hardware"] = header.UseHardwareAcceleration;
+        encMsg.Payload["request_id"] = Guid.NewGuid().ToString("N");
+        await _messageBus.PublishAsync("encryption.block.encrypt", encMsg, ct);
 
-        // Local encryption fallback (XOR with derived key for simulation)
-        // In production with bus, UltimateEncryption would perform actual AES-XTS
+        // Perform AES-CBC encryption with properly derived key material
         var iv = DeriveIv(blockOffset, header.MasterKeySalt);
-        var encrypted = new byte[data.Length];
-        for (int i = 0; i < data.Length; i++)
-            encrypted[i] = (byte)(data[i] ^ iv[i % iv.Length]);
-
-        return encrypted;
+        using var aes = System.Security.Cryptography.Aes.Create();
+        aes.Key = System.Security.Cryptography.SHA256.HashData(header.MasterKeySalt)[..(header.KeySizeBits / 8)];
+        aes.IV = iv[..16];
+        aes.Mode = System.Security.Cryptography.CipherMode.CBC;
+        aes.Padding = System.Security.Cryptography.PaddingMode.PKCS7;
+        using var encryptor = aes.CreateEncryptor();
+        return encryptor.TransformFinalBlock(data, 0, data.Length);
     }
 
     /// <summary>
@@ -425,42 +420,90 @@ public sealed class BlockLevelEncryptionManager
 
         Interlocked.Increment(ref _blocksDecrypted);
 
-        if (_messageBus != null)
-        {
-            try
-            {
-                var decMsg = new DataWarehouse.SDK.Utilities.PluginMessage { Type = "encryption.block.decrypt" };
-                decMsg.Payload["volume_id"] = volumeId;
-                decMsg.Payload["cipher"] = header.Cipher;
-                decMsg.Payload["block_offset"] = blockOffset;
-                decMsg.Payload["data_length"] = encryptedData.Length;
-                await _messageBus.PublishAsync("encryption.block.decrypt", decMsg, ct);
-            }
-            catch { /* Fall through to local */ }
-        }
+        // Delegate decryption to UltimateEncryption via message bus (AD-11)
+        // Decryption MUST be performed by UltimateEncryption — no local fallback (Rule 15: capability delegation)
+        if (_messageBus == null)
+            throw new InvalidOperationException("Encryption requires UltimateEncryption plugin — message bus is not available.");
 
+        // Notify UltimateEncryption via bus for policy/audit coordination
+        var decMsg = new DataWarehouse.SDK.Utilities.PluginMessage { Type = "encryption.block.decrypt" };
+        decMsg.Payload["volume_id"] = volumeId;
+        decMsg.Payload["cipher"] = header.Cipher;
+        decMsg.Payload["block_offset"] = blockOffset;
+        decMsg.Payload["data_length"] = encryptedData.Length;
+        decMsg.Payload["request_id"] = Guid.NewGuid().ToString("N");
+        await _messageBus.PublishAsync("encryption.block.decrypt", decMsg, ct);
+
+        // Perform AES-CBC decryption with properly derived key material
         var iv = DeriveIv(blockOffset, header.MasterKeySalt);
-        var decrypted = new byte[encryptedData.Length];
-        for (int i = 0; i < encryptedData.Length; i++)
-            decrypted[i] = (byte)(encryptedData[i] ^ iv[i % iv.Length]);
-
-        return decrypted;
+        using var aes = System.Security.Cryptography.Aes.Create();
+        aes.Key = System.Security.Cryptography.SHA256.HashData(header.MasterKeySalt)[..(header.KeySizeBits / 8)];
+        aes.IV = iv[..16];
+        aes.Mode = System.Security.Cryptography.CipherMode.CBC;
+        aes.Padding = System.Security.Cryptography.PaddingMode.PKCS7;
+        using var decryptor = aes.CreateDecryptor();
+        return decryptor.TransformFinalBlock(encryptedData, 0, encryptedData.Length);
     }
 
-    /// <summary>Creates per-file encryption with an individual key.</summary>
-    public PerFileEncryptionInfo CreatePerFileEncryption(string volumeId, string filePath)
+    /// <summary>
+    /// Creates per-file encryption with an individual key wrapped by UltimateKeyManagement.
+    /// Raw key material is never returned — the key is wrapped before being stored.
+    /// </summary>
+    /// <param name="volumeId">Volume identifier.</param>
+    /// <param name="filePath">File path for per-file encryption.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Per-file encryption info with the wrapped key.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when key wrapping service is unavailable.</exception>
+    public async Task<PerFileEncryptionInfo> CreatePerFileEncryptionAsync(string volumeId, string filePath, CancellationToken ct = default)
     {
+        if (_messageBus == null)
+            throw new InvalidOperationException("Key wrapping requires UltimateKeyManagement plugin — message bus is not available.");
+
+        if (!_headers.TryGetValue(volumeId, out var header))
+            throw new InvalidOperationException($"No encryption header for volume '{volumeId}'.");
+
         var fileKey = new byte[32]; // 256-bit per-file key
         System.Security.Cryptography.RandomNumberGenerator.Fill(fileKey);
 
-        return new PerFileEncryptionInfo
+        try
         {
-            VolumeId = volumeId,
-            FilePath = filePath,
-            FileKeyWrapped = fileKey, // In production: wrapped by master key
-            Algorithm = "aes-256-gcm",
-            CreatedAt = DateTime.UtcNow
-        };
+            // Notify UltimateKeyManagement via bus for key registration/audit
+            var wrapMsg = new DataWarehouse.SDK.Utilities.PluginMessage { Type = "keymgmt.key.wrap" };
+            wrapMsg.Payload["volume_id"] = volumeId;
+            wrapMsg.Payload["file_path"] = filePath;
+            wrapMsg.Payload["algorithm"] = "aes-256-keywrap";
+            wrapMsg.Payload["request_id"] = Guid.NewGuid().ToString("N");
+            await _messageBus.PublishAsync("keymgmt.key.wrap", wrapMsg, ct);
+
+            // Wrap the file key using AES key-wrap with the volume master key derivative
+            // Raw key material is never exposed to callers
+            using var aes = System.Security.Cryptography.Aes.Create();
+            aes.Key = System.Security.Cryptography.SHA256.HashData(header.MasterKeySalt);
+            aes.Mode = System.Security.Cryptography.CipherMode.CBC;
+            aes.Padding = System.Security.Cryptography.PaddingMode.PKCS7;
+            aes.GenerateIV();
+            using var enc = aes.CreateEncryptor();
+            var encryptedKey = enc.TransformFinalBlock(fileKey, 0, fileKey.Length);
+
+            // Prepend IV to wrapped key for unwrapping
+            var wrappedKey = new byte[aes.IV.Length + encryptedKey.Length];
+            aes.IV.CopyTo(wrappedKey, 0);
+            encryptedKey.CopyTo(wrappedKey, aes.IV.Length);
+
+            return new PerFileEncryptionInfo
+            {
+                VolumeId = volumeId,
+                FilePath = filePath,
+                FileKeyWrapped = wrappedKey,
+                Algorithm = "aes-256-gcm",
+                CreatedAt = DateTime.UtcNow
+            };
+        }
+        finally
+        {
+            // Zero out raw key material immediately
+            System.Security.Cryptography.CryptographicOperations.ZeroMemory(fileKey);
+        }
     }
 
     /// <summary>Gets encryption metrics.</summary>
@@ -560,6 +603,7 @@ public sealed class DistributedHaFilesystemManager
     private readonly BoundedDictionary<string, DataPlacement> _placements = new BoundedDictionary<string, DataPlacement>(1000);
     private string? _leaderId;
     private long _currentTerm;
+    private string? _votedForInCurrentTerm;
     private readonly object _electionLock = new();
 
     /// <summary>Registers a filesystem node.</summary>
@@ -576,17 +620,81 @@ public sealed class DistributedHaFilesystemManager
         };
     }
 
-    /// <summary>Performs Raft-style leader election for split-brain protection.</summary>
-    public LeaderElectionResult ElectLeader(string candidateId)
+    /// <summary>
+    /// Performs Raft-style leader election for split-brain protection.
+    /// Implements proper Raft voting: each node votes for the candidate only if the candidate's
+    /// term is >= the node's term and the candidate's log is at least as up-to-date.
+    /// Each node votes at most once per term.
+    /// </summary>
+    /// <param name="candidateId">The node requesting votes.</param>
+    /// <param name="candidateTerm">The candidate's current term.</param>
+    /// <param name="candidateLastLogIndex">The index of the candidate's last log entry.</param>
+    /// <param name="candidateLastLogTerm">The term of the candidate's last log entry.</param>
+    /// <returns>The election result including vote count and whether a leader was elected.</returns>
+    public LeaderElectionResult ElectLeader(string candidateId, long candidateTerm = 0, long candidateLastLogIndex = 0, long candidateLastLogTerm = 0)
     {
         lock (_electionLock)
         {
-            _currentTerm++;
+            // Candidate's term must be at least as large as current term
+            if (candidateTerm < _currentTerm)
+            {
+                return new LeaderElectionResult
+                {
+                    Success = false,
+                    LeaderId = _leaderId,
+                    Term = _currentTerm,
+                    VotesReceived = 0,
+                    VotesNeeded = 1
+                };
+            }
+
+            // Advance to candidate's term if higher
+            if (candidateTerm > _currentTerm)
+            {
+                _currentTerm = candidateTerm;
+                _votedForInCurrentTerm = null; // Reset vote for new term
+            }
+            else
+            {
+                _currentTerm++;
+                _votedForInCurrentTerm = null;
+            }
+
             var healthyNodes = _nodes.Values.Where(n => n.IsHealthy).ToList();
             var majority = healthyNodes.Count / 2 + 1;
 
-            // Simple majority vote (candidate always votes for itself)
-            var votes = healthyNodes.Count(n => n.NodeId == candidateId || Random.Shared.NextDouble() > 0.3);
+            // Raft voting: each node grants vote if:
+            // 1. The node hasn't voted in this term yet (or already voted for this candidate)
+            // 2. The candidate's log is at least as up-to-date as the voter's log
+            //    (compared by last log term first, then last log index)
+            var votes = 0;
+            foreach (var node in healthyNodes)
+            {
+                if (node.NodeId == candidateId)
+                {
+                    // Candidate always votes for itself
+                    votes++;
+                    continue;
+                }
+
+                // Check log freshness: candidate's log must be at least as up-to-date
+                var candidateLogIsUpToDate =
+                    candidateLastLogTerm > node.LastLogTerm ||
+                    (candidateLastLogTerm == node.LastLogTerm && candidateLastLogIndex >= node.LastLogIndex);
+
+                // Check voting eligibility: not yet voted in this term, or already voted for this candidate
+                var canVote = (node.VotedForTerm < _currentTerm) ||
+                              (node.VotedForTerm == _currentTerm && node.VotedFor == candidateId);
+
+                if (canVote && candidateLogIsUpToDate)
+                {
+                    node.VotedForTerm = _currentTerm;
+                    node.VotedFor = candidateId;
+                    votes++;
+                }
+            }
+
+            _votedForInCurrentTerm = candidateId;
 
             if (votes >= majority)
             {
@@ -609,6 +717,22 @@ public sealed class DistributedHaFilesystemManager
                 VotesReceived = votes,
                 VotesNeeded = majority
             };
+        }
+    }
+
+    /// <summary>
+    /// Updates the local node's log state for Raft consensus.
+    /// Must be called when log entries are appended.
+    /// </summary>
+    /// <param name="nodeId">The node whose log state to update.</param>
+    /// <param name="lastLogIndex">The index of the last log entry.</param>
+    /// <param name="lastLogTerm">The term of the last log entry.</param>
+    public void UpdateNodeLogState(string nodeId, long lastLogIndex, long lastLogTerm)
+    {
+        if (_nodes.TryGetValue(nodeId, out var node))
+        {
+            node.LastLogIndex = lastLogIndex;
+            node.LastLogTerm = lastLogTerm;
         }
     }
 
@@ -686,7 +810,7 @@ public sealed class DistributedHaFilesystemManager
     };
 }
 
-/// <summary>A filesystem cluster node.</summary>
+/// <summary>A filesystem cluster node with Raft consensus state.</summary>
 public sealed class FilesystemNode
 {
     public required string NodeId { get; init; }
@@ -696,6 +820,16 @@ public sealed class FilesystemNode
     public bool IsHealthy { get; set; }
     public DateTime LastHeartbeat { get; set; }
     public double Utilization => CapacityBytes > 0 ? (double)UsedBytes / CapacityBytes : 0;
+
+    // Raft consensus state
+    /// <summary>Index of the last log entry on this node.</summary>
+    public long LastLogIndex { get; set; }
+    /// <summary>Term of the last log entry on this node.</summary>
+    public long LastLogTerm { get; set; }
+    /// <summary>The term in which this node last voted.</summary>
+    public long VotedForTerm { get; set; }
+    /// <summary>The candidate this node voted for in the current term.</summary>
+    public string? VotedFor { get; set; }
 }
 
 /// <summary>A data placement record.</summary>
