@@ -27,9 +27,20 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { var client = handle.GetConnection<TcpClient>(); if (!client.Connected) return false; try { await client.GetStream().WriteAsync(Array.Empty<byte>(), 0, 0, ct).ConfigureAwait(false); return true; } catch { return false; } }
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { if (_tcpClient != null) { _tcpClient.Close(); _tcpClient.Dispose(); _tcpClient = null; } await Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var isHealthy = await TestCoreAsync(handle, ct); return new ConnectionHealth(isHealthy, isHealthy ? "SingleStore healthy" : "SingleStore unhealthy", TimeSpan.FromMilliseconds(5), DateTimeOffset.UtcNow); }
-        public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default) { await Task.Delay(5, ct); return new List<Dictionary<string, object?>> { new() { ["id"] = 1, ["value"] = "data" } }; }
-        public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default) { await Task.Delay(5, ct); return 1; }
-        public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default) { await Task.Delay(5, ct); return new List<DataSchema> { new DataSchema("table", new[] { new DataSchemaField("id", "Int", false, null, null) }, new[] { "id" }, new Dictionary<string, object> { ["type"] = "table" }) }; }
+        public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
+        {
+            // SingleStore (formerly MemSQL) uses the MySQL wire protocol (port 3306). Requires MySqlConnector or SingleStore.Data.
+            // This connector provides TCP connectivity; integrate a MySQL-compatible ADO.NET driver for query execution.
+            throw new InvalidOperationException("SingleStore query execution requires the SingleStore.Data or MySqlConnector ADO.NET driver. This connector provides TCP connectivity only.");
+        }
+        public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
+        {
+            throw new InvalidOperationException("SingleStore non-query execution requires the SingleStore.Data or MySqlConnector ADO.NET driver. This connector provides TCP connectivity only.");
+        }
+        public override Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
+        {
+            throw new InvalidOperationException("SingleStore schema discovery requires the SingleStore.Data or MySqlConnector ADO.NET driver. This connector provides TCP connectivity only.");
+        }
         private (string host, int port) ParseHostPort(string connectionString, int defaultPort) { var parts = connectionString.Split(':'); return (parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : defaultPort); }
     }
 }

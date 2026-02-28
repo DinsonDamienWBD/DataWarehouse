@@ -27,9 +27,20 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { var client = handle.GetConnection<TcpClient>(); if (!client.Connected) return false; try { await client.GetStream().WriteAsync(Array.Empty<byte>(), 0, 0, ct).ConfigureAwait(false); return true; } catch { return false; } }
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { if (_tcpClient != null) { _tcpClient.Close(); _tcpClient.Dispose(); _tcpClient = null; } await Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var isHealthy = await TestCoreAsync(handle, ct); return new ConnectionHealth(isHealthy, isHealthy ? "RethinkDB healthy" : "RethinkDB unhealthy", TimeSpan.FromMilliseconds(5), DateTimeOffset.UtcNow); }
-        public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default) { await Task.Delay(5, ct); return new List<Dictionary<string, object?>> { new() { ["id"] = "doc-123", ["name"] = "Sample" } }; }
-        public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default) { await Task.Delay(5, ct); return 1; }
-        public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default) { await Task.Delay(5, ct); return new List<DataSchema> { new DataSchema("table", new[] { new DataSchemaField("id", "String", false, null, null) }, new[] { "id" }, new Dictionary<string, object> { ["type"] = "table" }) }; }
+        public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
+        {
+            // RethinkDB uses a custom JSON-over-TCP protocol (port 28015). Requires the RethinkDB C# driver (RethinkDb.Driver).
+            // This connector provides TCP connectivity; integrate the RethinkDb.Driver for query execution.
+            throw new InvalidOperationException("RethinkDB query execution requires the RethinkDb.Driver NuGet package. This connector provides TCP connectivity only.");
+        }
+        public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
+        {
+            throw new InvalidOperationException("RethinkDB non-query execution requires the RethinkDb.Driver NuGet package. This connector provides TCP connectivity only.");
+        }
+        public override Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
+        {
+            throw new InvalidOperationException("RethinkDB schema discovery requires the RethinkDb.Driver NuGet package. This connector provides TCP connectivity only.");
+        }
         private (string host, int port) ParseHostPort(string connectionString, int defaultPort) { var parts = connectionString.Split(':'); return (parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : defaultPort); }
     }
 }

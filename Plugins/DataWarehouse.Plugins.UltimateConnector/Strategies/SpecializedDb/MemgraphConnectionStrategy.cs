@@ -64,25 +64,29 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             return new ConnectionHealth(isHealthy, isHealthy ? "Memgraph healthy" : "Memgraph unhealthy", TimeSpan.FromMilliseconds(4), DateTimeOffset.UtcNow);
         }
 
-        public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
+        public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            await Task.Delay(5, ct);
-            return new List<Dictionary<string, object?>> { new() { ["n.id"] = 1, ["n.name"] = "Node1" } };
+            // Memgraph uses the Bolt binary protocol (port 7687). Full Bolt framing requires
+            // the Neo4j.Driver or Memgraph-specific client library. This connector establishes
+            // TCP connectivity; integrate a Bolt-capable library for query execution.
+            throw new InvalidOperationException(
+                "Memgraph query execution requires a Bolt protocol driver (e.g., Neo4j.Driver or " +
+                "the Memgraph .NET client). This connector provides TCP connectivity only. " +
+                "Register the Bolt driver via the MessageBus 'bolt.query' topic or integrate directly.");
         }
 
-        public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
+        public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            await Task.Delay(5, ct);
-            return 1;
+            throw new InvalidOperationException(
+                "Memgraph non-query execution requires a Bolt protocol driver. " +
+                "This connector provides TCP connectivity only.");
         }
 
-        public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
+        public override Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
         {
-            await Task.Delay(5, ct);
-            return new List<DataSchema>
-            {
-                new DataSchema("Person", new[] { new DataSchemaField("id", "Integer", false, null, null), new DataSchemaField("name", "String", true, null, null) }, new[] { "id" }, new Dictionary<string, object> { ["type"] = "node_label" })
-            };
+            throw new InvalidOperationException(
+                "Memgraph schema discovery requires a Bolt protocol driver. " +
+                "This connector provides TCP connectivity only.");
         }
 
         private (string host, int port) ParseHostPort(string connectionString, int defaultPort)
