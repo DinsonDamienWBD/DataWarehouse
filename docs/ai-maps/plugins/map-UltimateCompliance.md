@@ -3655,13 +3655,14 @@ internal sealed class Ip2LocationProvider : IGeolocationProvider
 }
 ```
 ```csharp
-internal sealed class IpStackProvider : IGeolocationProvider
+internal sealed class IpStackProvider : IGeolocationProvider, IDisposable
 {
 }
     public string ProviderName;;
     public bool IsEnabled { get; set; };
     public void Configure(Dictionary<string, object> configuration);
     public async Task<GeolocationResult?> LookupAsync(string ipAddress, CancellationToken cancellationToken = default);
+    public void Dispose();
 }
 ```
 ```csharp
@@ -4011,6 +4012,7 @@ public sealed class AdminOverridePreventionStrategy : ComplianceStrategyBase
     public IReadOnlyList<TamperEvidentAuditEntry> GetAuditLog(int count = 100);
     public AuditIntegrityResult VerifyAuditIntegrity();
     protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    public string ComputeApprovalSignature(string authorizationId, string approverId, string commitmentHash);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
 }

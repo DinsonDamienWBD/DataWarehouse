@@ -525,7 +525,7 @@ public sealed class PolicyEnginePlugin : SecurityPluginBase, IClientPolicyEngine
     public override string SecurityDomain;;
     public override PluginCategory Category;;
     public Task<PolicyDecision> EvaluateAsync(IntentManifest manifest, PolicyContext context);
-    public Task LoadPolicyAsync(string policyPath);
+    public async Task LoadPolicyAsync(string policyPath);
     public void AddRule(PolicyRule rule);
     public override Task StartAsync(CancellationToken ct);
     public override Task StopAsync();

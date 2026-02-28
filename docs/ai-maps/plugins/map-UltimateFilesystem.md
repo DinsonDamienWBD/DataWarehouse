@@ -478,7 +478,7 @@ public sealed class DevicePoolStrategy : FilesystemStrategyBase
     public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);;
     public override Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);;
     public override Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);;
-    public override Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);
+    public override async Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);
     public Task<DevicePoolDescriptor> CreatePoolAsync(string name, StorageTier? tier, LocalityTag? locality, IReadOnlyList<IPhysicalBlockDevice> devices, CancellationToken ct);
     public Task<IReadOnlyList<DevicePoolDescriptor>> GetPoolsAsync();
     public Task DeletePoolAsync(Guid poolId, CancellationToken ct);
@@ -965,7 +965,7 @@ public sealed class BlockLevelEncryptionManager
     public int AddKeySlot(string volumeId, string passphrase);
     public async Task<byte[]> EncryptBlockAsync(string volumeId, byte[] data, long blockOffset, CancellationToken ct = default);
     public async Task<byte[]> DecryptBlockAsync(string volumeId, byte[] encryptedData, long blockOffset, CancellationToken ct = default);
-    public PerFileEncryptionInfo CreatePerFileEncryption(string volumeId, string filePath);
+    public async Task<PerFileEncryptionInfo> CreatePerFileEncryptionAsync(string volumeId, string filePath, CancellationToken ct = default);
     public EncryptionMetrics GetMetrics();;
 }
 ```
@@ -1022,7 +1022,8 @@ public sealed class DistributedHaFilesystemManager
 {
 }
     public void RegisterNode(string nodeId, long capacityBytes, string region);
-    public LeaderElectionResult ElectLeader(string candidateId);
+    public LeaderElectionResult ElectLeader(string candidateId, long candidateTerm = 0, long candidateLastLogIndex = 0, long candidateLastLogTerm = 0);
+    public void UpdateNodeLogState(string nodeId, long lastLogIndex, long lastLogTerm);
     public void Heartbeat(string nodeId, long usedBytes);
     public IReadOnlyList<string> DetectUnhealthyNodes(TimeSpan threshold);
     public IReadOnlyList<RebalanceMovement> Rebalance();
@@ -1041,6 +1042,10 @@ public sealed class FilesystemNode
     public bool IsHealthy { get; set; }
     public DateTime LastHeartbeat { get; set; }
     public double Utilization;;
+    public long LastLogIndex { get; set; }
+    public long LastLogTerm { get; set; }
+    public long VotedForTerm { get; set; }
+    public string? VotedFor { get; set; }
 }
 ```
 ```csharp

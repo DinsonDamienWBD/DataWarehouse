@@ -64,6 +64,7 @@ public abstract class DatabaseStorageStrategyBase : StorageStrategyBase, IAsyncD
     public async Task EnsureSchemaAsync(CancellationToken ct = default);
     protected virtual Task EnsureSchemaCoreAsync(CancellationToken ct);
     public DatabaseStorageStatistics GetDatabaseStatistics();
+    protected static void ValidateSqlIdentifier(string identifier, string parameterName = "identifier");
     protected virtual void ValidateKey(string key);
     protected virtual int GetMaxKeyLength();;
     protected static string GenerateETag(byte[] content);
@@ -2343,6 +2344,88 @@ private sealed class LevelDbTransaction : IDatabaseTransaction
     public Task CommitAsync(CancellationToken ct = default);
     public Task RollbackAsync(CancellationToken ct = default);
     public ValueTask DisposeAsync();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/Strategies/NoSQL/CouchDbStorageStrategy.cs
+```csharp
+public sealed class CouchDbStorageStrategy : DatabaseStorageStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageTier Tier;;
+    public override DatabaseCategory DatabaseCategory;;
+    public override string Engine;;
+    public override StorageCapabilities Capabilities;;
+    public override bool SupportsTransactions;;
+    public override bool SupportsSql;;
+    protected override async Task InitializeCoreAsync(CancellationToken ct);
+    protected override async Task ConnectCoreAsync(CancellationToken ct);
+    protected override async Task DisconnectCoreAsync(CancellationToken ct);
+    protected override async Task EnsureSchemaCoreAsync(CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct);
+    protected override async Task<byte[]> RetrieveCoreAsync(string key, CancellationToken ct);
+    protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
+    protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct);
+    protected override async Task<StorageObjectMetadata> GetMetadataCoreAsync(string key, CancellationToken ct);
+    protected override async Task<bool> CheckHealthCoreAsync(CancellationToken ct);
+    protected override async ValueTask DisposeAsyncCore();
+}
+```
+```csharp
+private sealed class CouchDocument
+{
+}
+    [JsonPropertyName("_id")]
+public string? Id { get; set; }
+    [JsonPropertyName("_rev")]
+public string? Rev { get; set; }
+    [JsonPropertyName("data")]
+public string Data { get; set; };
+    [JsonPropertyName("size")]
+public long Size { get; set; }
+    [JsonPropertyName("contentType")]
+public string? ContentType { get; set; }
+    [JsonPropertyName("etag")]
+public string? ETag { get; set; }
+    [JsonPropertyName("metadata")]
+public Dictionary<string, string>? Metadata { get; set; }
+    [JsonPropertyName("createdAt")]
+public DateTime CreatedAt { get; set; }
+    [JsonPropertyName("modifiedAt")]
+public DateTime ModifiedAt { get; set; }
+}
+```
+```csharp
+private sealed class CouchPutResult
+{
+}
+    [JsonPropertyName("ok")]
+public bool Ok { get; set; }
+    [JsonPropertyName("id")]
+public string? Id { get; set; }
+    [JsonPropertyName("rev")]
+public string? Rev { get; set; }
+}
+```
+```csharp
+private sealed class CouchAllDocsResult
+{
+}
+    [JsonPropertyName("rows")]
+public CouchAllDocsRow[]? Rows { get; set; }
+}
+```
+```csharp
+private sealed class CouchAllDocsRow
+{
+}
+    [JsonPropertyName("id")]
+public string? Id { get; set; }
+    [JsonPropertyName("doc")]
+public CouchDocument? Doc { get; set; }
 }
 ```
 

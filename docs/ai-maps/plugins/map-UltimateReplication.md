@@ -1400,7 +1400,7 @@ public sealed class SynchronousReplicationStrategy : EnhancedReplicationStrategy
     public override ReplicationCharacteristics Characteristics { get; };
     public override async Task ReplicateAsync(string sourceNodeId, IEnumerable<string> targetNodeIds, ReadOnlyMemory<byte> data, IDictionary<string, string>? metadata = null, CancellationToken cancellationToken = default);
     public override Task<(ReadOnlyMemory<byte> ResolvedData, VectorClock ResolvedVersion)> ResolveConflictAsync(ReplicationConflict conflict, CancellationToken cancellationToken = default);
-    public override async Task<bool> VerifyConsistencyAsync(IEnumerable<string> nodeIds, string dataId, CancellationToken cancellationToken = default);
+    public override Task<bool> VerifyConsistencyAsync(IEnumerable<string> nodeIds, string dataId, CancellationToken cancellationToken = default);
     public override Task<TimeSpan> GetReplicationLagAsync(string sourceNodeId, string targetNodeId, CancellationToken cancellationToken = default);
     protected override string GetStrategyDescription();;
     protected override string[] GetKnowledgeTags();;
@@ -1996,11 +1996,13 @@ public sealed class PrimarySecondaryReplicationStrategy : EnhancedReplicationStr
     public void SetPrimary(string nodeId);
     public void AddSecondary(string nodeId);
     public void RemoveSecondary(string nodeId);
+    public void RegisterEndpoint(string nodeId, string host, int port);
+    public void RecordHeartbeat(string nodeId);
     public string? GetPrimary();;
     public IReadOnlyList<string> GetSecondaries();;
     public override async Task ReplicateAsync(string sourceNodeId, IEnumerable<string> targetNodeIds, ReadOnlyMemory<byte> data, IDictionary<string, string>? metadata = null, CancellationToken cancellationToken = default);
     public override Task<(ReadOnlyMemory<byte> ResolvedData, VectorClock ResolvedVersion)> ResolveConflictAsync(ReplicationConflict conflict, CancellationToken cancellationToken = default);
-    public override async Task<bool> VerifyConsistencyAsync(IEnumerable<string> nodeIds, string dataId, CancellationToken cancellationToken = default);
+    public override Task<bool> VerifyConsistencyAsync(IEnumerable<string> nodeIds, string dataId, CancellationToken cancellationToken = default);
     public override Task<TimeSpan> GetReplicationLagAsync(string sourceNodeId, string targetNodeId, CancellationToken cancellationToken = default);
     public async Task<bool> PerformFailoverAsync(CancellationToken cancellationToken = default);
     protected override string GetStrategyDescription();;
@@ -2191,8 +2193,9 @@ public sealed class AsynchronousReplicationStrategy : EnhancedReplicationStrateg
     public override ReplicationCharacteristics Characteristics { get; };
     public override Task ReplicateAsync(string sourceNodeId, IEnumerable<string> targetNodeIds, ReadOnlyMemory<byte> data, IDictionary<string, string>? metadata = null, CancellationToken cancellationToken = default);
     public override Task<(ReadOnlyMemory<byte> ResolvedData, VectorClock ResolvedVersion)> ResolveConflictAsync(ReplicationConflict conflict, CancellationToken cancellationToken = default);
-    public override async Task<bool> VerifyConsistencyAsync(IEnumerable<string> nodeIds, string dataId, CancellationToken cancellationToken = default);
+    public override Task<bool> VerifyConsistencyAsync(IEnumerable<string> nodeIds, string dataId, CancellationToken cancellationToken = default);
     public override Task<TimeSpan> GetReplicationLagAsync(string sourceNodeId, string targetNodeId, CancellationToken cancellationToken = default);
+    internal void RecordNodeData(string nodeId, string dataId, ReadOnlySpan<byte> data);
     public int GetQueueDepth();;
     public new void Dispose();
     protected override string GetStrategyDescription();;

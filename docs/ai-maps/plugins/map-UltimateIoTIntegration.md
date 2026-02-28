@@ -36,7 +36,7 @@ public abstract class IoTStrategyBase : StrategyBase, IIoTStrategyBase
     protected virtual void OnIntelligenceConfigured();
     public virtual IEnumerable<KnowledgeObject> GetKnowledge();
     public virtual IEnumerable<RegisteredCapability> GetCapabilities();
-    protected Task PublishMessage(string topic, PluginMessage message);
+    protected async Task PublishMessage(string topic, PluginMessage message);
 }
 ```
 
@@ -1535,8 +1535,8 @@ public abstract class IoTSecurityStrategyBase : IoTStrategyBase, IIoTSecurityStr
     public abstract Task<CredentialRotationResult> RotateCredentialsAsync(string deviceId, CancellationToken ct = default);;
     public abstract Task<SecurityAssessment> AssessSecurityAsync(string deviceId, CancellationToken ct = default);;
     public abstract Task<ThreatDetectionResult> DetectThreatsAsync(ThreatDetectionRequest request, CancellationToken ct = default);;
-    public virtual Task<byte[]> EncryptAsync(string deviceId, byte[] data, CancellationToken ct = default);
-    public virtual Task<byte[]> DecryptAsync(string deviceId, byte[] data, CancellationToken ct = default);
+    public virtual async Task<byte[]> EncryptAsync(string deviceId, byte[] data, CancellationToken ct = default);
+    public virtual async Task<byte[]> DecryptAsync(string deviceId, byte[] data, CancellationToken ct = default);
 }
 ```
 ```csharp
@@ -3066,6 +3066,7 @@ public sealed class SensorFusionStrategy : IoTStrategyBase
 public sealed class KalmanFilter
 {
 }
+    public bool IsInitialized;;
     public void Initialize(double[] initialPosition);
     public void Predict(double dt);
     public void Update(double[] measurement, double[] measurementNoise);

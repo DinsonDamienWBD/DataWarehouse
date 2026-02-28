@@ -1485,6 +1485,7 @@ internal sealed class AlexaChannelStrategy : SdkInterface.InterfaceStrategyBase,
 internal sealed class GenericWebhookStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
 }
+    public void ConfigureWebhookSecret(string secret);
     public override string StrategyId;;
     public string DisplayName;;
     public string SemanticDescription;;
@@ -1539,6 +1540,7 @@ internal sealed class GoogleAssistantChannelStrategy : SdkInterface.InterfaceStr
 internal sealed class TeamsChannelStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
 }
+    public void ConfigureAuthentication(string appId, string? tenantId = null);
     public override string StrategyId;;
     public string DisplayName;;
     public string SemanticDescription;;
@@ -1557,6 +1559,7 @@ internal sealed class TeamsChannelStrategy : SdkInterface.InterfaceStrategyBase,
 internal sealed class DiscordChannelStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
 }
+    public void ConfigurePublicKey(string publicKeyHex);
     public override string StrategyId;;
     public string DisplayName;;
     public string SemanticDescription;;
@@ -1593,6 +1596,7 @@ internal sealed class SiriChannelStrategy : SdkInterface.InterfaceStrategyBase, 
 internal sealed class SlackChannelStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
 }
+    public void ConfigureSigningSecret(string signingSecret);
     public override string StrategyId;;
     public string DisplayName;;
     public string SemanticDescription;;
@@ -1611,6 +1615,7 @@ internal sealed class SlackChannelStrategy : SdkInterface.InterfaceStrategyBase,
 internal sealed class ChatGptPluginStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
 }
+    public void ConfigureVerificationToken(string verificationToken);
     public override string StrategyId;;
     public string DisplayName;;
     public string SemanticDescription;;

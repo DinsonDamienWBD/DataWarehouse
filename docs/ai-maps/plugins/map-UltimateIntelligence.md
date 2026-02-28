@@ -10053,6 +10053,7 @@ public sealed record PredictedFailureType
 public sealed class ConnectorIntegrationStrategy : FeatureStrategyBase
 {
 }
+    public string? ConnectorRegistryEndpoint { get; set; }
     public override string StrategyId;;
     public override string StrategyName;;
     public override IntelligenceStrategyInfo Info;;
@@ -14555,7 +14556,7 @@ public sealed class RedisPersistenceBackend : IProductionPersistenceBackend
     public Task<PersistenceStatistics> GetStatisticsAsync(CancellationToken ct = default);
     public Task<bool> IsHealthyAsync(CancellationToken ct = default);
     public async IAsyncEnumerable<StreamEntry> SubscribeToChangesAsync(string? fromId = null, [EnumeratorCancellation] CancellationToken ct = default);
-    public async Task<bool> StoreIfNotExistsAsync(MemoryRecord record, CancellationToken ct = default);
+    public Task<bool> StoreIfNotExistsAsync(MemoryRecord record, CancellationToken ct = default);
     public Task<long> IncrementAccessCountAsync(string id, CancellationToken ct = default);
     public ValueTask DisposeAsync();
 }
@@ -15222,6 +15223,7 @@ public abstract record PersistenceBackendConfig
     public int RetryDelayMs { get; init; };
     public int ConnectionTimeoutMs { get; init; };
     public int OperationTimeoutMs { get; init; };
+    public bool RequireRealBackend { get; init; }
 }
 ```
 ```csharp

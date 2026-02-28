@@ -1062,8 +1062,8 @@ public sealed class RaftConsensusStrategy : ResilienceStrategyBase
     public string? LeaderId;;
     public bool IsLeader;;
     public void AddNode(string nodeId);
-    public async Task<bool> StartElectionAsync(CancellationToken cancellationToken = default);
-    public async Task<bool> AppendCommandAsync(object command, CancellationToken cancellationToken = default);
+    public Task<bool> StartElectionAsync(CancellationToken cancellationToken = default);
+    public Task<bool> AppendCommandAsync(object command, CancellationToken cancellationToken = default);
     public void ReceiveHeartbeat(string leaderId, long term);
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
     protected override string? GetCurrentState();;
@@ -1079,7 +1079,7 @@ public sealed class PaxosConsensusStrategy : ResilienceStrategyBase
     public override string StrategyName;;
     public override string Category;;
     public override ResilienceCharacteristics Characteristics { get; };
-    public async Task<(bool success, object? value)> ProposeAsync(object value, CancellationToken cancellationToken = default);
+    public Task<(bool success, object? value)> ProposeAsync(object value, CancellationToken cancellationToken = default);
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
     protected override string? GetCurrentState();;
 }
@@ -1094,7 +1094,7 @@ public sealed class PbftConsensusStrategy : ResilienceStrategyBase
     public override string StrategyName;;
     public override string Category;;
     public override ResilienceCharacteristics Characteristics { get; };
-    public async Task<bool> ExecuteConsensusAsync(object request, CancellationToken cancellationToken = default);
+    public Task<bool> ExecuteConsensusAsync(object request, CancellationToken cancellationToken = default);
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
     protected override string? GetCurrentState();;
 }
@@ -1111,7 +1111,7 @@ public sealed class ZabConsensusStrategy : ResilienceStrategyBase
     public override ResilienceCharacteristics Characteristics { get; };
     public long Zxid;;
     public long Epoch;;
-    public async Task<bool> BroadcastAsync(object proposal, CancellationToken cancellationToken = default);
+    public Task<bool> BroadcastAsync(object proposal, CancellationToken cancellationToken = default);
     public void BecomeLeader();
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
     protected override string? GetCurrentState();;
@@ -1127,7 +1127,7 @@ public sealed class ViewstampedReplicationStrategy : ResilienceStrategyBase
     public override string StrategyName;;
     public override string Category;;
     public override ResilienceCharacteristics Characteristics { get; };
-    public async Task<bool> ProcessRequestAsync(object request, CancellationToken cancellationToken = default);
+    public Task<bool> ProcessRequestAsync(object request, CancellationToken cancellationToken = default);
     public void BecomePrimary();
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
     protected override string? GetCurrentState();;

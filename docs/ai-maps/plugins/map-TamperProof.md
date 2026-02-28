@@ -1323,32 +1323,16 @@ public class S3WormStorage : WormStorageProviderPluginBase
     public override WormEnforcementMode EnforcementMode;;
     public string BucketName;;
     public string Region;;
-    public async Task<bool> VerifyObjectLockConfigurationAsync(CancellationToken ct = default);
-    public async Task<S3WormWriteResult> WriteWithObjectLockAsync(Guid objectId, Stream data, WormRetentionPolicy retention, S3ObjectLockMode? lockMode = null, bool applyLegalHold = false, CancellationToken ct = default);
-    protected override async Task<SdkWormWriteResult> WriteInternalAsync(Guid objectId, Stream data, WormRetentionPolicy retention, WriteContext context, CancellationToken ct);
-    public override async Task<Stream> ReadAsync(Guid objectId, CancellationToken ct = default);
-    public override async Task<WormObjectStatus> GetStatusAsync(Guid objectId, CancellationToken ct = default);
-    public override async Task<bool> ExistsAsync(Guid objectId, CancellationToken ct = default);
-    public override async Task<IReadOnlyList<LegalHold>> GetLegalHoldsAsync(Guid objectId, CancellationToken ct = default);
-    protected override async Task ExtendRetentionInternalAsync(Guid objectId, DateTimeOffset newExpiry, CancellationToken ct);
-    protected override async Task PlaceLegalHoldInternalAsync(Guid objectId, string holdId, string reason, CancellationToken ct);
-    protected override async Task RemoveLegalHoldInternalAsync(Guid objectId, string holdId, CancellationToken ct);
+    public Task<bool> VerifyObjectLockConfigurationAsync(CancellationToken ct = default);
+    public Task<S3WormWriteResult> WriteWithObjectLockAsync(Guid objectId, Stream data, WormRetentionPolicy retention, S3ObjectLockMode? lockMode = null, bool applyLegalHold = false, CancellationToken ct = default);
+    protected override Task<SdkWormWriteResult> WriteInternalAsync(Guid objectId, Stream data, WormRetentionPolicy retention, WriteContext context, CancellationToken ct);
+    public override Task<Stream> ReadAsync(Guid objectId, CancellationToken ct = default);
+    public override Task<WormObjectStatus> GetStatusAsync(Guid objectId, CancellationToken ct = default);
+    public override Task<bool> ExistsAsync(Guid objectId, CancellationToken ct = default);
+    public override Task<IReadOnlyList<LegalHold>> GetLegalHoldsAsync(Guid objectId, CancellationToken ct = default);
+    protected override Task ExtendRetentionInternalAsync(Guid objectId, DateTimeOffset newExpiry, CancellationToken ct);
+    protected override Task PlaceLegalHoldInternalAsync(Guid objectId, string holdId, string reason, CancellationToken ct);
+    protected override Task RemoveLegalHoldInternalAsync(Guid objectId, string holdId, CancellationToken ct);
     protected override Dictionary<string, object> GetMetadata();
-}
-```
-```csharp
-private class S3ObjectRecord
-{
-}
-    public required string Key { get; init; }
-    public required string VersionId { get; init; }
-    public required byte[] Data { get; init; }
-    public required string ContentHash { get; init; }
-    public required string ETag { get; init; }
-    public required S3ObjectLockMode LockMode { get; init; }
-    public DateTimeOffset RetainUntil { get; set; }
-    public bool LegalHoldActive { get; set; }
-    public required DateTimeOffset CreatedAt { get; init; }
-    public required long SizeBytes { get; init; }
 }
 ```
