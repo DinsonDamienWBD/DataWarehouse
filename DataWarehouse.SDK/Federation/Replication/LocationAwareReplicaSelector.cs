@@ -159,7 +159,7 @@ public sealed class LocationAwareReplicaSelector : IReplicaSelector
         var self = await _topology.GetSelfTopologyAsync(ct).ConfigureAwait(false);
         if (self == null) return location.NodeIds.Where(id => id != failedNodeId).ToList();
 
-        return await ReplicaFallbackChain.BuildAsync(failedNodeId, location.NodeIds, self, _topology);
+        return await ReplicaFallbackChain.BuildAsync(failedNodeId, location.NodeIds, self, _topology, ct).ConfigureAwait(false);
     }
 
     /// <summary>

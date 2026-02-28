@@ -150,7 +150,8 @@ public sealed class MoonshotPipelineContext
         {
             lock (_resultsLock)
             {
-                return _stageResults.ToList().AsReadOnly();
+                // Array.AsReadOnly wraps without an extra List copy
+                return Array.AsReadOnly(_stageResults.ToArray());
             }
         }
     }

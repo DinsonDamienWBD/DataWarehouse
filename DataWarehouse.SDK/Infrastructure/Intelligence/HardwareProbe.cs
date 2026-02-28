@@ -98,6 +98,7 @@ public sealed class HardwareProbe : IAiAdvisor
     private readonly double[] _latencySamples;
     private int _latencySampleIndex;
     private int _latencySampleCount;
+    private readonly object _latencyLock = new();
     private const int LatencySampleCapacity = 256;
 
     /// <summary>
@@ -188,23 +189,32 @@ public sealed class HardwareProbe : IAiAdvisor
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void RecordLatency(double latencyMs)
     {
-        int idx = _latencySampleIndex;
-        _latencySamples[idx] = latencyMs;
-        _latencySampleIndex = (idx + 1) % LatencySampleCapacity;
-        if (_latencySampleCount < LatencySampleCapacity)
+        lock (_latencyLock)
         {
-            _latencySampleCount++;
+            int idx = _latencySampleIndex;
+            _latencySamples[idx] = latencyMs;
+            _latencySampleIndex = (idx + 1) % LatencySampleCapacity;
+            if (_latencySampleCount < LatencySampleCapacity)
+            {
+                _latencySampleCount++;
+            }
         }
     }
 
     private ThermalState InferThermalState()
     {
-        int count = _latencySampleCount;
+        int count;
+        double[] sorted;
+        lock (_latencyLock)
+        {
+            count = _latencySampleCount;
+            if (count < 10) return ThermalState.Normal;
+            sorted = new double[count];
+            Array.Copy(_latencySamples, sorted, count);
+        }
         if (count < 10) return ThermalState.Normal;
 
-        // Copy current samples for sorting
-        double[] sorted = new double[count];
-        Array.Copy(_latencySamples, sorted, count);
+        // Sort the captured samples
         Array.Sort(sorted);
 
         double p50 = sorted[count / 2];

@@ -161,9 +161,15 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.Discovery
             _listenCts?.Cancel();
 
             if (_announceTask != null)
-                await _announceTask.ConfigureAwait(false);
+            {
+                try { await _announceTask.ConfigureAwait(false); }
+                catch (OperationCanceledException) { /* expected on stop */ }
+            }
             if (_listenTask != null)
-                await _listenTask.ConfigureAwait(false);
+            {
+                try { await _listenTask.ConfigureAwait(false); }
+                catch (OperationCanceledException) { /* expected on stop */ }
+            }
 
             _announceClient?.Dispose();
             _listenClient?.Dispose();
@@ -296,6 +302,11 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.Discovery
                 var anCount = BinaryPrimitives.ReverseEndianness(reader.ReadUInt16());
                 var nsCount = reader.ReadUInt16();
                 var arCount = BinaryPrimitives.ReverseEndianness(reader.ReadUInt16());
+
+                // Sanity-check counts to reject malformed/crafted packets
+                const int MaxDnsRecords = 512;
+                if (qdCount > MaxDnsRecords || anCount > MaxDnsRecords || arCount > MaxDnsRecords)
+                    return;
 
                 // Skip question section
                 for (int i = 0; i < qdCount; i++)

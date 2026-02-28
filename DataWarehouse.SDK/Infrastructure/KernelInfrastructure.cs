@@ -1443,7 +1443,9 @@ public sealed class ConfigurationHotReloader : IConfigurationChangeNotifier, IAs
             _watcher.Created += OnFileChanged;
 
             // Load initial configuration
-            _ = LoadConfigurationAsync();
+            _ = LoadConfigurationAsync().ContinueWith(
+                t => System.Diagnostics.Debug.WriteLine($"[ConfigurationHotReloader] Initial load failed: {t.Exception?.GetBaseException().Message}"),
+                TaskContinuationOptions.OnlyOnFaulted);
         }
     }
 
@@ -1535,8 +1537,12 @@ public sealed class ConfigurationHotReloader : IConfigurationChangeNotifier, IAs
 
     private void OnFileChanged(object sender, FileSystemEventArgs e)
     {
-        // Debounce file changes
-        Task.Delay(100).ContinueWith(_ => ReloadAsync());
+        // Debounce file changes; unwrap inner task so exceptions are observed
+        _ = Task.Delay(100).ContinueWith(
+            _ => ReloadAsync(),
+            TaskScheduler.Default).Unwrap().ContinueWith(
+            t => System.Diagnostics.Debug.WriteLine($"[ConfigurationHotReloader] Reload failed: {t.Exception?.GetBaseException().Message}"),
+            TaskContinuationOptions.OnlyOnFaulted);
     }
 
     private async Task LoadConfigurationAsync(CancellationToken ct = default)

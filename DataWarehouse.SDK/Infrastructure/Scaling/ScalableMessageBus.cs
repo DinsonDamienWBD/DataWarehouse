@@ -115,6 +115,14 @@ namespace DataWarehouse.SDK.Infrastructure.Scaling
             var partitionIndex = GetPartitionIndex(message, partitionSet.PartitionCount);
             var partition = partitionSet.Partitions[partitionIndex];
 
+            // Check backpressure BEFORE enqueue so the message never enters the queue when shedding
+            if (_backpressureState == BackpressureState.Shedding)
+            {
+                Interlocked.Increment(ref _totalDropped);
+                Interlocked.Increment(ref _totalPublished);
+                return;
+            }
+
             if (partition.RingBuffer != null)
             {
                 // Hot path: use Disruptor ring buffer
@@ -132,13 +140,6 @@ namespace DataWarehouse.SDK.Infrastructure.Scaling
 
             Interlocked.Increment(ref partition.EnqueuedCount);
             Interlocked.Increment(ref _totalPublished);
-
-            // Check backpressure: if shedding, drop non-critical messages
-            if (_backpressureState == BackpressureState.Shedding)
-            {
-                Interlocked.Increment(ref _totalDropped);
-                return;
-            }
 
             // Delegate to inner bus for actual delivery
             await _inner.PublishAsync(topic, message, ct).ConfigureAwait(false);

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 
 namespace DataWarehouse.SDK.Primitives.Probabilistic;
 
@@ -28,7 +29,7 @@ public sealed class BloomFilter<T> : IProbabilisticStructure, IMergeable<BloomFi
     private readonly int _hashCount;
     private readonly int _bitCount;
     private readonly Func<T, byte[]> _serializer;
-    private long _itemCount;
+    private long _itemCount; // accessed via Interlocked for 32-bit atomicity (finding P2-559)
 
     /// <inheritdoc/>
     public string StructureType => "BloomFilter";
@@ -40,7 +41,7 @@ public sealed class BloomFilter<T> : IProbabilisticStructure, IMergeable<BloomFi
     public double ConfiguredErrorRate { get; }
 
     /// <inheritdoc/>
-    public long ItemCount => _itemCount;
+    public long ItemCount => Interlocked.Read(ref _itemCount);
 
     /// <summary>
     /// Gets the number of bits in the filter.
@@ -121,7 +122,7 @@ public sealed class BloomFilter<T> : IProbabilisticStructure, IMergeable<BloomFi
         {
             _bits.Set(index, true);
         }
-        _itemCount++;
+        Interlocked.Increment(ref _itemCount);
     }
 
     /// <summary>
@@ -194,7 +195,7 @@ public sealed class BloomFilter<T> : IProbabilisticStructure, IMergeable<BloomFi
             throw new ArgumentException("Cannot merge Bloom filters with different hash counts.");
 
         _bits.Or(other._bits);
-        _itemCount += other._itemCount;
+        Interlocked.Add(ref _itemCount, Interlocked.Read(ref other._itemCount));
     }
 
     /// <inheritdoc/>
@@ -263,24 +264,13 @@ public sealed class BloomFilter<T> : IProbabilisticStructure, IMergeable<BloomFi
     public void Clear()
     {
         _bits.SetAll(false);
-        _itemCount = 0;
+        Interlocked.Exchange(ref _itemCount, 0);
     }
 
     /// <summary>
     /// Gets the fill ratio (percentage of bits set).
     /// </summary>
-    public double FillRatio
-    {
-        get
-        {
-            int setBits = 0;
-            for (int i = 0; i < _bits.Length; i++)
-            {
-                if (_bits[i]) setBits++;
-            }
-            return (double)setBits / _bitCount;
-        }
-    }
+    public double FillRatio => (double)CountSetBits() / _bitCount;
 
     /// <summary>
     /// Estimates the number of items in the filter based on bit saturation.
@@ -288,11 +278,7 @@ public sealed class BloomFilter<T> : IProbabilisticStructure, IMergeable<BloomFi
     /// </summary>
     public long EstimateItemCount()
     {
-        int setBits = 0;
-        for (int i = 0; i < _bits.Length; i++)
-        {
-            if (_bits[i]) setBits++;
-        }
+        int setBits = CountSetBits(); // shared helper avoids duplicate O(n) scan (finding P2-556)
 
         if (setBits == 0) return 0;
         if (setBits == _bitCount) return long.MaxValue;
@@ -313,6 +299,20 @@ public sealed class BloomFilter<T> : IProbabilisticStructure, IMergeable<BloomFi
             var combinedHash = hash1 + (ulong)i * hash2;
             yield return (int)(combinedHash % (ulong)_bitCount);
         }
+    }
+
+    /// <summary>
+    /// Counts the number of set bits (popcount) in the filter in a single O(n) pass.
+    /// Shared between <see cref="FillRatio"/> and <see cref="EstimateItemCount"/> (finding P2-556).
+    /// </summary>
+    private int CountSetBits()
+    {
+        int setBits = 0;
+        for (int i = 0; i < _bits.Length; i++)
+        {
+            if (_bits[i]) setBits++;
+        }
+        return setBits;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

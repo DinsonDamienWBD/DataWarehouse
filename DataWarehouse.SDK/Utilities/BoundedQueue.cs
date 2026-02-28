@@ -181,13 +181,15 @@ namespace DataWarehouse.SDK.Utilities
         {
             if (!PersistenceEnabled) return;
 
+            // Clear flag before save to avoid lost-persist race
+            _pendingPersist = false;
+
             T[] snapshot;
             lock (_syncRoot) { snapshot = _queue.ToArray(); }
 
             var json = JsonSerializer.Serialize(snapshot);
             var bytes = Encoding.UTF8.GetBytes(json);
             await _stateStore!.SaveAsync(_pluginId!, _stateKey!, bytes, ct).ConfigureAwait(false);
-            _pendingPersist = false;
         }
 
         /// <summary>

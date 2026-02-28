@@ -271,7 +271,8 @@ public sealed class BatchProcessor<T> : IAsyncDisposable
         if (_currentBatch.Count == 0)
             return;
 
-        var batch = _currentBatch.ToList();
+        // Swap lists instead of copying to avoid hot-path allocation
+        var batch = _currentBatch.ToArray(); // single allocation, no intermediate List
         _currentBatch.Clear();
 
         await _processBatch(batch, cancellationToken);

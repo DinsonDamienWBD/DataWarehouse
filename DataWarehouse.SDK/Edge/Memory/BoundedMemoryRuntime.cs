@@ -109,7 +109,9 @@ public sealed class BoundedMemoryRuntime : IDisposable
     public bool CanAllocate(int size)
     {
         if (!_settings.Enabled) return true;
-        return _tracker!.CurrentUsage + size <= _tracker.Ceiling;
+        var tracker = _tracker; // capture volatile reference once to avoid TOCTOU
+        if (tracker == null) return true;
+        return tracker.CurrentUsage + size <= tracker.Ceiling;
     }
 
     /// <summary>
@@ -133,6 +135,12 @@ public sealed class BoundedMemoryRuntime : IDisposable
     /// </summary>
     public void Dispose()
     {
-        _monitorTimer?.Dispose();
+        lock (_initLock)
+        {
+            var timer = _monitorTimer;
+            _monitorTimer = null;
+            timer?.Dispose();
+            _tracker = null; // prevent post-dispose callbacks from referencing tracker
+        }
     }
 }

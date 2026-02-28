@@ -144,6 +144,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
             if (redirectTarget is not null)
             {
                 var visited = new List<string> { path };
+                var visitedSet = new HashSet<string>(StringComparer.Ordinal) { path }; // O(1) lookup
                 var currentTarget = redirectTarget;
 
                 for (var hop = 0; hop < maxDepth; hop++)
@@ -157,7 +158,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
                         throw new PolicyCircularReferenceException(visited);
                     }
 
-                    if (visited.Contains(currentTarget))
+                    if (visitedSet.Contains(currentTarget))
                     {
                         // Cycle detected (not back to origin but revisiting a node)
                         visited.Add(currentTarget);
@@ -165,6 +166,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
                     }
 
                     visited.Add(currentTarget);
+                    visitedSet.Add(currentTarget);
 
                     // Look up the target policy in the store to continue the chain
                     var targetPolicy = await store.GetAsync(featureId, level, currentTarget, ct).ConfigureAwait(false);

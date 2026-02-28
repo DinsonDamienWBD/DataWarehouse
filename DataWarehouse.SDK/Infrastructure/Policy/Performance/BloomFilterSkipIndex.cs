@@ -74,8 +74,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy.Performance
         /// <param name="path">The VDE path at the specified level.</param>
         public void Add(PolicyLevel level, string path)
         {
-            byte[] keyBytes = Encoding.UTF8.GetBytes($"{(int)level}:{path}");
-            ComputeHashPair(keyBytes, out ulong h1, out ulong h2);
+            ComputeHashPairFromLevelPath(level, path, out ulong h1, out ulong h2);
 
             for (int i = 0; i < _hashCount; i++)
             {
@@ -100,8 +99,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy.Performance
         /// <returns>False if definitely no override; true if an override might exist.</returns>
         public bool MayContain(PolicyLevel level, string path)
         {
-            byte[] keyBytes = Encoding.UTF8.GetBytes($"{(int)level}:{path}");
-            ComputeHashPair(keyBytes, out ulong h1, out ulong h2);
+            ComputeHashPairFromLevelPath(level, path, out ulong h1, out ulong h2);
 
             for (int i = 0; i < _hashCount; i++)
             {
@@ -181,6 +179,47 @@ namespace DataWarehouse.SDK.Infrastructure.Policy.Performance
         {
             h1 = XxHash64.HashToUInt64(keyBytes, seed: 0);
             h2 = XxHash64.HashToUInt64(keyBytes, seed: unchecked((long)GoldenRatioSeed));
+        }
+
+        /// <summary>
+        /// Allocation-free variant that hashes (level, path) directly using a pooled byte buffer,
+        /// avoiding the per-call string interpolation and byte[] allocation (finding P2-498).
+        /// </summary>
+        private static void ComputeHashPairFromLevelPath(PolicyLevel level, string path,
+            out ulong h1, out ulong h2)
+        {
+            // Key layout: 1-byte level prefix + ':' + UTF-8 path bytes
+            int pathByteCount = Encoding.UTF8.GetByteCount(path);
+            int totalBytes = 2 + pathByteCount; // level digit + ':' + path bytes
+
+            // Use stackalloc for small keys (≤256 bytes); rent from pool for larger paths.
+            const int StackThreshold = 256;
+            if (totalBytes <= StackThreshold)
+            {
+                Span<byte> buf = stackalloc byte[totalBytes];
+                buf[0] = (byte)('0' + (int)level); // level is a small int (0-5)
+                buf[1] = (byte)':';
+                Encoding.UTF8.GetBytes(path, buf[2..]);
+                h1 = XxHash64.HashToUInt64(buf, seed: 0);
+                h2 = XxHash64.HashToUInt64(buf, seed: unchecked((long)GoldenRatioSeed));
+            }
+            else
+            {
+                var rented = System.Buffers.ArrayPool<byte>.Shared.Rent(totalBytes);
+                try
+                {
+                    rented[0] = (byte)('0' + (int)level);
+                    rented[1] = (byte)':';
+                    Encoding.UTF8.GetBytes(path, 0, path.Length, rented, 2);
+                    var span = rented.AsSpan(0, totalBytes);
+                    h1 = XxHash64.HashToUInt64(span, seed: 0);
+                    h2 = XxHash64.HashToUInt64(span, seed: unchecked((long)GoldenRatioSeed));
+                }
+                finally
+                {
+                    System.Buffers.ArrayPool<byte>.Shared.Return(rented);
+                }
+            }
         }
     }
 }

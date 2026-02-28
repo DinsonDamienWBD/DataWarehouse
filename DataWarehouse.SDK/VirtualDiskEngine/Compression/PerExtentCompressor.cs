@@ -148,6 +148,10 @@ public sealed class PerExtentCompressor
             totalRead += read;
         }
 
+        if (totalRead != compressed.OriginalSize)
+            throw new InvalidDataException(
+                $"Brotli decompression produced {totalRead} bytes but expected {compressed.OriginalSize}; data may be corrupt.");
+
         return Task.FromResult(decompressed);
     }
 

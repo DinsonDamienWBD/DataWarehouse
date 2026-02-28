@@ -166,8 +166,15 @@ namespace DataWarehouse.SDK.Hardware
                 try
                 {
                     var name = item.TryGetProperty("_name", out var nameEl) ? nameEl.GetString() : "Unknown Storage";
-                    var deviceId = item.TryGetProperty("bsd_name", out var bsdEl) ? bsdEl.GetString() : name;
+                    var rawBsdName = item.TryGetProperty("bsd_name", out var bsdEl) ? bsdEl.GetString() : null;
                     var mediaType = item.TryGetProperty("medium_type", out var typeEl) ? typeEl.GetString() : null;
+
+                    // Sanitize bsd_name: macOS BSD names are simple identifiers like "disk0", "disk1s1".
+                    // Reject any value containing path separators or dots-only segments to prevent
+                    // path traversal via a crafted system_profiler output (finding P2-396).
+                    string? deviceId = null;
+                    if (rawBsdName != null && IsSafeBsdName(rawBsdName))
+                        deviceId = rawBsdName;
 
                     var deviceType = mediaType?.Contains("SSD", StringComparison.OrdinalIgnoreCase) == true
                         ? HardwareDeviceType.BlockDevice | HardwareDeviceType.NvmeController
@@ -305,6 +312,28 @@ namespace DataWarehouse.SDK.Hardware
             }
 
             return devices;
+        }
+
+        /// <summary>
+        /// Returns true if the BSD device name is safe to use in a /dev/ path.
+        /// Valid macOS BSD names consist only of ASCII alphanumerics plus 's' and digit
+        /// suffixes (e.g., "disk0", "disk1s1"). Rejects any name containing '/', '\', '..',
+        /// or non-ASCII characters (finding P2-396).
+        /// </summary>
+        private static bool IsSafeBsdName(string name)
+        {
+            if (string.IsNullOrEmpty(name) || name.Length > 32)
+                return false;
+
+            foreach (var ch in name)
+            {
+                // Allow only ASCII letters, digits, and underscore.
+                // Reject '/', '\', '.', spaces, or any non-ASCII char.
+                if (!char.IsAsciiLetterOrDigit(ch) && ch != '_')
+                    return false;
+            }
+
+            return true;
         }
     }
 }

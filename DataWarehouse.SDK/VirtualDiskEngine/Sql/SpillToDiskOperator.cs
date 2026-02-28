@@ -411,10 +411,15 @@ public sealed class SpillToDiskOperator : IAsyncDisposable
                 while (offset + 4 < blockData.Length)
                 {
                     int entryLen = BinaryPrimitives.ReadInt32LittleEndian(blockData.AsSpan(offset, 4));
-                    if (entryLen <= 0) break;
+                    if (entryLen <= 0) break; // end-of-block sentinel (zero padding)
                     offset += 4;
 
-                    if (offset + entryLen > blockData.Length) break;
+                    if (offset + entryLen > blockData.Length)
+                    {
+                        // Malformed block: entry claims more bytes than remain — log and skip block
+                        System.Diagnostics.Debug.WriteLine($"[SpillToDiskOperator] Block {blockNum}: malformed entry at offset {offset - 4}, entryLen={entryLen} exceeds block boundary. Skipping remainder of block.");
+                        break;
+                    }
 
                     // Entry format: [keyLen:4][key:N][aggState:M]
                     int keyLen = BinaryPrimitives.ReadInt32LittleEndian(blockData.AsSpan(offset, 4));

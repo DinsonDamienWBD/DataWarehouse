@@ -40,11 +40,20 @@
             {
                 if (!string.IsNullOrEmpty(BlobUri))
                 {
-                    return new Uri(BlobUri);
+                    // TryCreate avoids UriFormatException on invalid stored URIs; fall back to synthetic URI
+                    if (Uri.TryCreate(BlobUri, UriKind.Absolute, out var uri))
+                        return uri;
+                    return new Uri($"blob://{ContainerId}/{Id}");
                 }
                 return new Uri($"blob://{ContainerId}/{Id}");
             }
-            set => BlobUri = value?.ToString() ?? string.Empty;
+            set
+            {
+                // Validate at assignment time rather than at read time
+                if (value != null && !value.IsAbsoluteUri)
+                    throw new ArgumentException($"StorageUri must be an absolute URI.", nameof(value));
+                BlobUri = value?.ToString() ?? string.Empty;
+            }
         }
 
         /// <summary>

@@ -80,7 +80,15 @@ public readonly struct CompactInode64 : IEquatable<CompactInode64>
     /// Converts this compact inode to a standard InodeV2 for when an object grows
     /// beyond inline capacity and needs block allocation.
     /// </summary>
-    /// <returns>A new InodeV2 populated from this compact inode's fields.</returns>
+    /// <remarks>
+    /// <para>
+    /// <strong>Important</strong>: The <see cref="InlineData"/> payload is NOT copied into the returned
+    /// <see cref="InodeV2"/>. The caller is responsible for writing the inline data content to the
+    /// allocated extent(s) after promotion. The returned inode sets <c>Size = InlineDataSize</c> so
+    /// the caller knows how many bytes need to be migrated.
+    /// </para>
+    /// </remarks>
+    /// <returns>A new InodeV2 populated from this compact inode's fields (without inline data).</returns>
     public InodeV2 ToStandardInode()
     {
         var standard = new InodeV2

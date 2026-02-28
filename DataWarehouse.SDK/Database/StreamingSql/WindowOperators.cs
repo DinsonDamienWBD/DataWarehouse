@@ -515,7 +515,12 @@ public sealed class SlidingWindow : IWindowOperator
             var windowStart = evt.EventTime - _windowSize;
             var windowEnd = evt.EventTime;
 
-            // Re-aggregate all events in the window for this group
+            // Re-aggregate all events in the window for this group.
+            // NOTE: This is O(N) per event where N = events in the current window.
+            // For high-throughput streams (finding P2-248), consider replacing with
+            // an incremental aggregator that tracks running state and only adjusts
+            // on add/expire rather than full recompute. Current implementation is
+            // correct but has O(N²) total complexity for a window of N events.
             var aggregator = new WindowAggregator(_aggregations);
             foreach (var e in events)
             {

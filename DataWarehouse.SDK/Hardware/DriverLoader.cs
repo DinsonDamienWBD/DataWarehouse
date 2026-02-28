@@ -101,48 +101,46 @@ namespace DataWarehouse.SDK.Hardware
         }
 
         /// <inheritdoc/>
-        public async Task<IReadOnlyList<DriverInfo>> ScanAsync(string assemblyPath, CancellationToken cancellationToken = default)
+        public Task<IReadOnlyList<DriverInfo>> ScanAsync(string assemblyPath, CancellationToken cancellationToken = default)
         {
             if (assemblyPath == null)
                 throw new ArgumentNullException(nameof(assemblyPath));
             if (!File.Exists(assemblyPath))
                 throw new FileNotFoundException($"Assembly not found: {assemblyPath}", assemblyPath);
 
-            var results = new List<DriverInfo>();
-
-            // Use a temporary collectible context for scanning to avoid locking the file
-            var tempContextId = $"scan-{Guid.NewGuid()}";
-            var tempContext = new PluginAssemblyLoadContext(tempContextId, assemblyPath);
-
-            try
+            // Run assembly loading on a thread-pool thread to avoid blocking the caller's thread
+            return Task.Run<IReadOnlyList<DriverInfo>>(() =>
             {
-                var assembly = tempContext.LoadFromAssemblyPath(assemblyPath);
-
-                foreach (var type in GetTypesWithAttribute(assembly))
+                var results = new List<DriverInfo>();
+                var tempContextId = $"scan-{Guid.NewGuid()}";
+                var tempContext = new PluginAssemblyLoadContext(tempContextId, assemblyPath);
+                try
                 {
-                    var attribute = type.GetCustomAttribute<StorageDriverAttribute>();
-                    if (attribute != null)
+                    var assembly = tempContext.LoadFromAssemblyPath(assemblyPath);
+                    foreach (var type in GetTypesWithAttribute(assembly))
                     {
-                        results.Add(new DriverInfo
+                        var attribute = type.GetCustomAttribute<StorageDriverAttribute>();
+                        if (attribute != null)
                         {
-                            AssemblyPath = assemblyPath,
-                            TypeName = type.FullName ?? type.Name,
-                            Name = attribute.Name,
-                            Description = attribute.Description,
-                            Version = attribute.Version,
-                            SupportedDevices = attribute.SupportedDevices,
-                            AutoLoad = attribute.AutoLoad
-                        });
+                            results.Add(new DriverInfo
+                            {
+                                AssemblyPath = assemblyPath,
+                                TypeName = type.FullName ?? type.Name,
+                                Name = attribute.Name,
+                                Description = attribute.Description,
+                                Version = attribute.Version,
+                                SupportedDevices = attribute.SupportedDevices,
+                                AutoLoad = attribute.AutoLoad
+                            });
+                        }
                     }
+                    return results.AsReadOnly();
                 }
-
-                return results.AsReadOnly();
-            }
-            finally
-            {
-                // Unload the temporary context
-                tempContext.Unload();
-            }
+                finally
+                {
+                    tempContext.Unload();
+                }
+            }, cancellationToken);
         }
 
         /// <inheritdoc/>

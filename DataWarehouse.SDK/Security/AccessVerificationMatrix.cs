@@ -153,7 +153,10 @@ public sealed class AccessVerificationMatrix
     public void AddRule(HierarchyAccessRule rule)
     {
         ArgumentNullException.ThrowIfNull(rule);
-        _rules[rule.Level].Add(rule);
+        lock (_evaluationLock)
+        {
+            _rules[rule.Level].Add(rule);
+        }
     }
 
     /// <summary>
@@ -161,18 +164,22 @@ public sealed class AccessVerificationMatrix
     /// </summary>
     public int RemoveRules(Func<HierarchyAccessRule, bool> predicate)
     {
-        int removed = 0;
-        foreach (var level in _rules.Keys)
+        // Lock prevents concurrent AddRule from being lost during the read-snapshot-replace cycle
+        lock (_evaluationLock)
         {
-            var remaining = _rules[level].Where(r => !predicate(r)).ToArray();
-            var removedCount = _rules[level].Count - remaining.Length;
-            if (removedCount > 0)
+            int removed = 0;
+            foreach (var level in _rules.Keys)
             {
-                _rules[level] = new ConcurrentBag<HierarchyAccessRule>(remaining);
-                removed += removedCount;
+                var remaining = _rules[level].Where(r => !predicate(r)).ToArray();
+                var removedCount = _rules[level].Count - remaining.Length;
+                if (removedCount > 0)
+                {
+                    _rules[level] = new ConcurrentBag<HierarchyAccessRule>(remaining);
+                    removed += removedCount;
+                }
             }
+            return removed;
         }
-        return removed;
     }
 
     /// <summary>

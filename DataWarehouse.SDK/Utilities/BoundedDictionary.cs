@@ -558,6 +558,10 @@ namespace DataWarehouse.SDK.Utilities
         {
             if (!PersistenceEnabled) return;
 
+            // Clear the flag BEFORE the save so that any mutation during SaveAsync
+            // will re-set it to true (preventing lost-persist data race).
+            _pendingPersist = false;
+
             Dictionary<string, string> snapshot;
             _lock.EnterReadLock();
             try
@@ -575,7 +579,6 @@ namespace DataWarehouse.SDK.Utilities
             var json = JsonSerializer.Serialize(snapshot);
             var bytes = Encoding.UTF8.GetBytes(json);
             await _stateStore!.SaveAsync(_pluginId!, _stateKey!, bytes, ct).ConfigureAwait(false);
-            _pendingPersist = false;
         }
 
         /// <summary>

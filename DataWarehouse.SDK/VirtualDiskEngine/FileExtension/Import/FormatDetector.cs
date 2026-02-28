@@ -76,20 +76,32 @@ public static class FormatDetector
 
     /// <summary>
     /// Enhanced format detection that also checks file extension and size for Raw/Img
-    /// when magic-based detection returns Unknown.
+    /// when magic-based detection returns Unknown. Also handles dynamic VHD images whose
+    /// "conectix" footer is at <c>fileSize - 512</c> rather than offset 0.
     /// </summary>
     /// <param name="headerBytes">Header bytes from the file.</param>
     /// <param name="fileExtension">
     /// File extension including leading dot (e.g., ".raw", ".img"). May be null.
     /// </param>
     /// <param name="fileSize">Total file size in bytes.</param>
+    /// <param name="footerBytes">
+    /// Optional: the last 512 bytes of the file, used to detect dynamic VHD images.
+    /// When null the dynamic-VHD check is skipped.
+    /// </param>
     /// <returns>The detected format.</returns>
     public static VirtualDiskFormat DetectFormat(
-        ReadOnlySpan<byte> headerBytes, string? fileExtension, long fileSize)
+        ReadOnlySpan<byte> headerBytes, string? fileExtension, long fileSize,
+        ReadOnlySpan<byte> footerBytes = default)
     {
         var result = DetectFormat(headerBytes);
         if (result != VirtualDiskFormat.Unknown)
             return result;
+
+        // Dynamic VHD: "conectix" footer is at the end of the file (fileSize - 512),
+        // not at offset 0 like fixed VHDs. Check the caller-supplied footer bytes.
+        if (!footerBytes.IsEmpty && footerBytes.Length >= 8 &&
+            footerBytes[..8].SequenceEqual("conectix"u8))
+            return VirtualDiskFormat.Vhd;
 
         // Raw/Img heuristic: extension match + size > 512 + sector-aligned
         if (fileExtension is not null && fileSize > 512 && fileSize % 512 == 0)
@@ -141,7 +153,27 @@ public static class FormatDetector
         }
 
         var extension = Path.GetExtension(filePath);
-        return DetectFormat(buffer.AsSpan(0, totalRead), extension, stream.Length);
+
+        // For dynamic VHD detection: read last 512 bytes (the footer)
+        byte[]? footerBuffer = null;
+        if (stream.CanSeek && stream.Length >= 512 + RecommendedHeaderSize)
+        {
+            footerBuffer = new byte[512];
+            stream.Seek(-512, SeekOrigin.End);
+            int footerRead = 0;
+            while (footerRead < 512)
+            {
+                int r = await stream.ReadAsync(
+                    footerBuffer.AsMemory(footerRead, 512 - footerRead), ct)
+                    .ConfigureAwait(false);
+                if (r == 0) break;
+                footerRead += r;
+            }
+            if (footerRead < 8) footerBuffer = null;
+        }
+
+        return DetectFormat(buffer.AsSpan(0, totalRead), extension, stream.Length,
+            footerBuffer is not null ? footerBuffer.AsSpan(0, 512) : default);
     }
 
     /// <summary>

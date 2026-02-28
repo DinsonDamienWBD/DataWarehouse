@@ -50,6 +50,9 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         private long _currentTerm;
         private string? _votedFor;
         private bool _initialized;
+        // Tracks how many log entries have been compacted so followers can correctly compute
+        // their position relative to the compacted log (finding P2-430).
+        private long _compactionBaseIndex;
 
         /// <summary>
         /// Initializes a new instance of <see cref="FileRaftLogStore"/>.
@@ -265,11 +268,10 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                 // Remove compacted entries from cache
                 _logCache.RemoveRange(0, (int)upToIndex);
 
-                // Re-index remaining entries starting from 1
-                for (int i = 0; i < _logCache.Count; i++)
-                {
-                    _logCache[i].Index = i + 1;
-                }
+                // Advance the compaction base — remaining entries keep their original indices
+                // so followers can correctly compute their position after compaction (finding P2-430).
+                // Do NOT re-index from 1 as that breaks follower offset tracking.
+                _compactionBaseIndex += upToIndex;
 
                 // Rewrite log file to reflect compacted state
                 await RewriteLogFileAsync().ConfigureAwait(false);

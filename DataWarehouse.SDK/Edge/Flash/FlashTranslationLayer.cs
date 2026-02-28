@@ -223,9 +223,13 @@ public sealed class FlashTranslationLayer : IFlashTranslationLayer
                 _dirtyBlocks.Remove(dirtyBlock);
                 _freeBlocks.Add(dirtyBlock);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // Erase failed -- mark block bad
+                // Erase failed -- mark block bad and emit diagnostic so operators can
+                // track silently-reduced flash capacity (finding P2-279).
+                System.Diagnostics.Debug.WriteLine(
+                    $"[FTL] Block {dirtyBlock} erase failed during GC — marking bad. " +
+                    $"UsableBlocks will decrease. Error: {ex.Message}");
                 await _badBlockManager.MarkBadAsync(dirtyBlock, ct);
                 _dirtyBlocks.Remove(dirtyBlock);
             }

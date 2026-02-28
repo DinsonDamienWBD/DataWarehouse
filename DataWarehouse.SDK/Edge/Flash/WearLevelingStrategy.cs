@@ -24,6 +24,10 @@ internal sealed class WearLevelingStrategy
 {
     private readonly Dictionary<long, int> _blockEraseCount = new();
     private readonly Random _random = new();
+    // Pre-allocated candidate list reused across calls to avoid per-write heap allocation
+    // on memory-constrained edge devices (finding P2-281). Not thread-safe by design;
+    // callers must ensure single-threaded access or add external locking.
+    private readonly List<long> _candidateBuffer = new(16);
 
     /// <summary>
     /// Selects a block for write operation based on wear-leveling policy.
@@ -34,7 +38,7 @@ internal sealed class WearLevelingStrategy
     public long SelectBlockForWrite(IEnumerable<long> availableBlocks)
     {
         var minCount = int.MaxValue;
-        var candidates = new List<long>();
+        _candidateBuffer.Clear(); // reuse pre-allocated buffer — avoids per-call heap allocation
 
         foreach (var block in availableBlocks)
         {
@@ -42,21 +46,21 @@ internal sealed class WearLevelingStrategy
             if (count < minCount)
             {
                 minCount = count;
-                candidates.Clear();
-                candidates.Add(block);
+                _candidateBuffer.Clear();
+                _candidateBuffer.Add(block);
             }
             else if (count == minCount)
             {
-                candidates.Add(block);
+                _candidateBuffer.Add(block);
             }
         }
 
-        if (candidates.Count == 0)
+        if (_candidateBuffer.Count == 0)
         {
             throw new InvalidOperationException("No available blocks for wear-leveling allocation");
         }
 
-        var selected = candidates[_random.Next(candidates.Count)];
+        var selected = _candidateBuffer[_random.Next(_candidateBuffer.Count)];
         _blockEraseCount[selected] = _blockEraseCount.GetValueOrDefault(selected, 0) + 1;
         return selected;
     }

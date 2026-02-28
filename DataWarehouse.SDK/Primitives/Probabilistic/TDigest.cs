@@ -403,24 +403,33 @@ public sealed class TDigest : IProbabilisticStructure, IMergeable<TDigest>, ICon
 
         var compressed = new List<Centroid>((int)_compression);
         var current = _centroids[0];
+        // Track cumulative weight to compute quantile in O(1) per centroid,
+        // avoiding the O(n) Quantile() scan inside the loop (finding P2-557).
+        double cumulativeWeight = 0;
 
         for (int i = 1; i < _centroids.Count; i++)
         {
             var next = _centroids[i];
-            var q = Quantile(current);
+            // q = (cumulativeWeight + current.Weight / 2) / _count
+            var q = _count > 0
+                ? (cumulativeWeight + current.Weight / 2.0) / _count
+                : 0.5;
             var maxSize = MaxCentroidSize(q);
 
             if (current.Weight + next.Weight <= maxSize)
             {
-                // Merge
+                // Merge — cumulative weight stays at its pre-merge value until we commit current
+                var mergedWeight = current.Weight + next.Weight;
                 current = new Centroid
                 {
-                    Mean = (current.Mean * current.Weight + next.Mean * next.Weight) / (current.Weight + next.Weight),
-                    Weight = current.Weight + next.Weight
+                    Mean = (current.Mean * current.Weight + next.Mean * next.Weight) / mergedWeight,
+                    Weight = mergedWeight
                 };
+                // Don't advance cumulativeWeight yet — current is still being built
             }
             else
             {
+                cumulativeWeight += current.Weight;
                 compressed.Add(current);
                 current = next;
             }

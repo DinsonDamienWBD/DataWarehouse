@@ -22,8 +22,27 @@ namespace DataWarehouse.SDK.Edge.Protocols
         /// <summary>Gets or sets CoAP options (option number -> value). Optional.</summary>
         public IReadOnlyDictionary<int, byte[]>? Options { get; init; }
 
-        /// <summary>Gets whether the response indicates success (2.xx response code).</summary>
-        public bool IsSuccess => (int)Code >= 200 && (int)Code < 300;
+        /// <summary>
+        /// Gets whether the response indicates success (2.xx response code).
+        /// </summary>
+        /// <remarks>
+        /// CoAP wire-encoded codes use a compact bit format: high 3 bits = class, low 5 bits = detail
+        /// (e.g., 0x45 = 2.05 Content). This property checks the 3-bit class field for class 2 (success),
+        /// and also accepts HTTP-style integer values 200-299 for interoperability with the typed enum.
+        /// </remarks>
+        public bool IsSuccess
+        {
+            get
+            {
+                int code = (int)Code;
+                // HTTP-style integers (enum values 200-299): standard success range
+                if (code >= 200 && code < 300) return true;
+                // CoAP wire-encoded byte: high 3 bits = class (0-7), low 5 bits = detail (0-31)
+                // Class 2 = success (0x40..0x5F range)
+                if (code is >= 0x40 and <= 0x5F) return true;
+                return false;
+            }
+        }
     }
 
     /// <summary>

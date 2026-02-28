@@ -125,8 +125,18 @@ public record S3ServerOptions
     /// <summary>The network interface to bind to. Defaults to all interfaces.</summary>
     public string Host { get; init; } = "0.0.0.0";
 
-    /// <summary>The TCP port to listen on. Defaults to 9000 (MinIO default).</summary>
-    public int Port { get; init; } = 9000;
+    /// <summary>The TCP port to listen on (1-65535). Defaults to 9000 (MinIO default).</summary>
+    public int Port
+    {
+        get => _port;
+        init
+        {
+            if (value < 1 || value > 65535)
+                throw new ArgumentOutOfRangeException(nameof(Port), value, "Port must be between 1 and 65535.");
+            _port = value;
+        }
+    }
+    private readonly int _port = 9000;
 
     /// <summary>Whether to enable TLS/HTTPS for the endpoint.</summary>
     public bool UseTls { get; init; }
@@ -143,15 +153,31 @@ public record S3ServerOptions
     /// <summary>Maximum allowed request body size in bytes. Defaults to 5 GB.</summary>
     public long MaxRequestBodyBytes { get; init; } = 5L * 1024 * 1024 * 1024;
 
-    /// <summary>Minimum multipart chunk size in bytes. Defaults to 5 MB (S3 minimum).</summary>
-    public int MultipartChunkSize { get; init; } = 5 * 1024 * 1024;
+    /// <summary>Minimum multipart chunk size in bytes. Defaults to 5 MB (S3 minimum). Must be at least 5 MB (S3 requirement).</summary>
+    public int MultipartChunkSize
+    {
+        get => _multipartChunkSize;
+        init
+        {
+            const int S3MinChunkSize = 5 * 1024 * 1024; // 5 MB
+            if (value < S3MinChunkSize)
+                throw new ArgumentOutOfRangeException(nameof(MultipartChunkSize), value,
+                    $"MultipartChunkSize must be at least {S3MinChunkSize} bytes (5 MB, per S3 specification).");
+            _multipartChunkSize = value;
+        }
+    }
+    private readonly int _multipartChunkSize = 5 * 1024 * 1024;
 
     /// <summary>Maximum time allowed for a single request. Defaults to 30 minutes for large uploads.</summary>
     public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromMinutes(30);
 
     /// <summary>
-    /// Optional authentication provider for AWS Signature V4 verification.
-    /// When null, the server operates in anonymous/open mode.
+    /// Authentication provider for AWS Signature V4 verification.
+    /// <para>
+    /// <strong>Security warning</strong>: When <see langword="null"/>, the server operates in
+    /// anonymous (open) mode and any client can access all buckets and objects without authentication.
+    /// Always supply an <see cref="IS3AuthProvider"/> in production deployments.
+    /// </para>
     /// </summary>
     public IS3AuthProvider? AuthProvider { get; init; }
 

@@ -82,8 +82,25 @@ public class ConfigurationChangeApi
             var targetType = valueProperty?.PropertyType;
             if (targetType != null)
             {
-                var convertedValue = Convert.ChangeType(newValue, targetType);
-                valueProperty?.SetValue(currentValue, convertedValue);
+                object? convertedValue;
+                try
+                {
+                    convertedValue = Convert.ChangeType(newValue, targetType);
+                }
+                catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException)
+                {
+                    throw new InvalidOperationException(
+                        $"Cannot convert value '{newValue}' to type '{targetType.Name}' for setting '{path}'.", ex);
+                }
+                try
+                {
+                    valueProperty?.SetValue(currentValue, convertedValue);
+                }
+                catch (ArgumentException ex)
+                {
+                    throw new InvalidOperationException(
+                        $"Cannot set value of type '{convertedValue?.GetType().Name}' on property '{targetType.Name}' for setting '{path}'.", ex);
+                }
             }
             else
             {
@@ -110,7 +127,15 @@ public class ConfigurationChangeApi
         {
             // Direct property (not wrapped in ConfigurationItem)
             var oldValue = propertyInfo.GetValue(sectionObj);
-            propertyInfo.SetValue(sectionObj, newValue);
+            try
+            {
+                propertyInfo.SetValue(sectionObj, newValue);
+            }
+            catch (ArgumentException ex)
+            {
+                throw new InvalidOperationException(
+                    $"Cannot set property '{propertyInfo.Name}' to value of type '{newValue?.GetType().Name}' for setting '{path}'.", ex);
+            }
 
             // ENHANCED: Write back to file
             if (_configFilePath != null)

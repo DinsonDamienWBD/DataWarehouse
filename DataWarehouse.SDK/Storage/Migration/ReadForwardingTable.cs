@@ -28,7 +28,11 @@ public sealed class ReadForwardingTable : IDisposable
     public ReadForwardingTable(TimeSpan? defaultTtl = null)
     {
         _defaultTtl = defaultTtl ?? TimeSpan.FromHours(24);
-        _cleanupTimer = new Timer(_ => CleanExpired(), null, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
+        _cleanupTimer = new Timer(_ =>
+        {
+            try { CleanExpired(); }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[ReadForwardingTable] CleanExpired failed: {ex.Message}"); }
+        }, null, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
     }
 
     /// <summary>

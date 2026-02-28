@@ -257,11 +257,26 @@ namespace DataWarehouse.SDK.Contracts
         public abstract Task PublishAsync(string topic, PluginMessage message, CancellationToken ct = default);
 
         /// <summary>
-        /// Publish a message and wait for all handlers to complete.
-        /// Default implementation calls PublishAsync and awaits.
+        /// Publish a message and wait for all handlers to complete before returning.
         /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <strong>Contract</strong>: The returned task completes only after all synchronous and
+        /// asynchronous subscribers have finished processing the message.
+        /// </para>
+        /// <para>
+        /// <strong>Default implementation warning</strong>: The base implementation falls back to
+        /// <see cref="PublishAsync"/> which is fire-and-forget and does NOT wait for handler
+        /// completion (finding P2-117). Concrete message bus implementations MUST override this
+        /// method to honour the await-handlers semantic; otherwise callers that depend on
+        /// handler completion (e.g., flushing audit records before shutdown) will silently
+        /// receive a Task that completes before handlers run.
+        /// </para>
+        /// </remarks>
         public virtual Task PublishAndWaitAsync(string topic, PluginMessage message, CancellationToken ct = default)
         {
+            // WARNING: this default does NOT wait for handler completion.
+            // Override in concrete implementations that support synchronous handler dispatch.
             return PublishAsync(topic, message, ct);
         }
 

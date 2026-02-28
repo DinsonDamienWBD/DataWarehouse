@@ -224,7 +224,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
 
             try
             {
-                var correlationId = Guid.NewGuid().ToString("N");
+                var correlationId = NewCorrelationId();
                 var tcs = new TaskCompletionSource<MessageResponse>();
                 _pendingRequests[correlationId] = tcs;
 
@@ -524,7 +524,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             if (!IsIntelligenceAvailable || MessageBus == null)
                 return null;
 
-            var correlationId = Guid.NewGuid().ToString("N");
+            var correlationId = NewCorrelationId();
             var tcs = new TaskCompletionSource<MessageResponse>();
             _pendingRequests[correlationId] = tcs;
 
@@ -603,7 +603,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             var payload = new Dictionary<string, object>
             {
                 ["texts"] = texts,
-                ["contextId"] = context?.ContextId ?? Guid.NewGuid().ToString("N")
+                ["contextId"] = context?.ContextId ?? NewCorrelationId()
             };
 
             if (context?.PreferredModel != null)
@@ -648,7 +648,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
                 ["text"] = text,
                 ["categories"] = categories,
                 ["multiLabel"] = multiLabel,
-                ["contextId"] = context?.ContextId ?? Guid.NewGuid().ToString("N")
+                ["contextId"] = context?.ContextId ?? NewCorrelationId()
             };
 
             var response = await SendIntelligenceRequestAsync(
@@ -687,7 +687,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             {
                 ["data"] = data,
                 ["sensitivity"] = sensitivity,
-                ["contextId"] = context?.ContextId ?? Guid.NewGuid().ToString("N")
+                ["contextId"] = context?.ContextId ?? NewCorrelationId()
             };
 
             var response = await SendIntelligenceRequestAsync(
@@ -732,7 +732,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             {
                 ["predictionType"] = predictionType,
                 ["inputData"] = inputData,
-                ["contextId"] = context?.ContextId ?? Guid.NewGuid().ToString("N")
+                ["contextId"] = context?.ContextId ?? NewCorrelationId()
             };
 
             var response = await SendIntelligenceRequestAsync(
@@ -776,7 +776,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             var payload = new Dictionary<string, object>
             {
                 ["prompt"] = prompt,
-                ["contextId"] = context?.ContextId ?? Guid.NewGuid().ToString("N")
+                ["contextId"] = context?.ContextId ?? NewCorrelationId()
             };
 
             if (systemMessage != null)
@@ -823,7 +823,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             var payload = new Dictionary<string, object>
             {
                 ["text"] = text,
-                ["contextId"] = context?.ContextId ?? Guid.NewGuid().ToString("N")
+                ["contextId"] = context?.ContextId ?? NewCorrelationId()
             };
 
             if (maxLength != null)
@@ -864,7 +864,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             var payload = new Dictionary<string, object>
             {
                 ["text"] = text,
-                ["contextId"] = context?.ContextId ?? Guid.NewGuid().ToString("N")
+                ["contextId"] = context?.ContextId ?? NewCorrelationId()
             };
 
             if (entityTypes != null)
@@ -903,7 +903,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             var payload = new Dictionary<string, object>
             {
                 ["text"] = text,
-                ["contextId"] = context?.ContextId ?? Guid.NewGuid().ToString("N")
+                ["contextId"] = context?.ContextId ?? NewCorrelationId()
             };
 
             var response = await SendIntelligenceRequestAsync(
@@ -947,7 +947,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             {
                 ["query"] = query,
                 ["topK"] = topK,
-                ["contextId"] = context?.ContextId ?? Guid.NewGuid().ToString("N")
+                ["contextId"] = context?.ContextId ?? NewCorrelationId()
             };
 
             var response = await SendIntelligenceRequestAsync(
@@ -987,7 +987,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             var payload = new Dictionary<string, object>
             {
                 ["content"] = content,
-                ["contextId"] = Guid.NewGuid().ToString("N")
+                ["contextId"] = NewCorrelationId()
             };
 
             if (metadata != null)
@@ -1027,7 +1027,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             {
                 ["query"] = query,
                 ["topK"] = topK,
-                ["contextId"] = Guid.NewGuid().ToString("N")
+                ["contextId"] = NewCorrelationId()
             };
 
             var response = await SendIntelligenceRequestAsync(
@@ -1057,7 +1057,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
 
             var payload = new Dictionary<string, object>
             {
-                ["contextId"] = Guid.NewGuid().ToString("N")
+                ["contextId"] = NewCorrelationId()
             };
 
             var response = await SendIntelligenceRequestAsync(
@@ -1093,7 +1093,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             {
                 ["row"] = row,
                 ["modelId"] = modelId,
-                ["contextId"] = Guid.NewGuid().ToString("N")
+                ["contextId"] = NewCorrelationId()
             };
 
             var response = await SendIntelligenceRequestAsync(
@@ -1134,7 +1134,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
                 ["data"] = data,
                 ["targetColumn"] = targetColumn,
                 ["modelId"] = modelId,
-                ["contextId"] = Guid.NewGuid().ToString("N")
+                ["contextId"] = NewCorrelationId()
             };
 
             var response = await SendIntelligenceRequestAsync(
@@ -1166,7 +1166,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             {
                 ["row"] = row,
                 ["modelId"] = modelId,
-                ["contextId"] = Guid.NewGuid().ToString("N")
+                ["contextId"] = NewCorrelationId()
             };
 
             var response = await SendIntelligenceRequestAsync(
@@ -1210,7 +1210,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             {
                 ["task"] = task,
                 ["agentType"] = agentType,
-                ["contextId"] = Guid.NewGuid().ToString("N")
+                ["contextId"] = NewCorrelationId()
             };
 
             if (context != null)
@@ -1247,7 +1247,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             var payload = new Dictionary<string, object>
             {
                 ["tool"] = toolDefinition,
-                ["contextId"] = Guid.NewGuid().ToString("N")
+                ["contextId"] = NewCorrelationId()
             };
 
             var response = await SendIntelligenceRequestAsync(
@@ -1275,7 +1275,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             var payload = new Dictionary<string, object>
             {
                 ["agentId"] = agentId,
-                ["contextId"] = Guid.NewGuid().ToString("N")
+                ["contextId"] = NewCorrelationId()
             };
 
             var response = await SendIntelligenceRequestAsync(
@@ -1318,7 +1318,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
                 ["query"] = query,
                 ["response"] = response,
                 ["feedback"] = feedback,
-                ["contextId"] = Guid.NewGuid().ToString("N"),
+                ["contextId"] = NewCorrelationId(),
                 ["timestamp"] = DateTimeOffset.UtcNow
             };
 
@@ -1347,7 +1347,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             var payload = new Dictionary<string, object>
             {
                 ["domain"] = domain,
-                ["contextId"] = Guid.NewGuid().ToString("N")
+                ["contextId"] = NewCorrelationId()
             };
 
             var response = await SendIntelligenceRequestAsync(
@@ -1381,7 +1381,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             var payload = new Dictionary<string, object>
             {
                 ["metrics"] = performanceMetrics,
-                ["contextId"] = Guid.NewGuid().ToString("N"),
+                ["contextId"] = NewCorrelationId(),
                 ["timestamp"] = DateTimeOffset.UtcNow
             };
 
@@ -1645,6 +1645,19 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         }
 
         #endregion
+
+        /// <summary>
+        /// Generates a cryptographically unpredictable correlation ID for request/response
+        /// matching on the message bus (finding P2-124).
+        /// Uses <see cref="System.Security.Cryptography.RandomNumberGenerator"/> rather than
+        /// <see cref="Guid.NewGuid"/> to ensure the ID is not guessable in multi-tenant environments.
+        /// </summary>
+        private static string NewCorrelationId()
+        {
+            Span<byte> bytes = stackalloc byte[16];
+            System.Security.Cryptography.RandomNumberGenerator.Fill(bytes);
+            return Convert.ToHexString(bytes).ToLowerInvariant();
+        }
     }
 
     // ========================================

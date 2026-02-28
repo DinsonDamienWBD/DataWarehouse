@@ -82,7 +82,8 @@ public sealed class DefaultConnectionRegistry<TConfig> : IConnectionRegistry<TCo
     /// <inheritdoc/>
     public IReadOnlyList<string> GetRegisteredIds()
     {
-        return _connections.Keys.ToList().AsReadOnly();
+        // Single allocation: Array.AsReadOnly wraps without an extra copy
+        return Array.AsReadOnly(_connections.Keys.ToArray());
     }
 
     /// <inheritdoc/>

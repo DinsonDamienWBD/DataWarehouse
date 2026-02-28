@@ -35,7 +35,8 @@ namespace DataWarehouse.SDK.Edge.Protocols
     [SdkCompatibility("3.0.0", Notes = "Phase 36: CoAP client implementation (EDGE-03)")]
     public sealed class CoApClient : ICoApClient
     {
-        private UdpClient? _udpClient;
+        private volatile UdpClient? _udpClient;
+        private readonly object _udpInitLock = new();
         private readonly BoundedDictionary<ushort, TaskCompletionSource<CoApResponse>> _pendingRequests = new BoundedDictionary<ushort, TaskCompletionSource<CoApResponse>>(1000);
         private readonly BoundedDictionary<string, Action<CoApResponse>> _observations = new BoundedDictionary<string, Action<CoApResponse>>(1000);
         private int _nextMessageId; // use int for Interlocked, cast to ushort
@@ -78,11 +79,17 @@ namespace DataWarehouse.SDK.Edge.Protocols
 
             var port = uri.Port > 0 ? uri.Port : (uri.Scheme == "coaps" ? 5684 : 5683);
 
-            // Lazy-initialize UDP client
+            // Lazy-initialize UDP client (thread-safe: only one UdpClient created)
             if (_udpClient is null)
             {
-                _udpClient = new UdpClient();
-                StartReceiveLoop();
+                lock (_udpInitLock)
+                {
+                    if (_udpClient is null)
+                    {
+                        _udpClient = new UdpClient();
+                        StartReceiveLoop();
+                    }
+                }
             }
 
             // Build CoAP message (binary encoding)

@@ -291,6 +291,12 @@ public sealed class ColumnarRegionEngine
         int dataLen = BinaryPrimitives.ReadInt32LittleEndian(blockData.AsSpan(5, 4));
         int headerSize = 9;
 
+        // Validate dataLen before allocation to prevent OOM from corrupt/malicious on-disk values
+        const int MaxColumnarDataLen = 256 * 1024 * 1024; // 256 MB upper bound
+        if (dataLen < 0 || dataLen > MaxColumnarDataLen)
+            throw new InvalidDataException(
+                $"Columnar region block at offset {blockOffset} has invalid dataLen={dataLen}. Data may be corrupt.");
+
         // Read encoded data (may span multiple blocks)
         byte[] encodedData;
         if (headerSize + dataLen <= _blockSize)

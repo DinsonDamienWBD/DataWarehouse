@@ -286,7 +286,18 @@ public class CacheEntryMetadata
     public Uri? Uri { get; set; }
 
     /// <summary>String key for the cached item (alternative to Uri).</summary>
-    public string Key { get => Uri?.ToString() ?? ""; set => Uri = string.IsNullOrEmpty(value) ? null : new Uri(value); }
+    public string Key
+    {
+        get => Uri?.ToString() ?? "";
+        set
+        {
+            if (string.IsNullOrEmpty(value)) { Uri = null; return; }
+            // Accept both absolute URIs and plain string keys; for non-URI keys store as opaque relative URI
+            Uri = Uri.TryCreate(value, UriKind.Absolute, out var uri)
+                ? uri
+                : new Uri(Uri.EscapeDataString(value), UriKind.Relative);
+        }
+    }
 
     /// <summary>Size of the cached data in bytes.</summary>
     public long SizeBytes { get; set; }

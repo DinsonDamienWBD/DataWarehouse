@@ -112,18 +112,24 @@ public sealed class AzureCostManagementProvider : IBillingProvider
             int costIndex = FindColumnIndex(columns, "Cost");
             int serviceIndex = FindColumnIndex(columns, "ServiceName");
 
-            foreach (var row in rows.EnumerateArray())
+            // Only parse rows if required columns exist; avoids reading wrong column on schema mismatch
+            if (costIndex >= 0 && serviceIndex >= 0)
             {
-                var cost = row[costIndex].GetDecimal();
-                var service = row[serviceIndex].GetString() ?? "Unknown";
+                foreach (var row in rows.EnumerateArray())
+                {
+                    var rowArr = row.EnumerateArray().ToArray();
+                    if (costIndex >= rowArr.Length || serviceIndex >= rowArr.Length) continue;
+                    var cost = rowArr[costIndex].GetDecimal();
+                    var service = rowArr[serviceIndex].GetString() ?? "Unknown";
 
-                totalCost += cost;
-                breakdown.Add(new CostBreakdown(
-                    CategorizeAzureService(service),
-                    service,
-                    cost,
-                    "USD",
-                    (double)cost));
+                    totalCost += cost;
+                    breakdown.Add(new CostBreakdown(
+                        CategorizeAzureService(service),
+                        service,
+                        cost,
+                        "USD",
+                        (double)cost));
+                }
             }
         }
 
@@ -442,7 +448,7 @@ public sealed class AzureCostManagementProvider : IBillingProvider
                 return index;
             index++;
         }
-        return 0; // default to first column
+        return -1; // -1 signals "column not found"; callers must check before indexing into row data
     }
 
     private static CostCategory CategorizeAzureService(string serviceName)

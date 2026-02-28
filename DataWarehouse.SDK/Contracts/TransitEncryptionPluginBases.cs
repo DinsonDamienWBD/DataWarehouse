@@ -601,19 +601,18 @@ namespace DataWarehouse.SDK.Contracts
             CancellationToken cancellationToken = default)
         {
             // Default implementation: read stream to byte array and use byte array decryption
-            // Derived classes should override for true streaming decryption
+            // Derived classes should override for true streaming decryption with proper header parsing
             using var ms = new MemoryStream((int)(ciphertextStream.CanSeek ? ciphertextStream.Length : 4096));
             await ciphertextStream.CopyToAsync(ms, cancellationToken).ConfigureAwait(false);
             var ciphertext = ms.ToArray();
 
-            // Extract metadata from stream header (implementation-specific)
-            var metadata = new Dictionary<string, object>();
-
-            var result = await DecryptFromTransitAsync(ciphertext, metadata, context, cancellationToken).ConfigureAwait(false);
-
-            await plaintextStream.WriteAsync(result.Plaintext, cancellationToken).ConfigureAwait(false);
-
-            return result;
+            // Stream header parsing is implementation-specific. Derived classes must override
+            // this method and extract the PresetId (and other metadata) from the stream header
+            // before calling DecryptFromTransitAsync. The base class cannot parse an unknown format.
+            throw new NotSupportedException(
+                $"{GetType().Name} does not implement stream header parsing for DecryptStreamFromTransitAsync. " +
+                "Override this method in the derived class to extract encryption metadata (including PresetId) " +
+                "from the ciphertext stream header before calling DecryptFromTransitAsync.");
         }
 
         /// <inheritdoc/>

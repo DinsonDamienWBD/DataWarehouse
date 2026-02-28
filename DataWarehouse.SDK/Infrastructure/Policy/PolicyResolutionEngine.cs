@@ -530,11 +530,14 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
             var result = new List<(PolicyLevel Level, string PathForLevel)>();
             var maxLevels = Math.Min(segments.Count, levelMap.Length);
 
+            // Build path prefixes cumulatively to avoid O(N) string.Join + Take per level
+            // (finding P2-506). Each iteration appends one segment to the previous prefix.
+            var sb = new System.Text.StringBuilder(capacity: 128);
             for (var i = 0; i < maxLevels; i++)
             {
-                // Build path prefix up to this level
-                var pathPrefix = "/" + string.Join("/", segments.Take(i + 1));
-                result.Add((levelMap[i], pathPrefix));
+                sb.Append('/');
+                sb.Append(segments[i]);
+                result.Add((levelMap[i], sb.ToString()));
             }
 
             return result;

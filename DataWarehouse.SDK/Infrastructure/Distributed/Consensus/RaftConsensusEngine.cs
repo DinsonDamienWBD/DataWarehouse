@@ -30,6 +30,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         private readonly RaftVolatileState _volatile = new();
         private readonly SemaphoreSlim _stateLock = new(1, 1);
         private readonly List<Action<Proposal>> _commitHandlers = new();
+        private readonly object _commitHandlersLock = new();
         private readonly CancellationTokenSource _cts = new();
         private readonly BoundedDictionary<string, TaskCompletionSource<bool>> _pendingProposals = new BoundedDictionary<string, TaskCompletionSource<bool>>(1000);
         private readonly IRaftLogStore _logStore;
@@ -158,6 +159,10 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                     Timestamp = DateTimeOffset.UtcNow
                 };
 
+                // Persist entry via injected log store BEFORE adding to in-memory list
+                // so FileRaftLogStore durability is not bypassed (finding P2-429).
+                await _logStore.AppendAsync(entry).ConfigureAwait(false);
+
                 _persistent.Log.Add(entry);
                 CompactLogIfNeeded();
             }
@@ -198,19 +203,24 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         /// <inheritdoc />
         public IDisposable OnCommit(Action<Proposal> handler)
         {
-            _commitHandlers.Add(handler);
-            return new CommitHandlerRegistration(_commitHandlers, handler);
+            lock (_commitHandlersLock)
+            {
+                _commitHandlers.Add(handler);
+            }
+            return new CommitHandlerRegistration(_commitHandlers, _commitHandlersLock, handler);
         }
 
         private sealed class CommitHandlerRegistration : IDisposable
         {
             private readonly List<Action<Proposal>> _handlers;
+            private readonly object _lock;
             private readonly Action<Proposal> _handler;
             private int _disposed;
 
-            public CommitHandlerRegistration(List<Action<Proposal>> handlers, Action<Proposal> handler)
+            public CommitHandlerRegistration(List<Action<Proposal>> handlers, object handlerLock, Action<Proposal> handler)
             {
                 _handlers = handlers;
+                _lock = handlerLock;
                 _handler = handler;
             }
 
@@ -218,7 +228,10 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             {
                 if (Interlocked.Exchange(ref _disposed, 1) == 0)
                 {
-                    _handlers.Remove(_handler);
+                    lock (_lock)
+                    {
+                        _handlers.Remove(_handler);
+                    }
                 }
             }
         }
@@ -642,8 +655,10 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                             Payload = entry.Payload
                         };
 
-                        // Invoke commit handlers
-                        foreach (var handler in _commitHandlers)
+                        // Invoke commit handlers (snapshot to avoid concurrent modification)
+                        Action<Proposal>[] handlers;
+                        lock (_commitHandlersLock) { handlers = _commitHandlers.ToArray(); }
+                        foreach (var handler in handlers)
                         {
                             try
                             {
