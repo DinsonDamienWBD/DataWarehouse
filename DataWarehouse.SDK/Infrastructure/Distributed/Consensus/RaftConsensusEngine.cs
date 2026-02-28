@@ -135,6 +135,9 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         public bool IsLeader => _role == RaftRole.Leader;
 
         /// <inheritdoc />
+        public string? LeaderId => _leaderId;
+
+        /// <inheritdoc />
         public async Task<bool> ProposeAsync(Proposal proposal)
         {
             if (_role != RaftRole.Leader)

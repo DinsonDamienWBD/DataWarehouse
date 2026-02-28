@@ -116,6 +116,12 @@ public sealed class FreeSpaceManager : IBlockAllocator
     }
 
     /// <inheritdoc/>
+    public bool IsAllocated(long blockNumber)
+    {
+        return _bitmap.IsAllocated(blockNumber);
+    }
+
+    /// <inheritdoc/>
     public void FreeBlock(long blockNumber)
     {
         _lock.Wait();

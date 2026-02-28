@@ -28,6 +28,13 @@ namespace DataWarehouse.SDK.Contracts
         public abstract bool IsLeader { get; }
 
         /// <summary>
+        /// The node ID of the current Raft leader as known to this node.
+        /// Returns <c>null</c> when the cluster has no established leader (e.g. during election).
+        /// Override in derived classes that track leader state explicitly.
+        /// </summary>
+        public virtual string? LeaderId => null;
+
+        /// <summary>
         /// Propose a state change to the cluster. Returns when quorum is reached.
         /// Must be implemented by derived classes.
         /// </summary>

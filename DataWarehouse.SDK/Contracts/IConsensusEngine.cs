@@ -32,6 +32,13 @@
         bool IsLeader { get; }
 
         /// <summary>
+        /// The node ID of the current Raft leader as known to this node.
+        /// Returns <c>null</c> when the cluster has no established leader (e.g. during election).
+        /// On the leader node this returns the same value as this node's own node ID.
+        /// </summary>
+        string? LeaderId { get; }
+
+        /// <summary>
         /// Propose a state change to the cluster.
         /// Returns only when Quorum is reached.
         /// </summary>
