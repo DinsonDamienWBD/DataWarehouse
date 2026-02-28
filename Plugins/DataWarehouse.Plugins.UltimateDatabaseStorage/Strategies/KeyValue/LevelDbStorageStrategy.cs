@@ -105,23 +105,23 @@ public sealed class LevelDbStorageStrategy : DatabaseStorageStrategyBase
             ModifiedAt = now
         };
 
-        // Check if exists to preserve created timestamp
-        var existingMetadataBytes = _db!.Get(Encoding.UTF8.GetBytes($"meta:{key}"));
-        if (existingMetadataBytes != null)
-        {
-            var existingMetadata = JsonSerializer.Deserialize<MetadataDocument>(existingMetadataBytes, JsonOptions);
-            if (existingMetadata != null)
-            {
-                metadataDoc.CreatedAt = existingMetadata.CreatedAt;
-            }
-        }
-
-        var metadataJson = JsonSerializer.SerializeToUtf8Bytes(metadataDoc, JsonOptions);
         var dataKey = Encoding.UTF8.GetBytes($"data:{key}");
         var metaKey = Encoding.UTF8.GetBytes($"meta:{key}");
 
         lock (_lock)
         {
+            // Read existing metadata inside the lock to avoid TOCTOU with concurrent stores.
+            var existingMetadataBytes = _db!.Get(metaKey);
+            if (existingMetadataBytes != null)
+            {
+                var existingMetadata = JsonSerializer.Deserialize<MetadataDocument>(existingMetadataBytes, JsonOptions);
+                if (existingMetadata != null)
+                {
+                    metadataDoc.CreatedAt = existingMetadata.CreatedAt;
+                }
+            }
+
+            var metadataJson = JsonSerializer.SerializeToUtf8Bytes(metadataDoc, JsonOptions);
             using var batch = new WriteBatch();
             batch.Put(dataKey, data);
             batch.Put(metaKey, metadataJson);

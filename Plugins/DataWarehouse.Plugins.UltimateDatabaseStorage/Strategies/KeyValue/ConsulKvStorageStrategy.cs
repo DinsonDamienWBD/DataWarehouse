@@ -157,7 +157,14 @@ public sealed class ConsulKvStorageStrategy : DatabaseStorageStrategyBase
             new(metadataKey, KVTxnVerb.Delete)
         };
 
-        await _client!.KV.Txn(txn, ct);
+        var txnResult = await _client!.KV.Txn(txn, ct);
+        if (!txnResult.Response.Success)
+        {
+            var errors = txnResult.Response.Errors != null
+                ? string.Join("; ", txnResult.Response.Errors.Select(e => $"op[{e.OpIndex}]: {e.What}"))
+                : "unknown error";
+            throw new InvalidOperationException($"Consul transaction failed while deleting key '{key}': {errors}");
+        }
 
         return size;
     }

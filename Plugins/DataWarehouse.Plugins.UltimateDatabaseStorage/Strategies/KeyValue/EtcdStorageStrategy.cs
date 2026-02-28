@@ -267,10 +267,22 @@ public sealed class EtcdStorageStrategy : DatabaseStorageStrategyBase
 
     private static string GetRangeEnd(string prefix)
     {
-        // Get the range end for a prefix query
+        // Compute the exclusive range-end for a prefix scan by incrementing the last
+        // non-0xFF byte (with carry propagation). If every byte is 0xFF (or prefix is
+        // empty), return "\0" — the etcd special sentinel meaning "all keys from prefix".
         var bytes = System.Text.Encoding.UTF8.GetBytes(prefix);
-        bytes[^1]++;
-        return System.Text.Encoding.UTF8.GetString(bytes);
+        for (int i = bytes.Length - 1; i >= 0; i--)
+        {
+            if (bytes[i] < 0xFF)
+            {
+                bytes[i]++;
+                // Zero out trailing bytes that were 0xFF (they wrapped past FF).
+                for (int j = i + 1; j < bytes.Length; j++) bytes[j] = 0;
+                return System.Text.Encoding.UTF8.GetString(bytes);
+            }
+        }
+        // All bytes were 0xFF — use etcd's "open-ended" range sentinel.
+        return "\0";
     }
 
     protected override async ValueTask DisposeAsyncCore()

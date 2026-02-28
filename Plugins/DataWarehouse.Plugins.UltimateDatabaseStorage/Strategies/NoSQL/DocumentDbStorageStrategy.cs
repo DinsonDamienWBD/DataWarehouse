@@ -25,6 +25,7 @@ public sealed class DocumentDbStorageStrategy : DatabaseStorageStrategyBase
     private string _databaseName = "datawarehouse";
     private string _containerName = "storage";
     private string _partitionKeyPath = "/partitionKey";
+    private string _defaultPartitionKey = "default";
     private ConsistencyLevel _consistencyLevel = ConsistencyLevel.Session;
 
     public override string StrategyId => "documentdb";
@@ -56,6 +57,7 @@ public sealed class DocumentDbStorageStrategy : DatabaseStorageStrategyBase
         _databaseName = GetConfiguration("DatabaseName", "datawarehouse");
         _containerName = GetConfiguration("ContainerName", "storage");
         _partitionKeyPath = GetConfiguration("PartitionKeyPath", "/partitionKey");
+        _defaultPartitionKey = GetConfiguration("DefaultPartitionKey", "default");
         _consistencyLevel = Enum.Parse<ConsistencyLevel>(GetConfiguration("ConsistencyLevel", "Session"));
 
         var connectionString = GetConnectionString();
@@ -129,6 +131,19 @@ public sealed class DocumentDbStorageStrategy : DatabaseStorageStrategyBase
         var contentType = GetContentType(key);
         var partitionKey = GetPartitionKey(key);
 
+        // Preserve CreatedAt on update: read the existing document's creation timestamp.
+        DateTime createdAt = now;
+        try
+        {
+            var existingResponse = await _container!.ReadItemAsync<StorageDocument>(
+                key, new PartitionKey(partitionKey), cancellationToken: ct);
+            createdAt = existingResponse.Resource.CreatedAt;
+        }
+        catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            // New document — use current time as CreatedAt.
+        }
+
         var document = new StorageDocument
         {
             Id = key,
@@ -138,7 +153,7 @@ public sealed class DocumentDbStorageStrategy : DatabaseStorageStrategyBase
             ContentType = contentType,
             ETag = etag,
             Metadata = metadata?.ToDictionary(k => k.Key, v => v.Value),
-            CreatedAt = now,
+            CreatedAt = createdAt,
             ModifiedAt = now
         };
 
@@ -152,7 +167,7 @@ public sealed class DocumentDbStorageStrategy : DatabaseStorageStrategyBase
         {
             Key = key,
             Size = data.LongLength,
-            Created = now,
+            Created = createdAt,
             Modified = now,
             ETag = etag,
             ContentType = contentType,
@@ -311,11 +326,11 @@ public sealed class DocumentDbStorageStrategy : DatabaseStorageStrategyBase
         return new CosmosTransaction(_container!);
     }
 
-    private static string GetPartitionKey(string key)
+    private string GetPartitionKey(string key)
     {
-        // Use first path segment as partition key, or default if no path
+        // Use first path segment as partition key, or the configurable default if no path
         var slashIndex = key.IndexOf('/');
-        return slashIndex > 0 ? key.Substring(0, slashIndex) : "default";
+        return slashIndex > 0 ? key.Substring(0, slashIndex) : _defaultPartitionKey;
     }
 
     protected override async ValueTask DisposeAsyncCore()

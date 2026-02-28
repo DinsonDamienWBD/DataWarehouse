@@ -60,7 +60,10 @@ public sealed class ClickHouseStorageStrategy : DatabaseStorageStrategyBase
 
     protected override async Task ConnectCoreAsync(CancellationToken ct)
     {
-        await _connection!.OpenAsync(ct);
+        if (_connection!.State != System.Data.ConnectionState.Open)
+        {
+            await _connection.OpenAsync(ct);
+        }
     }
 
     protected override async Task DisconnectCoreAsync(CancellationToken ct)
@@ -71,34 +74,49 @@ public sealed class ClickHouseStorageStrategy : DatabaseStorageStrategyBase
 
     protected override async Task EnsureSchemaCoreAsync(CancellationToken ct)
     {
-        await _connection!.OpenAsync(ct);
-
-        await using (var cmd = _connection.CreateCommand())
+        // Open only if not already open to avoid double-open when called from InitializeCoreAsync
+        // before ConnectCoreAsync has run.
+        bool openedHere = _connection!.State != System.Data.ConnectionState.Open;
+        if (openedHere)
         {
-            cmd.CommandText = $"CREATE DATABASE IF NOT EXISTS {_database}";
-            await cmd.ExecuteNonQueryAsync(ct);
+            await _connection.OpenAsync(ct);
         }
 
-        await using (var cmd = _connection.CreateCommand())
+        try
         {
-            cmd.CommandText = $@"
-                CREATE TABLE IF NOT EXISTS {_database}.{_tableName} (
-                    key String,
-                    data String,
-                    size Int64,
-                    content_type Nullable(String),
-                    etag String,
-                    metadata Nullable(String),
-                    created_at DateTime64(3),
-                    modified_at DateTime64(3),
-                    sign Int8 DEFAULT 1
-                ) ENGINE = CollapsingMergeTree(sign)
-                ORDER BY key
-                SETTINGS index_granularity = 8192";
-            await cmd.ExecuteNonQueryAsync(ct);
-        }
+            await using (var cmd = _connection.CreateCommand())
+            {
+                cmd.CommandText = $"CREATE DATABASE IF NOT EXISTS {_database}";
+                await cmd.ExecuteNonQueryAsync(ct);
+            }
 
-        await _connection.CloseAsync();
+            await using (var cmd = _connection.CreateCommand())
+            {
+                cmd.CommandText = $@"
+                    CREATE TABLE IF NOT EXISTS {_database}.{_tableName} (
+                        key String,
+                        data String,
+                        size Int64,
+                        content_type Nullable(String),
+                        etag String,
+                        metadata Nullable(String),
+                        created_at DateTime64(3),
+                        modified_at DateTime64(3),
+                        sign Int8 DEFAULT 1
+                    ) ENGINE = CollapsingMergeTree(sign)
+                    ORDER BY key
+                    SETTINGS index_granularity = 8192";
+                await cmd.ExecuteNonQueryAsync(ct);
+            }
+        }
+        finally
+        {
+            // Only close if we opened; leave open if caller will manage state.
+            if (openedHere)
+            {
+                await _connection.CloseAsync();
+            }
+        }
     }
 
     protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct)

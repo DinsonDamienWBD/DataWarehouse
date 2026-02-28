@@ -194,38 +194,55 @@ public sealed class OpenSearchStorageStrategy : DatabaseStorageStrategyBase
 
     protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct)
     {
-        var searchResponse = await _client!.SearchAsync<StorageDocument>(s => s
-            .Index(_indexName)
-            .Query(q => string.IsNullOrEmpty(prefix)
-                ? q.MatchAll()
-                : q.Prefix(p => p.Field(f => f.Key).Value(prefix)))
-            .Size(10000)
-            .Source(src => src.Excludes(e => e.Field(f => f.Data))), ct);
+        // Use From/Size pagination to avoid the 10 000-hit limit.
+        const int PageSize = 1000;
+        int from = 0;
 
-        if (!searchResponse.IsValid)
-        {
-            yield break;
-        }
-
-        foreach (var hit in searchResponse.Hits)
+        while (true)
         {
             ct.ThrowIfCancellationRequested();
 
-            var doc = hit.Source;
-            if (doc == null) continue;
+            var localFrom = from;
+            var searchResponse = await _client!.SearchAsync<StorageDocument>(s => s
+                .Index(_indexName)
+                .Query(q => string.IsNullOrEmpty(prefix)
+                    ? q.MatchAll()
+                    : q.Prefix(p => p.Field(f => f.Key).Value(prefix)))
+                .From(localFrom)
+                .Size(PageSize)
+                .Sort(so => so.Ascending(f => f.Key))
+                .Source(src => src.Excludes(e => e.Field(f => f.Data))), ct);
 
-            yield return new StorageObjectMetadata
+            if (!searchResponse.IsValid || searchResponse.Hits.Count == 0)
             {
-                Key = doc.Key,
-                Size = doc.Size,
-                ContentType = doc.ContentType,
-                ETag = doc.ETag,
-                CustomMetadata = doc.Metadata as IReadOnlyDictionary<string, string>,
-                Created = doc.CreatedAt,
-                Modified = doc.ModifiedAt,
-                VersionId = hit.Version.ToString(),
-                Tier = Tier
-            };
+                yield break;
+            }
+
+            foreach (var hit in searchResponse.Hits)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var doc = hit.Source;
+                if (doc == null) continue;
+
+                yield return new StorageObjectMetadata
+                {
+                    Key = doc.Key,
+                    Size = doc.Size,
+                    ContentType = doc.ContentType,
+                    ETag = doc.ETag,
+                    CustomMetadata = doc.Metadata as IReadOnlyDictionary<string, string>,
+                    Created = doc.CreatedAt,
+                    Modified = doc.ModifiedAt,
+                    VersionId = hit.Version.ToString(),
+                    Tier = Tier
+                };
+            }
+
+            if (searchResponse.Hits.Count < PageSize)
+                yield break;
+
+            from += PageSize;
         }
     }
 

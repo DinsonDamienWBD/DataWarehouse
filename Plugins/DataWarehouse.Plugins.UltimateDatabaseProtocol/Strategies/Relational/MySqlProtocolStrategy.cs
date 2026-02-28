@@ -117,7 +117,7 @@ public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
     private uint _connectionId;
     private string _authPluginName = "";
     private byte[] _authPluginData = [];
-    private int _sequenceId;
+    private volatile int _sequenceId;
 
     /// <inheritdoc/>
     public override string StrategyId => "mysql-protocol";

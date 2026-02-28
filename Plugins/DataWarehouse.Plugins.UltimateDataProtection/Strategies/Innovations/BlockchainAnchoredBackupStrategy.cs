@@ -53,6 +53,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 
         /// <inheritdoc/>
         public override string StrategyId => "blockchain-anchored";
+        public override bool IsProductionReady => false;
 
         /// <inheritdoc/>
         public override string StrategyName => "Blockchain-Anchored Backup";

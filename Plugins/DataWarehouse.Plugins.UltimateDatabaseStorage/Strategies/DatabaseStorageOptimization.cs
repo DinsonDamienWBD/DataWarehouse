@@ -12,6 +12,7 @@ public sealed class DatabaseIndexManager
 {
     private readonly BoundedDictionary<string, IndexDefinition> _indexes = new BoundedDictionary<string, IndexDefinition>(1000);
     private readonly BoundedDictionary<string, IndexUsageStats> _usageStats = new BoundedDictionary<string, IndexUsageStats>(1000);
+    private readonly object _statsLock = new();
 
     /// <summary>Creates an index on a collection/table.</summary>
     public IndexDefinition CreateIndex(string collection, string indexName, IndexType type,
@@ -48,9 +49,12 @@ public sealed class DatabaseIndexManager
         var key = $"{collection}:{indexName}";
         if (_usageStats.TryGetValue(key, out var stats))
         {
-            stats.TotalScans++;
-            stats.TotalTimeMs += queryTimeMs;
-            stats.LastUsed = DateTime.UtcNow;
+            lock (_statsLock)
+            {
+                stats.TotalScans++;
+                stats.TotalTimeMs += queryTimeMs;
+                stats.LastUsed = DateTime.UtcNow;
+            }
         }
     }
 
@@ -409,6 +413,7 @@ public sealed record OptimizerMetrics
 public sealed class StorageCacheIntegration
 {
     private readonly BoundedDictionary<string, CacheEntry> _cache = new BoundedDictionary<string, CacheEntry>(1000);
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, SemaphoreSlim> _keyLocks = new();
     private readonly int _maxEntries;
     private long _hits;
     private long _misses;
@@ -429,13 +434,32 @@ public sealed class StorageCacheIntegration
             return entry.Data;
         }
 
-        Interlocked.Increment(ref _misses);
-        var data = await fallback(key);
-        if (data != null)
+        // Use a per-key semaphore to prevent duplicate fetches under concurrent cache misses.
+        var keyLock = _keyLocks.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
+        await keyLock.WaitAsync(ct).ConfigureAwait(false);
+        try
         {
-            Put(key, data);
+            // Re-check after acquiring the lock: another thread may have populated the cache.
+            if (_cache.TryGetValue(key, out entry))
+            {
+                entry.LastAccessed = DateTime.UtcNow;
+                entry.AccessCount++;
+                Interlocked.Increment(ref _hits);
+                return entry.Data;
+            }
+
+            Interlocked.Increment(ref _misses);
+            var data = await fallback(key).ConfigureAwait(false);
+            if (data != null)
+            {
+                Put(key, data);
+            }
+            return data;
         }
-        return data;
+        finally
+        {
+            keyLock.Release();
+        }
     }
 
     /// <summary>Puts a value into cache.</summary>

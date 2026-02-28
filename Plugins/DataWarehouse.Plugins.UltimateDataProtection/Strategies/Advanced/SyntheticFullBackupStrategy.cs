@@ -26,6 +26,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 
         /// <inheritdoc/>
         public override string StrategyId => "synthetic-full";
+        public override bool IsProductionReady => false;
 
         /// <inheritdoc/>
         public override string StrategyName => "Synthetic Full Backup";
@@ -488,9 +489,10 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
             BackupRequest request,
             CancellationToken ct)
         {
-            // In production, write the merged blocks to storage
+            // Return the actual sum of stored block sizes, not a fabricated multiple.
+            // Real compression savings are tracked separately via CompressedSize on each block.
             var storedBytes = mergedData.Sum(kvp => (long)kvp.Value.Length);
-            return Task.FromResult(storedBytes * 1000); // Simulate compression
+            return Task.FromResult(storedBytes);
         }
 
         private Task UpdateCatalogAsync(

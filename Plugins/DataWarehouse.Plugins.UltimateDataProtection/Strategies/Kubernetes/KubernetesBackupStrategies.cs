@@ -6,6 +6,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Kubernetes
     public sealed class VeleroBackupStrategy : DataProtectionStrategyBase
     {
         public override string StrategyId => "velero-backup";
+        public override bool IsProductionReady => false;
         public override string StrategyName => "Velero Backup";
         public override DataProtectionCategory Category => DataProtectionCategory.FullBackup;
         public override DataProtectionCapabilities Capabilities =>
@@ -36,6 +37,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Kubernetes
     public sealed class EtcdBackupStrategy : DataProtectionStrategyBase
     {
         public override string StrategyId => "etcd-backup";
+        public override bool IsProductionReady => false;
         public override string StrategyName => "etcd Backup";
         public override DataProtectionCategory Category => DataProtectionCategory.Snapshot;
         public override DataProtectionCapabilities Capabilities =>
@@ -66,6 +68,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Kubernetes
     public sealed class PVCBackupStrategy : DataProtectionStrategyBase
     {
         public override string StrategyId => "pvc-backup";
+        public override bool IsProductionReady => false;
         public override string StrategyName => "PVC Backup";
         public override DataProtectionCategory Category => DataProtectionCategory.Snapshot;
         public override DataProtectionCapabilities Capabilities =>
@@ -96,6 +99,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Kubernetes
     public sealed class HelmBackupStrategy : DataProtectionStrategyBase
     {
         public override string StrategyId => "helm-backup";
+        public override bool IsProductionReady => false;
         public override string StrategyName => "Helm Backup";
         public override DataProtectionCategory Category => DataProtectionCategory.FullBackup;
         public override DataProtectionCapabilities Capabilities =>
@@ -126,6 +130,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Kubernetes
     public sealed class CRDBackupStrategy : DataProtectionStrategyBase
     {
         public override string StrategyId => "crd-backup";
+        public override bool IsProductionReady => false;
         public override string StrategyName => "CRD Backup";
         public override DataProtectionCategory Category => DataProtectionCategory.FullBackup;
         public override DataProtectionCapabilities Capabilities =>

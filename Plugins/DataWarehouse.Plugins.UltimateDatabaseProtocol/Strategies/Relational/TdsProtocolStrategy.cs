@@ -115,12 +115,13 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
 
     // Protocol state
     private int _packetId;
+    private readonly object _packetIdLock = new();
     private int _spid = 0;
     private string _serverVersion = "";
     private string _instanceName = "";
     private bool _encryptionRequired;
     private byte[] _serverNonce = [];
-    private Dictionary<string, string> _envChanges = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _envChanges = new();
 
     /// <inheritdoc/>
     public override string StrategyId => "tds-protocol";
@@ -1148,7 +1149,7 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
             header[3] = (byte)packetLength;
             header[4] = (byte)(_spid >> 8);
             header[5] = (byte)_spid;
-            header[6] = (byte)_packetId++;
+            header[6] = (byte)Interlocked.Increment(ref _packetId);
             header[7] = 0; // Window
 
             await SendAsync(header, ct);

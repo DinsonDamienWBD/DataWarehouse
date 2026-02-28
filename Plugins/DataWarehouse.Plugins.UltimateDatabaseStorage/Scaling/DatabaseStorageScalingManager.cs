@@ -50,10 +50,10 @@ public sealed class DatabaseStorageScalingManager : IScalableSubsystem, IDisposa
 
     // ---- Configuration ----
     private volatile ScalingLimits _currentLimits;
-    private int _maxBufferBytes;
-    private int _chunkSize;
-    private int _defaultPageSize;
-    private int _healthCheckTimeoutMs;
+    private volatile int _maxBufferBytes;
+    private volatile int _chunkSize;
+    private volatile int _defaultPageSize;
+    private volatile int _healthCheckTimeoutMs;
 
     // ---- Query result cache ----
     private readonly BoundedCache<string, byte[]> _queryResultCache;
@@ -74,7 +74,7 @@ public sealed class DatabaseStorageScalingManager : IScalableSubsystem, IDisposa
     private volatile BackpressureState _backpressureState = BackpressureState.Normal;
 
     // ---- Disposal ----
-    private bool _disposed;
+    private volatile bool _disposed;
 
     /// <summary>
     /// Initializes a new <see cref="DatabaseStorageScalingManager"/> with optional backing store
@@ -380,18 +380,31 @@ public sealed class DatabaseStorageScalingManager : IScalableSubsystem, IDisposa
 
         var results = new Dictionary<string, bool>(strategyHealthChecks.Count);
         var tasks = new List<(string Name, Task<bool> Check)>();
+        // Keep CTS instances alive until all tasks complete; dispose afterward.
+        var timeoutCtsList = new List<CancellationTokenSource>(strategyHealthChecks.Count);
 
-        foreach (var (name, healthCheck) in strategyHealthChecks)
+        try
         {
-            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            timeoutCts.CancelAfter(_healthCheckTimeoutMs);
+            foreach (var (name, healthCheck) in strategyHealthChecks)
+            {
+                var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                timeoutCts.CancelAfter(_healthCheckTimeoutMs);
+                timeoutCtsList.Add(timeoutCts);
 
-            var checkTask = ExecuteHealthCheckWithTimeoutAsync(name, healthCheck, timeoutCts.Token);
-            tasks.Add((name, checkTask));
+                var checkTask = ExecuteHealthCheckWithTimeoutAsync(name, healthCheck, timeoutCts.Token);
+                tasks.Add((name, checkTask));
+            }
+
+            // Run all health checks in parallel
+            await Task.WhenAll(tasks.Select(t => t.Check)).ConfigureAwait(false);
         }
-
-        // Run all health checks in parallel
-        await Task.WhenAll(tasks.Select(t => t.Check)).ConfigureAwait(false);
+        finally
+        {
+            foreach (var cts in timeoutCtsList)
+            {
+                cts.Dispose();
+            }
+        }
 
         foreach (var (name, checkTask) in tasks)
         {

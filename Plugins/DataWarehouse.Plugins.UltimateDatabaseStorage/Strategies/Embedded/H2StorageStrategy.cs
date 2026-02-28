@@ -29,6 +29,7 @@ public sealed class H2StorageStrategy : DatabaseStorageStrategyBase
     private readonly object _lock = new();
 
     public override string StrategyId => "h2";
+    public override bool IsProductionReady => false; // H2 is a JVM-based database; this implementation uses a .NET-Java bridge which is not yet production-ready
     public override string Name => "H2 Embedded Storage";
     public override StorageTier Tier => StorageTier.Hot;
     public override DatabaseCategory DatabaseCategory => DatabaseCategory.Embedded;

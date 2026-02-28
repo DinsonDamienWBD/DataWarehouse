@@ -60,6 +60,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 
         /// <inheritdoc/>
         public override string StrategyId => "quantum-safe";
+        public override bool IsProductionReady => false;
 
         /// <inheritdoc/>
         public override string StrategyName => "Quantum-Safe Backup";

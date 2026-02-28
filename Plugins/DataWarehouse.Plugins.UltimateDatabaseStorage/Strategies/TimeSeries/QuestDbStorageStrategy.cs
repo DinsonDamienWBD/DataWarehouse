@@ -188,10 +188,14 @@ public sealed class QuestDbStorageStrategy : DatabaseStorageStrategyBase
 
     protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct)
     {
-        // QuestDB doesn't support DELETE, use UPDATE to mark as deleted
-        // For actual deletion, use retention policies
-
+        // QuestDB does not support DELETE DML on individual rows. Data can only be
+        // removed via TTL/retention policies or DROP TABLE. Log a warning so operators
+        // are aware that the row is not immediately removed.
         var metadata = await GetMetadataCoreAsync(key, ct);
+        System.Diagnostics.Debug.WriteLine(
+            $"[Warning] QuestDbStorageStrategy: DELETE is not supported for key '{key}'. " +
+            "The record will remain until the retention policy expires. Configure a " +
+            "retention policy on bucket '{_tableName}' to enforce data lifecycle.");
         return metadata.Size;
     }
 

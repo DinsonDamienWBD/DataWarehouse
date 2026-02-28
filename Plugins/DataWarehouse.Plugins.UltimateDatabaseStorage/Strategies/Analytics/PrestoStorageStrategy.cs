@@ -273,7 +273,8 @@ public sealed class PrestoStorageStrategy : DatabaseStorageStrategyBase
         var results = new List<List<object?>>();
 
         var content = new StringContent(sql, Encoding.UTF8, "text/plain");
-        _httpClient!.DefaultRequestHeaders.Add("X-Presto-Catalog", _catalog);
+        _httpClient!.DefaultRequestHeaders.Remove("X-Presto-Catalog");
+        _httpClient.DefaultRequestHeaders.Add("X-Presto-Catalog", _catalog);
         _httpClient.DefaultRequestHeaders.Remove("X-Presto-Schema");
         _httpClient.DefaultRequestHeaders.Add("X-Presto-Schema", _schema);
 

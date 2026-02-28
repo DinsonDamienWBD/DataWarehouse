@@ -282,22 +282,30 @@ public sealed class UltimateDatabaseStoragePlugin : DataWarehouse.SDK.Contracts.
     {
         if (!message.Payload.TryGetValue("strategyId", out var idObj) || idObj is not string strategyId)
         {
+            message.Payload["success"] = false;
+            message.Payload["error"] = "Missing 'strategyId' parameter";
             return;
         }
 
         var strategy = GetDatabaseStrategy(strategyId);
         if (strategy == null)
         {
+            message.Payload["success"] = false;
+            message.Payload["error"] = $"Strategy '{strategyId}' not found";
             return;
         }
 
         if (!message.Payload.TryGetValue("key", out var keyObj) || keyObj is not string key)
         {
+            message.Payload["success"] = false;
+            message.Payload["error"] = "Missing 'key' parameter";
             return;
         }
 
         if (!message.Payload.TryGetValue("data", out var dataObj) || dataObj is not byte[] data)
         {
+            message.Payload["success"] = false;
+            message.Payload["error"] = "Missing or invalid 'data' parameter";
             return;
         }
 
@@ -307,34 +315,61 @@ public sealed class UltimateDatabaseStoragePlugin : DataWarehouse.SDK.Contracts.
             metadata = meta;
         }
 
-        using var ms = new MemoryStream(data);
-        await strategy.StoreAsync(key, ms, metadata);
+        try
+        {
+            using var ms = new MemoryStream(data);
+            var result = await strategy.StoreAsync(key, ms, metadata);
+            message.Payload["success"] = true;
+            message.Payload["key"] = result.Key;
+            message.Payload["size"] = result.Size;
+            message.Payload["etag"] = result.ETag ?? "";
+        }
+        catch (Exception ex)
+        {
+            message.Payload["success"] = false;
+            message.Payload["error"] = ex.Message;
+        }
     }
 
     private async Task HandleRetrieveAsync(PluginMessage message)
     {
         if (!message.Payload.TryGetValue("strategyId", out var idObj) || idObj is not string strategyId)
         {
+            message.Payload["success"] = false;
+            message.Payload["error"] = "Missing 'strategyId' parameter";
             return;
         }
 
         var strategy = GetDatabaseStrategy(strategyId);
         if (strategy == null)
         {
+            message.Payload["success"] = false;
+            message.Payload["error"] = $"Strategy '{strategyId}' not found";
             return;
         }
 
         if (!message.Payload.TryGetValue("key", out var keyObj) || keyObj is not string key)
         {
+            message.Payload["success"] = false;
+            message.Payload["error"] = "Missing 'key' parameter";
             return;
         }
 
-        using var stream = await strategy.RetrieveAsync(key);
-        var capacity = stream.CanSeek && stream.Length > 0 ? (int)stream.Length : 0;
-        using var ms = new MemoryStream(capacity);
-        await stream.CopyToAsync(ms);
-        var data = ms.ToArray();
-        // Response would be sent via message context
+        try
+        {
+            using var stream = await strategy.RetrieveAsync(key);
+            var capacity = stream.CanSeek && stream.Length > 0 ? (int)stream.Length : 0;
+            using var ms = new MemoryStream(capacity);
+            await stream.CopyToAsync(ms);
+            message.Payload["success"] = true;
+            message.Payload["data"] = ms.ToArray();
+            message.Payload["key"] = key;
+        }
+        catch (Exception ex)
+        {
+            message.Payload["success"] = false;
+            message.Payload["error"] = ex.Message;
+        }
     }
 
     private async Task HandleDeleteAsync(PluginMessage message)
@@ -382,8 +417,18 @@ public sealed class UltimateDatabaseStoragePlugin : DataWarehouse.SDK.Contracts.
             parameters = @params;
         }
 
-        var results = await strategy.ExecuteQueryAsync(query, parameters);
-        // Response would be sent via message context
+        try
+        {
+            var results = await strategy.ExecuteQueryAsync(query, parameters);
+            message.Payload["success"] = true;
+            message.Payload["results"] = results.ToList();
+            message.Payload["count"] = results.Count;
+        }
+        catch (Exception ex)
+        {
+            message.Payload["success"] = false;
+            message.Payload["error"] = ex.Message;
+        }
     }
 
     private async Task HandleHealthCheckAsync(PluginMessage message)

@@ -28,8 +28,8 @@ public sealed class OracleTnsProtocolStrategy : DatabaseProtocolStrategyBase
     private const ushort DataFlagSendNti = 0x0001;
     private const ushort DataFlagResetMarker = 0x0002;
 
-    private int _sdu = 8192;
-    private int _tdu = 32767;
+    private volatile int _sdu = 8192;
+    private volatile int _tdu = 32767;
     private byte[] _sessionKey = [];
     private int _sequenceNumber;
 
@@ -117,6 +117,14 @@ public sealed class OracleTnsProtocolStrategy : DatabaseProtocolStrategyBase
         var host = parameters.Host;
         var port = parameters.Port;
 
+        // Validate parameters to prevent TNS descriptor injection.
+        // TNS descriptors use parentheses as delimiters; values containing '(' or ')'
+        // would allow an attacker to inject arbitrary TNS parameters.
+        if (host.IndexOfAny(['(', ')', '\0']) >= 0)
+            throw new ArgumentException($"Invalid Oracle host '{host}': must not contain TNS delimiter characters '(' or ')'.");
+        if (serviceName.IndexOfAny(['(', ')', '\0']) >= 0)
+            throw new ArgumentException($"Invalid Oracle service name '{serviceName}': must not contain TNS delimiter characters '(' or ')'.");
+
         return $"(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST={host})(PORT={port}))" +
                $"(CONNECT_DATA=(SERVICE_NAME={serviceName})(CID=(PROGRAM=DataWarehouse)(HOST=client))))";
     }
@@ -173,6 +181,11 @@ public sealed class OracleTnsProtocolStrategy : DatabaseProtocolStrategyBase
         offset += 2;
 
         _tdu = BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(offset));
+        offset += 2;
+
+        // Remaining fields (protocol characteristics, max connect data, etc.) are
+        // currently unused but the offset is maintained for future extensibility.
+        _ = offset;
     }
 
     private static string ParseRefusePacket(byte[] data)

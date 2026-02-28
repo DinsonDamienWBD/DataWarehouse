@@ -180,6 +180,35 @@ public sealed class DynamoDbStorageStrategy : DatabaseStorageStrategyBase
         var chunkSize = MaxItemSize - 1024; // Leave room for other attributes
         var chunks = (int)Math.Ceiling((double)data.Length / chunkSize);
 
+        // Write metadata FIRST so that any process death during chunk writes leaves
+        // the metadata record as a marker; a cleanup pass can detect and remove orphaned
+        // CHUNK# records for any PK whose DATA record is incomplete.
+        // The ChunkCount field reflects the intended total; readers verify against it.
+        var item = new Dictionary<string, AttributeValue>
+        {
+            ["PK"] = new() { S = $"STORAGE#{key}" },
+            ["SK"] = new() { S = "DATA" },
+            ["Size"] = new() { N = data.LongLength.ToString() },
+            ["ContentType"] = new() { S = contentType ?? "application/octet-stream" },
+            ["ETag"] = new() { S = etag },
+            ["CreatedAt"] = new() { S = now.ToString("o") },
+            ["ModifiedAt"] = new() { S = now.ToString("o") },
+            ["IsChunked"] = new() { BOOL = true },
+            ["ChunkCount"] = new() { N = chunks.ToString() },
+            ["IsComplete"] = new() { BOOL = false }  // Set to true after all chunks written
+        };
+
+        if (metadataJson != null)
+        {
+            item["Metadata"] = new() { S = metadataJson };
+        }
+
+        await _client!.PutItemAsync(new PutItemRequest
+        {
+            TableName = _tableName,
+            Item = item
+        }, ct);
+
         // Store chunks
         for (int i = 0; i < chunks; i++)
         {
@@ -196,33 +225,16 @@ public sealed class DynamoDbStorageStrategy : DatabaseStorageStrategyBase
                 ["ChunkIndex"] = new() { N = i.ToString() }
             };
 
-            await _client!.PutItemAsync(new PutItemRequest
+            await _client.PutItemAsync(new PutItemRequest
             {
                 TableName = _tableName,
                 Item = chunkItem
             }, ct);
         }
 
-        // Store metadata record
-        var item = new Dictionary<string, AttributeValue>
-        {
-            ["PK"] = new() { S = $"STORAGE#{key}" },
-            ["SK"] = new() { S = "DATA" },
-            ["Size"] = new() { N = data.LongLength.ToString() },
-            ["ContentType"] = new() { S = contentType ?? "application/octet-stream" },
-            ["ETag"] = new() { S = etag },
-            ["CreatedAt"] = new() { S = now.ToString("o") },
-            ["ModifiedAt"] = new() { S = now.ToString("o") },
-            ["IsChunked"] = new() { BOOL = true },
-            ["ChunkCount"] = new() { N = chunks.ToString() }
-        };
-
-        if (metadataJson != null)
-        {
-            item["Metadata"] = new() { S = metadataJson };
-        }
-
-        await _client!.PutItemAsync(new PutItemRequest
+        // Mark metadata as complete now that all chunks are written
+        item["IsComplete"] = new() { BOOL = true };
+        await _client.PutItemAsync(new PutItemRequest
         {
             TableName = _tableName,
             Item = item
@@ -291,10 +303,14 @@ public sealed class DynamoDbStorageStrategy : DatabaseStorageStrategyBase
                 }
             }, ct);
 
-            if (chunkResponse.IsItemSet && chunkResponse.Item.TryGetValue("Data", out var chunkData))
+            if (!chunkResponse.IsItemSet || !chunkResponse.Item.TryGetValue("Data", out var chunkData))
             {
-                await chunkData.B.CopyToAsync(resultStream, ct);
+                throw new InvalidOperationException(
+                    $"Chunked object '{key}' is corrupt: chunk {i} of {chunkCount} is missing. " +
+                    "The object may have been partially written during a previous failed store operation.");
             }
+
+            await chunkData.B.CopyToAsync(resultStream, ct);
         }
 
         return resultStream.ToArray();
@@ -306,30 +322,39 @@ public sealed class DynamoDbStorageStrategy : DatabaseStorageStrategyBase
         var metadata = await GetMetadataCoreAsync(key, ct);
         var size = metadata.Size;
 
-        // Query all items with this key
-        var queryResponse = await _client!.QueryAsync(new QueryRequest
+        // Paginate the query to handle objects with >1000 chunks (DynamoDB Query limit)
+        // or result sets >1 MB, ensuring no orphaned chunks are left behind.
+        Dictionary<string, AttributeValue>? lastKey = null;
+        do
         {
-            TableName = _tableName,
-            KeyConditionExpression = "PK = :pk",
-            ExpressionAttributeValues = new Dictionary<string, AttributeValue>
-            {
-                [":pk"] = new() { S = $"STORAGE#{key}" }
-            }
-        }, ct);
-
-        // Delete all items
-        foreach (var item in queryResponse.Items)
-        {
-            await _client.DeleteItemAsync(new DeleteItemRequest
+            var queryRequest = new QueryRequest
             {
                 TableName = _tableName,
-                Key = new Dictionary<string, AttributeValue>
+                KeyConditionExpression = "PK = :pk",
+                ExpressionAttributeValues = new Dictionary<string, AttributeValue>
                 {
-                    ["PK"] = item["PK"],
-                    ["SK"] = item["SK"]
-                }
-            }, ct);
-        }
+                    [":pk"] = new() { S = $"STORAGE#{key}" }
+                },
+                ExclusiveStartKey = lastKey
+            };
+
+            var queryResponse = await _client!.QueryAsync(queryRequest, ct);
+
+            foreach (var item in queryResponse.Items)
+            {
+                await _client.DeleteItemAsync(new DeleteItemRequest
+                {
+                    TableName = _tableName,
+                    Key = new Dictionary<string, AttributeValue>
+                    {
+                        ["PK"] = item["PK"],
+                        ["SK"] = item["SK"]
+                    }
+                }, ct);
+            }
+
+            lastKey = queryResponse.LastEvaluatedKey?.Count > 0 ? queryResponse.LastEvaluatedKey : null;
+        } while (lastKey != null);
 
         return size;
     }

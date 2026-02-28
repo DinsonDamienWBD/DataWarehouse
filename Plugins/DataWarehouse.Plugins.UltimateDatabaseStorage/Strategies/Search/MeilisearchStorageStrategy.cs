@@ -170,45 +170,54 @@ public sealed class MeilisearchStorageStrategy : DatabaseStorageStrategyBase
 
     protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct)
     {
-        var searchParams = new SearchQuery
-        {
-            Limit = 1000,
-            AttributesToRetrieve = new[] { "key", "size", "contentType", "etag", "metadata", "createdAt", "modifiedAt" }
-        };
+        // Paginate using Offset + Limit to avoid silently truncating beyond 1000 docs.
+        const int PageSize = 1000;
+        int offset = 0;
 
-        if (!string.IsNullOrEmpty(prefix))
-        {
-            searchParams.Q = prefix;
-        }
-
-        var result = await _index!.SearchAsync<StorageDocument>(prefix ?? "", searchParams, ct);
-
-        foreach (var hit in result.Hits)
+        while (true)
         {
             ct.ThrowIfCancellationRequested();
 
-            if (!string.IsNullOrEmpty(prefix) && !hit.Key.StartsWith(prefix, StringComparison.Ordinal))
+            var searchParams = new SearchQuery
             {
-                continue;
-            }
-
-            Dictionary<string, string>? customMetadata = null;
-            if (!string.IsNullOrEmpty(hit.Metadata))
-            {
-                customMetadata = JsonSerializer.Deserialize<Dictionary<string, string>>(hit.Metadata, JsonOptions);
-            }
-
-            yield return new StorageObjectMetadata
-            {
-                Key = hit.Key,
-                Size = hit.Size,
-                ContentType = hit.ContentType,
-                ETag = hit.ETag,
-                CustomMetadata = customMetadata,
-                Created = new DateTime(hit.CreatedAt, DateTimeKind.Utc),
-                Modified = new DateTime(hit.ModifiedAt, DateTimeKind.Utc),
-                Tier = Tier
+                Limit = PageSize,
+                Offset = offset,
+                AttributesToRetrieve = new[] { "key", "size", "contentType", "etag", "metadata", "createdAt", "modifiedAt" }
             };
+
+            var result = await _index!.SearchAsync<StorageDocument>(prefix ?? "", searchParams, ct);
+
+            if (result.Hits.Count == 0)
+                yield break;
+
+            foreach (var hit in result.Hits)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                if (!string.IsNullOrEmpty(prefix) && !hit.Key.StartsWith(prefix, StringComparison.Ordinal))
+                    continue;
+
+                Dictionary<string, string>? customMetadata = null;
+                if (!string.IsNullOrEmpty(hit.Metadata))
+                    customMetadata = JsonSerializer.Deserialize<Dictionary<string, string>>(hit.Metadata, JsonOptions);
+
+                yield return new StorageObjectMetadata
+                {
+                    Key = hit.Key,
+                    Size = hit.Size,
+                    ContentType = hit.ContentType,
+                    ETag = hit.ETag,
+                    CustomMetadata = customMetadata,
+                    Created = new DateTime(hit.CreatedAt, DateTimeKind.Utc),
+                    Modified = new DateTime(hit.ModifiedAt, DateTimeKind.Utc),
+                    Tier = Tier
+                };
+            }
+
+            if (result.Hits.Count < PageSize)
+                yield break;
+
+            offset += PageSize;
         }
     }
 

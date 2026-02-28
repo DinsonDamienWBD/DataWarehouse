@@ -37,6 +37,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
         public override string StrategyId => "zero-knowledge";
 
         /// <inheritdoc/>
+        public override bool IsProductionReady => false;
+
+        /// <inheritdoc/>
         public override string StrategyName => "Zero-Knowledge Backup";
 
         /// <inheritdoc/>
@@ -154,7 +157,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                     PercentComplete = 75
                 });
 
-                var encryptedMetadata = await EncryptMetadataHomomorphicAsync(catalog, keyDerivation, ct);
+                var encryptedMetadata = await EncryptMetadataDeterministicallyAsync(catalog, keyDerivation, ct);
 
                 // Phase 7: Generate commitment for verification
                 progressCallback(new BackupProgress
@@ -689,21 +692,22 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
         }
 
         /// <summary>
-        /// Encrypts metadata with homomorphic encryption for server-side queries.
+        /// Encrypts metadata using deterministic AES encryption for equality queries.
+        /// NOTE: This is deterministic AES (not homomorphic encryption). A full homomorphic
+        /// encryption implementation requires a library such as Microsoft SEAL or OpenFHE.
+        /// Callers must not rely on server-side computation on encrypted values.
         /// </summary>
-        private async Task<EncryptedMetadata> EncryptMetadataHomomorphicAsync(
+        private async Task<EncryptedMetadata> EncryptMetadataDeterministicallyAsync(
             CatalogResult catalog,
             KeyDerivationResult keys,
             CancellationToken ct)
         {
             await Task.CompletedTask;
 
-            // In production, use a homomorphic encryption library like SEAL or Palisade
-            // This allows the server to perform operations on encrypted data
-            // For now, we use deterministic encryption for equality queries
-
-            var encryptedFileCount = EncryptHomomorphic(catalog.FileCount, keys.MasterKey);
-            var encryptedTotalSize = EncryptHomomorphic(catalog.TotalBytes, keys.MasterKey);
+            // Deterministic encryption: same plaintext + key always produces the same ciphertext,
+            // enabling equality queries on the server without revealing the plaintext.
+            var encryptedFileCount = EncryptDeterministicValue(catalog.FileCount, keys.MasterKey);
+            var encryptedTotalSize = EncryptDeterministicValue(catalog.TotalBytes, keys.MasterKey);
 
             return new EncryptedMetadata
             {
@@ -845,9 +849,14 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             return level[0];
         }
 
-        private static byte[] EncryptHomomorphic(long value, byte[] key)
+        /// <summary>
+        /// Encrypts a 64-bit integer using AES-CBC for deterministic-style metadata protection.
+        /// NOTE: This is AES-CBC symmetric encryption, NOT homomorphic encryption.
+        /// Homomorphic encryption (e.g., Microsoft SEAL, OpenFHE) would allow computation on
+        /// ciphertext without decryption; this implementation does not provide that property.
+        /// </summary>
+        private static byte[] EncryptDeterministicValue(long value, byte[] key)
         {
-            // Simplified - in production use actual homomorphic encryption
             using var aes = Aes.Create();
             aes.Key = key;
             aes.GenerateIV();

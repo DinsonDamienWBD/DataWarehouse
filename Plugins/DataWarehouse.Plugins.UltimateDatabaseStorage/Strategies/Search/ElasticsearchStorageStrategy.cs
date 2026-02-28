@@ -195,45 +195,67 @@ public sealed class ElasticsearchStorageStrategy : DatabaseStorageStrategyBase
 
     protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct)
     {
-        SearchResponse<StorageDocument> searchResponse;
-        if (string.IsNullOrEmpty(prefix))
-        {
-            searchResponse = await _client!.SearchAsync<StorageDocument>(s => s
-                .Indices(_indexName)
-                .Size(10000), ct);
-        }
-        else
-        {
-            searchResponse = await _client!.SearchAsync<StorageDocument>(s => s
-                .Indices(_indexName)
-                .Query(q => q.Prefix(p => p.Field(f => f.Key).Value(prefix)))
-                .Size(10000), ct);
-        }
+        // Use From/Size pagination to avoid silently truncating large indexes.
+        // PageSize is intentionally bounded; callers enumerate the full result via the
+        // async stream rather than a single capped query.
+        const int PageSize = 1000;
+        int from = 0;
 
-        if (!searchResponse.IsValidResponse)
-        {
-            yield break;
-        }
-
-        foreach (var hit in searchResponse.Hits)
+        while (true)
         {
             ct.ThrowIfCancellationRequested();
 
-            var doc = hit.Source;
-            if (doc == null) continue;
-
-            yield return new StorageObjectMetadata
+            var localFrom = from;
+            SearchResponse<StorageDocument> searchResponse;
+            if (string.IsNullOrEmpty(prefix))
             {
-                Key = doc.Key,
-                Size = doc.Size,
-                ContentType = doc.ContentType,
-                ETag = doc.ETag,
-                CustomMetadata = doc.Metadata as IReadOnlyDictionary<string, string>,
-                Created = doc.CreatedAt,
-                Modified = doc.ModifiedAt,
-                VersionId = hit.Version?.ToString(),
-                Tier = Tier
-            };
+                searchResponse = await _client!.SearchAsync<StorageDocument>(s => s
+                    .Indices(_indexName)
+                    .From(localFrom)
+                    .Size(PageSize)
+                    .Sort(so => so.Field(f => f.Key, d => d.Order(Elastic.Clients.Elasticsearch.SortOrder.Asc))), ct);
+            }
+            else
+            {
+                searchResponse = await _client!.SearchAsync<StorageDocument>(s => s
+                    .Indices(_indexName)
+                    .Query(q => q.Prefix(p => p.Field(f => f.Key).Value(prefix)))
+                    .From(localFrom)
+                    .Size(PageSize)
+                    .Sort(so => so.Field(f => f.Key, d => d.Order(Elastic.Clients.Elasticsearch.SortOrder.Asc))), ct);
+            }
+
+            if (!searchResponse.IsValidResponse || searchResponse.Hits.Count == 0)
+            {
+                yield break;
+            }
+
+            foreach (var hit in searchResponse.Hits)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var doc = hit.Source;
+                if (doc == null) continue;
+
+                yield return new StorageObjectMetadata
+                {
+                    Key = doc.Key,
+                    Size = doc.Size,
+                    ContentType = doc.ContentType,
+                    ETag = doc.ETag,
+                    CustomMetadata = doc.Metadata as IReadOnlyDictionary<string, string>,
+                    Created = doc.CreatedAt,
+                    Modified = doc.ModifiedAt,
+                    VersionId = hit.Version?.ToString(),
+                    Tier = Tier
+                };
+            }
+
+            // If we got fewer results than the page size, there are no more pages.
+            if (searchResponse.Hits.Count < PageSize)
+                yield break;
+
+            from += PageSize;
         }
     }
 

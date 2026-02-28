@@ -41,6 +41,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 
         /// <inheritdoc/>
         public override string StrategyId => "semantic";
+        public override bool IsProductionReady => false;
 
         /// <inheritdoc/>
         public override string StrategyName => "Semantic Backup";

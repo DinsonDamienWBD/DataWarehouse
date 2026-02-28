@@ -495,7 +495,11 @@ public sealed class PostgreSqlSqlEngineIntegration : IDataSourceProvider
             _transactionLog.Add(sql);
         }
 
-        // DML operations tracked; row count returned after execution
+        // This SQL engine integration layer routes DML through the storage strategy and
+        // cannot determine the exact row count without executing against a real relation.
+        // Row counts are estimated as 1 (the common case). Callers requiring exact counts
+        // should use the underlying storage strategy's API directly, or connect via a
+        // real RDBMS driver (e.g. Npgsql) that reports actual rows-affected from the server.
         var commandTag = dmlType switch
         {
             "INSERT" => "INSERT 0 1",

@@ -24,8 +24,8 @@ public sealed class PregelGraphProcessor<TVertex, TMessage, TEdge>
     private readonly GraphPartitioningStrategyBase _partitioner;
     private readonly PregelConfiguration _config;
 
-    private int _currentSuperstep = 0;
-    private bool _isActive = false;
+    private volatile int _currentSuperstep = 0;
+    private volatile bool _isActive = false;
 
     /// <summary>
     /// Gets the current superstep number.

@@ -7,6 +7,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Intelligence
     public sealed class PredictiveBackupStrategy : DataProtectionStrategyBase
     {
         public override string StrategyId => "predictive-backup";
+        public override bool IsProductionReady => false;
         public override string StrategyName => "Predictive Backup";
         public override DataProtectionCategory Category => DataProtectionCategory.IncrementalBackup;
         public override DataProtectionCapabilities Capabilities =>
@@ -41,6 +42,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Intelligence
     public sealed class AnomalyAwareBackupStrategy : DataProtectionStrategyBase
     {
         public override string StrategyId => "anomaly-aware-backup";
+        public override bool IsProductionReady => false;
         public override string StrategyName => "Anomaly-Aware Backup";
         public override DataProtectionCategory Category => DataProtectionCategory.ContinuousProtection;
         public override DataProtectionCapabilities Capabilities =>
@@ -75,6 +77,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Intelligence
     public sealed class OptimizedRetentionStrategy : DataProtectionStrategyBase
     {
         public override string StrategyId => "optimized-retention";
+        public override bool IsProductionReady => false;
         public override string StrategyName => "Optimized Retention";
         public override DataProtectionCategory Category => DataProtectionCategory.Archive;
         public override DataProtectionCapabilities Capabilities =>
@@ -109,6 +112,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Intelligence
     public sealed class SmartRecoveryStrategy : DataProtectionStrategyBase
     {
         public override string StrategyId => "smart-recovery";
+        public override bool IsProductionReady => false;
         public override string StrategyName => "Smart Recovery";
         public override DataProtectionCategory Category => DataProtectionCategory.FullBackup;
         public override DataProtectionCapabilities Capabilities =>

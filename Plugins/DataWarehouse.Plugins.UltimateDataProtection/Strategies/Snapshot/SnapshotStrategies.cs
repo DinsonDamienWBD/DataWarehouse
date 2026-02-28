@@ -6,6 +6,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Snapshot
     public sealed class CopyOnWriteSnapshotStrategy : DataProtectionStrategyBase
     {
         public override string StrategyId => "cow-snapshot";
+        public override bool IsProductionReady => false;
         public override string StrategyName => "Copy-on-Write Snapshot";
         public override DataProtectionCategory Category => DataProtectionCategory.Snapshot;
         public override DataProtectionCapabilities Capabilities =>
@@ -35,6 +36,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Snapshot
     public sealed class RedirectOnWriteSnapshotStrategy : DataProtectionStrategyBase
     {
         public override string StrategyId => "row-snapshot";
+        public override bool IsProductionReady => false;
         public override string StrategyName => "Redirect-on-Write Snapshot";
         public override DataProtectionCategory Category => DataProtectionCategory.Snapshot;
         public override DataProtectionCapabilities Capabilities =>
@@ -64,6 +66,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Snapshot
     public sealed class VSSSnapshotStrategy : DataProtectionStrategyBase
     {
         public override string StrategyId => "vss-snapshot";
+        public override bool IsProductionReady => false;
         public override string StrategyName => "VSS Snapshot";
         public override DataProtectionCategory Category => DataProtectionCategory.Snapshot;
         public override DataProtectionCapabilities Capabilities =>
@@ -93,6 +96,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Snapshot
     public sealed class LVMSnapshotStrategy : DataProtectionStrategyBase
     {
         public override string StrategyId => "lvm-snapshot";
+        public override bool IsProductionReady => false;
         public override string StrategyName => "LVM Snapshot";
         public override DataProtectionCategory Category => DataProtectionCategory.Snapshot;
         public override DataProtectionCapabilities Capabilities =>
@@ -122,6 +126,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Snapshot
     public sealed class ZFSSnapshotStrategy : DataProtectionStrategyBase
     {
         public override string StrategyId => "zfs-snapshot";
+        public override bool IsProductionReady => false;
         public override string StrategyName => "ZFS Snapshot";
         public override DataProtectionCategory Category => DataProtectionCategory.Snapshot;
         public override DataProtectionCapabilities Capabilities =>
@@ -151,6 +156,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Snapshot
     public sealed class CloudSnapshotStrategy : DataProtectionStrategyBase
     {
         public override string StrategyId => "cloud-snapshot";
+        public override bool IsProductionReady => false;
         public override string StrategyName => "Cloud Snapshot";
         public override DataProtectionCategory Category => DataProtectionCategory.Snapshot;
         public override DataProtectionCapabilities Capabilities =>

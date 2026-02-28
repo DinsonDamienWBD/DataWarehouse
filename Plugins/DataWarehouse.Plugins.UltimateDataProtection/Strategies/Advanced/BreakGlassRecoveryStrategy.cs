@@ -31,6 +31,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 
         /// <inheritdoc/>
         public override string StrategyId => "break-glass";
+        public override bool IsProductionReady => false;
 
         /// <inheritdoc/>
         public override string StrategyName => "Break-Glass Recovery";

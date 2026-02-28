@@ -53,6 +53,8 @@ public sealed class ArangoDbStorageStrategy : DatabaseStorageStrategyBase
     {
         _database = GetConfiguration("Database", "datawarehouse");
         _collection = GetConfiguration("Collection", "storage");
+        ValidateSqlIdentifier(_database, nameof(_database));
+        ValidateSqlIdentifier(_collection, nameof(_collection));
 
         var connectionString = GetConnectionString();
         _httpClient = new HttpClient

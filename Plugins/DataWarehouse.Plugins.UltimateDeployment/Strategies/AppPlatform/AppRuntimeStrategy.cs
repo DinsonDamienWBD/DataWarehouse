@@ -24,6 +24,8 @@ public sealed class AppRuntimeStrategy : DeploymentStrategyBase
     private readonly BoundedDictionary<string, AiWorkflowConfig> _aiConfigs = new BoundedDictionary<string, AiWorkflowConfig>(1000);
     private readonly BoundedDictionary<string, AiUsageTracking> _aiUsage = new BoundedDictionary<string, AiUsageTracking>(1000);
     private readonly BoundedDictionary<string, int> _concurrentCounts = new BoundedDictionary<string, int>(1000);
+    // Per-app lock objects eliminate the TOCTOU race between budget/concurrency check and increment.
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, object> _aiLocks = new();
     private readonly BoundedDictionary<string, ObservabilityConfig> _observabilityConfigs = new BoundedDictionary<string, ObservabilityConfig>(1000);
 
     public override DeploymentCharacteristics Characteristics { get; } = new()
@@ -154,37 +156,46 @@ public sealed class AppRuntimeStrategy : DeploymentStrategyBase
         if (config.AllowedOperations.Count > 0 && !config.AllowedOperations.Contains(operation))
             return new AiRequestResult { Success = false, ErrorMessage = $"Operation '{operation}' not allowed" };
 
-        // Check budget
-        if (_aiUsage.TryGetValue(appId, out var usage))
+        // Acquire per-app lock to make budget check + increment atomic (eliminates TOCTOU).
+        var appLock = _aiLocks.GetOrAdd(appId, _ => new object());
+        lock (appLock)
         {
-            if (usage.MonthlySpendUsd + estimatedCost > config.MonthlyBudgetUsd)
-                return new AiRequestResult { Success = false, ErrorMessage = "Monthly AI budget exceeded" };
-            if (estimatedCost > config.MaxPerRequestUsd && config.MaxPerRequestUsd > 0)
-                return new AiRequestResult { Success = false, ErrorMessage = "Per-request budget exceeded" };
-        }
+            // Re-read usage inside the lock so the check is consistent with the increment.
+            _aiUsage.TryGetValue(appId, out var usage);
 
-        // Check concurrency
-        if (_concurrentCounts.TryGetValue(appId, out var current) && current >= config.MaxConcurrentRequests)
-            return new AiRequestResult { Success = false, ErrorMessage = "Concurrent AI request limit reached" };
+            // Check budget
+            if (usage != null)
+            {
+                if (usage.MonthlySpendUsd + estimatedCost > config.MonthlyBudgetUsd)
+                    return new AiRequestResult { Success = false, ErrorMessage = "Monthly AI budget exceeded" };
+                if (estimatedCost > config.MaxPerRequestUsd && config.MaxPerRequestUsd > 0)
+                    return new AiRequestResult { Success = false, ErrorMessage = "Per-request budget exceeded" };
+            }
 
-        // Increment concurrent count
-        _concurrentCounts.AddOrUpdate(appId, 1, (_, v) => v + 1);
+            // Check concurrency
+            if (_concurrentCounts.TryGetValue(appId, out var current) && current >= config.MaxConcurrentRequests)
+                return new AiRequestResult { Success = false, ErrorMessage = "Concurrent AI request limit reached" };
 
-        try
-        {
-            // Track usage
+            // Increment concurrent count and track usage atomically.
+            _concurrentCounts.AddOrUpdate(appId, 1, (_, v) => v + 1);
             if (usage != null)
             {
                 usage.MonthlySpendUsd += estimatedCost;
                 usage.TotalRequests++;
             }
+        }
 
+        try
+        {
             IncrementCounter("app_runtime.ai_request");
             return new AiRequestResult { Success = true, RequestId = $"req-{Guid.NewGuid():N}", EstimatedCostUsd = estimatedCost };
         }
         finally
         {
-            _concurrentCounts.AddOrUpdate(appId, 0, (_, v) => Math.Max(0, v - 1));
+            lock (appLock)
+            {
+                _concurrentCounts.AddOrUpdate(appId, 0, (_, v) => Math.Max(0, v - 1));
+            }
         }
     }
 

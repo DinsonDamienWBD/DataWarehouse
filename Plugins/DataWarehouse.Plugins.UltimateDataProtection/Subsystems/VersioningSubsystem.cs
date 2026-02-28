@@ -14,6 +14,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Subsystems
         private readonly BoundedDictionary<string, BoundedDictionary<string, VersionInfo>> _versions = new BoundedDictionary<string, BoundedDictionary<string, VersionInfo>>(1000);
         private readonly BoundedDictionary<string, byte[]> _versionContent = new BoundedDictionary<string, byte[]>(1000);
         private readonly BoundedDictionary<string, HashSet<string>> _contentHashes = new BoundedDictionary<string, HashSet<string>>(1000);
+        private readonly object _dedupLock = new();
         private IVersioningPolicy? _currentPolicy;
         private VersioningMode _currentMode = VersioningMode.Manual;
         private bool _isEnabled = true;
@@ -77,41 +78,45 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Subsystems
             var contentArray = content.ToArray();
             var contentHash = ComputeHash(contentArray);
 
-            // Check for deduplication
-            var itemHashes = _contentHashes.GetOrAdd(itemId, _ => new HashSet<string>());
-            var isDuplicate = itemHashes.Contains(contentHash);
-
-            var itemVersions = _versions.GetOrAdd(itemId, _ => new BoundedDictionary<string, VersionInfo>(1000));
-            var versionNumber = itemVersions.Count + 1;
-            var versionId = $"{itemId}_v{versionNumber}_{Guid.NewGuid():N}";
-
-            var storedSize = isDuplicate ? 0 : contentArray.Length;
-
-            var versionInfo = new VersionInfo
+            VersionInfo versionInfo;
+            lock (_dedupLock)
             {
-                VersionId = versionId,
-                ItemId = itemId,
-                VersionNumber = versionNumber,
-                CreatedAt = DateTimeOffset.UtcNow,
-                Metadata = metadata,
-                SizeBytes = contentArray.Length,
-                StoredSizeBytes = storedSize,
-                ContentHash = contentHash,
-                HashAlgorithm = "SHA256",
-                IsImmutable = false,
-                IsOnLegalHold = false,
-                IsVerified = true,
-                LastVerifiedAt = DateTimeOffset.UtcNow,
-                StorageTier = StorageTier.Standard
-            };
+                // Atomic check-then-act for deduplication: prevents two concurrent callers
+                // from both seeing isDuplicate=false and double-storing the same content.
+                var itemHashes = _contentHashes.GetOrAdd(itemId, _ => new HashSet<string>());
+                var isDuplicate = itemHashes.Contains(contentHash);
 
-            itemVersions[versionId] = versionInfo;
+                var itemVersions = _versions.GetOrAdd(itemId, _ => new BoundedDictionary<string, VersionInfo>(1000));
+                var versionNumber = itemVersions.Count + 1;
+                var versionId = $"{itemId}_v{versionNumber}_{Guid.NewGuid():N}";
 
-            // Store content if not duplicate
-            if (!isDuplicate)
-            {
-                _versionContent[versionId] = contentArray;
-                itemHashes.Add(contentHash);
+                var storedSize = isDuplicate ? 0 : contentArray.Length;
+
+                versionInfo = new VersionInfo
+                {
+                    VersionId = versionId,
+                    ItemId = itemId,
+                    VersionNumber = versionNumber,
+                    CreatedAt = DateTimeOffset.UtcNow,
+                    Metadata = metadata,
+                    SizeBytes = contentArray.Length,
+                    StoredSizeBytes = storedSize,
+                    ContentHash = contentHash,
+                    HashAlgorithm = "SHA256",
+                    IsImmutable = false,
+                    IsOnLegalHold = false,
+                    IsVerified = true,
+                    LastVerifiedAt = DateTimeOffset.UtcNow,
+                    StorageTier = StorageTier.Standard
+                };
+
+                itemVersions[versionId] = versionInfo;
+
+                if (!isDuplicate)
+                {
+                    _versionContent[versionId] = contentArray;
+                    itemHashes.Add(contentHash);
+                }
             }
 
             return Task.FromResult(versionInfo);
@@ -224,29 +229,42 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Subsystems
             ArgumentException.ThrowIfNullOrWhiteSpace(itemId);
             ArgumentException.ThrowIfNullOrWhiteSpace(versionId);
 
-            if (!_versionContent.TryGetValue(versionId, out var content))
+            // Fast path: content stored directly for this version
+            if (_versionContent.TryGetValue(versionId, out var content))
             {
-                // Check if version exists but content was deduplicated
-                if (_versions.TryGetValue(itemId, out var itemVersions) && itemVersions.ContainsKey(versionId))
-                {
-                    // Find content by hash
-                    var version = itemVersions[versionId];
-                    var matchingVersion = _versionContent
-                        .Where(kvp => _versions.Values
-                            .SelectMany(iv => iv.Values)
-                            .Any(v => v.VersionId == kvp.Key && v.ContentHash == version.ContentHash))
-                        .FirstOrDefault();
-
-                    if (matchingVersion.Value != null)
-                    {
-                        return Task.FromResult(matchingVersion.Value);
-                    }
-                }
-
-                throw new InvalidOperationException($"Content for version '{versionId}' not found.");
+                return Task.FromResult(content);
             }
 
-            return Task.FromResult(content);
+            // Slow path: content was deduplicated — look up by hash.
+            // Read itemVersions and the target version atomically to avoid TOCTOU.
+            if (!_versions.TryGetValue(itemId, out var itemVersions))
+            {
+                throw new InvalidOperationException($"Item '{itemId}' not found.");
+            }
+
+            if (!itemVersions.TryGetValue(versionId, out var version))
+            {
+                throw new InvalidOperationException($"Version '{versionId}' not found for item '{itemId}'.");
+            }
+
+            if (!string.IsNullOrEmpty(version.ContentHash))
+            {
+                // Find any stored version with the same content hash
+                foreach (var (storedVersionId, storedContent) in _versionContent)
+                {
+                    // Validate that this stored content matches by checking across all items
+                    foreach (var itemEntry in _versions.Values)
+                    {
+                        if (itemEntry.TryGetValue(storedVersionId, out var storedVersion) &&
+                            storedVersion.ContentHash == version.ContentHash)
+                        {
+                            return Task.FromResult(storedContent);
+                        }
+                    }
+                }
+            }
+
+            throw new InvalidOperationException($"Content for version '{versionId}' of item '{itemId}' not found.");
         }
 
         /// <inheritdoc/>
@@ -259,13 +277,37 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Subsystems
             ArgumentException.ThrowIfNullOrWhiteSpace(versionId);
 
             // Verify version exists
-            if (!_versions.TryGetValue(itemId, out var itemVersions) || !itemVersions.ContainsKey(versionId))
+            if (!_versions.TryGetValue(itemId, out var itemVersions) || !itemVersions.TryGetValue(versionId, out var sourceVersion))
             {
                 throw new InvalidOperationException($"Version '{versionId}' not found for item '{itemId}'.");
             }
 
-            // In a real implementation, this would restore the content to the item
-            // For now, we just validate that the version exists and is accessible
+            // Create a new "restored" version that is a copy of the requested version,
+            // making it the latest version for the item.
+            var versionNumber = itemVersions.Count + 1;
+            var restoredVersionId = $"{itemId}_v{versionNumber}_{Guid.NewGuid():N}";
+
+            var restoredVersion = sourceVersion with
+            {
+                VersionId = restoredVersionId,
+                VersionNumber = versionNumber,
+                CreatedAt = DateTimeOffset.UtcNow,
+                Metadata = sourceVersion.Metadata with
+                {
+                    Label = $"Restored from {versionId}",
+                    Description = $"Version restored from '{versionId}' at {DateTimeOffset.UtcNow:O}"
+                },
+                IsImmutable = false
+            };
+
+            itemVersions[restoredVersionId] = restoredVersion;
+
+            // Copy version content if available
+            if (_versionContent.TryGetValue(versionId, out var content))
+            {
+                _versionContent[restoredVersionId] = content;
+            }
+
             return Task.CompletedTask;
         }
 

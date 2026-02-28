@@ -32,6 +32,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 
         /// <inheritdoc/>
         public override string StrategyId => "crash-recovery";
+        public override bool IsProductionReady => false;
 
         /// <inheritdoc/>
         public override string StrategyName => "Crash Recovery";
@@ -523,11 +524,11 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
             return Task.FromResult(files);
         }
 
-        private Task<string> BeginTransactionAsync(string backupId, CancellationToken ct)
+        private async Task<string> BeginTransactionAsync(string backupId, CancellationToken ct)
         {
             var transactionId = Guid.NewGuid().ToString("N");
-            WriteLogEntryAsync(transactionId, "BEGIN_TRANSACTION", backupId, ct).Wait(ct);
-            return Task.FromResult(transactionId);
+            await WriteLogEntryAsync(transactionId, "BEGIN_TRANSACTION", backupId, ct).ConfigureAwait(false);
+            return transactionId;
         }
 
         private Task<long> WriteLogEntryAsync(string transactionId, string operation, string target, CancellationToken ct)

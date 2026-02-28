@@ -368,7 +368,15 @@ public sealed class LiteDbStorageStrategy : DatabaseStorageStrategyBase
         }
 
         var ms = new MemoryStream(65536);
-        await fileStorage.DownloadAsync(fileInfo.Id, ms);
+        try
+        {
+            await fileStorage.DownloadAsync(fileInfo.Id, ms);
+        }
+        catch
+        {
+            await ms.DisposeAsync();
+            throw;
+        }
         ms.Position = 0;
         return ms;
     }

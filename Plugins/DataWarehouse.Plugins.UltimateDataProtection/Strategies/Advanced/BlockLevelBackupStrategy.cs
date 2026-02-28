@@ -34,6 +34,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
         public override string StrategyId => "block-level";
 
         /// <inheritdoc/>
+        public override bool IsProductionReady => false;
+
+        /// <inheritdoc/>
         public override string StrategyName => "Block-Level Backup";
 
         /// <inheritdoc/>

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text.Json;
 using DataWarehouse.SDK.Utilities;
@@ -27,8 +28,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
         private readonly BoundedDictionary<string, UsbBackupPackage> _packages = new BoundedDictionary<string, UsbBackupPackage>(1000);
         private readonly BoundedDictionary<string, UsbDevice> _registeredDevices = new BoundedDictionary<string, UsbDevice>(1000);
         private readonly BoundedDictionary<string, CustodyRecord> _custodyChain = new BoundedDictionary<string, CustodyRecord>(1000);
-        private readonly List<TamperEvent> _tamperEvents = new();
-        private readonly object _tamperLock = new();
+        private readonly ConcurrentBag<TamperEvent> _tamperEvents = new();
 
         /// <summary>
         /// Interface for USB hardware operations.
@@ -1025,27 +1025,20 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             return new TamperCheckResult { IsTampered = false };
         }
 
-        private async Task RecordTamperEventAsync(string backupId, string details, CancellationToken ct)
+        private Task RecordTamperEventAsync(string backupId, string details, CancellationToken ct)
         {
-            await Task.CompletedTask;
-
-            lock (_tamperLock)
+            _tamperEvents.Add(new TamperEvent
             {
-                _tamperEvents.Add(new TamperEvent
-                {
-                    BackupId = backupId,
-                    DetectedAt = DateTimeOffset.UtcNow,
-                    Details = details
-                });
-            }
+                BackupId = backupId,
+                DetectedAt = DateTimeOffset.UtcNow,
+                Details = details
+            });
+            return Task.CompletedTask;
         }
 
         private List<TamperEvent> GetTamperEventsForBackup(string backupId)
         {
-            lock (_tamperLock)
-            {
-                return _tamperEvents.Where(e => e.BackupId == backupId).ToList();
-            }
+            return _tamperEvents.Where(e => e.BackupId == backupId).ToList();
         }
 
         #endregion

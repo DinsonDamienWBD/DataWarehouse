@@ -246,8 +246,9 @@ public sealed class Neo4jStorageStrategy : DatabaseStorageStrategyBase
                 RETURN COUNT(n) > 0 AS exists",
                 new { key });
 
-            var record = await cursor.SingleAsync();
-            return record["exists"].As<bool>();
+            // Use SingleOrDefaultAsync to avoid InvalidOperationException on empty result.
+            var record = await cursor.SingleOrDefaultAsync();
+            return record != null && record["exists"].As<bool>();
         });
 
         return exists;
@@ -301,7 +302,9 @@ public sealed class Neo4jStorageStrategy : DatabaseStorageStrategyBase
                        n.metadata AS metadata, n.createdAt AS createdAt, n.modifiedAt AS modifiedAt",
                 new { key });
 
-            return await cursor.SingleAsync();
+            // Use SingleOrDefaultAsync so that a missing key returns null rather than
+            // throwing InvalidOperationException from SingleAsync on an empty result set.
+            return await cursor.SingleOrDefaultAsync();
         });
 
         if (result == null)
