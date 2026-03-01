@@ -379,6 +379,10 @@ public sealed class DynamoDbStorageStrategy : DatabaseStorageStrategyBase
 
     protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct)
     {
+        // P2-2840: DynamoDB does not support begins_with() on partition key in KeyConditionExpression —
+        // a Scan with FilterExpression is the correct approach for prefix-filtered listing unless a
+        // GSI with a sort-key range is provisioned. The scan is paginated; performance can be improved
+        // by adding a GSI on a "tenant#" attribute and using a Query there.
         var scanRequest = new ScanRequest
         {
             TableName = _tableName,

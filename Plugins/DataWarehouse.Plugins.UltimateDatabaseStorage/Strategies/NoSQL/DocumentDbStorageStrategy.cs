@@ -394,7 +394,11 @@ public sealed class DocumentDbStorageStrategy : DatabaseStorageStrategyBase
 
         public Task RollbackAsync(CancellationToken ct = default)
         {
-            // Cosmos transactions are rolled back by not executing
+            // P2-2841: Cosmos TransactionalBatch is rolled back simply by not executing it.
+            // Guard against rollback after commit to surface contract violations to the caller.
+            if (_committed)
+                throw new InvalidOperationException(
+                    "Cannot roll back a Cosmos transaction that has already been committed.");
             return Task.CompletedTask;
         }
 

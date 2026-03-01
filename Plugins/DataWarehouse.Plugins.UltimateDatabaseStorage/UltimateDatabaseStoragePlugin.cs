@@ -441,19 +441,21 @@ public sealed class UltimateDatabaseStoragePlugin : DataWarehouse.SDK.Contracts.
 
         if (string.IsNullOrEmpty(strategyId))
         {
-            // Check health of all strategies
+            // P2-2867: Check health of all strategies and write results to message.Payload
+            // (consistent with HandleListStrategiesAsync and HandleGetStrategyAsync pattern).
             var healthResults = new Dictionary<string, object>();
             foreach (var strategy in GetAllDatabaseStrategies())
             {
                 var health = await strategy.GetHealthAsync();
-                healthResults[strategy.StrategyId] = new
+                healthResults[strategy.StrategyId] = new Dictionary<string, object>
                 {
-                    Status = health.Status.ToString(),
-                    health.LatencyMs,
-                    health.Message
+                    ["status"] = health.Status.ToString(),
+                    ["latencyMs"] = health.LatencyMs,
+                    ["message"] = health.Message ?? string.Empty
                 };
             }
-            // Response would be sent via message context
+            message.Payload["success"] = true;
+            message.Payload["results"] = healthResults;
         }
         else
         {
@@ -461,7 +463,17 @@ public sealed class UltimateDatabaseStoragePlugin : DataWarehouse.SDK.Contracts.
             if (strategy != null)
             {
                 var health = await strategy.GetHealthAsync();
-                // Response would be sent via message context
+                // P2-2867: Write health result to message.Payload for the caller.
+                message.Payload["success"] = true;
+                message.Payload["strategyId"] = strategyId;
+                message.Payload["status"] = health.Status.ToString();
+                message.Payload["latencyMs"] = health.LatencyMs;
+                message.Payload["message"] = health.Message ?? string.Empty;
+            }
+            else
+            {
+                message.Payload["success"] = false;
+                message.Payload["error"] = $"Strategy '{strategyId}' not found";
             }
         }
     }
