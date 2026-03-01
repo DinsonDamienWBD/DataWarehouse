@@ -810,10 +810,33 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
 
     #region Hierarchy DataTransitPluginBase Abstract Methods
     /// <inheritdoc/>
-    public override Task<Dictionary<string, object>> TransferAsync(string key, Dictionary<string, object> target, CancellationToken ct = default)
+    public override async Task<Dictionary<string, object>> TransferAsync(string key, Dictionary<string, object> target, CancellationToken ct = default)
     {
-        var result = new Dictionary<string, object> { ["key"] = key, ["status"] = "delegated-to-strategy", ["target"] = target };
-        return Task.FromResult(result);
+        // Cat 12 (finding 2685): actually delegate to the active strategy rather than returning a placeholder.
+        var strategyId = target.TryGetValue("strategyId", out var sid) ? sid?.ToString() : null;
+        var sourceUri = target.TryGetValue("sourceUri", out var src) ? src?.ToString() : null;
+        var destinationUri = target.TryGetValue("destinationUri", out var dst) ? dst?.ToString() : null;
+
+        var request = new TransitRequest
+        {
+            TransferId = key,
+            StrategyId = strategyId,
+            SourceUri = sourceUri ?? $"transfer://{key}",
+            DestinationUri = destinationUri ?? string.Empty,
+            Metadata = target.Where(kvp => kvp.Value is string).ToDictionary(kvp => kvp.Key, kvp => kvp.Value?.ToString() ?? string.Empty)
+        };
+
+        var transitResult = await TransferAsync(request, null, ct).ConfigureAwait(false);
+
+        return new Dictionary<string, object>
+        {
+            ["key"] = key,
+            ["transferId"] = transitResult.TransferId ?? key,
+            ["status"] = transitResult.IsSuccess ? "completed" : "failed",
+            ["bytesTransferred"] = transitResult.BytesTransferred,
+            ["strategyId"] = transitResult.StrategyId ?? strategyId ?? string.Empty,
+            ["error"] = transitResult.ErrorMessage ?? string.Empty
+        };
     }
     /// <inheritdoc/>
     public override Task<Dictionary<string, object>> GetTransferStatusAsync(string transferId, CancellationToken ct = default)

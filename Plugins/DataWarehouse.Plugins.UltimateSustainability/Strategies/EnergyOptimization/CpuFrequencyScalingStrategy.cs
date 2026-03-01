@@ -254,21 +254,22 @@ public sealed class CpuFrequencyScalingStrategy : SustainabilityStrategyBase
         {
             var cpuInfoPath = "/sys/devices/system/cpu/cpu0/cpufreq/";
 
-            if (File.Exists(cpuInfoPath + "cpuinfo_min_freq"))
+            // Finding 4450: TryParse guards against corrupt sysfs values.
+            if (File.Exists(cpuInfoPath + "cpuinfo_min_freq") &&
+                long.TryParse(File.ReadAllText(cpuInfoPath + "cpuinfo_min_freq").Trim(), out var minFreq))
             {
-                var minFreq = long.Parse(File.ReadAllText(cpuInfoPath + "cpuinfo_min_freq").Trim());
                 _minFrequencyMhz = minFreq / 1000.0;
             }
 
-            if (File.Exists(cpuInfoPath + "cpuinfo_max_freq"))
+            if (File.Exists(cpuInfoPath + "cpuinfo_max_freq") &&
+                long.TryParse(File.ReadAllText(cpuInfoPath + "cpuinfo_max_freq").Trim(), out var maxFreq))
             {
-                var maxFreq = long.Parse(File.ReadAllText(cpuInfoPath + "cpuinfo_max_freq").Trim());
                 _maxFrequencyMhz = maxFreq / 1000.0;
             }
 
-            if (File.Exists(cpuInfoPath + "base_frequency"))
+            if (File.Exists(cpuInfoPath + "base_frequency") &&
+                long.TryParse(File.ReadAllText(cpuInfoPath + "base_frequency").Trim(), out var baseFreq))
             {
-                var baseFreq = long.Parse(File.ReadAllText(cpuInfoPath + "base_frequency").Trim());
                 _baseFrequencyMhz = baseFreq / 1000.0;
             }
             else
@@ -308,9 +309,11 @@ public sealed class CpuFrequencyScalingStrategy : SustainabilityStrategyBase
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
                 var scalingCurFreqPath = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq";
-                if (File.Exists(scalingCurFreqPath))
+                // Finding 4450: TryParse guards against corrupt sysfs values.
+                if (File.Exists(scalingCurFreqPath) &&
+                    long.TryParse(File.ReadAllText(scalingCurFreqPath).Trim(), out var scaleKhz))
                 {
-                    currentFreq = long.Parse(File.ReadAllText(scalingCurFreqPath).Trim()) / 1000.0;
+                    currentFreq = scaleKhz / 1000.0;
                 }
             }
 

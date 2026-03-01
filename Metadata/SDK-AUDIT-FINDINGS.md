@@ -503,9 +503,9 @@
 | 267 | 2 | P2 | `Deployment/HyperscaleProvisioner.cs:63,84,96,119` | `_isActive` is non-volatile plain `bool` written from caller thread, read from background `Task.Run` loop. May never observe `false` write on multi-core. | [X]
 | 268 | 6 | P2 | `Deployment/HyperscaleProvisioner.cs:94-109` | Background scaling loop `Task.Delay` is outside try/catch — `OperationCanceledException` on cancellation silently swallowed by discarded task. | [X]
 | 269 | 1 | P2 | `Deployment/SpdkBindingValidator.cs:261-268` | `CheckWindowsMountStatusAsync` always returns `(true, "unknown", true)` — SPDK validation always fails on Windows. "For simplicity" comment confirms deferred work. | [X]
-| 270 | 12 | LOW | `Deployment/ParavirtIoDetector.cs:165-177` | VirtIO SCSI check uses bare vendor ID `1AF4` without requiring SCSI device ID — misclassifies VirtIO Net/Balloon as VirtIO SCSI. | [ ]
-| 271 | 15 | LOW | `Deployment/HyperscaleProvisioner.cs:82,111` | `StartAutoScalingAsync` is `async` with `await Task.CompletedTask` — meaningless state machine, returns before background loop starts. | [ ]
-| 272 | 14 | LOW | `Deployment/HyperscaleProvisioner.cs:214-223` | Hardcoded `"general-purpose"` instance type and `100` GB storage in `ProvisionNewNodeAsync` — not user-configurable. | [ ]
+| 270 | 12 | LOW | `Deployment/ParavirtIoDetector.cs:165-177` | VirtIO SCSI check uses bare vendor ID `1AF4` without requiring SCSI device ID — misclassifies VirtIO Net/Balloon as VirtIO SCSI. | [X]
+| 271 | 15 | LOW | `Deployment/HyperscaleProvisioner.cs:82,111` | `StartAutoScalingAsync` is `async` with `await Task.CompletedTask` — meaningless state machine, returns before background loop starts. | [X]
+| 272 | 14 | LOW | `Deployment/HyperscaleProvisioner.cs:214-223` | Hardcoded `"general-purpose"` instance type and `100` GB storage in `ProvisionNewNodeAsync` — not user-configurable. | [X]
 
 **Clean files:** HostedVmDetector.cs, HypervisorDetector.cs, IDeploymentDetector.cs, IAedsCore.cs, BusControllerFactory.cs, GpioBusController.cs, I2cBusController.cs, IGpioBusController.cs, II2cBusController.cs, ISpiBusController.cs, NullBusController.cs
 
@@ -526,9 +526,9 @@
 | 279 | 9 | P2 | `Edge/Flash/FlashTranslationLayer.cs:209-214` | `GarbageCollectAsync` catch block marks block bad but emits no log/metric — silently reduces usable capacity with no operator visibility. | [X]
 | 280 | 14 | P2 | `Edge/Inference/OnnxWasiNnHost.cs:119` | `session.InputNames[0]` with no empty-check — `IndexOutOfRangeException` on malformed ONNX model with no diagnostic message. | [X]
 | 281 | 13 | P2 | `Edge/Flash/WearLevelingStrategy.cs:37-51` | `SelectBlockForWrite` allocates `new List<long>` on every write call — hot-path heap allocation on memory-constrained edge devices. | [X]
-| 282 | 14 | LOW | `Edge/Camera/CameraFrameGrabber.cs:58` | `int.TryParse(settings.DevicePath)` silently falls back to device index 0 for Linux paths like `/dev/video3` — wrong device opened. | [ ]
-| 283 | 1 | LOW | `Edge/Inference/OnnxWasiNnHost.cs:141` | "Simplified batch implementation" comment — sequential loop defeats batch inference purpose on GPU/NPU. | [ ]
-| 284 | 2 | LOW | `Edge/Bus/SpiBusController.cs:31,96` | `_disposed` fields are non-volatile `bool` — concurrent Dispose+use race can pass disposed check due to missing memory barrier. | [ ]
+| 282 | 14 | LOW | `Edge/Camera/CameraFrameGrabber.cs:58` | `int.TryParse(settings.DevicePath)` silently falls back to device index 0 for Linux paths like `/dev/video3` — wrong device opened. | [X]
+| 283 | 1 | LOW | `Edge/Inference/OnnxWasiNnHost.cs:141` | "Simplified batch implementation" comment — sequential loop defeats batch inference purpose on GPU/NPU. | [X]
+| 284 | 2 | LOW | `Edge/Bus/SpiBusController.cs:31,96` | `_disposed` fields are non-volatile `bool` — concurrent Dispose+use race can pass disposed check due to missing memory barrier. | [X]
 
 **Clean files:** CameraSettings.cs, FrameBuffer.cs, ICameraDevice.cs, EdgeConstants.cs, IFlashTranslationLayer.cs, IWasiNnHost.cs, InferenceSession.cs, InferenceSettings.cs
 
@@ -580,10 +580,10 @@
 | 311 | 5 | P2 | `Federation/Authorization/PermissionAwareRouter.cs:252,288` | `TryExtractBool`/`TryExtractString` swallow all reflection exceptions — property getter throws → permanent silent denial with no trace. | [X]
 | 312 | 12 | P2 | `Edge/Protocols/MqttClient.cs:379-381` | Subscription restoration after reconnect always uses QoS 1, discarding original QoS — QoS 0 gets duplicates, QoS 2 loses exactly-once. | [X]
 | 313 | 13 | P2 | `Edge/Protocols/MqttClient.cs:235-239` | `_subscribedTopics` is `List<string>` with O(n) `Contains` for duplicate detection — quadratic on frequent reconnects. | [X]
-| 314 | 15 | LOW | `Federation/Addressing/UuidGenerator.cs:100-105` | Comments describe standard LE layout but code uses custom encoding — misleading for interop, round-trip internally consistent. | [ ]
-| 315 | 14 | LOW | `Edge/Protocols/MqttClient.cs:164` | No MQTT publish topic format validation — wildcards/null chars accepted, rejected at broker with cryptic error. | [ ]
-| 316 | 4 | LOW | `Edge/Protocols/MqttConnectionSettings.cs:66` | `Password` as plain `string` on managed heap — visible in heap dumps, no zeroing or secret-store guidance. | [ ]
-| 317 | 15 | LOW | `Federation/Authorization/PermissionAwareRouter.cs:199` | `DateTime.UtcNow` in audit log payload instead of `DateTimeOffset.UtcNow` — inconsistent with rest of codebase. | [ ]
+| 314 | 15 | LOW | `Federation/Addressing/UuidGenerator.cs:100-105` | Comments describe standard LE layout but code uses custom encoding — misleading for interop, round-trip internally consistent. | [X]
+| 315 | 14 | LOW | `Edge/Protocols/MqttClient.cs:164` | No MQTT publish topic format validation — wildcards/null chars accepted, rejected at broker with cryptic error. | [X]
+| 316 | 4 | LOW | `Edge/Protocols/MqttConnectionSettings.cs:66` | `Password` as plain `string` on managed heap — visible in heap dumps, no zeroing or secret-store guidance. | [X]
+| 317 | 15 | LOW | `Federation/Authorization/PermissionAwareRouter.cs:199` | `DateTime.UtcNow` in audit log payload instead of `DateTimeOffset.UtcNow` — inconsistent with rest of codebase. | [X]
 
 **Clean files:** IMqttClient.cs, MqttConnectionSettings.cs, MqttMessage.cs, KernelLoggingExtensions.cs, IObjectIdentityProvider.cs, ObjectIdentity.cs, UuidObjectAddress.cs, IPermissionCache.cs, PermissionCacheEntry.cs, PermissionCheckResult.cs, IManifestService.cs
 
@@ -609,10 +609,10 @@
 | 329 | 13 | P2 | `Federation/Catalog/ManifestStateMachine.cs:207-224` | `GetStatistics()` makes 4-5 LINQ passes over `_index.Values` under read lock — blocks all writers on large manifests. | [X]
 | 330 | 3 | P2 | `Federation/Replication/ReplicaFallbackChain.cs:49` | `GetNodeTopologyAsync(replicaId)` called without CancellationToken — topology fetch uncancellable. | [X]
 | 331 | 14 | P2 | `Federation/Orchestration/FederationOrchestrator.cs:91-138` | No validation on `registration.NodeId`, `Address`, or `Port` — empty NodeId inserts phantom node, null Address propagates, invalid Port unchecked. | [X]
-| 332 | 15 | LOW | `FederationOrchestrator.cs:71,83,216; RaftBackedManifest.cs:64` | Async methods with no actual async work use `await Task.CompletedTask` — unnecessary state machine overhead. | [ ]
-| 333 | 14 | LOW | `Federation/Catalog/ManifestStateMachine.cs:70` | `RestoreSnapshot` no null/empty guard on `snapshot` — null throws opaque ArgumentNullException from JsonSerializer. | [ ]
-| 334 | 14 | LOW | `Federation/Catalog/ManifestStateMachine.cs:92-95` | `Apply` no null guard on `logEntry` — null from Raft log compaction throws unhandled in OnCommit callback. | [ ]
-| 335 | 13 | LOW | `Federation/Routing/DualHeadRouter.cs:39,79` | `BoundedDictionary(1000)` for 2-member `RequestLanguage` enum — 500x over-allocated routing counter. | [ ]
+| 332 | 15 | LOW | `FederationOrchestrator.cs:71,83,216; RaftBackedManifest.cs:64` | Async methods with no actual async work use `await Task.CompletedTask` — unnecessary state machine overhead. | [X]
+| 333 | 14 | LOW | `Federation/Catalog/ManifestStateMachine.cs:70` | `RestoreSnapshot` no null/empty guard on `snapshot` — null throws opaque ArgumentNullException from JsonSerializer. | [X]
+| 334 | 14 | LOW | `Federation/Catalog/ManifestStateMachine.cs:92-95` | `Apply` no null guard on `logEntry` — null from Raft log compaction throws unhandled in OnCommit callback. | [X]
+| 335 | 13 | LOW | `Federation/Routing/DualHeadRouter.cs:39,79` | `BoundedDictionary(1000)` for 2-member `RequestLanguage` enum — 500x over-allocated routing counter. | [X]
 
 **Clean files:** ObjectLocationEntry.cs, IFederationOrchestrator.cs, NodeHeartbeat.cs, NodeRegistration.cs, ConsistencyLevel.cs, IReplicaSelector.cs
 
@@ -637,10 +637,10 @@
 | 346 | 2 | P2 | `Hardware/Accelerators/CudaInterop.cs:_isAvailable` | Same as above — `_isAvailable` non-volatile bool read cross-thread. | [X]
 | 347 | 7 | P2 | `Hardware/Accelerators/HsmProvider.cs:constructor` | Creates `SemaphoreSlim(maxConcurrentOperations)` as field but class Dispose() doesn't dispose it — semaphore leak. | [X]
 | 348 | 14 | P2 | `Federation/Routing/PatternBasedClassifier.cs:ClassifyRequest` | No null check on `request.Key` — NullReferenceException on any request with null key hitting regex patterns. | [X]
-| 349 | 13 | LOW | `Federation/Topology/ProximityCalculator.cs:CalculateProximity` | Allocates `new List<(string, double)>` per call in hot routing path — consider pooling or array. | [ ]
-| 350 | 15 | LOW | `Hardware/Accelerators/CudaInterop.cs:MatrixMultiplyAsync` | Named `*Async` but does purely synchronous CPU loop wrapped in Task.FromResult — no actual GPU dispatch. | [ ]
-| 351 | 14 | LOW | `Federation/Topology/LocationAwareRouter.cs:RouteAsync` | No validation that `RoutingPolicy.PreferredRegion` or `RoutingPolicy.PreferredZone` are non-null before string comparison. | [ ]
-| 352 | 15 | LOW | `Federation/Routing/StorageRequest.cs:EstimatedSizeBytes` | `EstimatedSizeBytes` defaults to 0 — capacity-based routing always sees 0-byte requests when callers don't set it. | [ ]
+| 349 | 13 | LOW | `Federation/Topology/ProximityCalculator.cs:CalculateProximity` | Allocates `new List<(string, double)>` per call in hot routing path — consider pooling or array. | [X]
+| 350 | 15 | LOW | `Hardware/Accelerators/CudaInterop.cs:MatrixMultiplyAsync` | Named `*Async` but does purely synchronous CPU loop wrapped in Task.FromResult — no actual GPU dispatch. | [X]
+| 351 | 14 | LOW | `Federation/Topology/LocationAwareRouter.cs:RouteAsync` | No validation that `RoutingPolicy.PreferredRegion` or `RoutingPolicy.PreferredZone` are non-null before string comparison. | [X]
+| 352 | 15 | LOW | `Federation/Routing/StorageRequest.cs:EstimatedSizeBytes` | `EstimatedSizeBytes` defaults to 0 — capacity-based routing always sees 0-byte requests when callers don't set it. | [X]
 
 **Clean files:** IRequestClassifier.cs, IStorageRouter.cs, RequestLanguage.cs, ITopologyProvider.cs, NodeTopology.cs, RoutingPolicy.cs
 
@@ -693,9 +693,9 @@
 | 380 | 1 | P2 | `Hardware/Interop/GrpcServiceContracts.cs:502-517` | `QueryAsync` ignores filter/projection/orderBy — returns all objects with hardcoded score 1.0. Comment: "Query delegates to list with filter application" but no filter is applied. | [X]
 | 381 | 4 | P2 | `Hardware/Interop/CrossLanguageSdkPorts.cs:528-531,566` | OAuth tokens generated with `Guid.NewGuid()` — only 122 bits entropy vs RFC 6749 requirement of 256-bit CSPRNG. | [X]
 | 382 | 9 | P2 | `Hardware/Interop/CrossLanguageSdkPorts.cs:577-595` | `ValidateToken` returns first enabled app regardless of token ownership — token-to-app binding broken, wrong access policies enforced. | [X]
-| 383 | 13 | LOW | `Hardware/Interop/CrossLanguageSdkPorts.cs:619-625` | O(n) linear `FindByClientId` scan on every token issuance — 1000 comparisons at capacity. | [ ]
-| 384 | 13 | LOW | `Hardware/Interop/MessagePackSerialization.cs:215-216` | Dead `MemoryStream`/`BinaryWriter` allocations in `WriteStorageAddress` — leftover from refactor. | [ ]
-| 385 | 15 | LOW | `Hardware/Interop/CrossLanguageSdkPorts.cs:272-278` | `GetLastError` always returns "No error"; `GetVersion` hardcodes "4.5.0" — cross-language error handling silently broken. | [ ]
+| 383 | 13 | LOW | `Hardware/Interop/CrossLanguageSdkPorts.cs:619-625` | O(n) linear `FindByClientId` scan on every token issuance — 1000 comparisons at capacity. | [X]
+| 384 | 13 | LOW | `Hardware/Interop/MessagePackSerialization.cs:215-216` | Dead `MemoryStream`/`BinaryWriter` allocations in `WriteStorageAddress` — leftover from refactor. | [X]
+| 385 | 15 | LOW | `Hardware/Interop/CrossLanguageSdkPorts.cs:272-278` | `GetLastError` always returns "No error"; `GetVersion` hardcodes "4.5.0" — cross-language error handling silently broken. | [X]
 
 **Clean files:** HardwareDeviceType.cs, HypervisorInfo.cs, HypervisorType.cs, IBalloonDriver.cs, IHypervisorDetector.cs, IDriverLoader.cs, IHardwareAcceleration.cs, IHardwareProbe.cs, IPlatformCapabilityRegistry.cs, HardwareProbeFactory.cs
 
@@ -719,11 +719,11 @@
 | 395 | 5 | P2 | `Hardware/WindowsHardwareProbe.cs:234-237` | `ParsePnPDevice` swallows all exceptions with no logging — WMI parse failures undiagnosable. | [X]
 | 396 | 4 | P2 | `Hardware/MacOsHardwareProbe.cs:181` | `bsd_name` from system_profiler JSON used unsanitized in `/dev/` path construction — potential path traversal. | [X]
 | 397 | 4 | P2 | `Hardware/NVMe/NvmePassthrough.cs:188` | `Regex.Match` without timeout on `devicePath` — should include timeout per project security policy. | [X]
-| 398 | 15 | LOW | `Hardware/NVMe/NvmePassthrough.cs:208-226,462-498` | Async methods wrap sync P/Invoke in `Task.Run` with single lock — serializes all I/O despite multi-threaded interface doc. | [ ]
-| 399 | 13 | LOW | `Hardware/PlatformCapabilityRegistry.cs:190,286` | LINQ `.Where().ToList()` materialized inside read lock — holds ReaderWriterLockSlim for allocation duration. | [ ]
-| 400 | 9 | LOW | `MacOsHardwareProbe.cs:73-81; LinuxHardwareProbe.cs:105-113` | TOCTOU race on `_lastDiscovery` read outside lock — duplicate discovery calls on first concurrent access. | [ ]
-| 401 | 14 | LOW | `Hosting/ConnectionTarget.cs:72-79` | `Remote()` factory accepts null host and out-of-range port without validation. | [ ]
-| 402 | 1 | LOW | `Hardware/Memory/INumaAllocator.cs:119-123,160-163` | Public interface documentation explicitly describes Phase 35 stubs as "future work." | [ ]
+| 398 | 15 | LOW | `Hardware/NVMe/NvmePassthrough.cs:208-226,462-498` | Async methods wrap sync P/Invoke in `Task.Run` with single lock — serializes all I/O despite multi-threaded interface doc. | [X]
+| 399 | 13 | LOW | `Hardware/PlatformCapabilityRegistry.cs:190,286` | LINQ `.Where().ToList()` materialized inside read lock — holds ReaderWriterLockSlim for allocation duration. | [X]
+| 400 | 9 | LOW | `MacOsHardwareProbe.cs:73-81; LinuxHardwareProbe.cs:105-113` | TOCTOU race on `_lastDiscovery` read outside lock — duplicate discovery calls on first concurrent access. | [X]
+| 401 | 14 | LOW | `Hosting/ConnectionTarget.cs:72-79` | `Remote()` factory accepts null host and out-of-range port without validation. | [X]
+| 402 | 1 | LOW | `Hardware/Memory/INumaAllocator.cs:119-123,160-163` | Public interface documentation explicitly describes Phase 35 stubs as "future work." | [X]
 
 **Clean files:** NumaTopology.cs, INvmePassthrough.cs, NvmeCommand.cs, NvmeInterop.cs, NullHardwareProbe.cs, StorageDriverAttribute.cs, ConnectionType.cs
 
@@ -931,7 +931,7 @@
 | 519 | 2 | P2 | `Infrastructure/StorageConnectionRegistry.cs:462-519` | `StorageConnectionStats` fields (`PoolHits++`, `ConnectionsCreated++`, etc.) mutated without `Interlocked` from concurrent threads. | [X]
 | 520 | 12 | P2 | `Infrastructure/Scaling/ScalableMessageBus.cs:137` | Backpressure shedding check happens AFTER enqueue — message already in queue when dropped, queue grows under load shedding. | [X]
 | 521 | 14 | P2 | `Mathematics/ParityCalculation.cs:310` | `stackalloc byte[blockSize]` with unbounded `blockSize` from caller data — stack overflow for RAID-sized blocks. | [X]
-| 522 | 15 | LOW | `Mathematics/ReedSolomon.cs:18` | `_lock` field declared but never used — dead code, misleading "thread-safe" claim. | [ ]
+| 522 | 15 | LOW | `Mathematics/ReedSolomon.cs:18` | `_lock` field declared but never used — dead code, misleading "thread-safe" claim. | [X]
 | 523 | 2 | LOW | `Infrastructure/Scaling/ScalableMessageBus.cs:78` | `_disposed` not `volatile` — stale reads possible from concurrent threads. | [X]
 | 524 | 2 | LOW | `Infrastructure/Scaling/WalMessageQueue.cs:95` | `_disposed` not `volatile` — timer callbacks may miss disposal signal. | [X]
 | 525 | 4 | LOW | `Infrastructure/StandardizedExceptions.cs:87,97` | `Guid.NewGuid()` called twice — IncidentId in message string won't match IncidentId property. | [X]
@@ -956,8 +956,8 @@
 | 533 | 13 | P2 | `Moonshots/MoonshotPipelineTypes.cs:152-155` | `StageResults` getter allocates new `List` + `.ToList().AsReadOnly()` on every access. | [X]
 | 534 | 15 | LOW | `Primitives/Configuration/ConfigurationAuditLog.cs:75` | `LogChangeAsync` accepts `object?` values but uses `.ToString()` — complex objects record type name, not content. | [X]
 | 535 | 14 | LOW | `Primitives/Configuration/ConfigurationChangeApi.cs:155-158` | `ParsePath` silently returns `(null,null)` for paths without exactly one dot — fails silently. | [X]
-| 536 | 1 | LOW | `Primitives/Configuration/ConfigurationSerializer.cs:86` | `SaveToFile` non-atomic: `File.WriteAllText` truncates first — crash leaves empty config file. | [ ]
-| 537 | 1 | LOW | `Performance/ILowLatencyStorage.cs:1-3` | `// FUTURE:` header comment on complete interface definitions — misleading Rule 13 borderline. | [ ]
+| 536 | 1 | LOW | `Primitives/Configuration/ConfigurationSerializer.cs:86` | `SaveToFile` non-atomic: `File.WriteAllText` truncates first — crash leaves empty config file. | [X]
+| 537 | 1 | LOW | `Performance/ILowLatencyStorage.cs:1-3` | `// FUTURE:` header comment on complete interface definitions — misleading Rule 13 borderline. | [X]
 
 **Clean files:** MoonshotConfigurationDefaults.cs, MoonshotConfigurationValidator.cs, MoonshotDashboardTypes.cs, MoonshotRegistry.cs, CompositeQuery.cs, Configuration.cs, ConfigurationItem.cs, ConfigurationPresets.cs, ConfigurationTypes.cs, DataWarehouseConfiguration.cs
 
@@ -978,10 +978,10 @@
 | 544 | 14 | P2 | `Primitives/Manifest.cs:43` | `StorageUri` getter throws `UriFormatException` on invalid `BlobUri` — no validation at assignment time. | [X]
 | 545 | 13 | P2 | `Primitives/Performance/PerformanceUtilities.cs:268` | `FlushInternalAsync` does `.ToList()` copy on every flush — hot-path allocation avoidable by list swap. | [X]
 | 546 | 10 | P2 | `Primitives/Manifest.cs:90,132` | `CreatedAt`/`LastAccessedAt` default to `UtcNow` — deserialized manifests silently appear freshly created. | [X]
-| 547 | 15 | LOW | `Primitives/Filesystem/FileSystemTypes.cs:30` | `FileAttributes` shadows `System.IO.FileAttributes` — compiler ambiguity risk. | [ ]
-| 548 | 15 | LOW | `Primitives/Filesystem/FileSystemTypes.cs:79` | `Permission` shadows `DataWarehouse.SDK.Primitives.Permission` — ambiguous reference. | [ ]
-| 549 | 15 | LOW | `Primitives/Enums.cs:254` | Typo in XML doc: "b∈ used" (Unicode element-of symbol instead of letter "e"). | [ ]
-| 550 | 15 | LOW | `Primitives/NodeHandshake.cs:53` | `SuccessResult` / `Failure` naming inconsistency — asymmetric suffix. | [ ]
+| 547 | 15 | LOW | `Primitives/Filesystem/FileSystemTypes.cs:30` | `FileAttributes` shadows `System.IO.FileAttributes` — compiler ambiguity risk. | [X]
+| 548 | 15 | LOW | `Primitives/Filesystem/FileSystemTypes.cs:79` | `Permission` shadows `DataWarehouse.SDK.Primitives.Permission` — ambiguous reference. | [X]
+| 549 | 15 | LOW | `Primitives/Enums.cs:254` | Typo in XML doc: "b∈ used" (Unicode element-of symbol instead of letter "e"). | [X]
+| 550 | 15 | LOW | `Primitives/NodeHandshake.cs:53` | `SuccessResult` / `Failure` naming inconsistency — asymmetric suffix. | [X]
 
 **Clean files:** IAutoConfiguration.cs, IFileSystem.cs, HardwareTypes.cs, IHardwareAccelerator.cs, IMetadataProvider.cs, MetadataTypes.cs, PipelineConfig.cs, Handshake.cs
 
@@ -1007,10 +1007,10 @@
 | 562 | 10 | P2 | `Primitives/Probabilistic/CountMinSketch.cs:196-218` | `TopK()` tiebreaker uses `GetHashCode()` — non-deterministic ordering across process restarts. | [X]
 | 563 | 14 | P2 | `Primitives/Probabilistic/TDigest.cs:356` | `Deserialize()` no null check, unbounded `centroidCount` — OOM bomb. TopKHeavyHitters:281 same. | [X]
 | 564 | 15 | LOW | `Security/AccessControl.cs` | File named `AccessControl.cs` but contains only `ContainerConfig` class — name mismatch. | [X]
-| 565 | 15 | LOW | `Primitives/Probabilistic/CountMinSketch.cs:36` | `_lastQueryResult` field naming ambiguous — should be `_lastEstimate`. | [ ]
-| 566 | 15 | LOW | `Primitives/Probabilistic/TDigest.cs:431-444` | Private `Quantile(Centroid)` shadows public `Quantile(double)` with different semantics. | [ ]
-| 567 | 9 | LOW | `Primitives/Probabilistic/SketchMerger.cs:141` | Lazy `Select(deserializer)` defers exceptions to merge time — misleading stack traces. | [ ]
-| 568 | 1 | LOW | `Scale/IExabyteScale.cs:5` | `// FUTURE:` comment with no ticket reference — borderline Rule 13. | [ ]
+| 565 | 15 | LOW | `Primitives/Probabilistic/CountMinSketch.cs:36` | `_lastQueryResult` field naming ambiguous — should be `_lastEstimate`. | [X]
+| 566 | 15 | LOW | `Primitives/Probabilistic/TDigest.cs:431-444` | Private `Quantile(Centroid)` shadows public `Quantile(double)` with different semantics. | [X]
+| 567 | 9 | LOW | `Primitives/Probabilistic/SketchMerger.cs:141` | Lazy `Select(deserializer)` defers exceptions to merge time — misleading stack traces. | [X]
+| 568 | 1 | LOW | `Scale/IExabyteScale.cs:5` | `// FUTURE:` comment with no ticket reference — borderline Rule 13. | [X]
 
 **Clean files:** RaidConstants.cs, StorageIntent.cs, IProbabilisticStructure.cs, IClusterMembership.cs
 
@@ -1036,11 +1036,11 @@
 | 580 | 13 | P2 | `Security/IncidentResponse/IncidentResponseEngine.cs:55` | `ActiveIncidentCount` property does O(n) LINQ Count on every access — hot property for metrics/health checks. | [X]
 | 581 | 12 | P2 | `Security/KeyManagement/CloudKmsProvider.cs:175` | LoadKeyFromStorage hardcodes CancellationToken.None — outer cancellation cannot interrupt in-progress KMS wrap. Same in SecretsManagerKeyStore:739,777. | [X]
 | 582 | 7 | P2 | `Security/KeyManagement/CloudKmsProvider.cs:410-417` + `SecretsManagerKeyStore.cs:973-980` | `new HttpClient()` per token exchange call — socket exhaustion under load. Existing `_httpClient` field should be reused. | [X]
-| 583 | 15 | LOW | `Security/ActiveDirectory/SpnegoNegotiator.cs:99` | `RejectLegacyEncryption` is mutable `{ get; set; }` — security policy flag settable after construction, race between config and request processing. | [ ]
-| 584 | 14 | LOW | `Security/AccessVerdict.cs:110` | HierarchyAccessRule.MatchesPrincipal uses StartsWith on TrimEnd('*') but no validation pattern ends with '*' — "admin" matches "adminevil" prefix. | [ ]
-| 585 | 14 | LOW | `Security/IKeyRotationPolicy.cs:174-178` | KeyRotationMetadata uses `DateTime` (not DateTimeOffset) for CreatedAt/LastUsedAt/LastRotatedAt — ambiguous UTC vs local in distributed system. | [ ]
-| 586 | 15 | LOW | `Security/IKeyStore.cs:161-172` | GetKeyNativeAsync default implementation doesn't forward CancellationToken to inner GetKeyAsync call. | [ ]
-| 587 | 11 | LOW | `Security/ISecurityContext.cs:33` | CommandIdentity default returns null — callers silently skip hierarchy evaluation when implementations forget to override. | [ ]
+| 583 | 15 | LOW | `Security/ActiveDirectory/SpnegoNegotiator.cs:99` | `RejectLegacyEncryption` is mutable `{ get; set; }` — security policy flag settable after construction, race between config and request processing. | [X]
+| 584 | 14 | LOW | `Security/AccessVerdict.cs:110` | HierarchyAccessRule.MatchesPrincipal uses StartsWith on TrimEnd('*') but no validation pattern ends with '*' — "admin" matches "adminevil" prefix. | [X]
+| 585 | 14 | LOW | `Security/IKeyRotationPolicy.cs:174-178` | KeyRotationMetadata uses `DateTime` (not DateTimeOffset) for CreatedAt/LastUsedAt/LastRotatedAt — ambiguous UTC vs local in distributed system. | [X]
+| 586 | 15 | LOW | `Security/IKeyStore.cs:161-172` | GetKeyNativeAsync default implementation doesn't forward CancellationToken to inner GetKeyAsync call. | [X]
+| 587 | 11 | LOW | `Security/ISecurityContext.cs:33` | CommandIdentity default returns null — callers silently skip hierarchy evaluation when implementations forget to override. | [X]
 
 **Clean files:** IKerberosAuthenticator.cs, IMilitarySecurity.cs, CryptographicAlgorithmRegistry.cs, CommandIdentity.cs, ContainmentActions.cs
 
@@ -1068,11 +1068,11 @@
 | 601 | 14 | P2 | `Security/SupplyChain/DependencyScanner.cs:95-110` | Assembly scanning catches all exceptions per-assembly but returns partial results without indicating incompleteness — caller assumes full scan. | [X]
 | 602 | 8 | P2 | `Security/OsHardening/SecurityVerification.cs:67,89,112` | Three `Console.WriteLine` calls in verification output — should use ILogger or Debug.WriteLine. | [X]
 | 603 | 15 | P2 | `Security/SecurityContracts.cs:45-50` | `ISecurityAuditable.GetAuditTrail` returns `IEnumerable<string>` — stringly-typed audit trail, no structured data. | [X]
-| 604 | 15 | LOW | `Security/Siem/ISiemTransport.cs:28` | `SendEventAsync` returns `Task<bool>` — should return result object with failure reason, not just bool. | [ ]
-| 605 | 14 | LOW | `Security/PluginIdentity.cs:35-40` | Certificate thumbprint stored as string with no format validation — accepts any string, not validated as hex SHA-1/SHA-256. | [ ]
-| 606 | 15 | LOW | `Security/NativeKeyHandle.cs:85` | `Span` property returns `new Span<byte>(_pointer, _length)` from freed memory if called after Dispose — no ObjectDisposedException guard. | [ ]
-| 607 | 13 | LOW | `Security/SupplyChain/SlsaProvenanceGenerator.cs:350-380` | Environment variable collection (45+ vars) on every provenance generation — should cache or lazy-load. | [ ]
-| 608 | 15 | LOW | `Security/SecretManager.cs:145` | `ListSecrets()` returns `IReadOnlyDictionary` exposing internal key set — caller can enumerate all secret names. | [ ]
+| 604 | 15 | LOW | `Security/Siem/ISiemTransport.cs:28` | `SendEventAsync` returns `Task<bool>` — should return result object with failure reason, not just bool. | [X]
+| 605 | 14 | LOW | `Security/PluginIdentity.cs:35-40` | Certificate thumbprint stored as string with no format validation — accepts any string, not validated as hex SHA-1/SHA-256. | [X]
+| 606 | 15 | LOW | `Security/NativeKeyHandle.cs:85` | `Span` property returns `new Span<byte>(_pointer, _length)` from freed memory if called after Dispose — no ObjectDisposedException guard. | [X]
+| 607 | 13 | LOW | `Security/SupplyChain/SlsaProvenanceGenerator.cs:350-380` | Environment variable collection (45+ vars) on every provenance generation — should cache or lazy-load. | [X]
+| 608 | 15 | LOW | `Security/SecretManager.cs:145` | `ListSecrets()` returns `IReadOnlyDictionary` exposing internal key set — caller can enumerate all secret names. | [X]
 
 **Clean files:** SecurityContracts.cs (mostly interfaces), ISiemTransport.cs (interface only)
 
@@ -1096,13 +1096,13 @@
 | 618 | 1 | P2 | `Storage/Billing/GcpBillingProvider.cs:307-316` | `GetReservedCapacityAsync` returns all zeros for financial fields — GCP CUD commitment data not parsed, partial stub. | [X]
 | 619 | 1 | P2 | `Storage/Billing/GcpBillingProvider.cs:159-172` | `GetBillingReportAsync` without billing account returns empty report with `TotalCost=0` and no warning — indistinguishable from free tier. | [X]
 | 620 | 2 | P2 | `Services/PluginRegistry.cs:22,29-31` | `_currentMode` field not volatile — written by SetOperatingMode, read by GetPlugin<T> on any thread, stale cache risk. | [X]
-| 621 | 5 | LOW | `Storage/Billing/AwsCostExplorerProvider.cs:297-300` + Azure:313 + Gcp:393 | `ValidateCredentialsAsync` catches all exceptions including OperationCanceledException — cancellation misreported as invalid credentials. | [ ]
-| 622 | 1 | LOW | `Storage/Billing/AwsCostExplorerProvider.cs:157` | `GetSpotPricingAsync` uses hardcoded `onDemandEstimate = spotPrice * 3.0m` — fabricated financial data. | [ ]
-| 623 | 1 | LOW | `Storage/Billing/AwsCostExplorerProvider.cs:205-206` | `GetReservedCapacityAsync` uses hardcoded `usagePrice * 1.4m` and default savings of 30.0 — estimated, not queried. | [ ]
-| 624 | 13 | LOW | `Storage/Billing/GcpBillingProvider.cs:105,113-155` | Up to 500 sequential HTTP round-trips (50 services × 10 SKUs) per billing report — O(n×m) unbounded sequential I/O. | [ ]
-| 625 | 15 | LOW | `Security/Transit/ITransitEncryptionStage.cs:61-66,98-103` | Interface documents ArgumentNullException for context but doesn't specify behavior when SecurityContext property within context is null. | [ ]
-| 626 | 15 | LOW | `Security/Transit/TransitEncryptionTypes.cs:246-251` | TranscryptionOptions SourceSecurityContext/TargetSecurityContext nullable with no null-semantics documentation. | [ ]
-| 627 | 14 | LOW | `Security/Transit/TransitEncryptionTypes.cs:246-251` | Same nullable fields — implementations may fail unpredictably when null contexts provided. | [ ]
+| 621 | 5 | LOW | `Storage/Billing/AwsCostExplorerProvider.cs:297-300` + Azure:313 + Gcp:393 | `ValidateCredentialsAsync` catches all exceptions including OperationCanceledException — cancellation misreported as invalid credentials. | [X]
+| 622 | 1 | LOW | `Storage/Billing/AwsCostExplorerProvider.cs:157` | `GetSpotPricingAsync` uses hardcoded `onDemandEstimate = spotPrice * 3.0m` — fabricated financial data. | [X]
+| 623 | 1 | LOW | `Storage/Billing/AwsCostExplorerProvider.cs:205-206` | `GetReservedCapacityAsync` uses hardcoded `usagePrice * 1.4m` and default savings of 30.0 — estimated, not queried. | [X]
+| 624 | 13 | LOW | `Storage/Billing/GcpBillingProvider.cs:105,113-155` | Up to 500 sequential HTTP round-trips (50 services × 10 SKUs) per billing report — O(n×m) unbounded sequential I/O. | [X]
+| 625 | 15 | LOW | `Security/Transit/ITransitEncryptionStage.cs:61-66,98-103` | Interface documents ArgumentNullException for context but doesn't specify behavior when SecurityContext property within context is null. | [X]
+| 626 | 15 | LOW | `Security/Transit/TransitEncryptionTypes.cs:246-251` | TranscryptionOptions SourceSecurityContext/TargetSecurityContext nullable with no null-semantics documentation. | [X]
+| 627 | 14 | LOW | `Security/Transit/TransitEncryptionTypes.cs:246-251` | Same nullable fields — implementations may fail unpredictably when null contexts provided. | [X]
 
 **Clean files:** ICommonCipherPresets.cs, ITranscryptionService.cs, ITransitCompression.cs, ITransitEncryption.cs, TransitCompressionTypes.cs, BillingTypes.cs, CostOptimizationTypes.cs
 
@@ -1122,9 +1122,9 @@
 | 633 | 4 | P2 | `Storage/Fabric/IS3CompatibleServer.cs:152-156` | `S3ServerOptions.AuthProvider` nullable defaults to anonymous/open mode — fail-open security, callers who forget AuthProvider deploy open S3 server. | [X]
 | 634 | 1 | P2 | `Storage/HybridStoragePluginBase.cs:403-417,437-442` | HandleListInstances and HandleAggregateHealthAsync build response data then discard it — `// Response would be sent via message context` comment confirms stub. Callers time out. | [X]
 | 635 | 14 | P2 | `Storage/Fabric/IS3CompatibleServer.cs:129,147` | `S3ServerOptions.Port` accepts any int (including negatives/65536+), MultipartChunkSize accepts below S3 minimum 5MB — no validation. | [X]
-| 636 | 13 | LOW | `Storage/HybridStoragePluginBase.cs:282-287` | GetAggregateHealth does three separate enumerations over _healthCache.Values — O(3n) when single pass suffices. | [ ]
-| 637 | 15 | LOW | `Storage/Billing/IBillingProvider.cs:59,66` | ForecastCostAsync/ValidateCredentialsAsync naming commits implementations to async but some may use Task.FromResult. | [ ]
-| 638 | 14 | LOW | `Storage/Billing/StorageCostOptimizer.cs:115` | MinSpotSavingsPercent default 20.0 compared against SavingsPercent with unspecified unit (0-100 vs 0.0-1.0) — ambiguous contract. | [ ]
+| 636 | 13 | LOW | `Storage/HybridStoragePluginBase.cs:282-287` | GetAggregateHealth does three separate enumerations over _healthCache.Values — O(3n) when single pass suffices. | [X]
+| 637 | 15 | LOW | `Storage/Billing/IBillingProvider.cs:59,66` | ForecastCostAsync/ValidateCredentialsAsync naming commits implementations to async but some may use Task.FromResult. | [X]
+| 638 | 14 | LOW | `Storage/Billing/StorageCostOptimizer.cs:115` | MinSpotSavingsPercent default 20.0 compared against SavingsPercent with unspecified unit (0-100 vs 0.0-1.0) — ambiguous contract. | [X]
 | 639 | 4 | LOW | `Storage/DwAddressParser.cs:31-45` | HostnameRegex has nested quantifiers without NonBacktracking or timeout — potential ReDoS on adversarial user input. | [X]
 
 **Clean files:** IBillingProvider.cs, DwNamespace.cs, BackendDescriptor.cs, IBackendRegistry.cs, IS3AuthProvider.cs, IStorageFabric.cs, S3Types.cs, StorageFabricErrors.cs, IObjectStorageCore.cs, IMigrationEngine.cs
@@ -1167,10 +1167,10 @@
 | 655 | 13 | P2 | `Storage/Services/DefaultConnectionRegistry.cs:85` | `GetRegisteredIds()` does Keys.ToList().AsReadOnly() — two full allocations per call on health-polling hot path. | [X]
 | 656 | 14 | P2 | `Storage/Services/DefaultStorageIndex.cs:49` | `SearchAsync` doesn't validate `maxResults` — negative values silently return empty, int.MaxValue materializes entire index. | [X]
 | 657 | 14 | P2 | `Storage/Services/DefaultTierManager.cs:21-27` | CoolThresholdDays/ColdThresholdDays/ArchiveThresholdDays have no range guards — zero values cause instant tier promotion, inverted values skip tiers. | [X]
-| 658 | 15 | LOW | `Storage/Services/DefaultTierManager.cs:101-104` | `CoolThresholdDays` maps to `StorageTier.Warm` — naming mismatch confuses operators. | [ ]
-| 659 | 13 | LOW | `Storage/Services/DefaultStorageIndex.cs:37` | MinBy scan O(n) on every write at capacity (up to 100K entries) — needs LRU/clock eviction structure. | [ ]
-| 660 | 12 | LOW | `Tags/DefaultTagQueryApi.cs:422-428` | `SortObjectKeys` switch has only `_` default arm — all sort fields silently ignored, always sorts by ObjectKey. | [ ]
-| 661 | 15 | LOW | `Tags/DefaultTagPropagationEngine.cs:36-37` | Uses plain Dictionary + lock instead of BoundedDictionary — inconsistent with SDK pattern, unbounded growth. | [ ]
+| 658 | 15 | LOW | `Storage/Services/DefaultTierManager.cs:101-104` | `CoolThresholdDays` maps to `StorageTier.Warm` — naming mismatch confuses operators. | [X]
+| 659 | 13 | LOW | `Storage/Services/DefaultStorageIndex.cs:37` | MinBy scan O(n) on every write at capacity (up to 100K entries) — needs LRU/clock eviction structure. | [X]
+| 660 | 12 | LOW | `Tags/DefaultTagQueryApi.cs:422-428` | `SortObjectKeys` switch has only `_` default arm — all sort fields silently ignored, always sorts by ObjectKey. | [X]
+| 661 | 15 | LOW | `Tags/DefaultTagPropagationEngine.cs:36-37` | Uses plain Dictionary + lock instead of BoundedDictionary — inconsistent with SDK pattern, unbounded growth. | [X]
 
 **Clean files:** ICacheManager.cs, IConnectionRegistry.cs, IStorageIndex.cs, ITierManager.cs, StorageAddressKind.cs, ICarbonAwareStorage.cs, DefaultTagAttachmentService.cs
 
@@ -1190,7 +1190,7 @@
 | 667 | 12 | P2 | `Tags/TagEvents.cs:80-88` | `TagsBulkUpdatedEvent` doesn't inherit from `TagEvent` unlike all other event types — breaks polymorphic bus subscription for TagEvent consumers. | [X]
 | 668 | 2 | P2 | `Tags/TagMergeStrategy.cs:119,157` | MultiValue/Union merge strategies use `DateTimeOffset.UtcNow` — violates documented determinism contract, causes CRDT convergence divergence. | [X]
 | 669 | 5 | P2 | `Tags/InMemoryTagSchemaRegistry.cs:87-133` | (See also #664) No logging when concurrent version addition overwrites another — silent data loss on schema evolution. | [X]
-| 670 | 14 | LOW | `Tags/InMemoryTagStore.cs:151` | `FindObjectsByTagAsync` limit=0 or negative silently returns empty — no validation. | [ ]
+| 670 | 14 | LOW | `Tags/InMemoryTagStore.cs:151` | `FindObjectsByTagAsync` limit=0 or negative silently returns empty — no validation. | [X]
 | 671 | 15 | LOW | `Tags/ITagAttachmentService.cs:119` vs `InMemoryTagStore.cs:75` | Inconsistent limit defaults — ITagAttachmentService defaults 100, ITagStore has no default. | [X]
 | 672 | 15 | LOW | `Tags/TagPropagationRule.cs:109` | `TransformFunc` (Func<Tag,Tag>) not serializable — silent null on deserialization across process boundaries. | [X]
 | 673 | 10 | LOW | `Tags/InvertedTagIndex.cs:361` | `GetShard` uses `string.GetHashCode()` — randomized per process in .NET 5+, non-deterministic shard assignment across restarts. | [X]
@@ -1216,9 +1216,9 @@
 | 682 | 14 | P2 | `Tags/TagSchema.cs:46` | `TagConstraint.Pattern` not validated as valid regex — invalid pattern causes unhandled ArgumentException on every validation call instead of TagValidationError. | [X]
 | 683 | 12 | P2 | `Tags/TagTypes.cs:144-145` | `GetByNamespace` uses OrdinalIgnoreCase but TagKey record equality is case-sensitive — asymmetric behavior, `GetByNamespace("System")` finds "system" but indexer doesn't. | [X]
 | 684 | 4 | P2 | `Utilities/PluginDetails.cs:286` | `IsAllowedPayloadType` allows any `IEnumerable<string>` implementation through — custom classes with arbitrary state bypass type allowlist. | [X]
-| 685 | 15 | LOW | `Tags/TagQueryExpression.cs:176` | `TagQueryRequest.Skip` has no validation — negative values silently accepted, causes ArgumentOutOfRangeException deep in query stack. | [ ]
+| 685 | 15 | LOW | `Tags/TagQueryExpression.cs:176` | `TagQueryRequest.Skip` has no validation — negative values silently accepted, causes ArgumentOutOfRangeException deep in query stack. | [X]
 | 686 | 15 | LOW | `Utilities/PluginDetails.cs:16` | `PluginDescriptor.Tags` is mutable `List<string>` on init-only class — external mutation corrupts plugin metadata. Should be IReadOnlyList. | [X]
-| 687 | 13 | LOW | `Tags/TagTypes.cs:181` | `TagCollection.GetHashCode` calls OrderBy on every computation — allocates and sorts on each hash lookup. | [ ]
+| 687 | 13 | LOW | `Tags/TagTypes.cs:181` | `TagCollection.GetHashCode` calls OrderBy on every computation — allocates and sorts on each hash lookup. | [X]
 | 688 | 15 | LOW | `Tags/TagSchema.cs:81` | `TagSchemaVersion.CreatedUtc` defaults to UtcNow — JSON deserialization without CreatedUtc gets current time, not original creation time. | [X]
 | 689 | 9 | LOW | `Validation/Guards.cs:107` | `MaxLength` returns `value!` when input is null — suppresses nullable warning but returns null through non-nullable return type. | [X]
 | 690 | 15 | LOW | `Tags/TagVersionVector.cs:153` | (See also #678) Deserialized empty dict creates vector that always loses Dominates check — edge case not handled. | [X]
@@ -1657,7 +1657,7 @@
 | 936 | 15 | P2 | `VDE/VirtualDiskEngine.cs:500-503` | `ListAsync` silently skips missing inodes with no log/metric — index inconsistency (key in B-Tree, inode missing) invisible to operators. | [X]
 | 937 | 9 | P2 | `VDE/VirtualDiskEngine.cs:654` | `scanResult.Events` not null-checked before `.Select()` — `NullReferenceException` in integrity scan path. | [X]
 | 938 | 13 | LOW | `VDE/Verification/TierPerformanceBenchmark.cs:383-402` | Only 1000 iterations with no GC stabilization — allocation-heavy loop produces jittery measurements. | [X]
-| 939 | 14 | LOW | `Virtualization/IHypervisorSupport.cs:201-204` | `TrimAsync` interface takes user-controlled `devicePath` with no contract documentation for path validation guidance. | [ ]
+| 939 | 14 | LOW | `Virtualization/IHypervisorSupport.cs:201-204` | `TrimAsync` interface takes user-controlled `devicePath` with no contract documentation for path validation guidance. | [X]
 
 **Clean files:** None (all 4 files have findings)
 
@@ -1692,8 +1692,8 @@
 | 948 | 9 | P1 | `MemoryPressureMonitor.cs:~154` | `CollectStatistics` swallows all exceptions and returns 8GB fallback — persistent GC API failure silently produces wrong memory metrics, causing incorrect pressure decisions. | [X]
 | 949 | 4 | P1 | `AuthenticatedMessageBusDecorator.cs:~219` | Pattern-based subscriptions bypass HMAC authentication entirely — wildcard topic subscribers receive messages without signature verification. | [X]
 | 950 | 7 | P1 | `DataWarehouseKernel.cs:~987` | `WaitAsync` timeout exception uncaught — `TimeoutException` from semaphore wait leaks resources held by the timed-out operation. | [X]
-| 951 | 8 | LOW | `KernelLogger.cs:~318` | `ConsoleLogTarget` used by default in all deployment modes — library code should not write to Console in production deployments. | [ ]
-| 952 | 15 | LOW | `AdvancedMessageBus.cs:~84` | `BoundedBoundedDictionary` naming typo + `GetOrAdd` may enqueue duplicate key on concurrent first access. | [ ]
+| 951 | 8 | LOW | `KernelLogger.cs:~318` | `ConsoleLogTarget` used by default in all deployment modes — library code should not write to Console in production deployments. | [X]
+| 952 | 15 | LOW | `AdvancedMessageBus.cs:~84` | `BoundedBoundedDictionary` naming typo + `GetOrAdd` may enqueue duplicate key on concurrent first access. | [X]
 
 **Clean files:** KernelConfiguration.cs, KernelContext.cs, KernelBuilder.cs, MessageBus.cs
 
@@ -1714,11 +1714,11 @@
 | 959 | 5 | P2 | `KernelStorageService.cs:261` | Silent bare `catch { }` in `DeleteMetadataAsync` — delete failure silently swallowed, caller believes deletion succeeded. | [X]
 | 960 | 1 | P2 | `KernelStorageService.cs:275` | `RebuildIndexAsync` is a no-op stub — index corruption cannot be repaired, callers receive false success. | [X]
 | 961 | 4 | P2 | `KnowledgeLake.cs:119` | `Regex` without timeout — user-supplied patterns risk catastrophic backtracking (ReDoS), blocking thread indefinitely. | [X]
-| 962 | 15 | LOW | `PipelinePluginIntegration.cs:49` | `StrategyName` parameter accepted but silently ignored — callers believe they're selecting a strategy but always get default. | [ ]
-| 963 | 4 | LOW | `PipelinePolicyManager.cs:620` | Null security context bypasses admin authorization check — missing context treated as "allow" instead of "deny". | [ ]
-| 964 | 13 | LOW | `InMemoryStoragePlugin.cs:419` | O(n log n) LRU sort in eviction loop — linear scan with `OrderBy` on every eviction call, quadratic under sustained writes. | [ ]
-| 965 | 2 | LOW | `InMemoryStoragePlugin.cs:470` | `_lastMemoryCheck` field mutated from timer callback without synchronization — stale reads cause redundant or missed GC checks. | [ ]
-| 966 | 7 | LOW | `KnowledgeLake.cs:40` | Index bags (tag→document mappings) grow without bound — no eviction or size limit, unbounded memory leak over time. | [ ]
+| 962 | 15 | LOW | `PipelinePluginIntegration.cs:49` | `StrategyName` parameter accepted but silently ignored — callers believe they're selecting a strategy but always get default. | [X]
+| 963 | 4 | LOW | `PipelinePolicyManager.cs:620` | Null security context bypasses admin authorization check — missing context treated as "allow" instead of "deny". | [X]
+| 964 | 13 | LOW | `InMemoryStoragePlugin.cs:419` | O(n log n) LRU sort in eviction loop — linear scan with `OrderBy` on every eviction call, quadratic under sustained writes. | [X]
+| 965 | 2 | LOW | `InMemoryStoragePlugin.cs:470` | `_lastMemoryCheck` field mutated from timer callback without synchronization — stale reads cause redundant or missed GC checks. | [X]
+| 966 | 7 | LOW | `KnowledgeLake.cs:40` | Index bags (tag→document mappings) grow without bound — no eviction or size limit, unbounded memory leak over time. | [X]
 
 **Clean files:** PipelineOrchestrator.cs, PipelinePolicyManager.cs, PipelineTransaction.cs, PluginCapabilityRegistry.cs
 
@@ -1787,11 +1787,11 @@
 | 1000 | 5 | P2 | `SemanticSync/SemanticSyncPlugin.cs:264-272` | Silent catch in `OnStopCoreAsync` strategy shutdown — "Best-effort" comment but no exception logging. | [X]
 | 1001 | 9 | P2 | `PluginMarketplace/PluginMarketplacePlugin.cs:512-516` | `InstallPluginViaKernelAsync` returns `true` on `TimeoutException` — "treat as potential success". Catalog diverges from kernel state. Same in uninstall. | [X]
 | 1002 | 2 | P2 | `AedsCore/Http2DataPlanePlugin.cs:333,345` | `_bytesTransferred += bytesRead` non-atomic `long` increment from concurrent Read/ReadAsync paths. | [X]
-| 1003 | 15 | LOW | `SemanticSync/SemanticSyncPlugin.cs:231` | `SemanticSyncOrchestrator.StartAsync()` returns `void` not `Task` — naming lie. | [ ]
+| 1003 | 15 | LOW | `SemanticSync/SemanticSyncPlugin.cs:231` | `SemanticSyncOrchestrator.StartAsync()` returns `void` not `Task` — naming lie. | [X]
 | 1004 | 10 | LOW | `AedsCore/Scaling/AedsScalingManager.cs:553` | `string.GetHashCode(StringComparison.Ordinal)` for partition routing — non-deterministic across restarts. | [X]
-| 1005 | 4 | LOW | `AedsCore/Extensions/ZeroTrustPairingPlugin.cs:50,75` | `Guid.NewGuid()` as client ID — adequate for identifiers but not security tokens. | [ ]
-| 1006 | 13 | LOW | `PluginMarketplace/PluginMarketplacePlugin.cs:660-682` | O(n*m) scan in `GetReverseDependencies` on every uninstall. | [ ]
-| 1007 | 12 | LOW | `PluginMarketplace/PluginMarketplacePlugin.cs:538` | `HasUpdate` set to `true` immediately after install if version differs from latest — misleading. | [ ]
+| 1005 | 4 | LOW | `AedsCore/Extensions/ZeroTrustPairingPlugin.cs:50,75` | `Guid.NewGuid()` as client ID — adequate for identifiers but not security tokens. | [X]
+| 1006 | 13 | LOW | `PluginMarketplace/PluginMarketplacePlugin.cs:660-682` | O(n*m) scan in `GetReverseDependencies` on every uninstall. | [X]
+| 1007 | 12 | LOW | `PluginMarketplace/PluginMarketplacePlugin.cs:538` | `HasUpdate` set to `true` immediately after install if version differs from latest — misleading. | [X]
 
 **Clean files:** SyncPipeline.cs, EmbeddingClassifier.cs, HybridClassifier.cs, RuleBasedClassifier.cs, ConflictClassificationEngine.cs, IntentManifestSignerPlugin.cs
 
@@ -1815,8 +1815,8 @@
 | 1017 | 14 | P2 | `TamperProof/Pipeline/ReadPhaseHandlers.cs:114-119` | Deserialized `TamperProofManifest` not validated — null `RaidConfiguration`/`Shards`/`FinalContentHash` causes NullReferenceException deep in reconstruction. | [X]
 | 1018 | 9 | P2 | `SemanticSync/Strategies/Routing/FidelityDownsampler.cs:81-91` | `ApplyTransition` exception mid-loop propagates with no context about which fidelity step failed. | [X]
 | 1019 | 9 | P2 | `SemanticSync/Strategies/Routing/FidelityDownsampler.cs:81-91` | Duplicate — `Downsample` loop has no recovery from partial fidelity reduction. | [X]
-| 1020 | 15 | LOW | `SemanticSync/Strategies/Fidelity/AdaptiveFidelityController.cs:243-248` | `DropOneFidelityLevel` clamps at hardcoded `SyncFidelity.Metadata` — breaks if enum extended. | [ ]
-| 1021 | 1 | LOW | `SemanticSync/Strategies/Routing/FidelityDownsampler.cs:69-127` | `metadata` parameter accepted but never read — dead parameter misleads callers. | [ ]
+| 1020 | 15 | LOW | `SemanticSync/Strategies/Fidelity/AdaptiveFidelityController.cs:243-248` | `DropOneFidelityLevel` clamps at hardcoded `SyncFidelity.Metadata` — breaks if enum extended. | [X]
+| 1021 | 1 | LOW | `SemanticSync/Strategies/Routing/FidelityDownsampler.cs:69-127` | `metadata` parameter accepted but never read — dead parameter misleads callers. | [X]
 
 **Clean files:** SemanticMergeResolver.cs, FederatedSyncLearner.cs, LocalModelManager.cs, BandwidthBudgetTracker.cs, FidelityPolicyEngine.cs, BandwidthAwareSummaryRouter.cs, SummaryGenerator.cs, IAccessLogProvider.cs, IPipelineOrchestrator.cs, IWormStorageProvider.cs
 
@@ -1846,7 +1846,7 @@
 | 1037 | 13 | P2 | `TamperProof/Services/BackgroundIntegrityScanner.cs:498-502` | `blockIds.Contains(pendingId)` on `List<Guid>` — O(n) per lookup, O(n²) total. Should use `HashSet<Guid>`. | [X]
 | 1038 | 14 | P2 | `TamperProof/Services/AuditTrailService.cs:122` | `LogOperationAsync` no null-check on `operation.Details` — null details produce incorrect hash, breaking audit chain integrity. | [X]
 | 1039 | 2 | P2 | `TamperProof/Services/BackgroundIntegrityScanner.cs:362-376` | `corruptedBlockDetails.Add(result)` outside lock — single-threaded now but racy if parallelized. | [X]
-| 1040 | 1 | LOW | `TamperProof/Services/SealService.cs:401` | `SealRangeAsync` returns `sealedCount: 1` always — comment: "For now, we return 1 to indicate the range seal itself". | [ ]
+| 1040 | 1 | LOW | `TamperProof/Services/SealService.cs:401` | `SealRangeAsync` returns `sealedCount: 1` always — comment: "For now, we return 1 to indicate the range seal itself". | [X]
 
 **Clean files:** TimeLockRegistration.cs, TamperProofScalingManager.cs, DegradationStateService.cs, MessageBusIntegration.cs, RetentionPolicyService.cs, TamperIncidentService.cs
 
@@ -1879,11 +1879,11 @@
 | 1059 | 14 | P2 | `Transcoding.Media/Execution/TranscodePackageExecutor.cs:107-131` | `reader.ReadInt32()` for field lengths with no bounds check — malicious package causes 2GB allocation. | [X]
 | 1060 | 9 | P2 | `Transcoding.Media/Execution/FfmpegExecutor.cs:229-232` | `process.Start()` return value not checked — `false` return causes downstream NullReferenceException. | [X]
 | 1061 | 12 | P2 | `Transcoding.Media/Execution/MediaFormatDetector.cs:63-65` | EBML header <30 bytes falls through to `return true` (WebM) — MKV files misidentified as WebM. | [X]
-| 1062 | 14 | LOW | `TamperProof/TimeLock/CloudTimeLockProvider.cs:284` | `RequiredApprovals` not validated ≥2 — value 0 trivially bypasses multi-party gate. | [ ]
-| 1063 | 15 | LOW | `Transcoding.Media/Execution/FfmpegTranscodeHelper.cs` | FFmpeg failure fallback to package taken silently with no log — callers can't distinguish real output from fallback. | [ ]
-| 1064 | 9 | LOW | `TamperProof/TimeLock/RansomwareVaccinationService.cs:469-553` | All bus-coordination catch blocks return false/null with no exception logging — vaccination failures undiagnosable. | [ ]
-| 1065 | 4 | LOW | `TamperProof/TimeLock/CloudTimeLockProvider.cs:623-638` | Content hash includes `UtcNow` timestamp — non-reproducible, useless for integrity verification. Same in Hsm/Software providers. | [ ]
-| 1066 | 14 | LOW | `Transcoding.Media/Strategies/GPUTexture/DdsTextureStrategy.cs:321-328` | `ParseDdsDimensions` no validation for negative/extreme width×height — integer overflow in mipmap calculations. | [ ]
+| 1062 | 14 | LOW | `TamperProof/TimeLock/CloudTimeLockProvider.cs:284` | `RequiredApprovals` not validated ≥2 — value 0 trivially bypasses multi-party gate. | [X]
+| 1063 | 15 | LOW | `Transcoding.Media/Execution/FfmpegTranscodeHelper.cs` | FFmpeg failure fallback to package taken silently with no log — callers can't distinguish real output from fallback. | [X]
+| 1064 | 9 | LOW | `TamperProof/TimeLock/RansomwareVaccinationService.cs:469-553` | All bus-coordination catch blocks return false/null with no exception logging — vaccination failures undiagnosable. | [X]
+| 1065 | 4 | LOW | `TamperProof/TimeLock/CloudTimeLockProvider.cs:623-638` | Content hash includes `UtcNow` timestamp — non-reproducible, useless for integrity verification. Same in Hsm/Software providers. | [X]
+| 1066 | 14 | LOW | `Transcoding.Media/Strategies/GPUTexture/DdsTextureStrategy.cs:321-328` | `ParseDdsDimensions` no validation for negative/extreme width×height — integer overflow in mipmap calculations. | [X]
 
 **Clean files:** None
 
@@ -1917,13 +1917,13 @@
 | 1086 | 15 | P2 | `Transcoding.Media/Strategies/Video/AdvancedVideoStrategies.cs:278-292` | `RenderViewportFrameAsync` returns `RenderTimeMs = 0`, `MotionToPhotonMs = 0`, empty `FrameData`. Same: `ConvertToCubemapAsync` returns metadata but no cubemap data. | [X]
 | 1087 | 15 | P2 | `Transcoding.Media/Strategies/Image/JpegImageStrategy.cs:91-95` | Health check `isOperational = testPixel.Length == 4` — dead code, always true. Same in PngImageStrategy. | [X]
 | 1088 | 12 | P2 | `Transcoding.Media/Strategies/ThreeD/UsdModelStrategy.cs:347-349` | USDZ ZIP parsing — `compressedSize = 0` with data descriptor flag causes infinite loop. No data descriptor scan. | [X]
-| 1089 | 15 | LOW | `Transcoding.Media/Strategies/Streaming/DashStreamingStrategy.cs:125-131` | `ShutdownAsyncCore` comments claim cleanup but body is `return Task.CompletedTask`. Same in HLS. | [ ]
-| 1090 | 9 | LOW | `Transcoding.Media/Strategies/RAW/DngRawStrategy.cs:275-285` | `ValidateDngFormat` handles endianness but `ParseDngVersion`/`DetectLinearDng`/`ExtractCameraModel` assume little-endian — big-endian DNG returns garbage. | [ ]
-| 1091 | 4 | LOW | `Transcoding.Media/Strategies/Streaming/CmafStreamingStrategy.cs:296-306` | `BuildFfmpegArguments` interpolates `options.VideoCodec`/`AudioCodec` without sanitization — FFmpeg argument injection if user-controlled. Same in DASH/HLS. | [ ]
-| 1092 | 2 | LOW | `Transcoding.Media/Strategies/ThreeD/UsdModelStrategy.cs:230-290` | `ParseUsdaScene` counts "variantSet"/"sublayer" keywords including in comments/strings — inflated counters. | [ ]
-| 1093 | 9 | LOW | `Transcoding.Media/Strategies/ThreeD/GltfModelStrategy.cs:246-268` | `ExtractGlbBinary` negative `jsonChunkLength` causes `binOffset < 20` — no guard. | [ ]
-| 1094 | 7 | LOW | `Transcoding.Media/Strategies/Image/WebPImageStrategy.cs:123,209` | `outputStream` not disposed on exception path before return — buffer held until GC. Same in JPEG/PNG. | [ ]
-| 1095 | 9 | LOW | `Transcoding.Media/Strategies/Image/JpegImageStrategy.cs:313-321` | Error message calls `DetermineQuality(options)` again instead of using existing `quality` local. | [ ]
+| 1089 | 15 | LOW | `Transcoding.Media/Strategies/Streaming/DashStreamingStrategy.cs:125-131` | `ShutdownAsyncCore` comments claim cleanup but body is `return Task.CompletedTask`. Same in HLS. | [X]
+| 1090 | 9 | LOW | `Transcoding.Media/Strategies/RAW/DngRawStrategy.cs:275-285` | `ValidateDngFormat` handles endianness but `ParseDngVersion`/`DetectLinearDng`/`ExtractCameraModel` assume little-endian — big-endian DNG returns garbage. | [X]
+| 1091 | 4 | LOW | `Transcoding.Media/Strategies/Streaming/CmafStreamingStrategy.cs:296-306` | `BuildFfmpegArguments` interpolates `options.VideoCodec`/`AudioCodec` without sanitization — FFmpeg argument injection if user-controlled. Same in DASH/HLS. | [X]
+| 1092 | 2 | LOW | `Transcoding.Media/Strategies/ThreeD/UsdModelStrategy.cs:230-290` | `ParseUsdaScene` counts "variantSet"/"sublayer" keywords including in comments/strings — inflated counters. | [X]
+| 1093 | 9 | LOW | `Transcoding.Media/Strategies/ThreeD/GltfModelStrategy.cs:246-268` | `ExtractGlbBinary` negative `jsonChunkLength` causes `binOffset < 20` — no guard. | [X]
+| 1094 | 7 | LOW | `Transcoding.Media/Strategies/Image/WebPImageStrategy.cs:123,209` | `outputStream` not disposed on exception path before return — buffer held until GC. Same in JPEG/PNG. | [X]
+| 1095 | 9 | LOW | `Transcoding.Media/Strategies/Image/JpegImageStrategy.cs:313-321` | Error message calls `DetermineQuality(options)` again instead of using existing `quality` local. | [X]
 
 **Clean files:** None
 

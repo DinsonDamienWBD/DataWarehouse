@@ -220,7 +220,10 @@ public sealed class RaplEnergyMeasurementStrategy : SustainabilityStrategyBase
         try
         {
             var text = await File.ReadAllTextAsync(path, ct);
-            return long.Parse(text.Trim());
+            // Finding 4449: TryParse guards against corrupt sysfs values.
+            if (!long.TryParse(text.Trim(), out var value))
+                throw new InvalidOperationException($"RAPL energy counter at {path} contained non-numeric value: '{text.Trim()}'");
+            return value;
         }
         catch (FileNotFoundException)
         {

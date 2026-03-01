@@ -44,6 +44,8 @@ public sealed class FederatedLearningOrchestrator
     /// <param name="nodeId">Node identifier to register.</param>
     public void RegisterNode(string nodeId)
     {
+        // Cat 14 (finding 2931): validate nodeId — null/empty would create a degenerate entry.
+        ArgumentException.ThrowIfNullOrWhiteSpace(nodeId, nameof(nodeId));
         _registeredNodes[nodeId] = true;
     }
 

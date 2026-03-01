@@ -89,51 +89,58 @@ public sealed class MultiCloudOptimizationStrategy : SustainabilityStrategyBase
     {
         lock (_lock)
         {
-            if (!_workloads.TryGetValue(workloadId, out var workload))
-                return new PlacementRecommendation { WorkloadId = workloadId, Success = false, Reason = "Workload not found" };
-
-            if (!workload.IsPortable)
-                return new PlacementRecommendation { WorkloadId = workloadId, Success = false, Reason = "Workload is not portable" };
-
-            var availableProviders = _providers.Values.Where(p => p.IsAvailable).ToList();
-            if (!availableProviders.Any())
-                return new PlacementRecommendation { WorkloadId = workloadId, Success = false, Reason = "No providers available" };
-
-            // Normalize and score
-            var maxCost = availableProviders.Max(p => p.BaseCostMultiplier);
-            var maxCarbon = availableProviders.Max(p => p.CarbonIntensity);
-            var maxLatency = availableProviders.Max(p => p.AvgLatencyMs);
-
-            var scored = availableProviders.Select(p =>
-            {
-                var costScore = maxCost > 0 ? 1 - (p.BaseCostMultiplier / maxCost) : 1;
-                var carbonScore = maxCarbon > 0 ? 1 - (p.CarbonIntensity / maxCarbon) : 1;
-                var latencyScore = maxLatency > 0 ? 1 - ((double)p.AvgLatencyMs / maxLatency) : 1;
-                var totalScore = costScore * CostWeight + carbonScore * CarbonWeight + latencyScore * LatencyWeight;
-
-                return new { Provider = p, Score = totalScore, CostScore = costScore, CarbonScore = carbonScore };
-            }).OrderByDescending(x => x.Score).ToList();
-
-            var best = scored.First();
-            var current = _providers.TryGetValue(workload.CurrentProvider, out var curr) ? curr : null;
-            var currentCost = current != null ? workload.BaselineCostUsd * current.BaseCostMultiplier : workload.BaselineCostUsd;
-            var newCost = workload.BaselineCostUsd * best.Provider.BaseCostMultiplier;
-            var costSavings = currentCost - newCost;
-            var carbonReduction = current != null ? current.CarbonIntensity - best.Provider.CarbonIntensity : 0;
-
-            return new PlacementRecommendation
-            {
-                WorkloadId = workloadId,
-                Success = true,
-                CurrentProvider = workload.CurrentProvider,
-                RecommendedProvider = best.Provider.ProviderId,
-                Score = best.Score,
-                EstimatedCostSavingsUsd = costSavings,
-                EstimatedCarbonReductionGrams = carbonReduction * 10, // Rough estimate
-                ShouldMigrate = best.Provider.ProviderId != workload.CurrentProvider && costSavings > 0,
-                Reason = $"Best fit: {best.Provider.Name} (score: {best.Score:F2})"
-            };
+            return GetOptimalPlacementCore(workloadId);
         }
+    }
+
+    // Finding 4445: extracted lock-free core so GetAllRecommendations can call it
+    // under a single lock acquisition rather than re-entering from GetOptimalPlacement.
+    private PlacementRecommendation GetOptimalPlacementCore(string workloadId)
+    {
+        if (!_workloads.TryGetValue(workloadId, out var workload))
+            return new PlacementRecommendation { WorkloadId = workloadId, Success = false, Reason = "Workload not found" };
+
+        if (!workload.IsPortable)
+            return new PlacementRecommendation { WorkloadId = workloadId, Success = false, Reason = "Workload is not portable" };
+
+        var availableProviders = _providers.Values.Where(p => p.IsAvailable).ToList();
+        if (!availableProviders.Any())
+            return new PlacementRecommendation { WorkloadId = workloadId, Success = false, Reason = "No providers available" };
+
+        // Normalize and score
+        var maxCost = availableProviders.Max(p => p.BaseCostMultiplier);
+        var maxCarbon = availableProviders.Max(p => p.CarbonIntensity);
+        var maxLatency = availableProviders.Max(p => p.AvgLatencyMs);
+
+        var scored = availableProviders.Select(p =>
+        {
+            var costScore = maxCost > 0 ? 1 - (p.BaseCostMultiplier / maxCost) : 1;
+            var carbonScore = maxCarbon > 0 ? 1 - (p.CarbonIntensity / maxCarbon) : 1;
+            var latencyScore = maxLatency > 0 ? 1 - ((double)p.AvgLatencyMs / maxLatency) : 1;
+            var totalScore = costScore * CostWeight + carbonScore * CarbonWeight + latencyScore * LatencyWeight;
+
+            return new { Provider = p, Score = totalScore, CostScore = costScore, CarbonScore = carbonScore };
+        }).OrderByDescending(x => x.Score).ToList();
+
+        var best = scored.First();
+        var current = _providers.TryGetValue(workload.CurrentProvider, out var curr) ? curr : null;
+        var currentCost = current != null ? workload.BaselineCostUsd * current.BaseCostMultiplier : workload.BaselineCostUsd;
+        var newCost = workload.BaselineCostUsd * best.Provider.BaseCostMultiplier;
+        var costSavings = currentCost - newCost;
+        var carbonReduction = current != null ? current.CarbonIntensity - best.Provider.CarbonIntensity : 0;
+
+        return new PlacementRecommendation
+        {
+            WorkloadId = workloadId,
+            Success = true,
+            CurrentProvider = workload.CurrentProvider,
+            RecommendedProvider = best.Provider.ProviderId,
+            Score = best.Score,
+            EstimatedCostSavingsUsd = costSavings,
+            EstimatedCarbonReductionGrams = carbonReduction * 10, // Rough estimate
+            ShouldMigrate = best.Provider.ProviderId != workload.CurrentProvider && costSavings > 0,
+            Reason = $"Best fit: {best.Provider.Name} (score: {best.Score:F2})"
+        };
     }
 
     /// <summary>Gets all placement recommendations.</summary>
@@ -141,8 +148,9 @@ public sealed class MultiCloudOptimizationStrategy : SustainabilityStrategyBase
     {
         lock (_lock)
         {
+            // Finding 4445: use core method to avoid re-entrant lock acquisition.
             return _workloads.Keys
-                .Select(GetOptimalPlacement)
+                .Select(GetOptimalPlacementCore)
                 .Where(r => r.Success && r.ShouldMigrate)
                 .OrderByDescending(r => r.EstimatedCostSavingsUsd)
                 .ToList();

@@ -7,7 +7,8 @@ namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.CloudOptimizat
 public sealed class ServerlessOptimizationStrategy : SustainabilityStrategyBase
 {
     private readonly Dictionary<string, ServerlessFunction> _functions = new();
-    private readonly List<FunctionExecution> _executions = new();
+    // Finding 4446: Queue for O(1) dequeue when capping execution history.
+    private readonly Queue<FunctionExecution> _executions = new();
     private readonly object _lock = new();
 
     /// <inheritdoc/>
@@ -64,8 +65,8 @@ public sealed class ServerlessOptimizationStrategy : SustainabilityStrategyBase
                 MemoryEfficiency = (double)memoryUsedMb / function.MemoryMb
             };
 
-            _executions.Add(execution);
-            if (_executions.Count > 50000) _executions.RemoveAt(0);
+            _executions.Enqueue(execution);
+            if (_executions.Count > 50000) _executions.Dequeue(); // O(1) vs O(n) RemoveAt(0)
 
             function.InvocationCount++;
             if (wasColdStart) function.ColdStartCount++;
@@ -80,11 +81,16 @@ public sealed class ServerlessOptimizationStrategy : SustainabilityStrategyBase
     {
         var recommendations = new List<ServerlessRecommendation>();
 
+        // Finding 4446: snapshot data under brief lock, compute LINQ outside lock.
+        ServerlessFunction? function;
+        List<FunctionExecution> executions;
         lock (_lock)
         {
-            if (!_functions.TryGetValue(functionId, out var function)) return recommendations;
+            if (!_functions.TryGetValue(functionId, out function)) return recommendations;
+            executions = _executions.Where(e => e.FunctionId == functionId).ToList();
+        }
 
-            var executions = _executions.Where(e => e.FunctionId == functionId).ToList();
+        {
             if (executions.Count < 10) return recommendations;
 
             // Check cold start rate
@@ -154,27 +160,30 @@ public sealed class ServerlessOptimizationStrategy : SustainabilityStrategyBase
     /// <summary>Gets function statistics.</summary>
     public ServerlessFunctionStats GetFunctionStats(string functionId)
     {
+        // Finding 4446: snapshot under brief lock, compute stats outside.
+        ServerlessFunction? function;
+        List<FunctionExecution> executions;
         lock (_lock)
         {
-            if (!_functions.TryGetValue(functionId, out var function))
+            if (!_functions.TryGetValue(functionId, out function))
                 return new ServerlessFunctionStats { FunctionId = functionId };
-
-            var executions = _executions.Where(e => e.FunctionId == functionId).ToList();
-            if (!executions.Any())
-                return new ServerlessFunctionStats { FunctionId = functionId, FunctionName = function.Name };
-
-            return new ServerlessFunctionStats
-            {
-                FunctionId = functionId,
-                FunctionName = function.Name,
-                TotalInvocations = function.InvocationCount,
-                ColdStartCount = function.ColdStartCount,
-                ColdStartRate = (double)function.ColdStartCount / function.InvocationCount * 100,
-                AvgDurationMs = executions.Average(e => e.DurationMs),
-                P95DurationMs = executions.OrderBy(e => e.DurationMs).Skip((int)(executions.Count * 0.95)).FirstOrDefault()?.DurationMs ?? 0,
-                AvgMemoryEfficiency = executions.Average(e => e.MemoryEfficiency) * 100
-            };
+            executions = _executions.Where(e => e.FunctionId == functionId).ToList();
         }
+
+        if (!executions.Any())
+            return new ServerlessFunctionStats { FunctionId = functionId, FunctionName = function.Name };
+
+        return new ServerlessFunctionStats
+        {
+            FunctionId = functionId,
+            FunctionName = function.Name,
+            TotalInvocations = function.InvocationCount,
+            ColdStartCount = function.ColdStartCount,
+            ColdStartRate = (double)function.ColdStartCount / function.InvocationCount * 100,
+            AvgDurationMs = executions.Average(e => e.DurationMs),
+            P95DurationMs = executions.OrderBy(e => e.DurationMs).Skip((int)(executions.Count * 0.95)).FirstOrDefault()?.DurationMs ?? 0,
+            AvgMemoryEfficiency = executions.Average(e => e.MemoryEfficiency) * 100
+        };
     }
 
     private void EvaluateOptimizations(string functionId)

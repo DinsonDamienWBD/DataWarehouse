@@ -19,8 +19,11 @@ public sealed class CarbonAwareRegionSelectionStrategy : SustainabilityStrategyB
     /// <inheritdoc/>
     public override SustainabilityCategory Category => SustainabilityCategory.CloudOptimization;
     /// <inheritdoc/>
+    // P2-4405: Removed ExternalIntegration capability flag — carbon data uses time-of-day estimation,
+    // not a real external API. Real external integration (e.g. Electricity Maps, WattTime) requires
+    // an HttpClient with API credentials configured by the user.
     public override SustainabilityCapabilities Capabilities =>
-        SustainabilityCapabilities.CarbonCalculation | SustainabilityCapabilities.ExternalIntegration | SustainabilityCapabilities.PredictiveAnalytics;
+        SustainabilityCapabilities.CarbonCalculation | SustainabilityCapabilities.PredictiveAnalytics;
     /// <inheritdoc/>
     public override string SemanticDescription =>
         "Selects cloud regions based on grid carbon intensity to minimize workload carbon footprint.";

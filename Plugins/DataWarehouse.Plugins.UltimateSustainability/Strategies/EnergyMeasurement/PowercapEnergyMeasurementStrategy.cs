@@ -245,7 +245,8 @@ public sealed class PowercapEnergyMeasurementStrategy : SustainabilityStrategyBa
             try
             {
                 var text = await File.ReadAllTextAsync(path, ct);
-                totalUj += long.Parse(text.Trim());
+                // Finding 4449: TryParse guards against corrupt sysfs values.
+                if (long.TryParse(text.Trim(), out var uj)) totalUj += uj;
             }
             catch (FileNotFoundException ex)
             {
@@ -267,11 +268,17 @@ public sealed class PowercapEnergyMeasurementStrategy : SustainabilityStrategyBa
             try
             {
                 var text = await File.ReadAllTextAsync(_primaryZonePath, ct);
-                totalUj = long.Parse(text.Trim());
+                // Finding 4449: TryParse guards against corrupt sysfs values.
+                if (!long.TryParse(text.Trim(), out totalUj))
+                    throw new InvalidOperationException("Failed to parse primary powercap energy counter value.");
             }
-            catch
+            catch (OperationCanceledException)
             {
-                throw new InvalidOperationException("Failed to read any powercap energy counter.");
+                throw;
+            }
+            catch (Exception ex) when (ex is not InvalidOperationException)
+            {
+                throw new InvalidOperationException("Failed to read any powercap energy counter.", ex);
             }
         }
 

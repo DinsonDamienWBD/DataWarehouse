@@ -154,6 +154,9 @@ public sealed class UltimateEdgeComputingPlugin : OrchestrationPluginBase, EC.IE
     {
         _initialized = false;
         _strategies.Clear();
+        // Cat 7 (finding 2930): dispose node manager to stop health-check timer.
+        if (NodeManager is IDisposable disposable)
+            disposable.Dispose();
         await base.ShutdownAsync(ct);
     }
 
@@ -239,19 +242,29 @@ public sealed class UltimateEdgeComputingPlugin : OrchestrationPluginBase, EC.IE
 
 #region 109.1: Edge Node Management Implementation
 
-internal sealed class EdgeNodeManagerImpl : EC.IEdgeNodeManager
+internal sealed class EdgeNodeManagerImpl : EC.IEdgeNodeManager, IDisposable
 {
     private readonly IMessageBus? _messageBus;
     private readonly BoundedDictionary<string, EC.EdgeNodeInfo> _nodes = new BoundedDictionary<string, EC.EdgeNodeInfo>(1000);
     private readonly BoundedDictionary<string, EC.EdgeCluster> _clusters = new BoundedDictionary<string, EC.EdgeCluster>(1000);
     private readonly Timer _healthCheckTimer;
+    private int _disposed;
 
     public event EventHandler<EC.EdgeNodeStatusChangedEventArgs>? NodeStatusChanged;
 
     public EdgeNodeManagerImpl(IMessageBus? messageBus)
     {
         _messageBus = messageBus;
+        // Cat 7 (finding 2930): timer stored for disposal — caller must Dispose() to stop health-check callbacks.
         _healthCheckTimer = new Timer(PerformHealthChecks, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+    }
+
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        _healthCheckTimer.Change(Timeout.Infinite, Timeout.Infinite);
+        _healthCheckTimer.Dispose();
     }
 
     public async Task<EC.EdgeNodeRegistration> RegisterNodeAsync(EC.EdgeNodeInfo node, CancellationToken ct = default)

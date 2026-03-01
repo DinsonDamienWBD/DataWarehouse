@@ -7,7 +7,8 @@ namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.CloudOptimizat
 public sealed class ReservedCapacityOptimizationStrategy : SustainabilityStrategyBase
 {
     private readonly Dictionary<string, ReservedCapacity> _reservations = new();
-    private readonly List<UsageRecord> _usageHistory = new();
+    // Finding 4451: Queue for O(1) dequeue when capping usage history (vs O(n) List.RemoveAt(0)).
+    private readonly Queue<UsageRecord> _usageHistory = new();
     private readonly object _lock = new();
 
     /// <inheritdoc/>
@@ -69,7 +70,7 @@ public sealed class ReservedCapacityOptimizationStrategy : SustainabilityStrateg
                     : 0
             });
 
-            if (_usageHistory.Count > 10000) _usageHistory.RemoveAt(0);
+            if (_usageHistory.Count > 10000) _usageHistory.Dequeue(); // O(1) vs O(n) RemoveAt(0)
         }
         RecordSample(onDemandCount + reservedCount, 0);
         EvaluateOptimizations();
