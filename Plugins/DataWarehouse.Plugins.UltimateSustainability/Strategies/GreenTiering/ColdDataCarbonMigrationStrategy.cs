@@ -592,12 +592,13 @@ public sealed class ColdDataCarbonMigrationStrategy : SustainabilityStrategyBase
             });
         }
 
-        // Finding 4435: avoid double-materializing; take the last 100 records from
-        // a single snapshot (bounded at MaxHistoryEntries so this is at most 10K entries).
-        var recentHistory = _migrationHistory.ToArray().TakeLast(100).ToArray();
-        if (recentHistory.Length >= 50)
+        // Finding 4435: single snapshot from the bounded queue (at most MaxHistoryEntries entries),
+        // then take the last 100 in-place. The trailing .ToArray() was redundant; TakeLast returns
+        // an IEnumerable and callers below use Count() + indexer — use ToList() once.
+        var recentHistory = _migrationHistory.ToArray().TakeLast(100).ToList();
+        if (recentHistory.Count >= 50)
         {
-            var successRate = recentHistory.Count(r => r.Success) / (double)recentHistory.Length;
+            var successRate = recentHistory.Count(r => r.Success) / (double)recentHistory.Count;
             if (successRate < 0.8)
             {
                 recommendations.Add(new SustainabilityRecommendation
