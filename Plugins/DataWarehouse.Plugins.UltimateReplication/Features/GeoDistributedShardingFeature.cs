@@ -489,7 +489,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
         private async Task<bool> WriteShardToRegionAsync(
             string shardId, byte[] shardData, string regionId, CancellationToken ct)
         {
-            var correlationId = $"shard-write-{shardId}";
+            // Append a unique token so the correlationId is not guessable/injectable
+            // from an attacker-controlled shardId (finding 3707).
+            var correlationId = $"shard-write-{shardId}-{Guid.NewGuid():N}";
             var tcs = new TaskCompletionSource<bool>();
 
             var subscription = _messageBus.Subscribe(StorageWriteResponseTopic, msg =>

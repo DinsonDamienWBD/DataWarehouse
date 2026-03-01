@@ -668,7 +668,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Core
             var dataId = metadata?.GetValueOrDefault("dataId") ?? Guid.NewGuid().ToString();
             var versionId = Guid.NewGuid().ToString("N");
 
-            // Track version chain
+            // Track version chain — cap at 100 versions per dataId to prevent unbounded
+            // memory growth on long-lived deployments (finding 3764).
+            const int MaxVersionsPerChain = 100;
             var chain = _versionChains.GetOrAdd(dataId, _ => new List<DeltaVersion>());
             string? parentId = null;
             byte[] delta = data.ToArray();
@@ -688,6 +690,10 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Core
                 Timestamp = DateTimeOffset.UtcNow,
                 ParentVersionId = parentId
             });
+
+            // Evict oldest versions when the chain exceeds the cap.
+            if (chain.Count > MaxVersionsPerChain)
+                chain.RemoveRange(0, chain.Count - MaxVersionsPerChain);
 
             // Replicate delta (much smaller than full data)
             foreach (var targetId in targetNodeIds)

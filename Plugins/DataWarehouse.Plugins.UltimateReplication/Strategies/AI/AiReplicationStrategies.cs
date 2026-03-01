@@ -472,6 +472,14 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
         private readonly BoundedDictionary<string, (byte[] Data, ReplicationConfig Config)> _dataStore = new BoundedDictionary<string, (byte[] Data, ReplicationConfig Config)>(1000);
         private readonly AdaptiveConfig _config = new();
 
+        // Running aggregates maintained incrementally to avoid O(n) scan on every RecordMetrics call
+        // (finding 3712). Updated atomically via Interlocked where possible.
+        private long _aggTotalReads;
+        private long _aggTotalWrites;
+        private long _aggTotalConflicts;
+        private long _aggTotalOps;       // for conflict rate denominator
+        private long _aggLatencySumMs;   // for average latency
+
         /// <summary>
         /// Workload metrics for adaptation.
         /// </summary>
@@ -544,7 +552,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
         public AdaptiveConfig GetConfig() => _config;
 
         /// <summary>
-        /// Records metrics for adaptation.
+        /// Records metrics for adaptation and updates running aggregates (O(1) per call).
         /// </summary>
         public void RecordMetrics(string key, bool isWrite, TimeSpan latency, bool hadConflict)
         {
@@ -571,19 +579,30 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
                     return metrics;
                 });
 
+            // Update running aggregates in O(1) (finding 3712: avoid O(n) scan in AdaptConfiguration).
+            if (isWrite) Interlocked.Increment(ref _aggTotalWrites);
+            else Interlocked.Increment(ref _aggTotalReads);
+            Interlocked.Add(ref _aggLatencySumMs, (long)latency.TotalMilliseconds);
+            Interlocked.Increment(ref _aggTotalOps);
+            if (hadConflict) Interlocked.Increment(ref _aggTotalConflicts);
+
             // Trigger adaptation if needed
             AdaptConfiguration();
         }
 
         /// <summary>
-        /// Adapts configuration based on workload.
+        /// Adapts configuration based on workload using O(1) running aggregates (finding 3712).
         /// </summary>
         private void AdaptConfiguration()
         {
-            var totalReads = _workloadMetrics.Values.Sum(m => m.TotalReads);
-            var totalWrites = _workloadMetrics.Values.Sum(m => m.TotalWrites);
-            var avgConflictRate = _workloadMetrics.Values.Average(m => m.ConflictRate);
-            var avgLatency = _workloadMetrics.Values.Average(m => m.AverageLatency.TotalMilliseconds);
+            var totalReads = Interlocked.Read(ref _aggTotalReads);
+            var totalWrites = Interlocked.Read(ref _aggTotalWrites);
+            var totalOps = Interlocked.Read(ref _aggTotalOps);
+            var totalConflicts = Interlocked.Read(ref _aggTotalConflicts);
+            var latencySumMs = Interlocked.Read(ref _aggLatencySumMs);
+
+            var avgConflictRate = totalOps > 0 ? (double)totalConflicts / totalOps : 0.0;
+            var avgLatency = totalOps > 0 ? (double)latencySumMs / totalOps : 0.0;
 
             // Adapt replica count based on read/write ratio
             if (totalReads > totalWrites * 10) // Read-heavy
