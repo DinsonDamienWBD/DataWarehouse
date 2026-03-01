@@ -136,7 +136,8 @@ internal sealed class SemanticSyncOrchestrator : IAsyncDisposable, IDisposable
     /// <summary>
     /// Starts the background worker loop that processes sync requests from the channel.
     /// </summary>
-    public void StartAsync()
+    // Cat 15 (finding 1003): renamed from StartAsync() to Start() — void return type makes "Async" suffix a naming lie.
+    public void Start()
     {
         if (_workerTask is not null) return;
 

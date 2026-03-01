@@ -60,6 +60,12 @@ public sealed class UltimateConsensusPlugin : ConsensusPluginBase, IDisposable
     // Each successful proposal increments the counter for that group.
     private long[] _perGroupCommitIndex = Array.Empty<long>();
 
+    // LOW-2227: Election term counter — incremented each time we detect a new leader.
+    // SDK MultiRaftGroupStatus does not expose the Raft election term directly, so this
+    // approximates it via leader-election observations rather than using commitIndex as term.
+    private long _electionTerm;
+    private bool _lastLeaderState;
+
     private bool _disposed;
     private IRaftStrategy _activeStrategy;
 
@@ -258,14 +264,22 @@ public sealed class UltimateConsensusPlugin : ConsensusPluginBase, IDisposable
         var statuses = _multiRaft.GetGroupStatuses();
         var healthyGroups = statuses.Values.Count(s => s.IsHealthy);
         var leaderExists = statuses.Values.Any(s => s.IsLeader);
-        var maxCommitIndex = _perGroupCommitIndex.Length > 0 ? _perGroupCommitIndex.Max() : 0;
+
+        // LOW-2227: Track election term via leader-state transitions rather than using
+        // commitIndex as term (commitIndex ≠ Raft election term).
+        if (leaderExists != _lastLeaderState)
+        {
+            _lastLeaderState = leaderExists;
+            if (leaderExists)
+                Interlocked.Increment(ref _electionTerm);
+        }
 
         return Task.FromResult(new ClusterState
         {
             IsHealthy = healthyGroups == _groupCount,
             LeaderId = leaderExists ? _nodeId : null,
             NodeCount = _groupCount,
-            Term = maxCommitIndex
+            Term = Interlocked.Read(ref _electionTerm)
         });
     }
 

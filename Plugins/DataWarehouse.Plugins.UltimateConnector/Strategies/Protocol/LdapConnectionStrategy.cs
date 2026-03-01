@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,6 +11,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
     /// <summary>
     /// Connection strategy for LDAP directory services.
     /// Tests connectivity via TCP connection to port 389 (or 636 for LDAPS).
+    /// Performs an anonymous LDAPv3 BindRequest to confirm the server speaks LDAP.
     /// </summary>
     public class LdapConnectionStrategy : ConnectionStrategyBase
     {
@@ -29,7 +29,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
 
         /// <inheritdoc/>
         public override string SemanticDescription =>
-            "Connects to LDAP directory services for user and resource directory queries";
+            "Connects to LDAP directory services. Performs anonymous LDAPv3 BindRequest to confirm server identity.";
 
         /// <inheritdoc/>
         public override string[] Tags => new[] { "ldap", "directory", "authentication", "protocol", "ad" };
@@ -51,27 +51,42 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
                 defaultPort, "LDAP");
 
             var client = new TcpClient();
-            await client.ConnectAsync(host, port, ct);
+            await client.ConnectAsync(host, port, ct).ConfigureAwait(false);
 
             if (!client.Connected)
                 throw new InvalidOperationException($"Failed to connect to LDAP server at {host}:{port}");
 
-            var stream = client.GetStream();
+            // P2-2134: Send anonymous LDAPv3 BindRequest and verify BindResponse.
+            // Anonymous bind BER: SEQUENCE { messageID=1, BindRequest { version=3, name="", simple="" } }
+            // Encoding: 30 0C 02 01 01 60 07 02 01 03 04 00 80 00
+            var bindRequest = new byte[] { 0x30, 0x0C, 0x02, 0x01, 0x01, 0x60, 0x07, 0x02, 0x01, 0x03, 0x04, 0x00, 0x80, 0x00 };
 
-            // P2-2134: Perform a real LDAP anonymous BindRequest (RFC 4511 §4.2).
-            // BindRequest PDU (BER-encoded):
-            //   LDAPMessage ::= SEQUENCE { messageID INTEGER, protocolOp BindRequest }
-            //   BindRequest ::= [APPLICATION 0] SEQUENCE { version INTEGER (1..127), name LDAPDN, authentication AuthenticationChoice }
-            //   Anonymous bind: version=3, name="", authentication=simple("")
-            var bindRequest = BuildAnonymousBindRequest(messageId: 1);
+            var stream = client.GetStream();
             await stream.WriteAsync(bindRequest, 0, bindRequest.Length, ct).ConfigureAwait(false);
 
-            // Read BindResponse — minimum 7 bytes (SEQUENCE tag + length + MessageID + BindResponse tag + length + resultCode + matchedDN + diagnosticMessage)
-            var responseBuffer = new byte[256];
-            var bytesRead = await ReadLdapMessageAsync(stream, responseBuffer, ct).ConfigureAwait(false);
+            // Read BindResponse: expect SEQUENCE (0x30) containing BindResponse (0x61)
+            var responseBuffer = new byte[64];
+            var bytesRead = await stream.ReadAsync(responseBuffer, 0, responseBuffer.Length, ct).ConfigureAwait(false);
 
-            // Validate BindResponse resultCode (offset varies; we parse the BER envelope minimally)
-            ParseAndValidateBindResponse(responseBuffer, bytesRead);
+            if (bytesRead < 7)
+                throw new InvalidOperationException($"LDAP server at {host}:{port} returned truncated BindResponse ({bytesRead} bytes)");
+
+            if (responseBuffer[0] != 0x30)
+                throw new InvalidOperationException($"LDAP server at {host}:{port} returned unexpected outer tag 0x{responseBuffer[0]:X2} (expected SEQUENCE 0x30)");
+
+            // Scan for BindResponse tag (0x61) within the first 10 bytes of the response
+            bool isBindResponse = false;
+            for (int i = 0; i < Math.Min(bytesRead - 1, 10); i++)
+            {
+                if (responseBuffer[i] == 0x61) { isBindResponse = true; break; }
+            }
+
+            if (!isBindResponse)
+                throw new InvalidOperationException(
+                    $"LDAP server at {host}:{port} did not return a BindResponse (0x61). Received 0x{responseBuffer[0]:X2}");
+
+            // Non-zero result codes (e.g. 49 = invalidCredentials) are acceptable for connectivity
+            // probing — we confirmed the server speaks LDAPv3.
 
             var info = new Dictionary<string, object>
             {
@@ -79,7 +94,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
                 ["port"] = port,
                 ["protocol"] = useTls ? "LDAPS" : "LDAP",
                 ["tls"] = useTls,
-                ["bind"] = "anonymous",
+                ["bind_performed"] = true,
                 ["connected_at"] = DateTimeOffset.UtcNow
             };
 
@@ -130,6 +145,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
                 Latency: TimeSpan.Zero,
                 CheckedAt: DateTimeOffset.UtcNow);
         }
+
         // P2-2132: IPv6-safe host/port parser. Handles "[::1]:port", "host:port", and "host" forms.
         private static (string host, int port) ParseHostPort(string cs, int defaultPort, string protocol)
         {

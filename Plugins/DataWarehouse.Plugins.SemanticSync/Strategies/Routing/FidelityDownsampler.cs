@@ -97,7 +97,13 @@ internal sealed class FidelityDownsampler
         SyncFidelity to,
         IDictionary<string, string>? metadata)
     {
-        bool isJson = TryParseJson(data.Span, out JsonDocument? doc);
+        // Cat 1 (finding 1021): use metadata content-type hint to skip TryParseJson on known binary data,
+        // making the previously-dead metadata parameter meaningful.
+        var contentType = metadata != null && metadata.TryGetValue("content-type", out var ct) ? ct : null;
+        bool knownBinary = contentType != null && !contentType.Contains("json", StringComparison.OrdinalIgnoreCase)
+                                               && !contentType.Contains("text", StringComparison.OrdinalIgnoreCase);
+        JsonDocument? doc = null;
+        bool isJson = !knownBinary && TryParseJson(data.Span, out doc);
 
         try
         {

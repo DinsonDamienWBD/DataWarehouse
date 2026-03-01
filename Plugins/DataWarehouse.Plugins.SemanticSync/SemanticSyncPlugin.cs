@@ -228,7 +228,7 @@ public sealed class SemanticSyncPlugin : OrchestrationPluginBase
             edgeInference);
 
         _orchestrator = new SemanticSyncOrchestrator(pipeline, _budgetTracker);
-        _orchestrator.StartAsync();
+        _orchestrator.Start();
 
         // Step 6: Subscribe to message bus topics
         SubscribeToTopics();

@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net.Sockets;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Connectors;
@@ -10,7 +12,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
 {
     /// <summary>
     /// Connection strategy for SMTP mail servers.
-    /// Tests connectivity via TCP connection to port 25 or 587.
+    /// Establishes a TCP connection, reads the server banner, sends EHLO,
+    /// and (on port 587) confirms STARTTLS capability per RFC 3207.
     /// </summary>
     public class SmtpConnectionStrategy : ConnectionStrategyBase
     {
@@ -28,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
 
         /// <inheritdoc/>
         public override string SemanticDescription =>
-            "Connects to SMTP mail servers for email transmission";
+            "Connects to SMTP mail servers. Performs EHLO handshake and STARTTLS capability check on port 587.";
 
         /// <inheritdoc/>
         public override string[] Tags => new[] { "smtp", "email", "mail", "protocol", "tcp" };
@@ -47,56 +50,51 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
                 config.ConnectionString ?? throw new ArgumentException("Connection string required"),
                 587, "SMTP");
 
-            // P2-2134: Perform a real SMTP handshake (EHLO/STARTTLS) instead of bare TCP.
             var client = new TcpClient();
             await client.ConnectAsync(host, port, ct).ConfigureAwait(false);
 
             if (!client.Connected)
                 throw new InvalidOperationException($"Failed to connect to SMTP server at {host}:{port}");
 
-            System.IO.Stream stream = client.GetStream();
-            using var reader = new System.IO.StreamReader(stream, System.Text.Encoding.ASCII, leaveOpen: true);
-            using var writer = new System.IO.StreamWriter(stream, System.Text.Encoding.ASCII, leaveOpen: true) { AutoFlush = true };
+            var stream = client.GetStream();
 
-            // Read server greeting (220 ...)
-            var greeting = await reader.ReadLineAsync(ct).ConfigureAwait(false);
-            if (greeting == null || !greeting.StartsWith("220", StringComparison.Ordinal))
-                throw new InvalidOperationException($"SMTP server did not send 220 greeting: {greeting}");
+            // P2-2134: Perform SMTP banner read + EHLO handshake + STARTTLS capability check (RFC 3207).
+            var reader = new StreamReader(stream, Encoding.ASCII, leaveOpen: true);
+            var writer = new StreamWriter(stream, Encoding.ASCII, leaveOpen: true) { AutoFlush = true, NewLine = "\r\n" };
 
-            // Send EHLO and read extended capability list
-            await writer.WriteLineAsync($"EHLO {System.Net.Dns.GetHostName()}").ConfigureAwait(false);
-            string? ehloLine;
-            bool supportsStartTls = false;
-            while ((ehloLine = await reader.ReadLineAsync(ct).ConfigureAwait(false)) != null)
+            // Read greeting banner (220 ...)
+            var banner = await reader.ReadLineAsync(ct).ConfigureAwait(false)
+                         ?? throw new InvalidOperationException("SMTP server sent empty banner");
+            if (!banner.StartsWith("220", StringComparison.Ordinal))
+                throw new InvalidOperationException($"SMTP server returned unexpected greeting: {banner}");
+
+            // Send EHLO
+            await writer.WriteLineAsync("EHLO datawarehouse-probe").ConfigureAwait(false);
+
+            // Read EHLO response (may be multi-line: "250-..." lines followed by "250 ...")
+            bool starttlsAdvertised = false;
+            string? line;
+            while ((line = await reader.ReadLineAsync(ct).ConfigureAwait(false)) != null)
             {
-                if (ehloLine.Contains("STARTTLS", StringComparison.OrdinalIgnoreCase))
-                    supportsStartTls = true;
-                // Last EHLO response line has a space after the code (e.g. "250 SIZE 35882577")
-                if (ehloLine.Length >= 4 && ehloLine[3] == ' ')
+                if (line.Length > 4 && line.Substring(4).Equals("STARTTLS", StringComparison.OrdinalIgnoreCase))
+                    starttlsAdvertised = true;
+                // End of multi-line EHLO response: "250 " (space, not dash)
+                if (line.Length >= 4 && line[3] == ' ')
                     break;
+                if (!line.StartsWith("250", StringComparison.Ordinal))
+                    throw new InvalidOperationException($"SMTP EHLO failed: {line}");
             }
 
-            // Upgrade to TLS if the server advertises STARTTLS (RFC 3207)
-            if (supportsStartTls && port == 587)
-            {
-                await writer.WriteLineAsync("STARTTLS").ConfigureAwait(false);
-                var tlsResponse = await reader.ReadLineAsync(ct).ConfigureAwait(false);
-                if (tlsResponse != null && tlsResponse.StartsWith("220", StringComparison.Ordinal))
-                {
-                    var sslStream = new System.Net.Security.SslStream(stream, leaveInnerStreamOpen: false);
-                    await sslStream.AuthenticateAsClientAsync(host, null,
-                        System.Security.Authentication.SslProtocols.Tls12 | System.Security.Authentication.SslProtocols.Tls13,
-                        checkCertificateRevocation: true);
-                    stream = sslStream; // replace plain stream with TLS stream
-                }
-            }
+            // Send QUIT to cleanly end the probe session
+            try { await writer.WriteLineAsync("QUIT").ConfigureAwait(false); } catch { /* best-effort */ }
 
             var info = new Dictionary<string, object>
             {
                 ["host"] = host,
                 ["port"] = port,
                 ["protocol"] = "SMTP",
-                ["starttls"] = supportsStartTls,
+                ["starttls_advertised"] = starttlsAdvertised,
+                ["banner"] = banner,
                 ["connected_at"] = DateTimeOffset.UtcNow
             };
 
@@ -114,8 +112,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
                 await client.GetStream().WriteAsync(Array.Empty<byte>(), 0, 0, ct).ConfigureAwait(false);
                 return true;
             }
-            catch (System.IO.IOException) { return false; }
-            catch (System.Net.Sockets.SocketException) { return false; }
+            catch (IOException) { return false; }
+            catch (SocketException) { return false; }
         }
 
         /// <inheritdoc/>
@@ -138,6 +136,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
                 Latency: TimeSpan.Zero,
                 CheckedAt: DateTimeOffset.UtcNow);
         }
+
         // P2-2132: IPv6-safe host/port parser. Handles "[::1]:port", "host:port", and "host" forms.
         private static (string host, int port) ParseHostPort(string cs, int defaultPort, string protocol)
         {

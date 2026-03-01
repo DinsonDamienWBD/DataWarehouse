@@ -198,7 +198,12 @@ public interface IStorageOptimizer
     /// <summary>
     /// Sends a TRIM command to discard unused blocks.
     /// </summary>
-    /// <param name="devicePath">Path to the storage device.</param>
+    /// <param name="devicePath">
+    /// Path to the storage device (e.g. "/dev/sda" on Linux, "\\.\PhysicalDrive0" on Windows).
+    /// Cat 14 (finding 939): implementations MUST validate that this path is an absolute device path
+    /// and reject paths containing path traversal components (e.g. ".."), symbolic links outside
+    /// approved device directories, or any user-controlled value that has not been allowlisted.
+    /// </param>
     /// <param name="offset">Offset in bytes to start trimming.</param>
     /// <param name="length">Length in bytes to trim.</param>
     Task TrimAsync(string devicePath, long offset, long length);

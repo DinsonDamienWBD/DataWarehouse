@@ -240,11 +240,13 @@ public sealed class AdaptiveFidelityController : SemanticSyncStrategyBase, ISync
     /// Drops one fidelity level (e.g., Full -> Detailed, Detailed -> Standard).
     /// Cannot go below <see cref="SyncFidelity.Metadata"/>.
     /// </summary>
+    // Cat 15 (finding 1020): use Enum.GetValues max to avoid breaking if SyncFidelity enum is extended.
+    private static readonly int _maxFidelityValue = Enum.GetValues<SyncFidelity>().Cast<int>().Max();
+
     private static SyncFidelity DropOneFidelityLevel(SyncFidelity current)
     {
         int next = (int)current + 1;
-        int maxValue = (int)SyncFidelity.Metadata;
-        return (SyncFidelity)Math.Min(next, maxValue);
+        return (SyncFidelity)Math.Min(next, _maxFidelityValue);
     }
 
     /// <summary>
