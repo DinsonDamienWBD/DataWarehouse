@@ -745,11 +745,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
 
             if (!string.IsNullOrEmpty(_customDomain))
             {
-                return $"https://{_customDomain}/{key}";
+                return $"https://{_customDomain}/{Uri.EscapeDataString(key)}";
             }
             else if (!string.IsNullOrEmpty(_cdnEndpoint))
             {
-                return $"https://{_cdnEndpoint}/{key}";
+                return $"https://{_cdnEndpoint}/{Uri.EscapeDataString(key)}";
             }
 
             return null;
@@ -763,7 +763,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
         public string GetDirectUrl(string key)
         {
             ValidateKey(key);
-            return $"https://{_bucket}.{_endpoint}/{key}";
+            return $"https://{_bucket}.{_endpoint}/{Uri.EscapeDataString(key)}";
         }
 
         /// <summary>

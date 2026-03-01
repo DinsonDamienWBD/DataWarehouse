@@ -221,7 +221,8 @@ internal sealed class TeamsChannelStrategy : SdkInterface.InterfaceStrategyBase,
     /// <summary>
     /// Handles invoke activities (Adaptive Card actions, task modules).
     /// </summary>
-    private async Task<SdkInterface.InterfaceResponse> HandleInvokeActivityAsync(
+    // Cat 15 (finding 3287): removed spurious async — no await in body.
+    private Task<SdkInterface.InterfaceResponse> HandleInvokeActivityAsync(
         JsonElement activity,
         CancellationToken cancellationToken)
     {
@@ -268,11 +269,11 @@ internal sealed class TeamsChannelStrategy : SdkInterface.InterfaceStrategyBase,
             };
 
             var responseBody = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(taskModule));
-            return new SdkInterface.InterfaceResponse(
+            return Task.FromResult(new SdkInterface.InterfaceResponse(
                 StatusCode: 200,
                 Headers: new Dictionary<string, string> { ["Content-Type"] = "application/json" },
                 Body: responseBody
-            );
+            ));
         }
         else if (invokeName == "task/submit")
         {
@@ -290,25 +291,26 @@ internal sealed class TeamsChannelStrategy : SdkInterface.InterfaceStrategyBase,
             };
 
             var responseBody = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(response));
-            return new SdkInterface.InterfaceResponse(
+            return Task.FromResult(new SdkInterface.InterfaceResponse(
                 StatusCode: 200,
                 Headers: new Dictionary<string, string> { ["Content-Type"] = "application/json" },
                 Body: responseBody
-            );
+            ));
         }
 
         // Acknowledge other invoke types
-        return new SdkInterface.InterfaceResponse(
+        return Task.FromResult(new SdkInterface.InterfaceResponse(
             StatusCode: 200,
             Headers: new Dictionary<string, string> { ["Content-Type"] = "application/json" },
             Body: Encoding.UTF8.GetBytes("{}")
-        );
+        ));
     }
 
     /// <summary>
     /// Handles conversation update activities (member added/removed).
     /// </summary>
-    private async Task<SdkInterface.InterfaceResponse> HandleConversationUpdateAsync(
+    // Cat 15 (finding 3287): removed spurious async — no await in body.
+    private Task<SdkInterface.InterfaceResponse> HandleConversationUpdateAsync(
         JsonElement activity,
         CancellationToken cancellationToken)
     {
@@ -352,19 +354,19 @@ internal sealed class TeamsChannelStrategy : SdkInterface.InterfaceStrategyBase,
             };
 
             var responseBody = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(response));
-            return new SdkInterface.InterfaceResponse(
+            return Task.FromResult(new SdkInterface.InterfaceResponse(
                 StatusCode: 200,
                 Headers: new Dictionary<string, string> { ["Content-Type"] = "application/json" },
                 Body: responseBody
-            );
+            ));
         }
 
         // Acknowledge other conversation updates
-        return new SdkInterface.InterfaceResponse(
+        return Task.FromResult(new SdkInterface.InterfaceResponse(
             StatusCode: 200,
             Headers: new Dictionary<string, string> { ["Content-Type"] = "application/json" },
             Body: Encoding.UTF8.GetBytes("{}")
-        );
+        ));
     }
 
     /// <summary>

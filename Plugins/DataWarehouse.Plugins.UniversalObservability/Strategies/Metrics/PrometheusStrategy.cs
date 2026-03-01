@@ -17,7 +17,8 @@ public sealed class PrometheusStrategy : ObservabilityStrategyBase
 {
     private readonly BoundedDictionary<string, double> _counters = new BoundedDictionary<string, double>(1000);
     private readonly BoundedDictionary<string, double> _gauges = new BoundedDictionary<string, double>(1000);
-    private readonly BoundedDictionary<string, List<double>> _histogramBuckets = new BoundedDictionary<string, List<double>>(1000);
+    // P2-4633: Use Queue<double> for O(1) dequeue when capping observation history.
+    private readonly BoundedDictionary<string, Queue<double>> _histogramBuckets = new BoundedDictionary<string, Queue<double>>(1000);
     private readonly HttpClient _httpClient;
     private string _pushGatewayUrl = "http://localhost:9091";
     private string _jobName = "datawarehouse";
@@ -101,41 +102,48 @@ public sealed class PrometheusStrategy : ObservabilityStrategyBase
         await PushMetricsAsync(metricsText.ToString(), cancellationToken);
     }
 
-    // P2-4633: Cap histogram observation list to prevent unbounded memory growth.
+    // P2-4633: Cap at 10k observations. Queue<double> gives O(1) dequeue vs O(n) List.RemoveAt(0).
     private const int MaxHistogramObservations = 10_000;
+    private static readonly double[] BucketBoundaries = { 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10 };
 
     private void RecordHistogram(string metricName, string labelString, double value, StringBuilder metricsText)
     {
         var bucketKey = $"{metricName}{labelString}";
-        var buckets = _histogramBuckets.GetOrAdd(bucketKey, _ => new List<double>());
+        var buckets = _histogramBuckets.GetOrAdd(bucketKey, _ => new Queue<double>());
 
+        // Snapshot under lock, compute counts outside lock to minimise contention.
+        double[] snapshot;
         lock (buckets)
         {
             if (buckets.Count >= MaxHistogramObservations)
-                buckets.RemoveAt(0); // drop oldest to keep bounded
-            buckets.Add(value);
+                buckets.Dequeue(); // O(1) vs O(n) RemoveAt(0)
+            buckets.Enqueue(value);
+            snapshot = buckets.ToArray();
         }
 
-        // Standard histogram buckets
-        var bucketBoundaries = new[] { 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10 };
+        // P2-4633: Single sorted pass O(n log n) instead of O(n*b) repeated LINQ per boundary.
+        Array.Sort(snapshot);
+        long count = snapshot.Length;
+        double sum = 0;
+        foreach (var v in snapshot) sum += v;
 
-        metricsText.AppendLine($"# TYPE {metricName} histogram");
-
-        lock (buckets)
+        // Compute cumulative bucket counts with a single pointer advance.
+        var bucketCounts = new long[BucketBoundaries.Length];
+        int ptr = 0;
+        for (int b = 0; b < BucketBoundaries.Length; b++)
         {
-            var count = buckets.Count;
-            var sum = buckets.Sum();
-
-            foreach (var boundary in bucketBoundaries)
-            {
-                var bucketCount = buckets.Count(v => v <= boundary);
-                metricsText.AppendLine($"{metricName}_bucket{{le=\"{boundary}\"{(labelString.Length > 2 ? "," + labelString.Substring(1, labelString.Length - 2) : "")}}} {bucketCount}");
-            }
-
-            metricsText.AppendLine($"{metricName}_bucket{{le=\"+Inf\"{(labelString.Length > 2 ? "," + labelString.Substring(1, labelString.Length - 2) : "")}}} {count}");
-            metricsText.AppendLine($"{metricName}_sum{labelString} {sum}");
-            metricsText.AppendLine($"{metricName}_count{labelString} {count}");
+            while (ptr < snapshot.Length && snapshot[ptr] <= BucketBoundaries[b])
+                ptr++;
+            bucketCounts[b] = ptr;
         }
+
+        var labelInner = labelString.Length > 2 ? "," + labelString.Substring(1, labelString.Length - 2) : "";
+        metricsText.AppendLine($"# TYPE {metricName} histogram");
+        for (int b = 0; b < BucketBoundaries.Length; b++)
+            metricsText.AppendLine($"{metricName}_bucket{{le=\"{BucketBoundaries[b]}\"{labelInner}}} {bucketCounts[b]}");
+        metricsText.AppendLine($"{metricName}_bucket{{le=\"+Inf\"{labelInner}}} {count}");
+        metricsText.AppendLine($"{metricName}_sum{labelString} {sum}");
+        metricsText.AppendLine($"{metricName}_count{labelString} {count}");
     }
 
     private async Task PushMetricsAsync(string metricsText, CancellationToken ct)

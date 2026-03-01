@@ -2324,7 +2324,7 @@
 | 1363 | 9 | P2 | `UltimateBlockchain/Services/ComplianceGapAnalyzer.cs:56-62` | `HttpClient` created per-call in `AnalyzeComplianceGapsAsync` — socket exhaustion under load. | [X]
 | 1364 | 2 | P2 | `UltimateCompliance/Reporting/ComplianceReportGenerator.cs:89-95` | `_reportCache` is `Dictionary<string, byte[]>` without size bounds. Large report generation caches grow unbounded. | [X]
 | 1365 | 2 | P2 | `UltimateCompliance/Reporting/ComplianceReportGenerator.cs:155-165` | `GenerateCsvReportAsync` does not escape fields containing commas, quotes, or newlines. Broken CSV output. | [X]
-| 1366 | 10 | LOW | `UltimateBlockchain/Scaling/BlockchainScalingManager.cs:201-212` | Metric `cache.block.hitRate` computed inline — HitRatio already available from `CacheStatistics`. Redundant. | [ ]
+| 1366 | 10 | LOW | `UltimateBlockchain/Scaling/BlockchainScalingManager.cs:201-212` | Metric `cache.block.hitRate` computed inline — HitRatio already available from `CacheStatistics`. Redundant. | [X]
 | 1367 | 10 | LOW | `UltimateCompliance/Reporting/ComplianceReportGenerator.cs:42` | `TamperProofAuditLog` is a `List<string>` — thread-unsafe for concurrent report generation, and "tamper-proof" name is misleading for an in-memory list. | [X]
 
 **Clean files:** DataSovereigntyEnforcer, ComplianceMigrationGuide
@@ -2467,7 +2467,7 @@
 | 1456 | 12 | P2 | `UltimateCompliance/Strategies/Innovation/DigitalTwinComplianceStrategy.cs:40-55` | Redundant double-lookup of `HasDigitalTwin` attribute. Second TryGetValue unnecessary. | [X]
 | 1457 | 12 | P2 | `UltimateCompliance/Strategies/Innovation/SelfHealingComplianceStrategy.cs:55-71` | Same redundant double-lookup: `AutoRemediationEnabled` looked up twice. | [X]
 | 1458 | 13 | P2 | `UltimateCompliance/Strategies/Innovation/QuantumProofAuditStrategy.cs:134,143` | Per-call array allocations `new[] { "Dilithium", ... }`. Should be `static readonly` fields. | [X]
-| 1459 | 15 | LOW | `BlockchainAuditTrailStrategy, QuantumProofAuditStrategy, SelfHealingComplianceStrategy` | `GetConfigValue<T>` identical copy-pasted into 3 files. Should be on base class. | [ ]
+| 1459 | 15 | LOW | `BlockchainAuditTrailStrategy, QuantumProofAuditStrategy, SelfHealingComplianceStrategy` | `GetConfigValue<T>` identical copy-pasted into 3 files. Should be on base class. | [X]
 
 **Clean files:** None fully clean (all share #1450/#1453). Least issues: PredictiveComplianceStrategy, PrivacyPreservingAuditStrategy, RegTechIntegrationStrategy, RealTimeComplianceStrategy
 
@@ -2636,7 +2636,7 @@
 | 1565 | 14 | LOW | `UltimateCompliance/Strategies/USState/NyShieldStrategy.cs:37` | `EncryptionImplemented` checked unconditionally for every operation type. False positives for read/audit operations. | [X]
 | 1566 | 14 | LOW | `UltimateCompliance/Strategies/WORM/Sec17a4WormStrategy.cs:59-71` | Retention period check uses `is int` pattern match. `long`/`double` from JSON deserializer silently fails. Same in FinraWormStrategy. | [X]
 | 1567 | 13 | LOW | `UltimateCompliance/Strategies/WORM/FinraWormStrategy.cs:158-184` + `Sec17a4WormStrategy.cs:161-184` | `GenerateRecommendations` O(N×M) using `violations.Any()` per check code. Should use HashSet. | [X]
-| 1568 | 15 | LOW | `All 15 files` | Mixed indentation: `InitializeAsyncCore`/`ShutdownAsyncCore` at shallower indent than class body. Systemic formatting issue. | [ ]
+| 1568 | 15 | LOW | `All 15 files` | Mixed indentation: `InitializeAsyncCore`/`ShutdownAsyncCore` at shallower indent than class body. Systemic formatting issue. | [X]
 
 **Clean files:** None fully clean. Least issues: all USState strategies share only systemic issues (#1560, #1563, #1568).
 
@@ -2915,7 +2915,7 @@
 | # | Cat | Sev | File:Line | Description |
 |---|-----|-----|-----------|-------------|
 | 1746 | 15 | LOW | `UltimateCompute/Strategies/WasmLanguages/Tier2/TypeScriptWasmLanguageStrategy.cs:48-50` | `PerformanceTier: NearNative` accurate only for AssemblyScript path. Javy/QuickJS path is `Interpreted` performance. Misleading to callers selecting by tier. | [X]
-| 1747 | 15 | LOW | All 15 leaf WasmLanguage strategies | `VerifyLanguageAsync` uses generic nop WASM module — verifies wasmtime itself, not language-specific toolchain (Javy, TeaVM, CPython). Reports `CompilationSuccessful: true` even without toolchains installed. Contract lie in verification method name. | [ ]
+| 1747 | 15 | LOW | All 15 leaf WasmLanguage strategies | `VerifyLanguageAsync` uses generic nop WASM module — verifies wasmtime itself, not language-specific toolchain (Javy, TeaVM, CPython). Reports `CompilationSuccessful: true` even without toolchains installed. Contract lie in verification method name. | [X]
 
 **Clean files:** All 15 files are pure metadata/sample registrations delegating to WasmLanguageStrategyBase. JavaScriptWasmLanguageStrategy, JavaWasmLanguageStrategy, KotlinWasmLanguageStrategy, LuaWasmLanguageStrategy, MoonBitWasmLanguageStrategy, OCamlWasmLanguageStrategy, PhpWasmLanguageStrategy, PythonWasmLanguageStrategy, RubyWasmLanguageStrategy, SwiftWasmLanguageStrategy, AdaWasmLanguageStrategy, CrystalWasmLanguageStrategy, ElixirWasmLanguageStrategy, FortranWasmLanguageStrategy
 
@@ -3526,8 +3526,8 @@
 | 2161 | 13 | P2 | `UltimateConnector/Strategies/SaaS/SalesforceConnectionStrategy.cs:135-187` | `ExecuteSoqlAsync` URL-encodes full SOQL into GET query string. Long queries exceed proxy URL limits. Should use POST for large queries. | [X]
 | 2162 | 14 | P2 | `UltimateConnector/Strategies/SaaS/JiraConnectionStrategy.cs:99-138` | `jql` serialized directly — empty/whitespace produces unhelpful Jira error. Missing `ArgumentException` guard. | [X]
 | 2163 | 14 | P2 | `UltimateConnector/Strategies/SaaS/SapConnectionStrategy.cs:120-169` | `$select={select}` not URL-encoded (contrast: `$filter` correctly uses `Uri.EscapeDataString`). Special chars produce malformed OData query. | [X]
-| 2164 | - | LOW | **SYSTEMIC** `DisconnectCoreAsync` — All 15 files | `await Task.CompletedTask` in async method with only synchronous work — unnecessary state machine. | [ ]
-| 2165 | - | LOW | **SYSTEMIC** All 11 simple strategies | Single-line multi-statement method bodies severely harm readability. | [ ]
+| 2164 | - | LOW | **SYSTEMIC** `DisconnectCoreAsync` — All 15 files | `await Task.CompletedTask` in async method with only synchronous work — unnecessary state machine. | [X]
+| 2165 | - | LOW | **SYSTEMIC** All 11 simple strategies | Single-line multi-statement method bodies severely harm readability. | [X]
 | 2166 | - | LOW | `UltimateConnector/Strategies/SaaS/GitHubConnectionStrategy.cs:257` | `Full_Name`, `Html_Url`, `Default_Branch` — snake_case in C# record. Should use PascalCase with `[JsonPropertyName]` attributes. | [X]
 
 **Clean files:** None — all 15 files have findings.
@@ -3713,7 +3713,7 @@
 | 2273 | 12 | P2 | `UltimateDataGovernance/Strategies/IntelligentGovernance/AutoPurgeStrategies.cs:683-685` | Urgency comparison relies on undocumented enum ordinal ordering (`Immediate=0 < High=1 < ...`). Future enum reorder silently inverts selection. | [X]
 | 2274 | 13 | P2 | `UltimateDataGovernance/Strategies/IntelligentGovernance/ConsciousnessScoringEngine.cs:244-247` | `IncrementCounter(name, amount)` uses serial for-loop of single increments. O(n) for large batches. Use `Interlocked.Add`. | [X]
 | 2275 | 14 | P2 | `UltimateDataGovernance/Strategies/IntelligentGovernance/LiabilityScoringStrategies.cs:68-69` | CVV pattern `\b\d{3,4}\b` matches any 3-4 digit number (zip codes, years, ports). Massive false-positive rate inflates PCI liability scores. | [X]
-| 2276 | 1 | LOW | **SYSTEMIC** — AuditReportingStrategies.cs, DataClassificationStrategies.cs, DataOwnershipStrategies.cs, DataStewardshipStrategies.cs | Metadata-only shells with zero behavioral logic. Acceptable only if `DataGovernanceStrategyBase` has complete non-placeholder default. | [ ]
+| 2276 | 1 | LOW | **SYSTEMIC** — AuditReportingStrategies.cs, DataClassificationStrategies.cs, DataOwnershipStrategies.cs, DataStewardshipStrategies.cs | Metadata-only shells with zero behavioral logic. Acceptable only if `DataGovernanceStrategyBase` has complete non-placeholder default. | [X]
 | 2277 | 9 | LOW | `UltimateDataGovernance/Strategies/IntelligentGovernance/AutoPurgeStrategies.cs:699-710` | No-purge decision hardcodes `Reason: PurgeReason.ToxicData` even though neither strategy triggered. Misleading reason field. | [X]
 | 2278 | 9 | LOW | `UltimateDataGovernance/Strategies/IntelligentGovernance/AutoArchiveStrategies.cs:467-471` | `_transitionLog` AddOrUpdate mutates inner List without lock. Concurrent AddOrUpdate callers corrupt list. `GetTransitionHistory` reads without lock. | [X]
 | 2279 | 12 | LOW | `UltimateDataGovernance/Strategies/IntelligentGovernance/IntelligentGovernanceStrategies.cs:604-610` | `AddRuleInternal` mutates `List<ClassificationRule>` in `_rules` AddOrUpdate factory without lock. Concurrent post-construction `AddRule` calls race. `Classify` iterates without lock. | [X]
@@ -3821,11 +3821,11 @@
 | 2351 | 12 | P2 | `UltimateDataLineage/Scaling/LineageScalingManager.cs:407-413` | `FilterEdgesByDirection` ignores direction parameter entirely. Returns all edges regardless of Upstream/Downstream. Caller gets incorrect results silently. | [X]
 | 2352 | 14 | P2 | `UltimateDataIntegration/UltimateDataIntegrationPlugin.cs:326` | `RecordOperation(string operationName)` increments `_totalWrites` but `operationName` parameter never used. Contract lie. | [X]
 | 2353 | 15 | P2 | `UltimateDataLineage/Scaling/LineageScalingManager.cs:371-387` | `AutoExpandPartition` sets capacity in dict but never creates new BoundedCache with that capacity. Name promises expansion but none occurs. Metrics report inflated capacity. | [X]
-| 2354 | 13 | LOW | `UltimateDataIntegrity/Hashing/HashProviders.cs:609,617` | HMAC-SHA3 providers buffer entire stream into MemoryStream before hashing. Should use streaming BlockUpdate like standard SHA-3. | [ ]
+| 2354 | 13 | LOW | `UltimateDataIntegrity/Hashing/HashProviders.cs:609,617` | HMAC-SHA3 providers buffer entire stream into MemoryStream before hashing. Should use streaming BlockUpdate like standard SHA-3. | [X]
 | 2355 | 14 | LOW | `UltimateDataLineage/Scaling/LineageScalingManager.cs:191-202` | `PutNodeAsync` increments `_totalNodeCount` unconditionally. Overwrites double-count actual distinct nodes. | [X]
 | 2356 | 14 | LOW | `UltimateDataLineage/Composition/ProvenanceCertificateService.cs:305` | `HandleCertificateRequestAsync` accesses `message.Payload["objectId"]` with indexer -- throws KeyNotFoundException if absent. Should use TryGetValue. | [X]
 | 2357 | 4 | LOW | `UltimateDataLineage/Composition/ProvenanceCertificateService.cs:337-351` | `ComputeCertificateHash` uses SHA256 while rest of system uses SHA-3/Keccak. Bypasses established integrity plugin. Inconsistency. | [X]
-| 2358 | 12 | LOW | `UltimateDataLake/UltimateDataLakePlugin.cs:402,443` | Missing space before `==` operator in category filters. Formatter not applied. | [ ]
+| 2358 | 12 | LOW | `UltimateDataLake/UltimateDataLakePlugin.cs:402,443` | Missing space before `==` operator in category filters. Formatter not applied. | [X]
 
 **Clean files:** UltimateDataIntegrityPlugin.cs, DataLakeArchitectureStrategies.cs, DataCatalogStrategies.cs, DataLakeGovernanceStrategies.cs, LakeWarehouseIntegrationStrategies.cs, DataLineageStrategies.cs, SchemaOnReadStrategies.cs, DataLakeSecurityStrategies.cs, DataLakeZoneStrategies.cs
 
@@ -4058,9 +4058,9 @@
 | 2516 | 2 | P2 | `UltimateDataPrivacy/Strategies/DifferentialPrivacy/DifferentialPrivacyEnhancedStrategies.cs:89-92` | `_queryHistory.AddOrUpdate` initial-value lambda outside lock. Two concurrent first-calls for same key can drop a query. | [X]
 | 2517 | 10 | P2 | `UltimateDataPrivacy/Strategies/DifferentialPrivacy/DifferentialPrivacyEnhancedStrategies.cs:51-115` | `ConsumePrivacy` performs budget check and update as two separate non-atomic operations. Concurrent callers can overshoot privacy budget. | [X]
 | 2518 | 13 | P2 | `UltimateDataPrivacy/Strategies/DifferentialPrivacy/DifferentialPrivacyEnhancedStrategies.cs:416-439` | `PiiDetectionStrategy.Scan` compiles new Regex per call in nested loop over all PII patterns. Should pre-compile. | [X]
-| 2519 | 14 | LOW | `UltimateDataPrivacy/Strategies/DifferentialPrivacy/DifferentialPrivacyEnhancedStrategies.cs:29-45` | `InitializeBudget` no validation that `totalEpsilon > 0` or `totalDelta >= 0`. Zero/negative epsilon produces nonsensical results. | [ ]
-| 2520 | 14 | LOW | `UltimateDataPrivacy/Strategies/DifferentialPrivacy/DifferentialPrivacyEnhancedStrategies.cs:213-239` | `SubmitContribution` no finite check on `value`. NaN/Infinity corrupts aggregate result. | [ ]
-| 2521 | 15 | LOW | `UltimateDataPrivacy/Strategies/DifferentialPrivacy/DifferentialPrivacyEnhancedStrategies.cs:384-406` | `PiiDetectionStrategy` has `Category = DifferentialPrivacy` but PII detection is classification, not DP. Misleading category. | [ ]
+| 2519 | 14 | LOW | `UltimateDataPrivacy/Strategies/DifferentialPrivacy/DifferentialPrivacyEnhancedStrategies.cs:29-45` | `InitializeBudget` no validation that `totalEpsilon > 0` or `totalDelta >= 0`. Zero/negative epsilon produces nonsensical results. | [X]
+| 2520 | 14 | LOW | `UltimateDataPrivacy/Strategies/DifferentialPrivacy/DifferentialPrivacyEnhancedStrategies.cs:213-239` | `SubmitContribution` no finite check on `value`. NaN/Infinity corrupts aggregate result. | [X]
+| 2521 | 15 | LOW | `UltimateDataPrivacy/Strategies/DifferentialPrivacy/DifferentialPrivacyEnhancedStrategies.cs:384-406` | `PiiDetectionStrategy` has `Category = DifferentialPrivacy` but PII detection is classification, not DP. Misleading category. | [X]
 
 **Clean files:** CrossDomainSharingStrategies.cs, DataProductStrategies.cs, DomainDiscoveryStrategies.cs, DomainOwnershipStrategies.cs, FederatedGovernanceStrategies.cs, MeshObservabilityStrategies.cs, MeshSecurityStrategies.cs, SelfServeStrategies.cs, AnonymizationStrategies.cs, DifferentialPrivacyStrategies.cs, MaskingStrategies.cs
 
@@ -4259,8 +4259,8 @@
 | 2663 | 15 | LOW | `UltimateDataQuality/Strategies/Monitoring/MonitoringStrategies.cs:464-513` | `CalculateTrend` hardcoded 5% threshold not configurable. Applies same to all metric ranges. | [X]
 | 2664 | 15 | LOW | `UltimateDataQuality/Strategies/Standardization/StandardizationStrategies.cs:51` | Property `StandardizedValue_` trailing underscore clashes with enclosing class name. Naming violation. | [X]
 | 2665 | 14 | LOW | `UltimateDataQuality/Strategies/Profiling/ProfilingStrategies.cs:575-604` | `ProfileNumeric` uses `sorted[n/4]` for Q1/Q3. No interpolation. Incorrect quartiles for small datasets. | [X]
-| 2666 | 7 | LOW | `UltimateDataTransit/Layers/CompressionInTransitLayer.cs:93-107` | `compressedStream` not disposed if `TransferAsync` throws. Missing using/try-finally. | [ ]
-| 2667 | 7 | LOW | `UltimateDataTransit/Layers/EncryptionInTransitLayer.cs:219` | Plaintext byte array not zeroed after encryption. Sensitive data remains in GC-reachable memory until collected. | [ ]
+| 2666 | 7 | LOW | `UltimateDataTransit/Layers/CompressionInTransitLayer.cs:93-107` | `compressedStream` not disposed if `TransferAsync` throws. Missing using/try-finally. | [X]
+| 2667 | 7 | LOW | `UltimateDataTransit/Layers/EncryptionInTransitLayer.cs:219` | Plaintext byte array not zeroed after encryption. Sensitive data remains in GC-reachable memory until collected. | [X]
 
 **Clean files:** CostAwareRouter.cs, TransitScalingMigration.cs
 
@@ -4287,9 +4287,9 @@
 | 2682 | 13 | P2 | `UltimateDataTransit/Strategies/DeltaDifferentialStrategy.cs:382` | `ComputeDeltaInstructions` recomputes `Adler32` over full block per byte position instead of using implemented `RollHash` O(1) update. O(n) degrades to O(n×blockSize). | [X]
 | 2683 | 7 | P2 | `UltimateDataTransit/Strategies/GrpcStreamingTransitStrategy.cs:140-142` | Pull-mode `HttpResponseMessage` never disposed. Same in `Http3TransitStrategy.cs:136-138`. | [X]
 | 2684 | 2 | P2 | `UltimateDatabaseProtocol/DatabaseProtocolStrategyBase.cs:997` | `ResetStatistics` writes `_lastUpdateTime` without lock/volatile. Technically undefined in C# memory model. | [X]
-| 2685 | 12 | LOW | `UltimateDataTransit/UltimateDataTransitPlugin.cs:789-793` | `TransferAsync(string key, ...)` returns hardcoded `"delegated-to-strategy"` without delegating. Rule 13 placeholder. | [ ]
-| 2686 | 14 | LOW | `UltimateDataTransit/Strategies/ChunkedResumableStrategy.cs:637-646` | `DetermineChunkSize` no upper bound. `int.MaxValue` (2GB) chunk size accepted, causing massive allocation. | [ ]
-| 2687 | 2 | LOW | `UltimateDataTransit/Strategies/P2PSwarmStrategy.cs:627-628` | `ActiveDownloads` counter updated by record replacement in BoundedDictionary — not atomic CAS. `ConcurrentDownloadLimitPerPeer` not reliably enforced. | [ ]
+| 2685 | 12 | LOW | `UltimateDataTransit/UltimateDataTransitPlugin.cs:789-793` | `TransferAsync(string key, ...)` returns hardcoded `"delegated-to-strategy"` without delegating. Rule 13 placeholder. | [X]
+| 2686 | 14 | LOW | `UltimateDataTransit/Strategies/ChunkedResumableStrategy.cs:637-646` | `DetermineChunkSize` no upper bound. `int.MaxValue` (2GB) chunk size accepted, causing massive allocation. | [X]
+| 2687 | 2 | LOW | `UltimateDataTransit/Strategies/P2PSwarmStrategy.cs:627-628` | `ActiveDownloads` counter updated by record replacement in BoundedDictionary — not atomic CAS. `ConcurrentDownloadLimitPerPeer` not reliably enforced. | [X]
 
 **Clean files:** TransitMessageTopics.cs
 
@@ -6559,10 +6559,10 @@
 #4427 | Cat 6 | P1 | WorkloadConsolidationStrategy.cs:108-113 | **Fire-and-forget async void timer**: `async _ => await MonitorAndConsolidateAsync()` is async void lambda — unhandled exceptions crash process. Same pattern in CarbonFootprintCalculationStrategy.cs:55, PueTrackingStrategy.cs:43, WaterUsageTrackingStrategy.cs:45. [X]
 #4428 | Cat 5 | P1 | WorkloadConsolidationStrategy.cs:191-221 | **Silent catch**: `catch { // Monitoring failed }` with no logging, no metric, no rethrow. CPU consolidation silently stops working. Similar in GreenPlacementService.cs:228-230, GreenTieringStrategy.cs:543-545, GreenTieringPolicyEngine.cs:238-241. [X]
 #4429 | Cat 7 | P2 | ElectricityMapsApiStrategy.cs:117 + WattTimeGridApiStrategy.cs:130 | **Resource leak**: Parameterless constructors `new HttpClient()` create instances never disposed — no IDisposable on either strategy. Socket exhaustion if used by auto-discovery. [X]
-#4430 | Cat 9 | P2 | GreenPlacementService.cs:276-291 | **Error handling**: `RefreshGridDataAsync` — `_registry.PersistAsync(ct)` call may throw and exception is unhandled. Contract lie: public async method can throw without callers knowing. [ ]
-#4431 | Cat 2 | P2 | GreenTieringStrategy.cs:488-489 | **Thread safety TOCTOU**: `_scanning` volatile bool read-check-set sequence allows two concurrent timer firings to both read false, both set true, and run scan concurrently. Should use `Interlocked.CompareExchange`. [ ]
-#4432 | Cat 1 | P2 | StorageTieringStrategy.cs:63 | **TOCTOU**: `TrackObject` updates `_objects` inside lock then calls `EvaluateTieringRecommendations()` outside lock. Between release and recommendation, another thread can modify `_objects`. [ ]
-#4433 | Cat 15 | P2 | PueTrackingStrategy.cs:57 | **Division by zero**: `RecordPue` computes `totalPowerKw / itLoadKw` with no guard against `itLoadKw == 0`. Public method — caller can trigger `double.PositiveInfinity` propagating into history and statistics. [ ]
+#4430 | Cat 9 | P2 | GreenPlacementService.cs:276-291 | **Error handling**: `RefreshGridDataAsync` — `_registry.PersistAsync(ct)` call may throw and exception is unhandled. Contract lie: public async method can throw without callers knowing. [X]
+#4431 | Cat 2 | P2 | GreenTieringStrategy.cs:488-489 | **Thread safety TOCTOU**: `_scanning` volatile bool read-check-set sequence allows two concurrent timer firings to both read false, both set true, and run scan concurrently. Should use `Interlocked.CompareExchange`. [X]
+#4432 | Cat 1 | P2 | StorageTieringStrategy.cs:63 | **TOCTOU**: `TrackObject` updates `_objects` inside lock then calls `EvaluateTieringRecommendations()` outside lock. Between release and recommendation, another thread can modify `_objects`. [X]
+#4433 | Cat 15 | P2 | PueTrackingStrategy.cs:57 | **Division by zero**: `RecordPue` computes `totalPowerKw / itLoadKw` with no guard against `itLoadKw == 0`. Public method — caller can trigger `double.PositiveInfinity` propagating into history and statistics. [X]
 #4434 | Cat 13 | LOW | GreenTieringStrategy.cs:174 | **Unnecessary allocation**: `GetPendingBatches()` chains `.ToArray().ToList().AsReadOnly()` — intermediate `ToArray()` is unnecessary. [ ]
 #4435 | Cat 13 | LOW | ColdDataCarbonMigrationStrategy.cs:594 | **Performance**: `_migrationHistory.ToArray().TakeLast(100).ToList()` snapshots entire queue (up to 10K entries) on every `GenerateRecommendations` call. Should use bounded circular buffer. [ ]
 #4436 | Cat 14 | LOW | PueTrackingStrategy.cs:57 | Related to #4433 — `RecordPue` public API accepts unvalidated doubles. Should reject non-positive `itLoadKw`. [ ]
@@ -6658,15 +6658,15 @@
 #4536 | Cat 5 | P1 | S3BucketManager.cs:355-358 + S3CredentialStore.cs:200-204 | **Silent catch**: `JsonException` discards corrupted persistence file silently. All registered buckets/credentials lost with no log or alert. [X]
 #4537 | Cat 5 | P1 | BackendAbstractionLayer.cs:217-221 | **Silent catch**: `GetAvailableCapacityAsync` bare `catch { return null; }` swallows `OperationCanceledException`, masking cancellation. [X]
 #4538 | Cat 5 | P1 | FallbackChain.cs:118-122 | **Silent catch**: Fallback loop bare `catch { continue; }` swallows `OperationCanceledException`. Cancellation not respected — loop continues attempting fallbacks. [X]
-#4539 | Cat 15 | P2 | S3HttpServer.cs:849-854 | **Contract lie**: `EnsureBucketExists` name implies authorization guard but body is empty. Misleads maintainers. [ ]
-#4540 | Cat 12 | P2 | S3HttpServer.cs:505-526 | **Presigned URL**: Includes `X-Amz-Date` but no `X-Amz-Expires` — server cannot validate expiry without storing the value. [ ]
-#4541 | Cat 13 | P2 | PlacementRule.cs:136-140 | **Performance**: Wildcard matching constructs new `Regex` on every call. Should cache compiled regex by pattern. [ ]
+#4539 | Cat 15 | P2 | S3HttpServer.cs:849-854 | **Contract lie**: `EnsureBucketExists` name implies authorization guard but body is empty. Misleads maintainers. [X]
+#4540 | Cat 12 | P2 | S3HttpServer.cs:505-526 | **Presigned URL**: Includes `X-Amz-Date` but no `X-Amz-Expires` — server cannot validate expiry without storing the value. [X]
+#4541 | Cat 13 | P2 | PlacementRule.cs:136-140 | **Performance**: Wildcard matching constructs new `Regex` on every call. Should cache compiled regex by pattern. [X]
 #4542 | Cat 13 | P2 | S3HttpServer.cs:244-262 | **Performance**: `PutObjectAsync` buffers entire request body into `MemoryStream`/`byte[]`. Unbounded heap pressure for large objects. [ ]
 #4543 | Cat 13 | P2 | S3HttpServer.cs:463 | **Performance**: `CompleteMultipartUploadAsync` materializes all parts into single `byte[]`. OOM risk for large multipart uploads (e.g., 5GB). [ ]
-#4544 | Cat 12 | P2 | BackendAbstractionLayer.cs:331-347 | **Logic bug**: `ExecuteWithTimeoutAsync` creates timeout CTS but never passes `timeoutCts.Token` to `operation()` delegate — timeout has no effect on inner I/O. [ ]
-#4545 | Cat 2 | P2 | BackendRegistryImpl.cs:33-36 | **TOCTOU**: `ContainsKey` + indexed set is non-atomic. `added` variable computed but never used. [ ]
-#4546 | Cat 14 | P2 | S3HttpServer.cs:627-669 | **Missing validation**: Null-forgiving `bucket!` and `key!` in dispatch switch without prior null check. Malformed URL causes 500 instead of 400. [ ]
-#4547 | Cat 14 | P2 | S3CredentialStore.cs:73-91 | **Missing validation**: `CreateCredentials` doesn't validate empty `userId` or empty strings in `allowedBuckets`. [ ]
+#4544 | Cat 12 | P2 | BackendAbstractionLayer.cs:331-347 | **Logic bug**: `ExecuteWithTimeoutAsync` creates timeout CTS but never passes `timeoutCts.Token` to `operation()` delegate — timeout has no effect on inner I/O. [X]
+#4545 | Cat 2 | P2 | BackendRegistryImpl.cs:33-36 | **TOCTOU**: `ContainsKey` + indexed set is non-atomic. `added` variable computed but never used. [X]
+#4546 | Cat 14 | P2 | S3HttpServer.cs:627-669 | **Missing validation**: Null-forgiving `bucket!` and `key!` in dispatch switch without prior null check. Malformed URL causes 500 instead of 400. [X]
+#4547 | Cat 14 | P2 | S3CredentialStore.cs:73-91 | **Missing validation**: `CreateCredentials` doesn't validate empty `userId` or empty strings in `allowedBuckets`. [X]
 #4548 | Cat 11 | P2 | S3HttpServer.cs:62-79 | **Architectural**: Duplicate bucket registry — `_bucketRegistry` in S3HttpServer AND `S3BucketManager` with no sync between them. [ ]
 #4549 | Cat 12 | P2 | LiveMigrationEngine.cs:163-185 | **Performance/Logic**: Full object list materialized into `List<T>` before parallelism. Unbounded memory for large migrations. [ ]
 #4550 | Cat 12 | LOW | AddressRouter.cs:137-138 | `NetworkEndpointAddress` silently falls back to `_defaultBackendId` when no match — may route data to unintended target. [ ]
@@ -6694,14 +6694,14 @@
 #4568 | Cat 6 | P1 | OpsGenieStrategy.cs:73-74,83-84,94-95 | **Fire-and-forget**: `AcknowledgeAlertAsync`, `CloseAlertAsync`, `AddNoteAsync` — HTTP responses never checked. [X]
 #4569 | Cat 6 | P1 | PagerDutyStrategy.cs:74,84 | **Fire-and-forget**: `AcknowledgeAlertAsync` and `ResolveAlertAsync` responses ignored. Critical lifecycle ops must not silently fail. [X]
 #4570 | Cat 12 | P1 | FabricScalingManager.cs:450-451 | **Logic bug**: Mesh-to-Federated threshold (400) < Star-to-Mesh threshold (800). Mesh cluster immediately triggers switch to Federated. [X]
-#4571 | Cat 13 | P2 | AppDynamicsStrategy.cs:72-86 | **Performance**: Metrics posted one-by-one in serial loop. Should batch into single request. [ ]
+#4571 | Cat 13 | P2 | AppDynamicsStrategy.cs:72-86 | **Performance**: Metrics posted one-by-one in serial loop. Should batch into single request. [X]
 #4572 | Cat 13 | P2 | AppDynamicsStrategy.cs:95-118 | **Performance**: Spans posted one-by-one. Same batching issue. [X]
-#4573 | Cat 13 | P2 | SensuStrategy.cs:164-182 | **Performance**: Events sent individually. Failure on event N silently abandons events N+1 through end. [ ]
-#4574 | Cat 12 | P2 | S3SignatureV4.cs:129 | **Info disclosure**: Error message leaks access key ID to caller. Should use generic message. [ ]
-#4575 | Cat 14 | P2 | S3RequestParser.cs:246-250 | **S3 compat**: `max-keys=0` clamped to 1. AWS S3 accepts 0 and returns empty page. Breaks client pagination. [ ]
-#4576 | Cat 14 | P2 | S3ResponseWriter.cs:58 | **S3 compat**: `MaxKeys` hardcoded to 1000 in response. Should echo request value. [ ]
-#4577 | Cat 2 | P2 | FabricScalingManager.cs:388-433 | **Thread safety**: `HeartbeatMonitorCallback` enumerates `_nodeHealth` while `RecordHeartbeat` writes. `_nodeLock` exists but never used. [ ]
-#4578 | Cat 12 | P2 | FabricScalingManager.cs:190 | **Logic bug**: `backpressure.queueDepth` metric reports `_activeNodeCount` not actual queue depth. [ ]
+#4573 | Cat 13 | P2 | SensuStrategy.cs:164-182 | **Performance**: Events sent individually. Failure on event N silently abandons events N+1 through end. [X]
+#4574 | Cat 12 | P2 | S3SignatureV4.cs:129 | **Info disclosure**: Error message leaks access key ID to caller. Should use generic message. [X]
+#4575 | Cat 14 | P2 | S3RequestParser.cs:246-250 | **S3 compat**: `max-keys=0` clamped to 1. AWS S3 accepts 0 and returns empty page. Breaks client pagination. [X]
+#4576 | Cat 14 | P2 | S3ResponseWriter.cs:58 | **S3 compat**: `MaxKeys` hardcoded to 1000 in response. Should echo request value. [X]
+#4577 | Cat 2 | P2 | FabricScalingManager.cs:388-433 | **Thread safety**: `HeartbeatMonitorCallback` enumerates `_nodeHealth` while `RecordHeartbeat` writes. `_nodeLock` exists but never used. [X]
+#4578 | Cat 12 | P2 | FabricScalingManager.cs:190 | **Logic bug**: `backpressure.queueDepth` metric reports `_activeNodeCount` not actual queue depth. [X]
 #4579 | Cat 14 | P2 | ElasticApmStrategy.cs:139 | **Logic bug**: `transaction_id` set to `ParentSpanId` instead of root transaction's span ID. Breaks deep call tree correlation. [X]
 #4580 | Cat 12 | P2 | DynatraceStrategy.cs:53-54 | **Logic bug**: MINT metric line format incorrect — bare float instead of `gauge,value=N` framing. Rejected by ingest. [X]
 #4581 | Cat 12 | P2 | VictorOpsStrategy.cs:110 | **Logic bug**: `LogLevel.Error` maps to VictorOps "WARNING" instead of "CRITICAL". [X]
@@ -6733,7 +6733,7 @@
 #4603 | Cat 12 | P2 | SentryStrategy.cs:202-207 | **Protocol error**: Sentry envelope format malformed — missing per-item header line required by NDJSON envelope protocol. [X]
 #4604 | Cat 4 | P2 | SentryStrategy.cs:221-224 | **Security**: DSN `UserInfo` may contain `publicKey:secretKey`. Full string including secret embedded in `X-Sentry-Auth` header. [X]
 #4605 | Cat 14 | P2 | ConsulHealthStrategy.cs:66-67 | **Missing validation**: `port` accepted as int with no bounds check (1-65535). [X]
-#4606 | Cat 12 | P2 | ZabbixStrategy.cs:139 | **Missing TryParse**: `int.Parse(severity)` without guard — `FormatException` on non-numeric input. [ ]
+#4606 | Cat 12 | P2 | ZabbixStrategy.cs:139 | **Missing TryParse**: `int.Parse(severity)` without guard — `FormatException` on non-numeric input. [X]
 #4607 | Cat 12 | P2 | LokiStrategy.cs:203-215 | **Logic bug**: `ParseLabels()` splits on `,` which breaks if label value contains comma. [X]
 #4608 | Cat 13 | P2 | ElasticsearchStrategy.cs:222+226 | **Double counting**: `bulk_requests` counter incremented on both success and catch path. [X]
 #4609 | Cat 13 | P2 | GraylogStrategy.cs:101-107 | **Performance**: `new UdpClient()` created per message — socket allocated per log entry. [X]
@@ -6764,11 +6764,11 @@
 #4630 | Cat 9 | P1 | AzureMonitorStrategy.cs:207-211 | **Response discarded**: `TracingAsyncCore` same — trace submission failures invisible. [X]
 #4631 | Cat 11 | P1 | StackdriverStrategy.cs:497-501 | **Sync-over-async in Dispose**: `Task.Run().Wait()` for flush. `_httpClient` may already be disposed by `ShutdownAsyncCore` causing `ObjectDisposedException`. [X]
 #4632 | Cat 11 | P1 | DatadogProfilerStrategy.cs:58 | **Duplicate headers**: `Configure()` adds `DD-API-KEY` without clearing first. Multiple calls accumulate duplicate headers. [X]
-#4633 | Cat 13 | P2 | PrometheusStrategy.cs:120-126 | **Unbounded memory**: `RecordHistogram` appends every observation to `List<double>` permanently. O(n*b) computation inside lock on every call. [ ]
+#4633 | Cat 13 | P2 | PrometheusStrategy.cs:120-126 | **Unbounded memory**: `RecordHistogram` appends every observation to `List<double>` permanently. O(n*b) computation inside lock on every call. [X]
 #4634 | Cat 14 | P2 | CloudWatchStrategy.cs:62-70 | **Missing validation**: `Configure()` doesn't validate region/accessKeyId/secretAccessKey non-empty. Runtime failures with no diagnostic. [X]
 #4635 | Cat 14 | P2 | DatadogStrategy.cs:52-59 | **Missing validation**: `Configure()` doesn't validate `apiKey` non-empty. Runtime 403s. [X]
 #4636 | Cat 14 | P2 | StackdriverStrategy.cs:65-72 | **Missing validation**: `Configure()` doesn't validate `accessToken`. Runtime 401s. [X]
-#4637 | Cat 14 | P2 | SumoLogicStrategy.cs:49-54 | **Missing validation**: `Configure()` doesn't validate `collectorUrl` format. `SendToSumoLogicAsync` can be called before init. [ ]
+#4637 | Cat 14 | P2 | SumoLogicStrategy.cs:49-54 | **Missing validation**: `Configure()` doesn't validate `collectorUrl` format. `SendToSumoLogicAsync` can be called before init. [X]
 #4638 | Cat 13 | P2 | GraphiteStrategy.cs:57-83 | **Lock contention**: Synchronous `_stream.Write()` inside lock for entire batch. Blocks all concurrent metric submissions. [X]
 #4639 | Cat 12 | P2 | CloudWatchStrategy.cs:191-221 | **Performance**: `EnsureLogStreamExistsAsync` called every batch — 2 extra network round-trips per log batch. Should cache existence flag. [X]
 #4640 | Cat 5 | P2 | CloudWatchStrategy.cs:201-205+216-220 | **Silent catch**: Bare `catch {}` also swallows `OperationCanceledException`, suppressing cancellation. [X]

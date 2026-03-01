@@ -124,7 +124,8 @@ internal sealed class SiriChannelStrategy : SdkInterface.InterfaceStrategyBase, 
     /// <summary>
     /// Builds a search data response.
     /// </summary>
-    private async Task<SdkInterface.InterfaceResponse> BuildSearchResponseAsync(
+    // Cat 15 (finding 3287): removed spurious async — no await in body.
+    private Task<SdkInterface.InterfaceResponse> BuildSearchResponseAsync(
         Dictionary<string, string> parameters,
         string? phase,
         CancellationToken cancellationToken)
@@ -145,11 +146,11 @@ internal sealed class SiriChannelStrategy : SdkInterface.InterfaceStrategyBase, 
             };
 
             var responseBody = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(confirmResponse));
-            return new SdkInterface.InterfaceResponse(
+            return Task.FromResult(new SdkInterface.InterfaceResponse(
                 StatusCode: 200,
                 Headers: new Dictionary<string, string> { ["Content-Type"] = "application/json" },
                 Body: responseBody
-            );
+            ));
         }
 
         // Handle phase
@@ -176,17 +177,18 @@ internal sealed class SiriChannelStrategy : SdkInterface.InterfaceStrategyBase, 
         };
 
         var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(response));
-        return new SdkInterface.InterfaceResponse(
+        return Task.FromResult(new SdkInterface.InterfaceResponse(
             StatusCode: 200,
             Headers: new Dictionary<string, string> { ["Content-Type"] = "application/json" },
             Body: body
-        );
+        ));
     }
 
     /// <summary>
     /// Builds a query data response.
     /// </summary>
-    private async Task<SdkInterface.InterfaceResponse> BuildQueryResponseAsync(
+    // Cat 15 (finding 3287): removed spurious async — no await in body.
+    private Task<SdkInterface.InterfaceResponse> BuildQueryResponseAsync(
         Dictionary<string, string> parameters,
         string? phase,
         CancellationToken cancellationToken)
@@ -206,11 +208,11 @@ internal sealed class SiriChannelStrategy : SdkInterface.InterfaceStrategyBase, 
             };
 
             var responseBody = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(confirmResponse));
-            return new SdkInterface.InterfaceResponse(
+            return Task.FromResult(new SdkInterface.InterfaceResponse(
                 StatusCode: 200,
                 Headers: new Dictionary<string, string> { ["Content-Type"] = "application/json" },
                 Body: responseBody
-            );
+            ));
         }
 
         var response = new
@@ -236,11 +238,11 @@ internal sealed class SiriChannelStrategy : SdkInterface.InterfaceStrategyBase, 
         };
 
         var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(response));
-        return new SdkInterface.InterfaceResponse(
+        return Task.FromResult(new SdkInterface.InterfaceResponse(
             StatusCode: 200,
             Headers: new Dictionary<string, string> { ["Content-Type"] = "application/json" },
             Body: body
-        );
+        ));
     }
 
     /// <summary>

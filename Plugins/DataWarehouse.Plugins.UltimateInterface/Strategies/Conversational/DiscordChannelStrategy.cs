@@ -219,7 +219,8 @@ internal sealed class DiscordChannelStrategy : SdkInterface.InterfaceStrategyBas
     /// <summary>
     /// Handles MESSAGE_COMPONENT interactions (button clicks, select menus).
     /// </summary>
-    private async Task<SdkInterface.InterfaceResponse> HandleMessageComponentAsync(
+    // Cat 15 (finding 3287): removed spurious async — no await in body; return Task.FromResult directly.
+    private Task<SdkInterface.InterfaceResponse> HandleMessageComponentAsync(
         JsonElement interaction,
         CancellationToken cancellationToken)
     {
@@ -241,17 +242,18 @@ internal sealed class DiscordChannelStrategy : SdkInterface.InterfaceStrategyBas
         };
 
         var responseBody = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(response));
-        return new SdkInterface.InterfaceResponse(
+        return Task.FromResult(new SdkInterface.InterfaceResponse(
             StatusCode: 200,
             Headers: new Dictionary<string, string> { ["Content-Type"] = "application/json" },
             Body: responseBody
-        );
+        ));
     }
 
     /// <summary>
     /// Handles MODAL_SUBMIT interactions (form submissions).
     /// </summary>
-    private async Task<SdkInterface.InterfaceResponse> HandleModalSubmitAsync(
+    // Cat 15 (finding 3287): removed spurious async — no await in body.
+    private Task<SdkInterface.InterfaceResponse> HandleModalSubmitAsync(
         JsonElement interaction,
         CancellationToken cancellationToken)
     {
@@ -273,11 +275,11 @@ internal sealed class DiscordChannelStrategy : SdkInterface.InterfaceStrategyBas
         };
 
         var responseBody = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(response));
-        return new SdkInterface.InterfaceResponse(
+        return Task.FromResult(new SdkInterface.InterfaceResponse(
             StatusCode: 200,
             Headers: new Dictionary<string, string> { ["Content-Type"] = "application/json" },
             Body: responseBody
-        );
+        ));
     }
 
     /// <summary>

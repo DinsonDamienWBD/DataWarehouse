@@ -21,7 +21,9 @@ public enum PrivacyCategory
     /// <summary>124.7: Privacy-Preserving Analytics</summary>
     PrivacyPreservingAnalytics,
     /// <summary>124.8: Privacy Metrics</summary>
-    PrivacyMetrics
+    PrivacyMetrics,
+    /// <summary>124.9: Data Classification (PII detection, sensitivity labeling)</summary>
+    DataClassification
 }
 
 /// <summary>Capabilities of a data privacy strategy.</summary>

@@ -31,6 +31,9 @@ internal sealed class ScalaWasmLanguageStrategy : WasmLanguageStrategyBase
     public override string StrategyId => "compute.wasm.lang.scala";
 
     /// <inheritdoc/>
+    protected override string[] GetToolchainBinaryNames() => new[] { "scala", "sbt" };
+
+    /// <inheritdoc/>
     public override string StrategyName => "Scala WASM Language";
 
     /// <inheritdoc/>

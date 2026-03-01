@@ -165,28 +165,41 @@ public sealed class SensuStrategy : ObservabilityStrategyBase
         await SendEventsAsync(new[] { sensuEvent }, ct);
     }
 
+    // P2-4573: Send each event independently so a failure on event N does not abandon N+1…end.
+    // Collect per-event results; log a warning summary if any failed.
     private async Task SendEventsAsync(IEnumerable<object> events, CancellationToken ct)
     {
-        try
+        var eventList = events.ToList();
+        var url = $"{_apiUrl}/api/core/v2/namespaces/{_namespace}/events";
+        var failed = 0;
+
+        foreach (var evt in eventList)
         {
-            foreach (var evt in events)
+            try
             {
                 var json = JsonSerializer.Serialize(evt);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
-                var url = $"{_apiUrl}/api/core/v2/namespaces/{_namespace}/events";
-
                 using var sensuRequest = new HttpRequestMessage(HttpMethod.Post, url) { Content = content };
                 AddApiKey(sensuRequest);
                 using var response = await _httpClient.SendAsync(sensuRequest, ct);
-                response.EnsureSuccessStatusCode();
+                if (!response.IsSuccessStatusCode)
+                {
+                    failed++;
+                    System.Diagnostics.Trace.TraceWarning(
+                        "[Sensu] Event POST returned {0} — event not delivered.", (int)response.StatusCode);
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                failed++;
+                System.Diagnostics.Trace.TraceWarning(
+                    "[Sensu] Event POST failed: {0}", ex.Message);
             }
         }
-        catch (HttpRequestException ex)
-        {
 
-            // Sensu backend unavailable - events lost
-            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
-        }
+        if (failed > 0)
+            System.Diagnostics.Trace.TraceWarning(
+                "[Sensu] {0}/{1} events failed to deliver.", failed, eventList.Count);
     }
 
     private static int DetermineStatus(MetricValue metric)

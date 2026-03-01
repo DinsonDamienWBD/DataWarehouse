@@ -252,6 +252,16 @@ public class MigrationJob
         Interlocked.Exchange(ref _totalBytes, bytes);
     }
 
+    /// <summary>
+    /// Atomically increments the running total count and size as objects are discovered.
+    /// Used for streaming enumeration where the full count is not known upfront.
+    /// </summary>
+    public void IncrementTotal(long objects, long bytes)
+    {
+        Interlocked.Add(ref _totalObjects, objects);
+        Interlocked.Add(ref _totalBytes, bytes);
+    }
+
     // --- Private backing fields for Interlocked ---
     private long _migratedObjects;
     private long _failedObjects;

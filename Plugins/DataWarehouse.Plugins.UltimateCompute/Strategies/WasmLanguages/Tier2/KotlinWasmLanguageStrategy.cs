@@ -30,6 +30,9 @@ internal sealed class KotlinWasmLanguageStrategy : WasmLanguageStrategyBase
     public override string StrategyId => "compute.wasm.lang.kotlin";
 
     /// <inheritdoc/>
+    protected override string[] GetToolchainBinaryNames() => new[] { "kotlinc" };
+
+    /// <inheritdoc/>
     public override string StrategyName => "Kotlin WASM Language";
 
     /// <inheritdoc/>

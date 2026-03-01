@@ -31,6 +31,9 @@ internal sealed class LuaWasmLanguageStrategy : WasmLanguageStrategyBase
     public override string StrategyId => "compute.wasm.lang.lua";
 
     /// <inheritdoc/>
+    protected override string[] GetToolchainBinaryNames() => new[] { "lua" };
+
+    /// <inheritdoc/>
     public override string StrategyName => "Lua WASM Language";
 
     /// <inheritdoc/>

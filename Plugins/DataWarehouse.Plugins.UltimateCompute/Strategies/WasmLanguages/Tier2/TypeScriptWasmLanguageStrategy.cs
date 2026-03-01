@@ -34,6 +34,9 @@ internal sealed class TypeScriptWasmLanguageStrategy : WasmLanguageStrategyBase
     public override string StrategyId => "compute.wasm.lang.typescript";
 
     /// <inheritdoc/>
+    protected override string[] GetToolchainBinaryNames() => new[] { "javy", "tsc" };
+
+    /// <inheritdoc/>
     public override string StrategyName => "TypeScript WASM Language";
 
     /// <inheritdoc/>

@@ -28,7 +28,12 @@ public sealed class SslCertificateMonitorService : IDisposable
                 {
                     CacheCertificateInfo(message.RequestUri.Host, cert, chain, errors);
                 }
-                return true; // We monitor; we don't block
+                // P2-4679: Intentional for SSL monitoring — the service MUST connect to
+                // inspect certificate data (expiry, chain, SANs) regardless of trust errors.
+                // All error details are captured in CacheCertificateInfo above; callers receive
+                // full SslErrors in the returned SslCertificateInfo. This class should ONLY be
+                // used for monitoring endpoints, never for authenticating data connections.
+                return true;
             }
         };
         _httpClient = new HttpClient(_handler) { Timeout = TimeSpan.FromSeconds(15) };

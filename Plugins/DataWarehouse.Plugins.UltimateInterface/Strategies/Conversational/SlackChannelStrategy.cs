@@ -149,7 +149,8 @@ internal sealed class SlackChannelStrategy : SdkInterface.InterfaceStrategyBase,
     /// <summary>
     /// Handles Slack event callbacks (message, app_mention, etc.).
     /// </summary>
-    private async Task<SdkInterface.InterfaceResponse> HandleSlackEventAsync(
+    // Cat 15 (finding 3287): removed spurious async — no await in body.
+    private Task<SdkInterface.InterfaceResponse> HandleSlackEventAsync(
         JsonElement eventElement,
         CancellationToken cancellationToken)
     {
@@ -187,25 +188,26 @@ internal sealed class SlackChannelStrategy : SdkInterface.InterfaceStrategyBase,
             };
 
             var responseBody = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(response));
-            return new SdkInterface.InterfaceResponse(
+            return Task.FromResult(new SdkInterface.InterfaceResponse(
                 StatusCode: 200,
                 Headers: new Dictionary<string, string> { ["Content-Type"] = "application/json" },
                 Body: responseBody
-            );
+            ));
         }
 
         // Acknowledge other event types
-        return new SdkInterface.InterfaceResponse(
+        return Task.FromResult(new SdkInterface.InterfaceResponse(
             StatusCode: 200,
             Headers: new Dictionary<string, string> { ["Content-Type"] = "application/json" },
             Body: Encoding.UTF8.GetBytes("{}")
-        );
+        ));
     }
 
     /// <summary>
     /// Handles Slack slash commands.
     /// </summary>
-    private async Task<SdkInterface.InterfaceResponse> HandleSlashCommandAsync(
+    // Cat 15 (finding 3287): removed spurious async — no await in body.
+    private Task<SdkInterface.InterfaceResponse> HandleSlashCommandAsync(
         JsonElement root,
         CancellationToken cancellationToken)
     {
@@ -220,17 +222,18 @@ internal sealed class SlackChannelStrategy : SdkInterface.InterfaceStrategyBase,
         };
 
         var responseBody = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(response));
-        return new SdkInterface.InterfaceResponse(
+        return Task.FromResult(new SdkInterface.InterfaceResponse(
             StatusCode: 200,
             Headers: new Dictionary<string, string> { ["Content-Type"] = "application/json" },
             Body: responseBody
-        );
+        ));
     }
 
     /// <summary>
     /// Handles Slack interactive components (button clicks, modal submissions).
     /// </summary>
-    private async Task<SdkInterface.InterfaceResponse> HandleInteractiveComponentAsync(
+    // Cat 15 (finding 3287): removed spurious async — no await in body.
+    private Task<SdkInterface.InterfaceResponse> HandleInteractiveComponentAsync(
         JsonElement root,
         CancellationToken cancellationToken)
     {
@@ -250,11 +253,11 @@ internal sealed class SlackChannelStrategy : SdkInterface.InterfaceStrategyBase,
         }
 
         // Acknowledge interactive component
-        return new SdkInterface.InterfaceResponse(
+        return Task.FromResult(new SdkInterface.InterfaceResponse(
             StatusCode: 200,
             Headers: new Dictionary<string, string> { ["Content-Type"] = "application/json" },
             Body: Encoding.UTF8.GetBytes("{}")
-        );
+        ));
     }
 
     /// <summary>

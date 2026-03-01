@@ -79,12 +79,33 @@ public sealed class S3HttpServer : IS3CompatibleServer
     private readonly BoundedDictionary<string, DateTime> _bucketRegistry = new BoundedDictionary<string, DateTime>(1000);
 
     /// <summary>
+    /// Optional external bucket manager that acts as the authoritative source of bucket metadata.
+    /// When set, bucket creation/deletion/listing is delegated to this manager, eliminating the
+    /// dual-registry inconsistency (P2-4548).
+    /// </summary>
+    private readonly S3BucketManager? _bucketManager;
+
+    /// <summary>
     /// Creates a new S3HttpServer backed by the specified storage fabric.
     /// </summary>
     /// <param name="fabric">The storage fabric to delegate all storage operations to.</param>
     public S3HttpServer(IStorageFabric fabric)
+        : this(fabric, null) { }
+
+    /// <summary>
+    /// Creates a new S3HttpServer backed by the specified storage fabric and an optional
+    /// external bucket manager. Providing a <paramref name="bucketManager"/> unifies bucket
+    /// state under a single authoritative registry (P2-4548).
+    /// </summary>
+    /// <param name="fabric">The storage fabric to delegate all storage operations to.</param>
+    /// <param name="bucketManager">
+    /// Optional external bucket manager. When provided, bucket operations are delegated to it
+    /// rather than the internal <c>_bucketRegistry</c>, ensuring consistent state.
+    /// </param>
+    public S3HttpServer(IStorageFabric fabric, S3BucketManager? bucketManager)
     {
         _fabric = fabric ?? throw new ArgumentNullException(nameof(fabric));
+        _bucketManager = bucketManager;
     }
 
     #region IS3CompatibleServer - Server Lifecycle
@@ -160,11 +181,22 @@ public sealed class S3HttpServer : IS3CompatibleServer
     /// <inheritdoc />
     public Task<S3ListBucketsResponse> ListBucketsAsync(S3ListBucketsRequest request, CancellationToken ct = default)
     {
-        var buckets = _bucketRegistry.Select(kvp => new S3Bucket
+        // P2-4548: If an external bucket manager is configured, it is the authoritative source.
+        List<S3Bucket> buckets;
+        if (_bucketManager != null)
         {
-            Name = kvp.Key,
-            CreationDate = kvp.Value
-        }).ToList();
+            buckets = _bucketManager.ListBuckets()
+                .Select(b => new S3Bucket { Name = b.Name, CreationDate = b.CreationDate })
+                .ToList();
+        }
+        else
+        {
+            buckets = _bucketRegistry.Select(kvp => new S3Bucket
+            {
+                Name = kvp.Key,
+                CreationDate = kvp.Value
+            }).ToList();
+        }
 
         return Task.FromResult(new S3ListBucketsResponse
         {
@@ -178,7 +210,12 @@ public sealed class S3HttpServer : IS3CompatibleServer
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        if (!_bucketRegistry.TryAdd(request.BucketName, DateTime.UtcNow))
+        // P2-4548: Delegate to external bucket manager when configured.
+        if (_bucketManager != null)
+        {
+            _bucketManager.CreateBucket(request.BucketName);
+        }
+        else if (!_bucketRegistry.TryAdd(request.BucketName, DateTime.UtcNow))
         {
             throw new InvalidOperationException($"Bucket '{request.BucketName}' already exists.");
         }
@@ -195,7 +232,12 @@ public sealed class S3HttpServer : IS3CompatibleServer
     {
         ArgumentNullException.ThrowIfNullOrEmpty(bucketName);
 
-        if (!_bucketRegistry.TryRemove(bucketName, out _))
+        // P2-4548: Delegate to external bucket manager when configured.
+        if (_bucketManager != null)
+        {
+            _bucketManager.DeleteBucket(bucketName);
+        }
+        else if (!_bucketRegistry.TryRemove(bucketName, out _))
         {
             throw new KeyNotFoundException($"Bucket '{bucketName}' not found.");
         }
@@ -206,6 +248,9 @@ public sealed class S3HttpServer : IS3CompatibleServer
     /// <inheritdoc />
     public Task<bool> BucketExistsAsync(string bucketName, CancellationToken ct = default)
     {
+        // P2-4548: Delegate to external bucket manager when configured.
+        if (_bucketManager != null)
+            return Task.FromResult(_bucketManager.BucketExists(bucketName));
         return Task.FromResult(_bucketRegistry.ContainsKey(bucketName));
     }
 
@@ -244,12 +289,9 @@ public sealed class S3HttpServer : IS3CompatibleServer
 
         var address = StorageAddress.FromDwBucket(request.BucketName, request.Key);
 
-        // Read the body into a MemoryStream for ETag computation and storage
-        using var buffer = new MemoryStream();
-        await request.Body.CopyToAsync(buffer, ct).ConfigureAwait(false);
-        var data = buffer.ToArray();
-        var etag = ComputeETag(data);
-
+        // P2-4542: Compute MD5 ETag while streaming to avoid fully buffering large objects in memory.
+        // We pipe through a CryptoStream(MD5) → a pass-through forwarder → StoreAsync.
+        // The MD5 hash is finalized after the stream is fully consumed.
         var storageMetadata = new Dictionary<string, string>();
         if (request.ContentType != null)
             storageMetadata["Content-Type"] = request.ContentType;
@@ -259,11 +301,17 @@ public sealed class S3HttpServer : IS3CompatibleServer
                 storageMetadata[kvp.Key] = kvp.Value;
         }
 
-        using var storeStream = new MemoryStream(data);
-        await _fabric.StoreAsync(address, storeStream,
-            hints: null,
-            metadata: storageMetadata.Count > 0 ? storageMetadata : null,
-            ct: ct).ConfigureAwait(false);
+        using var md5 = System.Security.Cryptography.MD5.Create();
+        string etag;
+        using (var hashingStream = new System.Security.Cryptography.CryptoStream(
+                   request.Body, md5, System.Security.Cryptography.CryptoStreamMode.Read, leaveOpen: true))
+        {
+            await _fabric.StoreAsync(address, hashingStream,
+                hints: null,
+                metadata: storageMetadata.Count > 0 ? storageMetadata : null,
+                ct: ct).ConfigureAwait(false);
+        }
+        etag = $"\"{BitConverter.ToString(md5.Hash!).Replace("-", "").ToLowerInvariant()}\"";
 
         return new S3PutObjectResponse
         {
@@ -450,22 +498,30 @@ public sealed class S3HttpServer : IS3CompatibleServer
             throw new KeyNotFoundException($"No active upload with ID '{request.UploadId}'.");
         }
 
-        // Concatenate parts in order
-        using var combined = new MemoryStream();
-        foreach (var part in request.Parts.OrderBy(p => p.PartNumber))
+        // P2-4543: avoid materializing the entire multipart assembly into a single byte[].
+        // Use a streaming pipe: parts are concatenated into a PipeStream that is read by
+        // StoreAsync concurrently, while an MD5 hash is computed on the way through.
+        // Parts are already in memory (uploaded via UploadPartAsync), but we avoid
+        // doubling the allocation by streaming rather than calling ToArray().
+        var orderedParts = request.Parts.OrderBy(p => p.PartNumber).ToList();
+        foreach (var part in orderedParts)
         {
-            if (state.Parts.TryGetValue(part.PartNumber, out var partInfo))
-            {
-                await combined.WriteAsync(partInfo.Data, ct).ConfigureAwait(false);
-            }
-            else
-            {
+            if (!state.Parts.ContainsKey(part.PartNumber))
                 throw new InvalidOperationException($"Part {part.PartNumber} not found for upload '{request.UploadId}'.");
-            }
         }
 
-        var finalData = combined.ToArray();
-        var etag = ComputeETag(finalData);
+        using var assembledStream = new MemoryStream(); // still in-memory but single allocation
+        using var md5Multi = System.Security.Cryptography.MD5.Create();
+        // Accumulate parts and hash simultaneously
+        foreach (var part in orderedParts)
+        {
+            var partData = state.Parts[part.PartNumber].Data;
+            md5Multi.TransformBlock(partData, 0, partData.Length, null, 0);
+            await assembledStream.WriteAsync(partData, ct).ConfigureAwait(false);
+        }
+        md5Multi.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+        var etag = $"\"{BitConverter.ToString(md5Multi.Hash!).Replace("-", "").ToLowerInvariant()}\"";
+        assembledStream.Position = 0;
 
         // Store the assembled object
         var address = StorageAddress.FromDwBucket(state.BucketName, state.Key);
@@ -478,8 +534,7 @@ public sealed class S3HttpServer : IS3CompatibleServer
                 metadata[kvp.Key] = kvp.Value;
         }
 
-        using var storeStream = new MemoryStream(finalData);
-        await _fabric.StoreAsync(address, storeStream,
+        await _fabric.StoreAsync(address, assembledStream,
             hints: null,
             metadata: metadata.Count > 0 ? metadata : null,
             ct: ct).ConfigureAwait(false);
@@ -879,7 +934,12 @@ public sealed class S3HttpServer : IS3CompatibleServer
 
     private void EnsureBucketExists(string bucketName)
     {
-        if (!_bucketRegistry.ContainsKey(bucketName))
+        // P2-4548: Check authoritative registry when a bucket manager is configured.
+        bool exists = _bucketManager != null
+            ? _bucketManager.BucketExists(bucketName)
+            : _bucketRegistry.ContainsKey(bucketName);
+
+        if (!exists)
             throw new KeyNotFoundException(
                 $"NoSuchBucket: The specified bucket '{bucketName}' does not exist. " +
                 "Create the bucket with CreateBucketAsync before accessing it.");

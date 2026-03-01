@@ -29,6 +29,9 @@ internal sealed class SwiftWasmLanguageStrategy : WasmLanguageStrategyBase
     public override string StrategyId => "compute.wasm.lang.swift";
 
     /// <inheritdoc/>
+    protected override string[] GetToolchainBinaryNames() => new[] { "swiftc" };
+
+    /// <inheritdoc/>
     public override string StrategyName => "Swift WASM Language";
 
     /// <inheritdoc/>

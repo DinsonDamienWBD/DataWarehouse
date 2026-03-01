@@ -31,6 +31,9 @@ internal sealed class JavaWasmLanguageStrategy : WasmLanguageStrategyBase
     public override string StrategyId => "compute.wasm.lang.java";
 
     /// <inheritdoc/>
+    protected override string[] GetToolchainBinaryNames() => new[] { "teavm" };
+
+    /// <inheritdoc/>
     public override string StrategyName => "Java WASM Language";
 
     /// <inheritdoc/>

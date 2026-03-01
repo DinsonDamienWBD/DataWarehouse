@@ -231,6 +231,10 @@ public sealed class FederatedAnalyticsStrategy : DataPrivacyStrategyBase
     /// </summary>
     public FederatedContributionResult SubmitContribution(string sessionId, string participantId, double value)
     {
+        // Cat 14 (finding 2520): reject NaN/Infinity — these corrupt aggregate results silently.
+        if (!double.IsFinite(value))
+            return new FederatedContributionResult { Accepted = false, Reason = $"Contribution value must be finite; got {value}" };
+
         if (!_sessions.TryGetValue(sessionId, out var session))
             return new FederatedContributionResult { Accepted = false, Reason = "Session not found" };
 
@@ -428,7 +432,8 @@ public sealed class PiiDetectionStrategy : DataPrivacyStrategyBase
 
     public override string StrategyId => "pii-detection";
     public override string DisplayName => "PII Detection";
-    public override PrivacyCategory Category => PrivacyCategory.DifferentialPrivacy;
+    // Cat 15 (finding 2521): PII detection is classification, not differential privacy.
+    public override PrivacyCategory Category => PrivacyCategory.DataClassification;
     public override DataPrivacyCapabilities Capabilities => new()
     {
         SupportsAsync = true, SupportsBatch = true,

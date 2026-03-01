@@ -96,7 +96,8 @@ public sealed class S3SignatureV4 : IS3AuthProvider
         var creds = _credentialStore.GetCredentials(accessKeyId);
         if (creds is null)
         {
-            throw new KeyNotFoundException($"No credentials found for access key '{accessKeyId}'");
+            // P2-4574: Do not include the access key ID in the error — information disclosure.
+            throw new KeyNotFoundException("No credentials found for the provided access key.");
         }
         return Task.FromResult(creds);
     }

@@ -600,11 +600,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
 
             if (!string.IsNullOrEmpty(_customDomain))
             {
-                return $"https://{_customDomain}/{key}";
+                return $"https://{_customDomain}/{Uri.EscapeDataString(key)}";
             }
             else if (!string.IsNullOrEmpty(_r2DevDomain))
             {
-                return $"https://{_r2DevDomain}/{key}";
+                return $"https://{_r2DevDomain}/{Uri.EscapeDataString(key)}";
             }
 
             return null;

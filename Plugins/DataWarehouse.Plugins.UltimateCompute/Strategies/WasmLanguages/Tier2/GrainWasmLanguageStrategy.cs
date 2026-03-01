@@ -30,6 +30,9 @@ internal sealed class GrainWasmLanguageStrategy : WasmLanguageStrategyBase
     public override string StrategyId => "compute.wasm.lang.grain";
 
     /// <inheritdoc/>
+    protected override string[] GetToolchainBinaryNames() => new[] { "grain" };
+
+    /// <inheritdoc/>
     public override string StrategyName => "Grain WASM Language";
 
     /// <inheritdoc/>

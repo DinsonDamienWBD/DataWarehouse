@@ -926,7 +926,9 @@ public sealed class PriorityInversionPreventionStrategy : RtosStrategyBase
             ResourcePath = context.ResourcePath
         });
 
-        var taskId = context.Parameters.TryGetValue("TaskId", out var tidObj) && tidObj is int tid ? tid : 0;
+        // Cat 14 (finding 3690): default to -1 when TaskId not provided so unidentified tasks do not share
+        // TaskInfo with the legitimate task 0, preventing accidental priority inheritance bleed.
+        var taskId = context.Parameters.TryGetValue("TaskId", out var tidObj) && tidObj is int tid ? tid : -1;
         var taskPriority = context.Priority;
 
         var task = _tasks.GetOrAdd(taskId, _ => new TaskInfo
@@ -967,7 +969,7 @@ public sealed class PriorityInversionPreventionStrategy : RtosStrategyBase
         if (!_locks.TryGetValue(context.ResourcePath, out var resourceLock))
             return Task.CompletedTask;
 
-        var taskId = context.Parameters.TryGetValue("TaskId", out var tidObj) && tidObj is int tid ? tid : 0;
+        var taskId = context.Parameters.TryGetValue("TaskId", out var tidObj) && tidObj is int tid ? tid : -1;
 
         if (resourceLock.HolderTaskId == taskId)
         {

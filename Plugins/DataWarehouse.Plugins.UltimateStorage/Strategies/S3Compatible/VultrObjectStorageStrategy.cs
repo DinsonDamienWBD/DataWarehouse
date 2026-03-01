@@ -770,7 +770,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
         public string GetDirectUrl(string key)
         {
             ValidateKey(key);
-            return $"https://{_bucket}.{_endpoint}/{key}";
+            return $"https://{_bucket}.{_endpoint}/{Uri.EscapeDataString(key)}";
         }
 
         /// <summary>
