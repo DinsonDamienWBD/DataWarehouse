@@ -347,6 +347,7 @@ public sealed class ConsulKvStorageStrategy : DatabaseStorageStrategyBase
         public Task ReleaseAsync(CancellationToken ct = default)
         {
             // LOW-2816: _lock.Release() is synchronous; no Task.Run wrapper needed
+            // P2-LOW-2816: non-async Task method avoids CS4014 warning
             _lock.Release();
             return Task.CompletedTask;
         }

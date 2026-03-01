@@ -616,7 +616,11 @@ internal sealed class GpuComputeAbstractionStrategy : ComputeRuntimeStrategyBase
                 }
             }
 
-            return (EncodeOutput("GPU compute completed"), "GPU: generic execution");
+            // Non-CUDA GPU paths: OpenCL and HLSL/GLSL require language-specific runtimes.
+            // Both are unsupported without additional tooling; surface a clear error instead of a silent stub.
+            throw new NotSupportedException(
+                $"GPU language '{language}' is not yet supported. Only 'cuda' is implemented. " +
+                "For OpenCL, install the 'clang' + 'OpenCL' SDK. For HLSL/GLSL, use DirectX/Vulkan toolchains.");
         }, cancellationToken);
     }
 }

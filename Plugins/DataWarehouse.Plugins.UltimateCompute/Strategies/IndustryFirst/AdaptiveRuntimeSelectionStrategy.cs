@@ -191,7 +191,7 @@ internal sealed class AdaptiveRuntimeSelectionStrategy : ComputeRuntimeStrategyB
             "deno" => ("deno", $"run --allow-all \"{codePath}\""),
             "bun" => ("bun", $"run \"{codePath}\""),
             "podman" => ("podman", $"run --rm -i --memory={GetMaxMemoryBytes(task, 512 * 1024 * 1024)} alpine sh \"{codePath}\""),
-            "docker" => ("docker", $"run --rm -i alpine sh \"{codePath}\""),
+            "docker" => ("docker", $"run --rm -i --memory={GetMaxMemoryBytes(task, 512 * 1024 * 1024)} alpine sh \"{codePath}\""),
             "bwrap" => ("bwrap", $"--ro-bind / / --dev /dev --proc /proc sh \"{codePath}\""),
             "sh" or "bash" => (runtime, $"\"{codePath}\""),
             _ => throw new NotSupportedException($"Runtime '{runtime}' is not supported by AdaptiveRuntimeSelectionStrategy.")

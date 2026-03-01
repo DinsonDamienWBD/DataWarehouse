@@ -187,7 +187,8 @@ public sealed class FabricScalingManager : IScalableSubsystem, IDisposable
             ["config.meshMaxNodes"] = GetMaxNodesForTopology(FabricTopology.Mesh),
             ["config.federatedMaxNodes"] = GetMaxNodesForTopology(FabricTopology.Federated),
             ["backpressure.state"] = _backpressureState.ToString(),
-            ["backpressure.queueDepth"] = Interlocked.Read(ref _activeNodeCount)
+            // P2-4578: Report actual active-node count under a correctly-named key
+            ["backpressure.activeNodeCount"] = Interlocked.Read(ref _activeNodeCount)
         };
         return metrics;
     }

@@ -126,7 +126,8 @@ public sealed class S3SignatureV4 : IS3AuthProvider
         var credentials = _credentialStore.GetCredentials(accessKeyId);
         if (credentials is null)
         {
-            return Fail($"Unknown access key: {accessKeyId}");
+            // P2-4574: Do not leak access key ID in error response — use generic message.
+            return Fail("InvalidAccessKeyId: The AWS access key ID provided does not exist.");
         }
 
         // Parse credential scope: date/region/service/aws4_request
@@ -243,7 +244,8 @@ public sealed class S3SignatureV4 : IS3AuthProvider
         var credentials = _credentialStore.GetCredentials(accessKeyId);
         if (credentials is null)
         {
-            return Fail($"Unknown access key: {accessKeyId}");
+            // P2-4574: Do not leak access key ID in error response — use generic message.
+            return Fail("InvalidAccessKeyId: The AWS access key ID provided does not exist.");
         }
 
         // For presigned URLs, build canonical query string WITHOUT X-Amz-Signature

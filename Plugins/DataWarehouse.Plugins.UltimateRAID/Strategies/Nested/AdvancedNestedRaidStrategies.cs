@@ -782,11 +782,13 @@ public sealed class Raid60Strategy : SdkRaidStrategyBase
         var bytesPerGroup = length / groupCount;
         if (bytesPerGroup == 0) bytesPerGroup = length;
 
+        // P2-3685: Actually read from disk groups rather than returning zeroed buffers.
         var readTasks = new List<Task<(int group, byte[] data)>>();
         for (int g = 0; g < groupCount; g++)
         {
             var gIdx = g;
-            readTasks.Add(Task.FromResult((gIdx, new byte[Math.Min(bytesPerGroup, length - gIdx * bytesPerGroup)])));
+            var readLen = Math.Min(bytesPerGroup, length - gIdx * bytesPerGroup);
+            readTasks.Add(ReadFromRaid6GroupAsync(diskList, gIdx, offset, readLen, cancellationToken));
         }
 
         var groupResults = await Task.WhenAll(readTasks);

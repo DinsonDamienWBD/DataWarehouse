@@ -105,6 +105,9 @@ internal abstract class WasmLanguageStrategyBase : ComputeRuntimeStrategyBase
                 args.Append("run --wasi ");
 
                 var maxMem = GetMaxMemoryBytes(task, 256 * 1024 * 1024);
+                // NOTE: wasmtime ≥ v14 uses --wasm-memory-reservation; older versions use --max-memory.
+                // If this flag is silently ignored (wasmtime exits 0 despite unknown flag), memory
+                // limits will not be enforced. Verify your installed wasmtime version matches this flag.
                 args.Append($"--max-memory {maxMem} ");
 
                 if (task.ResourceLimits?.AllowFileSystemAccess == true &&

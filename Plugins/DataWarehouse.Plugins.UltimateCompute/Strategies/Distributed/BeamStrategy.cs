@@ -39,9 +39,20 @@ internal sealed class BeamStrategy : ComputeRuntimeStrategyBase
             {
                 await File.WriteAllBytesAsync(codePath, task.Code.ToArray(), cancellationToken);
 
+                // Validate runner against the known safe set to prevent shell metacharacter injection.
+                static readonly HashSet<string> AllowedRunners = new(StringComparer.OrdinalIgnoreCase)
+                {
+                    "DirectRunner", "FlinkRunner", "SparkRunner", "DataflowRunner",
+                    "SamzaRunner", "NemoRunner", "PrismRunner", "TwisterRunner"
+                };
                 var runner = "DirectRunner";
                 if (task.Metadata?.TryGetValue("beam_runner", out var r) == true && r is string rs)
+                {
+                    if (!AllowedRunners.Contains(rs))
+                        throw new ArgumentException(
+                            $"Unknown Beam runner '{rs}'. Allowed: {string.Join(", ", AllowedRunners)}");
                     runner = rs;
+                }
 
                 var args = new StringBuilder();
 

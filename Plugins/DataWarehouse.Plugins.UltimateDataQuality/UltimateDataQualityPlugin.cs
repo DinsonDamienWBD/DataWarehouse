@@ -292,7 +292,7 @@ public sealed class UltimateDataQualityPlugin : DataManagementPluginBase, IDispo
 
         // P2-2662: actually validate records when provided.
         if (message.Payload.TryGetValue("records", out var recordsObj) && recordsObj != null &&
-            strategy is Strategies.Validation.SchemaValidationStrategy validationStrategy)
+            strategy is Strategies.Validation.RuleBasedValidationStrategy ruleBasedStrategy)
         {
             var records = DeserializeRecords(recordsObj);
             if (records.Count > 0)
@@ -302,7 +302,7 @@ public sealed class UltimateDataQualityPlugin : DataManagementPluginBase, IDispo
                 bool allValid = true;
                 foreach (var record in records)
                 {
-                    var result = await validationStrategy.ValidateAsync(record, CancellationToken.None).ConfigureAwait(false);
+                    var result = await ruleBasedStrategy.ValidateAsync(record, CancellationToken.None).ConfigureAwait(false);
                     if (!result.IsValid) allValid = false;
                     allIssues.AddRange(result.Issues);
                 }

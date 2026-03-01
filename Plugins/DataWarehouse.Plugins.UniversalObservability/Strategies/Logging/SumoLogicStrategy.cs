@@ -48,6 +48,13 @@ public sealed class SumoLogicStrategy : ObservabilityStrategyBase
     /// <param name="sourceHost">Source host name.</param>
     public void Configure(string collectorUrl, string sourceName = "datawarehouse", string? sourceHost = null)
     {
+        // P2-4637: Validate collectorUrl before storing — SendToSumoLogicAsync will throw a
+        // confusing UriFormatException later if the URL is empty or malformed.
+        if (string.IsNullOrWhiteSpace(collectorUrl))
+            throw new ArgumentException("Sumo Logic collector URL must not be empty.", nameof(collectorUrl));
+        if (!Uri.TryCreate(collectorUrl, UriKind.Absolute, out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+            throw new ArgumentException($"Sumo Logic collector URL must be an absolute http/https URL, got: '{collectorUrl}'.", nameof(collectorUrl));
         _collectorUrl = collectorUrl;
         _sourceName = sourceName;
         _sourceHost = sourceHost ?? Environment.MachineName;

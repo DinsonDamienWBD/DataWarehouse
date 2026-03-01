@@ -47,9 +47,9 @@ internal sealed class LandlockStrategy : ComputeRuntimeStrategyBase
                 landlockScript.AppendLine("# Landlock filesystem restriction wrapper");
                 landlockScript.AppendLine("# Uses LL_FS_RO and LL_FS_RW environment variables");
                 landlockScript.Append("LL_FS_RO=");
-                landlockScript.AppendLine(string.Join(":", allowedPaths.Where(p => !p.StartsWith("/tmp"))));
+                landlockScript.AppendLine(string.Join(":", allowedPaths.Where(p => !p.StartsWith("/tmp", StringComparison.Ordinal))));
                 landlockScript.Append("LL_FS_RW=");
-                landlockScript.AppendLine(string.Join(":", allowedPaths.Where(p => p.StartsWith("/tmp"))));
+                landlockScript.AppendLine(string.Join(":", allowedPaths.Where(p => p.StartsWith("/tmp", StringComparison.Ordinal))));
                 landlockScript.AppendLine("export LL_FS_RO LL_FS_RW");
                 landlockScript.AppendLine($"exec sandboxer sh \"{codePath}\"");
 

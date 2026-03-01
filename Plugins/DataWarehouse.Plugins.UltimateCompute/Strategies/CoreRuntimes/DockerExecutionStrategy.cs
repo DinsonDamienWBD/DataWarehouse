@@ -14,7 +14,10 @@ namespace DataWarehouse.Plugins.UltimateCompute.Strategies.CoreRuntimes;
 internal sealed class DockerExecutionStrategy : ComputeRuntimeStrategyBase
 {
     private readonly HttpClient _httpClient;
-    private const string DefaultDockerSocket = "http://localhost:2375"; // TCP fallback
+    // Default connection: Docker Engine API over TCP (localhost:2375, no TLS).
+    // For Unix socket support, inject an HttpClient with a UnixDomainSocketEndPoint handler
+    // that connects to /var/run/docker.sock using System.Net.Http.SocketsHttpHandler.
+    private const string DefaultDockerSocket = "http://localhost:2375";
 
     // Allowlist for env var keys and container-safe names — prevents injection.
     private static readonly Regex SafeEnvKeyRegex = new(@"^[a-zA-Z_][a-zA-Z0-9_]*$", RegexOptions.Compiled);

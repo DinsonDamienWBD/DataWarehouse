@@ -77,9 +77,21 @@ internal sealed class NitroEnclavesStrategy : ComputeRuntimeStrategyBase
                 var descResult = await RunProcessAsync("nitro-cli", "describe-enclaves",
                     timeout: TimeSpan.FromSeconds(10), cancellationToken: cancellationToken);
 
-                // Wait for completion via vsock or timeout
+                // Wait for enclave completion. In production, open a vsock connection to the enclave
+                // (CID from describe-enclaves output) and read until it closes or returns a result.
+                // For now, poll the enclave console on a 500ms interval up to the task timeout.
                 var timeout = GetEffectiveTimeout(task);
-                await Task.Delay(Math.Min(1000, (int)timeout.TotalMilliseconds), cancellationToken);
+                var deadline = DateTimeOffset.UtcNow.Add(timeout);
+                var pollInterval = TimeSpan.FromMilliseconds(500);
+                while (DateTimeOffset.UtcNow < deadline)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var pollResult = await RunProcessAsync("nitro-cli", $"console --enclave-id {enclaveId}",
+                        timeout: TimeSpan.FromSeconds(5), cancellationToken: cancellationToken);
+                    if (!string.IsNullOrWhiteSpace(pollResult.StandardOutput))
+                        break; // Enclave produced output — assume it has completed.
+                    await Task.Delay(pollInterval, cancellationToken);
+                }
 
                 // Get attestation document
                 var consoleResult = await RunProcessAsync("nitro-cli", $"console --enclave-id {enclaveId}",
