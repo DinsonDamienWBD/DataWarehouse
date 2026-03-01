@@ -28,6 +28,9 @@ public sealed class UltimateSustainabilityPlugin : InfrastructurePluginBase
 {
     get
     {
+        // Return cached value if still valid (volatile read for thread visibility).
+        if (_cachedCapabilities != null)
+            return _cachedCapabilities;
         var capabilities = new List<RegisteredCapability>
         {
             new RegisteredCapability
@@ -72,7 +75,10 @@ public sealed class UltimateSustainabilityPlugin : InfrastructurePluginBase
             capabilities.Add(new RegisteredCapability { CapabilityId = $"{Id}.strategy.{strategy.StrategyId}", DisplayName = strategy.DisplayName, Description = strategy.SemanticDescription, Category = CapabilityCategory.Custom, SubCategory = strategy.Category.ToString(), PluginId = Id, PluginName = Name, PluginVersion = Version, Tags = strategy.Tags, Metadata = new Dictionary<string, object> { ["strategyId"] = strategy.StrategyId, ["category"] = strategy.Category.ToString(), ["capabilities"] = strategy.Capabilities.ToString() }, SemanticDescription = strategy.SemanticDescription });
         }
 
-        return capabilities;
+        var built = capabilities.AsReadOnly();
+        // Store in cache field (volatile write ensures visibility to other threads).
+        _cachedCapabilities = built;
+        return built;
     }
 }
     protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge();

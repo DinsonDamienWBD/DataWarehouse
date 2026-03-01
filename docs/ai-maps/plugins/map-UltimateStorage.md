@@ -1204,6 +1204,7 @@ public sealed class StoragePool
 }
     public string PoolId { get; init; };
     public string PoolName { get; init; };
+    internal readonly object MembershipLock = new();
     public ConcurrentBag<PoolBackend> Backends { get; init; };
     public PoolPolicy Policy { get; init; };
     public DateTime CreatedTime { get; init; }
