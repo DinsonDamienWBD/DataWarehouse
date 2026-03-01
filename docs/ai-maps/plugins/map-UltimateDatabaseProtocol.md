@@ -477,6 +477,32 @@ public static class ProtocolCompressionExtensions
     public static Stream WrapWithCompression(this ProtocolCompressionManager compression, Stream stream, CompressionOptions? options = null);
 }
 ```
+```csharp
+internal sealed class CountingStream : Stream
+{
+}
+    public CountingStream(Stream inner);;
+    public long BytesRead;;
+    public long BytesWritten;;
+    public override bool CanRead;;
+    public override bool CanSeek;;
+    public override bool CanWrite;;
+    public override long Length;;
+    public override long Position { get => _inner.Position; set => _inner.Position = value; }
+    public override int Read(byte[] buffer, int offset, int count);
+    public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken ct);
+    public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken ct = default);
+    public override void Write(byte[] buffer, int offset, int count);
+    public override async Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken ct);
+    public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken ct = default);
+    public override void Flush();;
+    public override Task FlushAsync(CancellationToken ct);;
+    public override long Seek(long offset, SeekOrigin origin);;
+    public override void SetLength(long value);;
+    protected override void Dispose(bool disposing);
+    public override ValueTask DisposeAsync();
+}
+```
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/Infrastructure/ConnectionPoolManager.cs
 ```csharp

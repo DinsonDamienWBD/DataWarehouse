@@ -1457,7 +1457,7 @@ public sealed class RaidIntegrationFeature : IDisposable
     public long TotalRaidWrites;;
     public long TotalRaidReads;;
     public long TotalRaidRebuilds;;
-    public async Task<RaidArray> CreateRaidArrayAsync(string arrayId, RaidLevel raidLevel, IEnumerable<string> backendIds, int stripeSize = 65536);
+    public async Task<RaidArray> CreateRaidArrayAsync(string arrayId, RaidLevel raidLevel, IEnumerable<string> backendIds, int stripeSize = 65536, long perBackendCapacityBytes = 1_000_000_000_000L);
     public async Task WriteToRaidArrayAsync(string arrayId, string objectKey, byte[] data, CancellationToken ct = default);
     public async Task<byte[]> ReadFromRaidArrayAsync(string arrayId, string objectKey, CancellationToken ct = default);
     public async Task MarkBackendFailedAsync(string arrayId, string backendId);
