@@ -159,9 +159,12 @@ public static class NamespaceAuthority
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
         // Cat 15 (finding 839): Generate a random (not deterministic) UUID for this namespace.
         // Namespace UUIDs must be unique per registration; they are not derived from prefix/authority.
 =======
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
 =======
@@ -175,6 +178,9 @@ public static class NamespaceAuthority
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
