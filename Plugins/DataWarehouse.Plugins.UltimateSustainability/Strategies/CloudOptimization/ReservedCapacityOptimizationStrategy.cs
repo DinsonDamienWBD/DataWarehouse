@@ -57,7 +57,7 @@ public sealed class ReservedCapacityOptimizationStrategy : SustainabilityStrateg
     {
         lock (_lock)
         {
-            _usageHistory.Add(new UsageRecord
+            _usageHistory.Enqueue(new UsageRecord
             {
                 Timestamp = DateTimeOffset.UtcNow,
                 InstanceType = instanceType,

@@ -61,6 +61,9 @@ internal sealed class P2PSwarmStrategy : DataTransitStrategyBase
     /// Thread-safe storage of active swarm states keyed by transfer ID.
     /// </summary>
     private readonly BoundedDictionary<string, SwarmState> _swarmStates = new BoundedDictionary<string, SwarmState>(1000);
+    // Cat 2 (finding 2687): dedicated lock for per-peer active-download counter so
+    // concurrent tasks don't race on BoundedDictionary record replacement.
+    private readonly object _peerCounterLock = new();
 
     /// <summary>
     /// Set of banned peer IDs that failed SHA-256 integrity verification.
@@ -632,9 +635,12 @@ internal sealed class P2PSwarmStrategy : DataTransitStrategyBase
                         return;
                     }
 
-                    // Increment active downloads for this peer
-                    var updatedPeer = selectedPeer with { ActiveDownloads = selectedPeer.ActiveDownloads + 1 };
-                    state.Peers[selectedPeer.PeerId] = updatedPeer;
+                    // Increment active downloads for this peer (under lock to prevent CAS races).
+                    lock (_peerCounterLock)
+                    {
+                        var latestPeer = state.Peers.GetValueOrDefault(selectedPeer.PeerId) ?? selectedPeer;
+                        state.Peers[selectedPeer.PeerId] = latestPeer with { ActiveDownloads = latestPeer.ActiveDownloads + 1 };
+                    }
 
                     try
                     {
@@ -682,14 +688,17 @@ internal sealed class P2PSwarmStrategy : DataTransitStrategyBase
                     }
                     finally
                     {
-                        // Decrement active downloads for this peer
-                        var currentPeer = state.Peers.GetValueOrDefault(selectedPeer.PeerId);
-                        if (currentPeer is not null)
+                        // Decrement active downloads for this peer (under lock to prevent CAS races).
+                        lock (_peerCounterLock)
                         {
-                            state.Peers[selectedPeer.PeerId] = currentPeer with
+                            var currentPeer = state.Peers.GetValueOrDefault(selectedPeer.PeerId);
+                            if (currentPeer is not null)
                             {
-                                ActiveDownloads = Math.Max(0, currentPeer.ActiveDownloads - 1)
-                            };
+                                state.Peers[selectedPeer.PeerId] = currentPeer with
+                                {
+                                    ActiveDownloads = Math.Max(0, currentPeer.ActiveDownloads - 1)
+                                };
+                            }
                         }
                     }
                 }

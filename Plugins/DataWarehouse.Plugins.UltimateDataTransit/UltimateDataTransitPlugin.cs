@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Linq;
 using System.Reflection;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Hierarchy;
@@ -812,18 +813,37 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
     /// <inheritdoc/>
     public override async Task<Dictionary<string, object>> TransferAsync(string key, Dictionary<string, object> target, CancellationToken ct = default)
     {
-        // Cat 12 (finding 2685): actually delegate to the active strategy rather than returning a placeholder.
-        var strategyId = target.TryGetValue("strategyId", out var sid) ? sid?.ToString() : null;
-        var sourceUri = target.TryGetValue("sourceUri", out var src) ? src?.ToString() : null;
-        var destinationUri = target.TryGetValue("destinationUri", out var dst) ? dst?.ToString() : null;
+        // Cat 12 (finding 2685): actually delegate to the typed TransferAsync strategy rather than returning a placeholder.
+        var sourceUriStr = target.TryGetValue("sourceUri", out var src) ? src?.ToString() : null;
+        var destinationUriStr = target.TryGetValue("destinationUri", out var dst) ? dst?.ToString() : null;
+
+        Uri sourceUri;
+        Uri destinationUri;
+        try
+        {
+            sourceUri = new Uri(sourceUriStr ?? $"transfer://{key}");
+            destinationUri = new Uri(destinationUriStr ?? $"transfer://{key}/dest");
+        }
+        catch (UriFormatException ex)
+        {
+            return new Dictionary<string, object>
+            {
+                ["key"] = key,
+                ["status"] = "failed",
+                ["error"] = $"Invalid URI in target dictionary: {ex.Message}"
+            };
+        }
+
+        var metadata = target
+            .Where(kvp => kvp.Value is string)
+            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value?.ToString() ?? string.Empty);
 
         var request = new TransitRequest
         {
             TransferId = key,
-            StrategyId = strategyId,
-            SourceUri = sourceUri ?? $"transfer://{key}",
-            DestinationUri = destinationUri ?? string.Empty,
-            Metadata = target.Where(kvp => kvp.Value is string).ToDictionary(kvp => kvp.Key, kvp => kvp.Value?.ToString() ?? string.Empty)
+            Source = new TransitEndpoint { Uri = sourceUri },
+            Destination = new TransitEndpoint { Uri = destinationUri },
+            Metadata = metadata
         };
 
         var transitResult = await TransferAsync(request, null, ct).ConfigureAwait(false);
@@ -831,10 +851,10 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
         return new Dictionary<string, object>
         {
             ["key"] = key,
-            ["transferId"] = transitResult.TransferId ?? key,
-            ["status"] = transitResult.IsSuccess ? "completed" : "failed",
+            ["transferId"] = transitResult.TransferId,
+            ["status"] = transitResult.Success ? "completed" : "failed",
             ["bytesTransferred"] = transitResult.BytesTransferred,
-            ["strategyId"] = transitResult.StrategyId ?? strategyId ?? string.Empty,
+            ["strategyId"] = transitResult.StrategyUsed ?? string.Empty,
             ["error"] = transitResult.ErrorMessage ?? string.Empty
         };
     }

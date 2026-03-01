@@ -90,68 +90,66 @@ public sealed class ServerlessOptimizationStrategy : SustainabilityStrategyBase
             executions = _executions.Where(e => e.FunctionId == functionId).ToList();
         }
 
+        if (executions.Count < 10) return recommendations;
+
+        // Check cold start rate
+        var coldStartRate = (double)function.ColdStartCount / function.InvocationCount * 100;
+        if (coldStartRate > ColdStartAlertThreshold)
         {
-            if (executions.Count < 10) return recommendations;
-
-            // Check cold start rate
-            var coldStartRate = (double)function.ColdStartCount / function.InvocationCount * 100;
-            if (coldStartRate > ColdStartAlertThreshold)
+            recommendations.Add(new ServerlessRecommendation
             {
-                recommendations.Add(new ServerlessRecommendation
-                {
-                    FunctionId = functionId,
-                    Type = ServerlessRecommendationType.ReduceColdStarts,
-                    Description = $"Cold start rate at {coldStartRate:F0}%. Consider provisioned concurrency or warming.",
-                    Priority = 7,
-                    EstimatedSavingsMs = executions.Where(e => e.WasColdStart).Average(e => e.DurationMs) * 0.5
-                });
-            }
+                FunctionId = functionId,
+                Type = ServerlessRecommendationType.ReduceColdStarts,
+                Description = $"Cold start rate at {coldStartRate:F0}%. Consider provisioned concurrency or warming.",
+                Priority = 7,
+                EstimatedSavingsMs = executions.Where(e => e.WasColdStart).Average(e => e.DurationMs) * 0.5
+            });
+        }
 
-            // Check memory efficiency
-            var avgMemoryEfficiency = executions.Average(e => e.MemoryEfficiency);
-            if (avgMemoryEfficiency < 0.5)
-            {
-                var currentMem = function.MemoryMb;
-                var recommendedMem = (int)(currentMem * avgMemoryEfficiency * 1.5);
-                recommendedMem = Math.Max(128, (recommendedMem / 64) * 64); // Round to 64MB
+        // Check memory efficiency
+        var avgMemoryEfficiency = executions.Average(e => e.MemoryEfficiency);
+        if (avgMemoryEfficiency < 0.5)
+        {
+            var currentMem = function.MemoryMb;
+            var recommendedMem = (int)(currentMem * avgMemoryEfficiency * 1.5);
+            recommendedMem = Math.Max(128, (recommendedMem / 64) * 64); // Round to 64MB
 
-                recommendations.Add(new ServerlessRecommendation
-                {
-                    FunctionId = functionId,
-                    Type = ServerlessRecommendationType.ReduceMemory,
-                    Description = $"Avg memory usage {avgMemoryEfficiency * 100:F0}%. Reduce from {currentMem}MB to {recommendedMem}MB.",
-                    Priority = 6,
-                    RecommendedMemoryMb = recommendedMem,
-                    EstimatedCostSavingsPercent = (1 - (double)recommendedMem / currentMem) * 100
-                });
-            }
-            else if (avgMemoryEfficiency > 0.9)
+            recommendations.Add(new ServerlessRecommendation
             {
-                recommendations.Add(new ServerlessRecommendation
-                {
-                    FunctionId = functionId,
-                    Type = ServerlessRecommendationType.IncreaseMemory,
-                    Description = $"Memory usage at {avgMemoryEfficiency * 100:F0}%. Increase to avoid OOM and improve CPU allocation.",
-                    Priority = 5,
-                    RecommendedMemoryMb = (int)(function.MemoryMb * 1.5),
-                    EstimatedCostSavingsPercent = 0
-                });
-            }
+                FunctionId = functionId,
+                Type = ServerlessRecommendationType.ReduceMemory,
+                Description = $"Avg memory usage {avgMemoryEfficiency * 100:F0}%. Reduce from {currentMem}MB to {recommendedMem}MB.",
+                Priority = 6,
+                RecommendedMemoryMb = recommendedMem,
+                EstimatedCostSavingsPercent = (1 - (double)recommendedMem / currentMem) * 100
+            });
+        }
+        else if (avgMemoryEfficiency > 0.9)
+        {
+            recommendations.Add(new ServerlessRecommendation
+            {
+                FunctionId = functionId,
+                Type = ServerlessRecommendationType.IncreaseMemory,
+                Description = $"Memory usage at {avgMemoryEfficiency * 100:F0}%. Increase to avoid OOM and improve CPU allocation.",
+                Priority = 5,
+                RecommendedMemoryMb = (int)(function.MemoryMb * 1.5),
+                EstimatedCostSavingsPercent = 0
+            });
+        }
 
-            // Check execution patterns
-            var avgDuration = executions.Average(e => e.DurationMs);
-            var maxDuration = executions.Max(e => e.DurationMs);
-            if (maxDuration > avgDuration * 3)
+        // Check execution patterns
+        var avgDuration = executions.Average(e => e.DurationMs);
+        var maxDuration = executions.Max(e => e.DurationMs);
+        if (maxDuration > avgDuration * 3)
+        {
+            recommendations.Add(new ServerlessRecommendation
             {
-                recommendations.Add(new ServerlessRecommendation
-                {
-                    FunctionId = functionId,
-                    Type = ServerlessRecommendationType.OptimizeCode,
-                    Description = $"High variance in execution time (avg {avgDuration:F0}ms, max {maxDuration:F0}ms). Review for optimization.",
-                    Priority = 4,
-                    EstimatedSavingsMs = maxDuration - avgDuration
-                });
-            }
+                FunctionId = functionId,
+                Type = ServerlessRecommendationType.OptimizeCode,
+                Description = $"High variance in execution time (avg {avgDuration:F0}ms, max {maxDuration:F0}ms). Review for optimization.",
+                Priority = 4,
+                EstimatedSavingsMs = maxDuration - avgDuration
+            });
         }
 
         return recommendations.OrderByDescending(r => r.Priority).ToList();
