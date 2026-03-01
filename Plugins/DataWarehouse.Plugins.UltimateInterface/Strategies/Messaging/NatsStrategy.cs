@@ -298,10 +298,18 @@ internal sealed class NatsStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
             }
         }
 
-        // Store in subject buffer (use ConcurrentBag via wrapper for thread-safety)
+        // P2-3326: Cap each subject buffer at 10,000 messages to prevent unbounded growth.
         _subjects.AddOrUpdate(message.Subject,
             _ => new List<NatsMessage> { message },
-            (_, list) => { lock (list) { list.Add(message); } return list; });
+            (_, list) =>
+            {
+                lock (list)
+                {
+                    if (list.Count >= 10_000) list.RemoveAt(0); // FIFO drop oldest
+                    list.Add(message);
+                }
+                return list;
+            });
 
         await Task.CompletedTask;
     }

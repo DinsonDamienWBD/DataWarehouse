@@ -194,11 +194,8 @@ public sealed class JitteredExponentialBackoffStrategy : ResilienceStrategyBase
                 lastException = ex;
                 RecordRetry();
 
-                if (attempts <= _maxRetries)
-                {
-                    var delay = CalculateJitteredDelay(attempts);
-                    await Task.Delay(delay, cancellationToken);
-                }
+                var delay = CalculateJitteredDelay(attempts);
+                await Task.Delay(delay, cancellationToken);
             }
         }
 

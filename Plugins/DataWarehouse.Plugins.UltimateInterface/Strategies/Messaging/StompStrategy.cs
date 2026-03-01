@@ -340,10 +340,16 @@ internal sealed class StompStrategy : SdkInterface.InterfaceStrategyBase, IPlugi
 
     private async Task DeliverMessage(StompMessage message, CancellationToken cancellationToken)
     {
-        // Add to destination
+        // P2-3326: Cap each destination queue at 10,000 messages to prevent unbounded growth.
+        // When the cap is reached, evict the oldest (head) message (FIFO drop).
         _destinations.AddOrUpdate(message.Destination,
             _ => new List<StompMessage> { message },
-            (_, list) => { list.Add(message); return list; });
+            (_, list) =>
+            {
+                if (list.Count >= 10_000) list.RemoveAt(0);
+                list.Add(message);
+                return list;
+            });
 
         // Deliver to active subscriptions
         var matchingSubscriptions = _subscriptions.Values
