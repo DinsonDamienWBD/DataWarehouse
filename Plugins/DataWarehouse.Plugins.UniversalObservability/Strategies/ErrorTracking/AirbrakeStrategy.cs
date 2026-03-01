@@ -60,21 +60,30 @@ public sealed class AirbrakeStrategy : ObservabilityStrategyBase
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
         IncrementCounter("airbrake.metrics_sent");
-        // Airbrake supports performance metrics
+        // Finding 4613: Use metric metadata for HTTP method and status where present;
+        // fall back to sensible defaults rather than hardcoding GET/200 for every metric.
         foreach (var metric in metrics)
         {
+            // Airbrake routes-stats API expects HTTP method/status for route-level performance data.
+            // Labels "http.method" and "http.status_code" let callers supply real values.
+            var labelMap = metric.Labels?.ToDictionary(l => l.Name, l => l.Value, StringComparer.OrdinalIgnoreCase)
+                           ?? new Dictionary<string, string>();
+            var httpMethod = labelMap.TryGetValue("http.method", out var m) ? m : "POST";
+            var statusCode = labelMap.TryGetValue("http.status_code", out var sc)
+                && int.TryParse(sc, out var scInt) ? scInt : 0;
+
             var route = new
             {
-                method = "GET",
+                method = httpMethod,
                 route = $"/metrics/{metric.Name}",
-                statusCode = 200,
+                statusCode,
                 time = DateTimeOffset.UtcNow.ToString("o")
             };
 
             var timing = new
             {
                 value = metric.Value,
-                unit = "ms"
+                unit = labelMap.TryGetValue("unit", out var u) ? u : "ms"
             };
 
             var payload = new
@@ -319,17 +328,11 @@ public sealed class AirbrakeStrategy : ObservabilityStrategyBase
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("airbrake.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     protected override void Dispose(bool disposing)

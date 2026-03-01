@@ -6446,7 +6446,7 @@
 #4352 | Cat 6 | P1 | ChargeAwareSchedulingStrategy.cs:ScheduleWorkload:67 | **Fire-and-forget**: `_ = Task.Run(() => workload(CancellationToken.None))` — no await, no error handling, no cancellation propagation. Exceptions silently swallowed. [X]
 #4353 | Cat 6 | P2 | ChargeAwareSchedulingStrategy.cs:InitializeCoreAsync:43 | **Fire-and-forget in timer**: Timer callback `async _ => await CheckPowerStateAsync()` creates async void — any exception crashes the process. [X]
 #4354 | Cat 7 | P2 | MqttStreamingStrategy.cs:DisposeAsync:317 | **Resource leak on sync dispose path**: `Dispose(bool)` deliberately skips `_mqttClient` (cannot call async dispose from sync). Callers using only `Dispose()` leak the client. [X]
-#4355 | Cat 7 | LOW | KafkaStreamStrategy.cs:SubscribeAsync:225 | `RecordRead(msg.Data.Length, 0.1)` uses hardcoded latency value of `0.1` ms regardless of actual elapsed time. Latency metric is meaningless. [ ]
+#4355 | Cat 7 | LOW | KafkaStreamStrategy.cs:SubscribeAsync:225 | `RecordRead(msg.Data.Length, 0.1)` uses hardcoded latency value of `0.1` ms regardless of actual elapsed time. Latency metric is meaningless. [X]
 #4356 | Cat 9 | P2 | KafkaStreamStrategy.cs:PublishAsync:132-133 | **Wrong deduplication logic**: `_producerSequences.TryAdd(seq, true)` always succeeds because `seq` is monotonically incremented. The duplicate guard can never trigger. Idempotency claim incorrect. [X]
 #4357 | Cat 9 | P2 | PulsarStreamStrategy.cs:PublishAsync:126-128 | **Incorrect deduplication key**: Key includes user-supplied `message.Key` which can be null, and `msgId` is always unique — deduplication never fires for same-content messages. [X]
 #4358 | Cat 10 | P1 | ScalabilityStrategies.cs:PartitioningStrategy.AssignPartitionAsync:94 | **GetHashCode persistence violation**: `key.GetHashCode()` for partition assignment. Non-deterministic across restarts, breaks partitioning semantics. [X]
@@ -6457,11 +6457,11 @@
 #4363 | Cat 12 | LOW | NatsStreamStrategy.cs:SubscribeAsync:226-237 | **Logic bug — consumerIndex stale**: Index computed after add under concurrent access makes round-robin distribution assign to wrong consumer. [X]
 #4364 | Cat 13 | P2 | StateManagementStrategies.cs:ChangelogStateStrategy.CompactChangelogAsync | **Performance**: `GroupBy` + `OrderBy` on full changelog list under lock. For millions of entries, O(n log n) stop-the-world blocks all reads/writes. [X]
 #4365 | Cat 13 | P2 | ScalabilityStrategies.cs:AutoScalingStrategy.ReportMetricsAsync:314 | **Performance**: `RemoveAll(...)` inside lock on every metrics report is O(n). Circular buffer would be O(1). [X]
-#4366 | Cat 13 | LOW | StreamingInfrastructure.cs:RedisStreamsConsumerGroupManager.ReadGroup:53 | `Entries.Where(...).Take(count).ToList()` is O(n) linear scan per read on unindexed list. [ ]
+#4366 | Cat 13 | LOW | StreamingInfrastructure.cs:RedisStreamsConsumerGroupManager.ReadGroup:53 | `Entries.Where(...).Take(count).ToList()` is O(n) linear scan per read on unindexed list. [X]
 #4367 | Cat 14 | P2 | RabbitMqStreamStrategy.cs:CommitOffsetAsync:308 | **Missing null guard**: `consumerGroup.GroupId` accessed without null check. `GroupId` can be null on valid instance, causing NullReferenceException. [X]
-#4368 | Cat 14 | LOW | BatteryLevelMonitoringStrategy.cs:ReadLinuxBattery:87 | **Missing TryParse**: `int.Parse(File.ReadAllText(...).Trim())` — no guard for malformed kernel values. FormatException swallowed by outer catch, misreporting battery as absent. [ ]
-#4369 | Cat 15 | LOW | UltimateStreamingDataPlugin.cs:ProcessEventsAsync | **Contract lie**: `ProcessingLatency` never computed despite field existing. `TotalFailures` in `GetStatistics()` hardcoded to 0. [ ]
-#4370 | Cat 15 | LOW | MqttStreamingStrategy.cs:StreamExistsAsync | **Contract lie**: Returns true only if subscribed to topic, not whether topic exists at broker — completely different semantics. [ ]
+#4368 | Cat 14 | LOW | BatteryLevelMonitoringStrategy.cs:ReadLinuxBattery:87 | **Missing TryParse**: `int.Parse(File.ReadAllText(...).Trim())` — no guard for malformed kernel values. FormatException swallowed by outer catch, misreporting battery as absent. [X]
+#4369 | Cat 15 | LOW | UltimateStreamingDataPlugin.cs:ProcessEventsAsync | **Contract lie**: `ProcessingLatency` never computed despite field existing. `TotalFailures` in `GetStatistics()` hardcoded to 0. [X]
+#4370 | Cat 15 | LOW | MqttStreamingStrategy.cs:StreamExistsAsync | **Contract lie**: Returns true only if subscribed to topic, not whether topic exists at broker — completely different semantics. [X]
 
 
 ### Chunk 141 — UltimateStreamingData (Cloud/Kinesis+PubSub, EventDriven, FaultTolerance, Financial, Healthcare, Industrial, IoT, MQ/KafkaAdvanced)
@@ -6487,12 +6487,12 @@
 #4389 | Cat 9 | P2 | FhirStreamStrategy.cs:471-493 | **Contract lie**: `DeliverNotificationsAsync` sets `Success = true, HttpStatusCode = 200` without making any HTTP request. Failed deliveries cannot be detected or retried. [X]
 #4390 | Cat 5 | P2 | FhirStreamStrategy.cs:687-690 | **Silent catch**: `JsonException` catch in `PassesFilters` silently skips filter — corrupt resource passes all filters. Security-relevant pass-through with no logging. [X]
 #4391 | Cat 2 | P2 | EventDrivenArchitectureStrategies.cs:142 | **Thread safety**: `ReadEventsAsync` iterates `eventStore` list without acquiring lock while `AppendEventsAsync` holds lock during mutation. TOCTOU data race on concurrent read/append. [X]
-#4392 | Cat 1 | LOW | PubSubStreamStrategy.cs:812 | `DeadLetterMessage` hardcodes `CloudPubSubDeadLetterSourceSubscription` to literal "original-subscription" instead of actual subscription name. [ ]
-#4393 | Cat 15 | LOW | FixStreamStrategy.cs:388-390 | `LogoutAsync` sets state to Disconnected immediately — no actual FIN/LOGOUT exchange despite XML doc saying "Complete logout". [ ]
+#4392 | Cat 1 | LOW | PubSubStreamStrategy.cs:812 | `DeadLetterMessage` hardcodes `CloudPubSubDeadLetterSourceSubscription` to literal "original-subscription" instead of actual subscription name. [X]
+#4393 | Cat 15 | LOW | FixStreamStrategy.cs:388-390 | `LogoutAsync` sets state to Disconnected immediately — no actual FIN/LOGOUT exchange despite XML doc saying "Complete logout". [X]
 #4394 | Cat 4 | LOW | SwiftStreamStrategy.cs:216-217 | `BicRegex` and `CurrencyRegex` compiled without `RegexOptions.Timeout`. Defence-in-depth gap for unexpected input. [X]
-#4395 | Cat 13 | LOW | KafkaAdvancedFeatures.cs:125-133 | `PerformCooperativeStickyAssignment` hardcodes `12` as default partition count per topic with no configuration. [ ]
+#4395 | Cat 13 | LOW | KafkaAdvancedFeatures.cs:125-133 | `PerformCooperativeStickyAssignment` hardcodes `12` as default partition count per topic with no configuration. [X]
 #4396 | Cat 15 | LOW | KinesisStreamStrategy.cs:706 | Method name typo: `RoutToShard` should be `RouteToShard`. [X]
-#4397 | Cat 13 | LOW | MqttStreamStrategy.cs:237 + ZigbeeStreamStrategy.cs:225 | Both `SubscribeAsync` methods use O(n) linear scan over all topics/clusters. Acceptable for bounded collections but should use indexed lookup. [ ]
+#4397 | Cat 13 | LOW | MqttStreamStrategy.cs:237 + ZigbeeStreamStrategy.cs:225 | Both `SubscribeAsync` methods use O(n) linear scan over all topics/clusters. Acceptable for bounded collections but should use indexed lookup. [X]
 #4398 | Cat 9 | LOW | EventDrivenArchitectureStrategies.cs:125 | `storedEvents.First()` and `Last()` called without count guard. Empty events list throws `InvalidOperationException`. [X]
 
 
@@ -6542,12 +6542,12 @@
 #4449 | Cat 9 | P2 | PowercapEnergyMeasurementStrategy.cs:244 | **Missing TryParse**: `long.Parse(text.Trim())` on sysfs value without guard. Corrupt value throws FormatException bypassing specific catch blocks. Same at line 262 and RaplEnergyMeasurementStrategy.cs:219. [X]
 #4450 | Cat 9 | P2 | CpuFrequencyScalingStrategy.cs:259,265,271,311 | **Missing TryParse**: `long.Parse(File.ReadAllText(...).Trim())` on sysfs files. Parse errors hidden by silent `catch { }` at line 311. [X]
 #4451 | Cat 13 | P2 | ReservedCapacityOptimizationStrategy.cs:72 | **Performance**: `_usageHistory.RemoveAt(0)` is O(n) on every call at 10K entries. Should use Queue for O(1) removal. [X]
-#4452 | Cat 1 | LOW | PowerCappingStrategy.cs:255-259 | `IsAmdApmAvailable` always returns false — stub silently disables AMD APM for all users. [ ]
-#4453 | Cat 14 | LOW | ContainerDensityStrategy.cs:38,53,75,93 | Public methods accept string parameters without null/empty checks. Null keys cause ArgumentNullException without context. [ ]
-#4454 | Cat 14 | LOW | SpotInstanceStrategy.cs:43 | `RequestSpotInstance` doesn't validate `maxBidUsd` — zero or negative produces nonsense cost calculations. [ ]
-#4455 | Cat 14 | LOW | RightSizingStrategy.cs:79-82 | `Average()` and `Max()` on potentially empty `CpuSamples` throws InvalidOperationException. [ ]
-#4456 | Cat 14 | LOW | ServerlessOptimizationStrategy.cs:100 | `Average()` on filtered cold-start collection may be empty — throws if cold starts exist in count but not in bounded window. [ ]
-#4457 | Cat 15 | LOW | CpuFrequencyScalingStrategy.cs:290-297 | Comment "Using typical values for now" marks unimplemented Windows CPU detection via WMI. [ ]
+#4452 | Cat 1 | LOW | PowerCappingStrategy.cs:255-259 | `IsAmdApmAvailable` always returns false — stub silently disables AMD APM for all users. [X]
+#4453 | Cat 14 | LOW | ContainerDensityStrategy.cs:38,53,75,93 | Public methods accept string parameters without null/empty checks. Null keys cause ArgumentNullException without context. [X]
+#4454 | Cat 14 | LOW | SpotInstanceStrategy.cs:43 | `RequestSpotInstance` doesn't validate `maxBidUsd` — zero or negative produces nonsense cost calculations. [X]
+#4455 | Cat 14 | LOW | RightSizingStrategy.cs:79-82 | `Average()` and `Max()` on potentially empty `CpuSamples` throws InvalidOperationException. [X]
+#4456 | Cat 14 | LOW | ServerlessOptimizationStrategy.cs:100 | `Average()` on filtered cold-start collection may be empty — throws if cold starts exist in count but not in bounded window. [X]
+#4457 | Cat 15 | LOW | CpuFrequencyScalingStrategy.cs:290-297 | Comment "Using typical values for now" marks unimplemented Windows CPU detection via WMI. [X]
 #4458 | Cat 5 | LOW | EnergyMeasurementService.cs:305-308 | **Silent catch**: `catch { // Message bus publish failure is non-fatal }` — correct intent but no operational visibility into persistent publish failures. [X]
 
 
@@ -6563,9 +6563,9 @@
 #4431 | Cat 2 | P2 | GreenTieringStrategy.cs:488-489 | **Thread safety TOCTOU**: `_scanning` volatile bool read-check-set sequence allows two concurrent timer firings to both read false, both set true, and run scan concurrently. Should use `Interlocked.CompareExchange`. [X]
 #4432 | Cat 1 | P2 | StorageTieringStrategy.cs:63 | **TOCTOU**: `TrackObject` updates `_objects` inside lock then calls `EvaluateTieringRecommendations()` outside lock. Between release and recommendation, another thread can modify `_objects`. [X]
 #4433 | Cat 15 | P2 | PueTrackingStrategy.cs:57 | **Division by zero**: `RecordPue` computes `totalPowerKw / itLoadKw` with no guard against `itLoadKw == 0`. Public method — caller can trigger `double.PositiveInfinity` propagating into history and statistics. [X]
-#4434 | Cat 13 | LOW | GreenTieringStrategy.cs:174 | **Unnecessary allocation**: `GetPendingBatches()` chains `.ToArray().ToList().AsReadOnly()` — intermediate `ToArray()` is unnecessary. [ ]
-#4435 | Cat 13 | LOW | ColdDataCarbonMigrationStrategy.cs:594 | **Performance**: `_migrationHistory.ToArray().TakeLast(100).ToList()` snapshots entire queue (up to 10K entries) on every `GenerateRecommendations` call. Should use bounded circular buffer. [ ]
-#4436 | Cat 14 | LOW | PueTrackingStrategy.cs:57 | Related to #4433 — `RecordPue` public API accepts unvalidated doubles. Should reject non-positive `itLoadKw`. [ ]
+#4434 | Cat 13 | LOW | GreenTieringStrategy.cs:174 | **Unnecessary allocation**: `GetPendingBatches()` chains `.ToArray().ToList().AsReadOnly()` — intermediate `ToArray()` is unnecessary. [X]
+#4435 | Cat 13 | LOW | ColdDataCarbonMigrationStrategy.cs:594 | **Performance**: `_migrationHistory.ToArray().TakeLast(100).ToList()` snapshots entire queue (up to 10K entries) on every `GenerateRecommendations` call. Should use bounded circular buffer. [X]
+#4436 | Cat 14 | LOW | PueTrackingStrategy.cs:57 | Related to #4433 — `RecordPue` public API accepts unvalidated doubles. Should reject non-positive `itLoadKw`. [X]
 
 
 ### Chunk 146 — UltimateSustainability (ResourceEfficiency, Scheduling, Enhanced, RenewableRouting, ThermalManagement start)
@@ -6597,7 +6597,7 @@
 #4483 | Cat 3 | P2 | RenewableEnergyWindowStrategy.cs:41 | **Async void timer**: Same pattern as #4482. [X]
 #4484 | Cat 3 | P2 | OffPeakSchedulingStrategy.cs:57 | **Async void timer**: Same pattern as #4482. [X]
 #4485 | Cat 7 | LOW | SustainabilityRenewableRoutingStrategy.cs:30 | **Resource leak**: `HttpClient` constructed directly, never disposed. No IDisposable or DisposeCoreAsync override. [X]
-#4486 | Cat 15 | LOW | DiskSpinDownStrategy.cs:53 + NetworkPowerSavingStrategy.cs:53 + DemandResponseStrategy.cs:55 | **Contract lie**: async Task methods with no real async I/O — only synchronous ops + `Task.CompletedTask`. [ ]
+#4486 | Cat 15 | LOW | DiskSpinDownStrategy.cs:53 + NetworkPowerSavingStrategy.cs:53 + DemandResponseStrategy.cs:55 | **Contract lie**: async Task methods with no real async I/O — only synchronous ops + `Task.CompletedTask`. [X]
 
 
 ### Chunk 147 — UltimateSustainability (ThermalManagement end, StrategyBase, Plugin) + UltimateWorkflow (all strategies + Plugin)
@@ -6633,13 +6633,13 @@
 #4515 | Cat 11 | P2 | DistributedStrategies.cs:99 | **Architectural**: `LeaderFollowerStrategy` hardcodes `_currentLeader = "leader-1"` and 3 follower strings. No real leader election or failover. [X]
 #4516 | Cat 15 | P2 | DistributedStrategies.cs:284-338 | **Contract lie**: `RaftConsensusStrategy` has no Raft algorithm — no leader election, no log replication, no term handling, no quorum. [X]
 #4517 | Cat 15 | P2 | DistributedStrategies.cs:218-278 | **Contract lie**: `GossipCoordinationStrategy` has no gossip protocol — no node membership, no anti-entropy, no rumor spreading. [X]
-#4518 | Cat 15 | LOW | ThermalThrottlingStrategy.cs:70 | Switch uses literal constants instead of configurable properties. `EmergencyShutdownC` etc. are settable but never read. [ ]
+#4518 | Cat 15 | LOW | ThermalThrottlingStrategy.cs:70 | Switch uses literal constants instead of configurable properties. `EmergencyShutdownC` etc. are settable but never read. [X]
 #4519 | Cat 14 | LOW | PipelineScalingManager.cs:232 | Missing validation: `stageIndex` not checked for negative values. [X]
 #4520 | Cat 13 | LOW | WorkflowStrategyBase.cs:202-214 | `HasCycle` uses O(n) `Tasks.Find` per task — O(n^2) cycle detection. Should pre-build dictionary. [X]
 #4521 | Cat 13 | LOW | WorkflowStrategyBase.cs:219-238 | `GetTopologicalOrder` uses O(n) `Where(Contains)` per task — O(n^2) sort. Should pre-build reverse adjacency list. [X]
-#4522 | Cat 14 | LOW | WorkflowStrategyBase.cs:419 | `ExecuteTaskAsync` returns `TaskResult.Failed` for null handler — no way to distinguish "no handler" from execution failure. [ ]
-#4523 | Cat 15 | LOW | DistributedStrategies.cs:326-328 | `Task.Delay(1)` described as commit log delay is purely decorative. [ ]
-#4524 | Cat 11 | LOW | WorkflowAdvancedFeatures.cs:166-220 | `CancelChildren` sets status to Cancelled but no CancellationToken plumbing — cancellation is cosmetic. [ ]
+#4522 | Cat 14 | LOW | WorkflowStrategyBase.cs:419 | `ExecuteTaskAsync` returns `TaskResult.Failed` for null handler — no way to distinguish "no handler" from execution failure. [X]
+#4523 | Cat 15 | LOW | DistributedStrategies.cs:326-328 | `Task.Delay(1)` described as commit log delay is purely decorative. [X]
+#4524 | Cat 11 | LOW | WorkflowAdvancedFeatures.cs:166-220 | `CancelChildren` sets status to Cancelled but no CancellationToken plumbing — cancellation is cosmetic. [X]
 #4525 | Cat 14 | LOW | UltimateWorkflowPlugin.cs:240-243 | `DefineWorkflow` validates DAG is acyclic but doesn't validate dependency refs resolve to existing task IDs. [X]
 #4526 | Cat 13 | LOW | UltimateSustainabilityPlugin.cs:208-230 | `DeclaredCapabilities` getter allocates new list and iterates strategies on every call. Should cache. [X]
 
@@ -6669,11 +6669,11 @@
 #4547 | Cat 14 | P2 | S3CredentialStore.cs:73-91 | **Missing validation**: `CreateCredentials` doesn't validate empty `userId` or empty strings in `allowedBuckets`. [X]
 #4548 | Cat 11 | P2 | S3HttpServer.cs:62-79 | **Architectural**: Duplicate bucket registry — `_bucketRegistry` in S3HttpServer AND `S3BucketManager` with no sync between them. [X]
 #4549 | Cat 12 | P2 | LiveMigrationEngine.cs:163-185 | **Performance/Logic**: Full object list materialized into `List<T>` before parallelism. Unbounded memory for large migrations. [X]
-#4550 | Cat 12 | LOW | AddressRouter.cs:137-138 | `NetworkEndpointAddress` silently falls back to `_defaultBackendId` when no match — may route data to unintended target. [ ]
-#4551 | Cat 12 | LOW | MigrationProgress.cs:74-76 | `EstimatedRemaining` can return negative TimeSpan when `MigratedBytes > TotalBytes` due to torn read. [ ]
-#4552 | Cat 13 | LOW | BackendAbstractionLayer.cs:380 | `EnableMetrics` option exists but metrics collection never implemented — flag never read. [ ]
-#4553 | Cat 15 | LOW | PlacementOptimizer.cs:406-420 | `MatchesBackendForExclusion` uses `RequiredTags` inverted — asymmetric with `MatchesBackend`. Confusing semantics. [ ]
-#4554 | Cat 14 | LOW | S3BucketManager.cs:116-133 | `DeleteBucket` relies on `ObjectCount` which is caller-maintained. Non-empty bucket can be deleted if stats stale. [ ]
+#4550 | Cat 12 | LOW | AddressRouter.cs:137-138 | `NetworkEndpointAddress` silently falls back to `_defaultBackendId` when no match — may route data to unintended target. [X]
+#4551 | Cat 12 | LOW | MigrationProgress.cs:74-76 | `EstimatedRemaining` can return negative TimeSpan when `MigratedBytes > TotalBytes` due to torn read. [X]
+#4552 | Cat 13 | LOW | BackendAbstractionLayer.cs:380 | `EnableMetrics` option exists but metrics collection never implemented — flag never read. [X]
+#4553 | Cat 15 | LOW | PlacementOptimizer.cs:406-420 | `MatchesBackendForExclusion` uses `RequiredTags` inverted — asymmetric with `MatchesBackend`. Confusing semantics. [X]
+#4554 | Cat 14 | LOW | S3BucketManager.cs:116-133 | `DeleteBucket` relies on `ObjectCount` which is caller-maintained. Non-empty bucket can be deleted if stats stale. [X]
 
 
 ### Chunk 149 — UniversalFabric (S3Server end, Scaling, Plugin) + UniversalObservability (APM, Alerting start)
@@ -6706,11 +6706,11 @@
 #4580 | Cat 12 | P2 | DynatraceStrategy.cs:53-54 | **Logic bug**: MINT metric line format incorrect — bare float instead of `gauge,value=N` framing. Rejected by ingest. [X]
 #4581 | Cat 12 | P2 | VictorOpsStrategy.cs:110 | **Logic bug**: `LogLevel.Error` maps to VictorOps "WARNING" instead of "CRITICAL". [X]
 #4582 | Cat 14 | P2 | NewRelicStrategy.cs:140-145 | **Missing validation**: `InitializeAsyncCore` doesn't validate licenseKey or accountId. Empty key causes runtime 403s with no early failure. [X]
-#4583 | Cat 15 | LOW | S3RequestParser.cs:396-397 | Empty `sourceKey` from `/bucket/` accepted without validation. [ ]
-#4584 | Cat 15 | LOW | AppDynamicsStrategy.cs:148-158 | `ShutdownAsyncCore` uses `Task.Delay(100ms)` as grace period — meaningless. Same in all 10 APM/alerting strategies. [ ]
-#4585 | Cat 9 | LOW | ElasticApmStrategy.cs:221-222 | Duplicate `/// <inheritdoc/>` comment. Same in InstanaStrategy, SensuStrategy, VictorOpsStrategy. [ ]
-#4586 | Cat 15 | LOW | AlertManagerStrategy.cs:70 | `GetAlertsAsync` returns raw JSON string — callers must re-parse. [ ]
-#4587 | Cat 12 | LOW | S3SignatureV4.cs:610 | `ParseQueryString` uses OrdinalIgnoreCase for case-sensitive AWS query params. Silently accepts malformed requests. [ ]
+#4583 | Cat 15 | LOW | S3RequestParser.cs:396-397 | Empty `sourceKey` from `/bucket/` accepted without validation. [X]
+#4584 | Cat 15 | LOW | AppDynamicsStrategy.cs:148-158 | `ShutdownAsyncCore` uses `Task.Delay(100ms)` as grace period — meaningless. Same in all 10 APM/alerting strategies. [X]
+#4585 | Cat 9 | LOW | ElasticApmStrategy.cs:221-222 | Duplicate `/// <inheritdoc/>` comment. Same in InstanaStrategy, SensuStrategy, VictorOpsStrategy. [X]
+#4586 | Cat 15 | LOW | AlertManagerStrategy.cs:70 | `GetAlertsAsync` returns raw JSON string — callers must re-parse. [X]
+#4587 | Cat 12 | LOW | S3SignatureV4.cs:610 | `ParseQueryString` uses OrdinalIgnoreCase for case-sensitive AWS query params. Silently accepts malformed requests. [X]
 
 
 ### Chunk 150 — UniversalObservability (ErrorTracking, Health, Logging start)
@@ -6740,9 +6740,9 @@
 #4610 | Cat 13 | P2 | LokiStrategy.cs:90 | **Precision loss**: Nanosecond timestamps computed from milliseconds lose sub-ms precision. Same-millisecond logs share timestamp. [X]
 #4611 | Cat 14 | P2 | NagiosStrategy.cs:64-65 | **Missing sanitization**: `plugin_output` not sanitized for pipe/newline. Corrupts Nagios CGI passive check format. [X]
 #4612 | Cat 14 | P2 | IcingaStrategy.cs:86-87 | **Filter injection**: `SanitizeName` doesn't handle `\"` or backtick — allows malformed filter expression to Icinga API. [X]
-#4613 | Cat 15 | LOW | AirbrakeStrategy.cs:33-39 | `SupportsMetrics=true` but metrics sent as fake route data with hardcoded `method=GET, statusCode=200`. [ ]
-#4614 | Cat 15 | LOW | KubernetesProbesStrategy.cs:29-31 | `SupportsAlerting=false` misrepresents that probes affect traffic routing and pod restarts. [ ]
-#4615 | Cat 9 | LOW | Multiple files | Duplicate `/// <inheritdoc/>` orphaned XML doc tags in 6 strategy files. [ ]
+#4613 | Cat 15 | LOW | AirbrakeStrategy.cs:33-39 | `SupportsMetrics=true` but metrics sent as fake route data with hardcoded `method=GET, statusCode=200`. [X]
+#4614 | Cat 15 | LOW | KubernetesProbesStrategy.cs:29-31 | `SupportsAlerting=false` misrepresents that probes affect traffic routing and pod restarts. [X]
+#4615 | Cat 9 | LOW | Multiple files | Duplicate `/// <inheritdoc/>` orphaned XML doc tags in 6 strategy files. [X]
 #4616 | Cat 12 | LOW | ConsulHealthStrategy.cs:152-158 | `LoggingAsyncCore` never calls `PassTtlCheckAsync` — health check stuck in warn/fail state. [X]
 #4617 | Cat 12 | LOW | GraylogStrategy.cs:106 | CancellationToken not forwarded in `SendUdpAsync`. [X]
 #4618 | Cat 13 | LOW | FluentdStrategy.cs:48-70 | JSON array sent to Fluentd HTTP input — treated as single event, not multiple. [X]
@@ -6778,12 +6778,12 @@
 #4644 | Cat 12 | P2 | StackdriverStrategy.cs:310-311 | **Logic bug**: Counter metric `startTime` hardcoded as `Timestamp.AddMinutes(-1)`. Fabricated interval causes API validation errors. [X]
 #4645 | Cat 12 | P0 | DatadogStrategy.cs:131 | **Arithmetic overflow**: `span.StartTime.ToUnixTimeMilliseconds() * 1_000_000` overflows `long` for 2026+ timestamps. Span timestamps silently wrap to negative values. [X]
 #4646 | Cat 15 | LOW | SplunkStrategy.cs:34-43 | `new HttpClient()` per strategy instance — socket exhaustion. Same in 11 other strategy files. [X]
-#4647 | Cat 15 | LOW | SumoLogicStrategy.cs:21 | `_sourceHost = Environment.MachineName` at field init — stale if container renamed. [ ]
-#4648 | Cat 9 | LOW | Multiple files | Duplicate `/// <inheritdoc/>` in 10+ strategy files. [ ]
+#4647 | Cat 15 | LOW | SumoLogicStrategy.cs:21 | `_sourceHost = Environment.MachineName` at field init — stale if container renamed. [X]
+#4648 | Cat 9 | LOW | Multiple files | Duplicate `/// <inheritdoc/>` in 10+ strategy files. [X]
 #4649 | Cat 13 | LOW | CloudWatchStrategy.cs:28 | `PutLogEvents` chunks at 10K events but doesn't enforce 1MB payload limit. [X]
 #4650 | Cat 14 | LOW | StatsDStrategy.cs:51-61 | `Dns.GetHostAddresses(host)[0]` without null check on result array. [X]
 #4651 | Cat 14 | LOW | InfluxDbStrategy.cs:139-149 | Flux query interpolates `_bucket` and `metricName` without escaping — query injection risk. [X]
-#4652 | Cat 9 | LOW | StackdriverStrategy.cs:497 | Fragile lock usage: `_flushLock.Wait()` then `Task.Run().Wait()` while holding semaphore — correct only by implementation assumption. [ ]
+#4652 | Cat 9 | LOW | StackdriverStrategy.cs:497 | Fragile lock usage: `_flushLock.Wait()` then `Task.Run().Wait()` while holding semaphore — correct only by implementation assumption. [X]
 
 
 ### Chunk 152 — UniversalObservability (RealUserMonitoring, ResourceMonitoring, ServiceMesh, SyntheticMonitoring, Tracing, Plugin)

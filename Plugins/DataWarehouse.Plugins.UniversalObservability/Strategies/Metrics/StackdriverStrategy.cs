@@ -513,15 +513,22 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
         {
             _flushTimer?.Stop();
             _flushTimer?.Dispose();
-            // Bounded flush: acquire lock, flush both queues, release
+            // Finding 4652: avoid sync-over-async deadlock by running flush on the thread-pool
+            // rather than calling GetAwaiter().GetResult() on the calling (potentially UI/sync) thread.
             if (_flushLock.Wait(TimeSpan.FromSeconds(5)))
             {
                 try
                 {
                     using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
-                    try { FlushMetricsAsync(cts.Token).GetAwaiter().GetResult(); } catch { /* Best-effort */ }
-                    try { FlushLogsAsync(cts.Token).GetAwaiter().GetResult(); } catch { /* Best-effort */ }
+                    // Task.Run offloads to the thread-pool, avoiding SynchronizationContext deadlocks.
+                    var flushTask = Task.Run(async () =>
+                    {
+                        try { await FlushMetricsAsync(cts.Token).ConfigureAwait(false); } catch { /* Best-effort */ }
+                        try { await FlushLogsAsync(cts.Token).ConfigureAwait(false); } catch { /* Best-effort */ }
+                    }, cts.Token);
+                    flushTask.Wait(4000);
                 }
+                catch { /* Dispose must not throw */ }
                 finally
                 {
                     _flushLock.Release();

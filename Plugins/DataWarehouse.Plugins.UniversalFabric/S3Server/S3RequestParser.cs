@@ -400,6 +400,10 @@ public sealed class S3RequestParser
         var sourceBucket = decoded[..slashIndex];
         var sourceKey = decoded[(slashIndex + 1)..];
 
+        // Finding 4583: reject empty sourceKey (e.g. copy-source = /bucket/).
+        if (string.IsNullOrEmpty(sourceKey))
+            throw new ArgumentException($"Invalid x-amz-copy-source '{copySource}': source key is empty.");
+
         return new S3CopyObjectRequest
         {
             SourceBucket = sourceBucket,

@@ -610,7 +610,8 @@ public sealed class S3SignatureV4 : IS3AuthProvider
     /// </summary>
     private static Dictionary<string, string> ParseQueryString(string queryString)
     {
-        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        // Finding 4587: AWS query param names are case-sensitive — use Ordinal, not OrdinalIgnoreCase.
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
 
         if (string.IsNullOrEmpty(queryString))
         {

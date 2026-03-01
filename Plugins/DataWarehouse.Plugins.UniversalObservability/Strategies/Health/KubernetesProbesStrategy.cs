@@ -28,7 +28,10 @@ public sealed class KubernetesProbesStrategy : ObservabilityStrategyBase
 
     public KubernetesProbesStrategy() : base(new ObservabilityCapabilities(
         SupportsMetrics: false, SupportsTracing: false, SupportsLogging: false,
-        SupportsDistributedTracing: false, SupportsAlerting: false,
+        SupportsDistributedTracing: false,
+        // Finding 4614: liveness/readiness probe failures cause Kubernetes to redirect traffic
+        // away from the pod and trigger pod restarts — this is alerting/remediation behaviour.
+        SupportsAlerting: true,
         SupportedExporters: new[] { "Kubernetes", "K8sProbes", "HTTP" }))
     {
     }

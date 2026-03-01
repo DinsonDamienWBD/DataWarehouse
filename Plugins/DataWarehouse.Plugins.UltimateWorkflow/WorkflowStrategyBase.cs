@@ -107,6 +107,16 @@ public sealed record TaskResult
 
     public static TaskResult Failed(string error, TimeSpan? duration = null) =>
         new() { Success = false, Error = error, Duration = duration ?? TimeSpan.Zero };
+
+    /// <summary>
+    /// Returns a result indicating the task had no handler registered.
+    /// Callers can distinguish this from an execution failure by checking <see cref="IsNoHandlerError"/>.
+    /// </summary>
+    public static TaskResult NoHandler() =>
+        new() { Success = false, Error = "No handler defined for task", IsNoHandlerError = true };
+
+    /// <summary>True when the failure is specifically because no handler was registered for the task.</summary>
+    public bool IsNoHandlerError { get; init; }
 }
 
 /// <summary>
@@ -434,7 +444,8 @@ public abstract class WorkflowStrategyBase
         CancellationToken cancellationToken)
     {
         if (task.Handler == null)
-            return TaskResult.Failed("No handler defined for task");
+            // Finding 4522: use dedicated factory so callers can distinguish missing handler from execution failure.
+            return TaskResult.NoHandler();
 
         if (task.Condition != null && !task.Condition(context))
             return new TaskResult { Success = true, Output = null, Duration = TimeSpan.Zero };
