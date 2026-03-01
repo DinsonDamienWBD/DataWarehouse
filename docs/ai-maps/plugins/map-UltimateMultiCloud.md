@@ -756,8 +756,9 @@ public sealed class ReplicationTask
 public sealed class VectorClock
 {
 }
-    public Dictionary<string, long> Clocks { get; };
+    public IReadOnlyDictionary<string, long> Clocks;;
     public void Increment(string nodeId);;
+    public void Merge(VectorClock other);
 }
 ```
 ```csharp
@@ -2227,6 +2228,16 @@ public sealed class IaCPortabilityStrategy : MultiCloudStrategyBase
     public ConversionResult ConvertTemplate(string templateId, IaCFormat targetFormat);
     public ValidationResult ValidateForProvider(string templateId, string targetProvider);
     protected override string? GetCurrentState();;
+}
+```
+```csharp
+private sealed class GenericCloudResource
+{
+}
+    public required string LogicalId { get; init; }
+    public required string ResourceType { get; init; }
+    public required Dictionary<string, string> Properties { get; init; }
+    public string? OriginalType { get; init; }
 }
 ```
 ```csharp
