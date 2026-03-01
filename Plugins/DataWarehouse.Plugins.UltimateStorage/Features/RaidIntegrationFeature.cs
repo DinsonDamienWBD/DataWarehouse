@@ -80,12 +80,18 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         /// <param name="raidLevel">RAID level (0, 1, 5, 6, 10).</param>
         /// <param name="backendIds">Backend strategy IDs to include in the array.</param>
         /// <param name="stripeSize">Stripe size in bytes (for RAID 0, 5, 6).</param>
+        /// <param name="perBackendCapacityBytes">
+        /// Capacity of each backend in bytes. Used to compute total array capacity.
+        /// Finding 3862: was hardcoded to 1 TB; now caller-supplied so actual backend sizes are reflected.
+        /// Defaults to 1 TB when the backend does not expose a capacity API.
+        /// </param>
         /// <returns>The created RAID array.</returns>
         public async Task<RaidArray> CreateRaidArrayAsync(
             string arrayId,
             RaidLevel raidLevel,
             IEnumerable<string> backendIds,
-            int stripeSize = 65536)
+            int stripeSize = 65536,
+            long perBackendCapacityBytes = 1_000_000_000_000L)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(arrayId);
             ArgumentNullException.ThrowIfNull(backendIds);
@@ -118,7 +124,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 StripeSize = stripeSize,
                 CreatedTime = DateTime.UtcNow,
                 State = RaidArrayState.Online,
-                TotalCapacityBytes = CalculateTotalCapacity(raidLevel, backends.Count, 1_000_000_000_000) // Assume 1TB per backend
+                TotalCapacityBytes = CalculateTotalCapacity(raidLevel, backends.Count, perBackendCapacityBytes)
             };
 
             if (!_raidArrays.TryAdd(arrayId, array))

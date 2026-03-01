@@ -282,8 +282,16 @@ internal sealed class ModbusStreamStrategy : StreamingDataStrategyBase
     public override string[] Tags => ["modbus", "scada", "plc", "industrial", "registers", "polling"];
 
     /// <summary>
-    /// Creates a polling group for periodic data collection from a Modbus device.
+    /// Registers a polling group configuration for periodic register collection from a Modbus device.
     /// </summary>
+    /// <remarks>
+    /// Finding 4388: this method registers the polling parameters and initialises an in-process
+    /// register cache (65 536 holding registers per device address), but does not open a TCP or
+    /// serial connection to the device. <see cref="ReadRegistersAsync"/> returns values from the
+    /// in-process cache, which must be populated by an external Modbus transport adapter.
+    /// Real device communication (TCP/RTU/ASCII) is the responsibility of the adapter layer that
+    /// drives <see cref="WriteRegistersAsync"/> after reading from the physical bus.
+    /// </remarks>
     /// <param name="config">Polling configuration with register maps.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The polling group ID.</returns>
@@ -300,7 +308,7 @@ internal sealed class ModbusStreamStrategy : StreamingDataStrategyBase
         _pollingGroups[config.GroupId] = config;
         _dataQueues[config.GroupId] = new ConcurrentQueue<ModbusReadResult>();
 
-        // Initialize register state for the device
+        // Initialize register cache for the device (in-process, not connected to physical device)
         var stateKey = $"{config.Connection.Host}:{config.Connection.Port}:{config.Connection.UnitId}";
         _registerState.TryAdd(stateKey, new ushort[65536]);
 

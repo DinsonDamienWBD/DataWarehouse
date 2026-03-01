@@ -240,6 +240,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
             ArgumentNullException.ThrowIfNull(keys);
+            // Finding 3867: validate source and target backends BEFORE adding job to _activeJobs
+            // so failed-validation jobs are never visible via GetActiveJobs().
+            ArgumentException.ThrowIfNullOrWhiteSpace(sourceBackendId);
+            ArgumentException.ThrowIfNullOrWhiteSpace(targetBackendId);
+            if (_registry.Get(sourceBackendId) == null)
+                throw new ArgumentException($"Source backend '{sourceBackendId}' not found in registry.", nameof(sourceBackendId));
+            if (_registry.Get(targetBackendId) == null)
+                throw new ArgumentException($"Target backend '{targetBackendId}' not found in registry.", nameof(targetBackendId));
 
             options ??= MigrationOptions.Default;
 
@@ -251,7 +259,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 StartTime = DateTime.UtcNow
             };
 
-            // Create migration job
+            // Create migration job — validation already passed; safe to add to active jobs
             var jobId = Guid.NewGuid().ToString("N");
             var job = new MigrationJob
             {

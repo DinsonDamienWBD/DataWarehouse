@@ -31,18 +31,20 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
     /// </remarks>
     public class SemanticTrafficCompressionStrategy : ConnectionStrategyBase
     {
-        private static readonly Dictionary<string, CompressionProfile> PayloadProfiles = new(StringComparer.OrdinalIgnoreCase)
-        {
-            ["json"] = new("zstd", 3, true, "High redundancy in keys, excellent dictionary compression"),
-            ["protobuf"] = new("lz4", 1, false, "Already compact, fast compression preferred"),
-            ["avro"] = new("snappy", 1, false, "Schema-encoded, moderate redundancy"),
-            ["parquet"] = new("zstd", 1, false, "Columnar format, per-column codecs preferred"),
-            ["csv"] = new("zstd", 5, true, "High redundancy in headers and repeated values"),
-            ["text"] = new("brotli", 4, true, "Natural language benefits from Brotli's dictionary"),
-            ["binary"] = new("lz4", 1, false, "Unknown structure, prioritize speed"),
-            ["xml"] = new("zstd", 4, true, "High tag redundancy, excellent dictionary compression"),
-            ["msgpack"] = new("lz4", 2, false, "Compact binary format, moderate compression")
-        };
+        // Finding 1973: Expose as IReadOnlyDictionary to prevent external mutation of the profile table.
+        private static readonly IReadOnlyDictionary<string, CompressionProfile> PayloadProfiles =
+            new Dictionary<string, CompressionProfile>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["json"] = new("zstd", 3, true, "High redundancy in keys, excellent dictionary compression"),
+                ["protobuf"] = new("lz4", 1, false, "Already compact, fast compression preferred"),
+                ["avro"] = new("snappy", 1, false, "Schema-encoded, moderate redundancy"),
+                ["parquet"] = new("zstd", 1, false, "Columnar format, per-column codecs preferred"),
+                ["csv"] = new("zstd", 5, true, "High redundancy in headers and repeated values"),
+                ["text"] = new("brotli", 4, true, "Natural language benefits from Brotli's dictionary"),
+                ["binary"] = new("lz4", 1, false, "Unknown structure, prioritize speed"),
+                ["xml"] = new("zstd", 4, true, "High tag redundancy, excellent dictionary compression"),
+                ["msgpack"] = new("lz4", 2, false, "Compact binary format, moderate compression")
+            };
 
         /// <inheritdoc/>
         public override string StrategyId => "innovation-semantic-compression";

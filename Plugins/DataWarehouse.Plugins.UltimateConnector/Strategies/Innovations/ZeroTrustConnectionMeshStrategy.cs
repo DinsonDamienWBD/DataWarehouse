@@ -137,10 +137,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             client.DefaultRequestHeaders.Add("X-ZT-Session-Token", sessionToken);
 
             var connectionId = $"zt-{Guid.NewGuid():N}";
+            // Finding 1974: Do NOT store session_token in ConnectionInfo — it is a sensitive credential
+            // that would be exposed via health check serialization and logging. Store only non-sensitive metadata.
             var info = new Dictionary<string, object>
             {
                 ["endpoint"] = endpoint,
-                ["session_token"] = sessionToken,
                 ["trust_score"] = trustScore,
                 ["scopes"] = requiredScopes,
                 ["device_id"] = devicePosture["device_id"]!,
@@ -148,6 +149,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 ["last_auth_at"] = DateTimeOffset.UtcNow,
                 ["connected_at"] = DateTimeOffset.UtcNow,
                 ["auth_events"] = new List<string> { $"initial_auth:{DateTimeOffset.UtcNow:O}" }
+                // session_token intentionally omitted — held as Bearer header on HttpClient only
             };
 
             var handle = new DefaultConnectionHandle(client, info, connectionId);
