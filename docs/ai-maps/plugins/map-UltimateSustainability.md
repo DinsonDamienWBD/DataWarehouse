@@ -3430,6 +3430,7 @@ public sealed class CarbonOffsettingStrategy : SustainabilityStrategyBase
     public override SustainabilityCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
+    public Func<IReadOnlyList<OffsetProjectType>, double, IReadOnlyList<OffsetProjectRecommendation>>? ProjectCatalogProvider { get; set; }
     public double TotalEmissionsGrams
 {
     get
