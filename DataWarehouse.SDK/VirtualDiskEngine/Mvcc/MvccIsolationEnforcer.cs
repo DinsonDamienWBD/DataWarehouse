@@ -185,9 +185,9 @@ public sealed class MvccIsolationEnforcer
     /// <remarks>
     /// Cat 13 (finding 883): the inner <c>foreach (_committedWrites)</c> is O(n) over all
     /// committed-but-not-yet-pruned transactions. Pruning is performed via
-    /// <see cref="PruneOldCommits"/> which removes entries below the minimum active snapshot.
+    /// <see cref="PruneCommittedWrites"/> which removes entries below the minimum active snapshot.
     /// Under sustained high-throughput workloads without pruning this degrades to O(n²) per
-    /// commit wave. Mitigations: call <see cref="PruneOldCommits"/> frequently, or replace
+    /// commit wave. Mitigations: call <see cref="PruneCommittedWrites"/> frequently, or replace
     /// <c>_committedWrites</c> with an interval-tree keyed on commitSequence for O(log n)
     /// range queries.
     /// </remarks>
