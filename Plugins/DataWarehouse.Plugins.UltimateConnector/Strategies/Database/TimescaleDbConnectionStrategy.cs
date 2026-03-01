@@ -136,12 +136,22 @@ public sealed class TimescaleDbConnectionStrategy : DatabaseConnectionStrategyBa
             }
 
             await using var cmd = new NpgsqlCommand("SELECT extversion FROM pg_extension WHERE extname='timescaledb'", connection);
-            var tsVersion = await cmd.ExecuteScalarAsync(ct) as string ?? "Unknown";
+            // Finding 1899: Null result means extension not installed — report as unhealthy.
+            var tsVersionObj = await cmd.ExecuteScalarAsync(ct);
             sw.Stop();
+
+            if (tsVersionObj == null || tsVersionObj == DBNull.Value)
+            {
+                return new ConnectionHealth(
+                    IsHealthy: false,
+                    StatusMessage: "TimescaleDB extension not installed on this PostgreSQL server",
+                    Latency: sw.Elapsed,
+                    CheckedAt: DateTimeOffset.UtcNow);
+            }
 
             return new ConnectionHealth(
                 IsHealthy: true,
-                StatusMessage: $"TimescaleDB {tsVersion} (PostgreSQL {connection.ServerVersion}) - Database: {connection.Database}",
+                StatusMessage: $"TimescaleDB {tsVersionObj} (PostgreSQL {connection.ServerVersion}) - Database: {connection.Database}",
                 Latency: sw.Elapsed,
                 CheckedAt: DateTimeOffset.UtcNow);
         }

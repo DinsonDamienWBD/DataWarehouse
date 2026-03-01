@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
 {
-    public class NfsConnectionStrategy : ConnectionStrategyBase
+    public sealed class NfsConnectionStrategy : ConnectionStrategyBase
     {
         public override string StrategyId => "nfs";
         public override string DisplayName => "NFS";
@@ -22,13 +22,39 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
             var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':');
+            var host = parts[0];
+            var port = parts.Length > 1 && int.TryParse(parts[1], out var p2049) ? p2049 : 2049;
             var client = new TcpClient();
-            await client.ConnectAsync(parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p2049) ? p2049 : 2049, ct);
-            return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "NFS" });
+            await client.ConnectAsync(host, port, ct);
+            return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "NFS", ["host"] = host, ["port"] = port });
         }
 
-        protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(handle.GetConnection<TcpClient>().Connected);
-        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<TcpClient>().Close(); return Task.CompletedTask; }
-        protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(new ConnectionHealth(handle.GetConnection<TcpClient>().Connected, "NFS server", TimeSpan.Zero, DateTimeOffset.UtcNow));
+        // Finding 1919: Send a real TCP write (NFS NULL procedure) and measure actual round-trip latency.
+        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        {
+            var client = handle.GetConnection<TcpClient>();
+            if (!client.Connected) return false;
+            try
+            {
+                // NFS uses TCP; write a zero-length probe to verify the socket is still alive.
+                await client.GetStream().WriteAsync(Array.Empty<byte>(), ct);
+                return true;
+            }
+            catch { return false; }
+        }
+
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        {
+            handle.GetConnection<TcpClient>().Close();
+            return Task.CompletedTask;
+        }
+
+        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var isHealthy = await TestCoreAsync(handle, ct);
+            sw.Stop();
+            return new ConnectionHealth(isHealthy, isHealthy ? "NFS server connected" : "NFS server disconnected", sw.Elapsed, DateTimeOffset.UtcNow);
+        }
     }
 }

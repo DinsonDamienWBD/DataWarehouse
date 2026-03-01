@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
 {
-    public class HdfsConnectionStrategy : ConnectionStrategyBase
+    public sealed class HdfsConnectionStrategy : ConnectionStrategyBase
     {
         public override string StrategyId => "hdfs";
         public override string DisplayName => "HDFS";

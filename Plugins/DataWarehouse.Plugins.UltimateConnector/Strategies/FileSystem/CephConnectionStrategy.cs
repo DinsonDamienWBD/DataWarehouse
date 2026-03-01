@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
 {
-    public class CephConnectionStrategy : ConnectionStrategyBase
+    public sealed class CephConnectionStrategy : ConnectionStrategyBase
     {
         public override string StrategyId => "ceph";
         public override string DisplayName => "Ceph";

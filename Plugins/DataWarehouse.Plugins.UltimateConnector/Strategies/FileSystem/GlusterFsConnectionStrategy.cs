@@ -12,7 +12,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
     /// GlusterFS connection strategy using REST management API (glusterd2).
     /// Connects to GlusterFS cluster via HTTP-based management API.
     /// </summary>
-    public class GlusterFsConnectionStrategy : ConnectionStrategyBase
+    public sealed class GlusterFsConnectionStrategy : ConnectionStrategyBase
     {
         /// <inheritdoc/>
         public override string StrategyId => "fs-glusterfs";

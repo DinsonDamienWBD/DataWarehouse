@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Healthcare
 {
-    public class NcpdpConnectionStrategy : HealthcareConnectionStrategyBase
+    public sealed class NcpdpConnectionStrategy : HealthcareConnectionStrategyBase
     {
         public override string StrategyId => "ncpdp";
         public override string DisplayName => "NCPDP";
@@ -26,9 +26,24 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Healthcare
             return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "NCPDP/TCP" });
         }
 
-        protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(handle.GetConnection<TcpClient>().Connected);
+        // Finding 1919: Use live socket probe instead of stale Connected flag.
+        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        {
+            var client = handle.GetConnection<TcpClient>();
+            if (!client.Connected) return false;
+            try { await client.GetStream().WriteAsync(Array.Empty<byte>(), ct); return true; }
+            catch { return false; }
+        }
+
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<TcpClient>().Close(); return Task.CompletedTask; }
-        protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(new ConnectionHealth(handle.GetConnection<TcpClient>().Connected, "NCPDP server", TimeSpan.Zero, DateTimeOffset.UtcNow));
+
+        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var isHealthy = await TestCoreAsync(handle, ct);
+            sw.Stop();
+            return new ConnectionHealth(isHealthy, isHealthy ? "NCPDP server connected" : "NCPDP server disconnected", sw.Elapsed, DateTimeOffset.UtcNow);
+        }
         public override Task<(bool IsValid, string[] Errors)> ValidateHl7Async(IConnectionHandle handle, string hl7Message, CancellationToken ct = default)
         {
             // NCPDP uses its own format for pharmacy transactions

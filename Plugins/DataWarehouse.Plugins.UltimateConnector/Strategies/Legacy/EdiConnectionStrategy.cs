@@ -40,10 +40,15 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
 
         public override Task<string> TranslateCommandAsync(IConnectionHandle handle, string modernCommand, CancellationToken ct = default)
         {
-            // Translate JSON to EDI X12 format placeholder
+            // Finding 1994: Read sender/receiver from ConnectionInfo so they match the configured trading partner.
+            var senderInfo = handle.ConnectionInfo.TryGetValue("SenderId", out var sid) ? (sid?.ToString() ?? "SENDER") : "SENDER";
+            var receiverInfo = handle.ConnectionInfo.TryGetValue("ReceiverId", out var rid) ? (rid?.ToString() ?? "RECEIVER") : "RECEIVER";
+            var senderPadded = senderInfo.PadRight(15).Substring(0, 15);
+            var receiverPadded = receiverInfo.PadRight(15).Substring(0, 15);
+
             var segments = new System.Text.StringBuilder();
-            segments.AppendLine($"ISA*00*          *00*          *ZZ*SENDER         *ZZ*RECEIVER       *{DateTime.UtcNow:yyMMdd}*{DateTime.UtcNow:HHmm}*U*00401*000000001*0*P*:~");
-            segments.AppendLine($"GS*PO*SENDER*RECEIVER*{DateTime.UtcNow:yyyyMMdd}*{DateTime.UtcNow:HHmm}*1*X*004010~");
+            segments.AppendLine($"ISA*00*          *00*          *ZZ*{senderPadded}*ZZ*{receiverPadded}*{DateTime.UtcNow:yyMMdd}*{DateTime.UtcNow:HHmm}*U*00401*000000001*0*P*:~");
+            segments.AppendLine($"GS*PO*{senderInfo}*{receiverInfo}*{DateTime.UtcNow:yyyyMMdd}*{DateTime.UtcNow:HHmm}*1*X*004010~");
             segments.AppendLine($"ST*850*0001~");
             segments.AppendLine($"BEG*00*NE*{modernCommand}*{DateTime.UtcNow:yyyyMMdd}~");
             segments.AppendLine("SE*4*0001~");

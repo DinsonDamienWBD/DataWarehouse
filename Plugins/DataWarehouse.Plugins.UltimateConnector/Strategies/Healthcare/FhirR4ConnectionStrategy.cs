@@ -53,7 +53,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Healthcare
         /// <exception cref="ArgumentException">Thrown if the JSON is invalid or missing required fields.</exception>
         public async Task<FhirResourceWrapper> DeserializeResourceAsync(string json, CancellationToken ct = default)
         {
-            await Task.CompletedTask; // Make async for consistency
+            // Finding 1921: Removed no-op await. Synchronous parsing completes as Task via caller's await.
             ct.ThrowIfCancellationRequested();
 
             if (string.IsNullOrWhiteSpace(json))
