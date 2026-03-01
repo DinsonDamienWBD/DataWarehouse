@@ -1605,6 +1605,10 @@ public abstract class IntelligenceStrategyBase : StrategyBase, IIntelligenceStra
     public void Configure(string key, string value);
     protected string? GetConfig(string key);
     protected string GetRequiredConfig(string key);
+    protected int GetConfigInt(string key, int defaultValue);
+    protected float GetConfigFloat(string key, float defaultValue);
+    protected double GetConfigDouble(string key, double defaultValue);
+    protected bool GetConfigBool(string key, bool defaultValue);
     public virtual IntelligenceValidationResult Validate();
     public virtual IntelligenceStatistics GetStatistics();
     public virtual void ResetStatistics();

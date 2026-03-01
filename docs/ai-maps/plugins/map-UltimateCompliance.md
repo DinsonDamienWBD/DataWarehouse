@@ -6180,6 +6180,7 @@ public sealed record ErasureRequestInput
 }
     public required string SubjectId { get; init; }
     public required string SubjectEmail { get; init; }
+    public string? LegalBasis { get; init; }
     public ErasureScope? Scope { get; init; }
     public string[]? DataCategories { get; init; }
     public string? Reason { get; init; }

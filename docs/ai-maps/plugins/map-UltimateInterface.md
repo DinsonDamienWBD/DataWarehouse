@@ -989,7 +989,10 @@ public abstract class DashboardStrategyBase : StrategyBase, IDashboardStrategy
 {
 #endregion
 }
-    protected static readonly HttpClient SharedHttpClient = new HttpClient();
+    protected static readonly HttpClient SharedHttpClient = new HttpClient
+{
+    Timeout = TimeSpan.FromSeconds(30)
+};
     public abstract override string StrategyId { get; }
     public abstract string StrategyName { get; }
     public override string Name;;
