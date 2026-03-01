@@ -409,27 +409,33 @@ public sealed class ProtocolCompressionManager : IDisposable
     {
         var startTime = DateTime.UtcNow;
 
+        // P2-2711: avoid .Length on non-seekable streams (NetworkStream, GZipStream throw
+        // NotSupportedException). Use counting wrappers for both input and output.
+        await using var countingInput = new CountingStream(input);
+        await using var countingOutput = new CountingStream(output);
+
         if (algorithm == CompressionAlgorithm.None)
         {
-            await input.CopyToAsync(output, bufferSize, ct);
+            await countingInput.CopyToAsync(countingOutput, bufferSize, ct);
+            var copied = countingInput.BytesRead;
             return new CompressionResult
             {
                 WasCompressed = false,
-                OriginalSize = (int)output.Length,
-                CompressedSize = (int)input.Length,
+                OriginalSize = (int)copied,
+                CompressedSize = (int)copied,
                 Algorithm = algorithm,
                 ElapsedMs = 0
             };
         }
 
         var provider = GetProvider(algorithm);
-        var compressedLength = input.Length;
 
-        await using var decompressionStream = provider.CreateDecompressionStream(input, leaveOpen: true);
-        await decompressionStream.CopyToAsync(output, bufferSize, ct);
+        await using var decompressionStream = provider.CreateDecompressionStream(countingInput, leaveOpen: true);
+        await decompressionStream.CopyToAsync(countingOutput, bufferSize, ct);
 
         var elapsedMs = (long)(DateTime.UtcNow - startTime).TotalMilliseconds;
-        var decompressedLength = output.Length;
+        var compressedLength = countingInput.BytesRead;
+        var decompressedLength = countingOutput.BytesWritten;
 
         Interlocked.Increment(ref _decompressionOperations);
         Interlocked.Add(ref _decompressionTimeMs, elapsedMs);

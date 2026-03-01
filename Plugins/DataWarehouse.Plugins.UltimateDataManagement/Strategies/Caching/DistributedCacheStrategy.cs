@@ -124,7 +124,9 @@ internal sealed class CacheConnection : IDisposable
         _client = new TcpClient();
         _client.ReceiveTimeout = (int)timeout.TotalMilliseconds;
         _client.SendTimeout = (int)timeout.TotalMilliseconds;
-        _client.Connect(host, port);
+        // P2-2399: bound the TCP connect with the caller-supplied timeout so we never hang forever.
+        using var cts = new CancellationTokenSource(timeout);
+        _client.ConnectAsync(host, port, cts.Token).GetAwaiter().GetResult();
         _stream = _client.GetStream();
     }
 
