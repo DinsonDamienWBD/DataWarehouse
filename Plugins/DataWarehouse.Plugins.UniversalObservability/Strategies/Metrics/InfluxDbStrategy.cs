@@ -53,10 +53,12 @@ public sealed class InfluxDbStrategy : ObservabilityStrategyBase
         _token = token;
         _org = org;
         _bucket = bucket;
-        _httpClient.DefaultRequestHeaders.Clear();
-        _httpClient.DefaultRequestHeaders.Remove("Authorization");
-        _httpClient.DefaultRequestHeaders.Add("Authorization", $"Token {_token}");
+        // Do NOT set DefaultRequestHeaders — inject per-request to avoid thread-safety issues.
     }
+
+    /// <summary>Adds the InfluxDB token to the request headers (per-request, thread-safe).</summary>
+    private void AddToken(HttpRequestMessage request) =>
+        request.Headers.Add("Authorization", $"Token {_token}");
 
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
@@ -103,10 +105,11 @@ public sealed class InfluxDbStrategy : ObservabilityStrategyBase
             lineProtocol.AppendLine($"{measurement}{tags} {fields} {timestamp}");
         }
 
-        var content = new StringContent(lineProtocol.ToString(), Encoding.UTF8, "text/plain");
-        var url = $"{_url}/api/v2/write?org={Uri.EscapeDataString(_org)}&bucket={Uri.EscapeDataString(_bucket)}&precision=ms";
-
-        using var response = await _httpClient.PostAsync(url, content, cancellationToken);
+        var body = new StringContent(lineProtocol.ToString(), Encoding.UTF8, "text/plain");
+        var writeUrl = $"{_url}/api/v2/write?org={Uri.EscapeDataString(_org)}&bucket={Uri.EscapeDataString(_bucket)}&precision=ms";
+        using var request = new HttpRequestMessage(HttpMethod.Post, writeUrl) { Content = body };
+        AddToken(request);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -118,13 +121,11 @@ public sealed class InfluxDbStrategy : ObservabilityStrategyBase
     /// <returns>Query results as CSV.</returns>
     public async Task<string> QueryAsync(string fluxQuery, CancellationToken ct = default)
     {
-        // P2-4641: Do NOT mutate _httpClient.DefaultRequestHeaders.Accept — that is shared state
-        // and causes race conditions when QueryAsync is called concurrently. Use a per-request
-        // HttpRequestMessage so Accept is scoped to this call only.
         var url = $"{_url}/api/v2/query?org={Uri.EscapeDataString(_org)}";
         var content = new StringContent(fluxQuery, Encoding.UTF8, "application/vnd.flux");
 
         using var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = content };
+        AddToken(request);
         request.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/csv"));
 
         using var response = await _httpClient.SendAsync(request, ct);
@@ -197,7 +198,9 @@ from(bucket: ""{_bucket}"")
     {
         try
         {
-            using var response = await _httpClient.GetAsync($"{_url}/health", cancellationToken);
+            using var healthReq = new HttpRequestMessage(HttpMethod.Get, $"{_url}/health");
+            AddToken(healthReq);
+            using var response = await _httpClient.SendAsync(healthReq, cancellationToken);
             response.EnsureSuccessStatusCode();
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
 

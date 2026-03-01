@@ -52,12 +52,17 @@ public sealed class DatadogStrategy : ObservabilityStrategyBase
     /// <param name="service">Service name for tagging.</param>
     public void Configure(string apiKey, string site = "datadoghq.com", string service = "datawarehouse")
     {
+        if (string.IsNullOrWhiteSpace(apiKey))
+            throw new ArgumentException("Datadog API key must not be empty.", nameof(apiKey));
         _apiKey = apiKey;
         _site = site;
         _service = service;
-        _httpClient.DefaultRequestHeaders.Clear();
-        _httpClient.DefaultRequestHeaders.Add("DD-API-KEY", _apiKey);
+        // Do NOT set DefaultRequestHeaders — inject per-request to avoid thread-safety issues.
     }
+
+    /// <summary>Adds the Datadog API key to the request headers (per-request, thread-safe).</summary>
+    private void AddApiKey(HttpRequestMessage request) =>
+        request.Headers.Add("DD-API-KEY", _apiKey);
 
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
@@ -91,12 +96,9 @@ public sealed class DatadogStrategy : ObservabilityStrategyBase
 
         var payload = JsonSerializer.Serialize(new { series });
         var content = new StringContent(payload, Encoding.UTF8, "application/json");
-
-        using var response = await _httpClient.PostAsync(
-            $"https://api.{_site}/api/v2/series",
-            content,
-            cancellationToken);
-
+        using var req = new HttpRequestMessage(HttpMethod.Post, $"https://api.{_site}/api/v2/series") { Content = content };
+        AddApiKey(req);
+        using var response = await _httpClient.SendAsync(req, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -145,12 +147,9 @@ public sealed class DatadogStrategy : ObservabilityStrategyBase
 
         var payload = JsonSerializer.Serialize(traces);
         var content = new StringContent(payload, Encoding.UTF8, "application/json");
-
-        using var response = await _httpClient.PutAsync(
-            $"https://trace.agent.{_site}/v0.4/traces",
-            content,
-            cancellationToken);
-
+        using var req = new HttpRequestMessage(HttpMethod.Put, $"https://trace.agent.{_site}/v0.4/traces") { Content = content };
+        AddApiKey(req);
+        using var response = await _httpClient.SendAsync(req, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -201,12 +200,9 @@ public sealed class DatadogStrategy : ObservabilityStrategyBase
 
         var payload = JsonSerializer.Serialize(logs);
         var content = new StringContent(payload, Encoding.UTF8, "application/json");
-
-        using var response = await _httpClient.PostAsync(
-            $"https://http-intake.logs.{_site}/api/v2/logs",
-            content,
-            cancellationToken);
-
+        using var req = new HttpRequestMessage(HttpMethod.Post, $"https://http-intake.logs.{_site}/api/v2/logs") { Content = content };
+        AddApiKey(req);
+        using var response = await _httpClient.SendAsync(req, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -229,9 +225,9 @@ public sealed class DatadogStrategy : ObservabilityStrategyBase
     {
         try
         {
-            using var response = await _httpClient.GetAsync(
-                $"https://api.{_site}/api/v1/validate",
-                cancellationToken);
+            using var validateReq = new HttpRequestMessage(HttpMethod.Get, $"https://api.{_site}/api/v1/validate");
+            AddApiKey(validateReq);
+            using var response = await _httpClient.SendAsync(validateReq, cancellationToken);
 
             return new HealthCheckResult(
                 IsHealthy: response.IsSuccessStatusCode,
@@ -257,7 +253,8 @@ public sealed class DatadogStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        // Configuration validated via Configure method
+        if (string.IsNullOrWhiteSpace(_apiKey))
+            throw new InvalidOperationException("DatadogStrategy: API key is required. Call Configure() before initialization.");
         IncrementCounter("datadog.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }

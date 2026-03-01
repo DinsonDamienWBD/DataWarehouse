@@ -68,10 +68,12 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
         _projectId = projectId;
         _accessToken = accessToken;
         _metricPrefix = metricPrefix;
-        _httpClient.DefaultRequestHeaders.Clear();
-        _httpClient.DefaultRequestHeaders.Remove("Authorization");
-        _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_accessToken}");
+        // Do NOT set DefaultRequestHeaders — inject per-request to avoid thread-safety issues.
     }
+
+    /// <summary>Adds the Bearer authorization token to the request headers (per-request, thread-safe).</summary>
+    private void AddAuthToken(HttpRequestMessage request) =>
+        request.Headers.Add("Authorization", $"Bearer {_accessToken}");
 
     /// <inheritdoc/>
     protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
@@ -97,9 +99,10 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
         {
             try
             {
-                using var response = await _httpClient.GetAsync(
-                    $"https://monitoring.googleapis.com/v3/projects/{_projectId}/monitoredResourceDescriptors?pageSize=1",
-                    cancellationToken);
+                using var validateReq = new HttpRequestMessage(HttpMethod.Get,
+                    $"https://monitoring.googleapis.com/v3/projects/{_projectId}/monitoredResourceDescriptors?pageSize=1");
+                AddAuthToken(validateReq);
+                using var response = await _httpClient.SendAsync(validateReq, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -184,9 +187,10 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
                 var payload = new { timeSeries = batch };
                 var json = JsonSerializer.Serialize(payload);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
-                using var response = await _httpClient.PostAsync(
-                    $"https://monitoring.googleapis.com/v3/projects/{_projectId}/timeSeries",
-                    content, ct);
+                using var request = new HttpRequestMessage(HttpMethod.Post,
+                    $"https://monitoring.googleapis.com/v3/projects/{_projectId}/timeSeries") { Content = content };
+                AddAuthToken(request);
+                using var response = await _httpClient.SendAsync(request, ct);
                 response.EnsureSuccessStatusCode();
             }, ct);
 
@@ -212,9 +216,10 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
             var payload = new { entries = batch };
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
-            using var response = await _httpClient.PostAsync(
-                $"https://logging.googleapis.com/v2/entries:write",
-                content, ct);
+            using var request = new HttpRequestMessage(HttpMethod.Post,
+                "https://logging.googleapis.com/v2/entries:write") { Content = content };
+            AddAuthToken(request);
+            using var response = await _httpClient.SendAsync(request, ct);
             response.EnsureSuccessStatusCode();
         }, ct);
     }
@@ -312,14 +317,19 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
                 _ => "GAUGE"
             };
 
+            // For CUMULATIVE metrics, startTime must precede endTime and represent the start of the
+            // cumulative measurement window.  Using AddMinutes(-1) is arbitrary and wrong — use 1
+            // second before the sample timestamp as the minimum valid Cloud Monitoring window.
+            var counterStartTime = metric.Type == MetricType.Counter
+                ? (metric.Timestamp - TimeSpan.FromSeconds(1)).ToString("o")
+                : (string?)null;
+
             var point = new
             {
                 interval = new
                 {
                     endTime = metric.Timestamp.ToString("o"),
-                    startTime = metric.Type == MetricType.Counter
-                        ? metric.Timestamp.AddMinutes(-1).ToString("o")
-                        : null
+                    startTime = counterStartTime
                 },
                 value = new Dictionary<string, object>
                 {
@@ -400,12 +410,10 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
         var payload = new { spans = traceSpans };
         var json = JsonSerializer.Serialize(payload);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-        using var response = await _httpClient.PostAsync(
-            $"https://cloudtrace.googleapis.com/v2/projects/{_projectId}/traces:batchWrite",
-            content,
-            cancellationToken);
-
+        using var traceReq = new HttpRequestMessage(HttpMethod.Post,
+            $"https://cloudtrace.googleapis.com/v2/projects/{_projectId}/traces:batchWrite") { Content = content };
+        AddAuthToken(traceReq);
+        using var response = await _httpClient.SendAsync(traceReq, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -464,9 +472,10 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
         {
             try
             {
-                using var response = await _httpClient.GetAsync(
-                    $"https://monitoring.googleapis.com/v3/projects/{_projectId}/monitoredResourceDescriptors?pageSize=1",
-                    ct);
+                using var healthReq = new HttpRequestMessage(HttpMethod.Get,
+                    $"https://monitoring.googleapis.com/v3/projects/{_projectId}/monitoredResourceDescriptors?pageSize=1");
+                AddAuthToken(healthReq);
+                using var response = await _httpClient.SendAsync(healthReq, ct);
 
                 return new DataWarehouse.SDK.Contracts.StrategyHealthCheckResult(
                     IsHealthy: response.IsSuccessStatusCode,
