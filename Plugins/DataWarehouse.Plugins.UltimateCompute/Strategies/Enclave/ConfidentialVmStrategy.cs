@@ -64,6 +64,12 @@ internal sealed class ConfidentialVmStrategy : ComputeRuntimeStrategyBase
                 var sevReportResult = await RunProcessAsync("sevctl", "verify --attestation-report",
                     timeout: TimeSpan.FromSeconds(15), cancellationToken: cancellationToken);
 
+                // P2-1679: abort if attestation verification fails — launching without verified attestation
+                // undermines the confidential-computing security guarantee
+                if (sevReportResult.ExitCode != 0)
+                    throw new InvalidOperationException(
+                        $"SEV-SNP attestation verification failed (exit {sevReportResult.ExitCode}): {sevReportResult.StandardError}");
+
                 // Launch the workload in the confidential VM
                 var launchArgs = provider switch
                 {

@@ -50,15 +50,18 @@ internal sealed class DaskStrategy : ComputeRuntimeStrategyBase
                 var memPerWorker = GetMaxMemoryBytes(task, 4L * 1024 * 1024 * 1024) / nWorkers;
                 var memLimit = $"{memPerWorker / (1024 * 1024 * 1024)}GB";
 
-                // Wrap user code with Dask client connection
+                // Wrap user code with Dask client connection.
+                // P2-1683: use try/finally so client.close() is called even if user code raises.
                 var wrapperCode = $$"""
                     import dask
                     from dask.distributed import Client
                     import sys
                     client = Client('{{schedulerAddr}}', timeout=30)
                     print(f"Connected to Dask: {client.dashboard_link}")
-                    exec(open('{{codePath.Replace("\\", "/")}}').read())
-                    client.close()
+                    try:
+                        exec(open('{{codePath.Replace("\\", "/")}}').read())
+                    finally:
+                        client.close()
                     """;
 
                 var wrapperPath = Path.GetTempFileName() + ".py";

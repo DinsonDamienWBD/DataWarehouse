@@ -47,7 +47,9 @@ internal sealed class BeamStrategy : ComputeRuntimeStrategyBase
 
                 if (isPython)
                 {
-                    args.Append($"-m apache_beam.runners.{runner.ToLowerInvariant()} ");
+                    // P2-1682: Beam Python pipelines are executed directly as scripts, not via -m.
+                    // The -m flag with apache_beam.runners.* is incorrect — those modules are not
+                    // runnable entry points. The correct invocation is: python3 pipeline.py --runner=...
                     args.Append($"\"{codePath}\" ");
                     args.Append($"--runner={runner} ");
                 }
