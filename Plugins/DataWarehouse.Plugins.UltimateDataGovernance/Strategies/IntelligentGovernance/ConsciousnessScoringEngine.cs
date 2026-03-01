@@ -238,12 +238,6 @@ public sealed class ConsciousnessScoringEngine : ConsciousnessStrategyBase, ICon
         }
     }
 
-    /// <summary>
-    /// Increments a named counter by a specified amount. Thread-safe.
-    /// </summary>
-    private void IncrementCounter(string name, long amount)
-    {
-        for (long i = 0; i < amount; i++)
-            IncrementCounter(name);
-    }
+    // P2-2274: IncrementCounter(string, long) is now provided by StrategyBase — uses AddOrUpdate
+    // with the full amount instead of O(n) loop. Local override removed.
 }
