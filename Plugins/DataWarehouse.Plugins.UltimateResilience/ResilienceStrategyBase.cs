@@ -387,16 +387,22 @@ public abstract class ResilienceStrategyBase : StrategyBase, IResilienceStrategy
     {
         var times = _executionTimes.ToArray();
         if (times.Length == 0) return TimeSpan.Zero;
-        return TimeSpan.FromMilliseconds(times.Average(t => t.TotalMilliseconds));
+        // Manual fold avoids LINQ Average() allocation on hot metrics path
+        double sumMs = 0;
+        foreach (var t in times) sumMs += t.TotalMilliseconds;
+        return TimeSpan.FromMilliseconds(sumMs / times.Length);
     }
 
     private TimeSpan CalculateP99ExecutionTime()
     {
         var times = _executionTimes.ToArray();
         if (times.Length == 0) return TimeSpan.Zero;
-        var sorted = times.OrderBy(t => t.TotalMilliseconds).ToArray();
-        var p99Index = (int)(sorted.Length * 0.99);
-        return sorted[Math.Min(p99Index, sorted.Length - 1)];
+        // Sort the double array directly — avoids boxing TimeSpan values via LINQ
+        var ms = new double[times.Length];
+        for (int i = 0; i < times.Length; i++) ms[i] = times[i].TotalMilliseconds;
+        Array.Sort(ms);
+        var p99Index = Math.Min((int)(ms.Length * 0.99), ms.Length - 1);
+        return TimeSpan.FromMilliseconds(ms[p99Index]);
     }
 
     /// <summary>

@@ -370,7 +370,14 @@ public sealed class LeastConnectionsLoadBalancingStrategy : LoadBalancingStrateg
         var healthy = GetHealthyEndpoints();
         if (healthy.Count == 0) return null;
 
-        return healthy.OrderBy(e => e.ActiveConnections).First();
+        // Linear O(n) min scan — avoids O(n log n) sort + enumerator allocation on hot path
+        LoadBalancerEndpoint? best = null;
+        foreach (var e in healthy)
+        {
+            if (best is null || e.ActiveConnections < best.ActiveConnections)
+                best = e;
+        }
+        return best;
     }
 
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(
@@ -774,7 +781,14 @@ public sealed class LeastResponseTimeLoadBalancingStrategy : LoadBalancingStrate
         var healthy = GetHealthyEndpoints();
         if (healthy.Count == 0) return null;
 
-        return healthy.OrderBy(e => e.LastResponseTime).First();
+        // Linear O(n) min scan — avoids O(n log n) sort + enumerator allocation on hot path
+        LoadBalancerEndpoint? best = null;
+        foreach (var e in healthy)
+        {
+            if (best is null || e.LastResponseTime < best.LastResponseTime)
+                best = e;
+        }
+        return best;
     }
 
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(

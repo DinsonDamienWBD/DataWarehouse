@@ -46,6 +46,14 @@ public sealed class RaftConsensusStrategy : ResilienceStrategyBase
 
     public RaftConsensusStrategy(string nodeId, List<string> clusterNodes, TimeSpan electionTimeout, TimeSpan heartbeatInterval)
     {
+        if (string.IsNullOrWhiteSpace(nodeId))
+            throw new ArgumentException("Node ID must not be null or whitespace.", nameof(nodeId));
+        ArgumentNullException.ThrowIfNull(clusterNodes, nameof(clusterNodes));
+        if (electionTimeout <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(electionTimeout), "Election timeout must be positive.");
+        if (heartbeatInterval <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(heartbeatInterval), "Heartbeat interval must be positive.");
+
         _nodeId = nodeId;
         _clusterNodes = clusterNodes;
         _electionTimeout = electionTimeout;
