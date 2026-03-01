@@ -745,8 +745,8 @@ public sealed class DataArchivalStrategy : LifecycleStrategyBase
                 {
                     var payload = JsonSerializer.Serialize(new
                     {
-                        objectId = request.ObjectId,
-                        retrievalId = status.RetrievalId,
+                        archiveId = request.ArchiveId,
+                        requestId = status.RequestId,
                         completedAt = status.CompletedAt,
                         bytesRestored = status.BytesRestored,
                         success = true

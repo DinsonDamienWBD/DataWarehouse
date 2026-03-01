@@ -737,6 +737,12 @@ public sealed class DataMigrationStrategy : LifecycleStrategyBase
                 }, CancellationToken.None);
 
                 migrationTasks.Add(task);
+
+                // Periodically prune completed tasks to bound memory usage for large object sets.
+                if (migrationTasks.Count >= 1000)
+                {
+                    migrationTasks.RemoveAll(t => t.IsCompleted);
+                }
             }
 
             await Task.WhenAll(migrationTasks);

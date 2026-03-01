@@ -193,8 +193,10 @@ public sealed class LineageScalingManager : IScalableSubsystem, IDisposable
         ArgumentNullException.ThrowIfNull(adjacencyData);
 
         int partition = GetPartition(nodeId);
+        // Check if node already exists to avoid double-counting in _totalNodeCount
+        var existing = await _partitions[partition].GetAsync(nodeId, ct).ConfigureAwait(false);
         await _partitions[partition].PutAsync(nodeId, adjacencyData, ct).ConfigureAwait(false);
-        Interlocked.Increment(ref _totalNodeCount);
+        if (existing == null) Interlocked.Increment(ref _totalNodeCount); // Only count truly new nodes
         Interlocked.Increment(ref _backingStoreWrites);
 
         // Check for hot partition auto-expansion

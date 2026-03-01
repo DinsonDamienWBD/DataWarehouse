@@ -104,7 +104,7 @@ public sealed class InMemoryGraphStrategy : LineageStrategyBase
             Nodes = nodes.AsReadOnly(),
             Edges = edges.AsReadOnly(),
             Depth = maxDepth,
-            UpstreamCount = nodes.Count - 1
+            UpstreamCount = Math.Max(0, nodes.Count - 1)
         });
     }
 
@@ -150,7 +150,7 @@ public sealed class InMemoryGraphStrategy : LineageStrategyBase
             Nodes = nodes.AsReadOnly(),
             Edges = edges.AsReadOnly(),
             Depth = maxDepth,
-            DownstreamCount = nodes.Count - 1
+            DownstreamCount = Math.Max(0, nodes.Count - 1)
         });
     }
 

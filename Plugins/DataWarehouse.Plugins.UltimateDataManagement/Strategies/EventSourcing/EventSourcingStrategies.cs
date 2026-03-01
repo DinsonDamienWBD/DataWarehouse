@@ -301,9 +301,7 @@ public sealed class EventStoreStrategy : DataManagementStrategyBase
             return Task.FromResult(new AppendResult
             {
                 Success = true,
-                StreamId = streamId,
-                EventCount = 0,
-                Duration = TimeSpan.Zero
+                EventsAppended = 0
             });
         }
 

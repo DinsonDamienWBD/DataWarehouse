@@ -230,7 +230,13 @@ public sealed class PredictiveTieringStrategy : TieringStrategyBase
     {
         lock (history.Events)
         {
-            // Distribute historical accesses based on data object metrics
+            // Distribute historical accesses based on data object metrics.
+            // Use a seeded Random from the object ID hash so synthetic event placement
+            // is deterministic per object (same input = same history, no flapping predictions).
+            var seed = data.ObjectId != null
+                ? System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(data.ObjectId) ^ data.ObjectId.Length
+                : 0;
+            var rng = new Random(seed);
             var now = DateTime.UtcNow;
 
             // Add events for last 24 hours
@@ -238,7 +244,7 @@ public sealed class PredictiveTieringStrategy : TieringStrategyBase
             {
                 history.Events.Add(new AccessEvent
                 {
-                    Timestamp = now.AddHours(-Random.Shared.Next(0, 24)),
+                    Timestamp = now.AddHours(-rng.Next(0, 24)),
                     Type = AccessType.Read
                 });
             }
@@ -249,7 +255,7 @@ public sealed class PredictiveTieringStrategy : TieringStrategyBase
             {
                 history.Events.Add(new AccessEvent
                 {
-                    Timestamp = now.AddDays(-Random.Shared.Next(1, 7)),
+                    Timestamp = now.AddDays(-rng.Next(1, 7)),
                     Type = AccessType.Read
                 });
             }
@@ -260,7 +266,7 @@ public sealed class PredictiveTieringStrategy : TieringStrategyBase
             {
                 history.Events.Add(new AccessEvent
                 {
-                    Timestamp = now.AddDays(-Random.Shared.Next(7, 30)),
+                    Timestamp = now.AddDays(-rng.Next(7, 30)),
                     Type = AccessType.Read
                 });
             }

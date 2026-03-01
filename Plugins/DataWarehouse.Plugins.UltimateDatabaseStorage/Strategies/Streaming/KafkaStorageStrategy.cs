@@ -23,6 +23,10 @@ public sealed class KafkaStorageStrategy : DatabaseStorageStrategyBase
     private IAdminClient? _adminClient;
     private string _topicPrefix = "storage";
     private string _metadataTopic = "storage-metadata";
+    // P2-2863: In-process offset index so RetrieveCoreAsync can seek directly to the
+    // latest offset for a key rather than scanning from Offset.Beginning every call.
+    // Key = storage key, Value = (partition, offset) of the latest write.
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (int Partition, long Offset)> _offsetIndex = new();
 
     public override string StrategyId => "kafka";
     public override string Name => "Apache Kafka Streaming Storage";
@@ -180,6 +184,9 @@ public sealed class KafkaStorageStrategy : DatabaseStorageStrategyBase
             Value = metadataJson
         }, ct);
 
+        // P2-2863: Record (partition, offset) so RetrieveCoreAsync can seek directly.
+        _offsetIndex[key] = (dataResult.Partition.Value, dataResult.Offset.Value);
+
         return new StorageObjectMetadata
         {
             Key = key,
@@ -207,21 +214,34 @@ public sealed class KafkaStorageStrategy : DatabaseStorageStrategyBase
 
         using var consumer = new ConsumerBuilder<string, byte[]>(consumerConfig).Build();
 
-        consumer.Assign(new TopicPartitionOffset($"{_topicPrefix}-data", 0, Offset.Beginning));
-
         byte[]? latestValue = null;
 
-        while (true)
+        // P2-2863: If we have the exact (partition, offset) from the write index, seek
+        // directly to that offset instead of scanning from Offset.Beginning (O(1) vs O(n)).
+        if (_offsetIndex.TryGetValue(key, out var idx))
         {
-            var result = consumer.Consume(TimeSpan.FromSeconds(1));
-            if (result == null) break;
-
-            if (result.Message.Key == key)
-            {
+            consumer.Assign(new TopicPartitionOffset($"{_topicPrefix}-data", idx.Partition, idx.Offset));
+            var result = consumer.Consume(TimeSpan.FromSeconds(5));
+            if (result != null && result.Message.Key == key)
                 latestValue = result.Message.Value;
-            }
+        }
+        else
+        {
+            // Fall back to sequential scan (e.g. after process restart when index is cold).
+            consumer.Assign(new TopicPartitionOffset($"{_topicPrefix}-data", 0, Offset.Beginning));
+            while (true)
+            {
+                var result = consumer.Consume(TimeSpan.FromSeconds(1));
+                if (result == null) break;
 
-            if (result.IsPartitionEOF) break;
+                if (result.Message.Key == key)
+                {
+                    latestValue = result.Message.Value;
+                    _offsetIndex[key] = (result.Partition.Value, result.Offset.Value); // warm cache
+                }
+
+                if (result.IsPartitionEOF) break;
+            }
         }
 
         if (latestValue == null)

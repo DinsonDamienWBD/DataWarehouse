@@ -64,10 +64,25 @@ public sealed class CryptoProvenanceStrategy : LineageStrategyBase
 
     public override Task TrackAsync(ProvenanceRecord record, CancellationToken ct = default)
     {
-        // In production, would compute hashes and build chain
+        // Retrieve the previous record's AfterHash to chain to
+        var existingProvenance = GetProvenance(record.DataObjectId);
+        var previousHash = existingProvenance.Count > 0
+            ? existingProvenance[^1].AfterHash
+            : null;
+
+        // Compute BeforeHash from previous state + current record data
+        var beforeHash = previousHash != null
+            ? ComputeHash(previousHash + record.DataObjectId)
+            : ComputeHash("genesis:" + record.DataObjectId);
+
+        // AfterHash includes the actual change content for tamper detection
+        var contentKey = string.Concat(record.DataObjectId, record.Timestamp.Ticks, record.OperationType);
+        var afterHash = ComputeHash(beforeHash + contentKey);
+
         return base.TrackAsync(record with
         {
-            AfterHash = ComputeHash(record.DataObjectId + record.Timestamp.Ticks)
+            BeforeHash = beforeHash,
+            AfterHash = afterHash
         }, ct);
     }
 
@@ -76,7 +91,7 @@ public sealed class CryptoProvenanceStrategy : LineageStrategyBase
         using var sha = System.Security.Cryptography.SHA256.Create();
         var bytes = System.Text.Encoding.UTF8.GetBytes(input);
         var hash = sha.ComputeHash(bytes);
-        return Convert.ToHexString(hash);
+        return Convert.ToHexString(hash).ToLowerInvariant();
     }
 }
 

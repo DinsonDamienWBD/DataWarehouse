@@ -154,9 +154,19 @@ public sealed class TimescaleDbStorageStrategy : DatabaseStorageStrategyBase
         await using var connection = await _dataSource!.OpenConnectionAsync(ct);
         await using var command = connection.CreateCommand();
 
+        // P2-2868: Use ON CONFLICT DO UPDATE (upsert) to handle rapid same-key writes
+        // at the same millisecond without throwing a UNIQUE constraint violation.
+        // TimescaleDB hypertables partition by time; duplicate (time, key) within the same
+        // chunk chunk would violate the unique index without this clause.
         command.CommandText = $@"
             INSERT INTO {_tableName} (time, key, data, size, content_type, etag, metadata)
-            VALUES (@time, @key, @data, @size, @contentType, @etag, @metadata::jsonb)";
+            VALUES (@time, @key, @data, @size, @contentType, @etag, @metadata::jsonb)
+            ON CONFLICT (time, key) DO UPDATE SET
+                data = EXCLUDED.data,
+                size = EXCLUDED.size,
+                content_type = EXCLUDED.content_type,
+                etag = EXCLUDED.etag,
+                metadata = EXCLUDED.metadata";
 
         command.Parameters.AddWithValue("@time", now);
         command.Parameters.AddWithValue("@key", key);

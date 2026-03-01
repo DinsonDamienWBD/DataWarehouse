@@ -144,6 +144,10 @@ internal sealed class PredictiveApiStrategy : SdkInterface.InterfaceStrategyBase
     {
         if (request.Headers.TryGetValue("X-Client-Id", out var clientId))
         {
+            // P2-3321: Enforce a maximum length on user-supplied client IDs to prevent
+            // memory exhaustion by extremely long keys in _clientQueryHistory and _popularQueries.
+            if (clientId.Length > 256)
+                clientId = $"truncated-{StableHash.Compute(clientId):X16}";
             return clientId;
         }
 

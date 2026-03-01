@@ -62,9 +62,15 @@ public sealed class YugabyteDbStorageStrategy : DatabaseStorageStrategyBase
         await using var command = connection.CreateCommand();
         command.CommandText = "SELECT version()";
         var version = await command.ExecuteScalarAsync(ct);
-        if (!version?.ToString()?.Contains("YugabyteDB") ?? true)
+        // P2-2814: Log a warning when the server does not report YugabyteDB in its version
+        // string. We proceed but raise a diagnostic so operators are not silently connected
+        // to an incompatible server (e.g. plain PostgreSQL missing YugabyteDB-specific extensions).
+        var versionStr = version?.ToString() ?? string.Empty;
+        if (!versionStr.Contains("YugabyteDB", StringComparison.OrdinalIgnoreCase))
         {
-            // May still be compatible - proceed with caution
+            System.Diagnostics.Debug.WriteLine(
+                $"[YugabyteDB] WARNING: Connected server does not identify as YugabyteDB (version='{versionStr}'). " +
+                "YugabyteDB-specific features (e.g. YSQL extensions, xCluster replication) may not be available.");
         }
     }
 
