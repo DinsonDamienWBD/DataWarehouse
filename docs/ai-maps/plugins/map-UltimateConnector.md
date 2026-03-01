@@ -4011,7 +4011,7 @@ public class MinioConnectionStrategy : ConnectionStrategyBase
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateConnector/Strategies/FileSystem/SmbConnectionStrategy.cs
 ```csharp
-public class SmbConnectionStrategy : ConnectionStrategyBase
+public sealed class SmbConnectionStrategy : ConnectionStrategyBase
 {
 }
     public override string StrategyId;;
@@ -4022,15 +4022,15 @@ public class SmbConnectionStrategy : ConnectionStrategyBase
     public override string[] Tags;;
     public SmbConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
 }
 ```
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateConnector/Strategies/FileSystem/CephConnectionStrategy.cs
 ```csharp
-public class CephConnectionStrategy : ConnectionStrategyBase
+public sealed class CephConnectionStrategy : ConnectionStrategyBase
 {
 }
     public override string StrategyId;;
@@ -4049,7 +4049,7 @@ public class CephConnectionStrategy : ConnectionStrategyBase
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateConnector/Strategies/FileSystem/HdfsConnectionStrategy.cs
 ```csharp
-public class HdfsConnectionStrategy : ConnectionStrategyBase
+public sealed class HdfsConnectionStrategy : ConnectionStrategyBase
 {
 }
     public override string StrategyId;;
@@ -4068,7 +4068,7 @@ public class HdfsConnectionStrategy : ConnectionStrategyBase
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateConnector/Strategies/FileSystem/GlusterFsConnectionStrategy.cs
 ```csharp
-public class GlusterFsConnectionStrategy : ConnectionStrategyBase
+public sealed class GlusterFsConnectionStrategy : ConnectionStrategyBase
 {
 }
     public override string StrategyId;;
@@ -4087,7 +4087,7 @@ public class GlusterFsConnectionStrategy : ConnectionStrategyBase
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateConnector/Strategies/FileSystem/NfsConnectionStrategy.cs
 ```csharp
-public class NfsConnectionStrategy : ConnectionStrategyBase
+public sealed class NfsConnectionStrategy : ConnectionStrategyBase
 {
 }
     public override string StrategyId;;
@@ -4098,9 +4098,9 @@ public class NfsConnectionStrategy : ConnectionStrategyBase
     public override string[] Tags;;
     public NfsConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
 }
 ```
 
@@ -7514,7 +7514,7 @@ public class CdaConnectionStrategy : HealthcareConnectionStrategyBase
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateConnector/Strategies/Healthcare/DicomConnectionStrategy.cs
 ```csharp
-public class DicomConnectionStrategy : HealthcareConnectionStrategyBase
+public sealed class DicomConnectionStrategy : HealthcareConnectionStrategyBase
 {
 }
     public override string StrategyId;;
@@ -7524,9 +7524,9 @@ public class DicomConnectionStrategy : HealthcareConnectionStrategyBase
     public override string[] Tags;;
     public DicomConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override Task<(bool IsValid, string[] Errors)> ValidateHl7Async(IConnectionHandle handle, string hl7Message, CancellationToken ct = default);
     public override Task<string> QueryFhirAsync(IConnectionHandle handle, string resourceType, string? query = null, CancellationToken ct = default);
     public async Task<DicomStudy> ParseDicomFileAsync(byte[] dicomData, CancellationToken ct = default);
@@ -7535,7 +7535,7 @@ public class DicomConnectionStrategy : HealthcareConnectionStrategyBase
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateConnector/Strategies/Healthcare/Hl7v2ConnectionStrategy.cs
 ```csharp
-public class Hl7v2ConnectionStrategy : HealthcareConnectionStrategyBase
+public sealed class Hl7v2ConnectionStrategy : HealthcareConnectionStrategyBase
 {
 }
     public override string StrategyId;;
@@ -7545,9 +7545,9 @@ public class Hl7v2ConnectionStrategy : HealthcareConnectionStrategyBase
     public override string[] Tags;;
     public Hl7v2ConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override Task<(bool IsValid, string[] Errors)> ValidateHl7Async(IConnectionHandle handle, string hl7Message, CancellationToken ct = default);
     public override Task<string> QueryFhirAsync(IConnectionHandle handle, string resourceType, string? query = null, CancellationToken ct = default);
     public async Task<Hl7ParsedMessage> ParseHl7MessageAsync(string hl7Message, CancellationToken ct = default);
@@ -7556,7 +7556,7 @@ public class Hl7v2ConnectionStrategy : HealthcareConnectionStrategyBase
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateConnector/Strategies/Healthcare/NcpdpConnectionStrategy.cs
 ```csharp
-public class NcpdpConnectionStrategy : HealthcareConnectionStrategyBase
+public sealed class NcpdpConnectionStrategy : HealthcareConnectionStrategyBase
 {
 }
     public override string StrategyId;;
@@ -7566,9 +7566,9 @@ public class NcpdpConnectionStrategy : HealthcareConnectionStrategyBase
     public override string[] Tags;;
     public NcpdpConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override Task<(bool IsValid, string[] Errors)> ValidateHl7Async(IConnectionHandle handle, string hl7Message, CancellationToken ct = default);
     public override Task<string> QueryFhirAsync(IConnectionHandle handle, string resourceType, string? query = null, CancellationToken ct = default);
 }

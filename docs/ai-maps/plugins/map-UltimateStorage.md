@@ -8112,15 +8112,63 @@ public sealed class SSTableWriter
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateStorage/Strategies/Scale/LsmTree/WalEntry.cs
+```csharp
+public record WalEntry
+{
+};
+    public byte[] Key { get; }
+    public byte[]? Value { get; }
+    public WalOp Op { get; }
+    public WalEntry(byte[] key, byte[]? value, WalOp op);
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateStorage/Strategies/Scale/LsmTree/LsmTreeOptions.cs
 ```csharp
 public sealed record LsmTreeOptions
 {
 }
-    public long MemTableMaxSize { get; init; };
-    public int Level0CompactionThreshold { get; init; };
-    public int MaxLevels { get; init; };
-    public int BlockSize { get; init; };
+    public long MemTableMaxSize
+{
+    get => _memTableMaxSize;
+    init
+    {
+        if (value <= 0)
+            throw new ArgumentOutOfRangeException(nameof(MemTableMaxSize), value, "MemTableMaxSize must be greater than zero.");
+        _memTableMaxSize = value;
+    }
+}
+    public int Level0CompactionThreshold
+{
+    get => _level0CompactionThreshold;
+    init
+    {
+        if (value < 1)
+            throw new ArgumentOutOfRangeException(nameof(Level0CompactionThreshold), value, "Level0CompactionThreshold must be at least 1.");
+        _level0CompactionThreshold = value;
+    }
+}
+    public int MaxLevels
+{
+    get => _maxLevels;
+    init
+    {
+        if (value < 2)
+            throw new ArgumentOutOfRangeException(nameof(MaxLevels), value, "MaxLevels must be at least 2.");
+        _maxLevels = value;
+    }
+}
+    public int BlockSize
+{
+    get => _blockSize;
+    init
+    {
+        if (value <= 0 || (value & (value - 1)) != 0 || value < 512 || value > 1024 * 1024)
+            throw new ArgumentOutOfRangeException(nameof(BlockSize), value, "BlockSize must be a positive power of two between 512 and 1048576 (1MB).");
+        _blockSize = value;
+    }
+}
     public bool EnableBackgroundCompaction { get; init; };
 }
 ```

@@ -583,6 +583,7 @@ public sealed class RedisStreamState
 {
 }
     public required string StreamKey { get; init; }
+    public readonly object Lock = new();
     public List<RedisStreamEntry> Entries { get; };
     public long SequenceCounter { get; set; }
 }
@@ -1375,7 +1376,7 @@ public sealed record ConsumerGroupInfo
 }
 ```
 ```csharp
-public sealed class KafkaOffsetCommitManager
+public sealed class KafkaOffsetCommitManager : IDisposable
 {
 }
     public KafkaOffsetCommitManager(OffsetCommitStrategy strategy = OffsetCommitStrategy.AutoCommit, int autoCommitIntervalMs = 5000);
@@ -1384,6 +1385,7 @@ public sealed class KafkaOffsetCommitManager
     public Task<CommitResult> CommitAsync();
     public CommitResult CommitTransaction(string transactionId);
     public long GetCommittedOffset(string topic, int partition);
+    public void Dispose();
 }
 ```
 ```csharp
@@ -3449,6 +3451,7 @@ internal sealed class RestartTracker
     public required string TaskId { get; init; }
     public required RestartStrategyConfig Config { get; init; }
     public required List<RestartAttempt> RestartHistory { get; init; }
+    public readonly object RestartLock = new();
     public DateTimeOffset CreatedAt { get; init; }
     public int RestartCount;
     public DateTimeOffset? LastSuccessfulRestart;
@@ -5333,7 +5336,7 @@ internal sealed class WorkerState
 }
     public required string WorkerId { get; init; }
     public double Weight { get; init; }
-    public bool IsHealthy { get; set; }
+    public volatile bool IsHealthy;
     public long ActiveConnections;
     public long TotalRequests;
     public DateTimeOffset LastHealthCheck { get; set; }
