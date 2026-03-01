@@ -259,7 +259,8 @@ public sealed class EdgeSynchronizationStrategy : MultiCloudStrategyBase
     /// <summary>Executes sync job.</summary>
     public async Task<EdgeSyncResult> ExecuteSyncAsync(string jobId, CancellationToken ct = default)
     {
-        IncrementCounter("on_premise_integration.operation");
+        // Cat 15 (finding 3631): use the strategy's own counter name, not the on-premise integration counter.
+        IncrementCounter("edge_synchronization.operation");
         if (!_syncJobs.TryGetValue(jobId, out var job))
         {
             RecordFailure();
