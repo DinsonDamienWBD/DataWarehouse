@@ -101,10 +101,19 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
                 });
             }
 
-            if (context.Attributes.TryGetValue("AtoExpirationDate", out var expiryObj) &&
-                expiryObj is DateTime expiryDate)
+            // LOW-1558: Accept both DateTime and DateTimeOffset to avoid timezone-dependent comparison.
+            if (context.Attributes.TryGetValue("AtoExpirationDate", out var expiryObj))
             {
-                var daysUntilExpiry = (expiryDate - DateTime.UtcNow).TotalDays;
+                var expiryOffset = expiryObj switch
+                {
+                    DateTimeOffset dto => dto,
+                    DateTime dt => new DateTimeOffset(dt.Kind == DateTimeKind.Unspecified
+                        ? DateTime.SpecifyKind(dt, DateTimeKind.Utc) : dt),
+                    _ => (DateTimeOffset?)null
+                };
+                if (expiryOffset == null) return;
+                var expiryDate = expiryOffset.Value;
+                var daysUntilExpiry = (expiryDate - DateTimeOffset.UtcNow).TotalDays;
                 if (daysUntilExpiry < 0)
                 {
                     violations.Add(new ComplianceViolation

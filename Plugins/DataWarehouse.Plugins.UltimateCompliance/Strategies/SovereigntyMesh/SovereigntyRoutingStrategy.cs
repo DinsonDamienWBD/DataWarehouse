@@ -157,7 +157,8 @@ public sealed class SovereigntyRoutingStrategy : ComplianceStrategyBase
     {
         ArgumentNullException.ThrowIfNull(objectId);
         ArgumentNullException.ThrowIfNull(intendedDestination);
-        objectTags ??= new Dictionary<string, object>();
+        // LOW-1553: ??= on a parameter variable only updates the local copy; use an explicit local instead.
+        var effectiveObjectTags = objectTags ?? (IReadOnlyDictionary<string, object>)new Dictionary<string, object>();
 
         ct.ThrowIfCancellationRequested();
         Interlocked.Increment(ref _routingChecksTotal);
@@ -173,7 +174,7 @@ public sealed class SovereigntyRoutingStrategy : ComplianceStrategyBase
         }
 
         // 2. Determine jurisdictions
-        var sourceJurisdiction = ExtractSourceJurisdiction(objectTags);
+        var sourceJurisdiction = ExtractSourceJurisdiction(effectiveObjectTags);
         var destJurisdiction = MapStorageBackendToJurisdiction(intendedDestination);
 
         // 3. Same jurisdiction = fast-path allow
@@ -233,7 +234,7 @@ public sealed class SovereigntyRoutingStrategy : ComplianceStrategyBase
         else
         {
             // Denied — find alternatives
-            var allowed = await FindAllowedBackendsForObject(objectId, sourceJurisdiction, objectTags, ct);
+            var allowed = await FindAllowedBackendsForObject(objectId, sourceJurisdiction, effectiveObjectTags, ct);
             var recommended = allowed.Count > 0 ? allowed[0] : null;
 
             decision = new RoutingDecision

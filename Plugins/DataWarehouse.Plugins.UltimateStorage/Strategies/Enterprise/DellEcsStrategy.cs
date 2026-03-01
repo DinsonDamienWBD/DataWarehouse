@@ -157,17 +157,26 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             ValidateKey(key);
             ValidateStream(data);
 
-            // Determine if multipart upload is needed
-            var useMultipart = false;
-            long dataLength = 0;
-
+            // Determine if multipart upload is needed.
+            // For non-seekable streams we buffer into memory to get the data length and then
+            // decide whether to use multipart.  This avoids OOM on a 2GB non-seekable stream
+            // by routing large data through multipart (chunked) upload.
+            long dataLength;
             if (data.CanSeek)
             {
                 dataLength = data.Length - data.Position;
-                useMultipart = dataLength > _multipartThresholdBytes;
+            }
+            else
+            {
+                // Buffer non-seekable stream so we can inspect the size.
+                var buffer = new MemoryStream();
+                await data.CopyToAsync(buffer, 81920, ct);
+                buffer.Position = 0;
+                data = buffer;
+                dataLength = buffer.Length;
             }
 
-            if (useMultipart)
+            if (dataLength > _multipartThresholdBytes)
             {
                 return await StoreMultipartAsync(key, data, dataLength, metadata, ct);
             }
@@ -189,7 +198,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
         {
             var endpoint = GetEndpointUrl(key);
 
-            // Read data into memory
+            // Buffer the data so we can compute the request signature.
+            // For non-seekable streams the ECS S3 signature algorithm requires the full body hash.
             using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, 81920, ct);
             var content = ms.ToArray();
@@ -314,13 +324,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                     var currentPartNumber = partNumber;
                     var partSize = (int)Math.Min(_multipartChunkSizeBytes, dataLength - (partNumber - 1) * _multipartChunkSizeBytes);
 
+                    // Use ReadExactlyAsync to handle streams that return partial reads per call.
                     var partData = new byte[partSize];
-                    var bytesRead = await data.ReadAsync(partData, 0, partSize, ct);
-
-                    if (bytesRead != partSize)
-                    {
-                        throw new IOException($"Failed to read expected {partSize} bytes for part {partNumber}, got {bytesRead} bytes");
-                    }
+                    await data.ReadExactlyAsync(partData, 0, partSize, ct);
 
                     await semaphore.WaitAsync(ct);
 

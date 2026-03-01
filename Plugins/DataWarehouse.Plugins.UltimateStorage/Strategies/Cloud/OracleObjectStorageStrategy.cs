@@ -192,11 +192,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             // Execute request
             var response = await _client!.PutObject(request);
 
-            // Get object size
+            // Get object size — use Length - original Position for seekable streams
+            // (Position may have advanced during read) so we don't inflate stats.
             long size = 0;
             if (data.CanSeek)
             {
-                size = data.Length;
+                size = data.Length - data.Position;
             }
 
             // Update statistics
@@ -384,14 +385,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
 
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex.Message?.Contains("404") == true
+                                        || ex.Message?.Contains("NotFound") == true
+                                        || ex.GetType().Name.Contains("NotFoundException")
+                                        || ex.GetType().Name.Contains("NoSuchKey"))
             {
-                // Check if it's a 404 not found error
-                if (ex.Message?.Contains("404") == true || ex.Message?.Contains("NotFound") == true)
-                {
-                    IncrementOperationCounter(StorageOperationType.Exists);
-                    return false;
-                }
+                // Definitively "object not found" — return false.
+                IncrementOperationCounter(StorageOperationType.Exists);
                 return false;
             }
         }

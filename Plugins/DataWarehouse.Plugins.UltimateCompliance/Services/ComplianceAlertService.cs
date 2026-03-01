@@ -93,6 +93,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Services
                 catch (Exception ex)
                 {
                     failures.Add($"{channel}: {ex.Message}");
+                    // Log channel delivery failure so Critical/Emergency failures are not invisible
+                    System.Diagnostics.Debug.WriteLine($"[ComplianceAlertService] Channel delivery failed: channel={channel}, alert={alert.AlertId}, severity={alert.Severity}, error={ex.Message}");
                 }
             }
 

@@ -36,7 +36,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Americas
                 violations.Add(new ComplianceViolation { Code = "PIPEDA-003", Description = "Policies not made available to individuals", Severity = ViolationSeverity.Medium, Remediation = "Make policies and practices openly available", RegulatoryReference = "PIPEDA Principle 4.8" });
             }
 
-            if (!context.Attributes.TryGetValue("AppropiateSafeguards", out var safeguardsObj) || safeguardsObj is not true)
+            if (!context.Attributes.TryGetValue("AppropriateSafeguards", out var safeguardsObj) || safeguardsObj is not true)
             {
                 violations.Add(new ComplianceViolation { Code = "PIPEDA-004", Description = "Safeguards not proportionate to sensitivity", Severity = ViolationSeverity.High, Remediation = "Implement appropriate security safeguards", RegulatoryReference = "PIPEDA Principle 4.7" });
             }

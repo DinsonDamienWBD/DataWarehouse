@@ -392,8 +392,20 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             var fileInfo = new FileInfo(fullPath);
             var size = fileInfo.Length;
 
-            // Delete file
+            // Delete main file
             File.Delete(fullPath);
+
+            // Delete associated metadata sidecar to prevent stale files accumulating.
+            var metadataPath = fullPath + ".metadata.json";
+            if (File.Exists(metadataPath))
+            {
+                try { File.Delete(metadataPath); }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[WekaIoStrategy] Failed to delete metadata sidecar '{metadataPath}': {ex.GetType().Name}: {ex.Message}");
+                }
+            }
 
             // Create snapshot after deletion if enabled
             if (_enableSnapshots)

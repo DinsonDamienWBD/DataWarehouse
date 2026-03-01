@@ -12,6 +12,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
     /// </summary>
     public sealed class ItarStrategy : ComplianceStrategyBase
     {
+        // LOW-1557: ITAR restricted country lists change via regulation; the default set covers
+        // the 22 CFR Part 126.1 embargoed countries as of the strategy's last review date.
+        // Override via configuration key "RestrictedCountries" (comma-separated ISO-2 codes).
         private readonly HashSet<string> _restrictedCountries = new(StringComparer.OrdinalIgnoreCase)
         {
             "CN", "RU", "IR", "KP", "SY", "CU", "VE"
@@ -171,6 +174,19 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
             }
         }
     
+    /// <inheritdoc/>
+    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
+    {
+        // LOW-1557: Allow operators to supply an up-to-date restricted country list.
+        if (configuration.TryGetValue("RestrictedCountries", out var listObj) && listObj is string codes && !string.IsNullOrEmpty(codes))
+        {
+            _restrictedCountries.Clear();
+            foreach (var code in codes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                _restrictedCountries.Add(code);
+        }
+        return base.InitializeAsync(configuration, cancellationToken);
+    }
+
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {

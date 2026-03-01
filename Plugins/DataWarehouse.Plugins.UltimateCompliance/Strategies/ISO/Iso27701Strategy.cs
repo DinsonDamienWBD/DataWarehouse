@@ -11,6 +11,12 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.ISO
     /// </summary>
     public sealed class Iso27701Strategy : ComplianceStrategyBase
     {
+        /// <summary>
+        /// Configurable data-field count threshold for the data-minimization recommendation (ISO 27701 §7.2.2).
+        /// Default of 30 is a practical heuristic; override via configuration key "DataMinimizationFieldThreshold".
+        /// </summary>
+        public int DataMinimizationFieldThreshold { get; set; } = 30;
+
         /// <inheritdoc/>
         public override string StrategyId => "iso27701";
 
@@ -98,10 +104,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.ISO
                 }
             }
 
-            // Check data minimization (7.2.2)
+            // Check data minimization (7.2.2) — threshold is configurable via DataMinimizationFieldThreshold
             if (context.Attributes.TryGetValue("DataFields", out var fieldsObj) &&
                 fieldsObj is IEnumerable<string> fields &&
-                fields.Count() > 30)
+                fields.Count() > DataMinimizationFieldThreshold)
             {
                 recommendations.Add("Review data collection scope for compliance with data minimization principles");
             }

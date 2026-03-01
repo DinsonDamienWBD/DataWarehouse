@@ -226,7 +226,8 @@ public sealed class PolicyBasedRetentionStrategy : RetentionStrategyBase
     {
         if (!string.IsNullOrEmpty(assignment.PathPattern))
         {
-            var regex = new Regex(assignment.PathPattern.Replace("*", ".*"), RegexOptions.IgnoreCase);
+            // P2-2395: Add a 100ms regex timeout to prevent ReDoS from user-supplied PathPattern.
+            var regex = new Regex(assignment.PathPattern.Replace("*", ".*"), RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100));
             if (data.Path == null || !regex.IsMatch(data.Path))
             {
                 return false;

@@ -313,6 +313,9 @@ public sealed class SovereigntyZoneBuilder
             throw new InvalidOperationException("ZoneId is required.");
         if (string.IsNullOrWhiteSpace(_name))
             throw new InvalidOperationException("Name is required.");
+        // LOW-1555: A zone with no jurisdictions is silently unreachable; require at least one.
+        if (_jurisdictions.Count == 0)
+            throw new InvalidOperationException("At least one jurisdiction is required for a sovereignty zone.");
 
         return new SovereigntyZone(
             _zoneId,

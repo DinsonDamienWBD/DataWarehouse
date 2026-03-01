@@ -112,7 +112,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.NIST
             recommendations.Add("Consider CMMC certification if providing services to DoD");
 
             var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
-            var isCompliant = !hasHighViolations;
+            // IsCompliant is false whenever any violation exists so callers checking only IsCompliant get correct signal
+            var isCompliant = violations.Count == 0;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
                         hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;

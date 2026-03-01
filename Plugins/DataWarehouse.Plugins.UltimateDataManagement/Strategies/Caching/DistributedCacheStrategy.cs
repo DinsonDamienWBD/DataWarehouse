@@ -467,7 +467,10 @@ public sealed class DistributedCacheStrategy : CachingStrategyBase
 
     private string GetFullKey(string key)
     {
-        return string.IsNullOrEmpty(_config.KeyPrefix) ? key : $"{_config.KeyPrefix}:{key}";
+        // P2-2350/P2-2351: Sanitize key to prevent RESP and Memcached command injection.
+        // Remove CR, LF, and space characters which are used as protocol delimiters.
+        var sanitized = key.Replace("\r", string.Empty).Replace("\n", string.Empty).Replace(" ", "_");
+        return string.IsNullOrEmpty(_config.KeyPrefix) ? sanitized : $"{_config.KeyPrefix}:{sanitized}";
     }
 
     private async Task<string?> ExecuteRedisCommandAsync(string command, CancellationToken ct)

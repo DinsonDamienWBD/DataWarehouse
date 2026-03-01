@@ -45,7 +45,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Industry
                 });
             }
 
-            if (!context.Attributes.TryGetValue("MultiFactor Authentication", out var mfaObj) || mfaObj is not true)
+            // Key uses camelCase without space to avoid false-positive violations when callers use "MultiFactorAuthentication"
+            if (!context.Attributes.TryGetValue("MultiFactorAuthentication", out var mfaObj) || mfaObj is not true)
             {
                 violations.Add(new ComplianceViolation
                 {

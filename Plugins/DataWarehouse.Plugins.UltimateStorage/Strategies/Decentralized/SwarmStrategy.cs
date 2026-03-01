@@ -663,19 +663,18 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
         }
 
         /// <summary>
-        /// Computes a feed topic from a key using fast non-crypto hashing.
-        /// AD-11: Cryptographic hashing delegated to UltimateDataIntegrity via bus.
-        /// Feed topics only need deterministic distribution, not security.
+        /// Computes a deterministic 64-bit hex feed topic from a key.
+        /// Uses the first 8 bytes of SHA-256 to avoid the 32-bit birthday collision
+        /// that occurs with HashCode.Combine (~65K keys).  SHA-256 truncated to 64 bits
+        /// has negligible collision probability at any realistic key count.
         /// </summary>
         private string ComputeFeedTopic(string key)
         {
-            if (!string.IsNullOrEmpty(_feedTopic))
-            {
-                var combined = $"{_feedTopic}/{key}";
-                return HashCode.Combine(combined).ToString("x16").PadLeft(16, '0');
-            }
-
-            return HashCode.Combine(key).ToString("x16").PadLeft(16, '0');
+            var input = !string.IsNullOrEmpty(_feedTopic) ? $"{_feedTopic}/{key}" : key;
+            var hashBytes = System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(input));
+            // Use first 8 bytes for a 64-bit identifier.
+            return Convert.ToHexString(hashBytes, 0, 8).ToLowerInvariant();
         }
 
         /// <summary>

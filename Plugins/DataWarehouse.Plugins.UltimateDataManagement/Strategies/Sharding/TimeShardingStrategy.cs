@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Sharding;
@@ -90,6 +91,8 @@ public sealed class TimeShardingStrategy : ShardingStrategyBase
     private readonly int _cacheMaxSize;
     private readonly Timer? _partitionMaintenanceTimer;
     private string _timestampKeyPattern = @"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})";
+    // P2-2430: Cache compiled regex to avoid per-call compilation in ExtractTimestamp hot path.
+    private Regex _compiledTimestampRegex = new Regex(@"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100));
 
     /// <summary>
     /// Initializes a new TimeShardingStrategy with default settings.
@@ -353,6 +356,8 @@ public sealed class TimeShardingStrategy : ShardingStrategyBase
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(regexPattern);
         _timestampKeyPattern = regexPattern;
+        // P2-2430: Recompile cached regex when pattern changes.
+        _compiledTimestampRegex = new Regex(regexPattern, RegexOptions.Compiled, TimeSpan.FromMilliseconds(100));
         _cache.Clear();
     }
 
@@ -565,8 +570,8 @@ public sealed class TimeShardingStrategy : ShardingStrategyBase
             }
         }
 
-        // Try regex pattern
-        var match = System.Text.RegularExpressions.Regex.Match(key, _timestampKeyPattern);
+        // Try regex pattern — use cached compiled regex (P2-2430).
+        var match = _compiledTimestampRegex.Match(key);
         if (match.Success && match.Groups.Count > 1)
         {
             if (DateTime.TryParse(match.Groups[1].Value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsedTime))

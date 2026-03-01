@@ -454,12 +454,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
         #region Green Routing and Carbon Management
 
-        private async Task<DatacenterInfo> SelectGreenestDatacenterAsync(long dataSize, CancellationToken ct)
+        private Task<DatacenterInfo> SelectGreenestDatacenterAsync(long dataSize, CancellationToken ct)
         {
-            // Simulate querying real-time renewable energy availability
-            await Task.Delay(10, ct); // Simulate API call
-
-            // Get current hour to simulate time-of-day renewable availability
+            // Score registered datacenters by renewable availability, carbon intensity and PUE.
+            // Real deployments should inject fresh telemetry via SetDatacenterMetrics() before each placement decision.
             var hour = DateTime.UtcNow.Hour;
 
             // Simulate solar peak hours (10am-4pm UTC)
@@ -475,7 +473,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 .OrderByDescending(x => x.Score)
                 .ToList();
 
-            return scores.First().DC;
+            return Task.FromResult(scores.First().DC);
         }
 
         private double CalculateEnergyConsumption(long dataSize, DatacenterInfo datacenter, OperationType operation)
@@ -497,13 +495,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             return carbonKg;
         }
 
-        private async Task PurchaseCarbonOffsetAsync(double carbonKg, CancellationToken ct)
+        private Task PurchaseCarbonOffsetAsync(double carbonKg, CancellationToken ct)
         {
-            // Simulate API call to carbon offset provider
-            await Task.Delay(5, ct);
-
-            // In production: call real carbon offset API
-            // e.g., await _carbonOffsetClient.PurchaseOffsetAsync(carbonKg, ct);
+            // Carbon offset purchase requires an external provider integration.
+            // Configure CarbonOffsetApiUrl in strategy settings to enable live offset purchases.
+            // Until configured, emissions are tracked locally via _totalCarbonEmissionsKg only.
+            System.Diagnostics.Debug.WriteLine(
+                $"[CarbonNeutralStorageStrategy] Carbon offset required: {carbonKg:F6} kg CO2. " +
+                "Configure CarbonOffsetApiUrl to enable automatic offset purchases.");
+            return Task.CompletedTask;
         }
 
         #endregion

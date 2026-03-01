@@ -526,36 +526,40 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         }
 
         /// <summary>
-        /// Performs erasure coding to create redundant shards.
-        /// Simplified implementation - production would use Reed-Solomon or similar.
+        /// Performs erasure coding to create redundant shards using XOR-parity (RAID-5 style).
+        /// Data is split into (shardCount - 1) equal data shards plus 1 XOR parity shard.
+        /// This provides single-shard fault tolerance.  For m-of-n recovery (Reed-Solomon)
+        /// integrate an external library such as ErasureCoding.NET or Backblaze Java port.
         /// </summary>
         private List<byte[]> PerformErasureCoding(byte[] data, int shardCount)
         {
-            var shards = new List<byte[]>();
-            var shardSize = (data.Length + shardCount - 1) / shardCount;
+            if (shardCount < 2)
+                throw new ArgumentOutOfRangeException(nameof(shardCount), "shardCount must be at least 2 (1 data + 1 parity).");
 
-            // Simple data splitting (production would use proper erasure coding)
-            for (int i = 0; i < shardCount; i++)
+            var dataShardCount = shardCount - 1;
+            var shardSize = (data.Length + dataShardCount - 1) / dataShardCount;
+
+            var shards = new List<byte[]>(shardCount);
+            var parity = new byte[shardSize];
+
+            // Create data shards and accumulate XOR parity in one pass.
+            for (int i = 0; i < dataShardCount; i++)
             {
                 var offset = i * shardSize;
                 var length = Math.Min(shardSize, data.Length - offset);
-
+                var shard = new byte[shardSize]; // zero-padded for uniform size
                 if (length > 0)
-                {
-                    var shard = new byte[length];
                     Array.Copy(data, offset, shard, 0, length);
-                    shards.Add(shard);
-                }
-                else
-                {
-                    // Parity shard (simplified - just duplicate last shard)
-                    if (shards.Count > 0)
-                    {
-                        shards.Add((byte[])shards[shards.Count - 1].Clone());
-                    }
-                }
+
+                shards.Add(shard);
+
+                // XOR into parity
+                for (int j = 0; j < shardSize; j++)
+                    parity[j] ^= shard[j];
             }
 
+            // Add parity shard last
+            shards.Add(parity);
             return shards;
         }
 

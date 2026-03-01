@@ -412,12 +412,39 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
 
             IncrementOperationCounter(StorageOperationType.GetMetadata);
 
+            // Execute a lightweight probe query to determine actual response size and connectivity.
+            // We use __typename which is always available and blocked only by full schema introspection controls.
+            long responseSize = 0;
+            var checkedAt = DateTime.UtcNow;
+            try
+            {
+                await _httpLock.WaitAsync(ct);
+                try
+                {
+                    var probePayload = new { query = "{ __typename }" };
+                    var response = await _httpClient!.PostAsJsonAsync("", probePayload, ct);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var content = await response.Content.ReadAsStringAsync(ct);
+                        responseSize = System.Text.Encoding.UTF8.GetByteCount(content);
+                    }
+                }
+                finally
+                {
+                    _httpLock.Release();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[GraphQlConnectorStrategy.GetMetadataAsyncCore] probe failed: {ex.GetType().Name}: {ex.Message}");
+            }
+
             return new StorageObjectMetadata
             {
                 Key = key,
-                Size = 0,
-                Created = DateTime.MinValue,
-                Modified = DateTime.UtcNow,
+                Size = responseSize,
+                Created = checkedAt,
+                Modified = checkedAt,
                 ETag = $"\"{Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(key))).Substring(0, 16)}\"",
                 ContentType = "application/graphql",
                 CustomMetadata = new Dictionary<string, string>

@@ -45,7 +45,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
         private bool _verifyAfterStore = true;
         private readonly Dictionary<string, Cid> _keyToCidMap = new();
         private readonly object _mapLock = new();
-        private DateTime _lastGcTime = DateTime.MinValue;
+        // Store as Ticks (long) so reads/writes are atomic on all platforms.
+        private long _lastGcTimeTicks = DateTime.MinValue.Ticks;
 
         public override string StrategyId => "ipfs";
         public override string Name => "IPFS Decentralized Storage";
@@ -740,7 +741,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                     return true;
                 }, ct);
 
-                _lastGcTime = DateTime.UtcNow;
+                Interlocked.Exchange(ref _lastGcTimeTicks, DateTime.UtcNow.Ticks);
                 return true;
             }
             catch (Exception ex)
@@ -1040,7 +1041,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 return;
             }
 
-            var timeSinceLastGc = DateTime.UtcNow - _lastGcTime;
+            var timeSinceLastGc = DateTime.UtcNow - new DateTime(Interlocked.Read(ref _lastGcTimeTicks), DateTimeKind.Utc);
             if (timeSinceLastGc.TotalMinutes >= _gcIntervalMinutes)
             {
                 // Run GC in background

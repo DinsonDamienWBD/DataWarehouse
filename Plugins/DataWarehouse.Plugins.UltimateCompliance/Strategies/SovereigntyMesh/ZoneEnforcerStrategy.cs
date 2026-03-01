@@ -76,12 +76,13 @@ public sealed class ZoneEnforcerStrategy : ComplianceStrategyBase, IZoneEnforcer
         ct.ThrowIfCancellationRequested();
             IncrementCounter("zone_enforcer.enforce");
 
+        // LOW-1556: Use ArgumentException for whitespace violations (not ArgumentNullException).
         if (string.IsNullOrWhiteSpace(objectId))
-            throw new ArgumentNullException(nameof(objectId));
+            throw new ArgumentException("objectId must not be null or whitespace.", nameof(objectId));
         if (string.IsNullOrWhiteSpace(sourceZoneId))
-            throw new ArgumentNullException(nameof(sourceZoneId));
+            throw new ArgumentException("sourceZoneId must not be null or whitespace.", nameof(sourceZoneId));
         if (string.IsNullOrWhiteSpace(destinationZoneId))
-            throw new ArgumentNullException(nameof(destinationZoneId));
+            throw new ArgumentException("destinationZoneId must not be null or whitespace.", nameof(destinationZoneId));
 
         // 1. Same zone => always allow (intra-zone movement)
         if (string.Equals(sourceZoneId, destinationZoneId, StringComparison.OrdinalIgnoreCase))
@@ -234,14 +235,7 @@ public sealed class ZoneEnforcerStrategy : ComplianceStrategyBase, IZoneEnforcer
         }
         else
         {
-            // Wrap the interface into the concrete type via builder
-            var built = new SovereigntyZoneBuilder()
-                .WithId(zone.ZoneId)
-                .WithName(zone.Name)
-                .InJurisdictions(zone.Jurisdictions.ToArray())
-                .Build();
-
-            // Copy regulations and rules via reflection-free approach: rebuild fully
+            // LOW-1554: First builder chain was dead code (built but unused). Build only once with full configuration.
             var builder = new SovereigntyZoneBuilder()
                 .WithId(zone.ZoneId)
                 .WithName(zone.Name)

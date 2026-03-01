@@ -162,14 +162,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             ValidateKey(key);
             ValidateStream(data);
 
-            if (_enableWorm && await ExistsAsyncCore(key, ct))
-            {
-                throw new InvalidOperationException($"Object '{key}' already exists on WORM-enabled optical media. Modification not allowed.");
-            }
-
             await _driveLock.WaitAsync(ct);
             try
             {
+                // WORM check must be performed inside the lock to prevent a TOCTOU race
+                // where two concurrent writes both pass the existence check before either writes.
+                if (_enableWorm && await ExistsAsyncCore(key, ct))
+                {
+                    throw new InvalidOperationException($"Object '{key}' already exists on WORM-enabled optical media. Modification not allowed.");
+                }
+
                 // Calculate data size
                 var dataLength = data.CanSeek ? data.Length - data.Position : 0L;
                 if (dataLength == 0)
@@ -430,9 +432,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                     };
                 }
 
-                // Calculate available capacity
-                var totalCapacity = _cartridgeInventory.Values.Sum(c => _cartridgeCapacityBytes);
-                var usedCapacity = _cartridgeInventory.Values.Sum(c => c.UsedCapacity);
+                // Calculate available capacity in a single pass to avoid double enumeration.
+                long totalCapacity = 0;
+                long usedCapacity = 0;
+                foreach (var cartridge in _cartridgeInventory.Values)
+                {
+                    totalCapacity += _cartridgeCapacityBytes;
+                    usedCapacity += cartridge.UsedCapacity;
+                }
                 var availableCapacity = totalCapacity - usedCapacity;
 
                 // Check for cartridges approaching end of life

@@ -14,6 +14,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Features
     public sealed class TamperProofAuditLog
     {
         private readonly List<AuditEntry> _entries = new();
+        private readonly object _lock = new(); // guards _entries and _previousHash for thread safety
         private string _previousHash = "0000000000000000000000000000000000000000000000000000000000000000";
 
         /// <summary>
@@ -21,22 +22,25 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Features
         /// </summary>
         public string AppendEntry(string eventType, string userId, string resourceId, Dictionary<string, object> metadata)
         {
-            var entry = new AuditEntry
+            lock (_lock)
             {
-                EntryId = Guid.NewGuid().ToString(),
-                EventType = eventType,
-                UserId = userId,
-                ResourceId = resourceId,
-                Timestamp = DateTime.UtcNow,
-                Metadata = metadata,
-                PreviousHash = _previousHash
-            };
+                var entry = new AuditEntry
+                {
+                    EntryId = Guid.NewGuid().ToString(),
+                    EventType = eventType,
+                    UserId = userId,
+                    ResourceId = resourceId,
+                    Timestamp = DateTime.UtcNow,
+                    Metadata = metadata,
+                    PreviousHash = _previousHash
+                };
 
-            entry.Hash = ComputeEntryHash(entry);
-            _previousHash = entry.Hash;
+                entry.Hash = ComputeEntryHash(entry);
+                _previousHash = entry.Hash;
 
-            _entries.Add(entry);
-            return entry.EntryId;
+                _entries.Add(entry);
+                return entry.EntryId;
+            }
         }
 
         /// <summary>
@@ -44,7 +48,13 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Features
         /// </summary>
         public AuditVerificationResult VerifyIntegrity()
         {
-            if (_entries.Count == 0)
+            List<AuditEntry> snapshot;
+            lock (_lock)
+            {
+                snapshot = _entries.ToList(); // snapshot under lock for thread-safe read
+            }
+
+            if (snapshot.Count == 0)
             {
                 return new AuditVerificationResult
                 {
@@ -56,9 +66,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Features
 
             var expectedPreviousHash = "0000000000000000000000000000000000000000000000000000000000000000";
 
-            for (int i = 0; i < _entries.Count; i++)
+            for (int i = 0; i < snapshot.Count; i++)
             {
-                var entry = _entries[i];
+                var entry = snapshot[i];
 
                 if (entry.PreviousHash != expectedPreviousHash)
                 {
@@ -90,7 +100,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Features
             {
                 IsValid = true,
                 Message = "All entries verified successfully",
-                VerifiedEntries = _entries.Count
+                VerifiedEntries = snapshot.Count
             };
         }
 
@@ -99,11 +109,17 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Features
         /// </summary>
         public string ComputeMerkleRoot(int startIndex = 0, int count = -1)
         {
-            if (_entries.Count == 0)
+            List<AuditEntry> snapshot;
+            lock (_lock)
+            {
+                snapshot = _entries.ToList();
+            }
+
+            if (snapshot.Count == 0)
                 return string.Empty;
 
-            count = count == -1 ? _entries.Count - startIndex : count;
-            var batch = _entries.Skip(startIndex).Take(count).ToList();
+            count = count == -1 ? snapshot.Count - startIndex : count;
+            var batch = snapshot.Skip(startIndex).Take(count).ToList();
 
             if (batch.Count == 0)
                 return string.Empty;
@@ -117,7 +133,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Features
         /// </summary>
         public AuditEntry? GetEntry(string entryId)
         {
-            return _entries.FirstOrDefault(e => e.EntryId == entryId);
+            lock (_lock)
+            {
+                return _entries.FirstOrDefault(e => e.EntryId == entryId);
+            }
         }
 
         /// <summary>
@@ -125,15 +144,21 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Features
         /// </summary>
         public IReadOnlyList<AuditEntry> GetEntriesInRange(DateTime startTime, DateTime endTime)
         {
-            return _entries
-                .Where(e => e.Timestamp >= startTime && e.Timestamp <= endTime)
-                .ToList();
+            lock (_lock)
+            {
+                return _entries
+                    .Where(e => e.Timestamp >= startTime && e.Timestamp <= endTime)
+                    .ToList();
+            }
         }
 
         /// <summary>
         /// Gets the total number of audit entries.
         /// </summary>
-        public int EntryCount => _entries.Count;
+        public int EntryCount
+        {
+            get { lock (_lock) { return _entries.Count; } }
+        }
 
         private static string ComputeEntryHash(AuditEntry entry)
         {

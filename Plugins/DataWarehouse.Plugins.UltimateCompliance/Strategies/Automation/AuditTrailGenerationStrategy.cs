@@ -34,7 +34,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
         public override string StrategyName => "Audit Trail Generation";
 
         /// <inheritdoc/>
-        public override string Framework => "Audit-Based";
+        public override string Framework => "CROSS-FRAMEWORK";
 
         /// <inheritdoc/>
         public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
@@ -158,7 +158,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
             };
         }
 
-        private async Task<AuditEntry> GenerateAuditEntryAsync(ComplianceContext context, CancellationToken cancellationToken)
+        private Task<AuditEntry> GenerateAuditEntryAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
             var sequenceNumber = Interlocked.Increment(ref _sequenceNumber);
             var timestamp = DateTime.UtcNow;
@@ -217,7 +217,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
                 entry = entryBase;
             }
 
-            return entry;
+            return Task.FromResult(entry);
         }
 
         private Task GenerateChainEntryAsync(AuditEntry entry, CancellationToken cancellationToken)
@@ -256,7 +256,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
 
         private bool VerifyChainIntegrity(AuditChain chain)
         {
-            var entries = chain.Entries.ToArray();
+            // Take a single snapshot to avoid redundant copies; the ConcurrentQueue ToArray is O(n)
+            // but called only when Count > 1 (guarded at call site) so the cost is bounded.
+            var entries = chain.Entries.ToArray(); // single snapshot per verify call
             for (int i = 1; i < entries.Length; i++)
             {
                 if (entries[i].PreviousHash != entries[i - 1].Hash)

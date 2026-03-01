@@ -97,8 +97,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
         {
             try
             {
-                // Attempt to connect (will be validated on first call)
-                await Task.CompletedTask;
+                // ConnectAsync forces the channel to complete the TCP+TLS handshake immediately.
+                // This surfaces connection failures at initialization time rather than on the first RPC.
+                await _channel!.ConnectAsync(ct);
             }
             catch (Exception ex)
             {

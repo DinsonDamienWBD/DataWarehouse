@@ -685,7 +685,8 @@ public sealed class BiTemporalVersioningStrategy : VersioningStrategyBase
         {
             VersionId = fact.FactId,
             ObjectId = objectId,
-            VersionNumber = long.Parse(fact.FactId.Split('-').Last()),
+            // P2-2468: Use TryParse to avoid FormatException on malformed FactIds.
+            VersionNumber = long.TryParse(fact.FactId.Split('-').Last(), out var vn1) ? vn1 : 0L,
             ContentHash = fact.ContentHash,
             SizeBytes = fact.SizeBytes,
             CreatedAt = fact.TransactionTimeStart,
@@ -733,7 +734,8 @@ public sealed class BiTemporalVersioningStrategy : VersioningStrategyBase
             {
                 VersionId = f.FactId,
                 ObjectId = objectId,
-                VersionNumber = long.Parse(f.FactId.Split('-').Last()),
+                // P2-2469: Use TryParse to avoid FormatException on malformed FactIds.
+                VersionNumber = long.TryParse(f.FactId.Split('-').Last(), out var vn2) ? vn2 : 0L,
                 ContentHash = f.ContentHash,
                 SizeBytes = f.SizeBytes,
                 CreatedAt = f.TransactionTimeStart,
