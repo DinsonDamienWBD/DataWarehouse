@@ -379,10 +379,14 @@ public sealed class LineageScalingManager : IScalableSubsystem, IDisposable
             int newCapacity = Math.Min(capacity * 2, int.MaxValue / 2);
             if (newCapacity > capacity)
             {
-                // Replace with expanded partition (existing entries will need re-population from backing store)
+                // P2-2353: Actually replace the cache with one of doubled capacity.
+                // BoundedCache does not support in-place resize, so we create a new instance
+                // and copy all live entries from the old cache before swapping.
+                var newPartition = CreatePartitionCache(partitionIndex, newCapacity);
+                foreach (var kvp in partition)
+                    newPartition.Put(kvp.Key, kvp.Value);
+                _partitions[partitionIndex] = newPartition;
                 _partitionCapacities[partitionIndex] = newCapacity;
-                // Note: BoundedCache doesn't support runtime resize; new capacity applies to new cache
-                // In practice, the larger cache handles subsequent puts; existing entries remain accessible
             }
         }
     }
@@ -406,10 +410,17 @@ public sealed class LineageScalingManager : IScalableSubsystem, IDisposable
 
     private static IEnumerable<string> FilterEdgesByDirection(IReadOnlyList<string> edges, LineageDirection direction)
     {
-        // In a full implementation, edges would carry direction metadata.
-        // For this bounded implementation, all stored edges are treated as outgoing (downstream).
-        // Upstream traversal would require a reverse index. Here we return all edges for any direction.
-        return edges;
+        // P2-2351: All stored edges are outgoing (downstream, i.e. from source to target).
+        // Downstream and Both traversals follow these edges.
+        // Upstream traversal requires a reverse index which is not built in this implementation;
+        // returning an empty set for Upstream prevents silently returning wrong results.
+        return direction switch
+        {
+            LineageDirection.Downstream => edges,
+            LineageDirection.Both => edges,
+            LineageDirection.Upstream => Array.Empty<string>(), // reverse index not available
+            _ => edges
+        };
     }
 
     /// <summary>

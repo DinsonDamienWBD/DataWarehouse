@@ -171,8 +171,39 @@ public sealed class EnhancedBlastRadiusStrategy : LineageStrategyBase
 
     private static string[] BuildPath(SimpleLineageGraph graph, string from, string to, HashSet<string> visited)
     {
-        // Simplified path reconstruction
-        return new[] { from, to };
+        // P2-2371: BFS path reconstruction from 'from' to 'to' using the graph's edges.
+        // Build a parent map so we can reconstruct the shortest path after BFS completes.
+        var parent = new Dictionary<string, string?> { [from] = null };
+        var bfsQueue = new Queue<string>();
+        bfsQueue.Enqueue(from);
+
+        while (bfsQueue.Count > 0)
+        {
+            var current = bfsQueue.Dequeue();
+            if (current == to) break;
+
+            foreach (var edge in graph.Edges)
+            {
+                if (edge.SourceId != current) continue;
+                if (parent.ContainsKey(edge.TargetId)) continue;
+                parent[edge.TargetId] = current;
+                bfsQueue.Enqueue(edge.TargetId);
+            }
+        }
+
+        // Walk back from 'to' to 'from' via parent links
+        if (!parent.ContainsKey(to))
+            return [from, to]; // no path found — fall back to direct edge
+
+        var path = new List<string>();
+        var node = to;
+        while (node != null)
+        {
+            path.Add(node);
+            node = parent.TryGetValue(node, out var p) ? p : null;
+        }
+        path.Reverse();
+        return path.ToArray();
     }
 }
 

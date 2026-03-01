@@ -19,6 +19,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
         private RaidLevel _currentLevel;
         private readonly Dictionary<string, long> _workloadMetrics;
         private DateTime _lastAdaptation;
+        private readonly object _metricsLock = new();
 
         public AdaptiveRaidStrategy()
         {
@@ -57,7 +58,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
             ValidateDiskConfiguration(disks);
 
             // Track write patterns
-            _workloadMetrics["WriteCount"]++;
+            lock (_metricsLock) { _workloadMetrics["WriteCount"]++; }
             AdaptToWorkload(disks);
 
             var diskList = disks.ToList();
@@ -76,7 +77,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
             ValidateDiskConfiguration(disks);
 
             // Track read patterns
-            _workloadMetrics["ReadCount"]++;
+            lock (_metricsLock) { _workloadMetrics["ReadCount"]++; }
             AdaptToWorkload(disks);
 
             var diskList = disks.ToList();
@@ -176,14 +177,21 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
             if ((DateTime.UtcNow - _lastAdaptation).TotalMinutes < 5)
                 return;
 
-            var totalOps = _workloadMetrics["ReadCount"] + _workloadMetrics["WriteCount"];
+            long reads, writes;
+            lock (_metricsLock)
+            {
+                reads = _workloadMetrics["ReadCount"];
+                writes = _workloadMetrics["WriteCount"];
+            }
+
+            var totalOps = reads + writes;
             if (totalOps == 0) return;
 
-            var readRatio = (double)_workloadMetrics["ReadCount"] / totalOps;
+            var readRatio = (double)reads / totalOps;
             var diskList = disks.ToList();
 
             // Adapt strategy based on workload characteristics
-            _currentLevel = (readRatio, diskList.Count) switch
+            var newLevel = (readRatio, diskList.Count) switch
             {
                 // Read-heavy workload with many disks -> RAID 0 for max performance
                 ( > 0.8, >= 6) => RaidLevel.Raid0,
@@ -200,11 +208,15 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
                 _ => RaidLevel.Raid10
             };
 
-            _lastAdaptation = DateTime.UtcNow;
+            lock (_metricsLock)
+            {
+                _currentLevel = newLevel;
+                _lastAdaptation = DateTime.UtcNow;
 
-            // Reset metrics for next period
-            _workloadMetrics["ReadCount"] = 0;
-            _workloadMetrics["WriteCount"] = 0;
+                // Reset metrics for next period
+                _workloadMetrics["ReadCount"] = 0;
+                _workloadMetrics["WriteCount"] = 0;
+            }
         }
 
         private async Task WriteWithCurrentStrategy(
@@ -500,6 +512,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
     {
         private readonly Dictionary<string, DiskHealthMetrics> _diskHealthHistory;
         private readonly Queue<DiskHealthMetrics> _predictionQueue;
+        private readonly object _healthLock = new();
         private DateTime _lastHealthCheck;
 
         public SelfHealingRaidStrategy()
@@ -758,19 +771,13 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
                     PowerOnHours = disk.PowerOnHours ?? 0
                 };
 
-                if (!_diskHealthHistory.ContainsKey(disk.DiskId))
+                lock (_healthLock)
                 {
                     _diskHealthHistory[disk.DiskId] = metrics;
+                    _predictionQueue.Enqueue(metrics);
+                    if (_predictionQueue.Count > 1000)
+                        _predictionQueue.Dequeue();
                 }
-                else
-                {
-                    // Update history
-                    _diskHealthHistory[disk.DiskId] = metrics;
-                }
-
-                _predictionQueue.Enqueue(metrics);
-                if (_predictionQueue.Count > 1000)
-                    _predictionQueue.Dequeue();
             }
 
             _lastHealthCheck = DateTime.UtcNow;
@@ -785,10 +792,12 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
 
             foreach (var disk in disks)
             {
-                if (!_diskHealthHistory.ContainsKey(disk.DiskId))
-                    continue;
-
-                var metrics = _diskHealthHistory[disk.DiskId];
+                DiskHealthMetrics metrics;
+                lock (_healthLock)
+                {
+                    if (!_diskHealthHistory.TryGetValue(disk.DiskId, out metrics!))
+                        continue;
+                }
 
                 // Simple ML-like prediction based on trends
                 var failureProbability = CalculateFailureProbability(metrics);
@@ -1042,6 +1051,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
     public class TieredRaidStrategy : SdkRaidStrategyBase
     {
         private readonly Dictionary<long, AccessPattern> _accessPatterns;
+        private readonly object _accessPatternsLock = new();
         private DateTime _lastTieringOperation;
 
         public TieredRaidStrategy()
@@ -1230,24 +1240,33 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
 
         private void TrackAccess(long blockIndex, bool isWrite)
         {
-            if (!_accessPatterns.ContainsKey(blockIndex))
+            lock (_accessPatternsLock)
             {
-                _accessPatterns[blockIndex] = new AccessPattern();
+                if (!_accessPatterns.ContainsKey(blockIndex))
+                {
+                    _accessPatterns[blockIndex] = new AccessPattern();
+                }
+
+                var pattern = _accessPatterns[blockIndex];
+                pattern.AccessCount++;
+                pattern.LastAccess = DateTime.UtcNow;
+
+                if (isWrite)
+                    pattern.WriteCount++;
+                else
+                    pattern.ReadCount++;
             }
-
-            var pattern = _accessPatterns[blockIndex];
-            pattern.AccessCount++;
-            pattern.LastAccess = DateTime.UtcNow;
-
-            if (isWrite)
-                pattern.WriteCount++;
-            else
-                pattern.ReadCount++;
         }
 
         private StorageTier DetermineDataTier(long blockIndex)
         {
-            if (!_accessPatterns.TryGetValue(blockIndex, out var pattern))
+            AccessPattern? pattern;
+            lock (_accessPatternsLock)
+            {
+                _accessPatterns.TryGetValue(blockIndex, out pattern);
+            }
+
+            if (pattern == null)
                 return StorageTier.Cold; // New data starts cold
 
             var minutesSinceAccess = (DateTime.UtcNow - pattern.LastAccess).TotalMinutes;

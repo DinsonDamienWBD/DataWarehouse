@@ -230,6 +230,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Cloud
         private ConsistencyModel _cosmosConsistencyLevel = ConsistencyModel.SessionConsistent;
         private string? _writeRegion;
         private readonly List<string> _readRegions = new();
+        private readonly object _readRegionsLock = new();
 
         /// <inheritdoc/>
         public override ReplicationCharacteristics Characteristics { get; } = new()
@@ -291,7 +292,10 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Cloud
             }
             else
             {
-                _readRegions.Add(regionName);
+                lock (_readRegionsLock)
+                {
+                    _readRegions.Add(regionName);
+                }
             }
         }
 

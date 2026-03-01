@@ -441,7 +441,8 @@ public sealed class DimensionScoringStrategy : DataQualityStrategyBase
             {
                 Description = kvp.Key,
                 AffectedCount = kvp.Value,
-                Dimension = QualityDimension.Validity,
+                // P2-2660: Infer actual dimension from the issue description prefix set during scoring.
+                Dimension = InferDimensionFromIssue(kvp.Key),
                 ScoreImpact = (double)kvp.Value / recordList.Count * 10
             })
             .ToList();
@@ -540,6 +541,31 @@ public sealed class DimensionScoringStrategy : DataQualityStrategyBase
         // Gradual decay
         var overDays = age.TotalDays - thresholdDays;
         return Math.Max(0, 100 - overDays * 2);
+    }
+
+    /// <summary>
+    /// P2-2660: Infers the quality dimension from the issue description prefix written during per-record scoring.
+    /// Falls back to <see cref="QualityDimension.Validity"/> when the prefix is unrecognised.
+    /// </summary>
+    private static QualityDimension InferDimensionFromIssue(string description)
+    {
+        if (description.StartsWith("Completeness:", StringComparison.OrdinalIgnoreCase))
+            return QualityDimension.Completeness;
+        if (description.StartsWith("Validity:", StringComparison.OrdinalIgnoreCase))
+            return QualityDimension.Validity;
+        if (description.StartsWith("Timeliness:", StringComparison.OrdinalIgnoreCase) ||
+            description.StartsWith("Data may be stale", StringComparison.OrdinalIgnoreCase))
+            return QualityDimension.Timeliness;
+        if (description.StartsWith("Uniqueness:", StringComparison.OrdinalIgnoreCase) ||
+            description.StartsWith("Duplicate", StringComparison.OrdinalIgnoreCase))
+            return QualityDimension.Uniqueness;
+        if (description.StartsWith("Accuracy:", StringComparison.OrdinalIgnoreCase))
+            return QualityDimension.Accuracy;
+        if (description.StartsWith("Consistency:", StringComparison.OrdinalIgnoreCase))
+            return QualityDimension.Consistency;
+        if (description.StartsWith("Integrity:", StringComparison.OrdinalIgnoreCase))
+            return QualityDimension.Integrity;
+        return QualityDimension.Validity;
     }
 
     private double CalculateDatasetUniqueness(List<DataRecord> records)

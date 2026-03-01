@@ -565,6 +565,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.DR
         private readonly BoundedDictionary<string, (byte[] Data, DateTimeOffset Timestamp)> _dataStore = new BoundedDictionary<string, (byte[] Data, DateTimeOffset Timestamp)>(1000);
         private string? _activeSiteId;
         private readonly List<FailoverEvent> _failoverHistory = new();
+        private readonly object _failoverHistoryLock = new();
         private bool _autoFailoverEnabled = true;
         private int _healthCheckIntervalMs = 5000;
 
@@ -672,12 +673,15 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.DR
             targetSite.Role = DRSiteRole.Primary;
             _activeSiteId = targetSiteId;
 
-            _failoverHistory.Add(new FailoverEvent(
-                previousActive ?? "none",
-                targetSiteId,
-                DateTimeOffset.UtcNow,
-                FailoverStatus.Completed,
-                reason ?? "Manual failover"));
+            lock (_failoverHistoryLock)
+            {
+                _failoverHistory.Add(new FailoverEvent(
+                    previousActive ?? "none",
+                    targetSiteId,
+                    DateTimeOffset.UtcNow,
+                    FailoverStatus.Completed,
+                    reason ?? "Manual failover"));
+            }
 
             await Task.Delay(100, ct); // Simulate failover processing
             return true;
@@ -711,7 +715,10 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.DR
         /// </summary>
         public IReadOnlyList<FailoverEvent> GetFailoverHistory()
         {
-            return _failoverHistory.ToArray();
+            lock (_failoverHistoryLock)
+            {
+                return _failoverHistory.ToArray();
+            }
         }
 
         /// <inheritdoc/>

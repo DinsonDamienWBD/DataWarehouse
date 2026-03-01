@@ -30,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Features;
 /// </summary>
 public sealed class RaidPluginMigration
 {
-    private readonly Dictionary<string, LegacyPluginAdapter> _adapters = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, LegacyPluginAdapter> _adapters = new(StringComparer.Ordinal);
     private readonly MigrationRegistry _registry = new();
 
     /// <summary>
@@ -419,36 +419,53 @@ public sealed class CompatibilityMapping
 public sealed class MigrationRegistry
 {
     private readonly List<MigrationEntry> _entries = new();
+    private readonly object _entriesLock = new();
 
     public void AddEntry(string pluginId, LegacyPluginInfo info)
     {
-        _entries.Add(new MigrationEntry
+        var entry = new MigrationEntry
         {
             PluginId = pluginId,
             PluginName = info.Name,
             RegisteredTime = DateTime.UtcNow,
             Status = "registered"
-        });
+        };
+        lock (_entriesLock)
+        {
+            _entries.Add(entry);
+        }
     }
 
-    public IReadOnlyList<MigrationEntry> GetEntries() => _entries.ToList();
+    public IReadOnlyList<MigrationEntry> GetEntries()
+    {
+        lock (_entriesLock)
+        {
+            return _entries.ToList();
+        }
+    }
 
     public void UpdateStatus(string pluginId, string status)
     {
-        var entry = _entries.FirstOrDefault(e => e.PluginId == pluginId);
-        if (entry != null)
+        lock (_entriesLock)
         {
-            entry.Status = status;
-            entry.UpdatedTime = DateTime.UtcNow;
+            var entry = _entries.FirstOrDefault(e => e.PluginId == pluginId);
+            if (entry != null)
+            {
+                entry.Status = status;
+                entry.UpdatedTime = DateTime.UtcNow;
+            }
         }
     }
 
     /// <summary>Stores a configuration option for a plugin, carrying it forward to the new registry.</summary>
     public void SetOption(string pluginId, string key, object value)
     {
-        var entry = _entries.FirstOrDefault(e => e.PluginId == pluginId);
-        if (entry != null)
-            entry.Options[key] = value;
+        lock (_entriesLock)
+        {
+            var entry = _entries.FirstOrDefault(e => e.PluginId == pluginId);
+            if (entry != null)
+                entry.Options[key] = value;
+        }
     }
 }
 

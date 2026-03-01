@@ -900,7 +900,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
         private readonly BoundedDictionary<string, (byte[] Data, TuningState State)> _dataStore = new BoundedDictionary<string, (byte[] Data, TuningState State)>(1000);
         private readonly TuningParameters _params = new();
         private readonly List<TuningEpisode> _episodes = new();
-        private readonly Random _random = new();
+        private readonly object _episodesLock = new();
 
         /// <summary>
         /// Tuning parameters that can be adjusted.
@@ -976,17 +976,17 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
         /// </summary>
         public TuningParameters Explore()
         {
-            if (_random.NextDouble() < _params.ExplorationRate)
+            if (Random.Shared.NextDouble() < _params.ExplorationRate)
             {
                 // Explore: random adjustment
                 return new TuningParameters
                 {
-                    BatchSize = _random.Next(50, 500),
-                    ParallelDegree = _random.Next(1, 16),
-                    RetryCount = _random.Next(1, 5),
-                    Timeout = TimeSpan.FromSeconds(_random.Next(10, 60)),
-                    UseCompression = _random.Next(2) == 0,
-                    UseDeltaSync = _random.Next(2) == 0
+                    BatchSize = Random.Shared.Next(50, 500),
+                    ParallelDegree = Random.Shared.Next(1, 16),
+                    RetryCount = Random.Shared.Next(1, 5),
+                    Timeout = TimeSpan.FromSeconds(Random.Shared.Next(10, 60)),
+                    UseCompression = Random.Shared.Next(2) == 0,
+                    UseDeltaSync = Random.Shared.Next(2) == 0
                 };
             }
             else
@@ -1015,10 +1015,15 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
                 Reward = reward
             };
 
-            _episodes.Add(episode);
+            double averageReward;
+            lock (_episodesLock)
+            {
+                _episodes.Add(episode);
+                averageReward = _episodes.Average(e => e.Reward);
+            }
 
             // Keep best parameters
-            if (reward > _episodes.Average(e => e.Reward))
+            if (reward > averageReward)
             {
                 _params.BatchSize = action.BatchSize;
                 _params.ParallelDegree = action.ParallelDegree;
