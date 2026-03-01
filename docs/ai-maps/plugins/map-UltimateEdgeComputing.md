@@ -136,7 +136,7 @@ internal sealed class EdgeResourceManagerImpl : EC.IEdgeResourceManager
 }
     public event EventHandler<EC.ResourceThresholdEventArgs>? ResourceThresholdExceeded;
     public EdgeResourceManagerImpl(IMessageBus? messageBus);;
-    public Task<EC.ResourceUsage> GetResourceUsageAsync(string nodeId, CancellationToken ct = default);;
+    public Task<EC.ResourceUsage> GetResourceUsageAsync(string nodeId, CancellationToken ct = default);
     public Task<EC.ResourceAllocation> AllocateResourcesAsync(string nodeId, EC.ResourceRequest request, CancellationToken ct = default);
     public Task<bool> ReleaseResourcesAsync(string nodeId, string allocationId, CancellationToken ct = default);;
     public Task<bool> SetResourceLimitsAsync(string nodeId, EC.ResourceLimits limits, CancellationToken ct = default);
