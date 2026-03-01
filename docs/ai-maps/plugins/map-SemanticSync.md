@@ -78,7 +78,7 @@ internal sealed class SemanticSyncOrchestrator : IAsyncDisposable, IDisposable
     }
 }
     public int DeferredCount;;
-    public void StartAsync();
+    public void Start();
     public async Task StopAsync();
     public async Task<SyncPipelineResult> SubmitSyncAsync(string dataId, ReadOnlyMemory<byte> data, IDictionary<string, string>? metadata, CancellationToken ct);
     public void Dispose();
