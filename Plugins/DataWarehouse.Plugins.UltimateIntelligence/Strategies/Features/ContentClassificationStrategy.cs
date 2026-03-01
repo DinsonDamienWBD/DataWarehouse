@@ -51,8 +51,8 @@ public sealed class ContentClassificationStrategy : FeatureStrategyBase
         return await ExecuteWithTrackingAsync(async () =>
         {
             var targetCategories = categories ?? GetConfig("Categories")?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            var threshold = float.Parse(GetConfig("ConfidenceThreshold") ?? "0.7");
-            var multiLabel = bool.Parse(GetConfig("MultiLabel") ?? "true");
+            var threshold = GetConfigFloat("ConfidenceThreshold", 0.7f);
+            var multiLabel = GetConfigBool("MultiLabel", true);
 
             string prompt;
             if (targetCategories?.Length > 0)

@@ -660,7 +660,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                     continue;
 
                 var hardened = part.EndsWith("'") || part.EndsWith("h");
-                var value = uint.Parse(hardened ? part.TrimEnd('\'', 'h') : part);
+                var raw = hardened ? part.TrimEnd('\'', 'h') : part;
+                if (!uint.TryParse(raw, out var value))
+                    throw new FormatException($"Invalid BIP-32 path component: '{part}'");
 
                 if (hardened)
                 {

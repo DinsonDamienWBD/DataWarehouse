@@ -319,8 +319,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
                 else
                 {
                     // ipgeolocation.io format
-                    lat = double.Parse(result.RootElement.GetProperty("latitude").GetString()!);
-                    lon = double.Parse(result.RootElement.GetProperty("longitude").GetString()!);
+                    var latStr = result.RootElement.GetProperty("latitude").GetString();
+                    var lonStr = result.RootElement.GetProperty("longitude").GetString();
+                    if (!double.TryParse(latStr, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out lat) ||
+                        !double.TryParse(lonStr, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out lon))
+                        return null;
                 }
 
                 return new GeoLocation

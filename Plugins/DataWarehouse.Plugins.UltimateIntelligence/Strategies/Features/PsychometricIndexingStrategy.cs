@@ -53,8 +53,8 @@ public sealed class PsychometricIndexingStrategy : FeatureStrategyBase
         {
             var depth = GetConfig("AnalysisDepth") ?? "standard";
             var emotionModel = GetConfig("EmotionModel") ?? "plutchik";
-            var enablePersonality = bool.Parse(GetConfig("EnablePersonality") ?? "false");
-            var enableDeception = bool.Parse(GetConfig("EnableDeception") ?? "false");
+            var enablePersonality = GetConfigBool("EnablePersonality", false);
+            var enableDeception = GetConfigBool("EnableDeception", false);
 
             var prompt = BuildAnalysisPrompt(content, depth, emotionModel, enablePersonality, enableDeception);
 
@@ -190,7 +190,7 @@ public sealed class PsychometricIndexingStrategy : FeatureStrategyBase
 
             // Use AI for personality inference if enabled
             BigFiveScores? personality = null;
-            if (bool.Parse(GetConfig("EnablePersonality") ?? "false"))
+            if (GetConfigBool("EnablePersonality", false))
             {
                 var prompt = $@"Based on these aggregated content analyses, infer Big Five personality traits:
 

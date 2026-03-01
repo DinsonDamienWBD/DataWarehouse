@@ -203,7 +203,7 @@ public sealed class ApacheSupersetStrategy : DashboardStrategyBase
         if (!string.IsNullOrEmpty(_accessToken)) return;
         if (Config?.AuthType != AuthenticationType.Basic || string.IsNullOrEmpty(Config.Username)) return;
 
-        using var client = new HttpClient { BaseAddress = new Uri(Config.BaseUrl) };
+        var client = GetHttpClient();
         var loginPayload = new { username = Config.Username, password = Config.Password, provider = "db" };
         using var response = await client.PostAsync("/api/v1/security/login", CreateJsonContent(loginPayload), ct);
         response.EnsureSuccessStatusCode();

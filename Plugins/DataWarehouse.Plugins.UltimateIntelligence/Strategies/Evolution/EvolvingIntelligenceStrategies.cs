@@ -270,7 +270,7 @@ public sealed class EvolvingExpertStrategy : FeatureStrategyBase
                 (_, list) => { list.Add((query, response, success)); return list; });
 
             // Trigger consolidation if threshold reached
-            var threshold = int.Parse(GetConfig("ConsolidationThreshold") ?? "100");
+            var threshold = GetConfigInt("ConsolidationThreshold", 100);
             if (_experienceBuffer[domain].Count >= threshold)
             {
                 await EvolveExpertiseAsync(domain, ct);
@@ -518,7 +518,7 @@ public sealed class AdaptiveModelStrategy : FeatureStrategyBase
         return await ExecuteWithTrackingAsync(async () =>
         {
             var profile = await GetUserProfileAsync(userId, ct);
-            var minInteractions = int.Parse(GetConfig("MinInteractions") ?? "10");
+            var minInteractions = GetConfigInt("MinInteractions", 10);
 
             // Not enough data yet
             if (profile.InteractionCount < minInteractions)
@@ -744,7 +744,7 @@ public sealed class CollectiveIntelligenceStrategy : FeatureStrategyBase
     {
         await ExecuteWithTrackingAsync(async () =>
         {
-            var minConfidence = double.Parse(GetConfig("MinConfidence") ?? "0.8");
+            var minConfidence = GetConfigDouble("MinConfidence", 0.8);
 
             // Only share high-confidence knowledge
             if (knowledgePackage.ConfidenceScore < minConfidence)
@@ -904,7 +904,7 @@ public sealed class MetaLearningStrategy : FeatureStrategyBase
         return await ExecuteWithTrackingAsync(async () =>
         {
             var exampleList = examples.ToList();
-            var minExamples = int.Parse(GetConfig("MinExamplesForFewShot") ?? "5");
+            var minExamples = GetConfigInt("MinExamplesForFewShot", 5);
 
             if (exampleList.Count < minExamples)
                 throw new InvalidOperationException($"Need at least {minExamples} examples for few-shot learning");

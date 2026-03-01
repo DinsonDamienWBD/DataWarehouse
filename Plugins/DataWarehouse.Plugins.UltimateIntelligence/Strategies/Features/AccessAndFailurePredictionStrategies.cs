@@ -46,8 +46,8 @@ public sealed class AccessPredictionStrategy : FeatureStrategyBase
         return await ExecuteWithTrackingAsync(async () =>
         {
             var historyList = history.ToList();
-            var horizon = int.Parse(GetConfig("PredictionHorizon") ?? "24");
-            var minConfidence = float.Parse(GetConfig("MinConfidence") ?? "0.6");
+            var horizon = GetConfigInt("PredictionHorizon", 24);
+            var minConfidence = GetConfigFloat("MinConfidence", 0.6f);
 
             // Analyze access patterns
             var fileAccessCounts = historyList
@@ -215,7 +215,7 @@ public sealed class FailurePredictionStrategy : FeatureStrategyBase
 
         return await ExecuteWithTrackingAsync(async () =>
         {
-            var threshold = float.Parse(GetConfig("RiskThreshold") ?? "0.7");
+            var threshold = GetConfigFloat("RiskThreshold", 0.7f);
 
             var prompt = $@"Analyze these system metrics for potential failure indicators:
 

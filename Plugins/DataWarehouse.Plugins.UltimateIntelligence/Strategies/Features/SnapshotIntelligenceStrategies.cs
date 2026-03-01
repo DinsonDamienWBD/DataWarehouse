@@ -59,8 +59,8 @@ public sealed class PredictiveSnapshotStrategy : FeatureStrategyBase
         return await ExecuteWithTrackingAsync(async () =>
         {
             var changes = recentChanges.ToList();
-            var horizonMinutes = int.Parse(GetConfig("PredictionHorizonMinutes") ?? "60");
-            var changeThreshold = double.Parse(GetConfig("ChangeThreshold") ?? "0.3");
+            var horizonMinutes = GetConfigInt("PredictionHorizonMinutes", 60);
+            var changeThreshold = GetConfigDouble("ChangeThreshold", 0.3);
 
             // Build change profile
             var profile = UpdateChangeProfile(dataSourceId, changes);
@@ -119,7 +119,7 @@ Return JSON:
         return await ExecuteWithTrackingAsync(async () =>
         {
             var changes = recentChanges.ToList();
-            var anomalyThreshold = double.Parse(GetConfig("AnomalyThreshold") ?? "0.8");
+            var anomalyThreshold = GetConfigDouble("AnomalyThreshold", 0.8);
 
             // Calculate statistical anomaly indicators
             var changeRates = CalculateChangeRatesByPeriod(changes);
@@ -625,7 +625,7 @@ Return JSON:
     /// </summary>
     public void IndexSnapshot(string snapshotId, IEnumerable<FileVersionInfo> fileVersions)
     {
-        var maxVersions = int.Parse(GetConfig("MaxVersionsPerFile") ?? "1000");
+        var maxVersions = GetConfigInt("MaxVersionsPerFile", 1000);
 
         foreach (var fv in fileVersions)
         {

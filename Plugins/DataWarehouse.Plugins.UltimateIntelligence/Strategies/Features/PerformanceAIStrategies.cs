@@ -56,8 +56,8 @@ public sealed class MlIoSchedulerStrategy : FeatureStrategyBase
     {
         return await ExecuteWithTrackingAsync(async () =>
         {
-            var latencyTarget = double.Parse(GetConfig("LatencyTarget99Ms") ?? "100");
-            var throughputWeight = double.Parse(GetConfig("ThroughputWeight") ?? "0.5");
+            var latencyTarget = GetConfigDouble("LatencyTarget99Ms", 100);
+            var throughputWeight = GetConfigDouble("ThroughputWeight", 0.5);
 
             // Calculate queue metrics
             var queueUtilization = queueState.CurrentDepth / (double)queueState.MaxDepth;
@@ -450,9 +450,9 @@ public sealed class AiPredictivePrefetchStrategy : FeatureStrategyBase
     {
         return await ExecuteWithTrackingAsync(async () =>
         {
-            var windowSize = int.Parse(GetConfig("SequenceWindowSize") ?? "100");
-            var minConfidence = double.Parse(GetConfig("MinPredictionConfidence") ?? "0.7");
-            var maxPrefetch = int.Parse(GetConfig("MaxPrefetchAhead") ?? "16");
+            var windowSize = GetConfigInt("SequenceWindowSize", 100);
+            var minConfidence = GetConfigDouble("MinPredictionConfidence", 0.7);
+            var maxPrefetch = GetConfigInt("MaxPrefetchAhead", 16);
 
             // Update access sequence
             var sequence = _accessSequences.GetOrAdd(streamId, _ => new AccessSequence { StreamId = streamId });
@@ -832,9 +832,9 @@ public sealed class LatencyOptimizerStrategy : FeatureStrategyBase
         return await ExecuteWithTrackingAsync(async () =>
         {
             var measurements = latencyMeasurements.OrderBy(l => l).ToList();
-            var targetP50 = double.Parse(GetConfig("TargetP50Ms") ?? "10");
-            var targetP99 = double.Parse(GetConfig("TargetP99Ms") ?? "100");
-            var targetP999 = double.Parse(GetConfig("TargetP999Ms") ?? "500");
+            var targetP50 = GetConfigDouble("TargetP50Ms", 10);
+            var targetP99 = GetConfigDouble("TargetP99Ms", 100);
+            var targetP999 = GetConfigDouble("TargetP999Ms", 500);
 
             var p50 = CalculatePercentile(measurements, 0.50);
             var p90 = CalculatePercentile(measurements, 0.90);

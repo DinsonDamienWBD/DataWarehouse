@@ -172,7 +172,7 @@ public abstract class DashboardStrategyBase : StrategyBase, IDashboardStrategy
     private string? _cachedAccessToken;
     private DateTimeOffset _tokenExpiry = DateTimeOffset.MinValue;
 
-    protected static readonly HttpClient SharedHttpClient = new HttpClient();
+    protected static readonly HttpClient SharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
 
     /// <summary>
     /// Gets the unique identifier for this strategy.

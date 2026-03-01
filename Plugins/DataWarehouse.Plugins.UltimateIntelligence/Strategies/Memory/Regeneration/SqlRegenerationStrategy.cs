@@ -270,9 +270,10 @@ public sealed class SqlRegenerationStrategy : RegenerationStrategyBase
         var limitMatch = Regex.Match(sql, @"LIMIT\s+(\d+)(?:\s+OFFSET\s+(\d+))?", RegexOptions.IgnoreCase);
         if (limitMatch.Success)
         {
-            components["limit"] = int.Parse(limitMatch.Groups[1].Value);
-            if (limitMatch.Groups[2].Success)
-                components["offset"] = int.Parse(limitMatch.Groups[2].Value);
+            if (int.TryParse(limitMatch.Groups[1].Value, out var limitVal))
+                components["limit"] = limitVal;
+            if (limitMatch.Groups[2].Success && int.TryParse(limitMatch.Groups[2].Value, out var offsetVal))
+                components["offset"] = offsetVal;
         }
 
         // Extract query hints

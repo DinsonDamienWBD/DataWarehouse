@@ -1380,7 +1380,7 @@ public sealed class SimulationEngine : FeatureStrategyBase
         SimulationConfiguration? configuration = null,
         CancellationToken ct = default)
     {
-        var maxSessions = int.Parse(GetConfig("MaxSessions") ?? "10");
+        var maxSessions = GetConfigInt("MaxSessions", 10);
 
         if (_sessions.Count >= maxSessions)
             throw new InvalidOperationException($"Maximum number of sessions ({maxSessions}) reached");

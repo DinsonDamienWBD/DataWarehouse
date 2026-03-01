@@ -60,8 +60,8 @@ public sealed class SemanticSearchStrategy : FeatureStrategyBase
             RecordEmbeddings(1);
 
             // Search vector store
-            var k = topK ?? int.Parse(GetConfig("TopK") ?? "10");
-            var threshold = minScore ?? float.Parse(GetConfig("MinScore") ?? "0.7");
+            var k = topK ?? GetConfigInt("TopK", 10);
+            var threshold = minScore ?? GetConfigFloat("MinScore", 0.7f);
 
             var matches = await VectorStore.SearchAsync(queryEmbedding, k, threshold, filter, ct);
             RecordSearch();
@@ -76,7 +76,7 @@ public sealed class SemanticSearchStrategy : FeatureStrategyBase
             }).ToList();
 
             // Optional reranking with cross-encoder
-            if (bool.Parse(GetConfig("EnableReranking") ?? "false") && results.Count > 1)
+            if (GetConfigBool("EnableReranking", false) && results.Count > 1)
             {
                 results = await RerankResultsAsync(query, results, ct);
             }

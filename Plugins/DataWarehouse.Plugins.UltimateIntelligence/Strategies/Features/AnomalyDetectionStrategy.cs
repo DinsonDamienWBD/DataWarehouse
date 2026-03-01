@@ -88,7 +88,7 @@ public sealed class AnomalyDetectionStrategy : FeatureStrategyBase
         return await ExecuteWithTrackingAsync(async () =>
         {
             var method = GetConfig("Method") ?? "hybrid";
-            var threshold = float.Parse(GetConfig("SensitivityThreshold") ?? "0.95");
+            var threshold = GetConfigFloat("SensitivityThreshold", 0.95f);
 
             var embedding = await AIProvider.GetEmbeddingsAsync(sample, ct);
             RecordEmbeddings(1);
@@ -184,8 +184,8 @@ Return JSON:
         return await ExecuteWithTrackingAsync(async () =>
         {
             var data = timeSeries.ToList();
-            var windowSize = int.Parse(GetConfig("WindowSize") ?? "100");
-            var threshold = float.Parse(GetConfig("SensitivityThreshold") ?? "0.95");
+            var windowSize = GetConfigInt("WindowSize", 100);
+            var threshold = GetConfigFloat("SensitivityThreshold", 0.95f);
 
             var anomalies = new List<TimeSeriesAnomaly>();
 

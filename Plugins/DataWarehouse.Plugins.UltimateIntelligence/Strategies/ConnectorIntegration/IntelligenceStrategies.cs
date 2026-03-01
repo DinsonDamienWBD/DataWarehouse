@@ -281,7 +281,7 @@ public sealed class ZeroDayConnectorGeneratorStrategy : FeatureStrategyBase
 
             // Attempt WASM compilation if enabled
             IConnectionStrategy? compiledStrategy = null;
-            if (bool.Parse(GetConfig("WasmSandboxEnabled") ?? "false"))
+            if (GetConfigBool("WasmSandboxEnabled", false))
             {
                 compiledStrategy = await CompileInWasmSandboxAsync(generatedCode, ct);
                 if (compiledStrategy == null)
@@ -1116,7 +1116,7 @@ public sealed class SemanticSchemaAlignmentStrategy : FeatureStrategyBase
     private List<(string Field1, string Field2, float Similarity)> FindSemanticMatches(SchemaSource[] schemas, Dictionary<string, float[]> embeddings)
     {
         var matches = new List<(string, string, float)>();
-        var threshold = float.Parse(GetConfig("MinConfidenceThreshold") ?? "0.75");
+        var threshold = GetConfigFloat("MinConfidenceThreshold", 0.75f);
 
         var keys = embeddings.Keys.ToList();
         for (int i = 0; i < keys.Count; i++)
@@ -1573,7 +1573,7 @@ public sealed class UniversalQueryTranspilationStrategy : FeatureStrategyBase
             var warnings = new List<string>();
 
             var cacheKey = $"{target}:{ComputeQueryHash(sql)}";
-            if (bool.Parse(GetConfig("EnableCaching") ?? "true") && _transpilationCache.TryGetValue(cacheKey, out var cached))
+            if (GetConfigBool("EnableCaching", true) && _transpilationCache.TryGetValue(cacheKey, out var cached))
             {
                 return new TranspilationResult
                 {
@@ -1600,7 +1600,7 @@ public sealed class UniversalQueryTranspilationStrategy : FeatureStrategyBase
             }
 
             QueryValidationResult? validation = null;
-            if (bool.Parse(GetConfig("ValidateBeforeReturn") ?? "true"))
+            if (GetConfigBool("ValidateBeforeReturn", true))
             {
                 validation = await ValidateQueryAsync(transpiledQuery, target, ct);
                 if (!validation.IsValid)
@@ -1608,10 +1608,10 @@ public sealed class UniversalQueryTranspilationStrategy : FeatureStrategyBase
             }
 
             QueryExplainPlan? explainPlan = null;
-            if (bool.Parse(GetConfig("GenerateExplainPlan") ?? "true"))
+            if (GetConfigBool("GenerateExplainPlan", true))
                 explainPlan = await GenerateExplainPlanAsync(transpiledQuery, target, ct);
 
-            if (bool.Parse(GetConfig("EnableCaching") ?? "true"))
+            if (GetConfigBool("EnableCaching", true))
                 _transpilationCache[cacheKey] = transpiledQuery;
 
             return new TranspilationResult
@@ -1982,7 +1982,7 @@ public sealed class LegacyBehavioralModelingStrategy : FeatureStrategyBase
         if (AIProvider == null)
             return new BehavioralModel { Success = false, ErrorMessage = "AI provider not configured." };
 
-        var minSamples = int.Parse(GetConfig("MinSamplesForLearning") ?? "100");
+        var minSamples = GetConfigInt("MinSamplesForLearning", 100);
         if (samples.Samples.Count < minSamples)
             return new BehavioralModel { Success = false, SystemId = samples.SystemId, ErrorMessage = $"Insufficient samples. Min: {minSamples}, provided: {samples.Samples.Count}" };
 
@@ -2003,7 +2003,7 @@ public sealed class LegacyBehavioralModelingStrategy : FeatureStrategyBase
                 stateMachine = await BuildStateMachineAsync(samples.SystemType, operations, ct);
 
             var anomalyPatterns = new List<BehavioralAnomalyPattern>();
-            if (bool.Parse(GetConfig("AnomalyDetectionEnabled") ?? "true"))
+            if (GetConfigBool("AnomalyDetectionEnabled", true))
                 anomalyPatterns = await DetectAnomalyPatternsAsync(samples, ct);
 
             var apiSpec = GenerateOpenApiSpec(samples.SystemId, operations);
@@ -2036,7 +2036,7 @@ public sealed class LegacyBehavioralModelingStrategy : FeatureStrategyBase
     /// <returns>Parsed screen data.</returns>
     public async Task<Dictionary<string, object>> ParseGreenScreenAsync(byte[] screenCapture, CancellationToken ct = default)
     {
-        if (AIProvider == null || !bool.Parse(GetConfig("EnableVisionParsing") ?? "true"))
+        if (AIProvider == null || !GetConfigBool("EnableVisionParsing", true))
             return new Dictionary<string, object> { ["error"] = "Vision parsing not available" };
 
         var prompt = "Analyze this terminal screen and extract: menu options, data fields, status messages, cursor position, errors. Return structured JSON.";
@@ -2388,8 +2388,8 @@ public sealed class SmartQuotaTradingStrategy : FeatureStrategyBase
             var now = DateTimeOffset.UtcNow;
             var insights = new List<string>();
             var scheduled = new List<ScheduledRequest>();
-            var costWeight = double.Parse(GetConfig("CostWeight") ?? "0.5");
-            var speedWeight = double.Parse(GetConfig("SpeedWeight") ?? "0.5");
+            var costWeight = GetConfigDouble("CostWeight", 0.5);
+            var speedWeight = GetConfigDouble("SpeedWeight", 0.5);
 
             // Group requests by connector
             var byConnector = requests.Requests.GroupBy(r => r.ConnectorId).ToDictionary(g => g.Key, g => g.ToList());
@@ -2715,7 +2715,7 @@ public sealed class ApiArchaeologistStrategy : FeatureStrategyBase
             return new DiscoveredCapabilities { Success = false, ErrorMessage = "AI provider not configured." };
 
         // Enforce safe mode
-        if (bool.Parse(GetConfig("SafeMode") ?? "true"))
+        if (GetConfigBool("SafeMode", true))
             options = options with { AllowedMethods = new List<string> { "GET", "HEAD" } };
 
         return await ExecuteWithTrackingAsync(async () =>
@@ -3081,7 +3081,7 @@ public sealed class ProbabilisticDataBufferingStrategy : FeatureStrategyBase
         return await ExecuteWithTrackingAsync(async () =>
         {
             var sw = Stopwatch.StartNew();
-            var minConfidence = context.MinConfidence > 0 ? context.MinConfidence : double.Parse(GetConfig("DefaultConfidenceThreshold") ?? "0.75");
+            var minConfidence = context.MinConfidence > 0 ? context.MinConfidence : GetConfigDouble("DefaultConfidenceThreshold", 0.75);
 
             // Get or build history
             var history = context.History.Count > 0 ? context.History : GetCachedHistory(dataPath);
@@ -3289,7 +3289,7 @@ Return JSON array with predictions and confidence:
         }
         history.Add(point);
 
-        var maxSize = int.Parse(GetConfig("HistoryWindowSize") ?? "100");
+        var maxSize = GetConfigInt("HistoryWindowSize", 100);
         if (history.Count > maxSize)
             history.RemoveRange(0, history.Count - maxSize);
     }

@@ -72,7 +72,7 @@ public sealed class AccessPatternLearningStrategy : FeatureStrategyBase
         _eventBuffer.Enqueue(accessEvent);
 
         // Trigger training if needed
-        var trainingInterval = TimeSpan.FromMinutes(int.Parse(GetConfig("TrainingIntervalMinutes") ?? "60"));
+        var trainingInterval = TimeSpan.FromMinutes(GetConfigInt("TrainingIntervalMinutes", 60));
         if (DateTime.UtcNow - _lastTraining > trainingInterval)
         {
             Task.Run(() => TrainModelsAsync());
@@ -107,8 +107,8 @@ public sealed class AccessPatternLearningStrategy : FeatureStrategyBase
                 if (DateTime.UtcNow - _lastTraining < TimeSpan.FromMinutes(1))
                     return Task.CompletedTask;
 
-                var learningWindow = TimeSpan.FromHours(int.Parse(GetConfig("LearningWindow") ?? "168"));
-                var minEvents = int.Parse(GetConfig("MinEventsForModel") ?? "50");
+                var learningWindow = TimeSpan.FromHours(GetConfigInt("LearningWindow", 168));
+                var minEvents = GetConfigInt("MinEventsForModel", 50);
                 var cutoff = DateTime.UtcNow - learningWindow;
 
                 // Drain buffer
@@ -458,8 +458,8 @@ public sealed class PrefetchPredictionStrategy : FeatureStrategyBase
     {
         return ExecuteWithTrackingAsync(() =>
         {
-            var minConfidence = float.Parse(GetConfig("MinConfidence") ?? "0.3");
-            var maxItems = int.Parse(GetConfig("MaxPrefetchItems") ?? "10");
+            var minConfidence = GetConfigFloat("MinConfidence", 0.3f);
+            var maxItems = GetConfigInt("MaxPrefetchItems", 10);
 
             var recommendations = new List<PrefetchRecommendation>();
 
@@ -664,8 +664,8 @@ public sealed class CacheOptimizationStrategy : FeatureStrategyBase
     {
         return ExecuteWithTrackingAsync(() =>
         {
-            var defaultTtl = int.Parse(GetConfig("DefaultTtlMinutes") ?? "60");
-            var adaptiveTtl = bool.Parse(GetConfig("AdaptiveTtl") ?? "true");
+            var defaultTtl = GetConfigInt("DefaultTtlMinutes", 60);
+            var adaptiveTtl = GetConfigBool("AdaptiveTtl", true);
 
             if (!adaptiveTtl)
             {

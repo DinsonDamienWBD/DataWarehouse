@@ -479,10 +479,10 @@ public sealed class AiTierMigrationStrategy : FeatureStrategyBase
         return await ExecuteWithTrackingAsync(async () =>
         {
             var history = accessHistory.ToList();
-            var hotThreshold = double.Parse(GetConfig("HotThreshold") ?? "0.8");
-            var warmThreshold = double.Parse(GetConfig("WarmThreshold") ?? "0.5");
-            var coldThreshold = double.Parse(GetConfig("ColdThreshold") ?? "0.2");
-            var decayFactor = double.Parse(GetConfig("DecayFactor") ?? "0.95");
+            var hotThreshold = GetConfigDouble("HotThreshold", 0.8);
+            var warmThreshold = GetConfigDouble("WarmThreshold", 0.5);
+            var coldThreshold = GetConfigDouble("ColdThreshold", 0.2);
+            var decayFactor = GetConfigDouble("DecayFactor", 0.95);
 
             // Calculate weighted access score with temporal decay
             var accessScore = CalculateAccessScore(history, decayFactor);
@@ -564,7 +564,7 @@ Return JSON:
                 };
             }
 
-            var horizonDays = int.Parse(GetConfig("PredictionHorizonDays") ?? "7");
+            var horizonDays = GetConfigInt("PredictionHorizonDays", 7);
 
             var prompt = $@"Predict access patterns for the next {horizonDays} days:
 

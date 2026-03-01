@@ -573,7 +573,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
                                             KeyId = keyId,
                                             DerivedKey = derivedKey,
                                             TransactionHash = tx.Hash,
-                                            SequenceNumber = long.Parse(tx.PagingToken ?? "0"),
+                                            SequenceNumber = long.TryParse(tx.PagingToken, out var seq) ? seq : 0L,
                                             AccountId = _masterKeyPair.AccountId,
                                             CreatedAt = tx.CreatedAt,
                                             CreatedBy = "blockchain-recovery"

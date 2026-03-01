@@ -531,7 +531,7 @@ public sealed class AutoGptAgentStrategy : AgentStrategyBase
                 reasoningChain.Add($"Completed: {subtask} -> {result}");
 
                 // Store in memory
-                if (bool.Parse(GetConfig("EnableMemory") ?? "true"))
+                if (GetConfigBool("EnableMemory", true))
                 {
                     _memory[$"task_{completedTasks}"] = result;
                 }

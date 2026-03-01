@@ -82,6 +82,46 @@ public abstract class IntelligenceStrategyBase : StrategyBase, IIntelligenceStra
             ?? throw new InvalidOperationException($"Required configuration '{key}' is not set for {StrategyId}");
     }
 
+    /// <summary>
+    /// Gets a configuration value as int, falling back to <paramref name="defaultValue"/> if not set or unparseable.
+    /// </summary>
+    protected int GetConfigInt(string key, int defaultValue)
+    {
+        var raw = GetConfig(key);
+        if (raw == null) return defaultValue;
+        return int.TryParse(raw, out var v) ? v : defaultValue;
+    }
+
+    /// <summary>
+    /// Gets a configuration value as float, falling back to <paramref name="defaultValue"/> if not set or unparseable.
+    /// </summary>
+    protected float GetConfigFloat(string key, float defaultValue)
+    {
+        var raw = GetConfig(key);
+        if (raw == null) return defaultValue;
+        return float.TryParse(raw, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : defaultValue;
+    }
+
+    /// <summary>
+    /// Gets a configuration value as double, falling back to <paramref name="defaultValue"/> if not set or unparseable.
+    /// </summary>
+    protected double GetConfigDouble(string key, double defaultValue)
+    {
+        var raw = GetConfig(key);
+        if (raw == null) return defaultValue;
+        return double.TryParse(raw, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : defaultValue;
+    }
+
+    /// <summary>
+    /// Gets a configuration value as bool, falling back to <paramref name="defaultValue"/> if not set or unparseable.
+    /// </summary>
+    protected bool GetConfigBool(string key, bool defaultValue)
+    {
+        var raw = GetConfig(key);
+        if (raw == null) return defaultValue;
+        return bool.TryParse(raw, out var v) ? v : defaultValue;
+    }
+
     /// <inheritdoc/>
     public virtual IntelligenceValidationResult Validate()
     {

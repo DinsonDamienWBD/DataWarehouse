@@ -759,7 +759,8 @@ public sealed class TemporalContextIndex : ContextIndexBase, IDisposable
         if (parts.Length == 1) return $"Year {parts[0]}";
         if (parts.Length == 2)
         {
-            var month = int.Parse(parts[1]);
+            if (!int.TryParse(parts[1], out var month) || month < 1 || month > 12)
+                return period;
             return $"{System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(month)} {parts[0]}";
         }
         if (parts.Length == 3)

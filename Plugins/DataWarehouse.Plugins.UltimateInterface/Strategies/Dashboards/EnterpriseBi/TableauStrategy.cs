@@ -459,7 +459,7 @@ public sealed class TableauStrategy : DashboardStrategyBase
             }
         };
 
-        using var client = new HttpClient { BaseAddress = new Uri(Config.BaseUrl) };
+        var client = GetHttpClient();
         using var response = await client.PostAsync(
             $"/api/{_apiVersion}/auth/signin",
             CreateJsonContent(credentials),

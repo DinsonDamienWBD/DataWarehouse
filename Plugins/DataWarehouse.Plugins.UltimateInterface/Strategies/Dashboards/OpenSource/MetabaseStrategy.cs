@@ -129,7 +129,9 @@ public sealed class MetabaseStrategy : DashboardStrategyBase
         // Add cards for each widget
         foreach (var widget in dashboard.Widgets)
         {
-            await AddCardToDashboardAsync(int.Parse(createdDashboard.Id!), widget, cancellationToken);
+            if (!int.TryParse(createdDashboard.Id, out var dashboardId))
+                throw new InvalidOperationException($"Metabase returned a non-integer dashboard ID: '{createdDashboard.Id}'");
+            await AddCardToDashboardAsync(dashboardId, widget, cancellationToken);
         }
 
         return createdDashboard;
@@ -377,7 +379,7 @@ public sealed class MetabaseStrategy : DashboardStrategyBase
                 password = Config.Password
             };
 
-            using var client = new HttpClient { BaseAddress = new Uri(Config.BaseUrl) };
+            var client = GetHttpClient();
             using var response = await client.PostAsync(
                 "/api/session",
                 CreateJsonContent(loginPayload),

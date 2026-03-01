@@ -575,11 +575,11 @@ public sealed class ParquetRegenerationStrategy : RegenerationStrategyBase
 
         // Parse row group info
         var rgMatch = Regex.Match(data, @"row_groups?\s*[:""]?\s*(\d+)");
-        info.RowGroupCount = rgMatch.Success ? int.Parse(rgMatch.Groups[1].Value) : 1;
+        info.RowGroupCount = rgMatch.Success && int.TryParse(rgMatch.Groups[1].Value, out var rgCount) ? rgCount : 1;
 
         // Parse row count
         var rowMatch = Regex.Match(data, @"(?:row_count|num_rows)\s*[:""]?\s*(\d+)");
-        info.RowCount = rowMatch.Success ? long.Parse(rowMatch.Groups[1].Value) : 0;
+        info.RowCount = rowMatch.Success && long.TryParse(rowMatch.Groups[1].Value, out var rowCount) ? rowCount : 0;
 
         return info;
     }
