@@ -48,16 +48,19 @@ public sealed class DynatraceStrategy : ObservabilityStrategyBase
 
         foreach (var metric in metrics)
         {
-            var metricKey = metric.Name.Replace(" ", "_").Replace("-", "_");
-            var dimensions = metric.Labels != null
-                ? string.Join(",", metric.Labels.Select(l => $"{l.Name}=\"{l.Value}\""))
+            // MINT metric key: only lowercase letters, digits, dots, underscores, hyphens.
+            // Dots are allowed as namespace separators (e.g. "jvm.gc.time").
+            var metricKey = metric.Name
+                .Replace(" ", "_")
+                .ToLowerInvariant();
+
+            // MINT dimension format: key="escaped_value" — quote all values and escape backslash, quote, newline.
+            var dimensions = metric.Labels != null && metric.Labels.Any()
+                ? "," + string.Join(",", metric.Labels.Select(l =>
+                    $"{SanitizeMintKey(l.Name)}=\"{EscapeMintValue(l.Value)}\""))
                 : "";
 
-            var line = string.IsNullOrEmpty(dimensions)
-                ? $"{metricKey} {metric.Value} {metric.Timestamp.ToUnixTimeMilliseconds()}"
-                : $"{metricKey},{dimensions} {metric.Value} {metric.Timestamp.ToUnixTimeMilliseconds()}";
-
-            lines.AppendLine(line);
+            lines.AppendLine($"{metricKey}{dimensions} gauge,{metric.Value} {metric.Timestamp.ToUnixTimeMilliseconds()}");
         }
 
         var content = new StringContent(lines.ToString(), Encoding.UTF8, "text/plain");
@@ -186,4 +189,12 @@ public sealed class DynatraceStrategy : ObservabilityStrategyBase
     }
 
     protected override void Dispose(bool disposing) { if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }
+
+    /// <summary>Sanitizes a string to be a valid MINT dimension key (lowercase, alphanumeric, dot, underscore, hyphen).</summary>
+    private static string SanitizeMintKey(string key) =>
+        System.Text.RegularExpressions.Regex.Replace(key.ToLowerInvariant(), @"[^a-z0-9._-]", "_");
+
+    /// <summary>Escapes a MINT dimension value (backslash, double-quote, and newline must be escaped).</summary>
+    private static string EscapeMintValue(string value) =>
+        value.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "\\r");
 }

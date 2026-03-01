@@ -241,15 +241,46 @@ public sealed class BugsnagStrategy : ObservabilityStrategyBase
         };
     }
 
+    /// <summary>
+    /// Parses a .NET stack trace string into Bugsnag stacktrace frames.
+    /// Extracts file path, line number, and method name from each "at ... in file:line N" frame.
+    /// </summary>
     private static object[] ParseStackTrace(string stackTrace)
     {
+        if (string.IsNullOrEmpty(stackTrace))
+            return Array.Empty<object>();
+
         var lines = stackTrace.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-        return lines.Select(line => new
+        return lines.Select(line =>
         {
-            file = "unknown",
-            lineNumber = 0,
-            method = line.Trim(),
-            inProject = true
+            line = line.Trim();
+            string file = "unknown";
+            int lineNumber = 0;
+            string method = line;
+
+            // .NET stack frame: "   at Namespace.Class.Method(...) in /path/file.cs:line 42"
+            var inIdx = line.LastIndexOf(" in ", StringComparison.Ordinal);
+            if (inIdx >= 0)
+            {
+                method = line[..inIdx].TrimStart().TrimStart("at ".ToCharArray()).Trim();
+                var fileAndLine = line[(inIdx + 4)..];
+                var lineColonIdx = fileAndLine.LastIndexOf(":line ", StringComparison.Ordinal);
+                if (lineColonIdx >= 0)
+                {
+                    file = fileAndLine[..lineColonIdx];
+                    int.TryParse(fileAndLine[(lineColonIdx + 6)..], out lineNumber);
+                }
+                else
+                {
+                    file = fileAndLine;
+                }
+            }
+            else if (line.StartsWith("at ", StringComparison.Ordinal))
+            {
+                method = line[3..].Trim();
+            }
+
+            return (object)new { file, lineNumber, method, inProject = true };
         }).ToArray();
     }
 

@@ -125,40 +125,40 @@ public sealed class AppDynamicsStrategy : ObservabilityStrategyBase
 
     protected override async Task TracingAsyncCore(IEnumerable<SpanContext> spans, CancellationToken cancellationToken)
     {
+        // AppDynamics uses its own agent for tracing; we report custom events via REST API.
+        // Batch all spans into a single events array and post in one request.
+        var eventList = spans.Select(span => new
+        {
+            eventType = "CUSTOM",
+            summary = span.OperationName,
+            severity = span.Status == SpanStatus.Error ? "ERROR" : "INFO",
+            customEventDetails = new
+            {
+                traceId = span.TraceId,
+                spanId = span.SpanId,
+                parentSpanId = span.ParentSpanId,
+                duration = span.Duration.TotalMilliseconds,
+                attributes = span.Attributes
+            }
+        }).ToList();
+
+        if (eventList.Count == 0) return;
+
         IncrementCounter("app_dynamics.traces_sent");
 
-        // AppDynamics uses its own agent for tracing, but we can report custom events
-        foreach (var span in spans)
+        var json = JsonSerializer.Serialize(eventList);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+        using var request = await CreateAuthenticatedRequestAsync(
+            HttpMethod.Post,
+            $"{_controllerUrl}/controller/rest/applications/{_applicationName}/events",
+            content, cancellationToken);
+        using var resp = await _httpClient.SendAsync(request, cancellationToken);
+        if (!resp.IsSuccessStatusCode)
         {
-            var eventData = new
-            {
-                eventType = "CUSTOM",
-                summary = span.OperationName,
-                severity = span.Status == SpanStatus.Error ? "ERROR" : "INFO",
-                customEventDetails = new
-                {
-                    traceId = span.TraceId,
-                    spanId = span.SpanId,
-                    parentSpanId = span.ParentSpanId,
-                    duration = span.Duration.TotalMilliseconds,
-                    attributes = span.Attributes
-                }
-            };
-
-            var json = JsonSerializer.Serialize(eventData);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-            using var request = await CreateAuthenticatedRequestAsync(
-                HttpMethod.Post,
-                $"{_controllerUrl}/controller/rest/applications/{_applicationName}/events",
-                content, cancellationToken);
-            using var resp = await _httpClient.SendAsync(request, cancellationToken);
-            if (!resp.IsSuccessStatusCode)
-            {
-                var body = await resp.Content.ReadAsStringAsync(cancellationToken);
-                IncrementCounter("app_dynamics.traces_error");
-                System.Diagnostics.Trace.TraceWarning(
-                    "[AppDynamics] Traces POST returned {0}: {1}", (int)resp.StatusCode, body);
-            }
+            var body = await resp.Content.ReadAsStringAsync(cancellationToken);
+            IncrementCounter("app_dynamics.traces_error");
+            System.Diagnostics.Trace.TraceWarning(
+                "[AppDynamics] Traces POST returned {0}: {1}", (int)resp.StatusCode, body);
         }
     }
 

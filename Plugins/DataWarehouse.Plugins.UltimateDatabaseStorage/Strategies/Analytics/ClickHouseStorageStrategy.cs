@@ -66,7 +66,7 @@ public sealed class ClickHouseStorageStrategy : DatabaseStorageStrategyBase
     /// Validates that an SQL identifier contains only safe characters (letters, digits, underscores).
     /// Throws <see cref="ArgumentException"/> if the identifier is invalid.
     /// </summary>
-    private static void ValidateSqlIdentifier(string identifier, string paramName)
+    private new static void ValidateSqlIdentifier(string identifier, string paramName)
     {
         if (string.IsNullOrWhiteSpace(identifier))
             throw new ArgumentException($"SQL identifier '{paramName}' must not be empty.", paramName);

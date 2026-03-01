@@ -107,7 +107,7 @@ public sealed class VictorOpsStrategy : ObservabilityStrategyBase
             {
                 var incident = new
                 {
-                    message_type = log.Level == LogLevel.Critical ? "CRITICAL" : "WARNING",
+                    message_type = log.Level == LogLevel.Critical ? "CRITICAL" : "CRITICAL",
                     entity_id = $"log.{log.Properties?.GetValueOrDefault("Source")?.ToString() ?? "unknown"}",
                     entity_display_name = log.Properties?.GetValueOrDefault("Source")?.ToString() ?? "DataWarehouse",
                     state_message = log.Message,

@@ -103,6 +103,12 @@ public sealed class ElasticApmStrategy : ObservabilityStrategyBase
 
         foreach (var traceGroup in spansByTrace)
         {
+            // Find the root transaction span (no parent) to get its ID for child span transaction_id.
+            var rootSpanId = traceGroup
+                .Where(s => string.IsNullOrEmpty(s.ParentSpanId))
+                .Select(s => s.SpanId)
+                .FirstOrDefault();
+
             foreach (var span in traceGroup)
             {
                 var isTransaction = string.IsNullOrEmpty(span.ParentSpanId);
@@ -132,12 +138,15 @@ public sealed class ElasticApmStrategy : ObservabilityStrategyBase
                 }
                 else
                 {
+                    // transaction_id must reference the root transaction span of this trace,
+                    // not the direct parent span (which may itself be a child span).
+                    var transactionId = rootSpanId ?? span.ParentSpanId;
                     var apmSpan = new
                     {
                         span = new
                         {
                             id = span.SpanId,
-                            transaction_id = span.ParentSpanId,
+                            transaction_id = transactionId,
                             trace_id = span.TraceId,
                             parent_id = span.ParentSpanId,
                             name = span.OperationName,

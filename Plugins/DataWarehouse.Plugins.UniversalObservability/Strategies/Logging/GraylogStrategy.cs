@@ -13,6 +13,8 @@ namespace DataWarehouse.Plugins.UniversalObservability.Strategies.Logging;
 public sealed class GraylogStrategy : ObservabilityStrategyBase
 {
     private readonly HttpClient _httpClient;
+    private System.Net.Sockets.UdpClient? _udpClient;
+    private readonly object _udpLock = new();
     private string _gelfHttpUrl = "http://localhost:12201/gelf";
     private string _host = "localhost";
     private int _udpPort = 12201;
@@ -37,6 +39,16 @@ public sealed class GraylogStrategy : ObservabilityStrategyBase
         _useUdp = useUdp;
         _facility = facility;
         _gelfHttpUrl = $"http://{host}:{port}/gelf";
+
+        // Recreate the shared UDP client when configuration changes.
+        if (useUdp)
+        {
+            lock (_udpLock)
+            {
+                _udpClient?.Dispose();
+                _udpClient = new System.Net.Sockets.UdpClient();
+            }
+        }
     }
 
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken)
@@ -100,9 +112,16 @@ public sealed class GraylogStrategy : ObservabilityStrategyBase
 
     private async Task SendUdpAsync(Dictionary<string, object> gelfMessage, CancellationToken ct)
     {
-        using var udpClient = new UdpClient();
+        // Reuse the shared UDP client — UdpClient.SendAsync is not thread-safe so use lock.
         var json = JsonSerializer.Serialize(gelfMessage);
         var data = Encoding.UTF8.GetBytes(json);
+        System.Net.Sockets.UdpClient udpClient;
+        lock (_udpLock)
+        {
+            if (_udpClient == null)
+                _udpClient = new System.Net.Sockets.UdpClient();
+            udpClient = _udpClient;
+        }
         await udpClient.SendAsync(data, data.Length, _host, _udpPort);
     }
 
@@ -152,5 +171,13 @@ public sealed class GraylogStrategy : ObservabilityStrategyBase
         await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
     }
 
-    protected override void Dispose(bool disposing) { if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _httpClient.Dispose();
+            lock (_udpLock) { _udpClient?.Dispose(); _udpClient = null; }
+        }
+        base.Dispose(disposing);
+    }
 }

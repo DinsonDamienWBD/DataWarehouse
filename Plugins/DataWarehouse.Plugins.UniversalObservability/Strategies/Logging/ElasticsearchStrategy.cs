@@ -226,7 +226,8 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
             }
             catch (Exception)
             {
-                IncrementCounter("elasticsearch.bulk_requests");
+                // bulk_requests already incremented on success path; increment only errors here.
+                IncrementCounter("elasticsearch.bulk_errors");
                 throw;
             }
         }

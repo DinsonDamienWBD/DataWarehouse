@@ -88,7 +88,10 @@ public sealed class LokiStrategy : ObservabilityStrategyBase
             }
 
             var labelKey = FormatLabels(labels);
-            var timestamp = entry.Timestamp.ToUnixTimeMilliseconds() * 1_000_000;
+            // Loki timestamps are Unix nanoseconds (int64). Compute from Ticks for sub-millisecond precision.
+            // 1 Tick = 100 ns, Unix epoch offset = 621355968000000000 ticks.
+            const long UnixEpochTicks = 621355968000000000L;
+            var timestamp = (entry.Timestamp.UtcTicks - UnixEpochTicks) * 100L; // ticks→ns
             var logLine = FormatLogLine(entry);
 
             if (!streams.ContainsKey(labelKey))
@@ -124,9 +127,13 @@ public sealed class LokiStrategy : ObservabilityStrategyBase
     public async Task<string> QueryAsync(string query, DateTimeOffset start, DateTimeOffset end,
         int limit = 1000, CancellationToken ct = default)
     {
+        // Loki uses Unix nanoseconds for start/end parameters.
+        const long UnixEpochTicks = 621355968000000000L;
+        var startNs = (start.UtcTicks - UnixEpochTicks) * 100L;
+        var endNs = (end.UtcTicks - UnixEpochTicks) * 100L;
         var queryParams = $"query={Uri.EscapeDataString(query)}" +
-                         $"&start={start.ToUnixTimeMilliseconds() * 1_000_000}" +
-                         $"&end={end.ToUnixTimeMilliseconds() * 1_000_000}" +
+                         $"&start={startNs}" +
+                         $"&end={endNs}" +
                          $"&limit={limit}";
 
         using var response = await _httpClient.GetAsync($"{_url}/loki/api/v1/query_range?{queryParams}", ct);
@@ -199,18 +206,60 @@ public sealed class LokiStrategy : ObservabilityStrategyBase
         return "{" + string.Join(",", pairs) + "}";
     }
 
+    /// <summary>
+    /// Parses a Loki label string of the form <c>{key1="val1",key2="val2"}</c> into a dictionary.
+    /// Handles escaped characters inside quoted values (backslash-escaped quote, comma, newline).
+    /// </summary>
     private static Dictionary<string, string> ParseLabels(string labelString)
     {
         var result = new Dictionary<string, string>();
         var content = labelString.TrimStart('{').TrimEnd('}');
+        if (string.IsNullOrEmpty(content)) return result;
 
-        foreach (var pair in content.Split(','))
+        int i = 0;
+        while (i < content.Length)
         {
-            var parts = pair.Split('=');
-            if (parts.Length == 2)
+            // Skip whitespace
+            while (i < content.Length && content[i] == ' ') i++;
+
+            // Read key (up to '=')
+            var keyStart = i;
+            while (i < content.Length && content[i] != '=') i++;
+            if (i >= content.Length) break;
+            var key = content[keyStart..i].Trim();
+            i++; // skip '='
+
+            // Read value (must be double-quoted)
+            if (i >= content.Length || content[i] != '"') break;
+            i++; // skip opening quote
+
+            var valueSb = new System.Text.StringBuilder();
+            while (i < content.Length && content[i] != '"')
             {
-                result[parts[0]] = parts[1].Trim('"');
+                if (content[i] == '\\' && i + 1 < content.Length)
+                {
+                    i++; // skip backslash
+                    valueSb.Append(content[i] switch
+                    {
+                        '"' => '"',
+                        '\\' => '\\',
+                        'n' => '\n',
+                        _ => content[i]
+                    });
+                }
+                else
+                {
+                    valueSb.Append(content[i]);
+                }
+                i++;
             }
+            if (i < content.Length) i++; // skip closing quote
+
+            if (!string.IsNullOrEmpty(key))
+                result[key] = valueSb.ToString();
+
+            // Skip separator comma
+            while (i < content.Length && (content[i] == ',' || content[i] == ' ')) i++;
         }
 
         return result;

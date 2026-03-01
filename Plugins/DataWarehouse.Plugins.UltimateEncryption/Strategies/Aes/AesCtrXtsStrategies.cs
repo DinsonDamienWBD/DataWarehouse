@@ -303,6 +303,11 @@ public sealed class AesXtsStrategy : EncryptionStrategyBase
             var blockCount = plaintext.Length / 16;
             var remainderBytes = plaintext.Length % 16;
 
+            // P2-2951: XTS-AES requires at least one full block (16 bytes).
+            // Ciphertext stealing is undefined for inputs shorter than a single block.
+            if (blockCount == 0)
+                throw new ArgumentException("XTS-AES requires plaintext of at least 16 bytes.", nameof(plaintext));
+
             // Track alpha_{n-1} for ciphertext stealing (alpha before the last multiply).
             var penultimateAlpha = new byte[16];
 

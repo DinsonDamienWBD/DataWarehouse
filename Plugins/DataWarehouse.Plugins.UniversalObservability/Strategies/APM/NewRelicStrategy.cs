@@ -149,7 +149,10 @@ public sealed class NewRelicStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        // Configuration validated via Configure method
+        if (string.IsNullOrWhiteSpace(_licenseKey))
+            throw new InvalidOperationException("NewRelicStrategy: License key is required. Call Configure() before initialization.");
+        if (string.IsNullOrWhiteSpace(_accountId))
+            throw new InvalidOperationException("NewRelicStrategy: Account ID is required. Call Configure() before initialization.");
         IncrementCounter("new_relic.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }

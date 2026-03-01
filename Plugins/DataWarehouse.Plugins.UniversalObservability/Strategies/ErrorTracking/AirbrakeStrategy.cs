@@ -247,14 +247,46 @@ public sealed class AirbrakeStrategy : ObservabilityStrategyBase
         };
     }
 
+    /// <summary>
+    /// Parses a .NET stack trace string into Airbrake backtrace frames.
+    /// Extracts file path, line number, and method name from each "at ... in file:line N" frame.
+    /// </summary>
     private static object[] ParseBacktrace(string stackTrace)
     {
+        if (string.IsNullOrEmpty(stackTrace))
+            return Array.Empty<object>();
+
         var lines = stackTrace.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-        return lines.Select((line, index) => new
+        return lines.Select(line =>
         {
-            file = "unknown",
-            line = index + 1,
-            function = line.Trim()
+            line = line.Trim();
+            string file = "unknown";
+            int lineNumber = 0;
+            string function = line;
+
+            // .NET stack frame format: "   at Namespace.Class.Method(...) in /path/file.cs:line 42"
+            var inIdx = line.LastIndexOf(" in ", StringComparison.Ordinal);
+            if (inIdx >= 0)
+            {
+                function = line[..inIdx].TrimStart().TrimStart("at ".ToCharArray()).Trim();
+                var fileAndLine = line[(inIdx + 4)..]; // after " in "
+                var lineColonIdx = fileAndLine.LastIndexOf(":line ", StringComparison.Ordinal);
+                if (lineColonIdx >= 0)
+                {
+                    file = fileAndLine[..lineColonIdx];
+                    int.TryParse(fileAndLine[(lineColonIdx + 6)..], out lineNumber);
+                }
+                else
+                {
+                    file = fileAndLine;
+                }
+            }
+            else if (line.StartsWith("at ", StringComparison.Ordinal))
+            {
+                function = line[3..].Trim();
+            }
+
+            return (object)new { file, line = lineNumber, function };
         }).ToArray();
     }
 

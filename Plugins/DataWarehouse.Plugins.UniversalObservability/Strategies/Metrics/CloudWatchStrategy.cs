@@ -26,6 +26,7 @@ public sealed class CloudWatchStrategy : ObservabilityStrategyBase
     private string _logGroupName = "/datawarehouse/application";
     private string _logStreamName = "";
     private readonly int _batchSize = 20; // CloudWatch limit
+    private volatile bool _logStreamEnsured = false;
 
     private record MetricDatum(string Name, double Value, string Unit, DateTimeOffset Timestamp, Dictionary<string, string> Dimensions);
     private record LogEvent(string Message, DateTimeOffset Timestamp);
@@ -147,8 +148,12 @@ public sealed class CloudWatchStrategy : ObservabilityStrategyBase
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken)
     {
         IncrementCounter("cloud_watch.logs_sent");
-        // Ensure log group and stream exist
-        await EnsureLogStreamExistsAsync(cancellationToken);
+        // Ensure log group and stream exist — called once per session, not every batch.
+        if (!_logStreamEnsured)
+        {
+            await EnsureLogStreamExistsAsync(cancellationToken);
+            _logStreamEnsured = true;
+        }
 
         var logEvents = logEntries.Select(entry => new Dictionary<string, object>
         {
@@ -349,7 +354,12 @@ public sealed class CloudWatchStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        // Configuration validated via Configure method
+        if (string.IsNullOrWhiteSpace(_region))
+            throw new InvalidOperationException("CloudWatchStrategy: AWS region is required. Call Configure() before initialization.");
+        if (string.IsNullOrWhiteSpace(_accessKeyId))
+            throw new InvalidOperationException("CloudWatchStrategy: AWS access key ID is required. Call Configure() before initialization.");
+        if (string.IsNullOrWhiteSpace(_secretAccessKey))
+            throw new InvalidOperationException("CloudWatchStrategy: AWS secret access key is required. Call Configure() before initialization.");
         IncrementCounter("cloud_watch.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }

@@ -203,8 +203,22 @@ public sealed class SentryStrategy : ObservabilityStrategyBase
             var projectId = dsnUri.AbsolutePath.Trim('/');
             var sentryUrl = $"{dsnUri.Scheme}://{dsnUri.Host}/api/{projectId}/envelope/";
 
-            var json = JsonSerializer.Serialize(payload);
-            var envelope = $"{{\n  \"event_id\": \"{Guid.NewGuid():N}\"\n}}\n{json}";
+            var eventId = Guid.NewGuid().ToString("N");
+            var payloadJson = JsonSerializer.Serialize(payload);
+
+            // Sentry envelope format requires 3 parts:
+            //   1. Envelope header:  {"event_id":"<id>","sent_at":"<iso>"}
+            //   2. Item header:      {"type":"event","length":<bytes>}
+            //   3. Item payload:     <json>
+            // Each part is separated by a newline.
+            var itemBytes = Encoding.UTF8.GetByteCount(payloadJson);
+            var envelopeHeader = JsonSerializer.Serialize(new
+            {
+                event_id = eventId,
+                sent_at = DateTimeOffset.UtcNow.ToString("o")
+            });
+            var itemHeader = JsonSerializer.Serialize(new { type = "event", length = itemBytes });
+            var envelope = $"{envelopeHeader}\n{itemHeader}\n{payloadJson}";
 
             var content = new StringContent(envelope, Encoding.UTF8, "application/x-sentry-envelope");
             content.Headers.Add("X-Sentry-Auth", BuildAuthHeader(dsnUri));
@@ -240,13 +254,46 @@ public sealed class SentryStrategy : ObservabilityStrategyBase
         };
     }
 
+    /// <summary>
+    /// Parses a .NET stack trace into Sentry stacktrace frames.
+    /// Extracts filename, line number, and function from each "at ... in file:line N" frame.
+    /// </summary>
     private static object[] ParseStackTrace(string stackTrace)
     {
+        if (string.IsNullOrEmpty(stackTrace))
+            return Array.Empty<object>();
+
         var lines = stackTrace.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-        return lines.Select(line => new
+        // Sentry expects frames in innermost-first order (reverse of .NET's outermost-first).
+        return lines.Reverse().Select(line =>
         {
-            filename = "unknown",
-            function = line.Trim()
+            line = line.Trim();
+            string filename = "unknown";
+            int lineno = 0;
+            string function = line;
+
+            var inIdx = line.LastIndexOf(" in ", StringComparison.Ordinal);
+            if (inIdx >= 0)
+            {
+                function = line[..inIdx].TrimStart().TrimStart("at ".ToCharArray()).Trim();
+                var fileAndLine = line[(inIdx + 4)..];
+                var lineColonIdx = fileAndLine.LastIndexOf(":line ", StringComparison.Ordinal);
+                if (lineColonIdx >= 0)
+                {
+                    filename = fileAndLine[..lineColonIdx];
+                    int.TryParse(fileAndLine[(lineColonIdx + 6)..], out lineno);
+                }
+                else
+                {
+                    filename = fileAndLine;
+                }
+            }
+            else if (line.StartsWith("at ", StringComparison.Ordinal))
+            {
+                function = line[3..].Trim();
+            }
+
+            return (object)new { filename, lineno, function };
         }).ToArray();
     }
 

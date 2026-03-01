@@ -32,13 +32,14 @@ public sealed class ConsulHealthStrategy : ObservabilityStrategyBase
         _consulUrl = consulUrl.TrimEnd('/');
         _token = token;
         _serviceId = serviceId;
+        // Token injected per-request via AddToken() to avoid DefaultRequestHeaders thread-safety issues.
+    }
 
-        _httpClient.DefaultRequestHeaders.Clear();
+    /// <summary>Adds the Consul token header to a request if configured (per-request, thread-safe).</summary>
+    private void AddToken(HttpRequestMessage request)
+    {
         if (!string.IsNullOrEmpty(_token))
-        {
-            _httpClient.DefaultRequestHeaders.Remove("X-Consul-Token");
-            _httpClient.DefaultRequestHeaders.Add("X-Consul-Token", _token);
-        }
+            request.Headers.Add("X-Consul-Token", _token);
     }
 
     /// <summary>
@@ -47,6 +48,9 @@ public sealed class ConsulHealthStrategy : ObservabilityStrategyBase
     public async Task RegisterServiceAsync(string serviceName, int port, string[]? tags = null,
         int ttlSeconds = 30, CancellationToken ct = default)
     {
+        if (port < 1 || port > 65535)
+            throw new ArgumentOutOfRangeException(nameof(port), port, "Port must be between 1 and 65535.");
+
         var service = new
         {
             ID = _serviceId,
@@ -63,8 +67,10 @@ public sealed class ConsulHealthStrategy : ObservabilityStrategyBase
         };
 
         var json = JsonSerializer.Serialize(service);
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
-        using var response = await _httpClient.PutAsync($"{_consulUrl}/v1/agent/service/register", content, ct);
+        var body = new StringContent(json, Encoding.UTF8, "application/json");
+        using var request = new HttpRequestMessage(HttpMethod.Put, $"{_consulUrl}/v1/agent/service/register") { Content = body };
+        AddToken(request);
+        using var response = await _httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
     }
 
