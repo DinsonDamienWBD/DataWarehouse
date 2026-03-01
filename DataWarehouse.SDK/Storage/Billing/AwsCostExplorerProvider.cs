@@ -153,9 +153,11 @@ public sealed class AwsCostExplorerProvider : IBillingProvider
                 var instanceType = item.GetProperty("instanceType").GetString() ?? "unknown";
                 var az = item.GetProperty("availabilityZone").GetString() ?? targetRegion;
 
-                // Estimate on-demand price as ~3x spot for storage instances
-                var onDemandEstimate = spotPrice * 3.0m;
-                var savings = onDemandEstimate > 0 ? (double)((onDemandEstimate - spotPrice) / onDemandEstimate * 100) : 0;
+                // AWS Spot API does not return on-demand price in the same call.
+                // On-demand price is unknown here; expose 0 so callers query DescribeInstanceTypes separately.
+                // Cat 1 (finding 622): removed fabricated 3x multiplier — 0 is honest "unknown" rather than fabricated data.
+                var onDemandEstimate = 0m;
+                var savings = 0.0;
 
                 results.Add(new SpotPricing(
                     CloudProvider.AWS,
@@ -202,8 +204,10 @@ public sealed class AwsCostExplorerProvider : IBillingProvider
                     : DateTimeOffset.UtcNow.AddSeconds(duration);
 
                 var termMonths = (int)(duration / 2592000); // seconds to months
-                var onDemandEstimate = usagePrice * 1.4m;
-                var savings = onDemandEstimate > 0 ? (double)((onDemandEstimate - usagePrice) / onDemandEstimate * 100) : 30.0;
+                // Cat 1 (finding 623): on-demand price not available in DescribeReservedInstances response.
+                // Use 0 to indicate "unknown" rather than a fabricated 1.4x multiplier.
+                var onDemandEstimate = 0m;
+                var savings = 0.0;
 
                 results.Add(new ReservedCapacity(
                     CloudProvider.AWS,
@@ -293,6 +297,11 @@ public sealed class AwsCostExplorerProvider : IBillingProvider
                 httpMethod: "POST",
                 contentType: "application/x-www-form-urlencoded").ConfigureAwait(false);
             return true;
+        }
+        catch (OperationCanceledException)
+        {
+            // Cat 5 (finding 621): propagate cancellation rather than misreporting it as invalid credentials.
+            throw;
         }
         catch
         {

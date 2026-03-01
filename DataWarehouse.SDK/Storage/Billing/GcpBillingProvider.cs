@@ -102,19 +102,29 @@ public sealed class GcpBillingProvider : IBillingProvider
 
             if (servicesJson.TryGetProperty("services", out var services))
             {
-                foreach (var service in services.EnumerateArray().Take(50)) // Limit for performance
+                // Cat 13 (finding 624): parallelize SKU requests instead of O(n×m) sequential round-trips.
+                // Use SemaphoreSlim(10) to bound concurrency and avoid overwhelming the GCP API.
+                using var sem = new System.Threading.SemaphoreSlim(10, 10);
+
+                var serviceList = services.EnumerateArray().Take(50)
+                    .Select(s => (
+                        Name: s.TryGetProperty("displayName", out var dn) ? dn.GetString() ?? "Unknown" : "Unknown",
+                        Id: s.TryGetProperty("serviceId", out var sid) ? sid.GetString() : null
+                    ))
+                    .Where(s => s.Id != null)
+                    .ToList();
+
+                var skuResults = new System.Collections.Concurrent.ConcurrentBag<(string ServiceName, List<CostBreakdown> Items, decimal Cost)>();
+
+                var tasks = serviceList.Select(async svc =>
                 {
-                    var serviceName = service.TryGetProperty("displayName", out var dn) ? dn.GetString() ?? "Unknown" : "Unknown";
-                    var serviceId = service.TryGetProperty("serviceId", out var sid) ? sid.GetString() : null;
-
-                    if (serviceId == null) continue;
-
-                    // Get SKUs for this service to estimate costs
-                    var skuUrl = $"https://cloudbilling.googleapis.com/v1/services/{serviceId}/skus?currencyCode=USD&pageSize=10";
-
+                    await sem.WaitAsync(ct).ConfigureAwait(false);
                     try
                     {
+                        var skuUrl = $"https://cloudbilling.googleapis.com/v1/services/{svc.Id}/skus?currencyCode=USD&pageSize=10";
                         var skuJson = await SendGcpGetRequestAsync(skuUrl, token, ct).ConfigureAwait(false);
+                        decimal svcCost = 0m;
+                        var svcItems = new List<CostBreakdown>();
 
                         if (skuJson.TryGetProperty("skus", out var skus))
                         {
@@ -135,10 +145,10 @@ public sealed class GcpBillingProvider : IBillingProvider
                                         var price = units + (nanos / 1_000_000_000m);
                                         if (price > 0)
                                         {
-                                            totalCost += price;
-                                            breakdown.Add(new CostBreakdown(
-                                                CategorizeGcpService(serviceName),
-                                                serviceName,
+                                            svcCost += price;
+                                            svcItems.Add(new CostBreakdown(
+                                                CategorizeGcpService(svc.Name),
+                                                svc.Name,
                                                 price,
                                                 "USD",
                                                 1.0));
@@ -147,11 +157,25 @@ public sealed class GcpBillingProvider : IBillingProvider
                                 }
                             }
                         }
+
+                        skuResults.Add((svc.Name, svcItems, svcCost));
                     }
                     catch (HttpRequestException)
                     {
                         // Skip services we cannot query
                     }
+                    finally
+                    {
+                        sem.Release();
+                    }
+                });
+
+                await Task.WhenAll(tasks).ConfigureAwait(false);
+
+                foreach (var (_, items, cost) in skuResults)
+                {
+                    totalCost += cost;
+                    breakdown.AddRange(items);
                 }
             }
         }
@@ -315,16 +339,55 @@ public sealed class GcpBillingProvider : IBillingProvider
                         var termMonths = plan.Contains("THIRTY_SIX", StringComparison.OrdinalIgnoreCase) ? 36 : 12;
                         var savingsPercent = termMonths == 36 ? 57.0 : 37.0;
 
-                        // TODO (finding P2-618): Parse ReservedPricePerGBMonth/OnDemandPricePerGBMonth
-                        // from GCP Cloud Billing Catalog API (cloudbilling.googleapis.com/v1/services/{serviceId}/skus).
-                        // CUD pricing requires SKU lookup by resource type and region to get per-GB committed/on-demand rates.
+                        // Parse committed resources (GCP CUD API: resources[] array).
+                        // Each resource has a type (e.g. "MEMORY", "VCPU", "LOCAL_SSD") and amount.
+                        long committedGb = 0;
+                        decimal totalCostOverTerm = 0m;
+
+                        if (commitment.TryGetProperty("resources", out var resources))
+                        {
+                            foreach (var res in resources.EnumerateArray())
+                            {
+                                var resType = res.TryGetProperty("type", out var rt) ? rt.GetString() : "";
+                                // GCP storage CUDs report amount in GB
+                                if (string.Equals(resType, "STORAGE_PD_CAPACITY", StringComparison.OrdinalIgnoreCase) ||
+                                    string.Equals(resType, "LOCAL_SSD", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    var amtStr = res.TryGetProperty("amount", out var amtProp) ? amtProp.GetString() : null;
+                                    if (amtStr != null && long.TryParse(amtStr, out var amtGb))
+                                        committedGb += amtGb;
+                                }
+                            }
+                        }
+
+                        // Parse cost from monthlyCostEstimate if available
+                        if (commitment.TryGetProperty("monthlyCostEstimate", out var mce))
+                        {
+                            if (mce.TryGetProperty("currencyCode", out _) &&
+                                mce.TryGetProperty("units", out var units) &&
+                                long.TryParse(units.GetString(), out var unitVal))
+                            {
+                                var nanos = mce.TryGetProperty("nanos", out var nanoEl) ? nanoEl.GetInt64() : 0;
+                                totalCostOverTerm = unitVal + (decimal)nanos / 1_000_000_000m;
+                                // totalCostOverTerm is monthly; multiply by term for full commitment cost
+                                totalCostOverTerm *= termMonths;
+                            }
+                        }
+
+                        decimal reservedPerGbMonth = committedGb > 0 && termMonths > 0
+                            ? totalCostOverTerm / committedGb / termMonths
+                            : 0m;
+                        decimal onDemandPerGbMonth = reservedPerGbMonth > 0
+                            ? reservedPerGbMonth / (decimal)(1.0 - savingsPercent / 100.0)
+                            : 0m;
+
                         results.Add(new ReservedCapacity(
                             CloudProvider.GCP,
                             zoneName,
                             name,
-                            CommittedGB: 0,
-                            ReservedPricePerGBMonth: 0m,
-                            OnDemandPricePerGBMonth: 0m,
+                            CommittedGB: committedGb,
+                            ReservedPricePerGBMonth: reservedPerGbMonth,
+                            OnDemandPricePerGBMonth: onDemandPerGbMonth,
                             savingsPercent,
                             termMonths,
                             endTimestamp));
@@ -404,6 +467,10 @@ public sealed class GcpBillingProvider : IBillingProvider
         {
             await AcquireTokenAsync(ct).ConfigureAwait(false);
             return true;
+        }
+        catch (OperationCanceledException)
+        {
+            throw; // Cat 5 (finding 621): propagate cancellation, not invalid credentials.
         }
         catch
         {

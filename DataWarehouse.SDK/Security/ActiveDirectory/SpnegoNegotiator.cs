@@ -96,7 +96,8 @@ namespace DataWarehouse.SDK.Security.ActiveDirectory
         /// When false (default), RC4-HMAC tickets are processed but a warning is logged.
         /// When true, RC4-HMAC tickets are rejected with an error.
         /// </summary>
-        public bool RejectLegacyEncryption { get; set; }
+        // Cat 15 (finding 583): init-only — immutable after construction prevents race between config read and request processing.
+        public bool RejectLegacyEncryption { get; init; }
 
         /// <summary>
         /// Creates a new SPNEGO negotiator.

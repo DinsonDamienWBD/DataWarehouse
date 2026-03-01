@@ -47,17 +47,56 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
                 config.ConnectionString ?? throw new ArgumentException("Connection string required"),
                 587, "SMTP");
 
+            // P2-2134: Perform a real SMTP handshake (EHLO/STARTTLS) instead of bare TCP.
             var client = new TcpClient();
-            await client.ConnectAsync(host, port, ct);
+            await client.ConnectAsync(host, port, ct).ConfigureAwait(false);
 
             if (!client.Connected)
                 throw new InvalidOperationException($"Failed to connect to SMTP server at {host}:{port}");
+
+            System.IO.Stream stream = client.GetStream();
+            using var reader = new System.IO.StreamReader(stream, System.Text.Encoding.ASCII, leaveOpen: true);
+            using var writer = new System.IO.StreamWriter(stream, System.Text.Encoding.ASCII, leaveOpen: true) { AutoFlush = true };
+
+            // Read server greeting (220 ...)
+            var greeting = await reader.ReadLineAsync(ct).ConfigureAwait(false);
+            if (greeting == null || !greeting.StartsWith("220", StringComparison.Ordinal))
+                throw new InvalidOperationException($"SMTP server did not send 220 greeting: {greeting}");
+
+            // Send EHLO and read extended capability list
+            await writer.WriteLineAsync($"EHLO {System.Net.Dns.GetHostName()}").ConfigureAwait(false);
+            string? ehloLine;
+            bool supportsStartTls = false;
+            while ((ehloLine = await reader.ReadLineAsync(ct).ConfigureAwait(false)) != null)
+            {
+                if (ehloLine.Contains("STARTTLS", StringComparison.OrdinalIgnoreCase))
+                    supportsStartTls = true;
+                // Last EHLO response line has a space after the code (e.g. "250 SIZE 35882577")
+                if (ehloLine.Length >= 4 && ehloLine[3] == ' ')
+                    break;
+            }
+
+            // Upgrade to TLS if the server advertises STARTTLS (RFC 3207)
+            if (supportsStartTls && port == 587)
+            {
+                await writer.WriteLineAsync("STARTTLS").ConfigureAwait(false);
+                var tlsResponse = await reader.ReadLineAsync(ct).ConfigureAwait(false);
+                if (tlsResponse != null && tlsResponse.StartsWith("220", StringComparison.Ordinal))
+                {
+                    var sslStream = new System.Net.Security.SslStream(stream, leaveInnerStreamOpen: false);
+                    await sslStream.AuthenticateAsClientAsync(host, null,
+                        System.Security.Authentication.SslProtocols.Tls12 | System.Security.Authentication.SslProtocols.Tls13,
+                        checkCertificateRevocation: true);
+                    stream = sslStream; // replace plain stream with TLS stream
+                }
+            }
 
             var info = new Dictionary<string, object>
             {
                 ["host"] = host,
                 ["port"] = port,
                 ["protocol"] = "SMTP",
+                ["starttls"] = supportsStartTls,
                 ["connected_at"] = DateTimeOffset.UtcNow
             };
 

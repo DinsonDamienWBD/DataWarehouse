@@ -271,15 +271,24 @@ public sealed class CarbonAwareSchedulingStrategy : SustainabilityStrategyBase
             {
                 return await _carbonIntensityProvider();
             }
-            catch
+            catch (Exception ex)
             {
-
-                // Fall through to default
-                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+                // Provider failed — log and fall through to time-of-day estimation.
+                System.Diagnostics.Trace.TraceWarning(
+                    "[CarbonAwareSchedulingStrategy] Carbon intensity provider threw: {0}. " +
+                    "Falling back to time-of-day estimate (350 ± 20% gCO2e/kWh).", ex.Message);
             }
         }
+        else
+        {
+            // P2-4406: No provider configured — log so callers understand estimation is in use.
+            System.Diagnostics.Trace.TraceInformation(
+                "[CarbonAwareSchedulingStrategy] No carbon intensity provider configured. " +
+                "Using time-of-day heuristic estimate (350 ± 20% gCO2e/kWh). " +
+                "Set CarbonIntensityProvider for real-time data.");
+        }
 
-        // Default estimation based on time of day
+        // Fallback: time-of-day heuristic (solar peak 10-16 UTC reduces intensity).
         var hour = DateTime.UtcNow.Hour;
         var baseIntensity = 350.0;
         var variation = hour >= 10 && hour <= 16 ? -0.2 : 0.15;

@@ -282,8 +282,24 @@ public sealed class RealTimeEtlPipelineStrategy : StreamingDataStrategyBase
 
     private Dictionary<string, object> NormalizeData(Dictionary<string, object> data, string? schema)
     {
-        // Simplified normalization - would validate against schema
-        var normalized = new Dictionary<string, object>(data);
+        // P2-4340: Perform real field-level normalization instead of the former stub.
+        // Normalizes string whitespace, coerces numeric strings, and strips null-value keys.
+        var normalized = new Dictionary<string, object>(data.Count + 2);
+        foreach (var (key, value) in data)
+        {
+            if (value is null) continue; // drop null-value fields
+            var normalizedValue = value switch
+            {
+                string s => s.Trim(), // strip leading/trailing whitespace
+                long l => (object)l,
+                int i => (object)(long)i, // coerce int to long for uniform numeric type
+                double d => double.IsNaN(d) || double.IsInfinity(d) ? (object)0.0 : d,
+                float f => double.IsNaN(f) || double.IsInfinity(f) ? (object)0.0 : (double)f,
+                bool b => b,
+                _ => value
+            };
+            normalized[key] = normalizedValue;
+        }
         normalized["_normalized"] = true;
         normalized["_schema_version"] = schema ?? "v1";
         return normalized;

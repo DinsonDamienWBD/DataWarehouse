@@ -476,19 +476,53 @@ internal sealed class StatefulStreamProcessing : IDisposable
             }
             else
             {
-                // Log checksum mismatch so operators know data was skipped due to corruption.
+                // P2-4328: Checksum mismatch = data corruption. Publish a warning event via the
+                // message bus so operators can observe and alert on corrupted checkpoint entries.
+                // Do NOT silently ignore — this is data loss and must be surfaced.
                 skipped++;
-                System.Diagnostics.Debug.WriteLine(
-                    $"[StatefulStreamProcessing] Checksum mismatch restoring key '{key}' " +
-                    $"in namespace '{_namespace}': expected {entry.Checksum}, got {checksum}. Entry skipped.");
+                if (_messageBus != null)
+                {
+                    var warnMsg = new PluginMessage
+                    {
+                        Type = "streaming.state.checksum_mismatch",
+                        Source = $"StatefulStreamProcessing/{_namespace}",
+                        Timestamp = DateTime.UtcNow,
+                        Payload = new Dictionary<string, object>
+                        {
+                            ["namespace"] = _namespace,
+                            ["key"] = key,
+                            ["expectedChecksum"] = entry.Checksum,
+                            ["actualChecksum"] = checksum,
+                            ["severity"] = "warning"
+                        }
+                    };
+                    try { await _messageBus.PublishAsync("streaming.state.checksum_mismatch", warnMsg, ct); }
+                    catch { /* best-effort, do not fail restore */ }
+                }
             }
         }
 
         if (skipped > 0)
         {
-            System.Diagnostics.Debug.WriteLine(
-                $"[StatefulStreamProcessing] Checkpoint restore for namespace '{_namespace}': " +
-                $"{restored} entries restored, {skipped} entries skipped due to checksum mismatch.");
+            // Also publish a summary event
+            if (_messageBus != null)
+            {
+                var summaryMsg = new PluginMessage
+                {
+                    Type = "streaming.state.restore_summary",
+                    Source = $"StatefulStreamProcessing/{_namespace}",
+                    Timestamp = DateTime.UtcNow,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["namespace"] = _namespace,
+                        ["restored"] = restored,
+                        ["skipped"] = skipped,
+                        ["severity"] = skipped > 0 ? "warning" : "info"
+                    }
+                };
+                try { await _messageBus.PublishAsync("streaming.state.restore_summary", summaryMsg, ct); }
+                catch { /* best-effort */ }
+            }
         }
 
         return restored;

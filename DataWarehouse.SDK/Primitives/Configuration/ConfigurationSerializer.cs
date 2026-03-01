@@ -83,7 +83,18 @@ public static class ConfigurationSerializer
         if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
             Directory.CreateDirectory(directory);
 
-        File.WriteAllText(filePath, xml);
+        // Atomic write: write to temp file then rename to avoid leaving a truncated config on crash.
+        var tempPath = filePath + ".tmp." + Guid.NewGuid().ToString("N");
+        try
+        {
+            File.WriteAllText(tempPath, xml);
+            File.Move(tempPath, filePath, overwrite: true);
+        }
+        catch
+        {
+            try { File.Delete(tempPath); } catch { /* best effort cleanup */ }
+            throw;
+        }
     }
 
     /// <summary>

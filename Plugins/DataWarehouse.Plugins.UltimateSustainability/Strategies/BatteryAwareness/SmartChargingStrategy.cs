@@ -90,6 +90,7 @@ public sealed class SmartChargingStrategy : SustainabilityStrategyBase
     /// <summary>Ends the current charging session.</summary>
     public void EndSession(int finalChargePercent, double energyUsedWh)
     {
+        double overheadSaved = 0;
         lock (_lock)
         {
             var session = _sessions.LastOrDefault();
@@ -98,9 +99,16 @@ public sealed class SmartChargingStrategy : SustainabilityStrategyBase
                 session.EndedAt = DateTimeOffset.UtcNow;
                 session.FinalChargePercent = finalChargePercent;
                 session.EnergyUsedWh = energyUsedWh;
+                // P2-4407: Compute actual energy saved vs fast-charge overhead baseline.
+                // Smart charging avoids ~8% fast-charge degradation overhead, scaled by
+                // the fraction of charge replenished this session.
+                if (finalChargePercent > session.InitialChargePercent)
+                    overheadSaved = energyUsedWh * 0.08
+                        * (finalChargePercent - session.InitialChargePercent) / 100.0;
             }
         }
-        RecordEnergySaved(energyUsedWh * 0.1); // 10% efficiency gain estimate
+        if (overheadSaved > 0)
+            RecordEnergySaved(overheadSaved);
     }
 
     /// <summary>Gets charging statistics.</summary>

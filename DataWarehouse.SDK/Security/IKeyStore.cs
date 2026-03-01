@@ -160,6 +160,9 @@ namespace DataWarehouse.SDK.Security
         /// </remarks>
         async Task<NativeKeyHandle> GetKeyNativeAsync(string keyId, ISecurityContext context, CancellationToken ct = default)
         {
+            // Cat 15 (finding 586): GetKeyAsync does not accept a CancellationToken (legacy interface signature).
+            // ct is checked here before the call to avoid dispatching when already cancelled.
+            ct.ThrowIfCancellationRequested();
             var keyBytes = await GetKeyAsync(keyId, context).ConfigureAwait(false);
             try
             {

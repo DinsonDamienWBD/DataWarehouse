@@ -596,8 +596,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[ScalewayObjectStorageStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
+                // P2-4140: Re-throw auth and network errors so callers see real failures instead
+                // of a misleading false (object-not-found) result for auth/connectivity problems.
+                if (ex is AmazonS3Exception s3ex &&
+                    (s3ex.StatusCode == System.Net.HttpStatusCode.Forbidden ||
+                     s3ex.StatusCode == System.Net.HttpStatusCode.Unauthorized))
+                    throw;
                 IncrementOperationCounter(StorageOperationType.Exists);
+                RecordFailure();
                 return false;
             }
         }

@@ -36,6 +36,11 @@ namespace DataWarehouse.SDK.Connectors
         private long _totalLatencyTicks;
         private long _successfulConnections;
 
+        // P2-2158: Cache health-check results for HealthCacheTtl to avoid high-frequency
+        // full round-trips when callers poll rapidly. Cache is keyed by ConnectionId.
+        private static readonly TimeSpan HealthCacheTtl = TimeSpan.FromSeconds(10);
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (DateTimeOffset Expiry, ConnectionHealth Health)> _healthCache = new();
+
         /// <inheritdoc/>
         public override abstract string StrategyId { get; }
 
@@ -269,11 +274,19 @@ namespace DataWarehouse.SDK.Connectors
         {
             ArgumentNullException.ThrowIfNull(handle);
 
+            // P2-2158: Return a cached result if it has not yet expired to avoid
+            // one full network round-trip per caller per poll interval.
+            var cacheKey = handle.ConnectionId;
+            var now = DateTimeOffset.UtcNow;
+            if (_healthCache.TryGetValue(cacheKey, out var cached) && cached.Expiry > now)
+                return cached.Health;
+
             var sw = Stopwatch.StartNew();
             try
             {
                 var health = await GetHealthCoreAsync(handle, ct);
                 sw.Stop();
+                _healthCache[cacheKey] = (now.Add(HealthCacheTtl), health);
                 return health;
             }
             catch (Exception ex)
@@ -283,11 +296,14 @@ namespace DataWarehouse.SDK.Connectors
                     "Health check failed for strategy {StrategyId}, connection {ConnectionId}",
                     StrategyId, handle.ConnectionId);
 
-                return new ConnectionHealth(
+                var unhealthy = new ConnectionHealth(
                     IsHealthy: false,
                     StatusMessage: $"Health check failed: {ex.Message}",
                     Latency: sw.Elapsed,
                     CheckedAt: DateTimeOffset.UtcNow);
+                // Cache failures for a shorter period so errors resolve promptly.
+                _healthCache[cacheKey] = (now.AddSeconds(2), unhealthy);
+                return unhealthy;
             }
         }
 

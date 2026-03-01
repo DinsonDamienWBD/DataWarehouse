@@ -631,14 +631,8 @@ public sealed class BackpressureStrategy : StreamingDataStrategyBase
             switch (config.Strategy)
             {
                 case BackpressureStrategyType.Block:
-                    // Would block here in production
-                    Interlocked.Increment(ref controller.BlockedCount);
-                    return Task.FromResult(new SubmitResult
-                    {
-                        Accepted = false,
-                        Action = BackpressureAction.Blocked,
-                        Reason = "Buffer full, blocked"
-                    });
+                    // P2-4341: Actually block the caller until buffer space is available or timeout.
+                    return BlockUntilSpaceAsync(controller, @event, ct);
 
                 case BackpressureStrategyType.Drop:
                     Interlocked.Increment(ref controller.DroppedCount);
@@ -721,6 +715,42 @@ public sealed class BackpressureStrategy : StreamingDataStrategyBase
             Action = BackpressureAction.Accepted,
             BufferSize = controller.Buffer.Count
         });
+    }
+
+    /// <summary>
+    /// Blocks until buffer space is available, then enqueues the event.
+    /// P2-4341: replaces the "Would block here in production" stub.
+    /// </summary>
+    private async Task<SubmitResult> BlockUntilSpaceAsync<T>(BackpressureController controller, T @event, CancellationToken ct)
+    {
+        Interlocked.Increment(ref controller.BlockedCount);
+        var timeout = controller.Config.BlockTimeout ?? TimeSpan.FromSeconds(30);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(timeout);
+
+        // Spin-wait with brief yields until space opens or timeout fires.
+        while (controller.Buffer.Count >= controller.Config.MaxBufferSize)
+        {
+            try { await Task.Delay(1, cts.Token).ConfigureAwait(false); }
+            catch (OperationCanceledException)
+            {
+                return new SubmitResult
+                {
+                    Accepted = false,
+                    Action = BackpressureAction.Blocked,
+                    Reason = $"Buffer full, blocked {timeout.TotalSeconds:0}s timeout exceeded"
+                };
+            }
+        }
+
+        controller.Buffer.Enqueue(new BufferedEvent
+        {
+            EventId = Guid.NewGuid().ToString("N"),
+            Payload = @event,
+            EnqueuedAt = DateTimeOffset.UtcNow
+        });
+        Interlocked.Increment(ref controller.AcceptedCount);
+        return new SubmitResult { Accepted = true, Action = BackpressureAction.Accepted, BufferSize = controller.Buffer.Count };
     }
 
     /// <summary>
