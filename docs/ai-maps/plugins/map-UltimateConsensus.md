@@ -147,7 +147,7 @@ private sealed class PbftGroupState
     public BoundedDictionary<int, PbftCommittedEntry> CommittedEntries { get; };
     public List<PbftCheckpoint> Checkpoints { get; };
     public List<PbftViewChange> ViewChangeHistory { get; };
-    public PbftGroupState(int totalNodes);
+    public PbftGroupState(int totalNodes, int checkpointInterval = 100);
 }
 ```
 ```csharp
@@ -249,7 +249,7 @@ private sealed class CommitHandlerRegistration : IDisposable
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateConsensus/ConsistentHash.cs
 ```csharp
-public sealed class ConsistentHash
+public sealed class ConsistentHash : IDisposable
 {
 }
     public ConsistentHash(int initialBuckets);
@@ -262,12 +262,18 @@ public sealed class ConsistentHash
 {
     get
     {
-        lock (_lock)
+        _lock.EnterReadLock();
+        try
         {
             return _bucketCount;
         }
+        finally
+        {
+            _lock.ExitReadLock();
+        }
     }
 }
+    public void Dispose();;
 }
 ```
 
@@ -287,7 +293,15 @@ public sealed class SegmentedRaftLog : IRaftLogStore, IDisposable
     get
     {
         EnsureInitialized();
-        return _entries.Count;
+        _entriesLock.EnterReadLock();
+        try
+        {
+            return _entries.Count;
+        }
+        finally
+        {
+            _entriesLock.ExitReadLock();
+        }
     }
 }
     public Task<long> GetLastIndexAsync();

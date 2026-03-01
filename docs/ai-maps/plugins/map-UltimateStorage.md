@@ -729,7 +729,8 @@ public sealed class LatencyBasedSelectionFeature : IDisposable
     set
     {
         _healthCheckInterval = value;
-        _healthCheckTimer.Change(TimeSpan.Zero, value);
+        // Delay next execution by the new interval to avoid immediate fire-and-forget
+        _healthCheckTimer.Change(value, value);
     }
 }
     public double MaxAcceptableLatencyMs { get => _maxAcceptableLatencyMs; set => _maxAcceptableLatencyMs = value > 0 ? value : 5000; }
@@ -836,11 +837,12 @@ public sealed class ObjectAccessMetrics
 }
     public string Key { get; init; };
     public DateTime FirstAccess { get; set; }
-    public DateTime LastAccess { get; set; }
+    public DateTime LastAccess { get => new DateTime(Interlocked.Read(ref _lastAccessTicks), DateTimeKind.Utc); set => Interlocked.Exchange(ref _lastAccessTicks, value.Ticks); }
     public long TotalAccesses;
     public long ReadCount;
     public long WriteCount;
-    public ObjectTemperature Temperature { get; set; };
+    public ObjectTemperature Temperature { get => (ObjectTemperature)Interlocked.CompareExchange(ref _temperature, 0, 0); set => Interlocked.Exchange(ref _temperature, (int)value); }
+    public System.Collections.Concurrent.ConcurrentQueue<long> RecentAccessTicks { get; };
 }
 ```
 ```csharp
@@ -908,6 +910,7 @@ public sealed class LifecycleManagementFeature : IDisposable
     public long TotalExpiredObjects;;
     public long TotalDeletedObjects;;
     public long TotalTransitions;;
+    public long TotalDeletionFailures;;
     public bool EnableLifecycleManagement { get => _enableLifecycleManagement; set => _enableLifecycleManagement = value; }
     public void SetLifecyclePolicy(string policyId, LifecyclePolicy policy);
     public LifecyclePolicy? GetLifecyclePolicy(string policyId);

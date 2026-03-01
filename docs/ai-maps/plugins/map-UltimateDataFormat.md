@@ -926,7 +926,7 @@ public sealed class ArrowFlightStrategy : DataFormatStrategyBase
     public async IAsyncEnumerable<FlightInfo> ListFlights(FlightCriteria criteria, [EnumeratorCancellation] CancellationToken ct = default);
     protected override async Task<bool> DetectFormatCoreAsync(Stream stream, CancellationToken ct);
     public override async Task<DataFormatResult> ParseAsync(Stream input, DataFormatContext context, CancellationToken ct = default);
-    public override Task<DataFormatResult> SerializeAsync(object data, Stream output, DataFormatContext context, CancellationToken ct = default);
+    public override async Task<DataFormatResult> SerializeAsync(object data, Stream output, DataFormatContext context, CancellationToken ct = default);
     protected override async Task<FormatValidationResult> ValidateCoreAsync(Stream stream, FormatSchema? schema, CancellationToken ct);
 }
 ```
