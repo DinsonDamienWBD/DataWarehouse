@@ -80,6 +80,7 @@ public sealed record ResourceAllocation
 {
 }
     public required string RequestId { get; init; }
+    public string? RequesterId { get; init; }
     public bool Success { get; init; }
     public double AllocatedCpuCores { get; init; }
     public long AllocatedMemoryBytes { get; init; }
