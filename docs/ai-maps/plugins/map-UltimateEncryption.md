@@ -1429,8 +1429,8 @@ public sealed class ChaCha20TransitStrategy : TransitEncryptionPluginBase
     public override string Id;;
     public override string Name;;
     public override string Version;;
-    protected override async Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
+    protected override Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
     public override async Task<TransitEncryptionResult> EncryptStreamForTransitAsync(System.IO.Stream plaintextStream, System.IO.Stream ciphertextStream, TransitEncryptionOptions options, ISecurityContext context, CancellationToken cancellationToken = default);
 }
 ```
@@ -1457,8 +1457,8 @@ public sealed class XChaCha20TransitStrategy : TransitEncryptionPluginBase
     public override string Id;;
     public override string Name;;
     public override string Version;;
-    protected override async Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
+    protected override Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
     public override async Task<EndpointCapabilities> GetCapabilitiesAsync(CancellationToken cancellationToken = default);
 }
 ```
@@ -1471,8 +1471,8 @@ public sealed class AesCbcTransitStrategy : TransitEncryptionPluginBase
     public override string Id;;
     public override string Name;;
     public override string Version;;
-    protected override async Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
+    protected override Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
 }
 ```
 
@@ -1484,8 +1484,8 @@ public sealed class Aes128GcmTransitStrategy : TransitEncryptionPluginBase
     public override string Id;;
     public override string Name;;
     public override string Version;;
-    protected override async Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
+    protected override Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
     public override async Task<TransitEncryptionResult> EncryptStreamForTransitAsync(System.IO.Stream plaintextStream, System.IO.Stream ciphertextStream, TransitEncryptionOptions options, ISecurityContext context, CancellationToken cancellationToken = default);
 }
 ```
@@ -1498,8 +1498,8 @@ public sealed class AesGcmTransitStrategy : TransitEncryptionPluginBase
     public override string Id;;
     public override string Name;;
     public override string Version;;
-    protected override async Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
+    protected override Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
     public override async Task<TransitEncryptionResult> EncryptStreamForTransitAsync(System.IO.Stream plaintextStream, System.IO.Stream ciphertextStream, TransitEncryptionOptions options, ISecurityContext context, CancellationToken cancellationToken = default);
 }
 ```
@@ -1513,8 +1513,8 @@ public sealed class TlsBridgeTransitStrategy : TransitEncryptionPluginBase
     public override string Name;;
     public override string Version;;
     public SslStream? TlsStream { get; set; }
-    protected override async Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
+    protected override Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
     public override async Task<TransitEncryptionResult> EncryptStreamForTransitAsync(System.IO.Stream plaintextStream, System.IO.Stream ciphertextStream, TransitEncryptionOptions options, ISecurityContext context, CancellationToken cancellationToken = default);
     public override Task<EndpointCapabilities> GetCapabilitiesAsync(CancellationToken cancellationToken = default);
     public Dictionary<string, object> GetTlsConnectionInfo();
