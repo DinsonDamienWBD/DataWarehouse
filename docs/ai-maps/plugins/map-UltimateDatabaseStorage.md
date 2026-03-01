@@ -576,8 +576,8 @@ private sealed class SqlServerTransaction : IDatabaseTransaction
     public string TransactionId { get; };
     public IsolationLevel IsolationLevel;;
     public SqlServerTransaction(SqlConnection connection, SqlTransaction transaction);
-    public Task CommitAsync(CancellationToken ct = default);
-    public Task RollbackAsync(CancellationToken ct = default);
+    public Task CommitAsync(CancellationToken ct = default);;
+    public Task RollbackAsync(CancellationToken ct = default);;
     public ValueTask DisposeAsync();
 }
 ```

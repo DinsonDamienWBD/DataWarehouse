@@ -104,10 +104,11 @@ public interface IDeploymentStrategy
 }
 ```
 ```csharp
-public abstract class DeploymentStrategyBase : IDeploymentStrategy
+public abstract class DeploymentStrategyBase : IDeploymentStrategy, IDisposable
 {
 }
     protected DeploymentStrategyBase();
+    public void Dispose();
     public bool IsInitialized;;
     public virtual Task InitializeAsync(CancellationToken cancellationToken = default);
     public virtual Task ShutdownAsync(CancellationToken cancellationToken = default);

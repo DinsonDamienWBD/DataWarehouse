@@ -895,7 +895,7 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
     public override string StrategyName;;
     public override ProtocolInfo ProtocolInfo;;
     protected override async Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct);
-    protected override async Task NotifySslUpgradeAsync(CancellationToken ct);
+    protected override Task NotifySslUpgradeAsync(CancellationToken ct);
     protected override async Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct);
     protected override async Task<QueryResult> ExecuteQueryCoreAsync(string query, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);
     protected override Task<QueryResult> ExecuteNonQueryCoreAsync(string command, IReadOnlyDictionary<string, object?>? parameters, CancellationToken ct);

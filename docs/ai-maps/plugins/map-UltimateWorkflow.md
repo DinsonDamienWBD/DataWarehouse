@@ -511,11 +511,12 @@ public sealed class FallbackStrategy : WorkflowStrategyBase
 }
 ```
 ```csharp
-public sealed class BulkheadIsolationStrategy : WorkflowStrategyBase
+public sealed class BulkheadIsolationStrategy : WorkflowStrategyBase, IDisposable
 {
 }
     public override WorkflowCharacteristics Characteristics { get; };
     public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
+    public void Dispose();
 }
 ```
 ```csharp
@@ -738,6 +739,7 @@ public sealed class DistributedExecutionStrategy : WorkflowStrategyBase
 {
 }
     public override WorkflowCharacteristics Characteristics { get; };
+    public void ConfigureNodes(IReadOnlyList<string> nodeAddresses);
     public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
 }
 ```
@@ -746,6 +748,7 @@ public sealed class LeaderFollowerStrategy : WorkflowStrategyBase
 {
 }
     public override WorkflowCharacteristics Characteristics { get; };
+    public void ConfigureTopology(string leaderAddress, IReadOnlyList<string> followerAddresses);
     public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
 }
 ```
@@ -761,6 +764,7 @@ public sealed class ShardedExecutionStrategy : WorkflowStrategyBase
 public sealed class GossipCoordinationStrategy : WorkflowStrategyBase
 {
 }
+    public void ConfigureGossipPeers(IReadOnlyList<string> peerEndpoints);
     public override WorkflowCharacteristics Characteristics { get; };
     public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
 }
@@ -769,6 +773,7 @@ public sealed class GossipCoordinationStrategy : WorkflowStrategyBase
 public sealed class RaftConsensusStrategy : WorkflowStrategyBase
 {
 }
+    public void ConfigureRaftCluster(IReadOnlyList<string> nodeEndpoints, long initialTerm = 1);
     public override WorkflowCharacteristics Characteristics { get; };
     public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
 }
