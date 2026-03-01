@@ -100,7 +100,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
             };
         }
 
-        public override Task RebuildDiskAsync(
+        public override async Task RebuildDiskAsync(
             DiskInfo failedDisk,
             IEnumerable<DiskInfo> healthyDisks,
             DiskInfo targetDisk,
@@ -109,51 +109,24 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
         {
             var totalBytes = failedDisk.Capacity;
             var bytesRebuilt = 0L;
-            var diskList = healthyDisks.ToList();
             var startTime = DateTime.UtcNow;
+            var healthyDiskList = healthyDisks.ToList();
+            // Rebuild array includes healthy disks + the target (replacement) disk.
+            var rebuildDisks = healthyDiskList.Append(targetDisk).ToList();
 
-            // Rebuild disk by reconstructing data from current adaptive RAID level
+            // Rebuild by reading stripes through the RAID strategy's own ReadAsync
+            // (which applies the current RAID level's reconstruction logic) and
+            // writing back via WriteAsync with the replacement disk included.
+            // DiskInfo objects are metadata-only; actual I/O goes through the strategy.
             for (long offset = 0; offset < totalBytes; offset += Capabilities.StripeSize)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var stripeInfo = CalculateStripe(offset / Capabilities.StripeSize, diskList.Count + 1);
+                // Read the stripe using healthy disks (RAID parity reconstruction).
+                var stripeData = await ReadAsync(healthyDiskList, offset, Capabilities.StripeSize, cancellationToken);
 
-                // Read healthy data chunks
-                var chunks = new List<ReadOnlyMemory<byte>>();
-                foreach (var diskIndex in stripeInfo.DataDisks)
-                {
-                    if (diskList[diskIndex].HealthStatus == SdkDiskHealthStatus.Healthy)
-                    {
-                        // In production: var chunk = diskList[diskIndex].Read(offset, Capabilities.StripeSize)
-                        chunks.Add(new byte[Capabilities.StripeSize]);
-                    }
-                }
-
-                // Reconstruct data using current RAID level's parity/redundancy
-                ReadOnlyMemory<byte> reconstructedData;
-                switch (_currentLevel)
-                {
-                    case RaidLevel.Raid5:
-                    case RaidLevel.Raid6:
-                        // Read parity and reconstruct
-                        var parity = new byte[Capabilities.StripeSize];
-                        // In production: parity = diskList[stripeInfo.ParityDisks[0]].Read(offset, Capabilities.StripeSize)
-                        reconstructedData = CalculateXorParity(chunks.Append(parity));
-                        break;
-
-                    case RaidLevel.Raid10:
-                        // Copy from mirror disk
-                        reconstructedData = chunks.FirstOrDefault();
-                        break;
-
-                    default:
-                        reconstructedData = new byte[Capabilities.StripeSize];
-                        break;
-                }
-
-                // Write reconstructed data to target disk
-                // In production: targetDisk.Write(offset, reconstructedData)
+                // Write reconstructed stripe to the full array (including the target disk).
+                await WriteAsync(stripeData, rebuildDisks, offset, cancellationToken);
 
                 bytesRebuilt += Capabilities.StripeSize;
 
@@ -167,8 +140,6 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
                     EstimatedTimeRemaining: TimeSpan.FromSeconds((totalBytes - bytesRebuilt) / (double)speed),
                     CurrentSpeed: speed));
             }
-
-            return Task.CompletedTask;
         }
 
         private void AdaptToWorkload(IEnumerable<DiskInfo> disks)

@@ -26,7 +26,14 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
         }
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { var client = handle.GetConnection<TcpClient>(); if (!client.Connected) return false; try { await client.GetStream().WriteAsync(Array.Empty<byte>(), 0, 0, ct).ConfigureAwait(false); return true; } catch { return false; } }
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { if (_tcpClient != null) { _tcpClient.Close(); _tcpClient.Dispose(); _tcpClient = null; } await Task.CompletedTask; }
-        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var isHealthy = await TestCoreAsync(handle, ct); return new ConnectionHealth(isHealthy, isHealthy ? "FoundationDB healthy" : "FoundationDB unhealthy", TimeSpan.FromMilliseconds(3), DateTimeOffset.UtcNow); }
+        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        {
+            // P2-2180: Measure actual latency with Stopwatch instead of hardcoded value.
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var isHealthy = await TestCoreAsync(handle, ct);
+            sw.Stop();
+            return new ConnectionHealth(isHealthy, isHealthy ? "FoundationDB healthy" : "FoundationDB unhealthy", sw.Elapsed, DateTimeOffset.UtcNow);
+        }
         public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
             // FoundationDB is a low-level key-value store requiring native client library
@@ -44,6 +51,13 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             // FoundationDB is schema-less key-value store; returns minimal schema info
             return Task.FromResult<IReadOnlyList<DataSchema>>(new List<DataSchema> { new DataSchema("keyspace", new[] { new DataSchemaField("key", "Bytes", false, null, null), new DataSchemaField("value", "Bytes", true, null, null) }, new[] { "key" }, new Dictionary<string, object> { ["type"] = "keyspace", ["note"] = "FoundationDB requires native client for operations" }) });
         }
-        private (string host, int port) ParseHostPort(string connectionString, int defaultPort) { var parts = connectionString.Split(':'); return (parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : defaultPort); }
+        // P2-2203: Guard null/empty connectionString before Split to prevent empty-hostname SocketException.
+        private static (string host, int port) ParseHostPort(string connectionString, int defaultPort)
+        {
+            if (string.IsNullOrEmpty(connectionString))
+                throw new ArgumentException("ConnectionString must not be null or empty.", nameof(connectionString));
+            var parts = connectionString.Split(':');
+            return (parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : defaultPort);
+        }
     }
 }

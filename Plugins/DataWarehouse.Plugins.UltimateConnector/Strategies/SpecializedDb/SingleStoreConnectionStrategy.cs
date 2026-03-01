@@ -26,7 +26,14 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
         }
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { var client = handle.GetConnection<TcpClient>(); if (!client.Connected) return false; try { await client.GetStream().WriteAsync(Array.Empty<byte>(), 0, 0, ct).ConfigureAwait(false); return true; } catch { return false; } }
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { if (_tcpClient != null) { _tcpClient.Close(); _tcpClient.Dispose(); _tcpClient = null; } await Task.CompletedTask; }
-        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var isHealthy = await TestCoreAsync(handle, ct); return new ConnectionHealth(isHealthy, isHealthy ? "SingleStore healthy" : "SingleStore unhealthy", TimeSpan.FromMilliseconds(5), DateTimeOffset.UtcNow); }
+        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        {
+            // P2-2180: Measure actual latency with Stopwatch instead of hardcoded value.
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var isHealthy = await TestCoreAsync(handle, ct);
+            sw.Stop();
+            return new ConnectionHealth(isHealthy, isHealthy ? "SingleStore healthy" : "SingleStore unhealthy", sw.Elapsed, DateTimeOffset.UtcNow);
+        }
         public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
             // SingleStore (formerly MemSQL) uses the MySQL wire protocol (port 3306). Requires MySqlConnector or SingleStore.Data.
@@ -41,6 +48,13 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
         {
             throw new InvalidOperationException("SingleStore schema discovery requires the SingleStore.Data or MySqlConnector ADO.NET driver. This connector provides TCP connectivity only.");
         }
-        private (string host, int port) ParseHostPort(string connectionString, int defaultPort) { var parts = connectionString.Split(':'); return (parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : defaultPort); }
+        // P2-2203: Guard null/empty connectionString before Split to prevent empty-hostname SocketException.
+        private static (string host, int port) ParseHostPort(string connectionString, int defaultPort)
+        {
+            if (string.IsNullOrEmpty(connectionString))
+                throw new ArgumentException("ConnectionString must not be null or empty.", nameof(connectionString));
+            var parts = connectionString.Split(':');
+            return (parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : defaultPort);
+        }
     }
 }

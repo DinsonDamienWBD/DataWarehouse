@@ -82,9 +82,12 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
 
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
+            // P2-2180: Measure actual latency with Stopwatch instead of hardcoded value.
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             var isHealthy = await TestCoreAsync(handle, ct);
+            sw.Stop();
             return new ConnectionHealth(isHealthy, isHealthy ? "Druid healthy" : "Druid unhealthy",
-                TimeSpan.FromMilliseconds(8), DateTimeOffset.UtcNow);
+                sw.Elapsed, DateTimeOffset.UtcNow);
         }
 
         public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(
