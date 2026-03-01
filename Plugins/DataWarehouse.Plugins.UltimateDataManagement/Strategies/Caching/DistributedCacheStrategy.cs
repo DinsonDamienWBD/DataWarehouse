@@ -251,6 +251,8 @@ public sealed class DistributedCacheStrategy : CachingStrategyBase
     private ConnectionPool? _pool;
     private readonly BoundedDictionary<string, HashSet<string>> _tagIndex = new BoundedDictionary<string, HashSet<string>>(1000);
     private readonly object _tagLock = new();
+    private long _trackedSize;
+    private long _trackedEntryCount;
 
     /// <summary>
     /// Initializes a new DistributedCacheStrategy.
@@ -288,10 +290,10 @@ public sealed class DistributedCacheStrategy : CachingStrategyBase
     public override string[] Tags => ["cache", "distributed", "redis", "memcached", "cluster"];
 
     /// <inheritdoc/>
-    public override long GetCurrentSize() => 0; // Size tracked by backend
+    public override long GetCurrentSize() => Interlocked.Read(ref _trackedSize);
 
     /// <inheritdoc/>
-    public override long GetEntryCount() => 0; // Count tracked by backend
+    public override long GetEntryCount() => Interlocked.Read(ref _trackedEntryCount);
 
     /// <inheritdoc/>
     protected override Task InitializeCoreAsync(CancellationToken ct)

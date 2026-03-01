@@ -560,8 +560,11 @@ public sealed class Ext4Operations : FilesystemOperationsBase
         if (dir != null && !Directory.Exists(dir))
             Directory.CreateDirectory(dir);
 
-        // ext4 inline data: files <= 60 bytes stored directly in inode
-        // For our implementation, small files still go to regular storage but we track the optimization
+        // LOW-3031: Clarifying comment — ext4 inline data (EXT4_INLINE_DATA_FL) would store
+        // files ≤ 60 bytes inside the inode itself on real ext4 kernels. This layer delegates
+        // to the host filesystem and does NOT apply inline-data optimisation; all files go to
+        // regular file storage regardless of size. The optimisation is tracked here for future
+        // P/Invoke or FUSE implementation.
         await File.WriteAllBytesAsync(path, content, ct);
 
         var info = new FileInfo(path);
