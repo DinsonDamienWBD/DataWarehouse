@@ -119,6 +119,16 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
 
         private void CheckIncidentReporting(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
+            // P2-1513: Reporting deadline is configurable via context attribute "IncidentReportingDeadlineHours".
+            // NIS2 defaults: Essential entities = 24h early warning, Important entities = 72h notification.
+            // Operators can set per-entity-type deadlines via context.
+            int earlyWarningHours = 24;
+            int notificationHours = 72;
+            if (context.Attributes.TryGetValue("IncidentReportingDeadlineHours", out var deadlineObj) && deadlineObj is int configuredHours && configuredHours > 0)
+                earlyWarningHours = configuredHours;
+            if (context.Attributes.TryGetValue("IncidentNotificationDeadlineHours", out var notifObj) && notifObj is int configuredNotif && configuredNotif > 0)
+                notificationHours = configuredNotif;
+
             if (!context.Attributes.TryGetValue("IncidentReportingCapability", out var reportingObj) || reportingObj is not true)
             {
                 violations.Add(new ComplianceViolation
@@ -126,12 +136,12 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
                     Code = "NIS2-001",
                     Description = "No incident reporting capability implemented",
                     Severity = ViolationSeverity.Critical,
-                    Remediation = "Implement 24-hour incident reporting to national CSIRT",
+                    Remediation = $"Implement {earlyWarningHours}-hour early warning and {notificationHours}-hour incident notification to national CSIRT",
                     RegulatoryReference = "NIS2 Article 23"
                 });
             }
 
-            // Check for early warning (significant incidents within 24 hours)
+            // Check for early warning (significant incidents within configured hours)
             if (!context.Attributes.TryGetValue("EarlyWarningSystem", out var earlyWarningObj) || earlyWarningObj is not true)
             {
                 violations.Add(new ComplianceViolation

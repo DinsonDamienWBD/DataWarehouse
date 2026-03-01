@@ -532,6 +532,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
             if (string.IsNullOrWhiteSpace(input.RequestChannel))
                 return (false, "Request channel is required");
 
+            // P2-1509: Validate legal basis — GDPR Art.17 requires one of the enumerated grounds.
+            if (string.IsNullOrWhiteSpace(input.LegalBasis))
+                return (false, "Legal basis is required (e.g., 'withdrawal-of-consent', 'objection', 'unlawful-processing', 'legal-obligation', 'child-data')");
+
+            // P2-1509: Validate scope — must be specified to avoid unintended full-data erasure.
+            if (!input.Scope.HasValue)
+                return (false, "Erasure scope must be explicitly specified (AllPersonalData or SpecificCategories)");
+
             return (true, null);
         }
 
@@ -772,6 +780,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
     {
         public required string SubjectId { get; init; }
         public required string SubjectEmail { get; init; }
+        // P2-1509: LegalBasis is mandatory — GDPR Art.17 requires one of the enumerated grounds.
+        public string? LegalBasis { get; init; }
         public ErasureScope? Scope { get; init; }
         public string[]? DataCategories { get; init; }
         public string? Reason { get; init; }
