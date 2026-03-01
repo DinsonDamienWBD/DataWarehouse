@@ -247,7 +247,8 @@ public sealed class S3RequestParser
         if (queryParams.TryGetValue("max-keys", out var maxKeysStr) &&
             int.TryParse(maxKeysStr, out var parsedMaxKeys))
         {
-            maxKeys = Math.Clamp(parsedMaxKeys, 1, 1000);
+            // P2-4575: AWS S3 accepts max-keys=0 (returns empty page). Clamp to [0, 1000].
+            maxKeys = Math.Clamp(parsedMaxKeys, 0, 1000);
         }
 
         return new S3ListObjectsRequest

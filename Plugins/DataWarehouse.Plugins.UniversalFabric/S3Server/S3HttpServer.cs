@@ -778,7 +778,7 @@ public sealed class S3HttpServer : IS3CompatibleServer
     {
         var request = _parser.ParseListObjects(context.Request, bucket);
         var response = await ListObjectsV2Async(request, ct).ConfigureAwait(false);
-        _writer.WriteListObjectsResponse(context.Response, response, bucket);
+        _writer.WriteListObjectsResponse(context.Response, response, bucket, request.MaxKeys);
     }
 
     private async Task HandleInitiateMultipartUpload(HttpListenerContext context, string bucket, string key, CancellationToken ct)

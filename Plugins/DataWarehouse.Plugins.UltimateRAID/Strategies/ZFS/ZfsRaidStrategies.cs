@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.RAID;
+using DataWarehouse.SDK.Utilities;
 using SdkRaidStrategyBase = DataWarehouse.SDK.Contracts.RAID.RaidStrategyBase;
 using SdkDiskHealthStatus = DataWarehouse.SDK.Contracts.RAID.DiskHealthStatus;
 
@@ -17,7 +18,9 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ZFS
     public class RaidZ1Strategy : SdkRaidStrategyBase
     {
         private readonly int _defaultStripeWidth;
-        private readonly Dictionary<string, byte[]> _checksumCache;
+        // P2-3680: Use BoundedDictionary (max 10,000 entries) to prevent unbounded growth.
+        // All access is under _checksumLock to prevent torn reads during resize.
+        private readonly BoundedDictionary<string, byte[]> _checksumCache = new(10_000);
         private readonly object _checksumLock = new();
 
         public RaidZ1Strategy(int stripeWidth = 4)
@@ -450,7 +453,9 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ZFS
     public class RaidZ2Strategy : SdkRaidStrategyBase
     {
         private readonly int _defaultStripeWidth;
-        private readonly Dictionary<string, byte[]> _checksumCache;
+        // P2-3680: Use BoundedDictionary (max 10,000 entries) to prevent unbounded growth.
+        // All access is under _checksumLock to prevent torn reads during resize.
+        private readonly BoundedDictionary<string, byte[]> _checksumCache = new(10_000);
         private readonly object _checksumLock = new();
 
         public RaidZ2Strategy(int stripeWidth = 6)
@@ -837,7 +842,9 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ZFS
     public class RaidZ3Strategy : SdkRaidStrategyBase
     {
         private readonly int _defaultStripeWidth;
-        private readonly Dictionary<string, byte[]> _checksumCache;
+        // P2-3680: Use BoundedDictionary (max 10,000 entries) to prevent unbounded growth.
+        // All access is under _checksumLock to prevent torn reads during resize.
+        private readonly BoundedDictionary<string, byte[]> _checksumCache = new(10_000);
         private readonly object _checksumLock = new();
 
         public RaidZ3Strategy(int stripeWidth = 8)

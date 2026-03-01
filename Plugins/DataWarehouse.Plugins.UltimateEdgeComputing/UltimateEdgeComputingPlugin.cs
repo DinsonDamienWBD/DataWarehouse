@@ -1046,13 +1046,29 @@ internal sealed class MultiEdgeOrchestratorImpl : EC.IMultiEdgeOrchestrator
         var nodes = new List<EC.EdgeNodeInfo>();
         var connections = new List<EC.EdgeConnection>();
         await foreach (var node in _nodeManager.ListNodesAsync(null, ct)) nodes.Add(node);
-        for (int i = 0; i < nodes.Count; i++)
+
+        // P2-2923: cap connections to avoid O(n²) for large topologies.
+        // For ≤ 64 nodes build full mesh; above that limit to 8 nearest-neighbour ring connections per node.
+        const int FullMeshLimit = 64;
+        const int NeighbourCount = 8;
+        if (nodes.Count <= FullMeshLimit)
         {
-            for (int j = i + 1; j < nodes.Count; j++)
-            {
-                connections.Add(new EC.EdgeConnection { FromNodeId = nodes[i].NodeId, ToNodeId = nodes[j].NodeId, LatencyMs = 50, BandwidthMbps = 1000, IsActive = true });
-            }
+            for (int i = 0; i < nodes.Count; i++)
+                for (int j = i + 1; j < nodes.Count; j++)
+                    connections.Add(new EC.EdgeConnection { FromNodeId = nodes[i].NodeId, ToNodeId = nodes[j].NodeId, LatencyMs = 50, BandwidthMbps = 1000, IsActive = true });
         }
+        else
+        {
+            // Ring-lattice: connect each node to its next NeighbourCount/2 neighbours on each side.
+            int half = NeighbourCount / 2;
+            for (int i = 0; i < nodes.Count; i++)
+                for (int k = 1; k <= half; k++)
+                {
+                    int j = (i + k) % nodes.Count;
+                    connections.Add(new EC.EdgeConnection { FromNodeId = nodes[i].NodeId, ToNodeId = nodes[j].NodeId, LatencyMs = 50, BandwidthMbps = 1000, IsActive = true });
+                }
+        }
+
         return new EC.EdgeTopology { Nodes = nodes.ToArray(), Connections = connections.ToArray(), Clusters = Array.Empty<EC.EdgeCluster>(), GeneratedAt = DateTime.UtcNow };
     }
 

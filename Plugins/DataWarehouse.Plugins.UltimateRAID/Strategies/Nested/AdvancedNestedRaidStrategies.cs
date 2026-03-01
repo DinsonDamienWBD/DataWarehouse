@@ -949,6 +949,63 @@ public sealed class Raid60Strategy : SdkRaidStrategyBase
         await fs.FlushAsync(ct);
     }
 
+    // P2-3685: Read data-chunks from a RAID 6 group at the given offset.
+    // On single failure reconstruct from remaining data + P parity (XOR).
+    private async Task<(int group, byte[] data)> ReadFromRaid6GroupAsync(
+        List<DiskInfo> disks, int group, long offset, int length, CancellationToken ct)
+    {
+        var groupOffset = group * _disksPerRaid6Group;
+        var blockIndex = offset / _chunkSize;
+        var pDisk = (int)((blockIndex + group) % _disksPerRaid6Group);
+        var qDisk = (int)((blockIndex + group + 1) % _disksPerRaid6Group);
+        if (qDisk == pDisk) qDisk = (qDisk + 1) % _disksPerRaid6Group;
+
+        var chunks = new byte[_disksPerRaid6Group][];
+        var failed = new List<int>();
+
+        for (int i = 0; i < _disksPerRaid6Group; i++)
+        {
+            var diskIndex = groupOffset + i;
+            if (i == pDisk || i == qDisk || diskIndex >= disks.Count ||
+                disks[diskIndex].HealthStatus != SdkDiskHealthStatus.Healthy)
+            {
+                if (i != pDisk && i != qDisk) failed.Add(i);
+                chunks[i] = new byte[_chunkSize];
+            }
+            else
+            {
+                try { chunks[i] = await ReadFromDiskAsync(disks[diskIndex], offset, _chunkSize, ct); }
+                catch { failed.Add(i); chunks[i] = new byte[_chunkSize]; }
+            }
+        }
+
+        // Single-failure reconstruction: XOR all data chunks + P parity
+        var parityDiskIdx = groupOffset + pDisk;
+        if (failed.Count == 1 && parityDiskIdx < disks.Count &&
+            disks[parityDiskIdx].HealthStatus == SdkDiskHealthStatus.Healthy)
+        {
+            var pData = await ReadFromDiskAsync(disks[parityDiskIdx], offset, _chunkSize, ct);
+            var reconstructed = pData.ToArray();
+            for (int i = 0; i < _disksPerRaid6Group; i++)
+                if (i != pDisk && i != qDisk && i != failed[0])
+                    for (int j = 0; j < _chunkSize && j < chunks[i].Length; j++)
+                        reconstructed[j] ^= chunks[i][j];
+            chunks[failed[0]] = reconstructed;
+        }
+
+        // Concatenate data chunks (skip parity disks)
+        var result = new byte[length];
+        var pos = 0;
+        for (int i = 0; i < _disksPerRaid6Group && pos < length; i++)
+        {
+            if (i == pDisk || i == qDisk) continue;
+            var take = Math.Min(_chunkSize, length - pos);
+            Array.Copy(chunks[i], 0, result, pos, Math.Min(take, chunks[i].Length));
+            pos += take;
+        }
+        return (group, result);
+    }
+
     private async Task<byte[]> ReadFromDiskAsync(DiskInfo disk, long offset, int length, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(disk.Location))
