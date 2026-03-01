@@ -210,12 +210,14 @@ public sealed class LevelDbStorageStrategy : DatabaseStorageStrategyBase
 
             var key = currentKey.Substring(5); // Remove "meta:" prefix
 
+            // P2-2812: Break once keys have advanced past the prefix range (LevelDB is sorted).
+            // The redundant !StartsWith check inside the early-break was confusing but always
+            // true at that point (outer if already confirmed !StartsWith).
             if (!string.IsNullOrEmpty(prefix) && !key.StartsWith(prefix, StringComparison.Ordinal))
             {
-                if (string.Compare(key, prefix, StringComparison.Ordinal) > 0 && !key.StartsWith(prefix, StringComparison.Ordinal))
-                {
+                if (string.Compare(key, prefix, StringComparison.Ordinal) > 0)
                     break;
-                }
+
                 iterator.Next();
                 continue;
             }

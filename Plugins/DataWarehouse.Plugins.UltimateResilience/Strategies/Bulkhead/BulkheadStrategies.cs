@@ -343,12 +343,8 @@ public sealed class PartitionBulkheadStrategy : ResilienceStrategyBase
     public void ConfigurePartition(string partitionKey, int maxParallelism)
     {
         _partitionSizes[partitionKey] = maxParallelism;
-
-        // Update existing semaphore if it exists
-        if (_partitions.TryGetValue(partitionKey, out var existing))
-        {
-            // Can't resize SemaphoreSlim, so we leave it - new config applies on next creation
-        }
+        // LOW-3742: Removed dead TryGetValue block — SemaphoreSlim cannot be resized.
+        // New config applies on next partition creation (GetOrAdd in GetOrCreatePartition).
     }
 
     /// <summary>
@@ -695,9 +691,13 @@ public sealed class AdaptiveBulkheadStrategy : ResilienceStrategyBase
     {
         var startTime = DateTimeOffset.UtcNow;
 
+        int snapshotCapacity;
         lock (_adaptLock)
         {
             Adapt();
+            // LOW-3739: Capture _currentCapacity inside the lock so the reject message
+            // reflects the post-Adapt value rather than a potentially stale read.
+            snapshotCapacity = _currentCapacity;
         }
 
         if (!await _semaphore.WaitAsync(TimeSpan.Zero, cancellationToken))
@@ -705,10 +705,10 @@ public sealed class AdaptiveBulkheadStrategy : ResilienceStrategyBase
             return new ResilienceResult<T>
             {
                 Success = false,
-                Exception = new BulkheadRejectedException($"Adaptive bulkhead is full (capacity: {_currentCapacity})"),
+                Exception = new BulkheadRejectedException($"Adaptive bulkhead is full (capacity: {snapshotCapacity})"),
                 Attempts = 0,
                 TotalDuration = TimeSpan.Zero,
-                Metadata = { ["currentCapacity"] = _currentCapacity }
+                Metadata = { ["currentCapacity"] = snapshotCapacity }
             };
         }
 

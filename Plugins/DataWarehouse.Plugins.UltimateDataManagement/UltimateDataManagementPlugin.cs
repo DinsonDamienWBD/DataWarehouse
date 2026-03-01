@@ -126,7 +126,7 @@ public sealed class UltimateDataManagementPlugin : DataManagementPluginBase, IDi
         response.Metadata["RegisteredStrategies"] = _registry.Count.ToString();
         response.Metadata["AuditEnabled"] = _auditEnabled.ToString();
         response.Metadata["AutoOptimizationEnabled"] = _autoOptimizationEnabled.ToString();
-        response.Metadata["DeduplicationStrategies"] = GetStrategiesByCategory(DataManagementCategory.Lifecycle).Count.ToString();
+        response.Metadata["LifecycleStrategies"] = GetStrategiesByCategory(DataManagementCategory.Lifecycle).Count.ToString();
         response.Metadata["CachingStrategies"] = GetStrategiesByCategory(DataManagementCategory.Caching).Count.ToString();
         response.Metadata["IndexingStrategies"] = GetStrategiesByCategory(DataManagementCategory.Indexing).Count.ToString();
 
@@ -248,7 +248,7 @@ public sealed class UltimateDataManagementPlugin : DataManagementPluginBase, IDi
     {
         var metadata = base.GetMetadata();
         metadata["TotalStrategies"] = _registry.Count;
-        metadata["DeduplicationStrategies"] = GetStrategiesByCategory(DataManagementCategory.Lifecycle).Count;
+        metadata["LifecycleStrategies"] = GetStrategiesByCategory(DataManagementCategory.Lifecycle).Count;
         metadata["CachingStrategies"] = GetStrategiesByCategory(DataManagementCategory.Caching).Count;
         metadata["IndexingStrategies"] = GetStrategiesByCategory(DataManagementCategory.Indexing).Count;
         metadata["VersioningStrategies"] = GetStrategiesByCategory(DataManagementCategory.Versioning).Count;
