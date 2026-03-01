@@ -881,11 +881,18 @@ public sealed class ChangelogStateStrategy : StreamingDataStrategyBase
         {
             entriesBefore = store.Changelog.Count;
 
-            // Keep only the latest entry for each key
-            var compacted = store.Changelog
-                .GroupBy(e => e.Key)
-                .Select(g => g.OrderByDescending(e => e.SequenceNumber).First())
-                .Where(e => e.Operation != ChangeOperation.Delete) // Remove tombstones
+            // Finding 4364: replace O(n log n) GroupBy+OrderByDescending with a single O(n) forward pass.
+            // Walk the changelog once; keep the highest-sequence entry per key using a Dictionary<string, ChangelogEntry>.
+            var latest = new Dictionary<string, ChangelogEntry>(entriesBefore);
+            foreach (var entry in store.Changelog)
+            {
+                if (!latest.TryGetValue(entry.Key, out var existing) || entry.SequenceNumber > existing.SequenceNumber)
+                    latest[entry.Key] = entry;
+            }
+
+            // Remove tombstones (Delete operations) and sort by sequence for deterministic replay.
+            var compacted = latest.Values
+                .Where(e => e.Operation != ChangeOperation.Delete)
                 .OrderBy(e => e.SequenceNumber)
                 .ToList();
 

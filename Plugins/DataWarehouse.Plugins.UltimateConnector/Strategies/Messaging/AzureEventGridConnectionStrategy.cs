@@ -62,19 +62,13 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
             response.EnsureSuccessStatusCode();
         }
 
-        public override async IAsyncEnumerable<byte[]> SubscribeAsync(IConnectionHandle handle, string topic, string? consumerGroup = null, [EnumeratorCancellation] CancellationToken ct = default)
+        public override IAsyncEnumerable<byte[]> SubscribeAsync(IConnectionHandle handle, string topic, string? consumerGroup = null, CancellationToken ct = default)
         {
-            // Azure Event Grid is push-based and delivers events to webhooks/endpoints
-            // Direct pull subscription is not supported via REST API
-            // To receive events, configure an Event Grid subscription with a webhook or Azure Function
-            // This implementation indicates the limitation and yields nothing
-            while (!ct.IsCancellationRequested)
-            {
-                await Task.Delay(5000, ct);
-                // Event Grid requires webhook endpoints for event delivery
-                // Use Azure Service Bus or Storage Queue as dead-letter for pull-based consumption
-                yield break;
-            }
+            // Finding 2024: SubscribeAsync must throw NotSupportedException rather than yield break
+            // after a 5s delay. Azure Event Grid is push-based; configure a webhook or Azure Function.
+            throw new NotSupportedException(
+                "Azure Event Grid does not support pull-based subscriptions. " +
+                "Configure an Event Grid subscription with a webhook endpoint or Azure Service Bus for pull-based consumption.");
         }
     }
 }

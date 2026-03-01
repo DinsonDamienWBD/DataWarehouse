@@ -214,12 +214,20 @@ namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies
         }
 
         /// <inheritdoc/>
+        /// <remarks>
+        /// Finding 4370: MQTT brokers do not expose a topic-existence API. MQTT topics are created
+        /// implicitly on first publish/subscribe and cannot be queried without subscribing.
+        /// This method returns <see langword="true"/> when this client is subscribed to
+        /// <paramref name="streamName"/>, which is the closest proxy available in the MQTT protocol.
+        /// Callers that need broker-level discovery must use MQTT v5 topic aliases or a
+        /// broker-specific management API.
+        /// </remarks>
         public override Task<bool> StreamExistsAsync(string streamName, CancellationToken ct = default)
         {
             ValidateStreamName(streamName);
 
-            // MQTT topics exist implicitly (no explicit creation required)
-            // Return true if we're subscribed to it
+            // MQTT topics exist implicitly — no broker-side existence query is possible via the protocol.
+            // Return true if this client is currently subscribed to the topic.
             lock (_topicsLock)
             {
                 return Task.FromResult(_subscribedTopics.Contains(streamName));
@@ -297,8 +305,17 @@ namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies
 
             if (disposing)
             {
-                // Don't call async dispose from sync Dispose
-                // User must call DisposeAsync() for proper cleanup
+                // Finding 4354: release _mqttClient on the synchronous dispose path.
+                // Prefer IDisposable if the concrete implementation supports it; otherwise
+                // block on the async dispose to avoid leaking the underlying socket/resource.
+                if (_mqttClient is IDisposable syncClient)
+                {
+                    syncClient.Dispose();
+                }
+                else if (_mqttClient != null)
+                {
+                    _mqttClient.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                }
             }
 
             _disposed = true;

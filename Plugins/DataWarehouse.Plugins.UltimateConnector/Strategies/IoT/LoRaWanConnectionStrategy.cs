@@ -46,8 +46,14 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
             });
         }
 
-        protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) =>
-            Task.FromResult(handle.GetConnection<TcpClient>().Connected);
+        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        {
+            // Finding 1919: Use live socket probe instead of stale Connected flag.
+            var client = handle.GetConnection<TcpClient>();
+            if (!client.Connected) return false;
+            try { await client.GetStream().WriteAsync(Array.Empty<byte>(), ct); return true; }
+            catch { return false; }
+        }
 
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
@@ -55,9 +61,15 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
             return Task.CompletedTask;
         }
 
-        protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) =>
-            Task.FromResult(new ConnectionHealth(handle.GetConnection<TcpClient>().Connected,
-                $"LoRaWAN network server ({_devices.Count} devices registered)", TimeSpan.Zero, DateTimeOffset.UtcNow));
+        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var isHealthy = await TestCoreAsync(handle, ct);
+            sw.Stop();
+            return new ConnectionHealth(isHealthy,
+                isHealthy ? $"LoRaWAN network server connected ({_devices.Count} devices registered)" : "LoRaWAN network server disconnected",
+                sw.Elapsed, DateTimeOffset.UtcNow);
+        }
 
         public override Task<Dictionary<string, object>> ReadTelemetryAsync(IConnectionHandle handle, string deviceId, CancellationToken ct = default)
         {

@@ -45,6 +45,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
                 throw new InvalidOperationException("RocketMQ connection is not established");
             var stream = client.GetStream();
             // Send PULL_MESSAGE request
+            var retryCount = 0;
             while (!ct.IsCancellationRequested && client.Connected)
             {
                 var requestId = Interlocked.Increment(ref _requestId);
@@ -73,7 +74,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
                 catch (Exception) when (ct.IsCancellationRequested) { shouldBreak = true; }
                 if (shouldBreak) break;
                 if (messageData != null) yield return messageData;
-                await Task.Delay(100, ct);
+                // Finding 2021: Replace busy-poll with adaptive back-off: yield immediately if data arrived,
+                // then back off up to 1 second when idle to avoid capping throughput at 10 batches/sec.
+                if (messageData == null) await Task.Delay(Math.Min(100 * (1 << Math.Min(retryCount++, 4)), 1000), ct);
+                else retryCount = 0;
             }
         }
 

@@ -23,7 +23,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
             _httpClient = new HttpClient { BaseAddress = new Uri(endpoint), Timeout = config.Timeout };
             if (!string.IsNullOrEmpty(config.AuthCredential))
                 _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", config.AuthCredential);
-            return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object> { ["account"] = config.ConnectionString, ["warehouse"] = "COMPUTE_WH" });
+            // Finding 1846: Read warehouse from config.Properties; fall back to COMPUTE_WH only when absent.
+            var warehouse = config.Properties.TryGetValue("Warehouse", out var wh) && wh != null
+                ? wh.ToString()!
+                : "COMPUTE_WH";
+            return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object> { ["account"] = config.ConnectionString, ["warehouse"] = warehouse });
         }
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {

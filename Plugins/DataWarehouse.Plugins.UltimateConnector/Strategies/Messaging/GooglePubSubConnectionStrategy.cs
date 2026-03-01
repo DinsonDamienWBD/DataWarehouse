@@ -61,15 +61,19 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
             var pullUrl = $"/v1/{subscription}:pull";
             if (!subscription.StartsWith("projects/") && !string.IsNullOrEmpty(projectId))
                 pullUrl = $"/v1/projects/{projectId}/subscriptions/{subscription}:pull";
+            // Finding 2026: Cache the serialized bytes to avoid re-serializing the constant body on every poll.
+            // HttpClient disposes each HttpContent after sending so we must create a new instance per request,
+            // but we avoid the JSON serialization overhead by reusing the pre-computed byte array.
+            var pullBodyBytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { maxMessages = 10 }));
+            var retryCount = 0;
             while (!ct.IsCancellationRequested)
             {
                 List<byte[]>? collectedMessages = null;
                 bool shouldBreak = false;
                 try
                 {
-                    var requestBody = new { maxMessages = 10 };
-                    var json = JsonSerializer.Serialize(requestBody);
-                    var content = new StringContent(json, Encoding.UTF8, "application/json");
+                    using var content = new ByteArrayContent(pullBodyBytes);
+                    content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json") { CharSet = "utf-8" };
                     using var response = await httpClient.PostAsync(pullUrl, content, ct);
                     if (response.IsSuccessStatusCode)
                     {
@@ -89,7 +93,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
                             }
                         }
                     }
-                    await Task.Delay(100, ct);
+                    // Adaptive back-off: yield quickly if messages received, back off when idle.
+                    if (collectedMessages == null || collectedMessages.Count == 0)
+                        await Task.Delay(Math.Min(100 * (1 << Math.Min(retryCount++, 4)), 1000), ct);
+                    else
+                        retryCount = 0;
                 }
                 catch (Exception) when (ct.IsCancellationRequested) { shouldBreak = true; }
                 if (shouldBreak) break;

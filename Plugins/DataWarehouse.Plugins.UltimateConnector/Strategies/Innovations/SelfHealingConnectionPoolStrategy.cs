@@ -237,7 +237,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             {
                 metrics.ConsecutiveFailures = 0;
                 if (metrics.CircuitState == CircuitState.HalfOpen)
+                {
                     metrics.CircuitState = CircuitState.Closed;
+                    // Finding 1972: Increment on actual recovery, not on degradation detection.
+                    metrics.TotalHealedConnections++;
+                }
             }
             else
             {
@@ -250,10 +254,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 }
             }
 
-            if (metrics.EmaLatencyMs > metrics.DegradationThresholdMs && metrics.EnablePredictiveScaling)
-            {
-                metrics.TotalHealedConnections++;
-            }
+            // Finding 1972: TotalHealedConnections should increment on actual recovery (HalfOpen→Closed),
+            // not on degradation detection. Moved increment to the circuit recovery path above.
+            // (Increment is now inside the success branch when CircuitState transitions from HalfOpen to Closed.)
         }
 
         /// <summary>

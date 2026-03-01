@@ -14,6 +14,8 @@ public sealed class KafkaConsumerGroupManager
 {
     private readonly BoundedDictionary<string, ConsumerGroupState> _groups = new BoundedDictionary<string, ConsumerGroupState>(1000);
     private readonly BoundedDictionary<string, ConsumerMemberState> _members = new BoundedDictionary<string, ConsumerMemberState>(1000);
+    // Finding 4395: topic -> partition count, configurable per-topic (default 12 matches Kafka default).
+    private readonly BoundedDictionary<string, int> _topicPartitionCounts = new BoundedDictionary<string, int>(1000);
     private readonly object _rebalanceLock = new();
 
     /// <summary>Registers a new consumer in a consumer group and triggers rebalance.</summary>
@@ -57,6 +59,17 @@ public sealed class KafkaConsumerGroupManager
                 Assignments = assignments.GetValueOrDefault(memberId, [])
             };
         }
+    }
+
+    /// <summary>
+    /// Registers the partition count for a topic so assignment reflects the actual topology.
+    /// Must be called when a topic is created or its partition count changes.
+    /// </summary>
+    public void RegisterTopicPartitionCount(string topic, int partitionCount)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(topic);
+        if (partitionCount < 1) throw new ArgumentOutOfRangeException(nameof(partitionCount), "Partition count must be >= 1.");
+        _topicPartitionCounts[topic] = partitionCount;
     }
 
     /// <summary>Removes a consumer from a group and triggers rebalance.</summary>
@@ -121,8 +134,9 @@ public sealed class KafkaConsumerGroupManager
         int memberIdx = 0;
         foreach (var topic in allTopics)
         {
-            // Default 12 partitions per topic
-            for (int p = 0; p < 12; p++)
+            // Finding 4395: use configured partition count for this topic; fall back to Kafka default (12).
+            var partitionCount = _topicPartitionCounts.GetOrAdd(topic, _ => 12);
+            for (int p = 0; p < partitionCount; p++)
             {
                 var eligibleMembers = members.Where(m => m.Value.SubscribedTopics.Contains(topic)).ToList();
                 if (eligibleMembers.Count == 0) continue;

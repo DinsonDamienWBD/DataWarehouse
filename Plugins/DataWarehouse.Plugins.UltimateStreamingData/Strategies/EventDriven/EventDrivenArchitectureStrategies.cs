@@ -117,13 +117,14 @@ public sealed class EventSourcingStrategy : StreamingDataStrategyBase
             }
 
             RecordOperation("AppendEvents");
+            // Finding 4398: guard against empty storedEvents before calling First/Last.
             return Task.FromResult(new AppendResult
             {
                 StreamId = streamId,
                 NewVersion = stream.Version,
                 EventsAppended = storedEvents.Count,
-                FirstEventSequence = storedEvents.First().GlobalSequence,
-                LastEventSequence = storedEvents.Last().GlobalSequence
+                FirstEventSequence = storedEvents.Count > 0 ? storedEvents[0].GlobalSequence : 0L,
+                LastEventSequence = storedEvents.Count > 0 ? storedEvents[^1].GlobalSequence : 0L
             });
         }
     }

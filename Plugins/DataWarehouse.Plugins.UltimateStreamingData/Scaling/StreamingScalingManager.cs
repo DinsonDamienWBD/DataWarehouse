@@ -210,6 +210,7 @@ public sealed class StreamingScalingManager : IScalableSubsystem, IDisposable
         }
 
         // Adjust buffer sizes via backpressure handler
+        // Finding 4334/4335: removed trailing `await Task.CompletedTask` — no-op state machine allocation.
         await _backpressureHandler.ApplyBackpressureAsync(
             new BackpressureContext(
                 CurrentLoad: Interlocked.Read(ref _publishCount),
@@ -217,8 +218,6 @@ public sealed class StreamingScalingManager : IScalableSubsystem, IDisposable
                 QueueDepth: _backpressureHandler.CurrentQueueDepth,
                 LatencyP99: GetAverageLatencyMs()),
             ct).ConfigureAwait(false);
-
-        await Task.CompletedTask;
     }
 
     /// <inheritdoc/>
@@ -266,6 +265,11 @@ public sealed class StreamingScalingManager : IScalableSubsystem, IDisposable
 
         var channel = _partitionChannels[partition];
 
+        // Finding 4327: write to the local partition channel FIRST so local consumers never miss
+        // an event that the bus already received. If the channel write fails the whole publish
+        // fails before the bus publish, keeping both sides consistent.
+        await channel.Writer.WriteAsync(@event, ct).ConfigureAwait(false);
+
         // Dispatch to message bus via active strategy if available
         if (_messageBus != null)
         {
@@ -296,9 +300,6 @@ public sealed class StreamingScalingManager : IScalableSubsystem, IDisposable
                 throw;
             }
         }
-
-        // Write to partition channel for local consumers
-        await channel.Writer.WriteAsync(@event, ct).ConfigureAwait(false);
 
         Interlocked.Increment(ref _publishCount);
         var elapsed = Environment.TickCount64 - startTicks;

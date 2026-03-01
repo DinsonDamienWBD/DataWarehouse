@@ -70,6 +70,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
             if (client == null || !client.Connected)
                 throw new InvalidOperationException("Amazon MSK connection is not established");
             var stream = client.GetStream();
+            var retryCount = 0;
             while (!ct.IsCancellationRequested && client.Connected)
             {
                 using var ms = new System.IO.MemoryStream();
@@ -98,14 +99,17 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
                 var read = await stream.ReadAsync(respLengthBuf, 0, 4, ct);
                 if (read < 4) break;
                 var respLength = System.Net.IPAddress.NetworkToHostOrder(BitConverter.ToInt32(respLengthBuf, 0));
+                bool hadData = false;
                 if (respLength > 0 && respLength < 10 * 1024 * 1024)
                 {
                     var respBuf = new byte[respLength];
                     var totalRead = 0;
                     while (totalRead < respLength) { var chunk = await stream.ReadAsync(respBuf, totalRead, respLength - totalRead, ct); if (chunk == 0) break; totalRead += chunk; }
-                    if (totalRead > 8) yield return respBuf;
+                    if (totalRead > 8) { yield return respBuf; hadData = true; }
                 }
-                await Task.Delay(100, ct);
+                // Finding 2021: Adaptive back-off — yield quickly when messages present, back off when idle.
+                if (!hadData) await Task.Delay(Math.Min(100 * (1 << Math.Min(retryCount++, 4)), 1000), ct);
+                else retryCount = 0;
             }
         }
 

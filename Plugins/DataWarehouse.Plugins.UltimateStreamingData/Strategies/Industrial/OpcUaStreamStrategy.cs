@@ -235,13 +235,20 @@ internal sealed class OpcUaStreamStrategy : StreamingDataStrategyBase
     public override string[] Tags => ["opc-ua", "industrial", "scada", "plc", "automation", "iec-62541"];
 
     /// <summary>
-    /// Establishes a session with an OPC UA server.
+    /// Registers an OPC UA session configuration and allocates session state for subsequent operations.
     /// </summary>
+    /// <remarks>
+    /// Finding 4387: this method validates the endpoint URL and security configuration but does not
+    /// open a TCP channel, perform the OPC UA Hello/Acknowledge handshake, or negotiate certificates.
+    /// The security mode advertised by <paramref name="config"/> (e.g. <c>SignAndEncrypt</c>) is
+    /// stored for reference only — actual TLS/certificate negotiation requires an OPC UA stack
+    /// such as UA-.NET Standard. The session ID returned here is used as an in-process correlation
+    /// key for subscriptions, node reads, and writes provided by this strategy.
+    /// </remarks>
     /// <param name="config">Session connection parameters.</param>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns>A session identifier for subsequent operations.</returns>
+    /// <returns>A session identifier for subsequent in-process operations.</returns>
     /// <exception cref="ArgumentNullException">Thrown when config or EndpointUrl is null.</exception>
-    /// <exception cref="InvalidOperationException">Thrown when connection fails.</exception>
     public Task<string> ConnectSessionAsync(OpcUaSessionConfig config, CancellationToken ct = default)
     {
         ThrowIfNotInitialized();

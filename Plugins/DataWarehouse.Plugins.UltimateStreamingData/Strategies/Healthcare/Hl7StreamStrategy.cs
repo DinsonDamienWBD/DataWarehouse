@@ -275,11 +275,19 @@ internal sealed class Hl7StreamStrategy : StreamingDataStrategyBase
     public override string[] Tags => ["hl7", "healthcare", "mllp", "clinical", "ehr", "patient-data"];
 
     /// <summary>
-    /// Establishes an MLLP connection to an HL7 receiver.
+    /// Registers an MLLP connection configuration and allocates a message queue for it.
     /// </summary>
+    /// <remarks>
+    /// Finding 4386: this method does not open a TCP socket or establish a physical MLLP connection.
+    /// It stores the connection parameters and prepares an in-process message queue so that
+    /// <see cref="SendMessageAsync"/> can enqueue HL7 messages for processing.
+    /// A real network MLLP connection requires a TcpClient to <paramref name="config"/>
+    /// <c>Host:Port</c> with the standard 0x0B / 0x1C 0x0D MLLP framing; that layer is
+    /// the responsibility of the transport adapter using this strategy.
+    /// </remarks>
     /// <param name="config">MLLP connection configuration.</param>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns>A connection identifier.</returns>
+    /// <returns>A connection identifier for subsequent send/receive operations.</returns>
     public Task<string> ConnectAsync(MllpConnectionConfig config, CancellationToken ct = default)
     {
         ThrowIfNotInitialized();

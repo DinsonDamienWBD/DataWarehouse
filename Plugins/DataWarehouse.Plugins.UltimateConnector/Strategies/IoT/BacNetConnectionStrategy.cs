@@ -60,10 +60,21 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
         }
 
         /// <inheritdoc/>
-        protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
+            // Finding 1969: UDP has no connection state — probe by sending a WhoIs broadcast
+            // (BACnet service 8) and treating success as reachable endpoint configured.
+            // UdpClient.Client.Connected is always true after Connect() regardless of device presence.
             var client = handle.GetConnection<UdpClient>();
-            return Task.FromResult(client.Client?.Connected ?? false);
+            if (client.Client == null) return false;
+            try
+            {
+                // WhoIs (unconfirmed service 0x10=16) minimal BACnet/IP BVLL packet
+                var whoIs = new byte[] { 0x81, 0x0A, 0x00, 0x0C, 0x01, 0x20, 0xFF, 0xFF, 0x00, 0xFF, 0x10, 0x08 };
+                await client.SendAsync(whoIs, whoIs.Length).WaitAsync(ct);
+                return true;
+            }
+            catch { return false; }
         }
 
         /// <inheritdoc/>
@@ -76,16 +87,16 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
         }
 
         /// <inheritdoc/>
-        protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
-            var client = handle.GetConnection<UdpClient>();
-            var isHealthy = client.Client?.Connected ?? false;
-
-            return Task.FromResult(new ConnectionHealth(
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var isHealthy = await TestCoreAsync(handle, ct);
+            sw.Stop();
+            return new ConnectionHealth(
                 IsHealthy: isHealthy,
-                StatusMessage: isHealthy ? "BACnet device connected" : "BACnet device disconnected",
-                Latency: TimeSpan.Zero,
-                CheckedAt: DateTimeOffset.UtcNow));
+                StatusMessage: isHealthy ? "BACnet endpoint reachable" : "BACnet endpoint unreachable",
+                Latency: sw.Elapsed,
+                CheckedAt: DateTimeOffset.UtcNow);
         }
 
         /// <inheritdoc/>

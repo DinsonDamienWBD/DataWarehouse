@@ -159,10 +159,21 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
         }
 
         /// <inheritdoc/>
-        protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
+            // Finding 1969: UDP has no real connection state — probe by sending a CoAP ping
+            // (CON with empty payload, type=0, code=0, token-length=0) and verifying send succeeds.
             var client = handle.GetConnection<UdpClient>();
-            return Task.FromResult(client.Client?.Connected ?? false);
+            if (client.Client == null) return false;
+            try
+            {
+                var msgId = GetNextMessageId();
+                // CoAP CON ping: Ver=1, T=0(CON), TKL=0, Code=0.00, MsgId
+                var ping = new byte[] { 0x40, 0x00, (byte)(msgId >> 8), (byte)(msgId & 0xFF) };
+                await client.SendAsync(ping, ping.Length).WaitAsync(ct);
+                return true;
+            }
+            catch { return false; }
         }
 
         /// <inheritdoc/>
@@ -175,16 +186,16 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
         }
 
         /// <inheritdoc/>
-        protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
-            var client = handle.GetConnection<UdpClient>();
-            var isHealthy = client.Client?.Connected ?? false;
-
-            return Task.FromResult(new ConnectionHealth(
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var isHealthy = await TestCoreAsync(handle, ct);
+            sw.Stop();
+            return new ConnectionHealth(
                 IsHealthy: isHealthy,
-                StatusMessage: isHealthy ? "CoAP device connected" : "CoAP device disconnected",
-                Latency: TimeSpan.Zero,
-                CheckedAt: DateTimeOffset.UtcNow));
+                StatusMessage: isHealthy ? "CoAP endpoint reachable" : "CoAP endpoint unreachable",
+                Latency: sw.Elapsed,
+                CheckedAt: DateTimeOffset.UtcNow);
         }
 
         /// <inheritdoc/>

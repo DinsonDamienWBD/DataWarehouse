@@ -34,7 +34,19 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
             var eventBusName = topic.Contains("/") ? topic.Split('/')[^1] : topic;
             var source = headers?.GetValueOrDefault("Source") ?? "datawarehouse.connector";
             var detailType = headers?.GetValueOrDefault("DetailType") ?? "DataWarehouseEvent";
-            var detail = Encoding.UTF8.GetString(message);
+            // Finding 2023: Binary data embedded via UTF-8 decoding can corrupt the payload.
+            // Attempt to parse as JSON; fall back to base64 for binary payloads.
+            string detail;
+            try
+            {
+                var decoded = Encoding.UTF8.GetString(message);
+                using var _ = System.Text.Json.JsonDocument.Parse(decoded);
+                detail = decoded; // valid JSON
+            }
+            catch
+            {
+                detail = Convert.ToBase64String(message); // binary — base64 encode
+            }
             var requestBody = new
             {
                 Entries = new[]
@@ -56,24 +68,14 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
             response.EnsureSuccessStatusCode();
         }
 
-        public override async IAsyncEnumerable<byte[]> SubscribeAsync(IConnectionHandle handle, string topic, string? consumerGroup = null, [EnumeratorCancellation] CancellationToken ct = default)
+        public override IAsyncEnumerable<byte[]> SubscribeAsync(IConnectionHandle handle, string topic, string? consumerGroup = null, CancellationToken ct = default)
         {
-            // AWS EventBridge does not support pull-based subscription via REST API
-            // Events are delivered via configured rules to targets (Lambda, SQS, etc.)
-            // This implementation polls for rule existence as a heartbeat and yields nothing
-            // In production, you would configure an SQS queue as a target and poll that
-            var httpClient = handle.GetConnection<HttpClient>();
-            if (httpClient == null)
-                throw new InvalidOperationException("AWS EventBridge connection is not established");
-            while (!ct.IsCancellationRequested)
-            {
-                // EventBridge is push-based; no messages to pull directly
-                // Yield break after indicating the limitation
-                await Task.Delay(5000, ct);
-                // To make this useful, users should configure SQS as a target
-                // and use the SQS connector for consumption
-                yield break;
-            }
+            // Finding 2024: SubscribeAsync must throw NotSupportedException rather than yield break
+            // after a 5s delay. EventBridge is push-based; configure SQS as a target and use
+            // the AwsSqsConnectionStrategy for pull-based consumption.
+            throw new NotSupportedException(
+                "AWS EventBridge does not support pull-based subscriptions. " +
+                "Configure an SQS queue as a rule target and use AwsSqsConnectionStrategy to consume events.");
         }
     }
 }

@@ -353,7 +353,7 @@ internal sealed class KinesisStreamStrategy : StreamingDataStrategyBase
             throw new InvalidOperationException($"Stream '{streamName}' not found.");
 
         // Route to shard using MD5 hash of partition key
-        var shard = RoutToShard(streamName, partitionKey, explicitHashKey);
+        var shard = RouteToShard(streamName, partitionKey, explicitHashKey);
         var shardKey = $"{streamName}:{shard.ShardId}";
 
         // Generate sequence number
@@ -712,7 +712,8 @@ internal sealed class KinesisStreamStrategy : StreamingDataStrategyBase
         return shards;
     }
 
-    private KinesisShard RoutToShard(string streamName, string partitionKey, string? explicitHashKey)
+    // Finding 4396: fixed method name typo RoutToShard -> RouteToShard.
+    private KinesisShard RouteToShard(string streamName, string partitionKey, string? explicitHashKey)
     {
         if (!_shards.TryGetValue(streamName, out var shards))
             throw new InvalidOperationException($"Stream '{streamName}' not found.");

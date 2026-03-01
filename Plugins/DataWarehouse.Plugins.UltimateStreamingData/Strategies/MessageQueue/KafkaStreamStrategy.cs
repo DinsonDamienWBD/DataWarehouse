@@ -225,8 +225,12 @@ internal sealed class KafkaStreamStrategy : StreamingDataStrategyBase, IStreamin
             foreach (var msg in snapshot.Where(m => (m.Offset ?? 0) >= startOffset))
             {
                 ct.ThrowIfCancellationRequested();
+                var readStart = System.Diagnostics.Stopwatch.GetTimestamp();
                 Interlocked.Increment(ref _totalConsumed);
-                RecordRead(msg.Data.Length, 0.1);
+                // Finding 4355: use actual elapsed time instead of hardcoded 0.1 ms.
+                var readElapsedMs = (System.Diagnostics.Stopwatch.GetTimestamp() - readStart)
+                    * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+                RecordRead(msg.Data.Length, readElapsedMs);
 
                 // Auto-commit offset if enabled
                 if (options?.AutoCommit != false)

@@ -103,9 +103,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             var client = new HttpClient(handler)
             {
                 BaseAddress = new Uri(targetEndpoint),
+                // Finding 1946: Timeout.TotalSeconds may be zero or negative — clamp to at least 1s.
                 Timeout = powerState.IsOnBattery
-                    ? TimeSpan.FromSeconds(Math.Min(config.Timeout.TotalSeconds, 10))
-                    : config.Timeout
+                    ? TimeSpan.FromSeconds(Math.Clamp(config.Timeout.TotalSeconds, 1, 10))
+                    : config.Timeout.TotalSeconds > 0 ? config.Timeout : TimeSpan.FromSeconds(30)
             };
 
             var handshakePayload = new Dictionary<string, object>

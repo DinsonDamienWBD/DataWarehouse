@@ -160,9 +160,15 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
         /// <inheritdoc/>
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
-            var client = handle.GetConnection<HttpClient>();
-            using var response = await client.SendAsync(new HttpRequestMessage(HttpMethod.Head, "/"), ct);
-            return response.IsSuccessStatusCode;
+            // Finding 1924: Catch network errors and return false (health check contract).
+            try
+            {
+                var client = handle.GetConnection<HttpClient>();
+                using var response = await client.SendAsync(new HttpRequestMessage(HttpMethod.Head, "/"), ct);
+                return response.IsSuccessStatusCode;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch { return false; }
         }
 
         /// <inheritdoc/>
@@ -222,8 +228,24 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 probeClient.DefaultRequestVersion = new Version(3, 0);
 
             var sw = Stopwatch.StartNew();
-            var response = await probeClient.SendAsync(
-                new HttpRequestMessage(HttpMethod.Options, "/"), cts.Token);
+            HttpResponseMessage response;
+            // Finding 1922: WebSocket probe must use Upgrade handshake, not OPTIONS.
+            // OPTIONS cannot determine actual WebSocket support — server may accept OPTIONS but reject Upgrade.
+            if (protocol == "websocket")
+            {
+                var wsRequest = new HttpRequestMessage(HttpMethod.Get, "/");
+                wsRequest.Headers.TryAddWithoutValidation("Upgrade", "websocket");
+                wsRequest.Headers.TryAddWithoutValidation("Connection", "Upgrade");
+                wsRequest.Headers.TryAddWithoutValidation("Sec-WebSocket-Key", Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16)));
+                wsRequest.Headers.TryAddWithoutValidation("Sec-WebSocket-Version", "13");
+                response = await probeClient.SendAsync(wsRequest, cts.Token);
+                // 101 Switching Protocols = WebSocket supported; 400/426 = rejected
+                sw.Stop();
+                var wsScore = CalculateProtocolScore(protocol, sw.Elapsed, response);
+                return new ProbeResult((int)response.StatusCode == 101, sw.Elapsed, wsScore);
+            }
+            response = await probeClient.SendAsync(
+                new HttpRequestMessage(HttpMethod.Get, "/"), cts.Token);
             sw.Stop();
 
             var score = CalculateProtocolScore(protocol, sw.Elapsed, response);
