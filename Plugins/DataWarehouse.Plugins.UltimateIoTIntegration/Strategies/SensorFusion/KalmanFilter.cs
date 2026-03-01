@@ -11,11 +11,15 @@ namespace DataWarehouse.Plugins.UltimateIoTIntegration.Strategies.SensorFusion;
 public sealed class KalmanFilter
 {
     private KalmanState? _state;
+    private readonly object _stateLock = new();
 
     /// <summary>
     /// Gets whether the filter has been initialized with an initial position.
     /// </summary>
-    public bool IsInitialized => _state != null;
+    public bool IsInitialized
+    {
+        get { lock (_stateLock) { return _state != null; } }
+    }
 
     /// <summary>
     /// Initializes the Kalman filter with an initial position.
@@ -66,7 +70,10 @@ public sealed class KalmanFilter
             r[i, i] = 1.0; // Measurement noise
         }
 
-        _state = new KalmanState(x, p, f, h, q, r);
+        lock (_stateLock)
+        {
+            _state = new KalmanState(x, p, f, h, q, r);
+        }
     }
 
     /// <summary>
@@ -75,25 +82,28 @@ public sealed class KalmanFilter
     /// <param name="dt">Time step in seconds.</param>
     public void Predict(double dt)
     {
-        if (_state == null)
-            throw new InvalidOperationException("Filter not initialized");
+        lock (_stateLock)
+        {
+            if (_state == null)
+                throw new InvalidOperationException("Filter not initialized");
 
-        // Update state transition matrix with time step
-        // F = [I3  dt*I3]
-        //     [0   I3   ]
-        var f = Matrix.Identity(6);
-        f[0, 3] = dt; // x += vx * dt
-        f[1, 4] = dt; // y += vy * dt
-        f[2, 5] = dt; // z += vz * dt
+            // Update state transition matrix with time step
+            // F = [I3  dt*I3]
+            //     [0   I3   ]
+            var f = Matrix.Identity(6);
+            f[0, 3] = dt; // x += vx * dt
+            f[1, 4] = dt; // y += vy * dt
+            f[2, 5] = dt; // z += vz * dt
 
-        // Predict state: X = F * X
-        var xPred = Matrix.Multiply(f, _state.X);
+            // Predict state: X = F * X
+            var xPred = Matrix.Multiply(f, _state.X);
 
-        // Predict covariance: P = F * P * F^T + Q
-        var fPfT = Matrix.Multiply(Matrix.Multiply(f, _state.P), Matrix.Transpose(f));
-        var pPred = Matrix.Add(fPfT, _state.Q);
+            // Predict covariance: P = F * P * F^T + Q
+            var fPfT = Matrix.Multiply(Matrix.Multiply(f, _state.P), Matrix.Transpose(f));
+            var pPred = Matrix.Add(fPfT, _state.Q);
 
-        _state = _state with { X = xPred, P = pPred, F = f };
+            _state = _state with { X = xPred, P = pPred, F = f };
+        }
     }
 
     /// <summary>
@@ -103,44 +113,47 @@ public sealed class KalmanFilter
     /// <param name="measurementNoise">Measurement noise variances [σx², σy², σz²].</param>
     public void Update(double[] measurement, double[] measurementNoise)
     {
-        if (_state == null)
-            throw new InvalidOperationException("Filter not initialized");
-
         if (measurement.Length != 3)
             throw new ArgumentException("Measurement must have 3 elements [x, y, z]");
 
         if (measurementNoise.Length != 3)
             throw new ArgumentException("Measurement noise must have 3 elements");
 
-        // Update measurement noise covariance
-        var r = Matrix.Identity(3);
-        r[0, 0] = measurementNoise[0];
-        r[1, 1] = measurementNoise[1];
-        r[2, 2] = measurementNoise[2];
+        lock (_stateLock)
+        {
+            if (_state == null)
+                throw new InvalidOperationException("Filter not initialized");
 
-        // Innovation: y = z - H * X
-        var z = Matrix.FromArray(measurement);
-        var hx = Matrix.Multiply(_state.H, _state.X);
-        var y = Matrix.Subtract(z, hx);
+            // Update measurement noise covariance
+            var r = Matrix.Identity(3);
+            r[0, 0] = measurementNoise[0];
+            r[1, 1] = measurementNoise[1];
+            r[2, 2] = measurementNoise[2];
 
-        // Innovation covariance: S = H * P * H^T + R
-        var hpht = Matrix.Multiply(Matrix.Multiply(_state.H, _state.P), Matrix.Transpose(_state.H));
-        var s = Matrix.Add(hpht, r);
+            // Innovation: y = z - H * X
+            var z = Matrix.FromArray(measurement);
+            var hx = Matrix.Multiply(_state.H, _state.X);
+            var y = Matrix.Subtract(z, hx);
 
-        // Kalman gain: K = P * H^T * S^-1
-        var sInv = Matrix.Inverse(s);
-        var k = Matrix.Multiply(Matrix.Multiply(_state.P, Matrix.Transpose(_state.H)), sInv);
+            // Innovation covariance: S = H * P * H^T + R
+            var hpht = Matrix.Multiply(Matrix.Multiply(_state.H, _state.P), Matrix.Transpose(_state.H));
+            var s = Matrix.Add(hpht, r);
 
-        // Update state: X = X + K * y
-        var xUpd = Matrix.Add(_state.X, Matrix.Multiply(k, y));
+            // Kalman gain: K = P * H^T * S^-1
+            var sInv = Matrix.Inverse(s);
+            var k = Matrix.Multiply(Matrix.Multiply(_state.P, Matrix.Transpose(_state.H)), sInv);
 
-        // Update covariance: P = (I - K * H) * P
-        var i = Matrix.Identity(6);
-        var kh = Matrix.Multiply(k, _state.H);
-        var iMinusKh = Matrix.Subtract(i, kh);
-        var pUpd = Matrix.Multiply(iMinusKh, _state.P);
+            // Update state: X = X + K * y
+            var xUpd = Matrix.Add(_state.X, Matrix.Multiply(k, y));
 
-        _state = _state with { X = xUpd, P = pUpd, R = r };
+            // Update covariance: P = (I - K * H) * P
+            var i = Matrix.Identity(6);
+            var kh = Matrix.Multiply(k, _state.H);
+            var iMinusKh = Matrix.Subtract(i, kh);
+            var pUpd = Matrix.Multiply(iMinusKh, _state.P);
+
+            _state = _state with { X = xUpd, P = pUpd, R = r };
+        }
     }
 
     /// <summary>
@@ -149,15 +162,18 @@ public sealed class KalmanFilter
     /// <returns>Estimated position [x, y, z].</returns>
     public double[] GetEstimate()
     {
-        if (_state == null)
-            throw new InvalidOperationException("Filter not initialized");
-
-        return new double[]
+        lock (_stateLock)
         {
-            _state.X[0, 0],
-            _state.X[1, 0],
-            _state.X[2, 0]
-        };
+            if (_state == null)
+                throw new InvalidOperationException("Filter not initialized");
+
+            return new double[]
+            {
+                _state.X[0, 0],
+                _state.X[1, 0],
+                _state.X[2, 0]
+            };
+        }
     }
 
     /// <summary>
@@ -166,15 +182,18 @@ public sealed class KalmanFilter
     /// <returns>Estimated velocity [vx, vy, vz].</returns>
     public double[] GetVelocity()
     {
-        if (_state == null)
-            throw new InvalidOperationException("Filter not initialized");
-
-        return new double[]
+        lock (_stateLock)
         {
-            _state.X[3, 0],
-            _state.X[4, 0],
-            _state.X[5, 0]
-        };
+            if (_state == null)
+                throw new InvalidOperationException("Filter not initialized");
+
+            return new double[]
+            {
+                _state.X[3, 0],
+                _state.X[4, 0],
+                _state.X[5, 0]
+            };
+        }
     }
 
     /// <summary>
@@ -183,15 +202,18 @@ public sealed class KalmanFilter
     /// <returns>Position variance [σx², σy², σz²].</returns>
     public double[] GetCovariance()
     {
-        if (_state == null)
-            throw new InvalidOperationException("Filter not initialized");
-
-        return new double[]
+        lock (_stateLock)
         {
-            _state.P[0, 0],
-            _state.P[1, 1],
-            _state.P[2, 2]
-        };
+            if (_state == null)
+                throw new InvalidOperationException("Filter not initialized");
+
+            return new double[]
+            {
+                _state.P[0, 0],
+                _state.P[1, 1],
+                _state.P[2, 2]
+            };
+        }
     }
 
     /// <summary>

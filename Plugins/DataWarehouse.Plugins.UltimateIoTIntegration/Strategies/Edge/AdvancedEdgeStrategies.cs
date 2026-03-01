@@ -47,7 +47,7 @@ public sealed class EdgeCachingStrategy : EdgeIntegrationStrategyBase
                 return null;
             }
             _accessOrder[key] = Interlocked.Increment(ref _accessCounter);
-            entry.HitCount++;
+            entry.IncrementHitCount();
             return entry;
         }
         return null;
@@ -144,8 +144,21 @@ public sealed class EdgeCacheEntry
     public DateTimeOffset CachedAt { get; init; }
     public DateTimeOffset? ExpiresAt { get; init; }
     public Dictionary<string, string> Metadata { get; init; } = new();
-    public bool IsDirty { get; set; }
-    public long HitCount { get; set; }
+
+    // volatile ensures cross-thread visibility of bool flag without a full lock.
+    private volatile bool _isDirty;
+    public bool IsDirty
+    {
+        get => _isDirty;
+        set => _isDirty = value;
+    }
+
+    // Backing field for thread-safe increment via Interlocked.
+    private long _hitCount;
+    public long HitCount => Interlocked.Read(ref _hitCount);
+
+    /// <summary>Atomically increments the hit counter.</summary>
+    public void IncrementHitCount() => Interlocked.Increment(ref _hitCount);
 }
 
 /// <summary>Cache mode.</summary>
@@ -333,8 +346,16 @@ public sealed class BandwidthEstimationStrategy : EdgeIntegrationStrategyBase
         while (_samples.Count > _maxSamples)
             _samples.TryDequeue(out _);
 
-        // EWMA (Exponential Weighted Moving Average) with alpha = 0.3
-        _currentEstimateBps = _currentEstimateBps == 0 ? bps : _currentEstimateBps * 0.7 + bps * 0.3;
+        // EWMA (Exponential Weighted Moving Average) with alpha = 0.3.
+        // Use Interlocked for atomic double read+write on 32-bit platforms where
+        // double reads/writes are not guaranteed to be atomic.
+        double current, updated;
+        do
+        {
+            current = Interlocked.CompareExchange(ref _currentEstimateBps, 0.0, 0.0);
+            updated = current == 0.0 ? bps : current * 0.7 + bps * 0.3;
+        }
+        while (Interlocked.CompareExchange(ref _currentEstimateBps, updated, current) != current);
     }
 
     /// <summary>Gets the current bandwidth estimate.</summary>
@@ -350,7 +371,7 @@ public sealed class BandwidthEstimationStrategy : EdgeIntegrationStrategyBase
 
         return new BandwidthEstimate
         {
-            EstimatedBps = _currentEstimateBps,
+            EstimatedBps = Interlocked.CompareExchange(ref _currentEstimateBps, 0.0, 0.0),
             UploadBps = upSamples.Length > 0 ? upSamples.Average(s => s.Bps) : 0,
             DownloadBps = downSamples.Length > 0 ? downSamples.Average(s => s.Bps) : 0,
             Confidence = Math.Min(1.0, recentSamples.Length / 10.0),

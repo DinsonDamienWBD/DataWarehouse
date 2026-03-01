@@ -254,11 +254,16 @@ public class BufferedIngestionStrategy : SensorIngestionStrategyBase
             {
                 if (subscription.DeviceId == null || kvp.Key == subscription.DeviceId)
                 {
+                    // Copy under lock; yield outside the lock — C# does not allow
+                    // yield inside a lock block (compiler error) and holding a lock
+                    // across an async yield point would cause a deadlock anyway.
+                    List<TelemetryMessage> snapshot;
                     lock (kvp.Value)
                     {
-                        foreach (var message in kvp.Value)
-                            yield return message;
+                        snapshot = new List<TelemetryMessage>(kvp.Value);
                     }
+                    foreach (var message in snapshot)
+                        yield return message;
                 }
             }
             await Task.Delay(1000, ct);

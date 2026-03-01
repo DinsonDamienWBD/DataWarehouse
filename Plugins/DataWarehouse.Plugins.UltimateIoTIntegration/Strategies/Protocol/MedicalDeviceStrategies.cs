@@ -125,16 +125,34 @@ public sealed class Hl7V2ProtocolStrategy : ProtocolStrategyBase
         var controlId = Guid.NewGuid().ToString("N")[..20];
 
         sb.AppendLine($"MSH|^~\\&|DataWarehouse|DW_FACILITY|||{now}||ORU^R01|{controlId}|P|2.5.1");
-        sb.AppendLine($"PID|1||{patientId}||{patientName}");
+        sb.AppendLine($"PID|1||{EscapeField(patientId)}||{EscapeField(patientName)}");
 
         var setId = 1;
         foreach (var (obsId, value, units) in observations)
         {
-            sb.AppendLine($"OBX|{setId}|NM|{obsId}||{value}|{units}|||||F");
+            sb.AppendLine($"OBX|{setId}|NM|{EscapeField(obsId)}||{EscapeField(value)}|{EscapeField(units)}|||||F");
             setId++;
         }
 
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// Escapes HL7 v2 delimiter characters in a field value per the escape sequence rules.
+    /// The escape character itself must be escaped first to avoid double-encoding.
+    /// </summary>
+    private string EscapeField(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return value;
+
+        // Order matters: escape the escape char first, then delimiters.
+        return value
+            .Replace(_escapeCharacter.ToString(), $"{_escapeCharacter}E{_escapeCharacter}")
+            .Replace(_fieldSeparator.ToString(), $"{_escapeCharacter}F{_escapeCharacter}")
+            .Replace(_componentSeparator.ToString(), $"{_escapeCharacter}S{_escapeCharacter}")
+            .Replace(_repetitionSeparator.ToString(), $"{_escapeCharacter}R{_escapeCharacter}")
+            .Replace(_subComponentSeparator.ToString(), $"{_escapeCharacter}T{_escapeCharacter}");
     }
 
     private Hl7Segment ParseSegment(string line)

@@ -438,7 +438,10 @@ public class Iec104ProtocolStrategy : ProtocolStrategyBase
 
     private byte[] BuildIFrame(byte[] asdu)
     {
-        var sendSeq = Interlocked.Increment(ref _sendSequence) - 1;
+        // IEC 60870-5-104 sequence numbers are 15-bit (0-32767). Mask after increment
+        // to wrap correctly; without the mask an unbounded int overflows into negative
+        // values which produce invalid APCI control-field bytes.
+        var sendSeq = Interlocked.Increment(ref _sendSequence) & 0x7FFF;
         var recvSeq = _recvSequence;
 
         var frame = new List<byte>
