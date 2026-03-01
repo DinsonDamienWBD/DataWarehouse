@@ -1785,6 +1785,7 @@ public class HierarchicalNamespaceStrategy : UltimateStorageStrategyBase
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
+    public override bool IsProductionReady;;
     public override StorageCapabilities Capabilities;;
     protected override Task InitializeCoreAsync(CancellationToken ct);;
     protected override async Task<StorageObjectMetadata> StoreAsyncCore(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct);
@@ -3030,6 +3031,7 @@ public class NvmeOfStrategy : UltimateStorageStrategyBase
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
+    public override bool IsProductionReady;;
     public override StorageCapabilities Capabilities;;
     public NvmeOfStrategy();
     protected override Task InitializeCoreAsync(CancellationToken ct);
@@ -7770,7 +7772,7 @@ public class EdgeCascadeStrategy : UltimateStorageStrategyBase
     protected override async Task<StorageObjectMetadata> StoreAsyncCore(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct);
     protected override async Task<Stream> RetrieveAsyncCore(string key, CancellationToken ct);
     protected override async Task DeleteAsyncCore(string key, CancellationToken ct);
-    protected override async Task<bool> ExistsAsyncCore(string key, CancellationToken ct);
+    protected override Task<bool> ExistsAsyncCore(string key, CancellationToken ct);
     protected override async IAsyncEnumerable<StorageObjectMetadata> ListAsyncCore(string? prefix, [EnumeratorCancellation] CancellationToken ct);
     protected override async Task<StorageObjectMetadata> GetMetadataAsyncCore(string key, CancellationToken ct);
     protected override async Task<StorageHealthInfo> GetHealthAsyncCore(CancellationToken ct);

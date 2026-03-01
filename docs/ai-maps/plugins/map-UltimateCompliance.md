@@ -6694,7 +6694,7 @@ public sealed class SovereigntyObservabilityStrategy : ComplianceStrategyBase
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Framework;;
-    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
+    public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
     public Task IncrementCounterAsync(string metricName, long value = 1);
     public Task SetGaugeAsync(string metricName, long value);
     public Task RecordDurationAsync(string metricName, double durationMs);
