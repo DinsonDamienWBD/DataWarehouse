@@ -98,7 +98,9 @@ public sealed class PolicyDashboardDataLayer : DataGovernanceStrategyBase
         PolicyStatus? status = null, string? category = null,
         string? createdBy = null, int skip = 0, int take = 100)
     {
-        var query = _policyItems.Values.AsEnumerable();
+        // LOW-3019: Removed redundant AsEnumerable() — _policyItems.Values already implements
+        // IEnumerable<PolicyDashboardItem>; the extra call forced a premature evaluation.
+        IEnumerable<PolicyDashboardItem> query = _policyItems.Values;
         if (status.HasValue) query = query.Where(p => p.Status == status.Value);
         if (category != null) query = query.Where(p => p.Category == category);
         if (createdBy != null) query = query.Where(p => p.CreatedBy == createdBy);

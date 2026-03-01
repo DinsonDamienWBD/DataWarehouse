@@ -24,7 +24,9 @@ public enum PurgeReason
     /// <summary>Data subject or owner explicitly requested deletion.</summary>
     UserRequested,
     /// <summary>Storage reclamation needed and this data is lowest priority.</summary>
-    StorageReclamation
+    StorageReclamation,
+    /// <summary>LOW-2277: No purge recommended — neither toxic data nor retention criteria were met.</summary>
+    NoActionRequired
 }
 
 /// <summary>
@@ -698,10 +700,11 @@ public sealed class AutoPurgeOrchestrator : ConsciousnessStrategyBase
         if (selectedDecision == null)
         {
             IncrementCounter("no_purge_recommended");
+            // LOW-2277: Use NoActionRequired (not ToxicData) — neither strategy triggered purge.
             var noPurge = new PurgeDecision(
                 score.ObjectId,
                 ShouldPurge: false,
-                Reason: PurgeReason.ToxicData,
+                Reason: PurgeReason.NoActionRequired,
                 Urgency: PurgeUrgency.Low,
                 RequiresApproval: false,
                 ApprovalStatus: "not_applicable",
@@ -748,6 +751,18 @@ public sealed class AutoPurgeOrchestrator : ConsciousnessStrategyBase
     /// <returns>A read-only dictionary of all decisions keyed by object ID.</returns>
     public IReadOnlyDictionary<string, PurgeDecision> GetAllDecisions() =>
         new Dictionary<string, PurgeDecision>(_decisions);
+
+    // LOW-2273: Explicit urgency ordering so comparison does not depend on undocumented enum ordinal.
+    // Lower return value = higher urgency (Immediate is most urgent).
+    private static int UrgencyOrder(PurgeUrgency urgency) => urgency switch
+    {
+        PurgeUrgency.Immediate => 0,
+        PurgeUrgency.High => 1,
+        PurgeUrgency.Medium => 2,
+        PurgeUrgency.Low => 3,
+        PurgeUrgency.Scheduled => 4,
+        _ => 5
+    };
 }
 
 #endregion
