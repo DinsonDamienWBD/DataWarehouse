@@ -122,7 +122,7 @@ public sealed class PagerDutyStrategy : ObservabilityStrategyBase
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken ct);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -145,7 +145,7 @@ public sealed class OpsGenieStrategy : ObservabilityStrategyBase
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken ct);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -165,7 +165,7 @@ public sealed class VictorOpsStrategy : ObservabilityStrategyBase
     public async Task SendAlertAsync(string messageType, string entityId, string stateMessage, Dictionary<string, object>? additionalData = null, CancellationToken ct = default);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -185,7 +185,7 @@ public sealed class SensuStrategy : ObservabilityStrategyBase
     public async Task SendCheckAsync(string checkName, int status, string output, CancellationToken ct = default);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -208,7 +208,7 @@ public sealed class AlertManagerStrategy : ObservabilityStrategyBase
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken ct);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
     public class Alert;
 }
@@ -234,7 +234,9 @@ public sealed class KubernetesProbesStrategy : ObservabilityStrategyBase
 }
     public override string StrategyId;;
     public override string Name;;
-    public KubernetesProbesStrategy() : base(new ObservabilityCapabilities(SupportsMetrics: false, SupportsTracing: false, SupportsLogging: false, SupportsDistributedTracing: false, SupportsAlerting: false, SupportedExporters: new[] { "Kubernetes", "K8sProbes", "HTTP" }));
+    public KubernetesProbesStrategy() : base(new ObservabilityCapabilities(SupportsMetrics: false, SupportsTracing: false, SupportsLogging: false, SupportsDistributedTracing: false, // Finding 4614: liveness/readiness probe failures cause Kubernetes to redirect traffic
+// away from the pod and trigger pod restarts — this is alerting/remediation behaviour.
+SupportsAlerting: true, SupportedExporters: new[] { "Kubernetes", "K8sProbes", "HTTP" }));
     public void Configure(string prefix = "http://+:8080/");
     public void StartProbeServer();
     public void StopProbeServer();
@@ -284,7 +286,7 @@ public sealed class ConsulHealthStrategy : ObservabilityStrategyBase
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken ct);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -306,7 +308,7 @@ public sealed class ZabbixStrategy : ObservabilityStrategyBase
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken ct);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -327,7 +329,7 @@ public sealed class NagiosStrategy : ObservabilityStrategyBase
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken ct);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
     public enum NagiosStatus;
 }
@@ -348,7 +350,7 @@ public sealed class IcingaStrategy : ObservabilityStrategyBase
     public async Task SubmitServiceCheckAsync(string serviceName, int exitStatus, string pluginOutput, string[]? performanceData = null, CancellationToken ct = default);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -370,7 +372,7 @@ public sealed class PingdomStrategy : ObservabilityStrategyBase
     public async Task<List<Dictionary<string, object>>?> ListChecksAsync(CancellationToken ct = default);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -393,7 +395,7 @@ public sealed class UptimeRobotStrategy : ObservabilityStrategyBase
     public async Task<bool> DeleteMonitorAsync(int monitorId, CancellationToken ct = default);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -417,7 +419,7 @@ public sealed class StatusCakeStrategy : ObservabilityStrategyBase
     public async Task<bool> DeleteUptimeTestAsync(string testId, CancellationToken ct = default);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -571,7 +573,7 @@ public sealed class ZipkinStrategy : ObservabilityStrategyBase
     protected override Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken ct);;
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken ct);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -590,7 +592,7 @@ public sealed class XRayStrategy : ObservabilityStrategyBase
     protected override Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken ct);;
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken ct);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -609,7 +611,7 @@ public sealed class OpenTelemetryStrategy : ObservabilityStrategyBase
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken ct);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -630,7 +632,7 @@ public sealed class JaegerStrategy : ObservabilityStrategyBase
     protected override Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken ct);;
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken ct);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -662,7 +664,7 @@ public sealed class PprofStrategy : ObservabilityStrategyBase
     public async Task<byte[]?> CollectMutexProfileAsync(CancellationToken ct = default);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -682,7 +684,7 @@ public sealed class PyroscopeStrategy : ObservabilityStrategyBase
     public async Task UploadCpuProfileAsync(byte[] profileData, string profileType = "cpu", CancellationToken ct = default);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -702,7 +704,7 @@ public sealed class DatadogProfilerStrategy : ObservabilityStrategyBase
     public async Task UploadPprofAsync(byte[] profileData, string profileType, CancellationToken ct = default);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -722,7 +724,7 @@ public sealed class BugsnagStrategy : ObservabilityStrategyBase
     public async Task NotifyExceptionAsync(Exception exception, string severity = "error", Dictionary<string, object>? metadata = null, CancellationToken ct = default);
     protected override Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -742,7 +744,7 @@ public sealed class SentryStrategy : ObservabilityStrategyBase
     public async Task CaptureExceptionAsync(Exception exception, Dictionary<string, object>? additionalData = null, CancellationToken ct = default);
     protected override Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -762,7 +764,7 @@ public sealed class AirbrakeStrategy : ObservabilityStrategyBase
     public async Task NotifyAsync(Exception exception, Dictionary<string, object>? context = null, CancellationToken ct = default);
     protected override Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -783,7 +785,7 @@ public sealed class RollbarStrategy : ObservabilityStrategyBase
     public async Task ReportMessageAsync(string message, string level = "info", Dictionary<string, object>? customData = null, CancellationToken ct = default);
     protected override Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -804,7 +806,7 @@ public sealed class GoogleAnalyticsStrategy : ObservabilityStrategyBase
     public async Task TrackPageViewAsync(string pageTitle, string pageLocation, CancellationToken ct = default);
     protected override Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -826,7 +828,7 @@ public sealed class MixpanelStrategy : ObservabilityStrategyBase
     public async Task IncrementProfilePropertyAsync(string distinctId, string property, double value = 1, CancellationToken ct = default);
     protected override Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -847,7 +849,7 @@ public sealed class AmplitudeStrategy : ObservabilityStrategyBase
     public async Task IdentifyUserAsync(string userId, Dictionary<string, object> userProperties, CancellationToken ct = default);
     protected override Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -998,7 +1000,7 @@ public sealed class ContainerResourceStrategy : ObservabilityStrategyBase
     protected override Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -1088,7 +1090,7 @@ public sealed class DynatraceStrategy : ObservabilityStrategyBase
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken ct);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -1107,7 +1109,7 @@ public sealed class NewRelicStrategy : ObservabilityStrategyBase
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken ct);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -1126,7 +1128,7 @@ public sealed class ElasticApmStrategy : ObservabilityStrategyBase
     protected override Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -1145,7 +1147,7 @@ public sealed class InstanaStrategy : ObservabilityStrategyBase
     protected override Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -1167,7 +1169,7 @@ public sealed class IstioStrategy : ObservabilityStrategyBase
     protected override Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -1228,7 +1230,7 @@ public sealed class LinkerdStrategy : ObservabilityStrategyBase
     protected override Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -1310,7 +1312,7 @@ public sealed class EnvoyProxyStrategy : ObservabilityStrategyBase
     protected override Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -1386,7 +1388,7 @@ public sealed class LogglyStrategy : ObservabilityStrategyBase
     public async Task SendLogAsync(string message, LogLevel level, Dictionary<string, object>? additionalData = null, CancellationToken ct = default);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -1405,7 +1407,7 @@ public sealed class GraylogStrategy : ObservabilityStrategyBase
     protected override Task TracingAsyncCore(IEnumerable<SpanContext> spans, CancellationToken ct);;
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken ct);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -1425,7 +1427,7 @@ public sealed class SumoLogicStrategy : ObservabilityStrategyBase
     public async Task SendEventAsync(string message, string category = "application", Dictionary<string, object>? additionalFields = null, CancellationToken ct = default);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -1444,7 +1446,7 @@ public sealed class FluentdStrategy : ObservabilityStrategyBase
     protected override Task TracingAsyncCore(IEnumerable<SpanContext> spans, CancellationToken cancellationToken);;
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -1466,7 +1468,7 @@ public sealed class LokiStrategy : ObservabilityStrategyBase
     protected override Task TracingAsyncCore(IEnumerable<SpanContext> spans, CancellationToken cancellationToken);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -1505,7 +1507,7 @@ public sealed class SplunkStrategy : ObservabilityStrategyBase
     protected override Task TracingAsyncCore(IEnumerable<SpanContext> spans, CancellationToken cancellationToken);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -1550,7 +1552,7 @@ public sealed class InfluxDbStrategy : ObservabilityStrategyBase
     protected override Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -1631,7 +1633,7 @@ public sealed class TelegrafStrategy : ObservabilityStrategyBase
     protected override Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -1650,7 +1652,7 @@ public sealed class AzureMonitorStrategy : ObservabilityStrategyBase
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -1673,7 +1675,7 @@ public sealed class VictoriaMetricsStrategy : ObservabilityStrategyBase
     protected override Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -1692,7 +1694,7 @@ public sealed class DatadogStrategy : ObservabilityStrategyBase
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -1712,7 +1714,7 @@ public sealed class PrometheusStrategy : ObservabilityStrategyBase
     protected override Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -1731,7 +1733,7 @@ public sealed class CloudWatchStrategy : ObservabilityStrategyBase
     protected override Task TracingAsyncCore(IEnumerable<SpanContext> spans, CancellationToken cancellationToken);
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
 }
 ```

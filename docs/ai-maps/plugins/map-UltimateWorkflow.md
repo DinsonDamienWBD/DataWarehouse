@@ -103,6 +103,8 @@ public sealed record TaskResult
     public Dictionary<string, double> Metrics { get; init; };
     public static TaskResult Succeeded(object? output = null, TimeSpan? duration = null);;
     public static TaskResult Failed(string error, TimeSpan? duration = null);;
+    public static TaskResult NoHandler();;
+    public bool IsNoHandlerError { get; init; }
 }
 ```
 ```csharp
