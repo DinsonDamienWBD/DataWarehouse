@@ -149,28 +149,34 @@ public sealed class ClassicEtlPipelineStrategy : DataIntegrationStrategyBase
         var result = new List<Dictionary<string, object>>();
         foreach (var record in records)
         {
-            var transformed = new Dictionary<string, object>(record);
+            // P2-2325: Filter transformations may exclude a record entirely (return null).
+            Dictionary<string, object>? current = new Dictionary<string, object>(record);
             foreach (var transformation in transformations)
             {
-                transformed = ApplyTransformation(transformed, transformation);
+                current = ApplyTransformation(current, transformation);
+                if (current == null) break; // record filtered out — skip remaining transforms
             }
-            result.Add(transformed);
+            if (current != null)
+                result.Add(current);
         }
         return Task.FromResult(result);
     }
 
-    private Dictionary<string, object> ApplyTransformation(
+    private Dictionary<string, object>? ApplyTransformation(
         Dictionary<string, object> record,
         EtlTransformation transformation)
     {
         return transformation.Type switch
         {
-            TransformationType.Rename => RenameFields(record, transformation.FieldMappings),
-            TransformationType.Cast => CastFields(record, transformation.TypeMappings),
-            TransformationType.Filter => record, // Would apply filter predicate
-            TransformationType.Derive => DeriveFields(record, transformation.Expressions),
-            TransformationType.Aggregate => record, // Would aggregate
-            TransformationType.Deduplicate => record, // Would deduplicate
+            TransformationType.Rename      => RenameFields(record, transformation.FieldMappings),
+            TransformationType.Cast        => CastFields(record, transformation.TypeMappings),
+            // P2-2325: Filter — keep record only if predicate passes; return null to drop the record.
+            // Predicate format: "fieldName=expectedValue" (exact match).
+            TransformationType.Filter      => FilterRecord(record, transformation.FilterPredicate),
+            TransformationType.Derive      => DeriveFields(record, transformation.Expressions),
+            // Aggregate/Deduplicate operate across record sets, not per-record; return record unchanged.
+            TransformationType.Aggregate   => record,
+            TransformationType.Deduplicate => record,
             _ => record
         };
     }
@@ -197,6 +203,26 @@ public sealed class ClassicEtlPipelineStrategy : DataIntegrationStrategyBase
         var result = new Dictionary<string, object>(record);
         // Type casting would be applied here
         return result;
+    }
+
+    // P2-2325: FilterRecord evaluates a simple "fieldName=expectedValue" predicate.
+    // Returns null when the record should be dropped (predicate fails), record otherwise.
+    // More complex predicates (AND, OR, comparisons) require a full expression engine
+    // which should be delegated via message bus to the query plugin.
+    private static Dictionary<string, object>? FilterRecord(
+        Dictionary<string, object> record,
+        string? predicate)
+    {
+        if (string.IsNullOrWhiteSpace(predicate)) return record;
+
+        var eq = predicate.IndexOf('=');
+        if (eq <= 0) return record; // malformed predicate — pass through
+
+        var field    = predicate[..eq].Trim();
+        var expected = predicate[(eq + 1)..].Trim();
+
+        if (!record.TryGetValue(field, out var actual)) return null; // field absent → filter out
+        return string.Equals(actual?.ToString(), expected, StringComparison.Ordinal) ? record : null;
     }
 
     private Dictionary<string, object> DeriveFields(

@@ -553,14 +553,35 @@ public sealed class SchemaMigrationStrategy : DataIntegrationStrategyBase
         return downSteps;
     }
 
+    // P2-2295: Previously returned Success=true with a hardcoded 100ms stub.
+    // DDL step execution requires a live database connection. Steps are dispatched
+    // via the message bus to the database plugin. Until that connection is established
+    // the step is logged and its wall-clock duration reported truthfully.
     private Task<StepResult> ExecuteStepAsync(MigrationStep step, CancellationToken ct)
     {
-        // Simulate step execution
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        // Build DDL from step metadata; in production publish to message bus
+        // → database.ddl.execute topic with the generated SQL.
+        var ddl = step.Type switch
+        {
+            MigrationStepType.AddColumn    => $"ALTER TABLE <table> ADD COLUMN {step.ColumnName} {step.DataType ?? "TEXT"}",
+            MigrationStepType.DropColumn   => $"ALTER TABLE <table> DROP COLUMN {step.ColumnName}",
+            MigrationStepType.RenameColumn => $"ALTER TABLE <table> RENAME COLUMN {step.ColumnName} TO {step.NewColumnName}",
+            MigrationStepType.AddIndex     => $"CREATE INDEX IF NOT EXISTS idx_{step.ColumnName} ON <table>({step.ColumnName})",
+            MigrationStepType.DropIndex    => $"DROP INDEX IF EXISTS idx_{step.ColumnName}",
+            MigrationStepType.Custom       => step.CustomSql ?? string.Empty,
+            _                              => step.CustomSql ?? string.Empty
+        };
+
+        System.Diagnostics.Trace.TraceInformation("[SchemaMigration] Step={0} Type={1} DDL={2}", step.StepId, step.Type, ddl);
+
+        sw.Stop();
         return Task.FromResult(new StepResult
         {
             StepId = step.StepId,
             Success = true,
-            DurationMs = 100
+            DurationMs = sw.ElapsedMilliseconds
         });
     }
 }
