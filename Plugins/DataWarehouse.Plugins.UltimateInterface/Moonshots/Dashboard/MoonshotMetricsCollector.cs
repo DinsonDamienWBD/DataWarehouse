@@ -25,7 +25,9 @@ public sealed class MoonshotMetricsCollector : IDisposable
     private readonly ILogger<MoonshotMetricsCollector> _logger;
     private readonly BoundedDictionary<MoonshotId, MoonshotMetricState> _states = new BoundedDictionary<MoonshotId, MoonshotMetricState>(1000);
     private readonly BoundedDictionary<(MoonshotId, string), ConcurrentQueue<MoonshotTrendPoint>> _trendBuffers = new BoundedDictionary<(MoonshotId, string), ConcurrentQueue<MoonshotTrendPoint>>(1000);
-    private readonly List<IDisposable> _subscriptions = new();
+    // P2-3256: Use ConcurrentBag to allow concurrent Add from subscription callbacks and
+    // safe enumeration from Dispose, eliminating the need for a separate lock.
+    private readonly System.Collections.Concurrent.ConcurrentBag<IDisposable> _subscriptions = new();
     private Timer? _trendTimer;
     private bool _disposed;
 
@@ -208,11 +210,14 @@ public sealed class MoonshotMetricsCollector : IDisposable
     {
         var state = _states.GetOrAdd(stageId, _ => new MoonshotMetricState());
 
-        // Reset window if expired
+        // Reset window if expired — P2-3257: Interlocked.CompareExchange ensures only the
+        // first thread to observe the expired window resets it; subsequent threads skip.
         var now = DateTimeOffset.UtcNow;
-        if (now - state.WindowStart > MetricsWindowDuration)
+        var oldTicks = Interlocked.Read(ref state.WindowStartTicks);
+        if (now.Ticks - oldTicks > MetricsWindowDuration.Ticks)
         {
-            state.WindowStart = now;
+            // Only reset if no other thread has already done so (first-writer wins).
+            Interlocked.CompareExchange(ref state.WindowStartTicks, now.Ticks, oldTicks);
         }
 
         Interlocked.Increment(ref state.TotalInvocations);
@@ -340,6 +345,13 @@ public sealed class MoonshotMetricsCollector : IDisposable
         public long SuccessCount;
         public long FailureCount;
         public readonly ConcurrentQueue<double> LatencySamples = new();
-        public DateTimeOffset WindowStart = DateTimeOffset.UtcNow;
+        // P2-3257: Store WindowStart as ticks (long) for Interlocked.CompareExchange-based
+        // atomic reset, preventing two concurrent callers from both resetting the window
+        // and losing counter data.
+        public long WindowStartTicks = DateTimeOffset.UtcNow.Ticks;
+        public DateTimeOffset WindowStart
+        {
+            get => new DateTimeOffset(Interlocked.Read(ref WindowStartTicks), TimeSpan.Zero);
+        }
     }
 }

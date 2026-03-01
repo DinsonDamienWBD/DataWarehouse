@@ -600,5 +600,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         }
 
         #endregion
+
+        #region Disposal
+
+        protected override ValueTask DisposeCoreAsync()
+        {
+            _prefetchTimer?.Dispose();
+            _learningTimer?.Dispose();
+            return base.DisposeCoreAsync();
+        }
+
+        #endregion
     }
 }

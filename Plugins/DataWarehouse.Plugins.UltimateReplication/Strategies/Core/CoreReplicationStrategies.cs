@@ -266,12 +266,21 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Core
             EnhancedVectorClock mergedClock,
             CancellationToken ct)
         {
-            // CRDT merge: always succeeds without conflict
-            // In a real implementation, this would deserialize and merge the CRDT types
-            // For now, we take the larger payload (assuming more data = more operations merged)
-            var resolved = conflict.LocalData.Length >= conflict.RemoteData.Length
-                ? conflict.LocalData
-                : conflict.RemoteData;
+            // P2-3767: A real CRDT merge requires deserializing the concrete CRDT type (G-Set,
+            // OR-Set, LWW-Register, etc.) and invoking its merge function. Without a registered
+            // CRDT type resolver, we fall back to a Last-Write-Wins heuristic using the remote
+            // clock being causally after local (wins if remote is strictly greater), otherwise local.
+            // This is not a correct CRDT merge but is semantically stronger than payload-size.
+            bool remoteWins = true;
+            foreach (var kvp in conflict.RemoteVersion.Entries)
+            {
+                if (!conflict.LocalVersion.Entries.TryGetValue(kvp.Key, out var localTick) || localTick > kvp.Value)
+                {
+                    remoteWins = false;
+                    break;
+                }
+            }
+            var resolved = remoteWins ? conflict.RemoteData : conflict.LocalData;
 
             return Task.FromResult<(ReadOnlyMemory<byte>, EnhancedVectorClock)>((resolved, mergedClock));
         }

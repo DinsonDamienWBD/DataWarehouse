@@ -305,16 +305,45 @@ public readonly struct InodeLayoutDescriptor : IEquatable<InodeLayoutDescriptor>
 
     /// <inheritdoc />
     public bool Equals(InodeLayoutDescriptor other)
-        => InodeSize == other.InodeSize
-        && CoreFieldsEnd == other.CoreFieldsEnd
-        && ModuleFieldCount == other.ModuleFieldCount
-        && PaddingBytes == other.PaddingBytes;
+    {
+        // Cat 12 (finding 814): include ModuleFields in equality so two descriptors with the same
+        // header fields but different per-module field layouts are not considered equal.
+        if (InodeSize != other.InodeSize
+            || CoreFieldsEnd != other.CoreFieldsEnd
+            || ModuleFieldCount != other.ModuleFieldCount
+            || PaddingBytes != other.PaddingBytes)
+        {
+            return false;
+        }
+
+        if (ModuleFields.Length != other.ModuleFields.Length)
+            return false;
+
+        for (int i = 0; i < ModuleFields.Length; i++)
+        {
+            if (!ModuleFields[i].Equals(other.ModuleFields[i]))
+                return false;
+        }
+
+        return true;
+    }
 
     /// <inheritdoc />
     public override bool Equals(object? obj) => obj is InodeLayoutDescriptor other && Equals(other);
 
     /// <inheritdoc />
-    public override int GetHashCode() => HashCode.Combine(InodeSize, CoreFieldsEnd, ModuleFieldCount, PaddingBytes);
+    public override int GetHashCode()
+    {
+        // Cat 12 (finding 814): include ModuleFields in hash code to match updated Equals.
+        var hc = new HashCode();
+        hc.Add(InodeSize);
+        hc.Add(CoreFieldsEnd);
+        hc.Add(ModuleFieldCount);
+        hc.Add(PaddingBytes);
+        foreach (var mf in ModuleFields)
+            hc.Add(mf.GetHashCode());
+        return hc.ToHashCode();
+    }
 
     /// <summary>Equality operator.</summary>
     public static bool operator ==(InodeLayoutDescriptor left, InodeLayoutDescriptor right) => left.Equals(right);

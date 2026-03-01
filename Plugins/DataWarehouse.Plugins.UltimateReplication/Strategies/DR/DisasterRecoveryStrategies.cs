@@ -904,8 +904,11 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.DR
                 _currentStatus = FailoverStatus.Completed;
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                // P2-3769: log the failure reason so operators can diagnose failover issues.
+                System.Diagnostics.Trace.TraceError(
+                    "[DR] InitiateFailoverAsync to site '{0}' failed: {1}", targetSiteId, ex.Message);
                 _currentStatus = FailoverStatus.Failed;
                 return false;
             }

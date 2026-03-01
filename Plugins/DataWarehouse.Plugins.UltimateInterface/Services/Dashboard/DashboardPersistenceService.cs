@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts.Dashboards;
 using DataWarehouse.SDK.Utilities;
@@ -274,11 +275,16 @@ public sealed class DashboardPersistenceService
                     _dashboards[key] = dashboard;
                 }
             }
-            catch (JsonException ex)
+            catch (OperationCanceledException)
             {
-
-                // Skip corrupted files
-                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // P2-3259: Catch IOException and UnauthorizedAccessException in addition to
+                // JsonException so a single bad file doesn't abort the entire load.
+                // Trace is visible in Release builds; Debug.WriteLine is stripped.
+                Trace.TraceWarning($"[DashboardPersistenceService] Skipping file '{file}': {ex.GetType().Name}: {ex.Message}");
             }
         }
     }

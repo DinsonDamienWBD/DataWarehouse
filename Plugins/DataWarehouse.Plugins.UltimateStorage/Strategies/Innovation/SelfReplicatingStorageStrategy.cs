@@ -489,20 +489,25 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
         private void MonitorReplicaHealth()
         {
-            foreach (var location in _replicaLocationsSnapshot)
+            // Off-load to a thread-pool thread so the Timer callback returns immediately
+            // and doesn't block the shared timer thread with synchronous I/O.
+            _ = Task.Run(() =>
             {
-                try
+                foreach (var location in _replicaLocationsSnapshot)
                 {
-                    // Simple health check: verify directory is accessible
-                    var exists = Directory.Exists(location.Path);
-                    location.IsHealthy = exists;
+                    try
+                    {
+                        // Simple health check: verify directory is accessible
+                        var exists = Directory.Exists(location.Path);
+                        location.IsHealthy = exists;
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[SelfReplicatingStorageStrategy.MonitorReplicaHealth] {ex.GetType().Name}: {ex.Message}");
+                        location.IsHealthy = false;
+                    }
                 }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[SelfReplicatingStorageStrategy.MonitorReplicaHealth] {ex.GetType().Name}: {ex.Message}");
-                    location.IsHealthy = false;
-                }
-            }
+            });
         }
 
         private void RepairMissingReplicas()
@@ -582,6 +587,17 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             public int ReplicaCount { get; set; }
             public int TargetReplicaCount { get; set; }
             public DateTime LastVerified { get; set; }
+        }
+
+        #endregion
+
+        #region Disposal
+
+        protected override ValueTask DisposeCoreAsync()
+        {
+            _healthCheckTimer?.Dispose();
+            _repairTimer?.Dispose();
+            return base.DisposeCoreAsync();
         }
 
         #endregion
