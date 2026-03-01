@@ -577,9 +577,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     node.LastHealthCheck = DateTime.UtcNow;
                 }
 
-                // Sample check a subset of objects (not all, for performance)
+                // Sample check a subset of objects (not all, for performance).
+                // Use Guid-based sort key to avoid non-deterministic comparator issues.
                 var sampleSize = Math.Min(100, _healthRecords.Count);
-                var sampled = _healthRecords.Values.OrderBy(_ => Random.Shared.Next()).Take(sampleSize);
+                var sampled = _healthRecords.Values.OrderBy(_ => Guid.NewGuid()).Take(sampleSize);
 
                 foreach (var healthRecord in sampled)
                 {

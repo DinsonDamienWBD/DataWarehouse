@@ -281,7 +281,10 @@ public static class ArrowColumnarBridge
 
     private static ReadOnlyMemory<byte> AsReadOnlyMemory<T>(T[] values) where T : struct
     {
-        // Zero-copy: reinterpret typed array as bytes via MemoryMarshal
+        // Cat 13 (finding 911/912): MemoryMarshal.AsBytes gives a zero-copy view as Span<byte>,
+        // but ReadOnlyMemory<byte> requires a byte[] backing store, so we must allocate and copy.
+        // The previous comment "Zero-copy" was incorrect. If the caller can use ReadOnlySpan<byte>,
+        // use MemoryMarshal.AsBytes(values.AsSpan()) directly to avoid this allocation.
         var bytes = MemoryMarshal.AsBytes(values.AsSpan());
         var result = new byte[bytes.Length];
         bytes.CopyTo(result);
