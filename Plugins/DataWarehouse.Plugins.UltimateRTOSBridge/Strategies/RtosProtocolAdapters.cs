@@ -159,6 +159,13 @@ public sealed class VxWorksProtocolAdapter : RtosStrategyBase
     {
         var queue = _queues.GetOrAdd(context.ResourcePath, _ => new VxWorksQueue());
 
+        // P2-3683: Enforce backpressure — reject new messages when the queue is at capacity,
+        // matching VxWorks msgQCreate behavior (MSG_Q_FIFO with finite maxMsgs).
+        if (queue.Messages.Count >= VxWorksQueue.MaxDepth)
+            throw new InvalidOperationException(
+                $"VxWorks message queue '{context.ResourcePath}' is full (max {VxWorksQueue.MaxDepth} messages). " +
+                "Consumer is too slow or queue depth is misconfigured.");
+
         queue.Messages.Enqueue(context.Data ?? Array.Empty<byte>());
         queue.MessageAvailable.Release();
         await Task.CompletedTask;
@@ -224,6 +231,8 @@ public sealed class VxWorksProtocolAdapter : RtosStrategyBase
 
     private class VxWorksQueue
     {
+        /// <summary>Maximum queue depth. VxWorks msgQCreate sets a hard cap; we enforce 4096 messages.</summary>
+        public const int MaxDepth = 4096;
         public ConcurrentQueue<byte[]> Messages { get; } = new();
         public SemaphoreSlim MessageAvailable { get; } = new(0);
     }
@@ -401,6 +410,11 @@ public sealed class QnxProtocolAdapter : RtosStrategyBase
         catch (OperationCanceledException)
         {
             return Array.Empty<byte>();
+        }
+        finally
+        {
+            // P2-3684: Dispose the per-message SemaphoreSlim whether the wait succeeded or timed out.
+            msg.ReplyReady?.Dispose();
         }
     }
 

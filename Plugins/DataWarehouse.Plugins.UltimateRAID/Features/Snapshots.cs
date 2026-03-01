@@ -763,12 +763,18 @@ public sealed class SnapshotTree
         _arrayId = arrayId;
     }
 
-    public string? ActiveSnapshotId { get; private set; }
+    // LOW-3665: Volatile read/write for ActiveSnapshotId to prevent data races on concurrent
+    // AddSnapshot and clone operations. BoundedDictionary handles _snapshots thread-safety.
+    private volatile string? _activeSnapshotId;
+
+    public string? ActiveSnapshotId => _activeSnapshotId;
 
     public void AddSnapshot(Snapshot snapshot)
     {
         _snapshots[snapshot.SnapshotId] = snapshot;
-        ActiveSnapshotId = snapshot.SnapshotId;
+        // Volatile write ensures the new active snapshot ID is visible to all threads
+        // immediately after the dictionary entry is committed.
+        _activeSnapshotId = snapshot.SnapshotId;
     }
 
     public Snapshot? GetSnapshot(string snapshotId) =>

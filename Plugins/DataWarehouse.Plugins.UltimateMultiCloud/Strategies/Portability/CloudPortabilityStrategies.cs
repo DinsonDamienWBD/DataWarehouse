@@ -302,7 +302,7 @@ public sealed class DataMigrationStrategy : MultiCloudStrategyBase
     /// <summary>Executes migration job.</summary>
     public async Task<MigrationJobResult> ExecuteAsync(string jobId, CancellationToken ct = default)
     {
-        IncrementCounter("container_abstraction.operation");
+        IncrementCounter("data_migration.execute");
         if (!_jobs.TryGetValue(jobId, out var job))
         {
             RecordFailure();

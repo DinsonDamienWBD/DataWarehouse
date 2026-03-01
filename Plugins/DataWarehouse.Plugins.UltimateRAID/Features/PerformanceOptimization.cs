@@ -235,8 +235,12 @@ public sealed class RaidPerformanceOptimizer
 
     private Task FlushToDiskAsync(string arrayId, long offset, byte[] data, CancellationToken ct)
     {
-        // Disk write latency (actual I/O delegated to RAID strategy layer)
-        return Task.Delay(1, ct);
+        // LOW-3660: Actual disk I/O is performed by the RAID strategy layer (WriteToDiskAsync
+        // in strategy classes) which is invoked via the plugin's WriteAsync pipeline.
+        // This manager layer tracks coalescing/caching metadata only; persistence is confirmed
+        // when the strategy's WriteToDiskAsync completes, not via a redundant flush here.
+        ct.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
     }
 }
 

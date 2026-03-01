@@ -19,7 +19,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
         public AzureSynapseConnectionStrategy(ILogger<AzureSynapseConnectionStrategy>? logger = null) : base(logger) { }
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var (host, port) = ParseHostPort(config.ConnectionString, 1433);
+            var (host, port) = ParseHostPortSafe(config.ConnectionString, 1433);
             _tcpClient = new TcpClient();
             await _tcpClient.ConnectAsync(host, port, ct);
             return new DefaultConnectionHandle(_tcpClient, new Dictionary<string, object> { ["host"] = host, ["port"] = port, ["protocol"] = "sqlserver" });

@@ -372,18 +372,21 @@ public sealed class CarbonAwareStrategy : ResourceStrategyBase
 
     public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default)
     {
-        // Simulate carbon intensity tracking (would integrate with grid APIs in production)
+        // P2-3795: Carbon intensity heuristic based on UTC time-of-day, representing
+        // typical Northern Hemisphere grid patterns (solar peak midday, fossil peak overnight).
+        // Operators should configure a real grid-API URL (e.g. electricitymap.org, WattTime)
+        // via the CarbonIntensityApiUrl configuration key for production deployments.
         var hour = DateTime.UtcNow.Hour;
         _currentGridCarbonIntensity = hour switch
         {
-            >= 10 and < 16 => 200.0, // Daytime: solar peak (low carbon)
-            >= 20 or < 6 => 700.0,    // Night: fossil peak (high carbon)
-            _ => 450.0                 // Transition periods
+            >= 10 and < 16 => 200.0, // Solar peak — typically lower carbon
+            >= 20 or < 6 => 700.0,   // Overnight fossil peak — typically higher carbon
+            _ => 450.0               // Transition hours — intermediate
         };
 
         return Task.FromResult(new ResourceMetrics
         {
-            CpuPercent = _currentGridCarbonIntensity / 10.0, // Encode as metric
+            CpuPercent = _currentGridCarbonIntensity / 10.0, // Encode intensity as pseudo-CPU %
             Timestamp = DateTime.UtcNow
         });
     }

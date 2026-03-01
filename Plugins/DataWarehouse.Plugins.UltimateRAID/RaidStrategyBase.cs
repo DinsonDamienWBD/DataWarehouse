@@ -185,8 +185,16 @@ public abstract class RaidStrategyBase : StrategyBase, IRaidStrategy
                     continue;
                 }
 
-                // Simulate verification
-                await Task.Delay(10, ct);
+                // LOW-3661: Invoke per-block verification (overridden by derived classes).
+                // Base implementation is a no-op; derived ZFS/Adaptive strategies override
+                // VerifyBlockAsync to read blocks and compare against stored checksums.
+                var blockCount = disk.CapacityBytes > 0 ? disk.CapacityBytes / 4096 : 0;
+                for (long blk = 0; blk < Math.Min(blockCount, result.TotalBlocks); blk++)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    try { await VerifyBlockAsync(blk, ct); }
+                    catch { result.ErrorCount++; result.Errors.Add($"Disk {i} block {blk}: verification failed"); result.IsHealthy = false; }
+                }
                 result.VerifiedBlocks++;
                 progress?.Report((double)result.VerifiedBlocks / result.TotalBlocks);
             }
@@ -274,20 +282,27 @@ public abstract class RaidStrategyBase : StrategyBase, IRaidStrategy
     }
 
     /// <summary>
-    /// Verifies integrity of a single block.
+    /// Verifies integrity of a single block by reading it and comparing against stored
+    /// redundancy data (checksum or parity). Derived classes MUST override this method to
+    /// provide RAID-level–specific verification (e.g., ZFS Fletcher4 checksum, RS parity check).
+    /// The base implementation is intentionally a no-op to preserve backward compatibility;
+    /// leaving it unoverridden causes scrub to report zero errors regardless of actual state.
     /// </summary>
     protected virtual Task VerifyBlockAsync(long blockAddress, CancellationToken ct)
     {
-        // Base implementation - override in derived classes
+        // LOW-3662: Override in derived classes with real block read + checksum/parity check.
         return Task.CompletedTask;
     }
 
     /// <summary>
-    /// Attempts to correct errors in a single block using redundancy.
+    /// Attempts to correct errors in a single block using redundancy (XOR reconstruction,
+    /// Reed-Solomon decoding, etc.). Derived classes MUST override this method.
+    /// The base implementation is intentionally a no-op; unoverridden behaviour leaves
+    /// corrupted blocks in place and reports them as corrected.
     /// </summary>
     protected virtual Task CorrectBlockAsync(long blockAddress, CancellationToken ct)
     {
-        // Base implementation - override in derived classes
+        // LOW-3662: Override in derived classes with real parity-based reconstruction.
         return Task.CompletedTask;
     }
 

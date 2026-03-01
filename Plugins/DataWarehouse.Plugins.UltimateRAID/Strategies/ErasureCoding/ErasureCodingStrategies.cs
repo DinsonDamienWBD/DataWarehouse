@@ -384,8 +384,14 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
                     }
                 }
 
-                // Scale pivot to 1
+                // LOW-3664: Throw on singular matrix — a zero pivot after row-swap search means
+                // the generator matrix is non-invertible (degenerate configuration), and
+                // continuing would produce a garbage inverse that silently corrupts decoded data.
                 var pivot = augmented[i, i];
+                if (pivot == 0)
+                    throw new InvalidOperationException(
+                        $"Reed-Solomon matrix is singular at row {i}: cannot invert. " +
+                        "Ensure the generator matrix is constructed over GF(2^8) with distinct evaluation points.");
                 if (pivot != 0)
                 {
                     var inverse = GaloisInverse(pivot);

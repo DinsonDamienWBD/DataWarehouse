@@ -146,9 +146,13 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
 
         private (string host, int port) ParseHostPort(string connectionString, int defaultPort)
         {
-            var clean = connectionString.Replace("http://", "").Split('/')[0];
-            var parts = clean.Split(':');
-            return (parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : defaultPort);
+            // P2-2132: Use Uri parsing to correctly handle IPv6 addresses like http://[::1]:PORT/
+            var uriString = connectionString.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                            connectionString.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+                ? connectionString : "http://" + connectionString;
+            if (Uri.TryCreate(uriString, UriKind.Absolute, out var uri) && !string.IsNullOrEmpty(uri.Host) && uri.Port > 0)
+                return (uri.Host, uri.Port);
+            return ParseHostPortSafe(connectionString, defaultPort);
         }
     }
 }

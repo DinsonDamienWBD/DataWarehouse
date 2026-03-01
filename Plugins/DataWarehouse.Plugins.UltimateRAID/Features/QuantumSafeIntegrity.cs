@@ -44,7 +44,10 @@ public sealed class QuantumSafeIntegrity
             HashAlgorithmType.BLAKE3 => CalculateBLAKE3(data),
             HashAlgorithmType.Dilithium => CalculateDilithiumHash(data),
             HashAlgorithmType.SPHINCS => CalculateSPHINCSHash(data),
-            _ => CalculateSHA3_256(data)
+            // LOW-3663: Throw on unknown algorithm values to prevent silent algorithm mismatch
+            // where VerifyChecksum computes a different hash than what was stored.
+            _ => throw new ArgumentOutOfRangeException(nameof(algorithm), algorithm,
+                $"Unsupported hash algorithm: {algorithm}. Valid values: SHA3_256, SHA3_512, SHAKE256, BLAKE3, Dilithium, SPHINCS.")
         };
 
         return new QuantumSafeChecksum
