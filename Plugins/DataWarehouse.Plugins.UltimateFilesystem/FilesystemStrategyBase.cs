@@ -70,8 +70,25 @@ public sealed record BlockIoOptions
     public bool AsyncIo { get; init; }
     /// <summary>Buffer size for I/O operations.</summary>
     public int BufferSize { get; init; } = 64 * 1024;
-    /// <summary>I/O priority (0-7).</summary>
+    /// <summary>
+    /// I/O priority (0-7, where 0=highest). Maps to <see cref="Scaling.IoPriority"/>:
+    /// 0-2 → High, 3-5 → Normal, 6-7 → Low.
+    /// LOW-3036: Explicit mapping resolves ambiguity between this int-based priority and
+    /// the <see cref="Scaling.IoPriority"/> enum used by FilesystemScalingManager.
+    /// </summary>
     public int Priority { get; init; } = 4;
+
+    /// <summary>
+    /// Maps the integer <see cref="Priority"/> (0-7) to the canonical
+    /// <see cref="Scaling.IoPriority"/> enum understood by <c>FilesystemScalingManager</c>.
+    /// </summary>
+    public Scaling.IoPriority ToIoPriority() => Priority switch
+    {
+        <= 2 => Scaling.IoPriority.High,
+        <= 5 => Scaling.IoPriority.Normal,
+        _ => Scaling.IoPriority.Low
+    };
+
     /// <summary>Enable write-through caching.</summary>
     public bool WriteThrough { get; init; }
     /// <summary>Enable read-ahead.</summary>
@@ -251,11 +268,16 @@ public sealed class FilesystemStrategyRegistry
                     {
                         if (Activator.CreateInstance(type) is IFilesystemStrategy strategy)
                         {
-                            Register(strategy);
-                            discovered++;
+                            // LOW-3038: Skip already-registered IDs to avoid duplicates when multiple
+                            // assemblies or multiple AutoDiscover calls share the same strategy type.
+                            if (!_strategies.ContainsKey(strategy.StrategyId))
+                            {
+                                Register(strategy);
+                                discovered++;
+                            }
                         }
                     }
-                    catch { /* Skip types that cannot be instantiated */ }
+                    catch { /* Skip types that cannot be instantiated or with duplicate constructor params */ }
                 }
             }
             catch { /* Skip assemblies that cannot be scanned */ }

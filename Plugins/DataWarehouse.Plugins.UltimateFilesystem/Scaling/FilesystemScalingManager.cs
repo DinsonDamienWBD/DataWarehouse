@@ -156,11 +156,12 @@ public sealed class FilesystemScalingManager : IScalableSubsystem, IDisposable
         _dispatchCts = new CancellationTokenSource();
         _dispatchTask = Task.Run(() => DispatchLoopAsync(_dispatchCts.Token));
 
-        // Start kernel bypass re-detection timer
+        // Start kernel bypass re-detection timer.
+        // LOW-3035: Use 1s initial delay (not TimeSpan.Zero) so callback cannot fire before constructor returns.
         _kernelBypassRedetectTimer = new Timer(
             KernelBypassRedetectCallback,
             null,
-            TimeSpan.Zero,
+            TimeSpan.FromSeconds(1),
             TimeSpan.FromMilliseconds(_kernelBypassRedetectIntervalMs));
     }
 

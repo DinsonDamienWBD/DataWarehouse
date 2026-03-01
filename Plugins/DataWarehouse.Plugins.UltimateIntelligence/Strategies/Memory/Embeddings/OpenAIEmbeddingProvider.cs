@@ -296,7 +296,9 @@ public sealed class OpenAIEmbeddingProvider : EmbeddingProviderBase
             }
             else if (currentNumber.Length > 0)
             {
-                var value = double.Parse(currentNumber.ToString());
+                // P2-3149: Use InvariantCulture to avoid FormatException on non-US locales
+                // where the decimal separator is a comma instead of a period.
+                var value = double.Parse(currentNumber.ToString(), System.Globalization.CultureInfo.InvariantCulture);
                 currentNumber.Clear();
 
                 totalSeconds += c switch

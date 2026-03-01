@@ -271,6 +271,8 @@ public sealed class AccessPatternLearningStrategy : FeatureStrategyBase
     private static double CalculateAverageAccessesPerSession(List<AccessEvent> events)
     {
         var orderedEvents = events.OrderBy(e => e.Timestamp).ToList();
+        // P2-3100: Guard against empty list before indexing [0].
+        if (orderedEvents.Count == 0) return 0;
         var sessionCounts = new List<int>();
         var currentSessionCount = 1;
         var lastEvent = orderedEvents[0].Timestamp;

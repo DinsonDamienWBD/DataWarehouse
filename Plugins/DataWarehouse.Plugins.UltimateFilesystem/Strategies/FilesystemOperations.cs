@@ -543,8 +543,9 @@ public sealed class Ext4Operations : FilesystemOperationsBase
             BitConverter.TryWriteBytes(span[152..156], 8u); // Journal inode = 8 (standard)
         }
 
-        // Write to device/image
-        using var fs = new FileStream(devicePath, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None, 4096, FileOptions.Asynchronous);
+        // Write to device/image. LOW-3033: Use FileMode.Create to truncate stale bytes beyond the written range,
+        // preventing e2fsck from being confused by leftover superblock data.
+        using var fs = new FileStream(devicePath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, FileOptions.Asynchronous);
         fs.Seek(SuperblockOffset, SeekOrigin.Begin);
         await fs.WriteAsync(superblock, ct);
         await fs.FlushAsync(ct);

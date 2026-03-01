@@ -942,17 +942,13 @@ public sealed class UltimateFilesystemPlugin : DataWarehouse.SDK.Contracts.Hiera
         => throw new NotSupportedException("UltimateFilesystem uses block-level I/O via filesystem strategies. Use the 'filesystem.detect' message bus topic instead of ExistsAsync.");
 
     /// <inheritdoc/>
-    /// <remarks>
+    /// <exception cref="NotSupportedException">
     /// UltimateFilesystem uses block-level I/O. Object-level listing is not supported.
     /// Use the 'filesystem.list-strategies' message bus topic instead.
-    /// Yields no results to maintain the IAsyncEnumerable contract without throwing.
-    /// </remarks>
-#pragma warning disable CS1998 // Async method lacks 'await' operators
-    public override async IAsyncEnumerable<DataWarehouse.SDK.Contracts.Storage.StorageObjectMetadata> ListAsync(string? prefix, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
-    {
-        yield break;
-    }
-#pragma warning restore CS1998
+    /// LOW-3062: Throws NotSupportedException so callers are not silently misled into believing there is no data.
+    /// </exception>
+    public override IAsyncEnumerable<DataWarehouse.SDK.Contracts.Storage.StorageObjectMetadata> ListAsync(string? prefix, CancellationToken ct = default)
+        => throw new NotSupportedException("UltimateFilesystem uses block-level I/O. Object-level listing is not supported; use the 'filesystem.list-strategies' message bus topic instead of ListAsync.");
 
     /// <inheritdoc/>
     /// <exception cref="NotSupportedException">

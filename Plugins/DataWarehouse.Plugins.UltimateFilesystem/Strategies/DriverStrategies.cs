@@ -141,7 +141,10 @@ public sealed class IoUringDriverStrategy : FilesystemStrategyBase
         await using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.Asynchronous);
         fs.Seek(offset, SeekOrigin.Begin);
         var buffer = new byte[length];
-        await fs.ReadExactlyAsync(buffer, 0, length, ct);
+        // LOW-3027: Use ReadAsync with resize on partial read (consistent with other strategies).
+        var bytesRead = await fs.ReadAsync(buffer, 0, length, ct).ConfigureAwait(false);
+        if (bytesRead < length)
+            Array.Resize(ref buffer, bytesRead);
         return buffer;
     }
 
@@ -231,7 +234,10 @@ public sealed class WindowsNativeDriverStrategy : FilesystemStrategyBase
         await using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, options?.BufferSize ?? 4096, fileOptions);
         fs.Seek(offset, SeekOrigin.Begin);
         var buffer = new byte[length];
-        await fs.ReadExactlyAsync(buffer, 0, length, ct);
+        // LOW-3027: Use ReadAsync with resize on partial read (consistent with other strategies).
+        var bytesRead = await fs.ReadAsync(buffer, 0, length, ct).ConfigureAwait(false);
+        if (bytesRead < length)
+            Array.Resize(ref buffer, bytesRead);
         return buffer;
     }
 
