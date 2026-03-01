@@ -172,7 +172,10 @@ public sealed record TagQueryRequest
     /// <summary>The query expression tree to evaluate.</summary>
     public required TagQueryExpression Expression { get; init; }
 
-    /// <summary>Number of results to skip (for pagination). Defaults to 0.</summary>
+    /// <summary>
+    /// Number of results to skip (for pagination). Defaults to 0.
+    /// Must be non-negative; negative values are clamped to 0.
+    /// </summary>
     public int Skip { get; init; }
 
     /// <summary>Maximum number of results to return. Defaults to 100.</summary>
@@ -202,6 +205,9 @@ public sealed record TagQueryRequest
 
     /// <summary>Returns the effective Take value, clamped to <see cref="MaxTake"/>.</summary>
     internal int EffectiveTake => Math.Min(Math.Max(Take, 0), MaxTake);
+
+    /// <summary>Returns the effective Skip value, clamped to non-negative. Cat 14 (finding 685).</summary>
+    internal int EffectiveSkip => Math.Max(Skip, 0);
 }
 
 /// <summary>

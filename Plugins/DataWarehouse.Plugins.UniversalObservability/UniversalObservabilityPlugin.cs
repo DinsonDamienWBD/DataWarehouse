@@ -254,11 +254,11 @@ public sealed class UniversalObservabilityPlugin : ObservabilityPluginBase
                     RegisterObservabilityStrategy(strategy);
                 }
             }
-            catch
+            catch (Exception ex)
             {
-
-                // Strategy failed to instantiate, skip
-                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+                // Log the failure so operators can diagnose broken strategy types.
+                System.Diagnostics.Debug.WriteLine(
+                    $"[UniversalObservabilityPlugin] Failed to instantiate strategy type '{strategyType.FullName}': {ex.GetType().Name}: {ex.Message}");
             }
         }
     }
@@ -365,22 +365,64 @@ public sealed class UniversalObservabilityPlugin : ObservabilityPluginBase
         switch (message.Type)
         {
             case "observability.universal.list":
-                // Return list of available strategies
+                // Publish the list of registered strategy IDs back to the bus so callers
+                // can discover available observability backends without direct coupling.
+                if (MessageBus != null && message.Payload.TryGetValue("replyTopic", out var replyObj) && replyObj is string replyTopic)
+                {
+                    var strategyIds = _strategies.Keys.ToArray();
+                    var response = new PluginMessage
+                    {
+                        Type = "observability.universal.list.response",
+                        Source = Id,
+                        Timestamp = DateTime.UtcNow,
+                        Payload = new Dictionary<string, object>
+                        {
+                            ["strategyIds"] = strategyIds,
+                            ["count"] = strategyIds.Length
+                        }
+                    };
+                    // Fire-and-forget publish of the response; errors logged but not re-thrown.
+                    _ = MessageBus.PublishAsync(replyTopic, response).ContinueWith(
+                        t => System.Diagnostics.Debug.WriteLine(
+                            $"[UniversalObservabilityPlugin] Failed to publish list response: {t.Exception?.GetBaseException().Message}"),
+                        System.Threading.Tasks.TaskContinuationOptions.OnlyOnFaulted);
+                }
                 break;
 
             case "observability.universal.select.metrics":
                 if (message.Payload.TryGetValue("strategyId", out var mId) && mId is string metricsId)
-                    SetActiveMetricsStrategy(metricsId);
+                {
+                    try { SetActiveMetricsStrategy(metricsId); }
+                    catch (ArgumentException ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine(
+                            $"[UniversalObservabilityPlugin] select.metrics failed: {ex.Message}");
+                    }
+                }
                 break;
 
             case "observability.universal.select.logging":
                 if (message.Payload.TryGetValue("strategyId", out var lId) && lId is string loggingId)
-                    SetActiveLoggingStrategy(loggingId);
+                {
+                    try { SetActiveLoggingStrategy(loggingId); }
+                    catch (ArgumentException ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine(
+                            $"[UniversalObservabilityPlugin] select.logging failed: {ex.Message}");
+                    }
+                }
                 break;
 
             case "observability.universal.select.tracing":
                 if (message.Payload.TryGetValue("strategyId", out var tId) && tId is string tracingId)
-                    SetActiveTracingStrategy(tracingId);
+                {
+                    try { SetActiveTracingStrategy(tracingId); }
+                    catch (ArgumentException ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine(
+                            $"[UniversalObservabilityPlugin] select.tracing failed: {ex.Message}");
+                    }
+                }
                 break;
         }
 

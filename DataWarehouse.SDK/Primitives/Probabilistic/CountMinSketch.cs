@@ -34,7 +34,8 @@ public sealed class CountMinSketch<T> : IProbabilisticStructure, IMergeable<Coun
     private readonly double _delta;
     private readonly Func<T, byte[]> _serializer;
     private long _totalCount;
-    private long _lastQueryResult;
+    // Cat 15 (finding 565): renamed from _lastEstimate to _lastEstimate for clarity
+    private long _lastEstimate;
 
     /// <inheritdoc/>
     public string StructureType => "CountMinSketch";
@@ -154,7 +155,7 @@ public sealed class CountMinSketch<T> : IProbabilisticStructure, IMergeable<Coun
         }
 
         var result = minCount == long.MaxValue ? 0 : minCount;
-        Interlocked.Exchange(ref _lastQueryResult, result);
+        Interlocked.Exchange(ref _lastEstimate, result);
         return result;
     }
 
@@ -190,8 +191,8 @@ public sealed class CountMinSketch<T> : IProbabilisticStructure, IMergeable<Coun
     {
         // True count is guaranteed to be <= estimate
         // With high probability, true count >= estimate - epsilon * total
-        // Read _lastQueryResult once to avoid tearing if updated concurrently
-        var lastResult = Interlocked.Read(ref _lastQueryResult);
+        // Read _lastEstimate once to avoid tearing if updated concurrently
+        var lastResult = Interlocked.Read(ref _lastEstimate);
         var errorBound = _epsilon * Interlocked.Read(ref _totalCount);
         return (Math.Max(0, lastResult - errorBound), lastResult);
     }

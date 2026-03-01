@@ -245,7 +245,7 @@ namespace DataWarehouse.SDK.Primitives
     }
 
     /// <summary>
-    /// Level of compression to b∈ used
+    /// Level of compression to be used
     /// </summary>
     public enum CompressionLevel
     {

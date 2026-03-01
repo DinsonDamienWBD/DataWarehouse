@@ -459,7 +459,9 @@ public sealed class TDigest : IProbabilisticStructure, IMergeable<TDigest>, ICon
         return _count > 0 ? (weight + c.Weight / 2.0) / _count : 0.5;
     }
 
-    private double Quantile(Centroid centroid)
+    // Cat 15 (finding 566): renamed from Quantile(Centroid) to CentroidQuantilePosition to avoid
+    // shadowing public Quantile(double) and eliminate naming confusion.
+    private double CentroidQuantilePosition(Centroid centroid)
     {
         double weight = 0;
         for (int i = 0; i < _centroids.Count; i++)

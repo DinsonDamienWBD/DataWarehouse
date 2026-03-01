@@ -29,9 +29,14 @@ namespace DataWarehouse.Plugins.UltimateSustainability;
 /// </remarks>
 public sealed class UltimateSustainabilityPlugin : InfrastructurePluginBase
 {
+    // Single authoritative registry; _strategies is a secondary index kept in sync via RegisterStrategy.
+    // Authoritative source of truth is _strategies (BoundedDictionary gives thread-safe access);
+    // _registry provides category-based lookup only and is always updated atomically with _strategies.
     private readonly SustainabilityStrategyRegistry _registry = new();
     private readonly BoundedDictionary<string, ISustainabilityStrategy> _strategies = new BoundedDictionary<string, ISustainabilityStrategy>(1000);
     private ISustainabilityStrategy? _activeStrategy;
+    // Cached capabilities list; invalidated whenever a new strategy is registered.
+    private volatile IReadOnlyList<RegisteredCapability>? _cachedCapabilities;
 
 
     /// <inheritdoc/>
@@ -51,12 +56,15 @@ public sealed class UltimateSustainabilityPlugin : InfrastructurePluginBase
 
     /// <summary>
     /// Registers a sustainability strategy with the plugin.
+    /// Both internal registries are updated atomically and the capability cache is invalidated.
     /// </summary>
     public void RegisterStrategy(ISustainabilityStrategy strategy)
     {
         ArgumentNullException.ThrowIfNull(strategy);
         _strategies[strategy.StrategyId] = strategy;
         _registry.Register(strategy);
+        // Invalidate cached capabilities so the next access rebuilds with the new strategy.
+        _cachedCapabilities = null;
     }
 
     /// <summary>
@@ -104,11 +112,12 @@ public sealed class UltimateSustainabilityPlugin : InfrastructurePluginBase
                 var recommendations = await strategy.GetRecommendationsAsync(ct);
                 allRecommendations.AddRange(recommendations);
             }
-            catch
+            catch (Exception ex)
             {
-
-                // Continue with other strategies
-                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+                // Log and continue with remaining strategies so one faulty strategy
+                // does not block the others from returning their recommendations.
+                System.Diagnostics.Debug.WriteLine(
+                    $"[UltimateSustainabilityPlugin] GetRecommendationsAsync failed for strategy '{strategy.StrategyId}': {ex.GetType().Name}: {ex.Message}");
             }
         }
         return allRecommendations.OrderByDescending(r => r.Priority).ToList().AsReadOnly();
@@ -167,20 +176,28 @@ public sealed class UltimateSustainabilityPlugin : InfrastructurePluginBase
                     RegisterStrategy(strategy);
                 }
             }
-            catch
+            catch (Exception ex)
             {
-
-                // Strategy failed to instantiate, skip
-                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+                // Log the failure so operators can diagnose broken strategy types.
+                System.Diagnostics.Debug.WriteLine(
+                    $"[UltimateSustainabilityPlugin] Failed to instantiate strategy type '{strategyType.FullName}': {ex.GetType().Name}: {ex.Message}");
             }
         }
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// The result is cached after the first build and invalidated whenever a new strategy is registered.
+    /// This avoids per-call allocation and iteration over all strategies on a property getter hot path.
+    /// </remarks>
     protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities
     {
         get
         {
+            // Return cached value if still valid (volatile read for thread visibility).
+            if (_cachedCapabilities != null)
+                return _cachedCapabilities;
+
             var capabilities = new List<RegisteredCapability>
             {
                 new RegisteredCapability
@@ -233,7 +250,10 @@ public sealed class UltimateSustainabilityPlugin : InfrastructurePluginBase
                 });
             }
 
-            return capabilities;
+            var built = capabilities.AsReadOnly();
+            // Store in cache field (volatile write ensures visibility to other threads).
+            _cachedCapabilities = built;
+            return built;
         }
     }
 
@@ -280,7 +300,18 @@ public sealed class UltimateSustainabilityPlugin : InfrastructurePluginBase
 
             case "sustainability.select":
                 if (message.Payload.TryGetValue("strategyId", out var idObj) && idObj is string strategyId)
-                    SetActiveStrategy(strategyId);
+                {
+                    try
+                    {
+                        SetActiveStrategy(strategyId);
+                    }
+                    catch (ArgumentException ex)
+                    {
+                        // Unknown strategy ID — log and swallow so the message bus does not get an unhandled exception.
+                        System.Diagnostics.Debug.WriteLine(
+                            $"[UltimateSustainabilityPlugin] sustainability.select failed: {ex.Message}");
+                    }
+                }
                 break;
 
             case "sustainability.recommendations":

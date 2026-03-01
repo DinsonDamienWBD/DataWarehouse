@@ -81,14 +81,14 @@ namespace DataWarehouse.Kernel.Messaging
     /// Bounded concurrent dictionary that enforces a maximum capacity.
     /// When capacity is reached, oldest entries are evicted.
     /// </summary>
-    internal sealed class BoundedBoundedDictionary<TKey, TValue> where TKey : notnull
+    internal sealed class CappedDictionary<TKey, TValue> where TKey : notnull
     {
         private readonly BoundedDictionary<TKey, TValue> _dictionary;
         private readonly ConcurrentQueue<TKey> _keyOrder = new();
         private readonly int _maxCapacity;
         private readonly object _evictionLock = new();
 
-        public BoundedBoundedDictionary(int maxCapacity)
+        public CappedDictionary(int maxCapacity)
         {
             _maxCapacity = maxCapacity > 0 ? maxCapacity : int.MaxValue;
             _dictionary = new BoundedDictionary<TKey, TValue>(_maxCapacity);
@@ -184,8 +184,8 @@ namespace DataWarehouse.Kernel.Messaging
     /// </summary>
     public class AdvancedMessageBus : MessageBusBase, IAdvancedMessageBus
     {
-        private readonly BoundedBoundedDictionary<string, PendingMessage> _pendingMessages;
-        private readonly BoundedBoundedDictionary<string, MessageGroup> _messageGroups;
+        private readonly CappedDictionary<string, PendingMessage> _pendingMessages;
+        private readonly CappedDictionary<string, MessageGroup> _messageGroups;
         private readonly BoundedDictionary<string, FilteredSubscription> _filteredSubscriptions = new BoundedDictionary<string, FilteredSubscription>(1000);
         private readonly MessageBusStatistics _statistics = new();
         private readonly IKernelContext _context;
@@ -206,8 +206,8 @@ namespace DataWarehouse.Kernel.Messaging
             _config = config ?? new AdvancedMessageBusConfig();
 
             // Initialize bounded collections with configured limits
-            _pendingMessages = new BoundedBoundedDictionary<string, PendingMessage>(_config.MaxPendingMessages);
-            _messageGroups = new BoundedBoundedDictionary<string, MessageGroup>(_config.MaxMessageGroups);
+            _pendingMessages = new CappedDictionary<string, PendingMessage>(_config.MaxPendingMessages);
+            _messageGroups = new CappedDictionary<string, MessageGroup>(_config.MaxMessageGroups);
 
             // Start background timers
             _retryTimer = new Timer(ProcessRetries, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));

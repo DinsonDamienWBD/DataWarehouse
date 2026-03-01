@@ -463,6 +463,7 @@ internal sealed class StatefulStreamProcessing : IDisposable
         if (entries == null) return 0;
 
         int restored = 0;
+        int skipped = 0;
         foreach (var (key, entry) in entries)
         {
             var value = Convert.FromBase64String(entry.ValueBase64);
@@ -473,6 +474,21 @@ internal sealed class StatefulStreamProcessing : IDisposable
                 _state[key] = new StateEntry(value, entry.Timestamp, checksum);
                 restored++;
             }
+            else
+            {
+                // Log checksum mismatch so operators know data was skipped due to corruption.
+                skipped++;
+                System.Diagnostics.Debug.WriteLine(
+                    $"[StatefulStreamProcessing] Checksum mismatch restoring key '{key}' " +
+                    $"in namespace '{_namespace}': expected {entry.Checksum}, got {checksum}. Entry skipped.");
+            }
+        }
+
+        if (skipped > 0)
+        {
+            System.Diagnostics.Debug.WriteLine(
+                $"[StatefulStreamProcessing] Checkpoint restore for namespace '{_namespace}': " +
+                $"{restored} entries restored, {skipped} entries skipped due to checksum mismatch.");
         }
 
         return restored;

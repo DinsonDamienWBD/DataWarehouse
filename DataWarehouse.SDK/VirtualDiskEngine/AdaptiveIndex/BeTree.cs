@@ -228,7 +228,8 @@ public sealed class BeTree : IAdaptiveIndex, IAsyncDisposable
             var txn = await _wal.BeginTransactionAsync(ct).ConfigureAwait(false);
             var root = await ReadNodeAsync(_rootBlockNumber, ct).ConfigureAwait(false);
             var timestamp = Interlocked.Increment(ref _nextTimestamp);
-            var message = new BeTreeMessage(BeTreeMessageType.Upsert, key, newValue, timestamp);
+            // Cat 15 (finding 712): use Update message type — key already verified to exist above
+            var message = new BeTreeMessage(BeTreeMessageType.Update, key, newValue, timestamp);
 
             if (root.IsLeaf)
             {

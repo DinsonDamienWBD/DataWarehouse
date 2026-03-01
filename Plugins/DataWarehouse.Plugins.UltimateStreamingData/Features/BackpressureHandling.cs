@@ -175,7 +175,7 @@ internal sealed class BackpressureHandling : IDisposable
     /// <returns>The channel identifier.</returns>
     public string CreateChannel(string channelId, BackpressureConfig? config = null)
     {
-        ArgumentNullException.ThrowIfNull(channelId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(channelId, nameof(channelId));
 
         var channelConfig = config ?? _config;
         var options = new BoundedChannelOptions(channelConfig.BufferCapacity)

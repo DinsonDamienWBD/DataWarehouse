@@ -1018,9 +1018,11 @@ public sealed class SearchScalingManager : IScalableSubsystem, IDisposable
 
         Array.Sort(snapshot);
 
-        double p50 = snapshot[(int)(count * 0.50)];
-        double p95 = snapshot[(int)(count * 0.95)];
-        double p99 = snapshot[Math.Min((int)(count * 0.99), count - 1)];
+        // Use Math.Min to clamp index and avoid off-by-one with small sample sizes.
+        // (int)Math.Ceiling ensures the P50 of a 1-element array returns index 0, not index -1.
+        double p50 = snapshot[Math.Min((int)Math.Ceiling(count * 0.50) - 1, count - 1)];
+        double p95 = snapshot[Math.Min((int)Math.Ceiling(count * 0.95) - 1, count - 1)];
+        double p99 = snapshot[Math.Min((int)Math.Ceiling(count * 0.99) - 1, count - 1)];
 
         return (p50, p95, p99);
     }

@@ -143,10 +143,10 @@ public sealed class ArtIndex : IAdaptiveIndex, IDisposable
 
         foreach (var entry in results)
         {
+            ct.ThrowIfCancellationRequested();
             yield return entry;
         }
-
-        await Task.CompletedTask;
+        // Cat 13 (finding 713): removed gratuitous `await Task.CompletedTask` — unnecessary state-machine allocation
     }
 
     /// <inheritdoc />

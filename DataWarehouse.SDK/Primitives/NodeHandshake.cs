@@ -46,10 +46,18 @@ namespace DataWarehouse.SDK.Primitives
         public static NodeHandshake Failure(string error) => new() { Success = false, ErrorMessage = error };
 
         /// <summary>
-        /// Handshake Success
+        /// Creates a successful handshake result. Prefer <see cref="Create(string)"/> for consistent naming with <see cref="Failure(string)"/>.
         /// </summary>
-        /// <param name="nodeId"></param>
-        /// <returns></returns>
+        /// <param name="nodeId">The node identifier.</param>
+        /// <returns>A successful <see cref="NodeHandshake"/>.</returns>
+        [Obsolete("Use NodeHandshake.Create(nodeId) for consistent naming with Failure(error). SuccessResult retained for backward compatibility.")]
         public static NodeHandshake SuccessResult(string nodeId) => new() { Success = true, NodeId = nodeId };
+
+        /// <summary>
+        /// Creates a successful handshake result (Cat 15, finding 550: symmetric naming with <see cref="Failure(string)"/>).
+        /// </summary>
+        /// <param name="nodeId">The node identifier.</param>
+        /// <returns>A successful <see cref="NodeHandshake"/>.</returns>
+        public static NodeHandshake Create(string nodeId) => new() { Success = true, NodeId = nodeId };
     }
 }

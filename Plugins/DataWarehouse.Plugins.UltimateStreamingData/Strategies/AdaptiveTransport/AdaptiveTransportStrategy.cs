@@ -332,7 +332,9 @@ public sealed class BandwidthProbe
 
         try
         {
-            var stream = client.GetStream();
+            // NetworkStream is owned by the TcpClient and will be disposed when the client disposes,
+            // but we explicitly wrap it in a using to ensure prompt disposal if an exception occurs.
+            using var stream = client.GetStream();
             var sendData = new byte[probeSize];
             var receiveData = new byte[probeSize];
             var latencies = new List<double>();
@@ -377,8 +379,12 @@ public sealed class BandwidthProbe
 
             return (downloadBps, uploadBps, jitter);
         }
-        catch
+        catch (Exception ex)
         {
+            // Probe failed (network error, remote closed connection, etc.).
+            // Return zero measurements so the caller can fall back to estimated values.
+            System.Diagnostics.Debug.WriteLine(
+                $"[AdaptiveTransportStrategy] ActiveProbeAsync failed: {ex.GetType().Name}: {ex.Message}");
             return (0, 0, 0);
         }
     }

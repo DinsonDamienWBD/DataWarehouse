@@ -126,6 +126,9 @@ public sealed record Tag
 public sealed class TagCollection : IEnumerable<Tag>
 {
     private readonly IReadOnlyDictionary<TagKey, Tag> _tags;
+    // Cat 13: cache the hash code — collection is immutable, computing OrderBy on every GetHashCode is O(n log n)
+    private int _cachedHashCode;
+    private bool _hashCodeComputed;
 
     /// <summary>
     /// Initializes a new <see cref="TagCollection"/> wrapping the given dictionary.
@@ -191,16 +194,21 @@ public sealed class TagCollection : IEnumerable<Tag>
         _tags.All(kvp => other._tags.TryGetValue(kvp.Key, out var otherTag) && Equals(kvp.Value, otherTag));
 
     /// <inheritdoc />
+#pragma warning disable S2328 // TagCollection._tags is effectively immutable after construction; lazy hash cache is intentional.
     public override int GetHashCode()
     {
+        if (_hashCodeComputed) return _cachedHashCode;
         var hash = new HashCode();
         foreach (var kvp in _tags.OrderBy(p => p.Key.ToString(), StringComparer.Ordinal))
         {
             hash.Add(kvp.Key);
             hash.Add(kvp.Value);
         }
-        return hash.ToHashCode();
+        _cachedHashCode = hash.ToHashCode();
+        _hashCodeComputed = true;
+        return _cachedHashCode;
     }
+#pragma warning restore S2328
 }
 
 /// <summary>

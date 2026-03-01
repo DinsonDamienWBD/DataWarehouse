@@ -759,7 +759,8 @@ public sealed class MlInferenceStreamingStrategy : StreamingDataStrategyBase
 public sealed class TimeSeriesAnalyticsStrategy : StreamingDataStrategyBase
 {
     private readonly BoundedDictionary<string, TimeSeriesAnalyzer> _analyzers = new BoundedDictionary<string, TimeSeriesAnalyzer>(1000);
-    private readonly BoundedDictionary<string, List<TimeSeriesPoint>> _buffers = new BoundedDictionary<string, List<TimeSeriesPoint>>(1000);
+    // Queue<T> gives O(1) Enqueue/Dequeue vs O(n) List.RemoveAt(0) for the sliding window buffer.
+    private readonly BoundedDictionary<string, Queue<TimeSeriesPoint>> _buffers = new BoundedDictionary<string, Queue<TimeSeriesPoint>>(1000);
 
     public override string StrategyId => "analytics-timeseries";
     public override string DisplayName => "Time Series Analytics";
@@ -801,7 +802,7 @@ public sealed class TimeSeriesAnalyticsStrategy : StreamingDataStrategyBase
         if (!_analyzers.TryAdd(analyzerId, analyzer))
             throw new InvalidOperationException($"Analyzer {analyzerId} already exists");
 
-        _buffers[analyzerId] = new List<TimeSeriesPoint>();
+        _buffers[analyzerId] = new Queue<TimeSeriesPoint>();
         RecordOperation("CreateTimeSeriesAnalyzer");
         return Task.FromResult(analyzer);
     }
@@ -821,21 +822,25 @@ public sealed class TimeSeriesAnalyticsStrategy : StreamingDataStrategyBase
 
         await foreach (var point in points.WithCancellation(cancellationToken))
         {
+            List<TimeSeriesPoint>? snapshot = null;
             lock (buffer)
             {
-                buffer.Add(point);
+                buffer.Enqueue(point);
 
-                // Maintain buffer size
-                if (buffer.Count > analyzer.Config.BufferSize)
-                    buffer.RemoveAt(0);
+                // Maintain sliding window — O(1) Dequeue vs O(n) RemoveAt(0)
+                while (buffer.Count > analyzer.Config.BufferSize)
+                    buffer.Dequeue();
 
                 // Only analyze when we have enough data
                 if (buffer.Count < analyzer.Config.MinDataPoints)
                     continue;
+
+                // Snapshot the buffer under the lock so PerformAnalysis runs outside the lock
+                snapshot = buffer.ToList();
             }
 
-            // Perform analysis
-            var analysis = PerformAnalysis(buffer, analyzer.Config);
+            // Perform analysis on the snapshot (outside the lock to avoid holding it during analysis)
+            var analysis = PerformAnalysis(snapshot, analyzer.Config);
 
             yield return new TimeSeriesResult
             {
@@ -855,7 +860,7 @@ public sealed class TimeSeriesAnalyticsStrategy : StreamingDataStrategyBase
         RecordOperation("AnalyzeTimeSeries");
     }
 
-    private TimeSeriesAnalysis PerformAnalysis(List<TimeSeriesPoint> buffer, TimeSeriesConfig config)
+    private TimeSeriesAnalysis PerformAnalysis(IReadOnlyList<TimeSeriesPoint> buffer, TimeSeriesConfig config)
     {
         var values = buffer.Select(p => p.Value).ToArray();
 

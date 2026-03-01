@@ -163,18 +163,22 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 throw new ArgumentException($"Backend '{backendId}' not found in registry");
             }
 
-            if (pool.Backends.Any(b => b.StrategyId == backendId))
+            // Protect check-then-add with a per-pool lock to prevent TOCTOU duplicates.
+            lock (pool.MembershipLock)
             {
-                throw new InvalidOperationException($"Backend '{backendId}' already in pool '{poolId}'");
-            }
+                if (pool.Backends.Any(b => b.StrategyId == backendId))
+                {
+                    throw new InvalidOperationException($"Backend '{backendId}' already in pool '{poolId}'");
+                }
 
-            pool.Backends.Add(new PoolBackend
-            {
-                StrategyId = backendId,
-                Weight = weight,
-                Priority = priority,
-                IsEnabled = true
-            });
+                pool.Backends.Add(new PoolBackend
+                {
+                    StrategyId = backendId,
+                    Weight = weight,
+                    Priority = priority,
+                    IsEnabled = true
+                });
+            }
         }
 
         /// <summary>
@@ -487,6 +491,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
         /// <summary>Human-readable pool name.</summary>
         public string PoolName { get; init; } = string.Empty;
+
+        /// <summary>Lock protecting check-then-add membership operations to prevent duplicate backends.</summary>
+        internal readonly object MembershipLock = new();
 
         /// <summary>Backends in this pool.</summary>
         public ConcurrentBag<PoolBackend> Backends { get; init; } = new();

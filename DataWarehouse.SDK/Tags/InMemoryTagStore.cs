@@ -151,6 +151,10 @@ namespace DataWarehouse.SDK.Tags
         public Task<IReadOnlyList<string>> FindObjectsByTagAsync(
             TagKey tagKey, TagValue? value, int limit, CancellationToken ct = default)
         {
+            // Cat 14 (finding 670): validate limit — 0 or negative returns empty silently, which
+            // is often a caller bug. Treat limit <= 0 as "no limit" to avoid silent empty results.
+            if (limit <= 0) limit = int.MaxValue;
+
             var results = new List<string>();
 
             foreach (var kvp in _store)

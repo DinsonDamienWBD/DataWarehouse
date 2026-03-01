@@ -28,6 +28,9 @@ namespace DataWarehouse.Plugins.UltimateCompute.Strategies.WasmLanguages;
 /// </remarks>
 internal sealed class WasmLanguageEcosystemStrategy : ComputeRuntimeStrategyBase
 {
+    // P2-1758: Cache the ecosystem report to avoid duplicate reflection-based assembly scans.
+    private EcosystemReport? _cachedReport;
+
     /// <inheritdoc/>
     public override string StrategyId => "compute.wasm.ecosystem";
 
@@ -110,6 +113,8 @@ internal sealed class WasmLanguageEcosystemStrategy : ComputeRuntimeStrategyBase
     /// <returns>An <see cref="EcosystemReport"/> containing the full language catalog.</returns>
     public EcosystemReport GetEcosystemReport()
     {
+        // P2-1758: Return cached report to avoid repeated reflection-based assembly scans.
+        if (_cachedReport != null) return _cachedReport;
         var summaries = new List<LanguageSummary>();
         var assembly = Assembly.GetExecutingAssembly();
         var baseType = typeof(WasmLanguageStrategyBase);
@@ -162,13 +167,14 @@ internal sealed class WasmLanguageEcosystemStrategy : ComputeRuntimeStrategyBase
             return tierCompare != 0 ? tierCompare : string.Compare(a.Language, b.Language, StringComparison.OrdinalIgnoreCase);
         });
 
-        return new EcosystemReport(
+        _cachedReport = new EcosystemReport(
             TotalLanguages: summaries.Count,
             Tier1Count: summaries.Count(s => s.Tier == "Tier 1"),
             Tier2Count: summaries.Count(s => s.Tier == "Tier 2"),
             Tier3Count: summaries.Count(s => s.Tier == "Tier 3"),
             Languages: summaries
         );
+        return _cachedReport;
     }
 
     /// <summary>

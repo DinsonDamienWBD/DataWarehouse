@@ -1,4 +1,5 @@
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Tags;
 
@@ -30,10 +31,11 @@ namespace DataWarehouse.SDK.Tags;
 [SdkCompatibility("5.0.0", Notes = "Phase 55: Default tag propagation engine")]
 public sealed class DefaultTagPropagationEngine : ITagPropagationEngine
 {
+    // Cat 15 (finding 661): use BoundedDictionary consistent with SDK pattern — caps unbounded growth at 10K rules
+    private const int MaxRules = 10_000;
     private readonly ITagAttachmentService? _attachmentService;
     private readonly ITagSchemaRegistry? _schemaRegistry;
-    private readonly object _lock = new();
-    private readonly Dictionary<string, TagPropagationRule> _rulesById = new(StringComparer.Ordinal);
+    private readonly BoundedDictionary<string, TagPropagationRule> _rulesById = new(MaxRules, StringComparer.Ordinal);
 
     /// <summary>
     /// Initializes a new <see cref="DefaultTagPropagationEngine"/> with optional services
@@ -58,37 +60,31 @@ public sealed class DefaultTagPropagationEngine : ITagPropagationEngine
     public void AddRule(TagPropagationRule rule)
     {
         ArgumentNullException.ThrowIfNull(rule);
-        lock (_lock)
-        {
-            _rulesById[rule.RuleId] = rule;
-        }
+        // BoundedDictionary is thread-safe — no external lock needed
+        _rulesById[rule.RuleId] = rule;
     }
 
     /// <inheritdoc />
     public void RemoveRule(string ruleId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(ruleId);
-        lock (_lock)
-        {
-            _rulesById.Remove(ruleId);
-        }
+        _rulesById.TryRemove(ruleId, out _);
     }
 
     /// <inheritdoc />
     public IReadOnlyList<TagPropagationRule> GetRules(PipelineStage? stage = null)
     {
-        lock (_lock)
-        {
-            var rules = stage.HasValue
-                ? _rulesById.Values.Where(r => r.FromStage == stage.Value)
-                : _rulesById.Values;
+        // BoundedDictionary enumerates under its own internal read lock; snapshot values first
+        var values = _rulesById.Values.ToList();
+        var rules = stage.HasValue
+            ? values.Where(r => r.FromStage == stage.Value)
+            : (IEnumerable<TagPropagationRule>)values;
 
-            return rules
-                .OrderBy(r => r.Priority)
-                .ThenBy(r => r.RuleId, StringComparer.Ordinal)
-                .ToList()
-                .AsReadOnly();
-        }
+        return rules
+            .OrderBy(r => r.Priority)
+            .ThenBy(r => r.RuleId, StringComparer.Ordinal)
+            .ToList()
+            .AsReadOnly();
     }
 
     /// <inheritdoc />
@@ -103,15 +99,11 @@ public sealed class DefaultTagPropagationEngine : ITagPropagationEngine
         var dropped = new List<(TagKey Key, string Reason)>();
         var failed = new List<(TagKey Key, string Error)>();
 
-        // Snapshot rules under lock to avoid holding lock during async operations
-        List<TagPropagationRule> rules;
-        lock (_lock)
-        {
-            rules = _rulesById.Values
-                .OrderBy(r => r.Priority)
-                .ThenBy(r => r.RuleId, StringComparer.Ordinal)
-                .ToList();
-        }
+        // Snapshot rules — BoundedDictionary is thread-safe; snapshot before async work
+        var rules = _rulesById.Values
+            .OrderBy(r => r.Priority)
+            .ThenBy(r => r.RuleId, StringComparer.Ordinal)
+            .ToList();
 
         foreach (var tag in context.SourceTags)
         {

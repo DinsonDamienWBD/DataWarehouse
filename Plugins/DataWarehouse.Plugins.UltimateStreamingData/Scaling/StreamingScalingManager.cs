@@ -317,8 +317,9 @@ public sealed class StreamingScalingManager : IScalableSubsystem, IDisposable
 
     /// <summary>
     /// Creates a consumer group subscription that yields events from assigned partitions.
-    /// Consumer offsets are tracked per partition and committed to the checkpoint store
-    /// for exactly-once processing semantics on restart.
+    /// Consumer offsets are tracked per partition and committed to the checkpoint store.
+    /// Delivery semantics are at-least-once: checkpointed offsets prevent reprocessing already-committed
+    /// events on restart, but in-flight events at crash time may be redelivered.
     /// </summary>
     /// <param name="consumerGroupId">The consumer group identifier for coordinated consumption.</param>
     /// <param name="ct">Cancellation token that stops the subscription when cancelled.</param>
@@ -594,7 +595,9 @@ public sealed class StreamingScalingManager : IScalableSubsystem, IDisposable
 
     private long GetMaxConsumerLagMs()
     {
-        // Estimate lag based on partition channel depth and average processing rate
+        // Estimate lag based on partition channel depth and average processing rate.
+        // Compute average latency once outside the loop to avoid O(partitions) overhead.
+        var avgLatency = GetAverageLatencyMs();
         long maxLag = 0;
         for (int i = 0; i < _partitionCount; i++)
         {
@@ -602,7 +605,6 @@ public sealed class StreamingScalingManager : IScalableSubsystem, IDisposable
             if (channel?.Reader.CanCount == true)
             {
                 var depth = channel.Reader.Count;
-                var avgLatency = GetAverageLatencyMs();
                 var estimatedLagMs = (long)(depth * Math.Max(avgLatency, 1));
                 if (estimatedLagMs > maxLag)
                     maxLag = estimatedLagMs;
@@ -615,14 +617,14 @@ public sealed class StreamingScalingManager : IScalableSubsystem, IDisposable
     /// Evaluates whether partition or consumer auto-scaling is needed based on
     /// throughput and lag thresholds from the <see cref="ScalabilityConfig"/>.
     /// </summary>
-    private async Task EvaluateScaleDecisionAsync(CancellationToken ct)
+    private Task EvaluateScaleDecisionAsync(CancellationToken ct)
     {
         if (!_scalabilityConfig.AutoScale)
-            return;
+            return Task.CompletedTask;
 
         // Enforce cooldown
         if (DateTimeOffset.UtcNow - _lastScaleDecision < _scaleCooldown)
-            return;
+            return Task.CompletedTask;
 
         var throughput = Interlocked.Read(ref _publishCount);
         var throughputPerPartition = _partitionCount > 0 ? throughput / _partitionCount : throughput;
@@ -654,7 +656,7 @@ public sealed class StreamingScalingManager : IScalableSubsystem, IDisposable
             _lastScaleDecision = DateTimeOffset.UtcNow;
         }
 
-        await Task.CompletedTask;
+        return Task.CompletedTask;
     }
 
     private void ScalePartitions(int newCount)

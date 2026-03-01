@@ -266,6 +266,20 @@ public sealed class SqlSecurityAnalyzer
 /// </summary>
 public static class SqlSanitizer
 {
+    // Cat 13: per-call HashSet allocation fixed — static readonly instances
+    private static readonly HashSet<string> ReservedWords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "SELECT", "INSERT", "UPDATE", "DELETE", "DROP", "CREATE", "ALTER", "TRUNCATE",
+        "TABLE", "DATABASE", "INDEX", "VIEW", "PROCEDURE", "FUNCTION", "TRIGGER",
+        "FROM", "WHERE", "AND", "OR", "NOT", "IN", "EXISTS", "BETWEEN", "LIKE",
+        "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "FULL", "CROSS", "ON",
+        "GROUP", "BY", "HAVING", "ORDER", "ASC", "DESC", "LIMIT", "OFFSET",
+        "UNION", "INTERSECT", "EXCEPT", "ALL", "DISTINCT", "AS", "NULL",
+        "TRUE", "FALSE", "IS", "CASE", "WHEN", "THEN", "ELSE", "END",
+        "GRANT", "REVOKE", "COMMIT", "ROLLBACK", "SAVEPOINT", "TRANSACTION",
+        "PRIMARY", "KEY", "FOREIGN", "REFERENCES", "UNIQUE", "CHECK", "DEFAULT",
+        "CONSTRAINT", "CASCADE", "SET", "VALUES", "INTO"
+    };
     /// <summary>
     /// Sanitizes a string value for use in SQL.
     /// Note: Always prefer parameterized queries over sanitization.
@@ -373,24 +387,7 @@ public static class SqlSanitizer
     /// <summary>
     /// Checks if a word is a SQL reserved word.
     /// </summary>
-    public static bool IsReservedWord(string word)
-    {
-        var reserved = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "SELECT", "INSERT", "UPDATE", "DELETE", "DROP", "CREATE", "ALTER", "TRUNCATE",
-            "TABLE", "DATABASE", "INDEX", "VIEW", "PROCEDURE", "FUNCTION", "TRIGGER",
-            "FROM", "WHERE", "AND", "OR", "NOT", "IN", "EXISTS", "BETWEEN", "LIKE",
-            "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "FULL", "CROSS", "ON",
-            "GROUP", "BY", "HAVING", "ORDER", "ASC", "DESC", "LIMIT", "OFFSET",
-            "UNION", "INTERSECT", "EXCEPT", "ALL", "DISTINCT", "AS", "NULL",
-            "TRUE", "FALSE", "IS", "CASE", "WHEN", "THEN", "ELSE", "END",
-            "GRANT", "REVOKE", "COMMIT", "ROLLBACK", "SAVEPOINT", "TRANSACTION",
-            "PRIMARY", "KEY", "FOREIGN", "REFERENCES", "UNIQUE", "CHECK", "DEFAULT",
-            "CONSTRAINT", "CASCADE", "SET", "VALUES", "INTO"
-        };
-
-        return reserved.Contains(word);
-    }
+    public static bool IsReservedWord(string word) => ReservedWords.Contains(word);
 }
 
 #endregion
@@ -403,6 +400,11 @@ public static class SqlSanitizer
 /// </summary>
 public sealed class SafeQueryBuilder
 {
+    // Cat 13: per-call HashSet allocation fixed — static readonly
+    private static readonly HashSet<string> AllowedOperators = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "=", "!=", "<>", "<", ">", "<=", ">=", "LIKE", "IN", "IS", "IS NOT"
+    };
     private readonly StringBuilder _query = new();
     private readonly Dictionary<string, object?> _parameters = new();
     private int _parameterIndex;
@@ -572,9 +574,8 @@ public sealed class SafeQueryBuilder
 
     private static string ValidateOperator(string op)
     {
-        var allowed = new HashSet<string> { "=", "!=", "<>", "<", ">", "<=", ">=", "LIKE", "IN", "IS", "IS NOT" };
         var normalized = op.Trim().ToUpperInvariant();
-        if (!allowed.Contains(normalized))
+        if (!AllowedOperators.Contains(normalized))
         {
             throw new ArgumentException($"Invalid SQL operator: '{op}'", nameof(op));
         }
