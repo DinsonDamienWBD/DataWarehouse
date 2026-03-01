@@ -38,11 +38,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             return _filePath != null;
         }
 
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
-        {
-            _filePath = null;
-            await Task.CompletedTask;
-        }
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) {
+            _filePath = null; return Task.CompletedTask; }
 
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {

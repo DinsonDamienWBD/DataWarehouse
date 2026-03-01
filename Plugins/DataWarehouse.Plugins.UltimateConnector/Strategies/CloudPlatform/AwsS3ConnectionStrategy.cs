@@ -107,12 +107,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
             }
         }
 
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
-        {
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) {
             var s3Client = handle.GetConnection<IAmazonS3>();
-            s3Client?.Dispose();
-            await Task.CompletedTask;
-        }
+            s3Client?.Dispose(); return Task.CompletedTask; }
 
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {

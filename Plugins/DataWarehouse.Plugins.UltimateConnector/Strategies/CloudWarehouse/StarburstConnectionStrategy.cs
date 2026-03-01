@@ -26,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object> { ["host"] = host, ["port"] = port });
         }
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { if (_httpClient == null) return false; try { var response = await _httpClient.GetAsync("/v1/info", ct); return response.IsSuccessStatusCode; } catch { return false; } }
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { _httpClient?.Dispose(); _httpClient = null; await Task.CompletedTask; }
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { _httpClient?.Dispose(); _httpClient = null; return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             // P2-2180: Measure actual latency with Stopwatch instead of hardcoded value.

@@ -376,7 +376,9 @@ public sealed class SqlOverObjectProtocolStrategy : DatabaseProtocolStrategyBase
                         _ => new List<Dictionary<string, object?>>()
                     };
 
-                    Interlocked.Add(ref _totalBytesScanned, stream.Position);
+                    // P2-2744: capture Position before the using block disposes the stream.
+                    var bytesScanned = stream.CanSeek ? stream.Position : 0L;
+                    Interlocked.Add(ref _totalBytesScanned, bytesScanned);
 
                     _tableDataCache[query.TableName] = new CachedTableData
                     {

@@ -16,6 +16,7 @@ public sealed class CarbonBudgetStore : IDisposable, IAsyncDisposable
 {
     private readonly BoundedDictionary<string, MutableBudgetEntry> _budgets = new BoundedDictionary<string, MutableBudgetEntry>(1000);
     private readonly SemaphoreSlim _fileLock = new(1, 1);
+    private readonly object _timerLock = new();
     private readonly string _filePath;
     private Timer? _debounceSaveTimer;
     private volatile bool _dirty;
@@ -307,13 +308,17 @@ public sealed class CarbonBudgetStore : IDisposable, IAsyncDisposable
     private void MarkDirty()
     {
         _dirty = true;
-        // Debounce save: schedule save in 5 seconds, reset timer if already pending
-        _debounceSaveTimer?.Dispose();
-        _debounceSaveTimer = new Timer(
-            _ => _ = SaveAsync(CancellationToken.None),
-            null,
-            TimeSpan.FromSeconds(5),
-            Timeout.InfiniteTimeSpan);
+        // Debounce save: schedule save in 5 seconds, reset timer if already pending.
+        // Lock prevents concurrent MarkDirty() calls from racing on Dispose+Create.
+        lock (_timerLock)
+        {
+            _debounceSaveTimer?.Dispose();
+            _debounceSaveTimer = new Timer(
+                _ => _ = SaveAsync(CancellationToken.None),
+                null,
+                TimeSpan.FromSeconds(5),
+                Timeout.InfiniteTimeSpan);
+        }
     }
 
     #region Internal Mutable Entry

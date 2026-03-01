@@ -26,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object> { ["endpoint"] = endpoint });
         }
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { await Task.Delay(10, ct); return _httpClient != null; }
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { _httpClient?.Dispose(); _httpClient = null; await Task.CompletedTask; }
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { _httpClient?.Dispose(); _httpClient = null; return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             // P2-2180: Measure actual latency with Stopwatch instead of hardcoded value.

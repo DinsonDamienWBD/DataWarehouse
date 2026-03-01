@@ -47,7 +47,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             return new DefaultConnectionHandle(httpClient, new Dictionary<string, object> { ["Endpoint"] = "https://rest.zuora.com" });
         }
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { try { var response = await handle.GetConnection<HttpClient>().GetAsync("/v1/catalog/products", ct); return response.IsSuccessStatusCode; } catch { return false; } }
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<HttpClient>()?.Dispose(); await Task.CompletedTask; }
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<HttpClient>()?.Dispose(); return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, isHealthy ? "Zuora is reachable" : "Zuora is not responding", sw.Elapsed, DateTimeOffset.UtcNow); }
         protected override async Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default)
         {

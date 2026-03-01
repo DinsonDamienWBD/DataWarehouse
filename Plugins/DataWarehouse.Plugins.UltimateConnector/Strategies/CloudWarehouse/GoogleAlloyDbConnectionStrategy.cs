@@ -37,7 +37,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
             }
             catch { return false; }
         }
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { if (_tcpClient != null) { _tcpClient.Close(); _tcpClient.Dispose(); _tcpClient = null; } await Task.CompletedTask; }
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { if (_tcpClient != null) { _tcpClient.Close(); _tcpClient.Dispose(); _tcpClient = null; } return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, isHealthy ? "AlloyDB healthy" : "AlloyDB unhealthy", sw.Elapsed, DateTimeOffset.UtcNow); }
         public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
             => throw new NotSupportedException("Google AlloyDB query execution requires the Npgsql NuGet package (PostgreSQL-compatible) with valid host/port/database/user/password connection string.");

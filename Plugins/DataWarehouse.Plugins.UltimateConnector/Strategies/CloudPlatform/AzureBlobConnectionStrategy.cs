@@ -91,10 +91,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
             }
         }
 
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
-            // BlobServiceClient doesn't implement IDisposable in current Azure SDK
-            await Task.CompletedTask;
+            // BlobServiceClient doesn't implement IDisposable in the current Azure SDK version.
+            return Task.CompletedTask;
         }
 
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)

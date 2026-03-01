@@ -35,7 +35,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
             }
             catch { return false; }
         }
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { _httpClient?.Dispose(); _httpClient = null; await Task.CompletedTask; }
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { _httpClient?.Dispose(); _httpClient = null; return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, isHealthy ? "BigQuery healthy" : "BigQuery unhealthy", sw.Elapsed, DateTimeOffset.UtcNow); }
         public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
             => throw new NotSupportedException("BigQuery query execution requires the Google.Cloud.BigQuery.V2 NuGet package. Install it and use BigQueryClient.ExecuteQueryAsync.");

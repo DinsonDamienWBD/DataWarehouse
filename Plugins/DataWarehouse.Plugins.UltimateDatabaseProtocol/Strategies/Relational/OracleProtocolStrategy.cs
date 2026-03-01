@@ -207,7 +207,12 @@ public sealed class OracleTnsProtocolStrategy : DatabaseProtocolStrategyBase
         var length = BinaryPrimitives.ReadUInt16BigEndian(header);
         var type = header[4];
 
-        var data = new byte[length - 8];
+        // P2-2745: guard against malformed packets where length < 8 (header-only or truncated).
+        var dataLength = (int)length - 8;
+        if (dataLength < 0)
+            throw new InvalidOperationException($"[Oracle TNS] Malformed packet: declared length {length} is less than header size 8.");
+
+        var data = new byte[dataLength];
         if (data.Length > 0)
         {
             await ActiveStream.ReadExactlyAsync(data, 0, data.Length, ct);

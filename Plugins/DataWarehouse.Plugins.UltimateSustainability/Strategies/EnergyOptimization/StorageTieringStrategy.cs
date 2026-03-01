@@ -48,6 +48,9 @@ public sealed class StorageTieringStrategy : SustainabilityStrategyBase
     /// <summary>Tracks a data object.</summary>
     public void TrackObject(string objectId, string currentTier, long sizeBytes, DateTimeOffset lastAccessed)
     {
+        // Take a snapshot of the current state inside the lock so that EvaluateTieringRecommendations
+        // operates on a consistent view without holding the lock during the evaluation.
+        Dictionary<string, DataObjectInfo> snapshot;
         lock (_lock)
         {
             _objects[objectId] = new DataObjectInfo
@@ -58,9 +61,10 @@ public sealed class StorageTieringStrategy : SustainabilityStrategyBase
                 LastAccessed = lastAccessed,
                 CreatedAt = DateTimeOffset.UtcNow
             };
+            snapshot = new Dictionary<string, DataObjectInfo>(_objects);
         }
         RecordOptimizationAction();
-        EvaluateTieringRecommendations();
+        EvaluateTieringRecommendations(snapshot);
     }
 
     /// <summary>Records an access to an object.</summary>

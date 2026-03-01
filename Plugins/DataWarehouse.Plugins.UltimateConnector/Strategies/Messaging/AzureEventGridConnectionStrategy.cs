@@ -32,7 +32,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
             return new DefaultConnectionHandle(httpClient, new Dictionary<string, object> { ["Topic"] = topic, ["Endpoint"] = endpoint });
         }
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { try { var response = await handle.GetConnection<HttpClient>().GetAsync("/api/events", ct); return response.IsSuccessStatusCode; } catch { return false; } }
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<HttpClient>()?.Dispose(); await Task.CompletedTask; }
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<HttpClient>()?.Dispose(); return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, isHealthy ? "Azure Event Grid is reachable" : "Azure Event Grid is not responding", sw.Elapsed, DateTimeOffset.UtcNow); }
 
         public override async Task PublishAsync(IConnectionHandle handle, string topic, byte[] message, Dictionary<string, string>? headers = null, CancellationToken ct = default)

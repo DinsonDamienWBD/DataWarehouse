@@ -51,12 +51,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             catch { return false; /* Connection validation - failure acceptable */ }
         }
 
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
-        {
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) {
             _httpClient?.Dispose();
-            _httpClient = null;
-            await Task.CompletedTask;
-        }
+            _httpClient = null; return Task.CompletedTask; }
 
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {

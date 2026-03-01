@@ -28,7 +28,8 @@ public sealed class PostgreSqlSqlEngineIntegration : IDataSourceProvider
     private readonly ConcurrentDictionary<string, (SqlStatement Ast, QueryPlanNode? Plan)> _preparedStatements = new();
 
     // Transaction state: 'I' = idle, 'T' = in transaction, 'E' = failed transaction
-    private char _transactionStatus = 'I';
+    // P2-2748: volatile ensures visibility across async continuations without a full lock.
+    private volatile int _transactionStatusCode = (int)'I'; // stored as int; char cannot be volatile
     private long _transactionId;
     private readonly List<string> _transactionLog = new();
 
@@ -36,7 +37,14 @@ public sealed class PostgreSqlSqlEngineIntegration : IDataSourceProvider
     /// Gets the current transaction status character.
     /// 'I' = idle (no transaction), 'T' = in transaction, 'E' = failed transaction.
     /// </summary>
-    public char TransactionStatus => _transactionStatus;
+    public char TransactionStatus => (char)_transactionStatusCode;
+
+    // Internal helper property so existing code keeps the readable char comparisons.
+    private char _transactionStatus
+    {
+        get => (char)_transactionStatusCode;
+        set => _transactionStatusCode = (int)value;
+    }
 
     /// <summary>
     /// Initializes a new PostgreSqlSqlEngineIntegration.
@@ -422,10 +430,12 @@ public sealed class PostgreSqlSqlEngineIntegration : IDataSourceProvider
     {
         if (_transactionStatus == 'E')
         {
-            // Cannot commit a failed transaction; rollback instead
+            // P2-2742/P2-2753: Cannot commit a failed transaction. Throw so the caller is aware;
+            // the caller must issue ROLLBACK explicitly. Silently discarding is contract-breaking.
             _transactionStatus = 'I';
             _transactionLog.Clear();
-            return Task.CompletedTask;
+            throw new InvalidOperationException(
+                "Cannot COMMIT: transaction is in error state (status='E'). Issue ROLLBACK instead.");
         }
 
         _transactionStatus = 'I';

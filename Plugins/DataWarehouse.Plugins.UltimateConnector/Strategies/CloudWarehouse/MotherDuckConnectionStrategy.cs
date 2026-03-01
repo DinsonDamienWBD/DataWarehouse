@@ -29,7 +29,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
             // A real probe requires DuckDB + MotherDuck extension; without the SDK we cannot verify.
             return Task.FromResult(_token != null);
         }
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { _token = null; await Task.CompletedTask; }
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { _token = null; return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, isHealthy ? "MotherDuck token present (not verified)" : "MotherDuck token missing", sw.Elapsed, DateTimeOffset.UtcNow); }
         public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
             => throw new NotSupportedException("MotherDuck query execution requires the DuckDB.NET.Data NuGet package with the MotherDuck extension enabled via 'ATTACH md:' and a valid service token.");

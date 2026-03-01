@@ -106,12 +106,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
             }
         }
 
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
-        {
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) {
             var storageClient = handle.GetConnection<StorageClient>();
-            storageClient?.Dispose();
-            await Task.CompletedTask;
-        }
+            storageClient?.Dispose(); return Task.CompletedTask; }
 
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {

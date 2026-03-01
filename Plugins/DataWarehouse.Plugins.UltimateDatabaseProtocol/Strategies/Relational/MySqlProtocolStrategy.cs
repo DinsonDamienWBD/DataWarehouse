@@ -310,8 +310,18 @@ public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
         // Username
         offset += WriteNullTerminatedString(packet.AsSpan(offset), username);
 
-        // Auth response (length-encoded)
-        packet[offset++] = (byte)authResponse.Length;
+        // Auth response (length-encoded).
+        // P2-2746: if authResponse > 255 bytes use 0xFC 2-byte length encoding to avoid silent truncation.
+        if (authResponse.Length > 255)
+        {
+            packet[offset++] = 0xFC; // 2-byte length prefix
+            packet[offset++] = (byte)(authResponse.Length & 0xFF);
+            packet[offset++] = (byte)((authResponse.Length >> 8) & 0xFF);
+        }
+        else
+        {
+            packet[offset++] = (byte)authResponse.Length;
+        }
         authResponse.CopyTo(packet.AsSpan(offset));
         offset += authResponse.Length;
 

@@ -61,11 +61,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             catch { return false; }
         }
 
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
-        {
-            handle.GetConnection<HttpClient>()?.Dispose();
-            await Task.CompletedTask;
-        }
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) {
+            handle.GetConnection<HttpClient>()?.Dispose(); return Task.CompletedTask; }
 
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
