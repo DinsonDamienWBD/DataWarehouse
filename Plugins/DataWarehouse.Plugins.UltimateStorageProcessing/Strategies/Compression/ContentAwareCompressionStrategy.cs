@@ -60,7 +60,8 @@ internal sealed class ContentAwareCompressionStrategy : StorageProcessingStrateg
             };
         }
 
-        var extension = selectedAlgorithm switch { "brotli" => ".br", "zlib" => ".zst", _ => ".deflate" };
+        // .zst is the Zstandard extension; ZLib streams use .zlib (RFC 1950) or .deflate
+        var extension = selectedAlgorithm switch { "brotli" => ".br", "zlib" => ".zlib", _ => ".deflate" };
         var outputPath = sourcePath + extension;
 
         await using (var input = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, true))

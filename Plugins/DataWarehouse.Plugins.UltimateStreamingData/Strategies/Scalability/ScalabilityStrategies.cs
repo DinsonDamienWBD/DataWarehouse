@@ -309,9 +309,10 @@ public sealed class AutoScalingStrategy : StreamingDataStrategyBase
         lock (scaler.MetricsHistory)
         {
             scaler.MetricsHistory.Add(metrics);
-            // Keep only recent metrics
-            var cutoff = DateTimeOffset.UtcNow - TimeSpan.FromMinutes(10);
-            scaler.MetricsHistory.RemoveAll(m => m.Timestamp < cutoff);
+            // Finding 4365: RemoveAll O(n) → only trim when list grows large (amortized O(1)).
+            // Trim to last 600 entries (1 sample/sec × 10 min = 600 max); avoids per-call O(n) scan.
+            while (scaler.MetricsHistory.Count > 600)
+                scaler.MetricsHistory.RemoveAt(0);
         }
 
         return Task.CompletedTask;
@@ -977,7 +978,10 @@ public sealed class LoadBalancingStrategy : StreamingDataStrategyBase
         switch (balancer.Config.Algorithm)
         {
             case LoadBalanceAlgorithm.RoundRobin:
-                var index = (int)(Interlocked.Increment(ref balancer.RoundRobinCounter) % healthyWorkers.Count);
+                // Finding 4346: healthyWorkers.Count can change between the increment and the index.
+                // Clamp with % on the snapshot count to stay in range.
+                var rawIdx = Interlocked.Increment(ref balancer.RoundRobinCounter);
+                var index = (int)(rawIdx % healthyWorkers.Count);
                 selectedWorker = healthyWorkers[index];
                 break;
 
@@ -1134,7 +1138,8 @@ internal sealed class WorkerState
 {
     public required string WorkerId { get; init; }
     public double Weight { get; init; }
-    public bool IsHealthy { get; set; }
+    // Finding 4346: volatile so UpdateWorkerHealthAsync writes are visible to SelectWorkerAsync reads.
+    public volatile bool IsHealthy;
     public long ActiveConnections;
     public long TotalRequests;
     public DateTimeOffset LastHealthCheck { get; set; }

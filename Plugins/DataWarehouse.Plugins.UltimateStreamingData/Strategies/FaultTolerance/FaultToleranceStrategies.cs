@@ -371,13 +371,26 @@ public sealed class RestartStrategyHandler : StreamingDataStrategyBase
 
         var config = tracker.Config;
 
+        // Finding 4382: read RestartCount and RestartHistory under lock for consistency.
+        int restartCount;
+        int recentFailureCount = 0;
+        lock (tracker.RestartLock)
+        {
+            restartCount = tracker.RestartCount;
+            if (config.Strategy == RestartStrategyType.FailureRate)
+            {
+                var windowStart = DateTimeOffset.UtcNow - config.FailureRateInterval;
+                recentFailureCount = tracker.RestartHistory.Count(r => r.Timestamp >= windowStart);
+            }
+        }
+
         switch (config.Strategy)
         {
             case RestartStrategyType.NoRestart:
                 return Task.FromResult(new RestartDecision { ShouldRestart = false, Reason = "No restart configured" });
 
             case RestartStrategyType.FixedDelay:
-                if (tracker.RestartCount >= config.MaxRestartAttempts)
+                if (restartCount >= config.MaxRestartAttempts)
                 {
                     return Task.FromResult(new RestartDecision
                     {
@@ -393,7 +406,7 @@ public sealed class RestartStrategyHandler : StreamingDataStrategyBase
                 });
 
             case RestartStrategyType.ExponentialBackoff:
-                if (tracker.RestartCount >= config.MaxRestartAttempts)
+                if (restartCount >= config.MaxRestartAttempts)
                 {
                     return Task.FromResult(new RestartDecision
                     {
@@ -402,7 +415,7 @@ public sealed class RestartStrategyHandler : StreamingDataStrategyBase
                     });
                 }
                 var backoffDelay = TimeSpan.FromMilliseconds(
-                    config.InitialBackoff.TotalMilliseconds * Math.Pow(config.BackoffMultiplier, tracker.RestartCount));
+                    config.InitialBackoff.TotalMilliseconds * Math.Pow(config.BackoffMultiplier, restartCount));
                 if (config.MaxBackoff.HasValue && backoffDelay > config.MaxBackoff.Value)
                 {
                     backoffDelay = config.MaxBackoff.Value;
@@ -411,18 +424,16 @@ public sealed class RestartStrategyHandler : StreamingDataStrategyBase
                 {
                     ShouldRestart = true,
                     Delay = backoffDelay,
-                    Reason = $"Exponential backoff restart (attempt {tracker.RestartCount + 1})"
+                    Reason = $"Exponential backoff restart (attempt {restartCount + 1})"
                 });
 
             case RestartStrategyType.FailureRate:
-                var windowStart = DateTimeOffset.UtcNow - config.FailureRateInterval;
-                var recentFailures = tracker.RestartHistory.Count(r => r.Timestamp >= windowStart);
-                if (recentFailures >= config.MaxFailuresPerInterval)
+                if (recentFailureCount >= config.MaxFailuresPerInterval)
                 {
                     return Task.FromResult(new RestartDecision
                     {
                         ShouldRestart = false,
-                        Reason = $"Failure rate exceeded ({recentFailures} failures in {config.FailureRateInterval})"
+                        Reason = $"Failure rate exceeded ({recentFailureCount} failures in {config.FailureRateInterval})"
                     });
                 }
                 return Task.FromResult(new RestartDecision
@@ -451,18 +462,22 @@ public sealed class RestartStrategyHandler : StreamingDataStrategyBase
             return Task.CompletedTask;
         }
 
-        tracker.RestartCount++;
-        tracker.RestartHistory.Add(new RestartAttempt
+        // Finding 4382: guard RestartCount++ and RestartHistory.Add against concurrent ShouldRestartAsync.
+        lock (tracker.RestartLock)
         {
-            AttemptNumber = tracker.RestartCount,
-            Timestamp = DateTimeOffset.UtcNow,
-            Successful = successful,
-            Reason = reason
-        });
+            tracker.RestartCount++;
+            tracker.RestartHistory.Add(new RestartAttempt
+            {
+                AttemptNumber = tracker.RestartCount,
+                Timestamp = DateTimeOffset.UtcNow,
+                Successful = successful,
+                Reason = reason
+            });
 
-        if (successful)
-        {
-            tracker.LastSuccessfulRestart = DateTimeOffset.UtcNow;
+            if (successful)
+            {
+                tracker.LastSuccessfulRestart = DateTimeOffset.UtcNow;
+            }
         }
 
         return Task.CompletedTask;
@@ -475,8 +490,11 @@ public sealed class RestartStrategyHandler : StreamingDataStrategyBase
     {
         if (_trackers.TryGetValue(trackerId, out var tracker))
         {
-            tracker.RestartCount = 0;
-            tracker.RestartHistory.Clear();
+            lock (tracker.RestartLock)
+            {
+                tracker.RestartCount = 0;
+                tracker.RestartHistory.Clear();
+            }
         }
         return Task.CompletedTask;
     }
@@ -529,6 +547,8 @@ internal sealed class RestartTracker
     public required string TaskId { get; init; }
     public required RestartStrategyConfig Config { get; init; }
     public required List<RestartAttempt> RestartHistory { get; init; }
+    // Finding 4382: RestartHistory and RestartCount guarded by this lock.
+    public readonly object RestartLock = new();
     public DateTimeOffset CreatedAt { get; init; }
     public int RestartCount;
     public DateTimeOffset? LastSuccessfulRestart;

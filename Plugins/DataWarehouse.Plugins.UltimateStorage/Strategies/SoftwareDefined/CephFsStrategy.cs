@@ -92,7 +92,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             SupportsLocking = true, // POSIX distributed locking
             SupportsVersioning = true, // Via snapshots
             SupportsTiering = true, // Via multiple data pools
-            SupportsEncryption = false, // Encryption at rest handled at OSD level
+            SupportsEncryption = false, // POSIX layer does not encrypt; enable OSD-level dmcrypt at the Ceph OSD layer independently of this strategy
             SupportsCompression = false, // Compression handled at BlueStore level
             SupportsMultipart = false, // Striping is transparent
             MaxObjectSize = null, // Limited only by available space
@@ -730,18 +730,43 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 long usedBytes = totalBytes - driveInfo.AvailableFreeSpace;
                 long availableBytes = driveInfo.AvailableFreeSpace;
 
-                // Count files (respecting quota if set)
+                // Count files via ceph df (or xattr quota.max_files) to avoid O(N) directory walk.
+                // stat() on CephFS mount returns st_nlink which counts directory entries,
+                // but the most portable approach is the quota inode counter when quota is set.
                 long fileCount = 0;
                 try
                 {
-                    fileCount = Directory.GetFiles(_mountPath, "*", SearchOption.AllDirectories)
-                        .Where(f => !IsMetadataFile(f) && !IsSnapshotPath(f))
-                        .Count();
+                    // Try ceph df for inode count — available on CephFS ≥ Pacific
+                    using var process = new System.Diagnostics.Process
+                    {
+                        StartInfo = new System.Diagnostics.ProcessStartInfo
+                        {
+                            FileName = "ceph",
+                            Arguments = $"df detail -f json",
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                            UseShellExecute = false,
+                            CreateNoWindow = true
+                        }
+                    };
+                    process.Start();
+                    var stdout = await process.StandardOutput.ReadToEndAsync(ct).ConfigureAwait(false);
+                    await process.WaitForExitAsync(ct).ConfigureAwait(false);
+                    if (process.ExitCode == 0 && !string.IsNullOrWhiteSpace(stdout))
+                    {
+                        using var doc = System.Text.Json.JsonDocument.Parse(stdout);
+                        if (doc.RootElement.TryGetProperty("stats", out var statsEl) &&
+                            statsEl.TryGetProperty("total_objects", out var objEl) &&
+                            objEl.TryGetInt64(out var n))
+                        {
+                            fileCount = n;
+                        }
+                    }
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[CephFsStrategy.GetFilesystemUsageAsync] {ex.GetType().Name}: {ex.Message}");
-                    // File count may fail if permissions insufficient
+                    System.Diagnostics.Trace.TraceWarning($"[CephFsStrategy.GetFilesystemUsageAsync] ceph df failed: {ex.Message}");
+                    // File count unavailable — leave as 0
                 }
 
                 return new CephFsUsageInfo

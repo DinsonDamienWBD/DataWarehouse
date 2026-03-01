@@ -30,7 +30,7 @@ internal sealed class CostOptimizedProcessingStrategy : StorageProcessingStrateg
     };
 
     /// <inheritdoc/>
-    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default)
+    public override Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default)
     {
         ValidateQuery(query);
         var sw = Stopwatch.StartNew();
@@ -57,12 +57,21 @@ internal sealed class CostOptimizedProcessingStrategy : StorageProcessingStrateg
         var candidates = strategies.Where(s => s.Quality >= qualityThreshold).OrderBy(s => s.TotalCost).ToList();
         var selected = candidates.FirstOrDefault() ?? strategies.OrderBy(s => s.TotalCost).First();
 
-        // Record cost prediction
+        // Record cost prediction; actualCost measured AFTER selection work completes (finding 4289:
+        // was recording elapsed before any real processing, producing permanently near-zero values).
         var predictedCost = selected.TotalCost;
-        var actualCost = sw.Elapsed.TotalMilliseconds; // will be updated after actual processing
+        sw.Stop();
+        var actualCost = sw.Elapsed.TotalMilliseconds;
 
+        // Calculate prediction accuracy from history before adding this record
+        double accuracy;
         lock (_historyLock)
         {
+            var recent = _costHistory.TakeLast(100).ToList();
+            accuracy = recent.Count > 0
+                ? Math.Round(recent.Average(r => 1.0 - Math.Min(1.0, Math.Abs(r.PredictedCost - r.ActualCost) / Math.Max(r.PredictedCost, 1.0))) * 100.0, 2)
+                : 0.0;
+
             _costHistory.Add(new CostRecord
             {
                 Strategy = selected.Name,
@@ -76,18 +85,7 @@ internal sealed class CostOptimizedProcessingStrategy : StorageProcessingStrateg
             while (_costHistory.Count > 1000) _costHistory.RemoveAt(0);
         }
 
-        // Calculate prediction accuracy from history
-        double accuracy;
-        lock (_historyLock)
-        {
-            var recent = _costHistory.TakeLast(100).ToList();
-            accuracy = recent.Count > 0
-                ? Math.Round(recent.Average(r => 1.0 - Math.Min(1.0, Math.Abs(r.PredictedCost - r.ActualCost) / Math.Max(r.PredictedCost, 1.0))) * 100.0, 2)
-                : 0.0;
-        }
-
-        sw.Stop();
-        return await Task.FromResult(new ProcessingResult
+        return Task.FromResult(new ProcessingResult
         {
             Data = new Dictionary<string, object?>
             {

@@ -352,8 +352,9 @@ internal sealed class LoRaWanStreamStrategy : StreamingDataStrategyBase, IStream
     }
 
     /// <summary>
-    /// Computes Message Integrity Code (MIC) using AES-128-CMAC.
-    /// Simplified implementation using HMAC-SHA256 truncated to 4 bytes.
+    /// Computes Message Integrity Code (MIC) using AES-128-CMAC (RFC 4493).
+    /// Finding 4385: original used HMAC-SHA256 which no real LoRaWAN network server accepts.
+    /// AES-128-CMAC is implemented via AesCmac below.
     /// </summary>
     private static byte[] ComputeMic(byte[] payload, byte[] nwkSKey, long frameCounter)
     {
@@ -361,9 +362,58 @@ internal sealed class LoRaWanStreamStrategy : StreamingDataStrategyBase, IStream
         BitConverter.GetBytes(frameCounter).CopyTo(micInput, 0);
         payload.CopyTo(micInput, 8);
 
-        using var hmac = new HMACSHA256(nwkSKey);
-        var hash = hmac.ComputeHash(micInput);
-        return hash[..4]; // MIC is 4 bytes
+        // LoRaWAN MIC = first 4 bytes of AES-128-CMAC(NwkSKey, message) per LoRaWAN spec §4.4.
+        var cmac = AesCmac128(nwkSKey, micInput);
+        return cmac[..4];
+    }
+
+    /// <summary>
+    /// AES-128-CMAC implementation per RFC 4493.
+    /// Uses .NET AES in CBC mode to compute the CMAC tag.
+    /// </summary>
+    private static byte[] AesCmac128(byte[] key, byte[] data)
+    {
+        // Subkey generation (RFC 4493 §2.3)
+        static byte[] Xor(byte[] a, byte[] b) { var r = new byte[16]; for (int i = 0; i < 16; i++) r[i] = (byte)(a[i] ^ b[i]); return r; }
+        static byte[] Shift1(byte[] a) { var r = new byte[16]; for (int i = 0; i < 15; i++) r[i] = (byte)((a[i] << 1) | (a[i + 1] >> 7)); r[15] = (byte)(a[15] << 1); return r; }
+        static byte[] AesEncryptBlock(byte[] k, byte[] block)
+        {
+            using var aes = System.Security.Cryptography.Aes.Create();
+            aes.Key = k; aes.Mode = System.Security.Cryptography.CipherMode.ECB; aes.Padding = System.Security.Cryptography.PaddingMode.None;
+            using var enc = aes.CreateEncryptor();
+            var output = new byte[16]; enc.TransformBlock(block, 0, 16, output, 0); return output;
+        }
+
+        var rb = new byte[16]; rb[15] = 0x87;
+        var l = AesEncryptBlock(key, new byte[16]);
+        var k1 = (l[0] & 0x80) == 0 ? Shift1(l) : Xor(Shift1(l), rb);
+        var k2 = (k1[0] & 0x80) == 0 ? Shift1(k1) : Xor(Shift1(k1), rb);
+
+        // Compute CMAC
+        var n = (data.Length + 15) / 16;
+        if (n == 0) n = 1;
+        var lastBlockComplete = data.Length > 0 && data.Length % 16 == 0;
+
+        var lastBlock = new byte[16];
+        if (lastBlockComplete)
+        {
+            Array.Copy(data, (n - 1) * 16, lastBlock, 0, 16);
+            lastBlock = Xor(lastBlock, k1);
+        }
+        else
+        {
+            var padded = new byte[16]; padded[data.Length - (n - 1) * 16] = 0x80;
+            Array.Copy(data, (n - 1) * 16, padded, 0, data.Length - (n - 1) * 16);
+            lastBlock = Xor(padded, k2);
+        }
+
+        var x = new byte[16];
+        for (int i = 0; i < n - 1; i++)
+        {
+            var block = new byte[16]; Array.Copy(data, i * 16, block, 0, 16);
+            x = AesEncryptBlock(key, Xor(x, block));
+        }
+        return AesEncryptBlock(key, Xor(x, lastBlock));
     }
 
     /// <summary>

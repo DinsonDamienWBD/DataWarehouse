@@ -76,8 +76,10 @@ public sealed class SchemaMappingStrategy : DataIntegrationStrategyBase
         var mappedRecords = new List<Dictionary<string, object>>();
         var errors = new List<MappingError>();
 
-        foreach (var record in records)
+        // P2-2289: Track index explicitly — records.ToList().IndexOf(record) is O(n) per error.
+        for (int recordIdx = 0; recordIdx < records.Count; recordIdx++)
         {
+            var record = records[recordIdx];
             try
             {
                 var mapped = ApplyMapping(record, mapping);
@@ -89,7 +91,7 @@ public sealed class SchemaMappingStrategy : DataIntegrationStrategyBase
                 {
                     errors.Add(new MappingError
                     {
-                        RecordIndex = records.ToList().IndexOf(record),
+                        RecordIndex = recordIdx,
                         ErrorMessage = ex.Message
                     });
                 }

@@ -58,8 +58,10 @@ internal sealed class PredictiveProcessingStrategy : StorageProcessingStrategyBa
                 (_, stats) =>
                 {
                     stats.AccessCount++;
-                    // Update EMA: new_ema = alpha * current + (1 - alpha) * previous
-                    stats.EmaPrediction = Alpha * stats.AccessCount + (1 - Alpha) * stats.EmaPrediction;
+                    // Update EMA: new_ema = alpha * 1.0 (one access event) + (1 - alpha) * previous.
+                    // Finding 4298: was multiplying by AccessCount (unbounded), causing EmaPrediction
+                    // to grow without bound. Each access contributes 1.0 event to the EMA.
+                    stats.EmaPrediction = Alpha * 1.0 + (1.0 - Alpha) * stats.EmaPrediction;
                     stats.LastAccessed = info.LastAccessTimeUtc;
                     stats.Size = info.Length;
                     return stats;
@@ -81,7 +83,7 @@ internal sealed class PredictiveProcessingStrategy : StorageProcessingStrategyBa
             .ToList();
 
         sw.Stop();
-        return await Task.FromResult(new ProcessingResult
+        return new ProcessingResult
         {
             Data = new Dictionary<string, object?>
             {
@@ -96,7 +98,7 @@ internal sealed class PredictiveProcessingStrategy : StorageProcessingStrategyBa
                 RowsProcessed = _accessHistory.Count, RowsReturned = predictions.Count,
                 ProcessingTimeMs = sw.Elapsed.TotalMilliseconds
             }
-        });
+        };
     }
 
     /// <inheritdoc/>
@@ -125,7 +127,7 @@ internal sealed class PredictiveProcessingStrategy : StorageProcessingStrategyBa
             idx++;
         }
 
-        await Task.CompletedTask;
+        // No await needed here (finding 4299: `await Task.CompletedTask` is unnecessary anti-pattern).
     }
 
     /// <inheritdoc/>

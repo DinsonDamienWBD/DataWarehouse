@@ -374,7 +374,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
             while (offset < blockData.Length)
             {
                 ct.ThrowIfCancellationRequested();
-                await Task.Yield();
+                // Task.Yield() removed: per-entry scheduler round-trips are catastrophic at scale.
+                // Cancellation is handled by ThrowIfCancellationRequested() above.
 
                 if (offset + 8 > blockData.Length)
                 {

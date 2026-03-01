@@ -140,11 +140,18 @@ public sealed class EventSourcingStrategy : StreamingDataStrategyBase
         if (!_eventStore.TryGetValue(streamId, out var eventStore))
             throw new KeyNotFoundException($"Stream {streamId} not found");
 
-        var events = eventStore
-            .Where(e => e.Version > fromVersion && (toVersion == null || e.Version <= toVersion))
-            .OrderBy(e => e.Version);
+        // Finding 4391: take a snapshot under lock to prevent TOCTOU data race with
+        // concurrent AppendEventsAsync calls that mutate eventStore under the same lock.
+        List<StoredEvent> snapshot;
+        lock (eventStore)
+        {
+            snapshot = eventStore
+                .Where(e => e.Version > fromVersion && (toVersion == null || e.Version <= toVersion))
+                .OrderBy(e => e.Version)
+                .ToList();
+        }
 
-        foreach (var evt in events)
+        foreach (var evt in snapshot)
         {
             if (cancellationToken.IsCancellationRequested) yield break;
             yield return evt;

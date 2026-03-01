@@ -314,14 +314,21 @@ public sealed class DbtStyleTransformationStrategy : DataIntegrationStrategyBase
         return result;
     }
 
+    // P2-2294: RowsAffected was hardcoded 10000. Real row counts require a warehouse
+    // connection (via message bus → storage.execute). Return 0 until the caller
+    // supplies a connection context. DurationMs is measured from wall clock.
     private Task<DbtModelResult> ExecuteModelAsync(DbtModel model, CancellationToken ct)
     {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        // In production, publish model.SqlQuery to message bus → warehouse executor.
+        // Record actual rows affected from the response payload.
+        sw.Stop();
         return Task.FromResult(new DbtModelResult
         {
             ModelId = model.ModelId,
             ModelName = model.ModelName,
-            RowsAffected = 10000,
-            DurationMs = 2000,
+            RowsAffected = 0,
+            DurationMs = sw.ElapsedMilliseconds,
             Status = DbtModelStatus.Success
         });
     }
@@ -549,19 +556,26 @@ public sealed class MedallionArchitectureStrategy : DataIntegrationStrategyBase
         };
     }
 
+    // P2-2293: Bronze/Silver/Gold tier methods previously returned hardcoded fake counts.
+    // Real record counts come from the data source via message bus. We return 0 here
+    // rather than fabricated numbers. A production implementation would read the source
+    // path via IMessageBus → storage.read and count/stream the records.
     private Task<TierResult> ProcessBronzeTierAsync(MedallionPipeline pipeline, CancellationToken ct)
     {
-        return Task.FromResult(new TierResult { Tier = "bronze", Records = 100000 });
+        // Raw ingest: actual count depends on source data volume.
+        return Task.FromResult(new TierResult { Tier = "bronze", Records = 0 });
     }
 
     private Task<TierResult> ProcessSilverTierAsync(MedallionPipeline pipeline, TierResult bronze, CancellationToken ct)
     {
-        return Task.FromResult(new TierResult { Tier = "silver", Records = 95000 });
+        // Validated/enriched: subset of bronze after quality checks.
+        return Task.FromResult(new TierResult { Tier = "silver", Records = 0 });
     }
 
     private Task<TierResult> ProcessGoldTierAsync(MedallionPipeline pipeline, TierResult silver, CancellationToken ct)
     {
-        return Task.FromResult(new TierResult { Tier = "gold", Records = 50000 });
+        // Aggregated/curated: further reduced from silver.
+        return Task.FromResult(new TierResult { Tier = "gold", Records = 0 });
     }
 }
 

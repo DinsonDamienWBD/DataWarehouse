@@ -189,11 +189,16 @@ internal sealed class ProcessingJobScheduler : IDisposable
 
     /// <summary>
     /// Disposes scheduler resources including the concurrency semaphore.
+    /// Cancels all active and queued jobs and completes their TaskCompletionSources
+    /// so that any awaiter of <see cref="ScheduleAsync"/> is unblocked with
+    /// <see cref="OperationCanceledException"/> rather than hanging indefinitely.
     /// </summary>
     public void Dispose()
     {
         if (_disposed) return;
+        _disposed = true;
 
+        // Cancel all active jobs' CTSes first.
         foreach (var cts in _cancellations.Values)
         {
             try { cts.Cancel(); cts.Dispose(); }
@@ -201,8 +206,25 @@ internal sealed class ProcessingJobScheduler : IDisposable
         }
         _cancellations.Clear();
 
+        // Drain any queued (not yet started) jobs and cancel their TCSes.
+        // Without this, callers awaiting tcs.Task hang indefinitely after Dispose.
+        lock (_queueLock)
+        {
+            while (_queue.TryDequeue(out var pendingJob, out _))
+            {
+                pendingJob.Completion.TrySetCanceled();
+                try { pendingJob.Cts.Cancel(); pendingJob.Cts.Dispose(); } catch { }
+            }
+        }
+
+        // Cancel TCSes of active jobs (their tasks will be set by DrainQueueAsync catch(OperationCanceledException)).
+        // Belt-and-suspenders: also set TCSes directly so they unblock even if DrainQueue already finished.
+        foreach (var activeJob in _activeJobs.Values)
+        {
+            activeJob.Completion.TrySetCanceled();
+        }
+
         _concurrencyGate.Dispose();
-        _disposed = true;
     }
 
     /// <summary>

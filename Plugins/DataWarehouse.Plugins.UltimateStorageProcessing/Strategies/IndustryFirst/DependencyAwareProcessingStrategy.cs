@@ -37,9 +37,10 @@ internal sealed class DependencyAwareProcessingStrategy : StorageProcessingStrat
         if (!Directory.Exists(query.Source))
             return MakeError("Source directory not found", sw);
 
-        // Build dependency graph by scanning file contents for references
+        // Build dependency graph by scanning file contents for references.
+        // Use EnumerateFiles instead of GetFiles to avoid loading the full file list into memory (finding 4293).
         var graph = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
-        var allFiles = Directory.GetFiles(query.Source, "*", SearchOption.AllDirectories);
+        var allFiles = Directory.EnumerateFiles(query.Source, "*", SearchOption.AllDirectories).ToArray();
         var fileNames = new HashSet<string>(allFiles.Select(Path.GetFileName)!, StringComparer.OrdinalIgnoreCase);
 
         foreach (var file in allFiles)
@@ -71,7 +72,7 @@ internal sealed class DependencyAwareProcessingStrategy : StorageProcessingStrat
         var processingWaves = ComputeProcessingWaves(graph, sorted);
 
         sw.Stop();
-        return await Task.FromResult(new ProcessingResult
+        return new ProcessingResult
         {
             Data = new Dictionary<string, object?>
             {
@@ -95,7 +96,7 @@ internal sealed class DependencyAwareProcessingStrategy : StorageProcessingStrat
                 RowsProcessed = allFiles.Length, RowsReturned = 1,
                 ProcessingTimeMs = sw.Elapsed.TotalMilliseconds
             }
-        });
+        };
     }
 
     /// <inheritdoc/>

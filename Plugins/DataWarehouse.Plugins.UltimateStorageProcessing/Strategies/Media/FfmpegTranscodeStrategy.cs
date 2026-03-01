@@ -33,6 +33,9 @@ internal sealed class FfmpegTranscodeStrategy : StorageProcessingStrategyBase
         ValidateQuery(query);
         var videoCodec = CliProcessHelper.GetOption<string>(query, "videoCodec") ?? "libx264";
         var audioCodec = CliProcessHelper.GetOption<string>(query, "audioCodec") ?? "aac";
+        // Finding 4296: validate non-empty before allowlist check to produce a clear error message.
+        if (string.IsNullOrWhiteSpace(videoCodec)) videoCodec = "libx264";
+        if (string.IsNullOrWhiteSpace(audioCodec)) audioCodec = "aac";
         var bitrate = CliProcessHelper.GetOption<string>(query, "bitrate");
         var resolution = CliProcessHelper.GetOption<string>(query, "resolution");
         var preset = CliProcessHelper.GetOption<string>(query, "preset") ?? "medium";

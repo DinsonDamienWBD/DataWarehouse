@@ -22,7 +22,7 @@ internal sealed class SharedCacheManager : IDisposable
     private long _hits;
     private long _misses;
     private long _evictions;
-    private bool _disposed;
+    private volatile bool _disposed;
 
     /// <summary>
     /// Gets the number of items currently in the cache.

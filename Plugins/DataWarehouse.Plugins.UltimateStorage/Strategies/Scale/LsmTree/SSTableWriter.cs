@@ -58,6 +58,22 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
             // This avoids the fixed capacity of 10000 which would over-allocate for small
             // SSTables and under-allocate for large ones.
             var entryList = sortedEntries.ToList();
+
+            // Validate that entries are sorted (ascending byte-lexicographic order).
+            // Unsorted input would produce a corrupt index that breaks binary search in SSTableReader.
+            for (int i = 1; i < entryList.Count; i++)
+            {
+                var prev = entryList[i - 1].Key;
+                var curr = entryList[i].Key;
+                int cmp = ByteArrayComparer.Instance.Compare(prev, curr);
+                if (cmp > 0)
+                {
+                    throw new ArgumentException(
+                        $"sortedEntries must be in ascending key order. " +
+                        $"Entry at index {i} is less than entry at index {i - 1}.",
+                        nameof(sortedEntries));
+                }
+            }
             var bloomExpectedItems = Math.Max(entryList.Count, 100); // at least 100 to avoid degenerate filter
 
             var indexEntries = new List<(byte[] firstKey, long offset)>();
@@ -69,6 +85,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
             long currentBlockOffset = 0;
             byte[]? currentBlockFirstKey = null;
             var currentBlockBuffer = new MemoryStream(BlockSize);
+            try
+            {
 
             foreach (var kvp in entryList)
             {
@@ -95,9 +113,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
                 // Check if we need to start a new block
                 if (currentBlockBuffer.Length + entrySize > BlockSize && currentBlockBuffer.Length > 0)
                 {
-                    // Flush current block
+                    // Flush current block and dispose the used MemoryStream before creating a new one.
                     await FlushBlockAsync(stream, currentBlockBuffer, currentBlockFirstKey!, indexEntries, currentBlockOffset, ct);
                     currentBlockOffset = stream.Position;
+                    await currentBlockBuffer.DisposeAsync();
                     currentBlockBuffer = new MemoryStream(BlockSize);
                     currentBlockFirstKey = null;
                 }
@@ -127,6 +146,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
             if (currentBlockBuffer.Length > 0)
             {
                 await FlushBlockAsync(stream, currentBlockBuffer, currentBlockFirstKey!, indexEntries, currentBlockOffset, ct);
+            }
+
+            } // end try
+            finally
+            {
+                await currentBlockBuffer.DisposeAsync();
             }
 
             // Write index block

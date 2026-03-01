@@ -29,16 +29,13 @@ internal sealed class AvifConversionStrategy : StorageProcessingStrategyBase
     public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default)
     {
         ValidateQuery(query);
-        var minQuality = CliProcessHelper.GetOption<int>(query, "minQuality");
-        var maxQuality = CliProcessHelper.GetOption<int>(query, "maxQuality");
-        var speed = Math.Clamp(CliProcessHelper.GetOption<int>(query, "speed"), 0, 10);
-        var depth = CliProcessHelper.GetOption<int>(query, "depth");
+        // Use nullable int? to distinguish "not set" from "explicitly 0" (finding 4295).
+        var minQuality = CliProcessHelper.GetOption<int?>(query, "minQuality") ?? 18;
+        var maxQuality = CliProcessHelper.GetOption<int?>(query, "maxQuality") ?? 28;
+        var rawSpeed = CliProcessHelper.GetOption<int?>(query, "speed");
+        var speed = rawSpeed.HasValue ? Math.Clamp(rawSpeed.Value, 0, 10) : 6;
+        var depth = CliProcessHelper.GetOption<int?>(query, "depth") ?? 8;
         var yuv = CliProcessHelper.GetOption<string>(query, "yuv");
-
-        if (minQuality == 0) minQuality = 18;
-        if (maxQuality == 0) maxQuality = 28;
-        if (depth == 0) depth = 8;
-        if (speed == 0) speed = 6;
 
         var outputPath = Path.ChangeExtension(query.Source, ".avif");
         var args = $"\"{query.Source}\" \"{outputPath}\" --min {minQuality} --max {maxQuality} --speed {speed} --depth {depth}";

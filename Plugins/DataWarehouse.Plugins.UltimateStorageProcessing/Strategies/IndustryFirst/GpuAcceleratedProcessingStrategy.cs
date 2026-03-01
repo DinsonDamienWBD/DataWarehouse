@@ -102,14 +102,18 @@ internal sealed class GpuAcceleratedProcessingStrategy : StorageProcessingStrate
             }
             else
             {
-                result = new CliOutput { ExitCode = 1, StandardOutput = "", StandardError = "Source not found", Elapsed = sw.Elapsed, Success = false };
+                // Finding 4300: distinct "source-not-found" error indicator for callers.
+                result = new CliOutput { ExitCode = 2, StandardOutput = "", StandardError = "Source not found", Elapsed = sw.Elapsed, Success = false };
             }
         }
 
         return CliProcessHelper.ToProcessingResult(result, query.Source, useGpu ? "gpu" : "cpu", new Dictionary<string, object?>
         {
             ["operation"] = operation, ["gpuAvailable"] = gpuAvailable, ["usedGpu"] = useGpu,
-            ["outputPath"] = outputPath
+            ["outputPath"] = outputPath,
+            // Finding 4300: expose explicit error reason so callers can distinguish source-not-found
+            // (exitCode=2) from GPU/CPU processing failure (exitCode=1) from success (exitCode=0).
+            ["errorReason"] = result.Success ? null : (result.ExitCode == 2 ? "source-not-found" : "processing-failed")
         });
     }
 

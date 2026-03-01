@@ -127,7 +127,8 @@ internal sealed class SchemaInferenceStrategy : StorageProcessingStrategyBase
                     case JsonValueKind.String:
                         var strVal = prop.Value.GetString() ?? "";
                         stats.StringCount++;
-                        if (DateTime.TryParse(strVal, out _)) stats.DateCount++;
+                        // Finding 4280: use InvariantCulture for deterministic schema inference across locales.
+                        if (DateTime.TryParse(strVal, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out _)) stats.DateCount++;
                         if (stats.DistinctValues.Count < 100) stats.DistinctValues.Add(strVal);
                         break;
                     case JsonValueKind.Number:

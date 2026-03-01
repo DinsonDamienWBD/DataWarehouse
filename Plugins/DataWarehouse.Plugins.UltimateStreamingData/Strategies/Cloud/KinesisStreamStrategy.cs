@@ -729,19 +729,22 @@ internal sealed class KinesisStreamStrategy : StreamingDataStrategyBase
 
     private static string ComputeMidpoint(string startKey, string endKey)
     {
-        // Simplified midpoint calculation for hash key ranges
-        if (decimal.TryParse(startKey, out var start) && decimal.TryParse(endKey, out var end))
+        // Finding 4380: Kinesis hash key space is 128-bit (0 to 2^128-1). decimal has 96-bit mantissa
+        // and loses precision near extremes. Use BigInteger for exact integer arithmetic.
+        if (System.Numerics.BigInteger.TryParse(startKey, out var start) &&
+            System.Numerics.BigInteger.TryParse(endKey, out var end))
         {
-            return Math.Floor((start + end) / 2).ToString("F0");
+            return ((start + end) / 2).ToString();
         }
         return "170141183460469231731687303715884105727"; // 2^127 - 1
     }
 
     private static string IncrementHashKey(string key)
     {
-        if (decimal.TryParse(key, out var value))
+        // Finding 4380: use BigInteger to avoid decimal precision loss on 128-bit values.
+        if (System.Numerics.BigInteger.TryParse(key, out var value))
         {
-            return (value + 1).ToString("F0");
+            return (value + 1).ToString();
         }
         return "170141183460469231731687303715884105728";
     }

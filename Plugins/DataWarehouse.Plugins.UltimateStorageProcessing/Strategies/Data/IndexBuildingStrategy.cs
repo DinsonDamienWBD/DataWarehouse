@@ -37,7 +37,10 @@ internal sealed class IndexBuildingStrategy : StorageProcessingStrategyBase
         ValidateQuery(query);
         var sw = Stopwatch.StartNew();
         var fanout = CliProcessHelper.GetOption<int>(query, "fanout");
+        // Finding 4274: clamp fanout to a sensible range. int.MaxValue causes Math.Log to return
+        // near-zero tree depth, producing a degenerate single-level index.
         if (fanout <= 0) fanout = DefaultFanout;
+        fanout = Math.Min(fanout, 1024); // cap at 1024 to keep tree depth meaningful
         var keyField = CliProcessHelper.GetOption<string>(query, "keyField") ?? "id";
 
         if (!File.Exists(query.Source))
@@ -62,7 +65,9 @@ internal sealed class IndexBuildingStrategy : StorageProcessingStrategyBase
                 // Line is not valid JSON — use byte offset as fallback key
                 entries.Add((offset.ToString(), offset));
             }
-            offset += Encoding.UTF8.GetByteCount(line) + 1;
+            // Finding 4275: account for CRLF vs LF line endings. StreamReader strips the newline,
+            // so add back the platform-specific newline byte count to keep offsets accurate.
+            offset += Encoding.UTF8.GetByteCount(line) + (Environment.NewLine.Length == 2 ? 2 : 1);
         }
 
         // Sort entries by key

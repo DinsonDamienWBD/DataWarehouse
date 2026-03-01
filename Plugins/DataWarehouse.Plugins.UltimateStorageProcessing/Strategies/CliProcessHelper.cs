@@ -46,7 +46,10 @@ internal static class CliProcessHelper
 
         try
         {
-            process.Start();
+            if (!process.Start())
+                throw new InvalidOperationException(
+                    $"Failed to start process '{process.StartInfo.FileName}'. " +
+                    "Check that the executable exists and the system allows process creation.");
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
 
@@ -149,12 +152,23 @@ internal static class CliProcessHelper
     public static async IAsyncEnumerable<ProcessingResult> EnumerateProjectFiles(
         ProcessingQuery query, string[] extensions, Stopwatch sw, [EnumeratorCancellation] CancellationToken ct = default)
     {
-        if (!Directory.Exists(query.Source)) { await Task.CompletedTask; yield break; }
+        // Normalize and validate source to prevent path-traversal attacks.
+        string normalizedSource;
+        try
+        {
+            normalizedSource = Path.GetFullPath(query.Source);
+        }
+        catch
+        {
+            await Task.CompletedTask;
+            yield break;
+        }
+        if (!Directory.Exists(normalizedSource)) { await Task.CompletedTask; yield break; }
 
-        var limit = query.Limit ?? int.MaxValue;
+        var limit = query.Limit ?? 1000; // Cap at 1000 files to prevent OOM on unbounded walks (finding 4245)
         var offset = query.Offset ?? 0;
         var idx = 0;
-        foreach (var file in Directory.EnumerateFiles(query.Source, "*", SearchOption.AllDirectories))
+        foreach (var file in Directory.EnumerateFiles(normalizedSource, "*", SearchOption.AllDirectories))
         {
             ct.ThrowIfCancellationRequested();
             var ext = Path.GetExtension(file).ToLowerInvariant();

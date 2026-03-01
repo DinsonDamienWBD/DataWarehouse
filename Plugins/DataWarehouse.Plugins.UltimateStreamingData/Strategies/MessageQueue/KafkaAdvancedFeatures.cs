@@ -199,12 +199,14 @@ public sealed record ConsumerGroupInfo
 /// Kafka offset commit strategy manager supporting auto-commit, manual sync, manual async,
 /// and transactional offset commits for exactly-once processing.
 /// </summary>
-public sealed class KafkaOffsetCommitManager
+// Findings 4383/4384: implement IDisposable to properly dispose the auto-commit Timer.
+public sealed class KafkaOffsetCommitManager : IDisposable
 {
     private readonly BoundedDictionary<string, CommittedOffset> _committedOffsets = new BoundedDictionary<string, CommittedOffset>(1000);
     private readonly BoundedDictionary<string, long> _pendingOffsets = new BoundedDictionary<string, long>(1000);
     private readonly Timer? _autoCommitTimer;
     private readonly OffsetCommitStrategy _strategy;
+    private bool _disposed;
 
     public KafkaOffsetCommitManager(OffsetCommitStrategy strategy = OffsetCommitStrategy.AutoCommit, int autoCommitIntervalMs = 5000)
     {
@@ -282,6 +284,14 @@ public sealed class KafkaOffsetCommitManager
     }
 
     private void AutoCommitCallback(object? state) => CommitPending();
+
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        _autoCommitTimer?.Dispose();
+    }
 }
 
 /// <summary>Offset commit strategy types.</summary>

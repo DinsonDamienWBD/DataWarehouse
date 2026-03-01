@@ -42,7 +42,9 @@ internal sealed class TextureCompressionStrategy : StorageProcessingStrategyBase
         {
             args = $"-f {format} -y";
             if (generateMipmaps) args += " -m 0"; // auto mip count
-            if (colorSpace == "linear") args += " -srgb";
+            // Finding 4297: -srgb flag should be applied when colorSpace is "sRGB" (marks texture as
+            // sRGB-encoded, not linear). The previous logic was inverted — applying sRGB flag for linear.
+            if (colorSpace == "sRGB" || colorSpace == "srgb") args += " -srgb";
             args += $" -o \"{Path.GetDirectoryName(outputPath)}\" \"{query.Source}\"";
         }
         else

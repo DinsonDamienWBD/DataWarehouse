@@ -183,6 +183,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
         protected override async Task<StorageObjectMetadata> StoreAsyncCore(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct)
         {
+            EnsureInitialized();
             ValidateKey(key);
             ValidateStream(data);
 
@@ -307,12 +308,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             // Store metadata in the manifest object
             if (metadata != null || totalStripes > 1)
             {
+                var now = DateTime.UtcNow.ToString("O");
                 var manifestMetadata = new Dictionary<string, string>
                 {
                     ["_rados_striped"] = "true",
                     ["_rados_stripe_count"] = totalStripes.ToString(),
                     ["_rados_stripe_unit"] = _stripeUnit.ToString(),
-                    ["_rados_total_size"] = dataLength.ToString()
+                    ["_rados_total_size"] = dataLength.ToString(),
+                    ["_rados_created"] = now,
+                    ["_rados_modified"] = now
                 };
 
                 if (metadata != null)
@@ -385,6 +389,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
         protected override async Task<Stream> RetrieveAsyncCore(string key, CancellationToken ct)
         {
+            EnsureInitialized();
             ValidateKey(key);
 
             var objectName = GetObjectName(key);
@@ -500,6 +505,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
         protected override async Task DeleteAsyncCore(string key, CancellationToken ct)
         {
+            EnsureInitialized();
             ValidateKey(key);
 
             var objectName = GetObjectName(key);
@@ -569,6 +575,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
         protected override async Task<bool> ExistsAsyncCore(string key, CancellationToken ct)
         {
+            EnsureInitialized();
             ValidateKey(key);
 
             try
@@ -599,6 +606,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
         protected override async IAsyncEnumerable<StorageObjectMetadata> ListAsyncCore(string? prefix, [EnumeratorCancellation] CancellationToken ct)
         {
+            EnsureInitialized();
             IncrementOperationCounter(StorageOperationType.List);
 
             string? marker = null;
@@ -670,6 +678,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
         protected override async Task<StorageObjectMetadata> GetMetadataAsyncCore(string key, CancellationToken ct)
         {
+            EnsureInitialized();
             ValidateKey(key);
 
             var objectName = GetObjectName(key);
@@ -688,12 +697,20 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
                 IncrementOperationCounter(StorageOperationType.GetMetadata);
 
+                // Extract creation time from manifest metadata if stored there; fall back to unknown.
+                DateTime.TryParse(
+                    manifestMetadata.GetValueOrDefault("_rados_created"),
+                    out var created);
+                DateTime.TryParse(
+                    manifestMetadata.GetValueOrDefault("_rados_modified"),
+                    out var modified);
+
                 return new StorageObjectMetadata
                 {
                     Key = key,
                     Size = totalSize,
-                    Created = DateTime.UtcNow, // Would need to be stored in manifest
-                    Modified = DateTime.UtcNow,
+                    Created = created == default ? DateTime.UtcNow : created,
+                    Modified = modified == default ? DateTime.UtcNow : modified,
                     ETag = CalculateETag(Encoding.UTF8.GetBytes($"{objectName}:{totalSize}")),
                     ContentType = "application/octet-stream",
                     CustomMetadata = userMetadata.Count > 0 ? userMetadata : null,

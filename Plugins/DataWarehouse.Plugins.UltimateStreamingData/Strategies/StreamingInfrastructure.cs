@@ -49,12 +49,17 @@ public sealed class RedisStreamsConsumerGroupManager
 
         if (id == ">")
         {
-            // Deliver only new (undelivered) messages
-            var entries = stream.Entries.Where(e =>
-                string.Compare(e.Id, group.LastDeliveredId, StringComparison.Ordinal) > 0)
-                .Take(count).ToList();
+            // Deliver only new (undelivered) messages.
+            // Finding 4344: take snapshot under lock to avoid concurrent mutation by Trim/AddEntry.
+            List<RedisStreamEntry> snapshot;
+            lock (stream.Lock)
+            {
+                snapshot = stream.Entries
+                    .Where(e => string.Compare(e.Id, group.LastDeliveredId, StringComparison.Ordinal) > 0)
+                    .Take(count).ToList();
+            }
 
-            foreach (var entry in entries)
+            foreach (var entry in snapshot)
             {
                 pel[$"{entry.Id}:{consumerName}"] = new PendingEntry
                 {
@@ -74,11 +79,17 @@ public sealed class RedisStreamsConsumerGroupManager
             var pending = pel.Values
                 .Where(p => p.ConsumerName == consumerName)
                 .OrderBy(p => p.Id)
-                .Take(count);
+                .Take(count)
+                .ToList();
 
             foreach (var p in pending)
             {
-                var entry = stream.Entries.FirstOrDefault(e => e.Id == p.Id);
+                RedisStreamEntry? entry;
+                lock (stream.Lock)
+                {
+                    entry = stream.Entries.FirstOrDefault(e => e.Id == p.Id);
+                }
+
                 if (entry != null)
                 {
                     p.DeliveryCount++;
@@ -139,20 +150,25 @@ public sealed class RedisStreamsConsumerGroupManager
     {
         if (!_streams.TryGetValue(streamKey, out var stream)) return 0;
 
+        // Finding 4344: all Entries mutations must be under stream.Lock.
         long trimmed = 0;
-        if (maxLen.HasValue)
+        lock (stream.Lock)
         {
-            while (stream.Entries.Count > maxLen.Value)
+            if (maxLen.HasValue)
             {
-                stream.Entries.RemoveAt(0);
-                trimmed++;
+                while (stream.Entries.Count > maxLen.Value)
+                {
+                    stream.Entries.RemoveAt(0);
+                    trimmed++;
+                }
+            }
+            else if (minId != null)
+            {
+                trimmed = stream.Entries.RemoveAll(e =>
+                    string.Compare(e.Id, minId, StringComparison.Ordinal) < 0);
             }
         }
-        else if (minId != null)
-        {
-            trimmed = stream.Entries.RemoveAll(e =>
-                string.Compare(e.Id, minId, StringComparison.Ordinal) < 0);
-        }
+
         return trimmed;
     }
 
@@ -160,25 +176,32 @@ public sealed class RedisStreamsConsumerGroupManager
     public string AddEntry(string streamKey, Dictionary<string, string> fields)
     {
         var stream = _streams.GetOrAdd(streamKey, _ => new RedisStreamState { StreamKey = streamKey });
-        var id = $"{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}-{stream.SequenceCounter++}";
-        stream.Entries.Add(new RedisStreamEntry
+        // Finding 4344: lock to prevent concurrent mutation with ReadGroup/Trim.
+        lock (stream.Lock)
         {
-            Id = id,
-            Fields = fields,
-            Timestamp = DateTime.UtcNow
-        });
-        return id;
+            var id = $"{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}-{stream.SequenceCounter++}";
+            stream.Entries.Add(new RedisStreamEntry { Id = id, Fields = fields, Timestamp = DateTime.UtcNow });
+            return id;
+        }
     }
 
-    private string GetLastId(string streamKey) =>
-        _streams.TryGetValue(streamKey, out var s) && s.Entries.Count > 0
-            ? s.Entries[^1].Id : "0-0";
+    private string GetLastId(string streamKey)
+    {
+        if (!_streams.TryGetValue(streamKey, out var s)) return "0-0";
+        lock (s.Lock)
+        {
+            return s.Entries.Count > 0 ? s.Entries[^1].Id : "0-0";
+        }
+    }
 }
 
 /// <summary>Internal state for a Redis stream.</summary>
 public sealed class RedisStreamState
 {
     public required string StreamKey { get; init; }
+    // Finding 4344: Entries is mutated by ReadGroup, Trim, and AddEntry concurrently.
+    // All callers must acquire _lock before reading or writing Entries / SequenceCounter.
+    public readonly object Lock = new();
     public List<RedisStreamEntry> Entries { get; } = [];
     public long SequenceCounter { get; set; }
 }
@@ -231,31 +254,38 @@ public sealed record PendingInfo
 public sealed class KinesisCheckpointManager
 {
     private readonly BoundedDictionary<string, KinesisLeaseEntry> _leaseTable = new BoundedDictionary<string, KinesisLeaseEntry>(1000);
+    // Finding 4345: single lock for TakeLease read-modify-write atomicity.
+    private readonly object _leaseLock = new();
 
     /// <summary>Takes a lease on a shard for checkpointing.</summary>
     public bool TakeLease(string streamName, string shardId, string workerId)
     {
         var key = $"{streamName}:{shardId}";
-        var lease = _leaseTable.GetOrAdd(key, _ => new KinesisLeaseEntry
+        // Finding 4345: GetOrAdd + check + mutate must be atomic to prevent two workers
+        // both seeing an expired lease and both taking it simultaneously.
+        lock (_leaseLock)
         {
-            StreamName = streamName,
-            ShardId = shardId,
-            WorkerId = workerId,
-            LeaseCounter = 1,
-            TakenAt = DateTime.UtcNow
-        });
+            var lease = _leaseTable.GetOrAdd(key, _ => new KinesisLeaseEntry
+            {
+                StreamName = streamName,
+                ShardId = shardId,
+                WorkerId = workerId,
+                LeaseCounter = 1,
+                TakenAt = DateTime.UtcNow
+            });
 
-        // Check if lease is expired or owned by this worker
-        if (lease.WorkerId == workerId) return true;
-        if ((DateTime.UtcNow - lease.LastRenewed).TotalSeconds > 30)
-        {
-            lease.WorkerId = workerId;
-            lease.LeaseCounter++;
-            lease.TakenAt = DateTime.UtcNow;
-            lease.LastRenewed = DateTime.UtcNow;
-            return true;
+            // Check if lease is expired or owned by this worker
+            if (lease.WorkerId == workerId) return true;
+            if ((DateTime.UtcNow - lease.LastRenewed).TotalSeconds > 30)
+            {
+                lease.WorkerId = workerId;
+                lease.LeaseCounter++;
+                lease.TakenAt = DateTime.UtcNow;
+                lease.LastRenewed = DateTime.UtcNow;
+                return true;
+            }
+            return false;
         }
-        return false;
     }
 
     /// <summary>Checkpoints the processing position for a shard.</summary>
@@ -587,11 +617,16 @@ public sealed record EventHubsCheckpointEntry
 public sealed class MqttQoS2ProtocolHandler
 {
     private readonly BoundedDictionary<int, MqttQoS2State> _pendingMessages = new BoundedDictionary<int, MqttQoS2State>(1000);
+    // Finding 4362: monotonic counter wrapping at 65535 instead of Random to avoid packet ID collisions
+    // under high QoS 2 load. MQTT spec requires packet IDs 1-65535.
+    private int _packetIdCounter;
 
     /// <summary>Initiates QoS 2 publish (sender side). Returns packet ID.</summary>
     public int InitiatePublish(byte[] payload, string topic)
     {
-        var packetId = Random.Shared.Next(1, 65536);
+        // Wrap in 1-65535 range (MQTT spec); Interlocked for thread safety.
+        var raw = Interlocked.Increment(ref _packetIdCounter);
+        var packetId = ((raw - 1) % 65535) + 1; // 1..65535
         _pendingMessages[packetId] = new MqttQoS2State
         {
             PacketId = packetId,

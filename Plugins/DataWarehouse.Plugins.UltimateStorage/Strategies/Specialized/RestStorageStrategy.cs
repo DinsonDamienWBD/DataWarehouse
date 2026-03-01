@@ -244,6 +244,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
                 // Configure certificate validation
                 if (!_validateServerCertificate)
                 {
+                    // SECURITY WARNING: TLS certificate validation is DISABLED.
+                    // This should only be used in isolated development/test environments.
+                    // Disabling certificate validation exposes all traffic to MITM attacks.
+                    System.Diagnostics.Trace.TraceWarning(
+                        "[RestStorageStrategy] TLS certificate validation is DISABLED (ValidateServerCertificate=false). " +
+                        "All HTTPS traffic is vulnerable to man-in-the-middle attacks. " +
+                        "Enable certificate validation in production.");
                     handler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true;
                 }
 

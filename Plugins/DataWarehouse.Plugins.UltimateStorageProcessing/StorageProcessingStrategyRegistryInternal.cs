@@ -63,10 +63,13 @@ internal sealed class StorageProcessingStrategyRegistryInternal
                     {
                         // Index by category (derived from strategy ID prefix)
                         var category = ExtractCategory(strategy.StrategyId);
+                        // AddOrUpdate holds BoundedDictionary's write lock for the full call,
+                        // so the inner lock(list) is not only redundant but a nested-lock smell.
+                        // The update factory runs under the write lock; direct list.Add is safe.
                         _byCategory.AddOrUpdate(
                             category,
                             _ => new List<IStorageProcessingStrategy> { strategy },
-                            (_, list) => { lock (list) { list.Add(strategy); } return list; });
+                            (_, list) => { list.Add(strategy); return list; });
 
                         discovered++;
                     }

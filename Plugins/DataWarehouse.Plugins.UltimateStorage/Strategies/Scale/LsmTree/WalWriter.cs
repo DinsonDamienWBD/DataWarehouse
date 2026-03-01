@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
         private readonly string _filePath;
         private readonly SemaphoreSlim _writeLock;
         private FileStream? _fileStream;
-        private bool _disposed;
+        private volatile bool _disposed;
 
         /// <summary>
         /// Initializes a new WalWriter for the given file path.
@@ -42,6 +42,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
             await _writeLock.WaitAsync(ct);
             try
             {
+                // Re-check _disposed under lock — concurrent DisposeAsync may have run.
+                if (_disposed)
+                    throw new ObjectDisposedException(nameof(WalWriter));
+
                 if (_fileStream == null)
                 {
                     var directory = Path.GetDirectoryName(_filePath);
@@ -123,6 +127,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
 
         /// <summary>
         /// Replays all entries from the WAL file.
+        /// Holds the write lock for the full duration to prevent concurrent AppendAsync
+        /// calls from interleaving with the replay read (crash-recovery race).
         /// </summary>
         /// <param name="ct">Cancellation token.</param>
         /// <returns>Async enumerable of WAL entries.</returns>
@@ -133,71 +139,81 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
                 yield break;
             }
 
-            await using var stream = new FileStream(
-                _filePath,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.ReadWrite,
-                bufferSize: 4096,
-                useAsync: true);
-
-            var buffer = new byte[4096];
-
-            while (stream.Position < stream.Length)
+            // Hold the write lock for the entire replay so no concurrent AppendAsync
+            // can write new entries while we are reading the existing log.
+            await _writeLock.WaitAsync(ct);
+            try
             {
-                ct.ThrowIfCancellationRequested();
+                await using var stream = new FileStream(
+                    _filePath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.ReadWrite,
+                    bufferSize: 4096,
+                    useAsync: true);
 
-                // Read operation type
-                var opByte = stream.ReadByte();
-                if (opByte == -1)
-                {
-                    break;
-                }
-                var op = (WalOp)opByte;
+                var buffer = new byte[4096];
 
-                // Read key length
-                if (await stream.ReadAsync(buffer.AsMemory(0, 4), ct) != 4)
+                while (stream.Position < stream.Length)
                 {
-                    break;
-                }
-                var keyLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan(0, 4));
+                    ct.ThrowIfCancellationRequested();
 
-                if (keyLen < 0 || keyLen > 1024 * 1024) // Sanity check
-                {
-                    break;
-                }
-
-                // Read key
-                var key = new byte[keyLen];
-                if (await stream.ReadAsync(key, ct) != keyLen)
-                {
-                    break;
-                }
-
-                // Read value length
-                if (await stream.ReadAsync(buffer.AsMemory(0, 4), ct) != 4)
-                {
-                    break;
-                }
-                var valueLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan(0, 4));
-
-                if (valueLen < 0 || valueLen > 1024 * 1024) // Sanity check
-                {
-                    break;
-                }
-
-                // Read value
-                byte[]? value = null;
-                if (valueLen > 0)
-                {
-                    value = new byte[valueLen];
-                    if (await stream.ReadAsync(value, ct) != valueLen)
+                    // Read operation type
+                    var opByte = stream.ReadByte();
+                    if (opByte == -1)
                     {
                         break;
                     }
-                }
+                    var op = (WalOp)opByte;
 
-                yield return new WalEntry(key, value, op);
+                    // Read key length
+                    if (await stream.ReadAsync(buffer.AsMemory(0, 4), ct) != 4)
+                    {
+                        break;
+                    }
+                    var keyLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan(0, 4));
+
+                    if (keyLen < 0 || keyLen > 1024 * 1024) // Sanity check
+                    {
+                        break;
+                    }
+
+                    // Read key
+                    var key = new byte[keyLen];
+                    if (await stream.ReadAsync(key, ct) != keyLen)
+                    {
+                        break;
+                    }
+
+                    // Read value length
+                    if (await stream.ReadAsync(buffer.AsMemory(0, 4), ct) != 4)
+                    {
+                        break;
+                    }
+                    var valueLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan(0, 4));
+
+                    if (valueLen < 0 || valueLen > 1024 * 1024) // Sanity check
+                    {
+                        break;
+                    }
+
+                    // Read value
+                    byte[]? value = null;
+                    if (valueLen > 0)
+                    {
+                        value = new byte[valueLen];
+                        if (await stream.ReadAsync(value, ct) != valueLen)
+                        {
+                            break;
+                        }
+                    }
+
+                    yield return new WalEntry(key, value, op);
+                }
+            }
+            finally
+            {
+                _writeLock.Release();
             }
         }
 

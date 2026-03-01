@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
@@ -140,6 +141,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
         protected override async Task<StorageObjectMetadata> StoreAsyncCore(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct)
         {
+            EnsureInitialized();
             ValidateKey(key);
             ValidateStream(data);
 
@@ -241,7 +243,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 // Step 2: Upload parts in parallel
                 var partCount = (int)Math.Ceiling((double)dataLength / _multipartChunkSizeBytes);
                 var completedParts = new List<CompletedPart>();
-                var semaphore = new SemaphoreSlim(_maxConcurrentParts, _maxConcurrentParts);
+                using var semaphore = new SemaphoreSlim(_maxConcurrentParts, _maxConcurrentParts);
 
                 var uploadTasks = new List<Task<CompletedPart>>();
 
@@ -315,6 +317,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
         protected override async Task<Stream> RetrieveAsyncCore(string key, CancellationToken ct)
         {
+            EnsureInitialized();
             ValidateKey(key);
 
             var endpoint = GetEndpointUrl(key);
@@ -336,6 +339,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
         protected override async Task DeleteAsyncCore(string key, CancellationToken ct)
         {
+            EnsureInitialized();
             ValidateKey(key);
 
             // Get size before deletion for statistics
@@ -367,6 +371,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
         protected override async Task<bool> ExistsAsyncCore(string key, CancellationToken ct)
         {
+            EnsureInitialized();
             ValidateKey(key);
 
             try
@@ -390,6 +395,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
         protected override async IAsyncEnumerable<StorageObjectMetadata> ListAsyncCore(string? prefix, [EnumeratorCancellation] CancellationToken ct)
         {
+            EnsureInitialized();
             IncrementOperationCounter(StorageOperationType.List);
 
             string? continuationToken = null;
@@ -449,14 +455,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                     await Task.Yield();
                 }
 
-                // Extract continuation token
-                continuationToken = doc.Descendants(ns + "NextContinuationToken").FirstOrDefault()?.Value;
+                // Extract continuation token — use doc.Root.Element instead of Descendants
+                // to avoid re-traversing the entire document for a top-level element.
+                continuationToken = doc.Root?.Element(ns + "NextContinuationToken")?.Value;
 
             } while (continuationToken != null);
         }
 
         protected override async Task<StorageObjectMetadata> GetMetadataAsyncCore(string key, CancellationToken ct)
         {
+            EnsureInitialized();
             ValidateKey(key);
 
             var endpoint = GetEndpointUrl(key);
@@ -595,39 +603,48 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
             var json = await response.Content.ReadAsStringAsync(ct);
 
-            // Parse JSON response (simplified - real implementation would use System.Text.Json)
+            // Parse JSON response using System.Text.Json.
             // Expected format: {"usage": {"rgw.main": {"size_kb": 1234, "num_objects": 10}}}
             long totalBytes = 0;
             long numObjects = 0;
 
             try
             {
-                // Basic parsing - in production, use JsonDocument
-                if (json.Contains("\"size_kb\""))
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                // Walk into "usage" -> first pool key -> "size_kb" / "num_objects"
+                if (root.TryGetProperty("usage", out var usageEl))
                 {
-                    var sizeStart = json.IndexOf("\"size_kb\"") + 11;
-                    var sizeEnd = json.IndexOf(",", sizeStart);
-                    if (sizeEnd == -1) sizeEnd = json.IndexOf("}", sizeStart);
-                    var sizeStr = json.Substring(sizeStart, sizeEnd - sizeStart).Trim();
-                    if (long.TryParse(sizeStr, out var sizeKb))
+                    foreach (var poolProp in usageEl.EnumerateObject())
                     {
-                        totalBytes = sizeKb * 1024;
+                        if (poolProp.Value.TryGetProperty("size_kb", out var sizeKbEl) &&
+                            sizeKbEl.TryGetInt64(out var sizeKb))
+                        {
+                            totalBytes += sizeKb * 1024;
+                        }
+                        if (poolProp.Value.TryGetProperty("num_objects", out var numObjEl) &&
+                            numObjEl.TryGetInt64(out var n))
+                        {
+                            numObjects += n;
+                        }
                     }
                 }
-
-                if (json.Contains("\"num_objects\""))
+                else
                 {
-                    var objStart = json.IndexOf("\"num_objects\"") + 15;
-                    var objEnd = json.IndexOf(",", objStart);
-                    if (objEnd == -1) objEnd = json.IndexOf("}", objStart);
-                    var objStr = json.Substring(objStart, objEnd - objStart).Trim();
-                    long.TryParse(objStr, out numObjects);
+                    // Flat format: {"size_kb": 1234, "num_objects": 10}
+                    if (root.TryGetProperty("size_kb", out var sizeKbEl) &&
+                        sizeKbEl.TryGetInt64(out var sizeKb))
+                        totalBytes = sizeKb * 1024;
+                    if (root.TryGetProperty("num_objects", out var numObjEl) &&
+                        numObjEl.TryGetInt64(out var n))
+                        numObjects = n;
                 }
             }
-            catch (Exception ex)
+            catch (JsonException ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[management.GetBucketUsageAsync] {ex.GetType().Name}: {ex.Message}");
-                // Parsing failed, return zeros
+                System.Diagnostics.Trace.TraceWarning($"[CephRgwStrategy.GetBucketUsageAsync] Failed to parse JSON response: {ex.Message}");
+                // Parsing failed — return zeros; caller should treat as unavailable
             }
 
             return new CephBucketUsage
