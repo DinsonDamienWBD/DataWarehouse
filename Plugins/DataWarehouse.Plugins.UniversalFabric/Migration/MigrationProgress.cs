@@ -71,7 +71,16 @@ public record MigrationProgress
     /// Estimated time remaining based on current throughput.
     /// Null if throughput cannot be calculated yet.
     /// </summary>
-    public TimeSpan? EstimatedRemaining => BytesPerSecond > 0
-        ? TimeSpan.FromSeconds((TotalBytes - MigratedBytes) / BytesPerSecond)
-        : null;
+    public TimeSpan? EstimatedRemaining
+    {
+        get
+        {
+            // Finding 4551: guard against MigratedBytes > TotalBytes (e.g., due to torn read)
+            // and BytesPerSecond == 0 (division by zero / infinite time).
+            if (BytesPerSecond <= 0) return null;
+            var remaining = TotalBytes - MigratedBytes;
+            if (remaining <= 0) return TimeSpan.Zero;
+            return TimeSpan.FromSeconds(remaining / BytesPerSecond);
+        }
+    }
 }
