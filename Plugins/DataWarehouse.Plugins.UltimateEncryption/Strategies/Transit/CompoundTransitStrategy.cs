@@ -22,8 +22,8 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Transit;
 public sealed class CompoundTransitStrategy : TransitEncryptionPluginBase
 {
     private const int KeySize = 64; // 32 bytes per cipher (2 x 256-bit keys)
-    private const int NonceSize = 24; // 12 bytes per cipher
-    private const int TagSize = 32; // 16 bytes per cipher
+    private const int NonceSize = 24; // combined total (12 bytes per cipher × 2) — LOW-2965: comments corrected
+    private const int TagSize = 32;   // combined total (16 bytes per cipher × 2) — LOW-2965: comments corrected
 
     /// <inheritdoc/>
     public override string Id => "transit-compound-aes-serpent";

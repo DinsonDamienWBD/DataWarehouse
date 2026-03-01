@@ -647,7 +647,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Kdf
         public override CipherInfo CipherInfo => new()
         {
             AlgorithmName = "bcrypt-KDF",
-            KeySizeBits = 184, // bcrypt produces 23 bytes (184 bits) + 16 byte salt
+            KeySizeBits = 192, // bcrypt produces 24 bytes (192 bits) + 16 byte salt — LOW-3008: was 184 / "23 bytes", both wrong
             BlockSizeBytes = 0,
             IvSizeBytes = 16, // Salt size
             TagSizeBytes = 0,
@@ -791,6 +791,11 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Kdf
             byte[]? associatedData,
             CancellationToken cancellationToken)
         {
+            // P2-3006: reject empty IKM — empty input key material produces deterministic
+            // attacker-predictable output from HKDF.
+            if (plaintext == null || plaintext.Length == 0)
+                throw new ArgumentException("Input key material (IKM) must be non-empty for HKDF.", nameof(plaintext));
+
             // plaintext = input key material
             // key = salt
             // associatedData = info
@@ -1013,6 +1018,11 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Kdf
             byte[]? associatedData,
             CancellationToken cancellationToken)
         {
+            // P2-3006: reject empty/null password — empty password produces deterministic
+            // attacker-predictable PBKDF2 output.
+            if (plaintext == null || plaintext.Length == 0)
+                throw new ArgumentException("Password must be non-empty for PBKDF2 derivation.", nameof(plaintext));
+
             // Run the 600K-iteration PBKDF2 on a thread-pool thread to avoid stalling the
             // calling thread (which may be an ASP.NET request thread or I/O completion port).
             // Argon2 already does this; we match the pattern for consistency (#2996).

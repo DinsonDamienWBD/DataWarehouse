@@ -131,7 +131,7 @@ public sealed class Ff1Strategy : EncryptionStrategyBase
         }
 
         var u = n / 2;
-        var v = n - u;
+        // LOW-2958: v = n - u removed — variable was computed but never used.
 
         // Split the numeral string into two halves
         var A = numeralString.Substring(0, u);
@@ -170,7 +170,7 @@ public sealed class Ff1Strategy : EncryptionStrategyBase
                 nameof(numeralString));
         }
         var u = n / 2;
-        var v = n - u;
+        // LOW-2958: v = n - u removed — variable was computed but never used.
 
         var A = numeralString.Substring(0, u);
         var B = numeralString.Substring(u);
@@ -434,7 +434,7 @@ public sealed class Ff3Strategy : EncryptionStrategyBase
     {
         var n = numeralString.Length;
         var u = n / 2;
-        var v = n - u;
+        // LOW-2958: v = n - u removed — variable was computed but never used.
 
         // Split tweak into TL (left 4 bytes) and TR (right 4 bytes)
         var TL = new byte[4];
@@ -470,7 +470,7 @@ public sealed class Ff3Strategy : EncryptionStrategyBase
     {
         var n = numeralString.Length;
         var u = n / 2;
-        var v = n - u;
+        // LOW-2958: v = n - u removed — variable was computed but never used.
 
         var TL = new byte[4];
         var TR = new byte[4];

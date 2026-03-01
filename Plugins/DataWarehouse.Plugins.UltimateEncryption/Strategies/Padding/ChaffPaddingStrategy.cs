@@ -400,8 +400,10 @@ public sealed class ChaffPaddingStrategy : EncryptionStrategyBase
             case ChaffDistribution.RandomBurst:
                 // Insert random bursts of chaff using Fisher-Yates shuffle over result indices
                 // to guarantee termination regardless of collision patterns.
+                // LOW-3009: use BitArray instead of bool[] to reduce heap allocation
+                // (1 bit per entry vs 1 byte per entry — 8× smaller).
                 {
-                    var positions = new bool[result.Length];
+                    var positions = new System.Collections.BitArray(result.Length);
                     // Build a shuffled list of all result indices, then mark the first chaff.Length
                     // of them as chaff slots — guaranteed no infinite loop.
                     var indices = new int[result.Length];

@@ -306,7 +306,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 ["FipsReference"] = "FIPS 205",
                 ["StandardName"] = "SLH-DSA-SHAKE-192f",
                 ["Type"] = "Signature",
-                ["HashFunction"] = "SHAKE-192",
+                ["HashFunction"] = "SHAKE-256", // LOW-3007: SHAKE-192 does not exist; SPHINCS+-192f uses SHAKE-256 (truncated to 192-bit security)
                 ["Variant"] = "Fast",
                 ["PublicKeySize"] = 48,
                 ["PrivateKeySize"] = 96,

@@ -74,18 +74,12 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Educational
             byte[]? associatedData,
             CancellationToken cancellationToken)
         {
-            return Task.Run(() =>
-            {
-                var shift = key[0];
-                var ciphertext = new byte[plaintext.Length];
-
-                for (int i = 0; i < plaintext.Length; i++)
-                {
-                    ciphertext[i] = (byte)((plaintext[i] + shift) % 256);
-                }
-
-                return ciphertext;
-            }, cancellationToken);
+            // LOW-2960: trivial byte loop — no Task.Run overhead needed.
+            var shift = key[0];
+            var ciphertext = new byte[plaintext.Length];
+            for (int i = 0; i < plaintext.Length; i++)
+                ciphertext[i] = (byte)((plaintext[i] + shift) % 256);
+            return Task.FromResult(ciphertext);
         }
 
         /// <inheritdoc/>
@@ -95,18 +89,12 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Educational
             byte[]? associatedData,
             CancellationToken cancellationToken)
         {
-            return Task.Run(() =>
-            {
-                var shift = key[0];
-                var plaintext = new byte[ciphertext.Length];
-
-                for (int i = 0; i < ciphertext.Length; i++)
-                {
-                    plaintext[i] = (byte)((ciphertext[i] - shift + 256) % 256);
-                }
-
-                return plaintext;
-            }, cancellationToken);
+            // LOW-2960: trivial byte loop — no Task.Run overhead needed.
+            var shift = key[0];
+            var plaintext = new byte[ciphertext.Length];
+            for (int i = 0; i < ciphertext.Length; i++)
+                plaintext[i] = (byte)((ciphertext[i] - shift + 256) % 256);
+            return Task.FromResult(plaintext);
         }
 
         /// <inheritdoc/>
@@ -177,18 +165,11 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Educational
             byte[]? associatedData,
             CancellationToken cancellationToken)
         {
-            return Task.Run(() =>
-            {
-                var ciphertext = new byte[plaintext.Length];
-
-                for (int i = 0; i < plaintext.Length; i++)
-                {
-                    // XOR with key byte (cycling through key)
-                    ciphertext[i] = (byte)(plaintext[i] ^ key[i % key.Length]);
-                }
-
-                return ciphertext;
-            }, cancellationToken);
+            // LOW-2960: trivial byte loop — no Task.Run overhead needed.
+            var ciphertext = new byte[plaintext.Length];
+            for (int i = 0; i < plaintext.Length; i++)
+                ciphertext[i] = (byte)(plaintext[i] ^ key[i % key.Length]);
+            return Task.FromResult(ciphertext);
         }
 
         /// <inheritdoc/>
@@ -198,18 +179,11 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Educational
             byte[]? associatedData,
             CancellationToken cancellationToken)
         {
-            return Task.Run(() =>
-            {
-                // XOR is symmetric: encryption and decryption are identical operations
-                var plaintext = new byte[ciphertext.Length];
-
-                for (int i = 0; i < ciphertext.Length; i++)
-                {
-                    plaintext[i] = (byte)(ciphertext[i] ^ key[i % key.Length]);
-                }
-
-                return plaintext;
-            }, cancellationToken);
+            // LOW-2960: XOR is symmetric; trivial byte loop — no Task.Run overhead needed.
+            var plaintext = new byte[ciphertext.Length];
+            for (int i = 0; i < ciphertext.Length; i++)
+                plaintext[i] = (byte)(ciphertext[i] ^ key[i % key.Length]);
+            return Task.FromResult(plaintext);
         }
 
         /// <inheritdoc/>
@@ -272,19 +246,14 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Educational
             byte[]? associatedData,
             CancellationToken cancellationToken)
         {
-            return Task.Run(() =>
+            // LOW-2960: trivial byte loop — no Task.Run overhead needed.
+            var ciphertext = new byte[plaintext.Length];
+            for (int i = 0; i < plaintext.Length; i++)
             {
-                var ciphertext = new byte[plaintext.Length];
-
-                for (int i = 0; i < plaintext.Length; i++)
-                {
-                    // Apply Caesar shift based on corresponding key byte (cycling through key)
-                    var shift = key[i % key.Length];
-                    ciphertext[i] = (byte)((plaintext[i] + shift) % 256);
-                }
-
-                return ciphertext;
-            }, cancellationToken);
+                var shift = key[i % key.Length];
+                ciphertext[i] = (byte)((plaintext[i] + shift) % 256);
+            }
+            return Task.FromResult(ciphertext);
         }
 
         /// <inheritdoc/>
@@ -294,19 +263,14 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Educational
             byte[]? associatedData,
             CancellationToken cancellationToken)
         {
-            return Task.Run(() =>
+            // LOW-2960: trivial byte loop — no Task.Run overhead needed.
+            var plaintext = new byte[ciphertext.Length];
+            for (int i = 0; i < ciphertext.Length; i++)
             {
-                var plaintext = new byte[ciphertext.Length];
-
-                for (int i = 0; i < ciphertext.Length; i++)
-                {
-                    // Reverse Caesar shift based on corresponding key byte
-                    var shift = key[i % key.Length];
-                    plaintext[i] = (byte)((ciphertext[i] - shift + 256) % 256);
-                }
-
-                return plaintext;
-            }, cancellationToken);
+                var shift = key[i % key.Length];
+                plaintext[i] = (byte)((ciphertext[i] - shift + 256) % 256);
+            }
+            return Task.FromResult(plaintext);
         }
 
         /// <inheritdoc/>

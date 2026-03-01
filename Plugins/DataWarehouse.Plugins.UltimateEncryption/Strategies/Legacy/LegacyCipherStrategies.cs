@@ -337,6 +337,10 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Legacy
                 return plaintext;
             }, cancellationToken);
         }
+
+        // P2-3004: GenerateKey override returns correct 128-bit key for IDEA.
+        public override byte[] GenerateKey() =>
+            System.Security.Cryptography.RandomNumberGenerator.GetBytes(KeySizeBits / 8);
     }
 
     /// <summary>
@@ -473,6 +477,10 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Legacy
                 return plaintext;
             }, cancellationToken);
         }
+
+        // P2-3004: GenerateKey override returns correct 128-bit key for CAST5.
+        public override byte[] GenerateKey() =>
+            System.Security.Cryptography.RandomNumberGenerator.GetBytes(KeySizeBits / 8);
     }
 
     /// <summary>
@@ -608,6 +616,10 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Legacy
                 return plaintext;
             }, cancellationToken);
         }
+
+        // P2-3004: GenerateKey override returns correct 256-bit key for CAST6.
+        public override byte[] GenerateKey() =>
+            System.Security.Cryptography.RandomNumberGenerator.GetBytes(KeySizeBits / 8);
     }
 
     /// <summary>
@@ -745,6 +757,10 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Legacy
                 return plaintext;
             }, cancellationToken);
         }
+
+        // P2-3004: GenerateKey override returns correct 256-bit key for RC5.
+        public override byte[] GenerateKey() =>
+            System.Security.Cryptography.RandomNumberGenerator.GetBytes(KeySizeBits / 8);
     }
 
     /// <summary>

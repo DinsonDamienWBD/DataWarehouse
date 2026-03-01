@@ -187,8 +187,10 @@ public sealed class EncryptionScalingManager : IScalableSubsystem, IDisposable
 
     /// <summary>
     /// Gets the bounded cache for key derivation results.
+    /// LOW-2957: restricted to internal to prevent external components from reading or
+    /// poisoning cached key material.
     /// </summary>
-    public BoundedCache<string, byte[]> KeyDerivationCache => _keyDerivationCache;
+    internal BoundedCache<string, byte[]> KeyDerivationCache => _keyDerivationCache;
 
     /// <summary>
     /// Forces an immediate re-probe of hardware cryptographic capabilities.

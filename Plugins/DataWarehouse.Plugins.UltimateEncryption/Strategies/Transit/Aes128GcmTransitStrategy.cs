@@ -222,6 +222,96 @@ public sealed class Aes128GcmTransitStrategy : TransitEncryptionPluginBase
     }
 
     /// <summary>
+    /// Decrypts a stream written by <see cref="EncryptStreamForTransitAsync"/>.
+    /// Reads the master nonce from the stream header, then decrypts each chunk in sequence.
+    /// LOW-3010: previously absent — streams encrypted via the chunk-based path could not be decrypted.
+    /// </summary>
+    public override async Task<TransitDecryptionResult> DecryptStreamFromTransitAsync(
+        System.IO.Stream ciphertextStream,
+        System.IO.Stream plaintextStream,
+        ISecurityContext context,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(ciphertextStream);
+        ArgumentNullException.ThrowIfNull(plaintextStream);
+        ArgumentNullException.ThrowIfNull(context);
+
+        if (KeyStore is null)
+            throw new InvalidOperationException("KeyStore has not been initialized. Call InitializeAsync before streaming decryption.");
+
+        // Read master nonce from stream header
+        var masterNonce = new byte[NonceSize];
+        var nonceBytesRead = await ciphertextStream.ReadAsync(masterNonce, cancellationToken).ConfigureAwait(false);
+        if (nonceBytesRead != NonceSize)
+            throw new CryptographicException($"Stream header truncated: expected {NonceSize}-byte nonce, got {nonceBytesRead} bytes.");
+
+        var keyId = await KeyStore.GetCurrentKeyIdAsync().ConfigureAwait(false);
+        var key = await KeyStore.GetKeyAsync(keyId, context).ConfigureAwait(false);
+
+        if (key.Length != KeySize)
+            throw new CryptographicException($"Key size mismatch. Expected {KeySize} bytes, got {key.Length}.");
+
+        // Decrypt format (mirrors EncryptStreamForTransitAsync):
+        //   12-byte master nonce (already read above)
+        //   Per chunk: [4-byte LE plaintext-size][ciphertext(plaintext-size bytes)][16-byte tag]
+        //   Sentinel: [4-byte LE zero]
+        var lenBytes = new byte[4];
+        var buffer = new byte[ChunkSize + TagSize];
+        long totalBytes = 0;
+        ulong chunkCounter = 0;
+
+        using var aesGcm = new AesGcm(key, TagSize);
+
+        while (true)
+        {
+            // Read chunk plaintext-size prefix (4 bytes, LE)
+            var lenRead = await ReadExactAsync(ciphertextStream, lenBytes, cancellationToken).ConfigureAwait(false);
+            if (lenRead == 0) break; // clean end of stream (shouldn't happen before sentinel)
+            if (lenRead != 4) throw new CryptographicException("Truncated chunk length prefix.");
+
+            var plainSize = BitConverter.ToInt32(lenBytes, 0);
+            if (plainSize == 0) break; // end-of-stream sentinel
+            if (plainSize < 0 || plainSize > ChunkSize)
+                throw new CryptographicException($"Invalid chunk plaintext size {plainSize}.");
+
+            var totalChunkBytes = plainSize + TagSize;
+            var actualRead = await ReadExactAsync(ciphertextStream, buffer.AsMemory(0, totalChunkBytes), cancellationToken).ConfigureAwait(false);
+            if (actualRead != totalChunkBytes) throw new CryptographicException("Truncated chunk data.");
+
+            var chunkNonce = DeriveChunkNonce(masterNonce, chunkCounter++);
+            var cipherChunk = buffer.AsSpan(0, plainSize);
+            var tag = buffer.AsSpan(plainSize, TagSize);
+            var plainChunk = new byte[plainSize];
+
+            aesGcm.Decrypt(chunkNonce, cipherChunk, tag, plainChunk);
+
+            await plaintextStream.WriteAsync(plainChunk, cancellationToken).ConfigureAwait(false);
+            totalBytes += plainSize;
+        }
+
+        CryptographicOperations.ZeroMemory(key);
+
+        return new TransitDecryptionResult
+        {
+            Plaintext = Array.Empty<byte>(), // Data written to stream
+            UsedPresetId = "standard-aes128gcm",
+            WasDecompressed = false
+        };
+    }
+
+    private static async Task<int> ReadExactAsync(System.IO.Stream stream, Memory<byte> buffer, CancellationToken ct)
+    {
+        int offset = 0;
+        while (offset < buffer.Length)
+        {
+            var read = await stream.ReadAsync(buffer.Slice(offset), ct).ConfigureAwait(false);
+            if (read == 0) return offset; // EOF
+            offset += read;
+        }
+        return offset;
+    }
+
+    /// <summary>
     /// Derives a chunk-specific nonce from master nonce and chunk counter.
     /// </summary>
     private static byte[] DeriveChunkNonce(byte[] masterNonce, ulong counter)
