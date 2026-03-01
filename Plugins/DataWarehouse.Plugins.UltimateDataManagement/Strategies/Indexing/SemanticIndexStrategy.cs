@@ -300,11 +300,13 @@ public sealed class SemanticIndexStrategy : IndexingStrategyBase
                     }
                 }
             }
-            catch
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
             {
-
-                // Fall back to local embedding
-                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+                // P2-2436: Log the bus failure so operators know the AI service is unavailable,
+                // then fall through to the local TF-based embedding fallback.
+                System.Diagnostics.Trace.TraceWarning(
+                    $"[SemanticIndexStrategy] GenerateEmbeddingAsync: message bus call failed, using local fallback: {ex.GetType().Name}: {ex.Message}");
             }
         }
 

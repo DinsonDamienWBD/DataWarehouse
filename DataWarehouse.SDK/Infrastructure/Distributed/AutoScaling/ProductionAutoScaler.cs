@@ -92,8 +92,10 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.AutoScaling
     /// Default scaling executor that logs decisions but does not perform real infrastructure changes.
     /// Real implementations would call cloud APIs (AWS ASG, Azure VMSS, K8s HPA).
     /// </summary>
+    /// <remarks>LOW-435: internal to prevent accidental production injection. Use cloud-provider-specific
+    /// <see cref="IScalingExecutor"/> implementations in production.</remarks>
     [SdkCompatibility("5.0.0", Notes = "Phase 65: Production auto-scaler")]
-    public sealed class InMemoryScalingExecutor : IScalingExecutor
+    internal sealed class InMemoryScalingExecutor : IScalingExecutor
     {
         private int _simulatedNodeCount;
         private readonly ConcurrentQueue<ScalingEvent> _history = new();

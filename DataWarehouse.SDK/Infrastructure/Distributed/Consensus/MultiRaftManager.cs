@@ -46,6 +46,8 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         private readonly RaftConfiguration _defaultConfig;
         private readonly SemaphoreSlim _managementLock = new(1, 1);
         private bool _disposed;
+        // LOW-436: cached sorted group-ID array; invalidated on add/remove.
+        private volatile string[]? _cachedSortedGroupIds;
 
         /// <summary>
         /// Creates a new Multi-Raft manager with shared transport and membership layers.
@@ -114,6 +116,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                     throw new InvalidOperationException($"Failed to register Raft group '{groupId}'.");
                 }
 
+                _cachedSortedGroupIds = null; // LOW-436: invalidate RouteKey cache
                 return engine;
             }
             finally
@@ -145,6 +148,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
 
             if (_groups.TryRemove(groupId, out var engine))
             {
+                _cachedSortedGroupIds = null; // LOW-436: invalidate RouteKey cache
                 engine.Stop();
                 engine.Dispose();
                 return true;
@@ -163,7 +167,14 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
 
-            var groupIds = _groups.Keys.OrderBy(g => g, StringComparer.Ordinal).ToArray();
+            // LOW-436: use cached sorted array; build only on first call or after group membership change.
+            var groupIds = _cachedSortedGroupIds;
+            if (groupIds == null)
+            {
+                groupIds = _groups.Keys.OrderBy(g => g, StringComparer.Ordinal).ToArray();
+                _cachedSortedGroupIds = groupIds;
+            }
+
             if (groupIds.Length == 0)
                 return DefaultGroupId;
 

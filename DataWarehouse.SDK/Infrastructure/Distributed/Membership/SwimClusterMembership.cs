@@ -28,6 +28,8 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         private readonly CancellationTokenSource _probeCts = new();
         private readonly SemaphoreSlim _stateLock = new(1, 1);
         private readonly ConcurrentQueue<SwimMembershipUpdate> _recentUpdates = new();
+        // LOW-454: Track queue length via Interlocked counter to avoid O(n) ConcurrentQueue.Count in EnqueueUpdate.
+        private int _recentUpdatesCount;
         private readonly BoundedDictionary<string, int> _deadReportCounts = new BoundedDictionary<string, int>(1000);
         private readonly BoundedDictionary<string, DateTimeOffset> _lastStateChangePerNode = new BoundedDictionary<string, DateTimeOffset>(1000);
         private string? _leaderId;
@@ -840,11 +842,16 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         private void EnqueueUpdate(SwimMembershipUpdate update)
         {
             _recentUpdates.Enqueue(update);
+            // LOW-454: Increment counter atomically before trimming to avoid O(n) ConcurrentQueue.Count in loop.
+            int newCount = Interlocked.Increment(ref _recentUpdatesCount);
 
-            // Bound the recent updates queue
-            while (_recentUpdates.Count > MaxRecentUpdates)
+            // Trim excess entries; each dequeue decrements the counter.
+            while (newCount > MaxRecentUpdates)
             {
-                _recentUpdates.TryDequeue(out _);
+                if (_recentUpdates.TryDequeue(out _))
+                    newCount = Interlocked.Decrement(ref _recentUpdatesCount);
+                else
+                    break;
             }
         }
 

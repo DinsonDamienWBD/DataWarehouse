@@ -27,14 +27,17 @@ namespace DataWarehouse.SDK.Infrastructure.InMemory
         {
             ct.ThrowIfCancellationRequested();
 
-            var violations = new List<PolicyViolation>();
-            var requiredActions = new List<GovernanceAction>();
+            // LOW-470: defer List<> allocations until a violation is actually found.
+            List<PolicyViolation>? violations = null;
+            List<GovernanceAction>? requiredActions = null;
 
             foreach (var policy in _policies.Values.Where(p => p.IsEnabled).OrderBy(p => p.Priority))
             {
                 if (string.Equals(policy.Expression, context.OperationType, StringComparison.OrdinalIgnoreCase) &&
                     policy.Action == GovernanceAction.Deny)
                 {
+                    violations ??= new List<PolicyViolation>();
+                    requiredActions ??= new List<GovernanceAction>();
                     violations.Add(new PolicyViolation
                     {
                         PolicyId = policy.PolicyId,
@@ -46,17 +49,18 @@ namespace DataWarehouse.SDK.Infrastructure.InMemory
                 }
             }
 
+            bool hasViolations = violations != null && violations.Count > 0;
             OnGovernanceEvent?.Invoke(new GovernanceEvent
             {
-                EventType = violations.Count > 0 ? GovernanceEventType.PolicyViolated : GovernanceEventType.PolicyEvaluated,
-                PolicyId = violations.FirstOrDefault()?.PolicyId ?? "none",
+                EventType = hasViolations ? GovernanceEventType.PolicyViolated : GovernanceEventType.PolicyEvaluated,
+                PolicyId = hasViolations ? violations![0].PolicyId : "none",
                 ResourceId = context.ResourceId,
                 Timestamp = DateTimeOffset.UtcNow
             });
 
-            if (violations.Count > 0)
+            if (hasViolations)
             {
-                return Task.FromResult(PolicyEvaluationResult.Denied(violations, requiredActions));
+                return Task.FromResult(PolicyEvaluationResult.Denied(violations!, requiredActions ?? new List<GovernanceAction>()));
             }
 
             return Task.FromResult(PolicyEvaluationResult.Allowed());

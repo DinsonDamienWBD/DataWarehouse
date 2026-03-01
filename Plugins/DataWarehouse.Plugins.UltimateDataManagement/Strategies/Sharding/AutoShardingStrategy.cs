@@ -498,17 +498,15 @@ public sealed class AutoShardingStrategy : ShardingStrategyBase
                 _operationLock.Release();
             }
         }
-        catch (OperationCanceledException ex)
+        catch (OperationCanceledException)
         {
-
-            // Expected when cancellation requested
-            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
+            // Expected when cancellation requested — do not log noise.
         }
-        catch
+        catch (Exception ex)
         {
-
-            // Log but don't throw from monitoring
-            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+            // P2-2459: Log split/merge failures so operators can diagnose shard imbalance.
+            System.Diagnostics.Trace.TraceWarning(
+                $"[AutoShardingStrategy] Shard split/merge operation failed: {ex.GetType().Name}: {ex.Message}");
         }
     }
 

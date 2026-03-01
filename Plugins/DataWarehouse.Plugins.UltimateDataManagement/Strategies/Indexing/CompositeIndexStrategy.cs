@@ -191,11 +191,10 @@ public sealed class CompositeIndexStrategy : IndexingStrategyBase
                 {
                     return ca.CompareTo(b);
                 }
-                catch
+                catch (InvalidCastException)
                 {
-
-                    // Fall back to string comparison
-                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+                    // P2-2437: Type mismatch between comparable types — fall through to string comparison.
+                    // Only InvalidCastException is expected here; other exceptions propagate.
                 }
             }
 

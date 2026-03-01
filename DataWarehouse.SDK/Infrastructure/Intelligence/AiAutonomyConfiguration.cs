@@ -133,6 +133,9 @@ public sealed class AiAutonomyConfiguration
         }
     }
 
+    // LOW-469: Cache the timing values array to avoid Enum.GetValues<CheckTiming>() allocation per call.
+    private static readonly CheckTiming[] _allCheckTimings = Enum.GetValues<CheckTiming>();
+
     /// <summary>
     /// Checks whether a feature ID is recognized in the <see cref="CheckClassificationTable"/>.
     /// Unknown features are still allowed for forward compatibility.
@@ -143,12 +146,8 @@ public sealed class AiAutonomyConfiguration
     {
         if (featureId is null) throw new ArgumentNullException(nameof(featureId));
 
-        // CheckClassificationTable returns PerOperation for unknown features (its default),
-        // but we can verify by checking if it's actually in the table by testing all timings.
-        // A simpler approach: try to see if the table knows it by checking the timing differs
-        // from PerOperation when we know it's not a PerOperation feature — but that's unreliable.
-        // Instead, iterate the known features.
-        foreach (CheckTiming timing in Enum.GetValues<CheckTiming>())
+        // LOW-469: Use pre-cached timing array; iterate O(T) timings × O(F/T) features per timing.
+        foreach (CheckTiming timing in _allCheckTimings)
         {
             var features = CheckClassificationTable.GetFeaturesByTiming(timing);
             for (int i = 0; i < features.Count; i++)

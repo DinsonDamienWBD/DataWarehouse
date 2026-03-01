@@ -775,22 +775,32 @@ public sealed class LifecyclePolicyEngineStrategy : LifecycleStrategyBase
 
     private static DateTime CalculateNextExecution(string cronExpression)
     {
-        // Simplified cron calculation - in production use a proper library like NCrontab
+        // P2-2464: Simplified cron calculation. In production, replace with a proper library (NCrontab).
+        // Original code reused now.Minute for "*", then added 1 day when next <= now, turning
+        // "* * * * *" (every minute) into "24 hours from now". Fix: for wildcard fields use the
+        // smallest valid next value (minute=0 for hour, +1 minute for minute field).
         var parts = cronExpression.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var now = DateTime.UtcNow;
 
-        // Parse minute field
-        int minute = parts[0] == "*" ? now.Minute : int.TryParse(parts[0], out var m) ? m : 0;
+        bool minuteWild = parts[0] == "*";
+        bool hourWild = parts.Length > 1 && parts[1] == "*";
 
-        // Parse hour field
-        int hour = parts[1] == "*" ? now.Hour : int.TryParse(parts[1], out var h) ? h : 0;
+        // For wildcard minute: we want "next minute", so start from now+1min truncated.
+        // For specific minute: use that minute value.
+        int minute = minuteWild ? 0 : int.TryParse(parts[0], out var m) ? m : 0;
+        int hour = hourWild ? now.Hour : parts.Length > 1 && int.TryParse(parts[1], out var h) ? h : 0;
 
         var next = new DateTime(now.Year, now.Month, now.Day, hour, minute, 0, DateTimeKind.Utc);
 
-        if (next <= now)
+        if (minuteWild)
         {
-            // Daily schedule by default
-            next = next.AddDays(1);
+            // Wildcard minute: schedule every minute — next execution is now + 1 minute.
+            next = now.AddSeconds(60 - now.Second);
+        }
+        else if (next <= now)
+        {
+            // Specific time already passed today: schedule for tomorrow (or next hour if hourWild).
+            next = hourWild ? next.AddHours(1) : next.AddDays(1);
         }
 
         return next;

@@ -45,10 +45,16 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
 
         /// <summary>
         /// Gets the CRDT type for the given key.
-        /// Checks prefix registrations first (longest match), then exact match, then default.
+        /// LOW-450: exact match checked first (highest specificity), then longest-prefix match, then default.
         /// </summary>
         public Type GetCrdtType(string key)
         {
+            // Check exact registration first (highest specificity) — LOW-450
+            if (_exactRegistrations.TryGetValue(key, out var exactType))
+            {
+                return exactType;
+            }
+
             // Check prefix registrations (longest matching prefix wins)
             Type? longestPrefixMatch = null;
             int longestPrefixLength = 0;
@@ -65,12 +71,6 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             if (longestPrefixMatch != null)
             {
                 return longestPrefixMatch;
-            }
-
-            // Check exact registration
-            if (_exactRegistrations.TryGetValue(key, out var exactType))
-            {
-                return exactType;
             }
 
             // Default to LWWRegister

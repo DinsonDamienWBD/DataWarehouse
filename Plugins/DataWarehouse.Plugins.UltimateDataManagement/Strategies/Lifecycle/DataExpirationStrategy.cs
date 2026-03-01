@@ -1012,12 +1012,14 @@ public sealed class DataExpirationStrategy : LifecycleStrategyBase
         }
         catch (Exception ex)
         {
+            // P2-2442: Success=false distinguishes this from a successful expiration.
+            // ErrorMessage includes exception type so callers can diagnose.
             return new ExpirationResult
             {
                 ObjectId = tracker.ObjectId,
-                ActionTaken = ExpirationEventType.Expired,
+                ActionTaken = ExpirationEventType.Expired, // Indicates expiration was attempted but action failed
                 Success = false,
-                ErrorMessage = ex.Message
+                ErrorMessage = $"[{ex.GetType().Name}] {ex.Message}"
             };
         }
     }

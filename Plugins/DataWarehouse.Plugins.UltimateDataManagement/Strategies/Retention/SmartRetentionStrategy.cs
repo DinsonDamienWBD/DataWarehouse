@@ -331,7 +331,7 @@ public sealed class SmartRetentionStrategy : RetentionStrategyBase
             BusinessValue = 0.5, // Default neutral
             UserImportanceRating = 0.5, // Default neutral
             AccessHistory = new List<AccessEvent>(),
-            BusinessValueSignals = new List<ValueSignal>()
+            BusinessValueSignals = new System.Collections.Concurrent.ConcurrentBag<ValueSignal>()
         };
 
         _featureStore[data.ObjectId] = features;
@@ -448,7 +448,9 @@ public sealed class ObjectFeatures
     /// <summary>
     /// Business value signals.
     /// </summary>
-    public required List<ValueSignal> BusinessValueSignals { get; init; }
+    // P2-2473: Use ConcurrentBag to allow concurrent Add from RecordAccess/RecordBusinessValueSignal
+    // without holding a separate lock. Ordering is not required here; Take(10) after sort is fine.
+    public required System.Collections.Concurrent.ConcurrentBag<ValueSignal> BusinessValueSignals { get; init; }
 }
 
 /// <summary>

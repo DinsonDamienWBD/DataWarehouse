@@ -288,6 +288,14 @@ public sealed class RangeShardingStrategy : ShardingStrategyBase
         ArgumentException.ThrowIfNullOrWhiteSpace(shardId);
         ArgumentException.ThrowIfNullOrWhiteSpace(physicalLocation);
 
+        // P2-2487: Validate that start < end to prevent inverted ranges that never match keys.
+        if (end != null && string.Compare(start, end, StringComparison.Ordinal) >= 0)
+        {
+            throw new ArgumentException(
+                $"Range start '{start}' must be less than end '{end}'.",
+                nameof(start));
+        }
+
         _rangeLock.EnterWriteLock();
         try
         {

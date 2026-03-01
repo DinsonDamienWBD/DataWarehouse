@@ -82,8 +82,11 @@ namespace DataWarehouse.SDK.Infrastructure.Policy.Performance
     [SdkCompatibility("6.0.0", Notes = "Phase 76: Performance Optimization (PERF-05)")]
     public static class CheckClassificationTable
     {
-        private static readonly FrozenDictionary<string, CheckTiming> _classifications = BuildClassifications();
-        private static readonly FrozenDictionary<CheckTiming, string[]> _featuresByTiming = BuildFeaturesByTiming();
+        // LOW-501: Build both tables from a single BuildEntries() call to avoid double allocation.
+        private static readonly (FrozenDictionary<string, CheckTiming> Classifications,
+                                  FrozenDictionary<CheckTiming, string[]> FeaturesByTiming) _tables = BuildAllTables();
+        private static readonly FrozenDictionary<string, CheckTiming> _classifications = _tables.Classifications;
+        private static readonly FrozenDictionary<CheckTiming, string[]> _featuresByTiming = _tables.FeaturesByTiming;
 
         private static Dictionary<string, CheckTiming> BuildEntries() => new(StringComparer.Ordinal)
         {
@@ -192,12 +195,11 @@ namespace DataWarehouse.SDK.Infrastructure.Policy.Performance
             ["orphan_cleanup"] = CheckTiming.Periodic
         };
 
-        private static FrozenDictionary<string, CheckTiming> BuildClassifications()
-            => BuildEntries().ToFrozenDictionary(StringComparer.Ordinal);
-
-        private static FrozenDictionary<CheckTiming, string[]> BuildFeaturesByTiming()
+        private static (FrozenDictionary<string, CheckTiming>, FrozenDictionary<CheckTiming, string[]>) BuildAllTables()
         {
+            // LOW-501: single BuildEntries() call; derive both lookup tables from the same dictionary.
             var entries = BuildEntries();
+            var classifications = entries.ToFrozenDictionary(StringComparer.Ordinal);
             var grouped = new Dictionary<CheckTiming, string[]>();
             foreach (CheckTiming timing in Enum.GetValues<CheckTiming>())
             {
@@ -207,7 +209,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy.Performance
                     .OrderBy(k => k, StringComparer.Ordinal)
                     .ToArray();
             }
-            return grouped.ToFrozenDictionary();
+            return (classifications, grouped.ToFrozenDictionary());
         }
 
         /// <summary>
