@@ -9,6 +9,12 @@ namespace DataWarehouse.Plugins.UltimateCompute.Strategies.Distributed;
 /// </summary>
 internal sealed class BeamStrategy : ComputeRuntimeStrategyBase
 {
+    // Allowed Beam runner identifiers — used to prevent shell metacharacter injection via beam_runner metadata.
+    private static readonly HashSet<string> AllowedRunners = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "DirectRunner", "FlinkRunner", "SparkRunner", "DataflowRunner",
+        "SamzaRunner", "NemoRunner", "PrismRunner", "TwisterRunner"
+    };
     /// <inheritdoc/>
     public override string StrategyId => "compute.distributed.beam";
     /// <inheritdoc/>
@@ -40,11 +46,6 @@ internal sealed class BeamStrategy : ComputeRuntimeStrategyBase
                 await File.WriteAllBytesAsync(codePath, task.Code.ToArray(), cancellationToken);
 
                 // Validate runner against the known safe set to prevent shell metacharacter injection.
-                static readonly HashSet<string> AllowedRunners = new(StringComparer.OrdinalIgnoreCase)
-                {
-                    "DirectRunner", "FlinkRunner", "SparkRunner", "DataflowRunner",
-                    "SamzaRunner", "NemoRunner", "PrismRunner", "TwisterRunner"
-                };
                 var runner = "DirectRunner";
                 if (task.Metadata?.TryGetValue("beam_runner", out var r) == true && r is string rs)
                 {
