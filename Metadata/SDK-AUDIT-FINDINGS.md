@@ -6491,9 +6491,9 @@
 #4393 | Cat 15 | LOW | FixStreamStrategy.cs:388-390 | `LogoutAsync` sets state to Disconnected immediately — no actual FIN/LOGOUT exchange despite XML doc saying "Complete logout". [ ]
 #4394 | Cat 4 | LOW | SwiftStreamStrategy.cs:216-217 | `BicRegex` and `CurrencyRegex` compiled without `RegexOptions.Timeout`. Defence-in-depth gap for unexpected input. [X]
 #4395 | Cat 13 | LOW | KafkaAdvancedFeatures.cs:125-133 | `PerformCooperativeStickyAssignment` hardcodes `12` as default partition count per topic with no configuration. [ ]
-#4396 | Cat 15 | LOW | KinesisStreamStrategy.cs:706 | Method name typo: `RoutToShard` should be `RouteToShard`. [ ]
+#4396 | Cat 15 | LOW | KinesisStreamStrategy.cs:706 | Method name typo: `RoutToShard` should be `RouteToShard`. [X]
 #4397 | Cat 13 | LOW | MqttStreamStrategy.cs:237 + ZigbeeStreamStrategy.cs:225 | Both `SubscribeAsync` methods use O(n) linear scan over all topics/clusters. Acceptable for bounded collections but should use indexed lookup. [ ]
-#4398 | Cat 9 | LOW | EventDrivenArchitectureStrategies.cs:125 | `storedEvents.First()` and `Last()` called without count guard. Empty events list throws `InvalidOperationException`. [ ]
+#4398 | Cat 9 | LOW | EventDrivenArchitectureStrategies.cs:125 | `storedEvents.First()` and `Last()` called without count guard. Empty events list throws `InvalidOperationException`. [X]
 
 
 ### Chunk 143 — UltimateSustainability (Battery/SmartCharging+UPS, CarbonAwareness, CarbonBudget, CarbonReporting, CloudOptimization start)

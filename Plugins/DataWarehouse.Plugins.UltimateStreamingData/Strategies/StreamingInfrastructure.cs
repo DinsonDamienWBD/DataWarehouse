@@ -51,12 +51,24 @@ public sealed class RedisStreamsConsumerGroupManager
         {
             // Deliver only new (undelivered) messages.
             // Finding 4344: take snapshot under lock to avoid concurrent mutation by Trim/AddEntry.
+            // Finding 4366: use binary search to find start position in O(log n) instead of O(n) linear scan.
             List<RedisStreamEntry> snapshot;
             lock (stream.Lock)
             {
-                snapshot = stream.Entries
-                    .Where(e => string.Compare(e.Id, group.LastDeliveredId, StringComparison.Ordinal) > 0)
-                    .Take(count).ToList();
+                var entries = stream.Entries;
+                var lastId = group.LastDeliveredId;
+                // Binary search for the first entry with Id > lastDeliveredId.
+                int lo = 0, hi = entries.Count;
+                while (lo < hi)
+                {
+                    int mid = lo + (hi - lo) / 2;
+                    if (string.Compare(entries[mid].Id, lastId, StringComparison.Ordinal) <= 0)
+                        lo = mid + 1;
+                    else
+                        hi = mid;
+                }
+                // lo is now the index of the first undelivered entry.
+                snapshot = entries.GetRange(lo, Math.Min(count, entries.Count - lo));
             }
 
             foreach (var entry in snapshot)
