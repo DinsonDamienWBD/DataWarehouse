@@ -398,25 +398,22 @@ public sealed class ChaffPaddingStrategy : EncryptionStrategyBase
                 break;
 
             case ChaffDistribution.RandomBurst:
-                // Insert random bursts of chaff
-                using (var rng = RandomNumberGenerator.Create())
+                // Insert random bursts of chaff using Fisher-Yates shuffle over result indices
+                // to guarantee termination regardless of collision patterns.
                 {
                     var positions = new bool[result.Length];
-                    var remaining = chaff.Length;
-
-                    while (remaining > 0)
+                    // Build a shuffled list of all result indices, then mark the first chaff.Length
+                    // of them as chaff slots — guaranteed no infinite loop.
+                    var indices = new int[result.Length];
+                    for (int i = 0; i < result.Length; i++) indices[i] = i;
+                    for (int i = result.Length - 1; i > 0; i--)
                     {
-                        var burstSize = Math.Min(remaining, RandomNumberGenerator.GetInt32(1, Math.Min(16, remaining + 1)));
-                        var position = RandomNumberGenerator.GetInt32(0, result.Length - burstSize + 1);
-
-                        for (int i = 0; i < burstSize && position + i < positions.Length; i++)
-                        {
-                            if (!positions[position + i])
-                            {
-                                positions[position + i] = true;
-                                remaining--;
-                            }
-                        }
+                        var j = RandomNumberGenerator.GetInt32(0, i + 1);
+                        (indices[i], indices[j]) = (indices[j], indices[i]);
+                    }
+                    for (int i = 0; i < Math.Min(chaff.Length, result.Length); i++)
+                    {
+                        positions[indices[i]] = true;
                     }
 
                     for (int i = 0; i < result.Length; i++)

@@ -599,7 +599,6 @@ public sealed class DecorrelatedJitterRetryStrategy : ResilienceStrategyBase
     private readonly TimeSpan _baseDelay;
     private readonly TimeSpan _maxDelay;
     private static readonly Random _random = Random.Shared;
-    private TimeSpan _previousDelay;
 
     public DecorrelatedJitterRetryStrategy()
         : this(maxRetries: 3, baseDelay: TimeSpan.FromMilliseconds(500), maxDelay: TimeSpan.FromSeconds(30))
@@ -614,7 +613,6 @@ public sealed class DecorrelatedJitterRetryStrategy : ResilienceStrategyBase
         _maxRetries = maxRetries;
         _baseDelay = baseDelay;
         _maxDelay = maxDelay;
-        _previousDelay = baseDelay;
     }
 
     public override string StrategyId => "retry-decorrelated-jitter";
@@ -642,7 +640,7 @@ public sealed class DecorrelatedJitterRetryStrategy : ResilienceStrategyBase
         var startTime = DateTimeOffset.UtcNow;
         var attempts = 0;
         Exception? lastException = null;
-        _previousDelay = _baseDelay;
+        var previousDelay = _baseDelay;
 
         while (attempts <= _maxRetries)
         {
@@ -666,7 +664,7 @@ public sealed class DecorrelatedJitterRetryStrategy : ResilienceStrategyBase
 
                 if (attempts <= _maxRetries)
                 {
-                    var delay = CalculateDecorrelatedDelay();
+                    var delay = CalculateDecorrelatedDelay(ref previousDelay);
                     await Task.Delay(delay, cancellationToken);
                 }
             }
@@ -681,15 +679,15 @@ public sealed class DecorrelatedJitterRetryStrategy : ResilienceStrategyBase
         };
     }
 
-    private TimeSpan CalculateDecorrelatedDelay()
+    private TimeSpan CalculateDecorrelatedDelay(ref TimeSpan previousDelay)
     {
         // Decorrelated jitter: sleep = min(cap, random_between(base, sleep * 3))
         var min = _baseDelay.TotalMilliseconds;
-        var max = _previousDelay.TotalMilliseconds * 3;
+        var max = previousDelay.TotalMilliseconds * 3;
         var delay = min + _random.NextDouble() * (max - min);
         delay = Math.Min(delay, _maxDelay.TotalMilliseconds);
-        _previousDelay = TimeSpan.FromMilliseconds(delay);
-        return _previousDelay;
+        previousDelay = TimeSpan.FromMilliseconds(delay);
+        return previousDelay;
     }
 }
 

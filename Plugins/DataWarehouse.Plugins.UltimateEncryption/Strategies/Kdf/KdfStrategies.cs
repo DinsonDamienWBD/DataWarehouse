@@ -190,7 +190,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Kdf
                     throw new CryptographicException("Password verification failed");
                 }
 
-                return ciphertext; // Return password if verification succeeds
+                return computedHash; // Return the derived key, not the raw password
             }, cancellationToken);
         }
 
@@ -348,7 +348,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Kdf
                     throw new CryptographicException("Password verification failed");
                 }
 
-                return ciphertext;
+                return computedHash; // Return the derived key, not the raw password
             }, cancellationToken);
         }
 
@@ -498,7 +498,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Kdf
                     throw new CryptographicException("Password verification failed");
                 }
 
-                return ciphertext;
+                return computedHash; // Return the derived key, not the raw password
             }, cancellationToken);
         }
 

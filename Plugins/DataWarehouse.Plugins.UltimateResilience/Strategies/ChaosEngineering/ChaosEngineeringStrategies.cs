@@ -16,7 +16,7 @@ public sealed class FaultInjectionStrategy : ResilienceStrategyBase
     private readonly Type[] _exceptionTypes;
     private readonly string[]? _faultMessages;
     private static readonly Random _random = Random.Shared;
-    private bool _enabled = true;
+    private volatile bool _enabled = true;
 
     public FaultInjectionStrategy()
         : this(faultRate: 0.1, exceptionTypes: new[] { typeof(Exception) })
@@ -142,7 +142,7 @@ public sealed class LatencyInjectionStrategy : ResilienceStrategyBase
     private readonly TimeSpan _minLatency;
     private readonly TimeSpan _maxLatency;
     private static readonly Random _random = Random.Shared;
-    private bool _enabled = true;
+    private volatile bool _enabled = true;
 
     public LatencyInjectionStrategy()
         : this(injectionRate: 0.1, minLatency: TimeSpan.FromMilliseconds(100), maxLatency: TimeSpan.FromSeconds(2))
@@ -253,7 +253,7 @@ public sealed class ProcessTerminationStrategy : ResilienceStrategyBase
 {
     private readonly double _terminationRate;
     private static readonly Random _random = Random.Shared;
-    private bool _enabled = true;
+    private volatile bool _enabled = true;
     private readonly Action? _onTermination;
 
     public ProcessTerminationStrategy()
@@ -355,7 +355,7 @@ public sealed class ResourceExhaustionStrategy : ResilienceStrategyBase
     private readonly double _exhaustionRate;
     private readonly string[] _resourceTypes;
     private static readonly Random _random = Random.Shared;
-    private bool _enabled = true;
+    private volatile bool _enabled = true;
 
     public ResourceExhaustionStrategy()
         : this(exhaustionRate: 0.05, resourceTypes: new[] { "memory", "cpu", "connections", "disk" })
@@ -466,7 +466,7 @@ public sealed class NetworkPartitionStrategy : ResilienceStrategyBase
     private readonly double _partitionRate;
     private readonly TimeSpan _partitionDuration;
     private static readonly Random _random = Random.Shared;
-    private bool _enabled = true;
+    private volatile bool _enabled = true;
     private DateTimeOffset _partitionEnd = DateTimeOffset.MinValue;
     private readonly object _lock = new();
 
@@ -614,8 +614,9 @@ public sealed class NetworkPartitionStrategy : ResilienceStrategyBase
 public sealed class ChaosMonkeyStrategy : ResilienceStrategyBase
 {
     private readonly List<(string name, ResilienceStrategyBase strategy, double weight)> _chaosStrategies = new();
+    private readonly object _chaosStrategiesLock = new();
     private static readonly Random _random = Random.Shared;
-    private bool _enabled = true;
+    private volatile bool _enabled = true;
     private readonly double _overallRate;
 
     public ChaosMonkeyStrategy()
@@ -664,7 +665,10 @@ public sealed class ChaosMonkeyStrategy : ResilienceStrategyBase
     /// </summary>
     public ChaosMonkeyStrategy AddStrategy(string name, ResilienceStrategyBase strategy, double weight)
     {
-        _chaosStrategies.Add((name, strategy, weight));
+        lock (_chaosStrategiesLock)
+        {
+            _chaosStrategies.Add((name, strategy, weight));
+        }
         return this;
     }
 
@@ -673,11 +677,19 @@ public sealed class ChaosMonkeyStrategy : ResilienceStrategyBase
         if (!_enabled || _random.NextDouble() >= _overallRate)
             return null;
 
-        var totalWeight = _chaosStrategies.Sum(s => s.weight);
+        (string name, ResilienceStrategyBase strategy, double weight)[] snapshot;
+        lock (_chaosStrategiesLock)
+        {
+            snapshot = _chaosStrategies.ToArray();
+        }
+
+        if (snapshot.Length == 0) return null;
+
+        var totalWeight = snapshot.Sum(s => s.weight);
         var randomValue = _random.NextDouble() * totalWeight;
         var cumulative = 0.0;
 
-        foreach (var (_, strategy, weight) in _chaosStrategies)
+        foreach (var (_, strategy, weight) in snapshot)
         {
             cumulative += weight;
             if (randomValue <= cumulative)
@@ -686,7 +698,7 @@ public sealed class ChaosMonkeyStrategy : ResilienceStrategyBase
             }
         }
 
-        return _chaosStrategies.LastOrDefault().strategy;
+        return snapshot[^1].strategy;
     }
 
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(
@@ -730,8 +742,13 @@ public sealed class ChaosMonkeyStrategy : ResilienceStrategyBase
         }
     }
 
-    protected override string? GetCurrentState() =>
-        _enabled ? $"Enabled (rate: {_overallRate:P0}, strategies: {_chaosStrategies.Count})" : "Disabled";
+    protected override string? GetCurrentState()
+    {
+        if (!_enabled) return "Disabled";
+        int count;
+        lock (_chaosStrategiesLock) { count = _chaosStrategies.Count; }
+        return $"Enabled (rate: {_overallRate:P0}, strategies: {count})";
+    }
 }
 
 /// <summary>

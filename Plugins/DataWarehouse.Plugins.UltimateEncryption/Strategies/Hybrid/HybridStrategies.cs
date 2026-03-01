@@ -122,20 +122,31 @@ public sealed class HybridAesKyberStrategy : EncryptionStrategyBase
 
             var ecdhPublicKey = ((ECPublicKeyParameters)ecdhKeyPair.Public).Q.GetEncoded(compressed: false);
 
-            // Step 2: Derive classical shared secret using ECDH (with recipient's public key from 'key')
-            var recipientEcdhPublic = DecodeECPublicKey(key);
+            // Step 2: Parse composite public key: [ECDH Public Length:2][ECDH Public][NTRU Public Length:4][NTRU Public]
+            if (key.Length < 2)
+                throw new ArgumentException(
+                    "Key must be a composite public key. Use GenerateCompositeKeyPair() to obtain the correct public key.", nameof(key));
+            var ecdhPublicKeyLen = System.Buffers.Binary.BinaryPrimitives.ReadUInt16BigEndian(key.AsSpan(0, 2));
+            if (key.Length < 2 + ecdhPublicKeyLen + 4)
+                throw new ArgumentException("Composite public key is truncated (ECDH section).", nameof(key));
+            var ecdhPublicKeyBytes = new byte[ecdhPublicKeyLen];
+            Buffer.BlockCopy(key, 2, ecdhPublicKeyBytes, 0, ecdhPublicKeyLen);
+            var ntruPublicKeyLen = System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(key.AsSpan(2 + ecdhPublicKeyLen, 4));
+            if (key.Length < 2 + ecdhPublicKeyLen + 4 + ntruPublicKeyLen)
+                throw new ArgumentException("Composite public key is truncated (NTRU section).", nameof(key));
+            var ntruPublicKeyBytes = new byte[ntruPublicKeyLen];
+            Buffer.BlockCopy(key, 2 + ecdhPublicKeyLen + 4, ntruPublicKeyBytes, 0, ntruPublicKeyLen);
+
+            // Derive classical shared secret using ECDH (with recipient's ECDH public key)
+            var recipientEcdhPublic = DecodeECPublicKeyFromBytes(ecdhPublicKeyBytes);
             var ecdhAgreement = new ECDHBasicAgreement();
             ecdhAgreement.Init(ecdhKeyPair.Private);
             var classicalSecret = ecdhAgreement.CalculateAgreement(recipientEcdhPublic).ToByteArrayUnsigned();
 
-            // Step 3: Generate ephemeral NTRU key pair and encapsulate
-            var kemParams = new NtruKeyGenerationParameters(_secureRandom, NtruParameters.NtruHps2048677);
-            var kemGenerator = new NtruKeyPairGenerator();
-            kemGenerator.Init(kemParams);
-            var kemKeyPair = kemGenerator.GenerateKeyPair();
-
+            // Step 3: Encapsulate against recipient's NTRU public key
+            var recipientNtruPublic = NtruPublicKeyParameters.FromEncoding(NtruParameters.NtruHps2048677, ntruPublicKeyBytes);
             var kemEncapsulator = new NtruKemGenerator(_secureRandom);
-            var encapsulated = kemEncapsulator.GenerateEncapsulated((NtruPublicKeyParameters)kemKeyPair.Public);
+            var encapsulated = kemEncapsulator.GenerateEncapsulated(recipientNtruPublic);
             var kemCiphertext = encapsulated.GetEncapsulation();
             var pqSecret = encapsulated.GetSecret();
 
@@ -202,15 +213,26 @@ public sealed class HybridAesKyberStrategy : EncryptionStrategyBase
             var tag = reader.ReadBytes(TagSize);
             var encryptedData = reader.ReadBytes((int)(ms.Length - ms.Position));
 
-            // Step 4: Derive classical secret using recipient's ECDH private key (from 'key')
-            var recipientEcdhPrivate = DecodeECPrivateKey(key);
+            // Step 4: Parse composite private key: [ECDH Private Length:2][ECDH Private][NTRU Private:rest]
+            if (key.Length < 2)
+                throw new CryptographicException("Composite private key is too short.");
+            var ecdhPrivKeyLen = System.Buffers.Binary.BinaryPrimitives.ReadUInt16BigEndian(key.AsSpan(0, 2));
+            if (key.Length < 2 + ecdhPrivKeyLen)
+                throw new CryptographicException("Composite private key is truncated (ECDH section).");
+            var ecdhPrivKeyBytes = new byte[ecdhPrivKeyLen];
+            Buffer.BlockCopy(key, 2, ecdhPrivKeyBytes, 0, ecdhPrivKeyLen);
+            var ntruPrivKeyBytes = new byte[key.Length - 2 - ecdhPrivKeyLen];
+            Buffer.BlockCopy(key, 2 + ecdhPrivKeyLen, ntruPrivKeyBytes, 0, ntruPrivKeyBytes.Length);
+
+            // Derive classical secret using recipient's ECDH private key
+            var recipientEcdhPrivate = DecodeECPrivateKey(ecdhPrivKeyBytes);
             var senderEcdhPublic = DecodeECPublicKeyFromBytes(ecdhPublicKey);
             var ecdhAgreement = new ECDHBasicAgreement();
             ecdhAgreement.Init(recipientEcdhPrivate);
             var classicalSecret = ecdhAgreement.CalculateAgreement(senderEcdhPublic).ToByteArrayUnsigned();
 
-            // Step 5: Decapsulate KEM to get PQ secret
-            var kemPrivateKey = ExtractKemPrivateKey(key);
+            // Step 5: Decapsulate KEM to get PQ secret using recipient's NTRU private key
+            var kemPrivateKey = NtruPrivateKeyParameters.FromEncoding(NtruParameters.NtruHps2048677, ntruPrivKeyBytes);
             var kemExtractor = new NtruKemExtractor(kemPrivateKey);
             var pqSecret = kemExtractor.ExtractSecret(kemCiphertext);
 
@@ -263,20 +285,60 @@ public sealed class HybridAesKyberStrategy : EncryptionStrategyBase
     }
 
     /// <summary>
-    /// Decodes EC public key from key material.
+    /// Generates a composite key pair for AES-ECDH-NTRU hybrid operations.
+    /// Returns (compositePublicKey, compositePrivateKey) where:
+    /// - compositePublicKey: [ECDH Public Length:2][ECDH Public][NTRU Public Length:4][NTRU Public]
+    ///   (used as the 'key' parameter in EncryptAsync)
+    /// - compositePrivateKey: [ECDH Private Length:2][ECDH Private][NTRU Private:rest]
+    ///   (used as the 'key' parameter in DecryptAsync)
     /// </summary>
-    private ECPublicKeyParameters DecodeECPublicKey(byte[] keyMaterial)
+    public (byte[] PublicKey, byte[] CompositePrivateKey) GenerateCompositeKeyPair()
     {
         var curve = ECNamedCurveTable.GetByName("P-384");
-        var point = curve.Curve.DecodePoint(keyMaterial);
         var ecDomainParams = new ECDomainParameters(curve.Curve, curve.G, curve.N, curve.H);
-        return new ECPublicKeyParameters(point, ecDomainParams);
+        var ecdhGenerator = new ECKeyPairGenerator();
+        ecdhGenerator.Init(new ECKeyGenerationParameters(ecDomainParams, _secureRandom));
+        var ecdhKeyPair = ecdhGenerator.GenerateKeyPair();
+
+        var ecdhPublicBytes = ((ECPublicKeyParameters)ecdhKeyPair.Public).Q.GetEncoded(compressed: false);
+        var ecdhPrivateBytes = ((ECPrivateKeyParameters)ecdhKeyPair.Private).D.ToByteArrayUnsigned();
+
+        var kemParams = new NtruKeyGenerationParameters(_secureRandom, NtruParameters.NtruHps2048677);
+        var kemGenerator = new NtruKeyPairGenerator();
+        kemGenerator.Init(kemParams);
+        var kemKeyPair = kemGenerator.GenerateKeyPair();
+
+        var ntruPublicBytes = ((NtruPublicKeyParameters)kemKeyPair.Public).GetEncoded();
+        var ntruPrivateBytes = ((NtruPrivateKeyParameters)kemKeyPair.Private).GetEncoded();
+
+        // Build composite public key: [ECDH Public Length:2][ECDH Public][NTRU Public Length:4][NTRU Public]
+        var pubLenBytes = new byte[2];
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt16BigEndian(pubLenBytes, (ushort)ecdhPublicBytes.Length);
+        var ntruPubLenBytes = new byte[4];
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32BigEndian(ntruPubLenBytes, ntruPublicBytes.Length);
+        var compositePublicKey = new byte[2 + ecdhPublicBytes.Length + 4 + ntruPublicBytes.Length];
+        int pos = 0;
+        Buffer.BlockCopy(pubLenBytes, 0, compositePublicKey, pos, 2); pos += 2;
+        Buffer.BlockCopy(ecdhPublicBytes, 0, compositePublicKey, pos, ecdhPublicBytes.Length); pos += ecdhPublicBytes.Length;
+        Buffer.BlockCopy(ntruPubLenBytes, 0, compositePublicKey, pos, 4); pos += 4;
+        Buffer.BlockCopy(ntruPublicBytes, 0, compositePublicKey, pos, ntruPublicBytes.Length);
+
+        // Build composite private key: [ECDH Private Length:2][ECDH Private][NTRU Private:rest]
+        var privLenBytes = new byte[2];
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt16BigEndian(privLenBytes, (ushort)ecdhPrivateBytes.Length);
+        var compositePrivateKey = new byte[2 + ecdhPrivateBytes.Length + ntruPrivateBytes.Length];
+        int ppos = 0;
+        Buffer.BlockCopy(privLenBytes, 0, compositePrivateKey, ppos, 2); ppos += 2;
+        Buffer.BlockCopy(ecdhPrivateBytes, 0, compositePrivateKey, ppos, ecdhPrivateBytes.Length); ppos += ecdhPrivateBytes.Length;
+        Buffer.BlockCopy(ntruPrivateBytes, 0, compositePrivateKey, ppos, ntruPrivateBytes.Length);
+
+        return (compositePublicKey, compositePrivateKey);
     }
 
     /// <summary>
-    /// Decodes EC private key from key material.
+    /// Decodes EC private key from raw big-endian bytes.
     /// </summary>
-    private ECPrivateKeyParameters DecodeECPrivateKey(byte[] keyMaterial)
+    private static ECPrivateKeyParameters DecodeECPrivateKey(byte[] keyMaterial)
     {
         var curve = ECNamedCurveTable.GetByName("P-384");
         var d = new Org.BouncyCastle.Math.BigInteger(1, keyMaterial);
@@ -285,23 +347,14 @@ public sealed class HybridAesKyberStrategy : EncryptionStrategyBase
     }
 
     /// <summary>
-    /// Decodes EC public key from raw bytes.
+    /// Decodes EC public key from raw encoded bytes.
     /// </summary>
-    private ECPublicKeyParameters DecodeECPublicKeyFromBytes(byte[] encodedKey)
+    private static ECPublicKeyParameters DecodeECPublicKeyFromBytes(byte[] encodedKey)
     {
         var curve = ECNamedCurveTable.GetByName("P-384");
         var point = curve.Curve.DecodePoint(encodedKey);
         var ecDomainParams = new ECDomainParameters(curve.Curve, curve.G, curve.N, curve.H);
         return new ECPublicKeyParameters(point, ecDomainParams);
-    }
-
-    /// <summary>
-    /// Extracts NTRU private key from composite key material.
-    /// </summary>
-    private NtruPrivateKeyParameters ExtractKemPrivateKey(byte[] keyMaterial)
-    {
-        // In production, parse composite key format
-        return NtruPrivateKeyParameters.FromEncoding(NtruParameters.NtruHps2048677, keyMaterial);
     }
 }
 
@@ -391,20 +444,31 @@ public sealed class HybridChaChaKyberStrategy : EncryptionStrategyBase
 
             var ecdhPublicKey = ((ECPublicKeyParameters)ecdhKeyPair.Public).Q.GetEncoded(compressed: false);
 
-            // Step 2: Derive classical shared secret
-            var recipientEcdhPublic = DecodeECPublicKey(key);
+            // Step 2: Parse composite public key: [ECDH Public Length:2][ECDH Public][NTRU Public Length:4][NTRU Public]
+            if (key.Length < 2)
+                throw new ArgumentException(
+                    "Key must be a composite public key. Use GenerateCompositeKeyPair() to obtain the correct public key.", nameof(key));
+            var ecdhPublicKeyLen2 = System.Buffers.Binary.BinaryPrimitives.ReadUInt16BigEndian(key.AsSpan(0, 2));
+            if (key.Length < 2 + ecdhPublicKeyLen2 + 4)
+                throw new ArgumentException("Composite public key is truncated (ECDH section).", nameof(key));
+            var ecdhPublicKeyBytes2 = new byte[ecdhPublicKeyLen2];
+            Buffer.BlockCopy(key, 2, ecdhPublicKeyBytes2, 0, ecdhPublicKeyLen2);
+            var ntruPublicKeyLen2 = System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(key.AsSpan(2 + ecdhPublicKeyLen2, 4));
+            if (key.Length < 2 + ecdhPublicKeyLen2 + 4 + ntruPublicKeyLen2)
+                throw new ArgumentException("Composite public key is truncated (NTRU section).", nameof(key));
+            var ntruPublicKeyBytes2 = new byte[ntruPublicKeyLen2];
+            Buffer.BlockCopy(key, 2 + ecdhPublicKeyLen2 + 4, ntruPublicKeyBytes2, 0, ntruPublicKeyLen2);
+
+            // Derive classical shared secret using recipient's ECDH public key
+            var recipientEcdhPublic = DecodeECPublicKeyFromBytes(ecdhPublicKeyBytes2);
             var ecdhAgreement = new ECDHBasicAgreement();
             ecdhAgreement.Init(ecdhKeyPair.Private);
             var classicalSecret = ecdhAgreement.CalculateAgreement(recipientEcdhPublic).ToByteArrayUnsigned();
 
-            // Step 3: Generate ephemeral NTRU and encapsulate
-            var kemParams = new NtruKeyGenerationParameters(_secureRandom, NtruParameters.NtruHps2048677);
-            var kemGenerator = new NtruKeyPairGenerator();
-            kemGenerator.Init(kemParams);
-            var kemKeyPair = kemGenerator.GenerateKeyPair();
-
+            // Step 3: Encapsulate against recipient's NTRU public key
+            var recipientNtruPublic2 = NtruPublicKeyParameters.FromEncoding(NtruParameters.NtruHps2048677, ntruPublicKeyBytes2);
             var kemEncapsulator = new NtruKemGenerator(_secureRandom);
-            var encapsulated = kemEncapsulator.GenerateEncapsulated((NtruPublicKeyParameters)kemKeyPair.Public);
+            var encapsulated = kemEncapsulator.GenerateEncapsulated(recipientNtruPublic2);
             var kemCiphertext = encapsulated.GetEncapsulation();
             var pqSecret = encapsulated.GetSecret();
 
@@ -465,13 +529,24 @@ public sealed class HybridChaChaKyberStrategy : EncryptionStrategyBase
             var tag = reader.ReadBytes(TagSize);
             var encryptedData = reader.ReadBytes((int)(ms.Length - ms.Position));
 
-            var recipientEcdhPrivate = DecodeECPrivateKey(key);
+            // Parse composite private key: [ECDH Private Length:2][ECDH Private][NTRU Private:rest]
+            if (key.Length < 2)
+                throw new CryptographicException("Composite private key is too short.");
+            var ecdhPrivKeyLen2 = System.Buffers.Binary.BinaryPrimitives.ReadUInt16BigEndian(key.AsSpan(0, 2));
+            if (key.Length < 2 + ecdhPrivKeyLen2)
+                throw new CryptographicException("Composite private key is truncated (ECDH section).");
+            var ecdhPrivKeyBytes2 = new byte[ecdhPrivKeyLen2];
+            Buffer.BlockCopy(key, 2, ecdhPrivKeyBytes2, 0, ecdhPrivKeyLen2);
+            var ntruPrivKeyBytes2 = new byte[key.Length - 2 - ecdhPrivKeyLen2];
+            Buffer.BlockCopy(key, 2 + ecdhPrivKeyLen2, ntruPrivKeyBytes2, 0, ntruPrivKeyBytes2.Length);
+
+            var recipientEcdhPrivate = DecodeECPrivateKey(ecdhPrivKeyBytes2);
             var senderEcdhPublic = DecodeECPublicKeyFromBytes(ecdhPublicKey);
             var ecdhAgreement = new ECDHBasicAgreement();
             ecdhAgreement.Init(recipientEcdhPrivate);
             var classicalSecret = ecdhAgreement.CalculateAgreement(senderEcdhPublic).ToByteArrayUnsigned();
 
-            var kemPrivateKey = ExtractKemPrivateKey(key);
+            var kemPrivateKey = NtruPrivateKeyParameters.FromEncoding(NtruParameters.NtruHps2048677, ntruPrivKeyBytes2);
             var kemExtractor = new NtruKemExtractor(kemPrivateKey);
             var pqSecret = kemExtractor.ExtractSecret(kemCiphertext);
 
@@ -514,15 +589,53 @@ public sealed class HybridChaChaKyberStrategy : EncryptionStrategyBase
         return derivedKey;
     }
 
-    private ECPublicKeyParameters DecodeECPublicKey(byte[] keyMaterial)
+    /// <summary>
+    /// Generates a composite key pair for ChaCha-ECDH-NTRU hybrid operations.
+    /// Returns (compositePublicKey, compositePrivateKey) using the same format as
+    /// <see cref="HybridAesKyberStrategy.GenerateCompositeKeyPair"/>.
+    /// </summary>
+    public (byte[] PublicKey, byte[] CompositePrivateKey) GenerateCompositeKeyPair()
     {
         var curve = ECNamedCurveTable.GetByName("P-384");
-        var point = curve.Curve.DecodePoint(keyMaterial);
         var ecDomainParams = new ECDomainParameters(curve.Curve, curve.G, curve.N, curve.H);
-        return new ECPublicKeyParameters(point, ecDomainParams);
+        var ecdhGenerator = new ECKeyPairGenerator();
+        ecdhGenerator.Init(new ECKeyGenerationParameters(ecDomainParams, _secureRandom));
+        var ecdhKeyPair = ecdhGenerator.GenerateKeyPair();
+
+        var ecdhPublicBytes = ((ECPublicKeyParameters)ecdhKeyPair.Public).Q.GetEncoded(compressed: false);
+        var ecdhPrivateBytes = ((ECPrivateKeyParameters)ecdhKeyPair.Private).D.ToByteArrayUnsigned();
+
+        var kemParams = new NtruKeyGenerationParameters(_secureRandom, NtruParameters.NtruHps2048677);
+        var kemGenerator = new NtruKeyPairGenerator();
+        kemGenerator.Init(kemParams);
+        var kemKeyPair = kemGenerator.GenerateKeyPair();
+
+        var ntruPublicBytes = ((NtruPublicKeyParameters)kemKeyPair.Public).GetEncoded();
+        var ntruPrivateBytes = ((NtruPrivateKeyParameters)kemKeyPair.Private).GetEncoded();
+
+        var pubLenBytes = new byte[2];
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt16BigEndian(pubLenBytes, (ushort)ecdhPublicBytes.Length);
+        var ntruPubLenBytes = new byte[4];
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32BigEndian(ntruPubLenBytes, ntruPublicBytes.Length);
+        var compositePublicKey = new byte[2 + ecdhPublicBytes.Length + 4 + ntruPublicBytes.Length];
+        int pos = 0;
+        Buffer.BlockCopy(pubLenBytes, 0, compositePublicKey, pos, 2); pos += 2;
+        Buffer.BlockCopy(ecdhPublicBytes, 0, compositePublicKey, pos, ecdhPublicBytes.Length); pos += ecdhPublicBytes.Length;
+        Buffer.BlockCopy(ntruPubLenBytes, 0, compositePublicKey, pos, 4); pos += 4;
+        Buffer.BlockCopy(ntruPublicBytes, 0, compositePublicKey, pos, ntruPublicBytes.Length);
+
+        var privLenBytes = new byte[2];
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt16BigEndian(privLenBytes, (ushort)ecdhPrivateBytes.Length);
+        var compositePrivateKey = new byte[2 + ecdhPrivateBytes.Length + ntruPrivateBytes.Length];
+        int ppos = 0;
+        Buffer.BlockCopy(privLenBytes, 0, compositePrivateKey, ppos, 2); ppos += 2;
+        Buffer.BlockCopy(ecdhPrivateBytes, 0, compositePrivateKey, ppos, ecdhPrivateBytes.Length); ppos += ecdhPrivateBytes.Length;
+        Buffer.BlockCopy(ntruPrivateBytes, 0, compositePrivateKey, ppos, ntruPrivateBytes.Length);
+
+        return (compositePublicKey, compositePrivateKey);
     }
 
-    private ECPrivateKeyParameters DecodeECPrivateKey(byte[] keyMaterial)
+    private static ECPrivateKeyParameters DecodeECPrivateKey(byte[] keyMaterial)
     {
         var curve = ECNamedCurveTable.GetByName("P-384");
         var d = new Org.BouncyCastle.Math.BigInteger(1, keyMaterial);
@@ -530,17 +643,12 @@ public sealed class HybridChaChaKyberStrategy : EncryptionStrategyBase
         return new ECPrivateKeyParameters(d, ecDomainParams);
     }
 
-    private ECPublicKeyParameters DecodeECPublicKeyFromBytes(byte[] encodedKey)
+    private static ECPublicKeyParameters DecodeECPublicKeyFromBytes(byte[] encodedKey)
     {
         var curve = ECNamedCurveTable.GetByName("P-384");
         var point = curve.Curve.DecodePoint(encodedKey);
         var ecDomainParams = new ECDomainParameters(curve.Curve, curve.G, curve.N, curve.H);
         return new ECPublicKeyParameters(point, ecDomainParams);
-    }
-
-    private NtruPrivateKeyParameters ExtractKemPrivateKey(byte[] keyMaterial)
-    {
-        return NtruPrivateKeyParameters.FromEncoding(NtruParameters.NtruHps2048677, keyMaterial);
     }
 }
 
@@ -626,21 +734,28 @@ public sealed class HybridX25519KyberStrategy : EncryptionStrategyBase
 
             var x25519PublicKey = ((Org.BouncyCastle.Crypto.Parameters.X25519PublicKeyParameters)x25519KeyPair.Public).GetEncoded();
 
-            // Step 2: Derive classical shared secret using X25519
+            // Step 2: Parse composite public key: [X25519 Public:32][NTRU Public Length:4][NTRU Public:rest]
+            if (key.Length < X25519KeySize + 4)
+                throw new ArgumentException(
+                    "Key must be a composite public key: [X25519 Public:32][NTRU Public Length:4][NTRU Public:rest]. " +
+                    "Use GenerateCompositeKeyPair() to obtain the correct public key.", nameof(key));
+            var ntruPubLen3 = System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(key.AsSpan(X25519KeySize, 4));
+            if (key.Length < X25519KeySize + 4 + ntruPubLen3)
+                throw new ArgumentException("Composite public key is truncated (NTRU section).", nameof(key));
+            var ntruPublicKeyBytes3 = new byte[ntruPubLen3];
+            Buffer.BlockCopy(key, X25519KeySize + 4, ntruPublicKeyBytes3, 0, ntruPubLen3);
+
+            // Derive classical shared secret using X25519 with recipient's X25519 public key
             var recipientX25519Public = new Org.BouncyCastle.Crypto.Parameters.X25519PublicKeyParameters(key, 0);
             var x25519Agreement = new Org.BouncyCastle.Crypto.Agreement.X25519Agreement();
             x25519Agreement.Init(x25519KeyPair.Private);
             var classicalSecret = new byte[32];
             x25519Agreement.CalculateAgreement(recipientX25519Public, classicalSecret, 0);
 
-            // Step 3: Generate ephemeral NTRU and encapsulate
-            var kemParams = new NtruKeyGenerationParameters(_secureRandom, NtruParameters.NtruHps2048677);
-            var kemGenerator = new NtruKeyPairGenerator();
-            kemGenerator.Init(kemParams);
-            var kemKeyPair = kemGenerator.GenerateKeyPair();
-
+            // Step 3: Encapsulate against recipient's NTRU public key
+            var recipientNtruPublic3 = NtruPublicKeyParameters.FromEncoding(NtruParameters.NtruHps2048677, ntruPublicKeyBytes3);
             var kemEncapsulator = new NtruKemGenerator(_secureRandom);
-            var encapsulated = kemEncapsulator.GenerateEncapsulated((NtruPublicKeyParameters)kemKeyPair.Public);
+            var encapsulated = kemEncapsulator.GenerateEncapsulated(recipientNtruPublic3);
             var kemCiphertext = encapsulated.GetEncapsulation();
             var pqSecret = encapsulated.GetSecret();
 
@@ -699,16 +814,24 @@ public sealed class HybridX25519KyberStrategy : EncryptionStrategyBase
             var tag = reader.ReadBytes(TagSize);
             var encryptedData = reader.ReadBytes((int)(ms.Length - ms.Position));
 
-            // Derive classical secret
-            var recipientX25519Private = new Org.BouncyCastle.Crypto.Parameters.X25519PrivateKeyParameters(key, 0);
+            // Parse composite private key: [X25519 Private:32][NTRU Private:rest]
+            if (key.Length < X25519KeySize)
+                throw new CryptographicException("Composite private key is too short.");
+            var x25519PrivKeyBytes3 = new byte[X25519KeySize];
+            Buffer.BlockCopy(key, 0, x25519PrivKeyBytes3, 0, X25519KeySize);
+            var ntruPrivKeyBytes3 = new byte[key.Length - X25519KeySize];
+            Buffer.BlockCopy(key, X25519KeySize, ntruPrivKeyBytes3, 0, ntruPrivKeyBytes3.Length);
+
+            // Derive classical secret using recipient's X25519 private key
+            var recipientX25519Private = new Org.BouncyCastle.Crypto.Parameters.X25519PrivateKeyParameters(x25519PrivKeyBytes3, 0);
             var senderX25519Public = new Org.BouncyCastle.Crypto.Parameters.X25519PublicKeyParameters(x25519PublicKey, 0);
             var x25519Agreement = new Org.BouncyCastle.Crypto.Agreement.X25519Agreement();
             x25519Agreement.Init(recipientX25519Private);
             var classicalSecret = new byte[32];
             x25519Agreement.CalculateAgreement(senderX25519Public, classicalSecret, 0);
 
-            // Decapsulate KEM
-            var kemPrivateKey = ExtractKemPrivateKey(key);
+            // Decapsulate KEM using recipient's NTRU private key
+            var kemPrivateKey = NtruPrivateKeyParameters.FromEncoding(NtruParameters.NtruHps2048677, ntruPrivKeyBytes3);
             var kemExtractor = new NtruKemExtractor(kemPrivateKey);
             var pqSecret = kemExtractor.ExtractSecret(kemCiphertext);
 
@@ -751,8 +874,43 @@ public sealed class HybridX25519KyberStrategy : EncryptionStrategyBase
         return derivedKey;
     }
 
-    private NtruPrivateKeyParameters ExtractKemPrivateKey(byte[] keyMaterial)
+    /// <summary>
+    /// Generates a composite key pair for X25519+NTRU hybrid operations.
+    /// Returns (compositePublicKey, compositePrivateKey) where:
+    /// - compositePublicKey: [X25519 Public:32][NTRU Public Length:4][NTRU Public:rest]
+    ///   (used as the 'key' parameter in EncryptAsync)
+    /// - compositePrivateKey: [X25519 Private:32][NTRU Private:rest]
+    ///   (used as the 'key' parameter in DecryptAsync)
+    /// </summary>
+    public (byte[] PublicKey, byte[] CompositePrivateKey) GenerateCompositeKeyPair()
     {
-        return NtruPrivateKeyParameters.FromEncoding(NtruParameters.NtruHps2048677, keyMaterial);
+        var x25519Generator = new X25519KeyPairGenerator();
+        x25519Generator.Init(new KeyGenerationParameters(_secureRandom, 256));
+        var x25519KeyPair = x25519Generator.GenerateKeyPair();
+
+        var x25519PublicBytes = ((Org.BouncyCastle.Crypto.Parameters.X25519PublicKeyParameters)x25519KeyPair.Public).GetEncoded();
+        var x25519PrivateBytes = ((Org.BouncyCastle.Crypto.Parameters.X25519PrivateKeyParameters)x25519KeyPair.Private).GetEncoded();
+
+        var kemParams = new NtruKeyGenerationParameters(_secureRandom, NtruParameters.NtruHps2048677);
+        var kemGenerator = new NtruKeyPairGenerator();
+        kemGenerator.Init(kemParams);
+        var kemKeyPair = kemGenerator.GenerateKeyPair();
+
+        var ntruPublicBytes = ((NtruPublicKeyParameters)kemKeyPair.Public).GetEncoded();
+        var ntruPrivateBytes = ((NtruPrivateKeyParameters)kemKeyPair.Private).GetEncoded();
+
+        var ntruPubLenBytes = new byte[4];
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32BigEndian(ntruPubLenBytes, ntruPublicBytes.Length);
+        var compositePublicKey = new byte[x25519PublicBytes.Length + 4 + ntruPublicBytes.Length];
+        int pos = 0;
+        Buffer.BlockCopy(x25519PublicBytes, 0, compositePublicKey, pos, x25519PublicBytes.Length); pos += x25519PublicBytes.Length;
+        Buffer.BlockCopy(ntruPubLenBytes, 0, compositePublicKey, pos, 4); pos += 4;
+        Buffer.BlockCopy(ntruPublicBytes, 0, compositePublicKey, pos, ntruPublicBytes.Length);
+
+        var compositePrivateKey = new byte[x25519PrivateBytes.Length + ntruPrivateBytes.Length];
+        Buffer.BlockCopy(x25519PrivateBytes, 0, compositePrivateKey, 0, x25519PrivateBytes.Length);
+        Buffer.BlockCopy(ntruPrivateBytes, 0, compositePrivateKey, x25519PrivateBytes.Length, ntruPrivateBytes.Length);
+
+        return (compositePublicKey, compositePrivateKey);
     }
 }

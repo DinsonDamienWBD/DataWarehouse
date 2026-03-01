@@ -118,14 +118,18 @@ public sealed class X25519Kyber768Strategy : EncryptionStrategyBase
     }
 
     /// <summary>
-    /// Encrypts plaintext using X25519+Kyber768 hybrid key exchange and AES-256-GCM.
+    /// Encrypts plaintext using X25519+NTRU hybrid key exchange and AES-256-GCM.
     ///
     /// Process:
-    /// 1. Generate ephemeral X25519 key pair and perform key agreement with recipient public key
-    /// 2. Generate ephemeral NTRU-HPS-2048-677 key pair and encapsulate
+    /// 1. Generate ephemeral X25519 key pair and perform key agreement with recipient X25519 public key
+    /// 2. Encapsulate against the recipient's NTRU public key (extracted from composite key)
     /// 3. Combine both shared secrets via HKDF-SHA256 with domain-separated info string
     /// 4. Encrypt plaintext with AES-256-GCM using the derived 256-bit key
     /// 5. Serialize to TLS-compatible wire format
+    ///
+    /// The key parameter must be a composite public key:
+    /// [X25519 Public:32][NTRU Public Length:4][NTRU Public:rest]
+    /// Use <see cref="GenerateCompositeKeyPair"/> to generate the key pair.
     /// </summary>
     protected override async Task<byte[]> EncryptCoreAsync(
         byte[] plaintext,
@@ -135,6 +139,19 @@ public sealed class X25519Kyber768Strategy : EncryptionStrategyBase
     {
         return await Task.Run(() =>
         {
+            // Parse composite public key: [X25519 Public:32][NTRU Public Length:4][NTRU Public:rest]
+            if (key.Length < X25519KeySize + 4)
+                throw new ArgumentException(
+                    "Key must be a composite public key: [X25519 Public:32][NTRU Public Length:4][NTRU Public:rest]. " +
+                    "Use GenerateCompositeKeyPair() to obtain the correct public key.", nameof(key));
+
+            var ntruPublicLength = System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(
+                key.AsSpan(X25519KeySize, 4));
+            if (key.Length < X25519KeySize + 4 + ntruPublicLength)
+                throw new ArgumentException("Composite public key is truncated.", nameof(key));
+            var ntruPublicKeyBytes = new byte[ntruPublicLength];
+            Buffer.BlockCopy(key, X25519KeySize + 4, ntruPublicKeyBytes, 0, ntruPublicLength);
+
             // Step 1: Generate ephemeral X25519 key pair
             var x25519Generator = new X25519KeyPairGenerator();
             x25519Generator.Init(new KeyGenerationParameters(_secureRandom, 256));
@@ -142,21 +159,17 @@ public sealed class X25519Kyber768Strategy : EncryptionStrategyBase
 
             var x25519PublicKey = ((X25519PublicKeyParameters)x25519KeyPair.Public).GetEncoded();
 
-            // Step 2: X25519 key agreement with recipient public key -> classicalSecret (32 bytes)
+            // Step 2: X25519 key agreement with recipient X25519 public key -> classicalSecret (32 bytes)
             var recipientX25519Public = new X25519PublicKeyParameters(key, 0);
             var x25519Agreement = new X25519Agreement();
             x25519Agreement.Init(x25519KeyPair.Private);
             var classicalSecret = new byte[X25519KeySize];
             x25519Agreement.CalculateAgreement(recipientX25519Public, classicalSecret, 0);
 
-            // Step 3: NTRU-HPS-2048-677 encapsulate -> pqSecret
-            var kemParams = new NtruKeyGenerationParameters(_secureRandom, NtruParameters.NtruHps2048677);
-            var kemGenerator = new NtruKeyPairGenerator();
-            kemGenerator.Init(kemParams);
-            var kemKeyPair = kemGenerator.GenerateKeyPair();
-
+            // Step 3: Encapsulate against recipient's NTRU public key -> pqSecret
+            var recipientNtruPublicKey = NtruPublicKeyParameters.FromEncoding(NtruParameters.NtruHps2048677, ntruPublicKeyBytes);
             var kemEncapsulator = new NtruKemGenerator(_secureRandom);
-            var encapsulated = kemEncapsulator.GenerateEncapsulated((NtruPublicKeyParameters)kemKeyPair.Public);
+            var encapsulated = kemEncapsulator.GenerateEncapsulated(recipientNtruPublicKey);
             var kemCiphertext = encapsulated.GetEncapsulation();
             var pqSecret = encapsulated.GetSecret();
 
@@ -308,15 +321,14 @@ public sealed class X25519Kyber768Strategy : EncryptionStrategyBase
     }
 
     /// <summary>
-    /// Generates a full composite key pair for X25519+Kyber768 hybrid operations.
-    /// Returns (publicKey, compositePrivateKey) where:
-    /// - publicKey: 32-byte X25519 public key (used as the 'key' parameter in EncryptAsync)
-    /// - compositePrivateKey: [X25519 Private:32][NTRU Private Key:rest] (used as the 'key' parameter in DecryptAsync)
-    ///
-    /// Note: The NTRU key pair is ephemeral per-encryption, but the NTRU private key in the
-    /// composite key is needed for decapsulating the KEM ciphertext during decryption.
+    /// Generates a full composite key pair for X25519+NTRU hybrid operations.
+    /// Returns (compositePublicKey, compositePrivateKey) where:
+    /// - compositePublicKey: [X25519 Public:32][NTRU Public Length:4][NTRU Public:rest]
+    ///   (used as the 'key' parameter in EncryptAsync)
+    /// - compositePrivateKey: [X25519 Private:32][NTRU Private Key:rest]
+    ///   (used as the 'key' parameter in DecryptAsync)
     /// </summary>
-    /// <returns>A tuple of (X25519PublicKey, CompositePrivateKey).</returns>
+    /// <returns>A tuple of (CompositePublicKey, CompositePrivateKey).</returns>
     public (byte[] PublicKey, byte[] CompositePrivateKey) GenerateCompositeKeyPair()
     {
         // Generate X25519 key pair
@@ -333,14 +345,23 @@ public sealed class X25519Kyber768Strategy : EncryptionStrategyBase
         kemGenerator.Init(kemParams);
         var kemKeyPair = kemGenerator.GenerateKeyPair();
 
+        var ntruPublicKey = ((NtruPublicKeyParameters)kemKeyPair.Public).GetEncoded();
         var ntruPrivateKey = ((NtruPrivateKeyParameters)kemKeyPair.Private).GetEncoded();
+
+        // Build composite public key: [X25519 Public:32][NTRU Public Length:4][NTRU Public:rest]
+        var ntruPublicLengthBytes = new byte[4];
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32BigEndian(ntruPublicLengthBytes, ntruPublicKey.Length);
+        var compositePublicKey = new byte[x25519PublicKey.Length + 4 + ntruPublicKey.Length];
+        Buffer.BlockCopy(x25519PublicKey, 0, compositePublicKey, 0, x25519PublicKey.Length);
+        Buffer.BlockCopy(ntruPublicLengthBytes, 0, compositePublicKey, x25519PublicKey.Length, 4);
+        Buffer.BlockCopy(ntruPublicKey, 0, compositePublicKey, x25519PublicKey.Length + 4, ntruPublicKey.Length);
 
         // Build composite private key: [X25519 Private:32][NTRU Private Key:rest]
         var compositePrivateKey = new byte[x25519PrivateKey.Length + ntruPrivateKey.Length];
         Buffer.BlockCopy(x25519PrivateKey, 0, compositePrivateKey, 0, x25519PrivateKey.Length);
         Buffer.BlockCopy(ntruPrivateKey, 0, compositePrivateKey, x25519PrivateKey.Length, ntruPrivateKey.Length);
 
-        return (x25519PublicKey, compositePrivateKey);
+        return (compositePublicKey, compositePrivateKey);
     }
 
     /// <summary>
