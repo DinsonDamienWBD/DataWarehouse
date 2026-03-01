@@ -588,7 +588,7 @@ public sealed class XRayStrategy : ObservabilityStrategyBase
     protected override async Task TracingAsyncCore(IEnumerable<SpanContext> spans, CancellationToken cancellationToken);
     protected override Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken ct);;
     protected override Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken ct);;
-    protected override Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken ct);
+    protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken ct);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
     protected override void Dispose(bool disposing);
@@ -622,7 +622,7 @@ public sealed class JaegerStrategy : ObservabilityStrategyBase
     public override string StrategyId;;
     public override string Name;;
     public JaegerStrategy() : base(new ObservabilityCapabilities(SupportsMetrics: false, SupportsTracing: true, SupportsLogging: false, SupportsDistributedTracing: true, SupportsAlerting: false, SupportedExporters: new[] { "Jaeger", "Thrift", "OTLP" }));
-    public void Configure(string collectorUrl, string serviceName = "datawarehouse");
+    public void Configure(string collectorUrl, string serviceName = "datawarehouse", string? queryUrl = null);
     protected override async Task TracingAsyncCore(IEnumerable<SpanContext> spans, CancellationToken cancellationToken);
     public async Task<string> GetServicesAsync(CancellationToken ct = default);
     public async Task<string> FindTracesAsync(string service, string operation = "", int limit = 20, CancellationToken ct = default);

@@ -1577,8 +1577,8 @@ public sealed class GeoDistributedCacheStrategy : CachingStrategyBase
     public IReadOnlyList<CacheRegion> GetHealthyRegions();;
     public CacheRegion? GetNearestRegion(double latitude, double longitude);
     public void BroadcastInvalidation(string[] keys, string[]? tags = null);
-    protected override Task<CacheResult<byte[]>> GetCoreAsync(string key, CancellationToken ct);
-    protected override Task SetCoreAsync(string key, byte[] value, CacheOptions options, CancellationToken ct);
+    protected override async Task<CacheResult<byte[]>> GetCoreAsync(string key, CancellationToken ct);
+    protected override async Task SetCoreAsync(string key, byte[] value, CacheOptions options, CancellationToken ct);
     protected override Task<bool> RemoveCoreAsync(string key, CancellationToken ct);
     protected override Task<bool> ExistsCoreAsync(string key, CancellationToken ct);
     protected override Task InvalidateByTagsCoreAsync(string[] tags, CancellationToken ct);

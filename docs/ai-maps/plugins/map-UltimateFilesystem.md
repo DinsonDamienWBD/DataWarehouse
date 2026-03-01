@@ -1478,7 +1478,7 @@ public sealed class BaremetalBootstrap
 {
 }
     public BaremetalBootstrap(DeviceDiscoveryService discoveryService, DevicePoolManager poolManager, DeviceJournal journal, PhysicalDeviceManager deviceManager, ILogger? logger = null);
-    public async Task<BootstrapResult> BootstrapFromRawDevicesAsync(CancellationToken ct = default);
+    public async Task<BootstrapResult> BootstrapFromRawDevicesAsync(IReadOnlyList<IPhysicalBlockDevice>? physicalDevices = null, CancellationToken ct = default);
     public async Task<DevicePoolDescriptor> InitializeNewSystemAsync(string poolName, IReadOnlyList<IPhysicalBlockDevice> devices, StorageTier? tier = null, LocalityTag? locality = null, CancellationToken ct = default);
 }
 ```
