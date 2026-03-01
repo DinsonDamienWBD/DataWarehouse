@@ -228,6 +228,8 @@ public sealed class CostAnalyzer : IAiAdvisor
         private long _operationCount;
         // Store duration sum as long microseconds for Interlocked.Add atomicity
         private long _durationSumUs;
+        // LOW-489: Track oldest retained sample time to avoid O(n) ToArray() in GetOperationsPerHour.
+        private long _oldestSampleTicks;
 
         public AlgorithmTracker(string algorithmId)
         {
@@ -241,10 +243,18 @@ public sealed class CostAnalyzer : IAiAdvisor
             // Atomically accumulate duration — store as microseconds (long) for Interlocked.Add
             Interlocked.Add(ref _durationSumUs, (long)(durationMs * 1000));
 
+            // LOW-489: Record first sample time (compare-exchange so only first write wins).
+            Interlocked.CompareExchange(ref _oldestSampleTicks, timestamp.Ticks, 0L);
+
             // Bound memory: keep last 10000 samples
             while (_samples.Count > 10000)
             {
-                _samples.TryDequeue(out _);
+                if (_samples.TryDequeue(out var evicted))
+                {
+                    // Update oldest time to the next sample if available.
+                    if (_samples.TryPeek(out var next))
+                        Interlocked.Exchange(ref _oldestSampleTicks, next.Timestamp.Ticks);
+                }
             }
         }
 
@@ -266,12 +276,13 @@ public sealed class CostAnalyzer : IAiAdvisor
 
         public double GetOperationsPerHour(DateTimeOffset now)
         {
-            var samples = _samples.ToArray();
-            if (samples.Length < 2) return 0;
-
-            DateTimeOffset oldest = samples[0].Timestamp;
-            double hours = (now - oldest).TotalHours;
-            return hours > 0 ? samples.Length / hours : 0;
+            // LOW-489: avoid O(n) ToArray() — use tracked oldest sample time and queue count.
+            long count = _samples.Count;
+            if (count < 2) return 0;
+            long oldestTicks = Interlocked.Read(ref _oldestSampleTicks);
+            if (oldestTicks == 0L) return 0;
+            double hours = (now - new DateTimeOffset(oldestTicks, TimeSpan.Zero)).TotalHours;
+            return hours > 0 ? count / hours : 0;
         }
     }
 }

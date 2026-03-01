@@ -746,8 +746,8 @@
 | 411 | 2 | P2 | `IO/DeterministicIo/DeadlineScheduler.cs:372-374` | `_latencyWriteIndex` written without volatile; non-barrier read in `ComputeP99` — stale P99 on ARM. | [X]
 | 412 | 7 | P2 | `IO/DeterministicIo/DeadlineScheduler.cs:194-223` | Double-dispose guard uses CTS state not `_disposed` flag — re-entry throws ObjectDisposedException; `_shutdownCts` not disposed on second call. | [X]
 | 413 | 14 | P2 | `Hosting/InstallConfiguration.cs:52` | `AdminPassword` nullable with no validation when `CreateDefaultAdmin = true` — risk of blank admin account. | [X]
-| 414 | 9 | LOW | `Infrastructure/Authority/DeadManSwitch.cs:198-217` | `UnlockAsync` doesn't verify system is locked — silently resets warning state and records misleading audit entry. | [ ]
-| 415 | 1 | LOW | `Infrastructure/Authority/AuthorityChainFacade.cs:262` | Hardcoded placeholder admin IDs `"admin-1"` through `"admin-5"` in `CreateDefault` quorum config. | [ ]
+| 414 | 9 | LOW | `Infrastructure/Authority/DeadManSwitch.cs:198-217` | `UnlockAsync` doesn't verify system is locked — silently resets warning state and records misleading audit entry. | [X]
+| 415 | 1 | LOW | `Infrastructure/Authority/AuthorityChainFacade.cs:262` | Hardcoded placeholder admin IDs `"admin-1"` through `"admin-5"` in `CreateDefault` quorum config. | [X]
 
 **Clean files:** DeploymentTopology.cs, EmbeddedConfiguration.cs, OperatingMode.cs, PluginProfileAttribute.cs, ServiceProfileType.cs, IDeterministicIoPath.cs, PreAllocatedBufferPool.cs, AuthorityContextPropagator.cs
 
@@ -775,11 +775,11 @@
 | 429 | 9 | P2 | `Infrastructure/Distributed/Consensus/RaftConsensusEngine.cs:149-158` | `ProposeAsync` appends to `_persistent.Log` list directly, bypassing injected `_logStore` — FileRaftLogStore durability defeated. | [X]
 | 430 | 12 | P2 | `Infrastructure/Distributed/Consensus/FileRaftLogStore.cs:268-271` | `CompactAsync` re-indexes from 1 — breaks follower offset tracking. Same in InMemoryRaftLogStore:166. | [X]
 | 431 | 14 | P2 | `Infrastructure/Distributed/Discovery/MdnsServiceDiscovery.cs:285-301` | No length check on DNS packet buffer; unbounded `qdCount` loop — crafted packet availability concern. | [X]
-| 432 | 15 | LOW | `Infrastructure/Authority/HardwareTokenValidator.cs:121-175` | `ValidateYubiKeyOtp`/`ValidateYubiKeyFido2`/`ValidateTpmAttestation` return Success but only check format — no crypto validation. | [ ]
-| 433 | 4 | LOW | `Infrastructure/Distributed/Consensus/RaftConsensusEngine.cs:1039` | HMAC comparison uses `string.Equals` — timing side-channel (should use FixedTimeEquals). | [ ]
-| 434 | 13 | LOW | `Infrastructure/Distributed/Discovery/MdnsServiceDiscovery.cs:444,449` | O(n) scan + O(n log n) sort inside hot lock on every mDNS packet. | [ ]
-| 435 | 1 | LOW | `Infrastructure/Distributed/AutoScaling/ProductionAutoScaler.cs:96-153` | `InMemoryScalingExecutor` is public simulation class not marked test-only — accidental production injection. | [ ]
-| 436 | 13 | LOW | `Infrastructure/Distributed/Consensus/MultiRaftManager.cs:166` | `RouteKey` sorts all group IDs on every call — no caching of sorted array. | [ ]
+| 432 | 15 | LOW | `Infrastructure/Authority/HardwareTokenValidator.cs:121-175` | `ValidateYubiKeyOtp`/`ValidateYubiKeyFido2`/`ValidateTpmAttestation` return Success but only check format — no crypto validation. | [X]
+| 433 | 4 | LOW | `Infrastructure/Distributed/Consensus/RaftConsensusEngine.cs:1039` | HMAC comparison uses `string.Equals` — timing side-channel (should use FixedTimeEquals). | [X]
+| 434 | 13 | LOW | `Infrastructure/Distributed/Discovery/MdnsServiceDiscovery.cs:444,449` | O(n) scan + O(n log n) sort inside hot lock on every mDNS packet. | [X]
+| 435 | 1 | LOW | `Infrastructure/Distributed/AutoScaling/ProductionAutoScaler.cs:96-153` | `InMemoryScalingExecutor` is public simulation class not marked test-only — accidental production injection. | [X]
+| 436 | 13 | LOW | `Infrastructure/Distributed/Consensus/MultiRaftManager.cs:166` | `RouteKey` sorts all group IDs on every call — no caching of sorted array. | [X]
 
 **Clean files:** EscalationRecordStore.cs, EscalationStateMachine.cs, QuorumVetoHandler.cs, IRaftLogStore.cs, InMemoryRaftLogStore.cs, RaftLogEntry.cs, RaftState.cs
 
@@ -804,12 +804,12 @@
 | 447 | 5 | P2 | `Infrastructure/Distributed/Replication/GossipReplicator.cs:253` | Bare `catch {}` in `SpreadToRandomPeersAsync` outer — swallows serializer/GetMembers failures. | [X]
 | 448 | 5 | P2 | `Infrastructure/Distributed/TcpP2PNetwork.cs:287` | Bare `catch {}` in `AcceptConnectionsAsync` — comment says "log" but no logging; socket exhaustion invisible. | [X]
 | 449 | 5 | P2 | `Infrastructure/Distributed/TcpP2PNetwork.cs:341` | Bare `catch {}` in `HandleIncomingConnectionAsync` — TLS/auth/protocol failures silently dropped. | [X]
-| 450 | 12 | LOW | `Infrastructure/Distributed/Replication/CrdtRegistry.cs:51-77` | Prefix match checked before exact match — inverted specificity order. | [ ]
-| 451 | 4 | LOW | `Infrastructure/Distributed/Membership/SwimClusterMembership.cs:640` | `CancellationToken.None` in refutation fire-and-forget — broadcast uncancellable during shutdown. | [ ]
+| 450 | 12 | LOW | `Infrastructure/Distributed/Replication/CrdtRegistry.cs:51-77` | Prefix match checked before exact match — inverted specificity order. | [X]
+| 451 | 4 | LOW | `Infrastructure/Distributed/Membership/SwimClusterMembership.cs:640` | `CancellationToken.None` in refutation fire-and-forget — broadcast uncancellable during shutdown. | [X]
 | 452 | 7 | LOW | `Infrastructure/Distributed/TcpP2PNetwork.cs:237-259` | `SslStream` created, authenticated, then dropped (not stored) — leaks or closes inner NetworkStream on GC. | [X]
 | 453 | 15 | LOW | `Infrastructure/Distributed/TcpP2PNetwork.cs:473` | `ProcessIncomingMessageAsync` discards all "Data" messages — only logs to Debug, never raises OnPeerEvent. | [X]
-| 454 | 13 | LOW | `Infrastructure/Distributed/Membership/SwimClusterMembership.cs:843` | O(n²) bound enforcement on ConcurrentQueue via O(n) `Count` in loop. | [ ]
-| 455 | 15 | LOW | `Infrastructure/Distributed/Locking/DistributedLockService.cs:10` | Named "Distributed" but docs say "single process" — misleading for cross-node use. | [ ]
+| 454 | 13 | LOW | `Infrastructure/Distributed/Membership/SwimClusterMembership.cs:843` | O(n²) bound enforcement on ConcurrentQueue via O(n) `Count` in loop. | [X]
+| 455 | 15 | LOW | `Infrastructure/Distributed/Locking/DistributedLockService.cs:10` | Named "Distributed" but docs say "single process" — misleading for cross-node use. | [X]
 | 456 | 15 | LOW | `Infrastructure/Distributed/TcpP2PNetwork.cs:499` | `await Task.CompletedTask` dead code at end of method. | [X]
 | 457 | 5 | LOW | `Infrastructure/Distributed/Replication/CrdtReplicationSync.cs:252` | Bare `catch {}` in `ResolveConflictAsync` CRDT deserialization fallback. | [X]
 
@@ -833,9 +833,9 @@
 | 465 | 1 | P2 | `Infrastructure/InMemory/InMemoryClusterMembership.cs:22-23` | Untracked `TODO (v6.0)` in XML doc deferring etcd/Consul production impl. | [X]
 | 466 | 1 | P2 | `Infrastructure/InMemory/InMemoryP2PNetwork.cs:22-23` | Untracked `TODO (v6.0)` in XML doc deferring gRPC production impl. | [X]
 | 467 | 14 | P2 | `Infrastructure/InMemory/InMemoryDeadLetterQueue.cs:27-30` | Constructor accepts `maxCapacity <= 0` — value of 0 causes infinite eviction loop in `EnqueueAsync`. | [X]
-| 468 | 15 | LOW | `Infrastructure/Intelligence/AiAutonomyConfiguration.cs:103` | `SetAutonomyForLevel` name misleading given dead loop body — see #458. | [ ]
-| 469 | 13 | LOW | `Infrastructure/Intelligence/AiAutonomyConfiguration.cs:156` | `IsFeatureKnown` allocates `Enum.GetValues<CheckTiming>()` on every call — should cache. | [ ]
-| 470 | 13 | LOW | `Infrastructure/InMemory/InMemoryAutoGovernance.cs:30-31` | `EvaluateAsync` unconditionally allocates two `List<>` even when no policies registered. | [ ]
+| 468 | 15 | LOW | `Infrastructure/Intelligence/AiAutonomyConfiguration.cs:103` | `SetAutonomyForLevel` name misleading given dead loop body — see #458. | [X]
+| 469 | 13 | LOW | `Infrastructure/Intelligence/AiAutonomyConfiguration.cs:156` | `IsFeatureKnown` allocates `Enum.GetValues<CheckTiming>()` on every call — should cache. | [X]
+| 470 | 13 | LOW | `Infrastructure/InMemory/InMemoryAutoGovernance.cs:30-31` | `EvaluateAsync` unconditionally allocates two `List<>` even when no policies registered. | [X]
 
 **Clean files:** ErrorHandling.cs, InMemoryAuditTrail.cs, InMemoryAutoScaler.cs, InMemoryAutoTier.cs, InMemoryBulkheadIsolation.cs, InMemoryFederatedMessageBus.cs, InMemoryLoadBalancerStrategy.cs, InMemoryReplicationSync.cs
 
@@ -862,10 +862,10 @@
 | 483 | 2 | P2 | `Infrastructure/Intelligence/HardwareProbe.cs:189-198` | `RecordLatency` mutates `_latencySampleIndex`/`_latencySampleCount` without sync — public `RefreshSnapshot()` breaks single-consumer assumption. | [X]
 | 484 | 7 | P2 | `Infrastructure/KernelInfrastructure.cs:744` | `Process.GetCurrentProcess()` never disposed in `GetStats()` — called every 5s timer tick. | [X]
 | 485 | 13 | P2 | `Infrastructure/Intelligence/WorkloadAnalyzer.cs:280-301` | `CalculateRollingAverage` iterates full 1440-entry buffer on each drain cycle — 14,400 iterations/sec avoidable. | [X]
-| 486 | 15 | LOW | `Infrastructure/KernelInfrastructure.cs:474-484` | `CheckVersionCompatibilityAsync` named `Async` but only does `await Task.CompletedTask` — stub artifact. | [ ]
-| 487 | 1 | LOW | `Infrastructure/Intelligence/AiSelfModificationGuard.cs:160-164` | "In a real system, approvals would be gathered asynchronously" comment — known incomplete path, safe fail-closed. | [ ]
-| 488 | 14 | LOW | `Infrastructure/Policy/CascadeOverrideStore.cs:70-84` | `SetOverride` TOCTOU race: `ContainsKey` + `Count` + index-write not atomic on `ConcurrentDictionary`. | [ ]
-| 489 | 13 | LOW | `Infrastructure/Intelligence/CostAnalyzer.cs:266-273` | `GetOperationsPerHour` calls `_samples.ToArray()` (up to 10K entries) per tracker per rebuild — O(n×m) allocation pressure. | [ ]
+| 486 | 15 | LOW | `Infrastructure/KernelInfrastructure.cs:474-484` | `CheckVersionCompatibilityAsync` named `Async` but only does `await Task.CompletedTask` — stub artifact. | [X]
+| 487 | 1 | LOW | `Infrastructure/Intelligence/AiSelfModificationGuard.cs:160-164` | "In a real system, approvals would be gathered asynchronously" comment — known incomplete path, safe fail-closed. | [X]
+| 488 | 14 | LOW | `Infrastructure/Policy/CascadeOverrideStore.cs:70-84` | `SetOverride` TOCTOU race: `ContainsKey` + `Count` + index-write not atomic on `ConcurrentDictionary`. | [X]
+| 489 | 13 | LOW | `Infrastructure/Intelligence/CostAnalyzer.cs:266-273` | `GetOperationsPerHour` calls `_samples.ToArray()` (up to 10K entries) per tracker per rebuild — O(n×m) allocation pressure. | [X]
 
 **Clean files:** AiAutonomyDefaults.cs, AiObservationRingBuffer.cs, AiPolicyIntelligenceFactory.cs, DataSensitivityAnalyzer.cs, HybridAutonomyProfile.cs, OverheadThrottle.cs, PolicyAdvisor.cs, ThreatDetector.cs
 
@@ -886,9 +886,9 @@
 | 496 | 3 | P2 | `Infrastructure/Policy/FilePolicyPersistence.cs:126-142` | `DeleteCoreAsync` uses sync `File.Exists`/`File.Delete` — blocks thread pool thread. | [X]
 | 497 | 9 | P2 | `Infrastructure/Policy/Performance/FastPathPolicyEngine.cs:298-308` | `GetBloomFilterFromOptimizer` always returns null — `FullCascade` tier classification unreachable dead code. | [X]
 | 498 | 13 | P2 | `Infrastructure/Policy/Performance/BloomFilterSkipIndex.cs:76-118` | `MayContain`/`Add` allocate string + byte[] on every call via `$"{(int)level}:{path}"` — hot path GC pressure. | [X]
-| 499 | 15 | LOW | `Infrastructure/Policy/Compatibility/PolicyCompatibilityGate.cs:30` | `IsMultiLevelEnabled` is non-volatile property read/written from different threads. | [ ]
-| 500 | 14 | LOW | `Infrastructure/Policy/InMemoryPolicyStore.cs:151-162` | `ParseKey` has no guard against malformed composite keys — throws unhelpful `ArgumentOutOfRangeException`. | [ ]
-| 501 | 15 | LOW | `Infrastructure/Policy/Performance/CheckClassification.cs:88` | `BuildEntries()` called twice at static init — minor inefficiency and maintenance trap. | [ ]
+| 499 | 15 | LOW | `Infrastructure/Policy/Compatibility/PolicyCompatibilityGate.cs:30` | `IsMultiLevelEnabled` is non-volatile property read/written from different threads. | [X]
+| 500 | 14 | LOW | `Infrastructure/Policy/InMemoryPolicyStore.cs:151-162` | `ParseKey` has no guard against malformed composite keys — throws unhelpful `ArgumentOutOfRangeException`. | [X]
+| 501 | 15 | LOW | `Infrastructure/Policy/Performance/CheckClassification.cs:88` | `BuildEntries()` called twice at static init — minor inefficiency and maintenance trap. | [X]
 
 **Clean files:** CascadeStrategies.cs, V5ConfigMigrator.cs, EffectivePolicy.cs, HybridPolicyPersistence.cs, MergeConflictResolver.cs, CompiledPolicyDelegate.cs
 
@@ -907,8 +907,8 @@
 | 506 | 13 | P2 | `Infrastructure/Policy/PolicyResolutionEngine.cs:536` | `string.Join` + `Take(i+1)` in hot resolution loop — per-level string + enumerator allocation on every resolve. | [X]
 | 507 | 15 | P2 | `Infrastructure/Policy/Performance/PolicyDelegateCache.cs:55` | `GetOrCompile` is synchronous but delegates to potentially-async compilation path — contract ambiguity. | [X]
 | 508 | 14 | P2 | `Infrastructure/Policy/PolicyMarketplace.cs:153` | Deserialized `template.Policies` items used without null-item guard — `null` array elements cause NRE in `PoliciesToTuples`. | [X]
-| 509 | 1 | LOW | `Infrastructure/Policy/Performance/PolicySimulationSandbox.cs:127` | Misleading "Placeholder" comment on correctly-initialized field. | [ ]
-| 510 | 15 | LOW | `Infrastructure/Policy/PolicyPersistenceBase.cs:143-165` | Abstract `*CoreAsync` methods lack XML doc requiring `CancellationToken` propagation. | [ ]
+| 509 | 1 | LOW | `Infrastructure/Policy/Performance/PolicySimulationSandbox.cs:127` | Misleading "Placeholder" comment on correctly-initialized field. | [X]
+| 510 | 15 | LOW | `Infrastructure/Policy/PolicyPersistenceBase.cs:143-165` | Abstract `*CoreAsync` methods lack XML doc requiring `CancellationToken` propagation. | [X]
 
 **Clean files:** MaterializedPolicyCache.cs, PolicySkipOptimizer.cs, SimulationImpactReport.cs, PolicyCategoryDefaults.cs, PolicyComplianceScorer.cs, PolicyPersistenceComplianceValidator.cs, PolicyPersistenceConfiguration.cs, PolicySerializationHelper.cs, PolicySimulator.cs
 
@@ -932,9 +932,9 @@
 | 520 | 12 | P2 | `Infrastructure/Scaling/ScalableMessageBus.cs:137` | Backpressure shedding check happens AFTER enqueue — message already in queue when dropped, queue grows under load shedding. | [X]
 | 521 | 14 | P2 | `Mathematics/ParityCalculation.cs:310` | `stackalloc byte[blockSize]` with unbounded `blockSize` from caller data — stack overflow for RAID-sized blocks. | [X]
 | 522 | 15 | LOW | `Mathematics/ReedSolomon.cs:18` | `_lock` field declared but never used — dead code, misleading "thread-safe" claim. | [ ]
-| 523 | 2 | LOW | `Infrastructure/Scaling/ScalableMessageBus.cs:78` | `_disposed` not `volatile` — stale reads possible from concurrent threads. | [ ]
-| 524 | 2 | LOW | `Infrastructure/Scaling/WalMessageQueue.cs:95` | `_disposed` not `volatile` — timer callbacks may miss disposal signal. | [ ]
-| 525 | 4 | LOW | `Infrastructure/StandardizedExceptions.cs:87,97` | `Guid.NewGuid()` called twice — IncidentId in message string won't match IncidentId property. | [ ]
+| 523 | 2 | LOW | `Infrastructure/Scaling/ScalableMessageBus.cs:78` | `_disposed` not `volatile` — stale reads possible from concurrent threads. | [X]
+| 524 | 2 | LOW | `Infrastructure/Scaling/WalMessageQueue.cs:95` | `_disposed` not `volatile` — timer callbacks may miss disposal signal. | [X]
+| 525 | 4 | LOW | `Infrastructure/StandardizedExceptions.cs:87,97` | `Guid.NewGuid()` called twice — IncidentId in message string won't match IncidentId property. | [X]
 
 **Clean files:** PolicyTemplate.cs, RegulatoryTemplate.cs, VersionedPolicyCache.cs, GaloisField.cs, IMoonshotHealthProbe.cs, IMoonshotOrchestrator.cs
 
