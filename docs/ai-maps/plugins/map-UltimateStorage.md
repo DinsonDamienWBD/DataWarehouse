@@ -7993,7 +7993,7 @@ public class TeleportStorageStrategy : UltimateStorageStrategyBase
     protected override async IAsyncEnumerable<StorageObjectMetadata> ListAsyncCore(string? prefix, [EnumeratorCancellation] CancellationToken ct);
     protected override async Task<StorageObjectMetadata> GetMetadataAsyncCore(string key, CancellationToken ct);
     protected override async Task<StorageHealthInfo> GetHealthAsyncCore(CancellationToken ct);
-    protected override async Task<long?> GetAvailableCapacityAsyncCore(CancellationToken ct);
+    protected override Task<long?> GetAvailableCapacityAsyncCore(CancellationToken ct);
 }
 ```
 ```csharp

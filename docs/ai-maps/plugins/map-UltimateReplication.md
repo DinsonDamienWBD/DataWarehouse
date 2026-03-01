@@ -233,7 +233,7 @@ public abstract class EnhancedReplicationStrategyBase : ReplicationStrategyBase
     public virtual EnhancedReplicationConflict? DetectConflictEnhanced(EnhancedVectorClock localVersion, EnhancedVectorClock remoteVersion, ReadOnlyMemory<byte> localData, ReadOnlyMemory<byte> remoteData, string remoteNodeId);
     public virtual async Task<(ReadOnlyMemory<byte> ResolvedData, EnhancedVectorClock ResolvedVersion)> ResolveConflictEnhancedAsync(EnhancedReplicationConflict conflict, CancellationToken cancellationToken = default);
     protected virtual Task<(ReadOnlyMemory<byte>, EnhancedVectorClock)> ResolveByCrdtAsync(EnhancedReplicationConflict conflict, EnhancedVectorClock mergedClock, CancellationToken ct);
-    protected virtual Task<(ReadOnlyMemory<byte>, EnhancedVectorClock)> ResolveBytMergeAsync(EnhancedReplicationConflict conflict, EnhancedVectorClock mergedClock, CancellationToken ct);
+    protected virtual Task<(ReadOnlyMemory<byte>, EnhancedVectorClock)> ResolveByMergeAsync(EnhancedReplicationConflict conflict, EnhancedVectorClock mergedClock, CancellationToken ct);
     protected void RecordReplicationLag(string targetNodeId, TimeSpan lag);
     protected IEnumerable<string> GetNodesNeedingAntiEntropy();
     protected void UpdateRemoteNodeVersion(string nodeId, EnhancedVectorClock version);
@@ -1531,6 +1531,7 @@ private sealed class DeltaVersion
 }
     public required string VersionId { get; init; }
     public required byte[] Delta { get; init; }
+    public required byte[] FullData { get; init; }
     public required EnhancedVectorClock Clock { get; init; }
     public required DateTimeOffset Timestamp { get; init; }
     public string? ParentVersionId { get; init; }
