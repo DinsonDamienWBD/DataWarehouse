@@ -79,14 +79,16 @@ internal sealed class CarbonAwareComputeStrategy : ComputeRuntimeStrategyBase
             {
                 var deferralStart = DateTime.UtcNow;
                 var deferralDeadline = deferralStart.Add(maxDeferral);
+                int retryCount = 0;
 
                 while (currentIntensity > intensityThreshold && DateTime.UtcNow < deferralDeadline)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     deferred = true;
 
-                    // Wait and re-check (exponential backoff: 30s, 60s, 120s, up to 300s)
-                    var waitTime = TimeSpan.FromSeconds(Math.Min(300, 30 * Math.Pow(2, deferralTime.TotalMinutes / 5)));
+                    // Exponential backoff: 30s, 60s, 120s, 240s, up to 300s max.
+                    var waitTime = TimeSpan.FromSeconds(Math.Min(300, 30 * Math.Pow(2, retryCount)));
+                    retryCount++;
                     await Task.Delay(waitTime, cancellationToken);
 
                     currentIntensity = await QueryCarbonIntensityAsync(region, cancellationToken);

@@ -290,19 +290,26 @@ public sealed class UltimateDataQualityPlugin : DataManagementPluginBase, IDispo
         var strategy = GetStrategyOrThrow(strategyId);
         IncrementUsageStats(strategyId);
 
-        // P2-2662: actually validate data if records are provided in the payload.
-        if (message.Payload.TryGetValue("records", out var recordsObj) && recordsObj != null)
+        // P2-2662: actually validate records when provided.
+        if (message.Payload.TryGetValue("records", out var recordsObj) && recordsObj != null &&
+            strategy is Strategies.Validation.SchemaValidationStrategy validationStrategy)
         {
             var records = DeserializeRecords(recordsObj);
             if (records.Count > 0)
             {
                 Interlocked.Add(ref _totalRecordsProcessed, records.Count);
-                var result = await strategy.ValidateAsync(records, default).ConfigureAwait(false);
-                var issueCount = result.ValidationIssues?.Count ?? 0;
-                Interlocked.Add(ref _totalIssuesFound, issueCount);
-                message.Payload["success"] = result.IsValid;
-                message.Payload["issuesFound"] = issueCount;
-                message.Payload["validationIssues"] = result.ValidationIssues ?? new List<DataQualityIssue>();
+                var allIssues = new List<DataQualityIssue>();
+                bool allValid = true;
+                foreach (var record in records)
+                {
+                    var result = await validationStrategy.ValidateAsync(record, CancellationToken.None).ConfigureAwait(false);
+                    if (!result.IsValid) allValid = false;
+                    allIssues.AddRange(result.Issues);
+                }
+                Interlocked.Add(ref _totalIssuesFound, allIssues.Count);
+                message.Payload["success"] = allValid;
+                message.Payload["issuesFound"] = allIssues.Count;
+                message.Payload["validationIssues"] = allIssues;
                 message.Payload["strategyId"] = strategy.StrategyId;
                 message.Payload["strategyName"] = strategy.DisplayName;
                 return;
@@ -743,5 +750,26 @@ public sealed class UltimateDataQualityPlugin : DataManagementPluginBase, IDispo
         public required string PolicyId { get; init; }
         public required string Name { get; init; }
         public DateTime CreatedAt { get; init; }
+    }
+
+    /// <summary>
+    /// Deserializes a records payload into a list of DataRecord objects.
+    /// Accepts List&lt;DataRecord&gt;, JsonElement arrays, or DataRecord[].
+    /// </summary>
+    private static List<DataRecord> DeserializeRecords(object? recordsObj)
+    {
+        if (recordsObj is List<DataRecord> list) return list;
+        if (recordsObj is DataRecord[] arr) return arr.ToList();
+        if (recordsObj is System.Text.Json.JsonElement je && je.ValueKind == System.Text.Json.JsonValueKind.Array)
+        {
+            var result = new List<DataRecord>();
+            foreach (var elem in je.EnumerateArray())
+            {
+                var record = System.Text.Json.JsonSerializer.Deserialize<DataRecord>(elem.GetRawText());
+                if (record != null) result.Add(record);
+            }
+            return result;
+        }
+        return new List<DataRecord>();
     }
 }

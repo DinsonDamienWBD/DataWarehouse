@@ -344,10 +344,11 @@ public sealed class ConsulKvStorageStrategy : DatabaseStorageStrategyBase
             _lock = lockHandle;
         }
 
-        public async Task ReleaseAsync(CancellationToken ct = default)
+        public Task ReleaseAsync(CancellationToken ct = default)
         {
             // LOW-2816: _lock.Release() is synchronous; no Task.Run wrapper needed
             _lock.Release();
+            return Task.CompletedTask;
         }
 
         public async ValueTask DisposeAsync()

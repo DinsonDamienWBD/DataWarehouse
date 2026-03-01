@@ -23,6 +23,8 @@ public sealed class OpenSearchStorageStrategy : DatabaseStorageStrategyBase
     private string _indexName = "datawarehouse-storage";
     private int _numberOfShards = 1;
     private int _numberOfReplicas = 1;
+    // LOW-2843: Configurable immediate refresh — default false for production throughput
+    private bool _immediateRefresh = false;
 
     public override string StrategyId => "opensearch";
     public override string Name => "OpenSearch Storage";
@@ -52,6 +54,7 @@ public sealed class OpenSearchStorageStrategy : DatabaseStorageStrategyBase
     {
         _indexName = GetConfiguration("IndexName", "datawarehouse-storage");
         _numberOfShards = GetConfiguration("NumberOfShards", 1);
+        _immediateRefresh = GetConfiguration("ImmediateRefresh", false);
         _numberOfReplicas = GetConfiguration("NumberOfReplicas", 1);
 
         var connectionString = GetConnectionString();
@@ -136,7 +139,7 @@ public sealed class OpenSearchStorageStrategy : DatabaseStorageStrategyBase
         var response = await _client!.IndexAsync(document, i => i
             .Index(_indexName)
             .Id(key)
-            .Refresh(Refresh.True), ct);
+            .Refresh(_immediateRefresh ? Refresh.True : Refresh.False), ct);
 
         if (!response.IsValid)
         {
@@ -176,7 +179,7 @@ public sealed class OpenSearchStorageStrategy : DatabaseStorageStrategyBase
 
         var response = await _client!.DeleteAsync<StorageDocument>(key, d => d
             .Index(_indexName)
-            .Refresh(Refresh.True), ct);
+            .Refresh(_immediateRefresh ? Refresh.True : Refresh.False), ct);
 
         if (!response.IsValid)
         {

@@ -70,6 +70,15 @@ internal sealed class PartitionedQueryStrategy : ComputeRuntimeStrategyBase
                     finally { try { File.Delete(codePath); } catch { /* Best-effort cleanup — failure is non-fatal */ } }
                 });
 
+            // Verify all partitions produced results; if any are missing, a partition task failed.
+            var missingPartitions = Enumerable.Range(0, partitionCount)
+                .Where(i => !partitionResults.ContainsKey(i))
+                .ToList();
+            if (missingPartitions.Count > 0)
+                throw new InvalidOperationException(
+                    $"Partitioned query failed: {missingPartitions.Count} partition(s) produced no output " +
+                    $"(indices: {string.Join(", ", missingPartitions)}).");
+
             // Merge-sort across partitions
             var merged = partitionResults.Values.SelectMany(v => v).OrderBy(l => l);
             var output = string.Join('\n', merged);

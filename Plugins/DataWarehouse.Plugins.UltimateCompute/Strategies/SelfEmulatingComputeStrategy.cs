@@ -96,7 +96,9 @@ internal sealed class SelfEmulatingComputeStrategy : ComputeRuntimeStrategyBase
             sb.AppendLine($"[SelfEmulating] Bundle created: {output.Length} bytes");
             sb.AppendLine($"[SelfEmulating] Execution completed successfully");
 
-            await Task.CompletedTask;
+            // NOTE: Viewer runtime dispatch (actual WASM execution) is not yet implemented.
+            // The envelope above contains metadata + data for the self-emulating format,
+            // but the WASM viewer is not launched. IsProductionReady = false reflects this.
             return (output, sb.ToString());
         }, cancellationToken);
     }

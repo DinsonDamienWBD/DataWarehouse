@@ -4412,11 +4412,11 @@
 | 2782 | 13 | P2 | `UltimateDatabaseStorage/Strategies/Graph/DistributedGraphProcessing.cs:173-176` | `GroupBy(v => v.Partition).ToList()` every superstep materializes O(V) objects. | [X]
 | 2783 | 12 | P2 | `UltimateDatabaseStorage/Strategies/Analytics/DruidStorageStrategy.cs:316-319` | `Created`/`Modified` always `DateTime.UtcNow` instead of parsed from `__time`. Timestamps meaningless. | [X]
 | 2784 | 15 | P2 | `UltimateDatabaseStorage/Strategies/Analytics/ClickHouseStorageStrategy.cs:309-327` | `CheckHealthCoreAsync` bare catch returns false. Infrastructure vs health failures indistinguishable. Pattern repeated across 6 strategies. | [X]
-| 2785 | 15 | LOW | `UltimateDatabaseStorage/Strategies/Graph/ArangoDbStorageStrategy.cs:164-175` | PUT fail silently falls through to POST regardless of error type. Should check 404 only. | [ ]
-| 2786 | 15 | LOW | `UltimateDatabaseStorage/Scaling/DatabaseStorageScalingManager.cs:343` | `ExecuteStreamingQueryAsync` increments `_paginatedQueries` counter. Misleading metric. | [ ]
+| 2785 | 15 | LOW | `UltimateDatabaseStorage/Strategies/Graph/ArangoDbStorageStrategy.cs:164-175` | PUT fail silently falls through to POST regardless of error type. Should check 404 only. | [X]
+| 2786 | 15 | LOW | `UltimateDatabaseStorage/Scaling/DatabaseStorageScalingManager.cs:343` | `ExecuteStreamingQueryAsync` increments `_paginatedQueries` counter. Misleading metric. | [X]
 | 2787 | 12 | LOW | `UltimateDatabaseStorage/Strategies/Graph/GraphAnalyticsStrategies.cs:817-819` | LabelPropagation returns `Modularity = 0` without computing it. Misleading. | [X]
-| 2788 | 14 | LOW | `UltimateDatabaseStorage/Strategies/Analytics/DruidStorageStrategy.cs:56-63` | `_httpClient` no `BaseAddress` set. Misconfigured trailing slash produces double-slash URLs. | [ ]
-| 2789 | 14 | LOW | `UltimateDatabaseStorage/Strategies/CloudNative/CosmosDbStorageStrategy.cs:65` | `Enum.Parse<ConsistencyLevel>` without `ignoreCase: true` or try/catch. Case mismatch throws. | [ ]
+| 2788 | 14 | LOW | `UltimateDatabaseStorage/Strategies/Analytics/DruidStorageStrategy.cs:56-63` | `_httpClient` no `BaseAddress` set. Misconfigured trailing slash produces double-slash URLs. | [X]
+| 2789 | 14 | LOW | `UltimateDatabaseStorage/Strategies/CloudNative/CosmosDbStorageStrategy.cs:65` | `Enum.Parse<ConsistencyLevel>` without `ignoreCase: true` or try/catch. Case mismatch throws. | [X]
 
 ---
 
@@ -4450,7 +4450,7 @@
 | 2813 | 15 | P2 | `UltimateDatabaseStorage/Strategies/Graph/JanusGraphStorageStrategy.cs:83-88` | `ConnectCoreAsync` submits test query but discards result. Connectivity not actually verified. | [X]
 | 2814 | 15 | P2 | `UltimateDatabaseStorage/Strategies/NewSQL/YugabyteDbStorageStrategy.cs:62-67` | Version check for "YugabyteDB" has empty `if` body (comment only). Silently connects to non-YugabyteDB. | [X]
 | 2815 | 15 | LOW | `UltimateDatabaseStorage/Strategies/KeyValue/FoundationDbStorageStrategy.cs:59` | `Fdb.Start()` called every init. Must be once-per-process. | [X]
-| 2816 | 15 | LOW | `UltimateDatabaseStorage/Strategies/KeyValue/ConsulKvStorageStrategy.cs:342` | `Task.Run(() => _lock.Release())` wraps sync call unnecessarily. | [ ]
+| 2816 | 15 | LOW | `UltimateDatabaseStorage/Strategies/KeyValue/ConsulKvStorageStrategy.cs:342` | `Task.Run(() => _lock.Release())` wraps sync call unnecessarily. | [X]
 | 2817 | 14 | LOW | `UltimateDatabaseStorage/Strategies/Graph/GraphVisualizationExport.cs:499-510` | `ParseHexColor` throws on malformed 6-char hex. No TryParse fallback. | [X]
 
 ---
@@ -4484,7 +4484,7 @@
 | 2840 | 13 | P2 | `UltimateDatabaseStorage/Strategies/NoSQL/DynamoDbStorageStrategy.cs:353-413` | `ListCoreAsync` performs full-table `Scan` instead of `Query`. Reads every partition. | [X]
 | 2841 | 15 | P2 | `UltimateDatabaseStorage/Strategies/NoSQL/DocumentDbStorageStrategy.cs:380-383` | `RollbackAsync` is no-op returning Task.CompletedTask. After CommitAsync, second Rollback silently succeeds. | [X]
 | 2842 | 7 | P2 | `UltimateDatabaseStorage/Strategies/NoSQL/RavenDbStorageStrategy.cs:212-232` | `IAsyncEnumerator` from `StreamAsync` not in `await using`. Server-side cursor leak on early dispose. | [X]
-| 2843 | 13 | LOW | `UltimateDatabaseStorage/Strategies/Search/ElasticsearchStorageStrategy.cs:139-142` | `.Refresh(Refresh.True)` on every write. 10x indexing throughput reduction. Should be configurable. Same in OpenSearch. | [ ]
+| 2843 | 13 | LOW | `UltimateDatabaseStorage/Strategies/Search/ElasticsearchStorageStrategy.cs:139-142` | `.Refresh(Refresh.True)` on every write. 10x indexing throughput reduction. Should be configurable. Same in OpenSearch. | [X]
 | 2844 | 14 | LOW | `UltimateDatabaseStorage/Strategies/Spatial/PostGisStorageStrategy.cs:87-98` | `_tableName` interpolated into DDL without `ValidateIdentifier`. Inconsistent with PostgreSql strategy. | [X]
 
 **Clean files:** PostgreSqlStorageStrategy.cs (best-in-class with ValidateIdentifier)
@@ -4519,7 +4519,7 @@
 | 2866 | 9 | P2 | `UltimateDatabaseStorage/Strategies/WideColumn/HBaseStorageStrategy.cs:265,325` | `DateTime.Parse` without `CultureInfo.InvariantCulture` — throws on non-invariant locale hosts. | [X]
 | 2867 | 1 | P2 | `UltimateDatabaseStorage/UltimateDatabaseStoragePlugin.cs:332-421` | `HandleRetrieveAsync` and `HandleHealthCheckAsync` compute results that are never sent — wasted work, callers get nothing. | [X]
 | 2868 | 10 | P2 | `UltimateDatabaseStorage/Strategies/TimeSeries/TimescaleDbStorageStrategy.cs:140-152` | `StoreCoreAsync` plain INSERT with UNIQUE constraint — rapid same-key stores at same millisecond throw constraint violation. Needs ON CONFLICT. | [X]
-| 2869 | 15 | LOW | `UltimateDatabaseStorage/Strategies/Streaming/PulsarStorageStrategy.cs:51` | `SupportsSql => true` but no SQL execution path exists in strategy. | [ ]
+| 2869 | 15 | LOW | `UltimateDatabaseStorage/Strategies/Streaming/PulsarStorageStrategy.cs:51` | `SupportsSql => true` but no SQL execution path exists in strategy. | [X]
 | 2870 | 15 | LOW | `UltimateDeployment/Strategies/AppPlatform/AppHostingStrategy.cs:126-137` | `HealthCheckCoreAsync` hardcodes `IsHealthy=true, ResponseTimeMs=1` — fabricated health data. | [X]
 | 2871 | 15 | LOW | `UltimateDeployment/Strategies/AppPlatform/AppRuntimeStrategy.cs:118` | `GetStateCoreAsync` returns hardcoded `Version="1.0.0", Health=Healthy` for any deploymentId. | [X]
 | 2872 | 15 | LOW | `UltimateDatabaseStorage/Strategies/WideColumn/BigtableStorageStrategy.cs:35` | `DatabaseCategory => NoSQL` — should be WideColumn (SDK gap). | [X]

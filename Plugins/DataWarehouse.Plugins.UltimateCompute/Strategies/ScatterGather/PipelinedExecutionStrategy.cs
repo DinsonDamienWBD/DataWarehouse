@@ -42,8 +42,17 @@ internal sealed class PipelinedExecutionStrategy : ComputeRuntimeStrategyBase
             if (stages.Length == 0) stages = [codeStr];
 
             var bufferSize = 100;
-            if (task.Metadata?.TryGetValue("buffer_size", out var bs) == true && bs is int bsi)
-                bufferSize = bsi;
+            if (task.Metadata?.TryGetValue("buffer_size", out var bs) == true && bs != null)
+            {
+                // Metadata values from JSON deserialization arrive as JsonElement or long.
+                bufferSize = bs switch
+                {
+                    int i => i,
+                    long l => (int)Math.Clamp(l, 1, 10_000),
+                    System.Text.Json.JsonElement je when je.TryGetInt32(out var jei) => jei,
+                    _ => bufferSize
+                };
+            }
 
             // Create bounded channels between stages
             var channels = new Channel<string>[stages.Length + 1];

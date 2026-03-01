@@ -38,7 +38,10 @@ internal sealed class AppArmorStrategy : ComputeRuntimeStrategyBase
         {
             var codePath = Path.GetTempFileName() + ".sh";
             var profilePath = Path.GetTempFileName() + ".apparmor";
-            var profileName = $"datawarehouse_compute_{task.Id[..Math.Min(12, task.Id.Length)]}";
+            // AppArmor profile names are restricted to [a-zA-Z0-9_.-]. Sanitize task.Id to avoid
+            // characters that would break the profile grammar (hyphens are allowed per the spec).
+            var sanitizedId = Regex.Replace(task.Id, @"[^a-zA-Z0-9_.\-]", "_");
+            var profileName = $"datawarehouse_compute_{sanitizedId[..Math.Min(32, sanitizedId.Length)]}";
 
             try
             {

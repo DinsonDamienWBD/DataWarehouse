@@ -48,7 +48,9 @@ public sealed class PulsarStorageStrategy : DatabaseStorageStrategyBase
     };
 
     public override bool SupportsTransactions => true;
-    public override bool SupportsSql => true; // Pulsar SQL
+    // LOW-2869: Pulsar SQL is a separate Presto service, not wired through this strategy.
+    // Set to false to prevent false SQL-capability advertisement.
+    public override bool SupportsSql => false;
 
     protected override async Task InitializeCoreAsync(CancellationToken ct)
     {
