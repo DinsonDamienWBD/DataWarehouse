@@ -45,6 +45,10 @@ public sealed class UltimateConnectorPlugin : DataWarehouse.SDK.Contracts.Hierar
     private readonly ConnectionStrategyRegistry _registry;
     private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private volatile bool _initialized;
+    // P2-2204: Cache capabilities after init to avoid O(n) rebuild on every handshake call.
+    private IReadOnlyList<RegisteredCapability>? _cachedCapabilities;
+    // P2-2205: Pre-computed stats to avoid repeated O(4n) scans per GetStaticKnowledge() call.
+    private StaticKnowledgeStats? _cachedStats;
 
     /// <inheritdoc/>
     public override string Id => "com.datawarehouse.connector.ultimate";
@@ -87,11 +91,15 @@ public sealed class UltimateConnectorPlugin : DataWarehouse.SDK.Contracts.Hierar
     /// <summary>
     /// Declares all capabilities provided by this plugin.
     /// Includes main plugin capability and auto-generated strategy capabilities.
+    /// P2-2204: Cached after first build to avoid O(n) list reconstruction on every handshake call.
     /// </summary>
     protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities
     {
         get
         {
+            if (_cachedCapabilities != null)
+                return _cachedCapabilities;
+
             var capabilities = new List<RegisteredCapability>
             {
                 // Main plugin capability
@@ -136,7 +144,8 @@ public sealed class UltimateConnectorPlugin : DataWarehouse.SDK.Contracts.Hierar
                 });
             }
 
-            return capabilities.AsReadOnly();
+            _cachedCapabilities = capabilities.AsReadOnly();
+            return _cachedCapabilities;
         }
     }
 
@@ -170,6 +179,20 @@ public sealed class UltimateConnectorPlugin : DataWarehouse.SDK.Contracts.Hierar
         }
 
         _initialized = true;
+
+        // P2-2205: Pre-compute static knowledge stats once after discovery to avoid O(4n) scans
+        // on every GetStaticKnowledge() call. CategoryCounts also reused for DeclaredCapabilities.
+        var allStrategies = _registry.GetAll();
+        _cachedStats = new StaticKnowledgeStats
+        {
+            CategoryCounts = allStrategies
+                .GroupBy(s => s.Category)
+                .ToDictionary(g => g.Key.ToString(), g => g.Count()),
+            PoolingCount = allStrategies.Count(s => s.Capabilities.SupportsPooling),
+            StreamingCount = allStrategies.Count(s => s.Capabilities.SupportsStreaming),
+            TransactionCount = allStrategies.Count(s => s.Capabilities.SupportsTransactions),
+            TotalCount = allStrategies.Count
+        };
     }
 
     /// <inheritdoc/>
@@ -208,14 +231,31 @@ public sealed class UltimateConnectorPlugin : DataWarehouse.SDK.Contracts.Hierar
     /// <inheritdoc/>
     protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
     {
-        var strategies = _registry.GetAll();
-        var categoryCounts = strategies
-            .GroupBy(s => s.Category)
-            .ToDictionary(g => g.Key.ToString(), g => g.Count());
+        // P2-2205: Use pre-computed stats from OnStartCoreAsync; fall back to live scan only if
+        // called before init (unusual but safe).
+        var stats = _cachedStats;
+        Dictionary<string, int> categoryCounts;
+        int poolingCount, streamingCount, transactionCount, totalCount;
 
-        var poolingCount = strategies.Count(s => s.Capabilities.SupportsPooling);
-        var streamingCount = strategies.Count(s => s.Capabilities.SupportsStreaming);
-        var transactionCount = strategies.Count(s => s.Capabilities.SupportsTransactions);
+        if (stats != null)
+        {
+            categoryCounts = stats.CategoryCounts;
+            poolingCount = stats.PoolingCount;
+            streamingCount = stats.StreamingCount;
+            transactionCount = stats.TransactionCount;
+            totalCount = stats.TotalCount;
+        }
+        else
+        {
+            var strategies = _registry.GetAll();
+            categoryCounts = strategies
+                .GroupBy(s => s.Category)
+                .ToDictionary(g => g.Key.ToString(), g => g.Count());
+            poolingCount = strategies.Count(s => s.Capabilities.SupportsPooling);
+            streamingCount = strategies.Count(s => s.Capabilities.SupportsStreaming);
+            transactionCount = strategies.Count(s => s.Capabilities.SupportsTransactions);
+            totalCount = strategies.Count;
+        }
 
         return new List<KnowledgeObject>
         {
@@ -230,7 +270,7 @@ public sealed class UltimateConnectorPlugin : DataWarehouse.SDK.Contracts.Hierar
                 Payload = new Dictionary<string, object>
                 {
                     ["description"] = SemanticDescription,
-                    ["totalStrategies"] = strategies.Count,
+                    ["totalStrategies"] = totalCount,
                     ["categories"] = categoryCounts,
                     ["features"] = new Dictionary<string, object>
                     {
@@ -463,4 +503,16 @@ public sealed class UltimateConnectorPlugin : DataWarehouse.SDK.Contracts.Hierar
     }
 
     #endregion
+
+    /// <summary>
+    /// Pre-computed statistics to avoid repeated O(n) scans in GetStaticKnowledge.
+    /// </summary>
+    private sealed class StaticKnowledgeStats
+    {
+        public required Dictionary<string, int> CategoryCounts { get; init; }
+        public required int PoolingCount { get; init; }
+        public required int StreamingCount { get; init; }
+        public required int TransactionCount { get; init; }
+        public required int TotalCount { get; init; }
+    }
 }

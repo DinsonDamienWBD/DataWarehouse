@@ -18,6 +18,15 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transit
         private const int MaxInputSize = 100 * 1024 * 1024; // 100 MB
 
         /// <summary>
+        /// Initializes a new instance of the <see cref="SnappyTransitStrategy"/> class
+        /// with the default compression level. Required for parameterless factory instantiation.
+        /// </summary>
+        public SnappyTransitStrategy() : base(CompressionLevel.Default)
+        {
+            // Snappy has no compression levels, always fastest
+        }
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="SnappyTransitStrategy"/> class.
         /// </summary>
         /// <param name="level">The compression level (Snappy has fixed level).</param>

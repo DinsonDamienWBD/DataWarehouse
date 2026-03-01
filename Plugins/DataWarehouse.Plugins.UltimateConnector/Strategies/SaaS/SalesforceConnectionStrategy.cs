@@ -133,10 +133,26 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
         {
             var client = handle.GetConnection<HttpClient>();
             var token = await EnsureValidTokenAsync(handle, ct);
-            var encodedQuery = Uri.EscapeDataString(soqlQuery);
 
-            using var request = new HttpRequestMessage(HttpMethod.Get,
-                $"/services/data/{ApiVersion}/query/?q={encodedQuery}");
+            // Finding 2161: Use POST for queries that may exceed URL length limits imposed by proxies
+            // (typically 2–8 KB). GET with a URL-encoded query string silently fails on long SOQL.
+            HttpRequestMessage request;
+            if (soqlQuery.Length > 2000)
+            {
+                // Salesforce supports POST to /query with a JSON body for large queries
+                var bodyJson = System.Text.Json.JsonSerializer.Serialize(new { q = soqlQuery });
+                request = new HttpRequestMessage(HttpMethod.Post, $"/services/data/{ApiVersion}/query/")
+                {
+                    Content = new StringContent(bodyJson, Encoding.UTF8, "application/json")
+                };
+            }
+            else
+            {
+                var encodedQuery = Uri.EscapeDataString(soqlQuery);
+                request = new HttpRequestMessage(HttpMethod.Get,
+                    $"/services/data/{ApiVersion}/query/?q={encodedQuery}");
+            }
+
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
             using var response = await client.SendAsync(request, ct);
@@ -297,8 +313,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
 
             var createJson = await createResponse.Content.ReadAsStringAsync(ct);
             using var createDoc = JsonDocument.Parse(createJson);
-            var jobId = createDoc.RootElement.GetProperty("id").GetString()!;
-            var contentUrl = createDoc.RootElement.GetProperty("contentUrl").GetString()!;
+            // Finding 2156: Avoid null-forgiving operator — throw clearly if response body is unexpected.
+            var jobId = createDoc.RootElement.GetProperty("id").GetString()
+                ?? throw new InvalidOperationException("Salesforce Bulk API response missing 'id' field.");
+            var contentUrl = createDoc.RootElement.GetProperty("contentUrl").GetString()
+                ?? throw new InvalidOperationException("Salesforce Bulk API response missing 'contentUrl' field.");
 
             // Step 2: Upload CSV data
             using var uploadRequest = new HttpRequestMessage(HttpMethod.Put, contentUrl)

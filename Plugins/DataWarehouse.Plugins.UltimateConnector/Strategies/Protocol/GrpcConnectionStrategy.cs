@@ -12,7 +12,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
     /// Connection strategy for gRPC endpoints using HTTP/2 protocol.
     /// Tests connectivity via HTTP/2 connection to gRPC service endpoint.
     /// </summary>
-    public class GrpcConnectionStrategy : ConnectionStrategyBase
+    public sealed class GrpcConnectionStrategy : ConnectionStrategyBase
     {
         /// <inheritdoc/>
         public override string StrategyId => "grpc";
@@ -64,32 +64,42 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
             var client = new HttpClient(handler) { BaseAddress = new Uri(endpoint) };
             client.DefaultRequestVersion = new Version(2, 0);
 
-            // Use proper gRPC health check endpoint instead of HTTP GET
-            // Try the standard gRPC health checking protocol endpoint
-            var healthRequest = new HttpRequestMessage(HttpMethod.Post, "/grpc.health.v1.Health/Check");
-            healthRequest.Version = new Version(2, 0);
-            healthRequest.Headers.Add("content-type", "application/grpc");
-
+            // Finding 2130: Wrap the entire connection probe in try/finally so client is always
+            // disposed on error, and use `using` on testResponse to prevent resource leaks.
             try
             {
-                using var response = await client.SendAsync(healthRequest, ct);
-                // For gRPC, we expect HTTP 200 with grpc-status header, or at least HTTP/2 connection success
-                // Even if the health endpoint isn't implemented, HTTP/2 connection success is sufficient
-                if (response.Version.Major < 2)
+                // Use proper gRPC health check endpoint instead of HTTP GET
+                // Try the standard gRPC health checking protocol endpoint
+                var healthRequest = new HttpRequestMessage(HttpMethod.Post, "/grpc.health.v1.Health/Check");
+                healthRequest.Version = new Version(2, 0);
+                healthRequest.Headers.Add("content-type", "application/grpc");
+
+                try
                 {
-                    throw new InvalidOperationException("gRPC requires HTTP/2 protocol support");
+                    using var response = await client.SendAsync(healthRequest, ct);
+                    // For gRPC, we expect HTTP 200 with grpc-status header, or at least HTTP/2 connection success
+                    // Even if the health endpoint isn't implemented, HTTP/2 connection success is sufficient
+                    if (response.Version.Major < 2)
+                    {
+                        throw new InvalidOperationException("gRPC requires HTTP/2 protocol support");
+                    }
+                }
+                catch (HttpRequestException)
+                {
+                    // If health check fails, try a simple connection test with proper disposal
+                    var testRequest = new HttpRequestMessage(HttpMethod.Post, "/");
+                    testRequest.Version = new Version(2, 0);
+                    using var testResponse = await client.SendAsync(testRequest, ct);
+                    if (testResponse.Version.Major < 2)
+                    {
+                        throw new InvalidOperationException("gRPC requires HTTP/2 protocol support");
+                    }
                 }
             }
-            catch (HttpRequestException)
+            catch
             {
-                // If health check fails, try a simple connection test
-                var testRequest = new HttpRequestMessage(HttpMethod.Post, "/");
-                testRequest.Version = new Version(2, 0);
-                var testResponse = await client.SendAsync(testRequest, ct);
-                if (testResponse.Version.Major < 2)
-                {
-                    throw new InvalidOperationException("gRPC requires HTTP/2 protocol support");
-                }
+                client.Dispose();
+                throw;
             }
 
             var info = new Dictionary<string, object>

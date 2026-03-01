@@ -95,6 +95,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
         public async Task<GitHubListResult<GitHubRepo>> ListRepositoriesAsync(IConnectionHandle handle,
             string? org = null, int perPage = 30, int page = 1, CancellationToken ct = default)
         {
+            // Finding 2159: Clamp perPage to GitHub maximum of 100; validate page is positive.
+            perPage = Math.Clamp(perPage, 1, 100);
+            if (page < 1) page = 1;
+
             var client = handle.GetConnection<HttpClient>();
             await CheckRateLimitAsync(ct);
 
@@ -190,6 +194,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
         public async Task<GitHubWebhookResult> CreateWebhookAsync(IConnectionHandle handle, string owner,
             string repo, string payloadUrl, string[] events, string secret, CancellationToken ct = default)
         {
+            // Finding 2160: Require a minimum-entropy webhook secret (GitHub recommends >= 20 chars).
+            if (string.IsNullOrWhiteSpace(secret) || secret.Length < 20)
+                throw new ArgumentException(
+                    "Webhook secret must be at least 20 characters to provide adequate HMAC security.", nameof(secret));
+
             var client = handle.GetConnection<HttpClient>();
             await CheckRateLimitAsync(ct);
 
@@ -259,11 +268,15 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
     {
         public long Id { get; init; }
         public string Name { get; init; } = "";
-        public string Full_Name { get; init; } = "";
+        // Finding 2166: Use PascalCase with JsonPropertyName to follow C# conventions.
+        [System.Text.Json.Serialization.JsonPropertyName("full_name")]
+        public string FullName { get; init; } = "";
         public bool Private { get; init; }
         public string? Description { get; init; }
-        public string Html_Url { get; init; } = "";
-        public string Default_Branch { get; init; } = "main";
+        [System.Text.Json.Serialization.JsonPropertyName("html_url")]
+        public string HtmlUrl { get; init; } = "";
+        [System.Text.Json.Serialization.JsonPropertyName("default_branch")]
+        public string DefaultBranch { get; init; } = "main";
     }
 
     public sealed record GitHubListResult<T>

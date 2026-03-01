@@ -140,8 +140,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
 
             if (!string.IsNullOrEmpty(filter))
                 queryParams.Add($"$filter={Uri.EscapeDataString(filter)}");
+            // Finding 2163: URL-encode $select just like $filter — special chars produce malformed OData query.
             if (!string.IsNullOrEmpty(select))
-                queryParams.Add($"$select={select}");
+                queryParams.Add($"$select={Uri.EscapeDataString(select)}");
             if (top.HasValue)
                 queryParams.Add($"$top={top.Value}");
             if (skip.HasValue)
@@ -220,7 +221,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                 ? "?" + string.Join("&", parameters.Select(p => $"{p.Key}='{Uri.EscapeDataString(p.Value)}'"))
                 : "";
 
-            var url = $"/sap/opu/odata/sap/{servicePath}/{functionName}{paramString}&$format=json";
+            // Finding 2157: Use '?' when no parameters are present, '&' only when appending to existing query string.
+            var separator = paramString.Length > 0 ? "&" : "?";
+            var url = $"/sap/opu/odata/sap/{servicePath}/{functionName}{paramString}{separator}$format=json";
             using var response = await client.GetAsync(url, ct);
             response.EnsureSuccessStatusCode();
             var responseJson = await response.Content.ReadAsStringAsync(ct);

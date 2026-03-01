@@ -111,21 +111,16 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             }
         }
 
-        public override async Task<int> ExecuteNonQueryAsync(
+        public override Task<int> ExecuteNonQueryAsync(
             IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            if (_httpClient == null) return 0;
-            try
-            {
-                var requestBody = System.Text.Json.JsonSerializer.Serialize(new { query = command });
-                var content = new StringContent(requestBody, System.Text.Encoding.UTF8, "application/json");
-                using var response = await _httpClient.PostAsync("/druid/v2/sql", content, ct);
-                return response.IsSuccessStatusCode ? 1 : 0;
-            }
-            catch
-            {
-                return 0;
-            }
+            // Finding 2181: Apache Druid SQL (/druid/v2/sql) does not support DML (INSERT/UPDATE/DELETE).
+            // Returning a fabricated row count silently discards data-mutation requests. Throw instead so
+            // callers are informed that Druid is query-only and must use the Druid native ingestion API
+            // (e.g. Kafka supervisor or native batch task) for data ingestion.
+            throw new NotSupportedException(
+                "Apache Druid SQL does not support DML (INSERT/UPDATE/DELETE). " +
+                "Use the Druid native batch ingestion API or Kafka supervisor for data loading.");
         }
 
         public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)

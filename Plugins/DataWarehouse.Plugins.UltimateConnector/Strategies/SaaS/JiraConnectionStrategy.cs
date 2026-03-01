@@ -109,6 +109,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
         public async Task<JiraSearchResult> SearchIssuesAsync(IConnectionHandle handle, string jql,
             int startAt = 0, int maxResults = 50, string[]? fields = null, CancellationToken ct = default)
         {
+            // Finding 2162: Validate jql before sending to avoid unhelpful Jira error responses.
+            if (string.IsNullOrWhiteSpace(jql))
+                throw new ArgumentException("JQL query must not be empty or whitespace.", nameof(jql));
+
             var client = handle.GetConnection<HttpClient>();
             var body = new Dictionary<string, object>
             {

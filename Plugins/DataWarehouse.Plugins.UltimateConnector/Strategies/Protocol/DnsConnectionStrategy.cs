@@ -12,7 +12,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
     /// Connection strategy for DNS servers.
     /// Tests connectivity via UDP/TCP connection to port 53.
     /// </summary>
-    public class DnsConnectionStrategy : ConnectionStrategyBase
+    public sealed class DnsConnectionStrategy : ConnectionStrategyBase
     {
         /// <inheritdoc/>
         public override string StrategyId => "dns";

@@ -141,12 +141,12 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
             if (input.Length == 0)
                 return output.ToArray();
 
-            // Initialize hash table with linked lists.
+            // Initialize hash table with lazy-allocated lists.
             // Each bucket is capped at MaxBucketDepth to bound memory: older entries are dropped.
+            // P2-1595: Use null-initialized array to avoid 16K heap allocations upfront;
+            // buckets are created on first use so sparse inputs only pay for touched slots.
             const int MaxBucketDepth = 8;
-            var hashTable = new List<int>[HashSize];
-            for (int i = 0; i < HashSize; i++)
-                hashTable[i] = new List<int>(MaxBucketDepth);
+            var hashTable = new List<int>?[HashSize];
 
             int pos = 0;
 
@@ -160,17 +160,21 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
                 {
                     uint hash = RollingHash(input, pos, MinMatchLength);
                     int hashIdx = (int)(hash & (HashSize - 1));
+                    var scanBucket = hashTable[hashIdx];
 
-                    foreach (int candPos in hashTable[hashIdx])
+                    if (scanBucket != null)
                     {
-                        if (candPos >= pos) break;
-                        if (pos - candPos > WindowSize) continue;
-
-                        int len = FindMatchLength(input, candPos, pos);
-                        if (len > matchLen)
+                        foreach (int candPos in scanBucket)
                         {
-                            matchLen = len;
-                            matchPos = candPos;
+                            if (candPos >= pos) break;
+                            if (pos - candPos > WindowSize) continue;
+
+                            int len = FindMatchLength(input, candPos, pos);
+                            if (len > matchLen)
+                            {
+                                matchLen = len;
+                                matchPos = candPos;
+                            }
                         }
                     }
                 }
@@ -190,7 +194,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
                         {
                             uint h = RollingHash(input, pos, MinMatchLength);
                             int hIdx = (int)(h & (HashSize - 1));
-                            var zBucket = hashTable[hIdx];
+                            var zBucket = hashTable[hIdx] ??= new List<int>(MaxBucketDepth);
                             if (zBucket.Count >= MaxBucketDepth) zBucket.RemoveAt(0);
                             zBucket.Add(pos);
                         }
@@ -210,17 +214,21 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
                         {
                             uint hash = RollingHash(input, pos, MinMatchLength);
                             int hashIdx = (int)(hash & (HashSize - 1));
+                            var scanBkt = hashTable[hashIdx];
 
-                            foreach (int candPos in hashTable[hashIdx])
+                            if (scanBkt != null)
                             {
-                                if (candPos >= pos) break;
-                                if (pos - candPos > WindowSize) continue;
-
-                                int len = FindMatchLength(input, candPos, pos);
-                                if (len >= MinMatchLength)
+                                foreach (int candPos in scanBkt)
                                 {
-                                    foundMatch = true;
-                                    break;
+                                    if (candPos >= pos) break;
+                                    if (pos - candPos > WindowSize) continue;
+
+                                    int len = FindMatchLength(input, candPos, pos);
+                                    if (len >= MinMatchLength)
+                                    {
+                                        foundMatch = true;
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -232,7 +240,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
                         {
                             uint h = RollingHash(input, pos, MinMatchLength);
                             int hIdx = (int)(h & (HashSize - 1));
-                            var zBucket = hashTable[hIdx];
+                            var zBucket = hashTable[hIdx] ??= new List<int>(MaxBucketDepth);
                             if (zBucket.Count >= MaxBucketDepth) zBucket.RemoveAt(0);
                             zBucket.Add(pos);
                         }
