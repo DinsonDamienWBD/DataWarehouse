@@ -453,7 +453,10 @@ public sealed class TigerGraphProtocolStrategy : DatabaseProtocolStrategyBase
         MaxPacketSize = 1073741824, // 1 GB
         Capabilities = new ProtocolCapabilities
         {
-            SupportsTransactions = true,
+            // P2-2696: TigerGraph REST API does not expose explicit ACID transaction management.
+            // BeginTransaction/Commit/Rollback are no-ops; set SupportsTransactions = false to
+            // accurately reflect what the protocol actually supports.
+            SupportsTransactions = false,
             SupportsPreparedStatements = true,
             SupportsCursors = true,
             SupportsStreaming = true,

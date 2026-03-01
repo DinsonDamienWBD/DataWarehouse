@@ -202,10 +202,16 @@ public sealed class ChannelRegistry : IAsyncDisposable
                 await channel.SendAsync(message, ct).ConfigureAwait(false);
                 Interlocked.Increment(ref successCount);
             }
-            catch
+            catch (OperationCanceledException)
             {
-                Debug.WriteLine($"Caught exception in ConcreteChannels.cs");
-                // Channel failed, continue with others
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // P2-3052: Surface channel send failures via Trace so malfunctioning channels
+                // are visible in production (Debug.WriteLine is stripped in Release builds).
+                Trace.TraceWarning($"[ChannelRegistry] BroadcastAsync: channel '{channel.GetType().Name}' failed: {ex.GetType().Name}: {ex.Message}");
+                // Continue broadcasting to remaining channels
             }
         });
 

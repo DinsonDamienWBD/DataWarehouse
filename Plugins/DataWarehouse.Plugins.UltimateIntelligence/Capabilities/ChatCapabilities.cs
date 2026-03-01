@@ -429,7 +429,9 @@ public sealed class ChatCapabilityHandler : IDisposable
         if (!string.IsNullOrEmpty(request.ConversationId))
         {
             var conversation = _conversationManager.GetOrCreate(request.ConversationId);
-            conversation.AddUserMessage(messages.Last().Content ?? string.Empty);
+            // P2-3058: Guard against empty message list before calling .Last().
+            var lastUserContent = messages.Count > 0 ? messages.Last().Content ?? string.Empty : string.Empty;
+            conversation.AddUserMessage(lastUserContent);
             conversation.AddAssistantMessage(aiResponse.Content);
         }
 
@@ -603,7 +605,9 @@ public sealed class ChatCapabilityHandler : IDisposable
         if (!string.IsNullOrEmpty(request.ConversationId))
         {
             var conversation = _conversationManager.GetOrCreate(request.ConversationId);
-            conversation.AddUserMessage(messages.Last().Content ?? string.Empty);
+            // P2-3058: Guard against empty message list before calling .Last().
+            var lastUserContent = messages.Count > 0 ? messages.Last().Content ?? string.Empty : string.Empty;
+            conversation.AddUserMessage(lastUserContent);
             conversation.AddAssistantMessage(fullContent.ToString());
         }
     }

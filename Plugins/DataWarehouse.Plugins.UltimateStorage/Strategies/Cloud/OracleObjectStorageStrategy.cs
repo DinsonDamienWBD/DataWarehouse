@@ -162,6 +162,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
 
         private async Task<StorageObjectMetadata> StoreSinglePartAsync(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct)
         {
+            // Capture size BEFORE the upload — Position advances to end after PutObject reads the stream.
+            long size = data.CanSeek ? data.Length - data.Position : 0L;
+
             var request = new PutObjectRequest
             {
                 NamespaceName = _namespaceName,
@@ -191,14 +194,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
 
             // Execute request
             var response = await _client!.PutObject(request);
-
-            // Get object size — use Length - original Position for seekable streams
-            // (Position may have advanced during read) so we don't inflate stats.
-            long size = 0;
-            if (data.CanSeek)
-            {
-                size = data.Length - data.Position;
-            }
 
             // Update statistics
             IncrementBytesStored(size);

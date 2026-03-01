@@ -181,6 +181,8 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
     /// </summary>
     public ConnectionPool GetOrCreatePool(ConnectionParameters parameters, ConnectionPoolOptions? options = null)
     {
+        // LOW-2721: guard against null parameters before accessing Host/Port/Database.
+        ArgumentNullException.ThrowIfNull(parameters);
         var key = GeneratePoolKey(parameters);
         return _pools.GetOrAdd(key, _ => new ConnectionPool(
             key,
@@ -287,7 +289,10 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
 
     private static string GeneratePoolKey(ConnectionParameters parameters)
     {
-        return $"{parameters.Host}:{parameters.Port ?? 0}:{parameters.Database}:{parameters.Username}:{parameters.UseSsl}";
+        // LOW-2718: Distinguish null username from empty string so unauthenticated and
+        // authenticated connections don't accidentally share the same pool bucket.
+        var user = parameters.Username is null ? "<null>" : parameters.Username;
+        return $"{parameters.Host}:{parameters.Port ?? 0}:{parameters.Database}:{user}:{parameters.UseSsl}";
     }
 
     private void UpdatePeakInUse()

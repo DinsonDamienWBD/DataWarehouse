@@ -96,7 +96,7 @@ internal sealed class OnStorageLz4Strategy : StorageProcessingStrategyBase
         await Task.CompletedTask;
     }
 
-    private static async Task<AggregationResult> AggregateFileSizes(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct)
+    private static Task<AggregationResult> AggregateFileSizes(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct)
     {
         var sw = Stopwatch.StartNew();
         var sizes = new List<long>();
@@ -118,7 +118,8 @@ internal sealed class OnStorageLz4Strategy : StorageProcessingStrategyBase
             _ => 0.0
         };
 
-        return await Task.FromResult(new AggregationResult
+        // Finding 4252: synchronous return via Task.FromResult avoids state-machine allocation.
+        return Task.FromResult(new AggregationResult
         {
             AggregationType = aggregationType,
             Value = value,

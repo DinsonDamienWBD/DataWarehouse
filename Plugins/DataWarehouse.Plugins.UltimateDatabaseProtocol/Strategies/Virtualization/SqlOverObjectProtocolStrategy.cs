@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -210,6 +211,10 @@ public sealed class SqlOverObjectProtocolStrategy : DatabaseProtocolStrategyBase
         ArgumentNullException.ThrowIfNull(tableName);
         ArgumentNullException.ThrowIfNull(schema);
         _tableRegistry[tableName] = schema;
+        // P2-2749: invalidate the entire query cache so stale results for the updated
+        // table schema are not served. The cache keys include table names in queries,
+        // so a prefix-based invalidation is not safe; full clear is the correct approach.
+        _queryCache.Clear();
     }
 
     /// <summary>
@@ -217,7 +222,10 @@ public sealed class SqlOverObjectProtocolStrategy : DatabaseProtocolStrategyBase
     /// </summary>
     public bool UnregisterTable(string tableName)
     {
-        return _tableRegistry.TryRemove(tableName, out _);
+        var removed = _tableRegistry.TryRemove(tableName, out _);
+        // P2-2749: invalidate cache when table is removed to prevent stale query results.
+        if (removed) _queryCache.Clear();
+        return removed;
     }
 
     /// <summary>
@@ -422,10 +430,9 @@ public sealed class SqlOverObjectProtocolStrategy : DatabaseProtocolStrategyBase
     private async Task<List<Dictionary<string, object?>>> ParseJsonStreamAsync(Stream stream, VirtualTableSchema schema, CancellationToken ct)
     {
         var rows = new List<Dictionary<string, object?>>();
-        using var reader = new StreamReader(stream, Encoding.UTF8);
-        var content = await reader.ReadToEndAsync(ct);
-
-        using var doc = JsonDocument.Parse(content);
+        // P2-2752: parse JSON directly from the stream to avoid materialising the entire file
+        // into a string in memory. JsonDocument.ParseAsync reads from the stream incrementally.
+        using var doc = await JsonDocument.ParseAsync(stream, default, ct);
         var elements = doc.RootElement.ValueKind == JsonValueKind.Array
             ? doc.RootElement.EnumerateArray()
             : Enumerable.Repeat(doc.RootElement, 1);
@@ -627,13 +634,17 @@ public sealed class SqlOverObjectProtocolStrategy : DatabaseProtocolStrategyBase
 
     private static string ComputeQueryCacheKey(string query, IDictionary<string, object?>? parameters)
     {
+        // P2-2751: hash the composite key instead of using raw concatenated SQL + params as the
+        // dictionary key to prevent unbounded string lengths from large queries / many parameters.
         var sb = new StringBuilder(query);
         if (parameters != null)
         {
             foreach (var p in parameters.OrderBy(kv => kv.Key))
                 sb.Append('|').Append(p.Key).Append('=').Append(p.Value);
         }
-        return sb.ToString();
+        var rawKey = sb.ToString();
+        var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(rawKey));
+        return Convert.ToHexStringLower(hashBytes);
     }
 
     #endregion

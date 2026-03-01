@@ -46,7 +46,9 @@ internal sealed class BazelBuildStrategy : StorageProcessingStrategyBase
         var workDir = Directory.Exists(query.Source) ? query.Source : Path.GetDirectoryName(query.Source);
         var result = await CliProcessHelper.RunAsync("bazel", args, workDir, ct: ct);
 
-        var buildSuccess = result.StandardError.Contains("Build completed successfully") || result.Success;
+        // Finding 4251: prefer exit code (result.Success) as primary success indicator; stderr string
+        // matching is locale-sensitive and version-dependent. Keep as secondary hint only.
+        var buildSuccess = result.Success || result.StandardError.Contains("Build completed successfully");
 
         return CliProcessHelper.ToProcessingResult(result, query.Source, "bazel build", new Dictionary<string, object?>
         {

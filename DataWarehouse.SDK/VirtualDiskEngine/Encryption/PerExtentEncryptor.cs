@@ -69,10 +69,17 @@ public sealed class PerExtentEncryptor : IDisposable
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Nonce(12) + EncryptedData(extentData.Length) + Tag(16).</returns>
     /// <remarks>
+<<<<<<< Updated upstream
     /// Cat 15 (finding 788): Although this method has an Async suffix (required by the interface),
     /// AES-GCM encryption is CPU-bound and executes synchronously. The returned Task wraps the
     /// result via <c>Task.FromResult</c>. Callers that need non-blocking behaviour should offload
     /// this call via <c>Task.Run</c> or a dedicated worker thread.
+=======
+    /// Although this method has an Async suffix (mandated by the interface contract), the
+    /// AES-GCM encryption performed here is CPU-bound and executes synchronously. The returned
+    /// Task wraps the completed result via <c>Task.FromResult</c>. Callers that need to avoid
+    /// blocking a thread pool thread should dispatch this call onto a dedicated thread (finding 788).
+>>>>>>> Stashed changes
     /// </remarks>
     public Task<byte[]> EncryptExtentAsync(ReadOnlyMemory<byte> extentData, InodeExtent extent, CancellationToken ct = default)
     {

@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
@@ -273,9 +274,13 @@ public sealed class MorphTransitionEngine
             throw new InvalidOperationException("Another morph transition is already in progress.");
         }
 
+        // Cat 9 (finding 753): declare target outside try so the OCE catch can write the WAL abort marker.
+        IAdaptiveIndex? target = null;
+        MorphTransition? transition = null;
+
         try
         {
-            var transition = new MorphTransition(source.CurrentLevel, targetLevel);
+            transition = new MorphTransition(source.CurrentLevel, targetLevel);
             _currentTransition = transition;
 
             // Phase 1: Preparing
@@ -284,7 +289,7 @@ public sealed class MorphTransitionEngine
             transition.TotalEntries = totalEntries;
 
             // Create target index at target level
-            var target = CreateIndexForLevel(targetLevel);
+            target = CreateIndexForLevel(targetLevel);
 
             // Write WAL MorphStart marker
             await WriteWalMarkerAsync(new MorphWalMarker
@@ -407,11 +412,23 @@ public sealed class MorphTransitionEngine
         }
         catch (OperationCanceledException)
         {
-            if (_currentTransition is { } t)
+            // Cat 9 (finding 753): write WAL abort marker so crash-recovery doesn't attempt to
+            // resume a cancelled transition.  AbortTransitionAsync requires an active target index;
+            // if target was never created (cancellation before CreateIndexForLevel), just mark state.
+            if (transition is not null && target is not null)
             {
-                t.ErrorMessage = "Transition cancelled.";
-                t.State = MorphTransitionState.Aborted;
-                t.EndTime = DateTimeOffset.UtcNow;
+                // Best-effort WAL abort — suppress any secondary exceptions to preserve original OCE.
+                try
+                {
+                    await AbortTransitionAsync(transition, target).ConfigureAwait(false);
+                }
+                catch { /* best-effort */ }
+            }
+            else if (transition is not null)
+            {
+                transition.ErrorMessage = "Transition cancelled before target was created.";
+                transition.State = MorphTransitionState.Aborted;
+                transition.EndTime = DateTimeOffset.UtcNow;
             }
             return null;
         }
@@ -489,9 +506,15 @@ public sealed class MorphTransitionEngine
         var buffer = new byte[MorphWalMarker.SerializedSize];
         marker.Serialize(buffer);
 
+        // Cat 1 (finding 755): use TransitionId (low 8 bytes of Guid) so crash-recovery can
+        // correlate WAL entries with the originating morph transition scope.
+        Span<byte> transitionIdBytes = stackalloc byte[16];
+        marker.TransitionId.TryWriteBytes(transitionIdBytes);
+        long correlationId = System.Buffers.Binary.BinaryPrimitives.ReadInt64LittleEndian(transitionIdBytes);
+
         var entry = new JournalEntry
         {
-            TransactionId = -1,
+            TransactionId = correlationId,
             Type = JournalEntryType.Checkpoint,
             TargetBlockNumber = marker.TargetRootBlock,
             BeforeImage = new byte[] { (byte)marker.SourceLevel },

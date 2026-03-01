@@ -48,11 +48,18 @@ internal sealed class GradleBuildStrategy : StorageProcessingStrategyBase
 
         var buildSuccessful = result.StandardOutput.Contains("BUILD SUCCESSFUL");
         var buildFailed = result.StandardOutput.Contains("BUILD FAILED");
+        // Finding 4250: a third state exists when neither marker appears (e.g. process crash, timeout,
+        // or unexpected output). Expose as a distinct "buildStatus" string so callers can distinguish.
+        var buildStatus = buildSuccessful ? "successful"
+            : buildFailed ? "failed"
+            : result.Success ? "completed-no-marker"
+            : "error";
 
         return CliProcessHelper.ToProcessingResult(result, query.Source, "gradle", new Dictionary<string, object?>
         {
             ["task"] = task, ["noDaemon"] = noDaemon, ["parallel"] = parallel,
             ["buildSuccessful"] = buildSuccessful, ["buildFailed"] = buildFailed,
+            ["buildStatus"] = buildStatus,
             ["usedWrapper"] = executable != "gradle"
         });
     }

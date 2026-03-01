@@ -232,8 +232,21 @@ public sealed class MongoDbWireProtocolStrategy : DatabaseProtocolStrategyBase
 
     private static string Normalize(string password)
     {
-        // SASLprep normalization (simplified)
-        return password;
+        // LOW-2723: Apply minimal SASLprep-compatible normalization per RFC 4013:
+        // 1. Map: normalize Unicode to NFC form (canonical decomposition, then canonical composition).
+        // 2. Map: map prohibited non-ASCII control characters to nothing (RFC 3454 C.1.2/C.2.1).
+        // Full SASLprep (bidirectional, surrogate pair checks) requires a dedicated library
+        // (e.g. Cyrus SASL or System.Text.Unicode). This handles the common ASCII+NFC case correctly.
+        if (string.IsNullOrEmpty(password)) return password;
+        var normalized = password.Normalize(System.Text.NormalizationForm.FormC);
+        // Strip RFC 3454 C.1.2 prohibited characters (non-ASCII control codes U+0080–U+009F).
+        var sb = new System.Text.StringBuilder(normalized.Length);
+        foreach (var ch in normalized)
+        {
+            if (ch >= 0x0080 && ch <= 0x009F) continue; // prohibited C1 controls
+            sb.Append(ch);
+        }
+        return sb.ToString();
     }
 
     private static byte[] Hi(string password, byte[] salt, int iterations)
@@ -641,13 +654,12 @@ public sealed class MongoDbWireProtocolStrategy : DatabaseProtocolStrategyBase
 
     private static string ReadCString(BinaryReader reader)
     {
-        var bytes = new List<byte>();
+        // LOW-2720: use a single MemoryStream to avoid List<byte> + ToArray() double allocation.
+        using var ms = new System.IO.MemoryStream(32);
         byte b;
         while ((b = reader.ReadByte()) != 0x00)
-        {
-            bytes.Add(b);
-        }
-        return Encoding.UTF8.GetString(bytes.ToArray());
+            ms.WriteByte(b);
+        return Encoding.UTF8.GetString(ms.GetBuffer(), 0, (int)ms.Length);
     }
 
     private object ReadBsonValue(BinaryReader reader, byte elementType)

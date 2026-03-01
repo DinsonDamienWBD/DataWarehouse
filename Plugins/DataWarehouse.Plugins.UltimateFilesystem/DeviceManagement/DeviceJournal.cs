@@ -245,15 +245,20 @@ public sealed class DeviceJournal : IAsyncDisposable
 
         entries.Sort((a, b) => a.SequenceNumber.CompareTo(b.SequenceNumber));
 
-        // Update next sequence number based on max found
+        // Update next sequence number based on max found.
+        // P2-2975: Use a CompareExchange loop so we only advance _nextSequenceNumber forward.
+        // A plain Read→check→Exchange is a TOCTOU race: a concurrent writer could increment
+        // the counter between our Read and Exchange, and Exchange would regress it to maxSeq.
         if (entries.Count > 0)
         {
             var maxSeq = entries[entries.Count - 1].SequenceNumber;
-            var current = Interlocked.Read(ref _nextSequenceNumber);
-            if (maxSeq >= current)
+            long current;
+            do
             {
-                Interlocked.Exchange(ref _nextSequenceNumber, maxSeq);
+                current = Interlocked.Read(ref _nextSequenceNumber);
+                if (maxSeq < current) break; // Already at or past this value — nothing to do.
             }
+            while (Interlocked.CompareExchange(ref _nextSequenceNumber, maxSeq, current) != current);
         }
 
         return entries.AsReadOnly();

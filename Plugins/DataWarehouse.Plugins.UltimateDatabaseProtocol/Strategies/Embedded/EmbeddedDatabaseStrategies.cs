@@ -503,8 +503,14 @@ public sealed class LevelDbProtocolStrategy : DatabaseProtocolStrategyBase
     private bool _createIfMissing = true;
     private bool _isOpen;
 
-    // LevelDB would typically use native bindings
-    // This is a simplified implementation using file-based storage
+    // P2-2695: LevelDB requires a native library (e.g. IronLevelDB, LevelDB.NET) for real LSM-tree
+    // behaviour including bloom filters, SSTable compaction, write-ahead log, and block cache.
+    // This implementation uses a flat-file directory store as a structural stand-in so the protocol
+    // contract is exercisable without a native dependency. Production deployments must replace this
+    // with a proper LevelDB binding.
+
+    /// <summary>LevelDB requires a native library — this filesystem stand-in is not production-ready.</summary>
+    public override bool IsProductionReady => false;
 
     /// <inheritdoc/>
     public override string StrategyId => "leveldb-native";
@@ -1118,6 +1124,12 @@ public sealed class BerkeleyDbProtocolStrategy : DatabaseProtocolStrategyBase
     private string _databasePath = "";
     private string _databaseType = "btree";
     private bool _isOpen;
+
+    // P2-2695: BerkeleyDB requires a native library for real B-tree/hash-tree storage.
+    // This is a filesystem stand-in. Production deployments must use a native BDB binding.
+
+    /// <summary>BerkeleyDB requires a native library — this filesystem stand-in is not production-ready.</summary>
+    public override bool IsProductionReady => false;
 
     /// <inheritdoc/>
     public override string StrategyId => "berkeleydb-native";

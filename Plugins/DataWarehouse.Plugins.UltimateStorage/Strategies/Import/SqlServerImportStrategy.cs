@@ -1,9 +1,11 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Data.SqlClient;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -23,7 +25,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Import
 
         public override string StrategyId => "sqlserver-import";
         public override string Name => "SQL Server Bulk Import";
-        public override bool IsProductionReady => false;
+        public override bool IsProductionReady => true;
         public override StorageTier Tier => StorageTier.Warm;
 
         public override StorageCapabilities Capabilities => new StorageCapabilities
@@ -58,13 +60,62 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Import
             EnsureInitialized();
             ValidateKey(key);
 
-            var tableName = key.Replace("sqlserver://", "");
+            // Key format: "sqlserver://<tableName>" or just "<tableName>".
+            var tableName = key.StartsWith("sqlserver://", StringComparison.OrdinalIgnoreCase)
+                ? key.Substring("sqlserver://".Length)
+                : key;
+
+            if (string.IsNullOrWhiteSpace(tableName))
+                throw new ArgumentException("Key must specify a target table name (e.g. 'sqlserver://Orders').", nameof(key));
+
+            // Validate table name to prevent SQL injection — must be identifier-safe.
+            if (!System.Text.RegularExpressions.Regex.IsMatch(tableName, @"^[\w][\w\s]*$"))
+                throw new ArgumentException($"Table name '{tableName}' contains invalid characters.", nameof(key));
+
+            using var reader = new StreamReader(data, Encoding.UTF8, leaveOpen: true);
+            var json = await reader.ReadToEndAsync(ct);
+
+            using var jsonDoc = JsonDocument.Parse(json);
+            var root = jsonDoc.RootElement;
+
+            // Accept either a JSON array of objects or a single JSON object.
+            var rows = root.ValueKind == JsonValueKind.Array
+                ? root.EnumerateArray().ToArray()
+                : new[] { root };
+
+            if (rows.Length == 0)
+            {
+                IncrementOperationCounter(StorageOperationType.Store);
+                return new StorageObjectMetadata { Key = key, Size = 0, Created = DateTime.UtcNow, Modified = DateTime.UtcNow, Tier = Tier };
+            }
+
+            // Build DataTable from first row to discover columns.
+            var dt = new System.Data.DataTable(tableName);
+            foreach (var prop in rows[0].EnumerateObject())
+                dt.Columns.Add(prop.Name);
+
+            foreach (var row in rows)
+            {
+                var dataRow = dt.NewRow();
+                foreach (var prop in row.EnumerateObject())
+                {
+                    if (dt.Columns.Contains(prop.Name))
+                        dataRow[prop.Name] = prop.Value.ValueKind == JsonValueKind.Null ? DBNull.Value : (object)prop.Value.ToString();
+                }
+                dt.Rows.Add(dataRow);
+            }
 
             using var connection = new SqlConnection(_connectionString);
             await connection.OpenAsync(ct);
 
-            using var reader = new StreamReader(data, Encoding.UTF8);
-            var json = await reader.ReadToEndAsync(ct);
+            using var bulkCopy = new SqlBulkCopy(connection)
+            {
+                DestinationTableName = $"[{tableName.Replace("]", "]]")}]",
+                BatchSize = _batchSize,
+                BulkCopyTimeout = _commandTimeout
+            };
+
+            await bulkCopy.WriteToServerAsync(dt, ct);
 
             IncrementBytesStored(json.Length);
             IncrementOperationCounter(StorageOperationType.Store);
@@ -75,8 +126,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Import
                 Size = json.Length,
                 Created = DateTime.UtcNow,
                 Modified = DateTime.UtcNow,
-                ETag = $"\"{HashCode.Combine(key):x}\"",
+                ETag = $"\"{Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(json))).ToLowerInvariant()}\"",
                 ContentType = "application/json",
+                CustomMetadata = metadata as IReadOnlyDictionary<string, string>,
                 Tier = Tier
             };
         }

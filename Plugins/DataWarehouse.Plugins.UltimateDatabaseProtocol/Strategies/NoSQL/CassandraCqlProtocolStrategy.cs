@@ -83,7 +83,9 @@ public sealed class CassandraCqlProtocolStrategy : DatabaseProtocolStrategyBase
     private const ushort ConsistencyLocalOne = 0x000A;
 
     // State
-    private byte _protocolVersion = 4;
+    // LOW-2719: use volatile to ensure _protocolVersion writes in PerformHandshakeAsync are
+    // visible to reads in subsequent async continuations executing on different threads.
+    private volatile byte _protocolVersion = 4;
     private int _streamId;
     private string _currentKeyspace = "";
     private readonly Dictionary<string, (byte[] id, ColumnMetadata[] columns)> _preparedStatements = new();

@@ -227,9 +227,14 @@ public sealed class CohereEmbeddingProvider : EmbeddingProviderBase
             var result = await GetEmbeddingAsync("test", ct);
             return result.Length > 0;
         }
-        catch
+        catch (OperationCanceledException)
         {
-            Debug.WriteLine($"Caught exception in CohereEmbeddingProvider.cs");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // P2-3121: Surface connectivity failures via Trace so they are visible in production.
+            Trace.TraceWarning($"[CohereEmbeddingProvider] ValidateConnectionAsync failed: {ex.GetType().Name}: {ex.Message}");
             return false;
         }
     }

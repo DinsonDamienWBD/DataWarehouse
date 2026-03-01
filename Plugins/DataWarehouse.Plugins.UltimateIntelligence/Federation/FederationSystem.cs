@@ -531,10 +531,11 @@ public sealed class InstanceRegistry : IAsyncDisposable
                         details = healthResponse;
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    Debug.WriteLine($"Caught exception in FederationSystem.cs");
-                    // Ignore JSON parsing errors
+                    // P2-3056: Surface JSON parse errors via Trace so health-check failures
+                    // are visible in production (Debug.WriteLine is stripped in Release builds).
+                    Trace.TraceWarning($"[FederationSystem] PerformHealthCheckAsync: failed to parse health response JSON: {ex.GetType().Name}: {ex.Message}");
                 }
 
                 result = new HealthCheckResult

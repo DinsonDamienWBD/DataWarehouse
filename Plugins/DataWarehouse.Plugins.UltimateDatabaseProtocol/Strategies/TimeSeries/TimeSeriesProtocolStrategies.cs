@@ -176,8 +176,16 @@ public sealed class InfluxDbLineProtocolStrategy : DatabaseProtocolStrategyBase
     protected override async Task<bool> PingCoreAsync(CancellationToken ct)
     {
         if (_httpClient == null) return false;
-        using var response = await _httpClient.GetAsync("/ping", ct);
-        return response.IsSuccessStatusCode;
+        // LOW-2758: catch HTTP exceptions so PingCoreAsync returns false rather than propagating.
+        try
+        {
+            using var response = await _httpClient.GetAsync("/ping", ct);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return false;
+        }
     }
 
     /// <inheritdoc/>

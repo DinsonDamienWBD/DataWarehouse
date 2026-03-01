@@ -234,9 +234,16 @@ public readonly struct Superblock
         }
 
         // Cat 14 (finding 790): validate blockSize against known Min/MaxBlockSize so that
+<<<<<<< Updated upstream
         // a corrupt superblock cannot propagate an extreme value into downstream allocations.
         if (blockSize < FormatConstants.MinBlockSize || blockSize > FormatConstants.MaxBlockSize ||
             (blockSize & (blockSize - 1)) != 0) // must be a power of two
+=======
+        // a corrupt or crafted superblock cannot propagate an extreme value into downstream
+        // allocations (stackalloc, array allocation, division by blockSize).
+        if (blockSize < FormatConstants.MinBlockSize || blockSize > FormatConstants.MaxBlockSize ||
+            (blockSize & (blockSize - 1)) != 0) // must be power of two
+>>>>>>> Stashed changes
         {
             return false;
         }

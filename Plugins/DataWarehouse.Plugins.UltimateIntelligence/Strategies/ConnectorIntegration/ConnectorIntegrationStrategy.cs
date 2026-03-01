@@ -29,6 +29,12 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
         private readonly List<IDisposable> _subscriptions = new();
         private ConnectorIntegrationMode _mode = ConnectorIntegrationMode.Disabled;
         private readonly BoundedDictionary<string, System.Net.Http.HttpClient> _httpClients = new BoundedDictionary<string, System.Net.Http.HttpClient>(1000);
+        // P2-3081: Shared HttpClient for registry health checks; avoids per-call socket exhaustion.
+        private static readonly System.Net.Http.HttpClient _registryHealthClient = new(new System.Net.Http.SocketsHttpHandler
+        {
+            PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+            ConnectTimeout = TimeSpan.FromSeconds(10)
+        }) { Timeout = TimeSpan.FromSeconds(5) };
 
         /// <summary>
         /// Gets or sets the connector registry endpoint URL.
@@ -181,10 +187,8 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
                     return false;
 
                 var registryEndpoint = ConnectorRegistryEndpoint;
-                using var httpClient = new System.Net.Http.HttpClient();
-                httpClient.Timeout = TimeSpan.FromSeconds(5);
-
-                using var response = await httpClient.GetAsync($"{registryEndpoint}/health", ct);
+                // P2-3081: Reuse shared static HttpClient to prevent socket exhaustion.
+                using var response = await _registryHealthClient.GetAsync($"{registryEndpoint}/health", ct);
                 return response.IsSuccessStatusCode;
             }
             catch

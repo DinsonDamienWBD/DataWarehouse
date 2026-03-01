@@ -844,12 +844,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         /// AD-11: Cryptographic integrity verification delegated to UltimateDataIntegrity via bus.
         /// Self-healing uses fast checksums for corruption detection; bus handles crypto-grade integrity.
         /// </summary>
-        private string ComputeChecksum(byte[] data, HashAlgorithmName algorithmName)
+        private static string ComputeChecksum(byte[] data, HashAlgorithmName algorithmName)
         {
-            var hash = new HashCode();
-            hash.AddBytes(data);
-            hash.Add(data.Length);
-            return hash.ToHashCode().ToString("x8");
+            using var ha = HashAlgorithm.Create(algorithmName.Name!)
+                ?? throw new ArgumentException($"Unsupported hash algorithm: {algorithmName.Name}", nameof(algorithmName));
+            return Convert.ToHexString(ha.ComputeHash(data)).ToLowerInvariant();
         }
 
         #endregion

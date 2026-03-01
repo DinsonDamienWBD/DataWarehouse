@@ -288,12 +288,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                     var uploadTask = new COSXMLUploadTask(_bucketName, key);
                     uploadTask.SetSrcPath(tempFile);
 
-                    // Set custom metadata directly on the upload task (PutObjectRequest is not used
-                    // for multipart uploads — metadata must be set on the upload task headers).
-                    // COSXMLUploadTask does not expose per-header metadata API;
-                    // custom metadata must be set via PutObjectRequest for small objects.
-                    // For large multipart uploads the metadata headers are not forwarded here.
-
                     var tcs = new TaskCompletionSource<bool>();
 
                     uploadTask.successCallback = (result) => tcs.TrySetResult(true);
@@ -301,6 +295,29 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
 
                     await _transferManager!.UploadAsync(uploadTask);
                     await tcs.Task;
+
+                    // The Tencent COS SDK's COSXMLUploadTask does not expose a public API
+                    // for setting custom metadata headers.  After the multipart upload completes,
+                    // apply metadata via a server-side CopyObject (metadata-replace) request.
+                    // This is the documented COS approach for updating metadata after upload.
+                    if (metadata != null && metadata.Count > 0)
+                    {
+                        var copyRequest = new COSXML.Model.Object.CopyObjectRequest(_bucketName, key);
+                        // Source = same object (required for metadata-replace copy)
+                        var sourceInfo = new COSXML.Model.Tag.CopySourceStruct(
+                            _appId, _bucketName, _region, key);
+                        copyRequest.SetCopySource(sourceInfo);
+                        copyRequest.SetCopyMetaDataDirective(COSXML.Common.CosMetaDataDirective.Replaced);
+                        foreach (var kvp in metadata)
+                        {
+                            var headerName = kvp.Key.StartsWith("x-cos-meta-", StringComparison.OrdinalIgnoreCase)
+                                ? kvp.Key
+                                : $"x-cos-meta-{kvp.Key}";
+                            copyRequest.SetRequestHeader(headerName, kvp.Value);
+                        }
+
+                        await Task.Run(() => _cosClient!.CopyObject(copyRequest), ct).ConfigureAwait(false);
+                    }
 
                     return true;
                 }, ct);

@@ -476,6 +476,12 @@ public sealed class CompressionDictionaryRegion
     public const ushort CurrentVersion = 1;
 
     /// <summary>
+    /// Maximum dictionary size allowed when reading from an untrusted block device (16 MiB).
+    /// Limits blast radius from corrupt on-disk dictSize values (finding 765).
+    /// </summary>
+    public const uint MaxDictionarySize = 16 * 1024 * 1024;
+
+    /// <summary>
     /// Stores a trained dictionary to the VDE block device at the specified region.
     /// </summary>
     /// <param name="dictionary">Dictionary bytes to store.</param>
@@ -580,6 +586,11 @@ public sealed class CompressionDictionaryRegion
         }
 
         uint dictSize = BitConverter.ToUInt32(firstBlock, dictSizeOffset);
+        // Cat 14 (finding 765): dictSize is read from an untrusted block device.  Casting a uint > Int32.MaxValue
+        // to int produces a negative value, causing negative allocations downstream.  Reject implausible sizes.
+        if (dictSize > MaxDictionarySize)
+            throw new InvalidDataException(
+                $"VDE trained-dictionary region at block {regionStart}: dictSize {dictSize} exceeds maximum {MaxDictionarySize}.");
         int fullPayloadSize = totalPayloadSize + (int)dictSize;
         int totalDataSize = fullPayloadSize + 8; // + XxHash64
 

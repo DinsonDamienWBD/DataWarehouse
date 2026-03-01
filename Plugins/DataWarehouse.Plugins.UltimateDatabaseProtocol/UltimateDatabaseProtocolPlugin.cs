@@ -43,6 +43,8 @@ public sealed class UltimateDatabaseProtocolPlugin : DataWarehouse.SDK.Contracts
     private readonly DatabaseProtocolStrategyRegistry _registry;
     private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private readonly object _statsLock = new();
+    // LOW-2757: cache DeclaredCapabilities so the per-call strategy enumeration doesn't run on every access.
+    private IReadOnlyList<RegisteredCapability>? _cachedCapabilities;
     private bool _disposed;
     private bool _initialized;
 
@@ -92,6 +94,10 @@ public sealed class UltimateDatabaseProtocolPlugin : DataWarehouse.SDK.Contracts
     {
         get
         {
+            // LOW-2757: lazily compute and cache the capabilities list.
+            // Strategy enumeration is expensive; caching avoids repeated allocations per call.
+            if (_cachedCapabilities != null) return _cachedCapabilities;
+
             var capabilities = new List<RegisteredCapability>
             {
                 // Main plugin capability
@@ -139,7 +145,8 @@ public sealed class UltimateDatabaseProtocolPlugin : DataWarehouse.SDK.Contracts
                 });
             }
 
-            return capabilities.AsReadOnly();
+            _cachedCapabilities = capabilities.AsReadOnly();
+            return _cachedCapabilities;
         }
     }
 

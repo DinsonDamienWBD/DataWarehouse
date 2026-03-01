@@ -155,8 +155,15 @@ public static class NamespaceAuthority
         prefixUtf8.AsSpan(0, Math.Min(prefixUtf8.Length, NamespaceRegistration.PrefixSize))
             .CopyTo(prefixBytes);
 
+<<<<<<< Updated upstream
         // Cat 15 (finding 839): Generate a random (not deterministic) UUID for this namespace.
         // Namespace UUIDs must be unique per registration; they are not derived from prefix/authority.
+=======
+        // Cat 15 (finding 839): Generate a random UUID (v4) for this namespace. The previous
+        // comment said "deterministic" which was incorrect — Guid.NewGuid() is non-deterministic.
+        // Namespace UUIDs must be unique per registration and are not derived from the prefix/authority,
+        // so random generation is the correct behaviour here.
+>>>>>>> Stashed changes
         var namespaceUuid = Guid.NewGuid();
 
         // Build padded authority bytes

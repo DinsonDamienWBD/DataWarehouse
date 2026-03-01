@@ -422,6 +422,17 @@ public sealed class ActiveLineageStrategy : IntelligenceStrategyBase
 
         return Math.Min(1.0f, (criticalWeight + highWeight + mediumWeight) / 10f);
     }
+
+    /// <inheritdoc/>
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            // P2-3103: Dispose ReaderWriterLockSlim to release kernel synchronization resources.
+            _graphLock.Dispose();
+        }
+        base.Dispose(disposing);
+    }
 }
 
 #endregion

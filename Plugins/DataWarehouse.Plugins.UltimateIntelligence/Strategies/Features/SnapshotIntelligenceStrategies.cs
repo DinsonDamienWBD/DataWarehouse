@@ -730,10 +730,15 @@ public sealed class SnapshotFederationStrategy : FeatureStrategyBase
                         Metadata = s.Metadata
                     }));
                 }
-                catch
+                catch (OperationCanceledException)
                 {
-                    Debug.WriteLine($"Caught exception in SnapshotIntelligenceStrategies.cs");
-                    // Log but continue with other sources
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    // P2-3119: Surface federation failures via Trace (visible in Release builds).
+                    Trace.TraceWarning($"[SnapshotFederationStrategy] Failed to get snapshots from source '{source.SourceId}': {ex.GetType().Name}: {ex.Message}");
+                    // Continue collecting from other sources
                 }
             }
 

@@ -228,10 +228,12 @@ public sealed class KnowledgeAggregator : IDisposable
                 {
                     throw;
                 }
-                catch
+                catch (Exception ex)
                 {
-                    Debug.WriteLine($"Caught exception in KnowledgeSystem.cs");
-                    // Source failed, skip but continue with others
+                    // P2-3082: Include source ID and exception details in warning so failures are
+                    // actionable in production (Trace is visible in Release; Debug.WriteLine is not).
+                    Trace.TraceWarning($"[KnowledgeSystem] GetAllKnowledgeAsync: source '{source.SourceId}' failed: {ex.GetType().Name}: {ex.Message}");
+                    // Continue collecting from remaining sources
                 }
             }
 
