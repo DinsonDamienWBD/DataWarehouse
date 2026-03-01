@@ -206,19 +206,39 @@ public sealed class CatalogScalingManager : IScalableSubsystem, IDisposable
         ArgumentOutOfRangeException.ThrowIfNegative(offset);
         ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
 
-        var allItems = new List<KeyValuePair<string, byte[]>>();
-        foreach (var shard in _assetShards.Values)
+        // P2-2220: Stream across shards without materializing entire dataset.
+        // Compute total count as sum of shard counts, then skip/take at shard-level granularity.
+        var shards = _assetShards.Values.ToArray(); // snapshot shard references
+        int totalCount = 0;
+        foreach (var shard in shards)
+            totalCount += shard.Count;
+
+        var page = new List<KeyValuePair<string, byte[]>>(Math.Min(limit, totalCount));
+        int remaining = offset;
+        int needed = limit;
+
+        foreach (var shard in shards)
         {
+            if (needed <= 0) break;
+            int shardCount = shard.Count;
+            if (remaining >= shardCount)
+            {
+                remaining -= shardCount;
+                continue;
+            }
+            // Enumerate only the needed portion of this shard
+            int skipInShard = remaining;
+            remaining = 0;
             foreach (var kvp in shard)
             {
-                allItems.Add(kvp);
+                if (skipInShard > 0) { skipInShard--; continue; }
+                if (needed <= 0) break;
+                page.Add(kvp);
+                needed--;
             }
         }
 
-        int totalCount = allItems.Count;
-        var page = allItems.Skip(offset).Take(limit).ToList();
         bool hasMore = offset + limit < totalCount;
-
         return new PagedResult<KeyValuePair<string, byte[]>>(page, totalCount, hasMore);
     }
 

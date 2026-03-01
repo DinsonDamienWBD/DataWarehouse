@@ -581,25 +581,88 @@ public sealed class RelationshipDiscoveryStrategy : DataCatalogStrategyBase
 
         var discovered = new List<DiscoveredRelationship>();
 
-        // Get snapshot of all other asset columns
+        // P2-2222: Build reverse index (column_name_lower → assetId set) under the lock
+        // to replace the O(N×M²) triple-nested loop with O(M) exact/stripped lookups.
+        Dictionary<string, List<(string assetId, string originalName)>> colIndex;
         Dictionary<string, HashSet<string>> otherAssets;
         lock (_columnsLock)
         {
             otherAssets = _assetColumns
                 .Where(kv => !string.Equals(kv.Key, assetId, StringComparison.OrdinalIgnoreCase))
                 .ToDictionary(kv => kv.Key, kv => new HashSet<string>(kv.Value, StringComparer.OrdinalIgnoreCase));
+
+            // Build: lowerColumnName → [(targetAssetId, originalName)]
+            colIndex = new Dictionary<string, List<(string, string)>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (tgtId, tgtCols) in otherAssets)
+            {
+                foreach (var col in tgtCols)
+                {
+                    var key = col.ToLowerInvariant();
+                    if (!colIndex.TryGetValue(key, out var list))
+                        colIndex[key] = list = new List<(string, string)>();
+                    list.Add((tgtId, col));
+                }
+            }
         }
 
+        // Fast pass: exact name match and stripped-suffix match using the index
+        var emitted = new HashSet<(string, string, string, string)>(); // de-duplicate
+        foreach (var srcCol in sourceColumns)
+        {
+            var srcLower = srcCol.ToLowerInvariant();
+            var srcStripped = StripIdSuffix(srcLower);
+
+            // Exact match
+            if (colIndex.TryGetValue(srcLower, out var exactMatches))
+            {
+                foreach (var (tgtId, tgtCol) in exactMatches)
+                {
+                    var key = (assetId, tgtId, srcCol, tgtCol);
+                    if (emitted.Add(key))
+                        discovered.Add(new DiscoveredRelationship(assetId, tgtId, srcCol, tgtCol, 1.0, "foreign_key"));
+                }
+            }
+
+            // Stripped-suffix match (both have _id suffix with same root)
+            if (srcStripped != srcLower)
+            {
+                // e.g. srcCol = "user_id" → look for other columns named "user_id" (exact, already handled) or "user"
+                if (colIndex.TryGetValue(srcStripped, out var strippedMatches))
+                {
+                    foreach (var (tgtId, tgtCol) in strippedMatches)
+                    {
+                        var key = (assetId, tgtId, srcCol, tgtCol);
+                        if (emitted.Add(key))
+                            discovered.Add(new DiscoveredRelationship(assetId, tgtId, srcCol, tgtCol, 0.7, "reference"));
+                    }
+                }
+
+                // Also find tgt columns with the same stripped root (user_id ↔ user_id already done; user_id ↔ order_user_id needs full scan — skip Jaccard for large sets)
+            }
+        }
+
+        // Jaccard pass: for pairs not already emitted, run full Jaccard over remaining column pairs
+        // Only scan assets with multi-token column names to limit combinatorial blow-up.
         foreach (var (targetAssetId, targetColumns) in otherAssets)
         {
             foreach (var srcCol in sourceColumns)
             {
+                var srcTokens = TokenizeColumnName(srcCol.ToLowerInvariant());
+                if (srcTokens.Count <= 1) continue; // single-token names only match via exact — already handled
+
                 foreach (var tgtCol in targetColumns)
                 {
-                    var relationship = EvaluateColumnPair(assetId, targetAssetId, srcCol, tgtCol);
-                    if (relationship is not null)
+                    var tgtTokens = TokenizeColumnName(tgtCol.ToLowerInvariant());
+                    if (tgtTokens.Count <= 1) continue;
+
+                    var dedup = (assetId, targetAssetId, srcCol, tgtCol);
+                    if (emitted.Contains(dedup)) continue;
+
+                    double jaccard = ComputeJaccard(srcTokens, tgtTokens);
+                    if (jaccard > 0.5)
                     {
-                        discovered.Add(relationship);
+                        emitted.Add(dedup);
+                        discovered.Add(new DiscoveredRelationship(assetId, targetAssetId, srcCol, tgtCol, jaccard * 0.6, "derived"));
                     }
                 }
             }
