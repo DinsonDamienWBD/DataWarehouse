@@ -72,11 +72,14 @@ public sealed class PerExtentEncryptor : IDisposable
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
     /// Cat 15 (finding 788): Although this method has an Async suffix (required by the interface),
     /// AES-GCM encryption is CPU-bound and executes synchronously. The returned Task wraps the
     /// result via <c>Task.FromResult</c>. Callers that need non-blocking behaviour should offload
     /// this call via <c>Task.Run</c> or a dedicated worker thread.
 =======
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
 =======
@@ -87,6 +90,9 @@ public sealed class PerExtentEncryptor : IDisposable
     /// blocking a thread pool thread should dispatch this call onto a dedicated thread (finding 788).
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
