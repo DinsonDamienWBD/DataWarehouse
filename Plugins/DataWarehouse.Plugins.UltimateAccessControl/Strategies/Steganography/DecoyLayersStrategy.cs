@@ -206,15 +206,12 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
                 // Extract embedded data
                 var embeddedData = ExtractEmbeddedData(carrierData);
 
-                // Derive key from password
-                var key = DeriveKey(password);
-
                 // Find and decrypt matching layer
                 var layers = ParseLayers(embeddedData);
 
                 foreach (var layer in layers)
                 {
-                    if (TryDecryptLayer(layer, key, out var decryptedData))
+                    if (TryDecryptLayer(layer, password, out var decryptedData))
                     {
                         return new LayerExtractionResult
                         {
@@ -404,8 +401,11 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
 
             foreach (var layer in layers)
             {
-                var key = DeriveKey(layer.Password);
-                var encryptedData = EncryptLayerData(layer.Content, key);
+                var encryptedData = EncryptLayerData(layer.Content, layer.Password);
+                // Derive key separately (using a fresh salt) only for the key hash — it is stored
+                // purely for lookup; the real per-call salt is embedded in encryptedData.
+                var hashSalt = Array.Empty<byte>();
+                var key = DeriveKey(layer.Password, ref hashSalt);
 
                 processed.Add(new ProcessedLayer
                 {
@@ -601,11 +601,20 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
             return layers;
         }
 
-        private bool TryDecryptLayer(ProcessedLayer layer, byte[] key, out byte[] decryptedData)
+        private bool TryDecryptLayer(ProcessedLayer layer, string password, out byte[] decryptedData)
         {
             decryptedData = Array.Empty<byte>();
 
-            // Verify key hash matches
+            // Verify key hash (derived with a fresh salt from the stored salt in encryptedData prefix)
+            // Note: the real per-call salt is embedded inside layer.EncryptedData (first 16 bytes).
+            // We extract it here to derive the same key for the hash comparison.
+            if (layer.EncryptedData.Length < 16)
+                return false;
+
+            var storedSalt = new byte[16];
+            Buffer.BlockCopy(layer.EncryptedData, 0, storedSalt, 0, 16);
+            var key = DeriveKey(password, ref storedSalt);
+
             var computedHash = ComputeKeyHash(key);
             if (!CryptographicOperations.FixedTimeEquals(computedHash, layer.KeyHash))
             {
@@ -614,7 +623,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
 
             try
             {
-                decryptedData = DecryptLayerData(layer.EncryptedData, key);
+                decryptedData = DecryptLayerData(layer.EncryptedData, password);
                 return decryptedData.Length > 0;
             }
             catch
@@ -623,22 +632,44 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
             }
         }
 
-        private byte[] DeriveKey(string password)
+        /// <summary>
+        /// Derives a 32-byte AES key from a password using PBKDF2-SHA256 with a random per-call salt.
+        /// </summary>
+        /// <param name="password">The password to derive from.</param>
+        /// <param name="salt">
+        /// On entry: if non-empty, used as the salt (for decryption, where the salt is read from stored data).
+        /// On exit: the 16-byte salt that was used (for callers that need to store it alongside ciphertext).
+        /// </param>
+        private static byte[] DeriveKey(string password, ref byte[] salt)
         {
-            var salt = Encoding.UTF8.GetBytes("DecoyLayersSalt2024");
+            // LOW-1325: Use a per-call random salt instead of a static "DecoyLayersSalt2024" salt.
+            // A shared static salt weakens PBKDF2 by allowing precomputed rainbow-table attacks.
+            if (salt.Length == 0)
+            {
+                salt = RandomNumberGenerator.GetBytes(16);
+            }
             return Rfc2898DeriveBytes.Pbkdf2(password, salt, 100000, HashAlgorithmName.SHA256, 32);
         }
 
-        private byte[] EncryptLayerData(byte[] data, byte[] key)
+        /// <summary>
+        /// Encrypts layer data with AES-CBC. The returned blob has layout:
+        /// [16-byte salt][16-byte IV][ciphertext]
+        /// The salt enables per-call PBKDF2 key derivation during decryption.
+        /// </summary>
+        private static byte[] EncryptLayerData(byte[] data, string password)
         {
+            var salt = Array.Empty<byte>();
+            var key = DeriveKey(password, ref salt);
+
             using var aes = Aes.Create();
             aes.Key = key;
             aes.GenerateIV();
             aes.Mode = CipherMode.CBC;
             aes.Padding = PaddingMode.PKCS7;
 
-            using var ms = new MemoryStream(65536);
-            ms.Write(aes.IV, 0, 16);
+            using var ms = new MemoryStream(16 + 16 + data.Length + 16);
+            ms.Write(salt, 0, 16);   // prepend salt for decryption
+            ms.Write(aes.IV, 0, 16); // prepend IV
 
             using (var cs = new CryptoStream(ms, aes.CreateEncryptor(), CryptoStreamMode.Write))
             {
@@ -648,10 +679,19 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
             return ms.ToArray();
         }
 
-        private byte[] DecryptLayerData(byte[] encryptedData, byte[] key)
+        /// <summary>
+        /// Decrypts layer data encrypted with <see cref="EncryptLayerData"/>.
+        /// Expects layout: [16-byte salt][16-byte IV][ciphertext]
+        /// </summary>
+        private static byte[] DecryptLayerData(byte[] encryptedData, string password)
         {
-            if (encryptedData.Length < 17)
+            if (encryptedData.Length < 33) // 16 salt + 16 IV + at least 1 byte ciphertext
                 throw new InvalidDataException("Encrypted data too short");
+
+            // Extract the per-call salt stored at the front of the blob
+            var salt = new byte[16];
+            Buffer.BlockCopy(encryptedData, 0, salt, 0, 16);
+            var key = DeriveKey(password, ref salt);
 
             using var aes = Aes.Create();
             aes.Key = key;
@@ -659,13 +699,13 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
             aes.Padding = PaddingMode.PKCS7;
 
             var iv = new byte[16];
-            Buffer.BlockCopy(encryptedData, 0, iv, 0, 16);
+            Buffer.BlockCopy(encryptedData, 16, iv, 0, 16);
             aes.IV = iv;
 
-            using var ms = new MemoryStream(65536);
+            using var ms = new MemoryStream(encryptedData.Length - 32);
             using (var cs = new CryptoStream(ms, aes.CreateDecryptor(), CryptoStreamMode.Write))
             {
-                cs.Write(encryptedData, 16, encryptedData.Length - 16);
+                cs.Write(encryptedData, 32, encryptedData.Length - 32);
             }
 
             return ms.ToArray();

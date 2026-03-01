@@ -122,8 +122,14 @@ public sealed class InMemoryTieredMemorySystem
                 // Boost by tier (higher tiers = more important)
                 relevance += (int)tier * 0.1f;
 
-                entry.AccessCount++;
-                entry.LastAccessedAt = DateTime.UtcNow;
+                // P2-3229: AccessCount and LastAccessedAt are mutable fields on a shared entry
+                // that may be accessed by concurrent recalls. Lock on the entry itself (a
+                // reference-type record) to make the read-modify-write atomic.
+                lock (entry)
+                {
+                    entry.AccessCount++;
+                    entry.LastAccessedAt = DateTime.UtcNow;
+                }
 
                 results.Add(new RetrievedMemory
                 {

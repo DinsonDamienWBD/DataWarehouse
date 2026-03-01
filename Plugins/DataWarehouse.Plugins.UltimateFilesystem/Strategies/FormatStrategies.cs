@@ -179,7 +179,7 @@ public sealed class F2FsStrategy : FilesystemStrategyBase
             if (!File.Exists("/proc/mounts"))
                 return Task.FromResult<FilesystemMetadata?>(null);
 
-            var mounts = File.ReadAllLines("/proc/mounts");
+            var mounts = File.ReadLines("/proc/mounts");
             var normalizedPath = Path.GetFullPath(path);
 
             foreach (var line in mounts)
@@ -266,7 +266,7 @@ public sealed class Ext3Strategy : FilesystemStrategyBase
             if (!File.Exists("/proc/mounts"))
                 return Task.FromResult<FilesystemMetadata?>(null);
 
-            var mounts = File.ReadAllLines("/proc/mounts");
+            var mounts = File.ReadLines("/proc/mounts");
             var normalizedPath = Path.GetFullPath(path);
 
             foreach (var line in mounts)
@@ -353,7 +353,7 @@ public sealed class Ext2Strategy : FilesystemStrategyBase
             if (!File.Exists("/proc/mounts"))
                 return Task.FromResult<FilesystemMetadata?>(null);
 
-            var mounts = File.ReadAllLines("/proc/mounts");
+            var mounts = File.ReadLines("/proc/mounts");
             var normalizedPath = Path.GetFullPath(path);
 
             foreach (var line in mounts)
@@ -591,7 +591,7 @@ public sealed class Ocfs2Strategy : FilesystemStrategyBase
             if (!File.Exists("/proc/mounts"))
                 return Task.FromResult<FilesystemMetadata?>(null);
 
-            var mounts = File.ReadAllLines("/proc/mounts");
+            var mounts = File.ReadLines("/proc/mounts");
             var normalizedPath = Path.GetFullPath(path);
 
             foreach (var line in mounts)
@@ -678,7 +678,7 @@ public sealed class TmpfsStrategy : FilesystemStrategyBase
             if (!File.Exists("/proc/mounts"))
                 return Task.FromResult<FilesystemMetadata?>(null);
 
-            var mounts = File.ReadAllLines("/proc/mounts");
+            var mounts = File.ReadLines("/proc/mounts");
             var normalizedPath = Path.GetFullPath(path);
 
             foreach (var line in mounts)

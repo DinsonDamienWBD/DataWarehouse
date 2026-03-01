@@ -23,6 +23,14 @@ public sealed class SmartMonitor
     private readonly ILogger _logger;
 
     /// <summary>
+    /// LOW-2989: Maximum uncorrectable errors before the drive is considered unhealthy.
+    /// Industry best practice: 0 or 1 (any uncorrectable error is critical for storage devices).
+    /// Configurable so operators can adjust for specific drive models or test environments.
+    /// Default: 1 (first uncorrectable error triggers unhealthy status).
+    /// </summary>
+    public long MaxUncorrectableErrors { get; set; } = 1;
+
+    /// <summary>
     /// Initializes a new SmartMonitor with an optional logger.
     /// </summary>
     /// <param name="logger">Logger for diagnostics. Uses NullLogger if null.</param>
@@ -162,7 +170,8 @@ public sealed class SmartMonitor
         }
 
         // Health assessment: healthy if no extreme values
-        isHealthy = temperature < 85 && wearLevelPercent < 100 && uncorrectableErrors < 100;
+        // LOW-2989: use configurable MaxUncorrectableErrors (default 1) instead of magic 100.
+        isHealthy = temperature < 85 && wearLevelPercent < 100 && uncorrectableErrors <= MaxUncorrectableErrors;
 
         TimeSpan? estimatedLife = null;
         if (wearLevelPercent > 0 && wearLevelPercent < 100)

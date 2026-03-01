@@ -49,7 +49,18 @@ public sealed class WeaviateVectorStrategy : VectorStoreStrategyBase
     }
 
     private string GetHost() => GetConfig("Host") ?? DefaultHost;
-    private string GetClassName() => GetConfig("ClassName") ?? DefaultClassName;
+
+    private string GetClassName()
+    {
+        var name = GetConfig("ClassName") ?? DefaultClassName;
+        // P2-3239: Sanitize className before embedding in GraphQL query.
+        // Weaviate class names must be alphanumeric + underscore.
+        // Reject any value containing characters that could break the query structure.
+        if (!System.Text.RegularExpressions.Regex.IsMatch(name, @"^[A-Za-z][A-Za-z0-9_]*$"))
+            throw new InvalidOperationException(
+                $"[WeaviateVectorStrategy] Invalid ClassName '{name}': must match ^[A-Za-z][A-Za-z0-9_]*$");
+        return name;
+    }
 
     /// <inheritdoc/>
     public override async Task StoreAsync(string id, float[] vector, Dictionary<string, object>? metadata = null, CancellationToken ct = default)

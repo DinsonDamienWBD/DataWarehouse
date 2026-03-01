@@ -853,6 +853,12 @@ public sealed class RocksDbPersistenceBackend : IProductionPersistenceBackend
             sizeByTier[tier] = cf.Values.Sum(r => r.SizeBytes);
         }
 
+        // P2-3177: Read _snapshots.Count under _snapshotLock — _snapshots is a List<T>
+        // that is only ever mutated inside _snapshotLock; reading Count without the lock
+        // can produce a stale value after a concurrent Add resizes the internal array.
+        int snapshotCountSafe;
+        lock (_snapshotLock) { snapshotCountSafe = _snapshots.Count; }
+
         return Task.FromResult(new PersistenceStatistics
         {
             BackendId = BackendId,
@@ -879,7 +885,7 @@ public sealed class RocksDbPersistenceBackend : IProductionPersistenceBackend
             CustomMetrics = new Dictionary<string, object>
             {
                 ["walQueueSize"] = _walQueue.Count,
-                ["snapshotCount"] = _snapshots.Count,
+                ["snapshotCount"] = snapshotCountSafe,
                 ["scopeIndexSize"] = _scopeIndex.Count,
                 ["tagIndexSize"] = _tagIndex.Count
             }

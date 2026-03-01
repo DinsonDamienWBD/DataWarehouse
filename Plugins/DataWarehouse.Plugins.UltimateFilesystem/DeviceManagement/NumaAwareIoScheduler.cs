@@ -270,8 +270,8 @@ public sealed class NumaAwareIoScheduler
             {
                 try
                 {
-                    // Set affinity on the current process thread as approximation
-                    if (thread.Id == currentThreadId || thread.ThreadState == System.Diagnostics.ThreadState.Running)
+                    // LOW-2984: match only the current managed thread; ThreadState.Running could be any thread.
+                    if (thread.Id == currentThreadId)
                     {
                         thread.ProcessorAffinity = new IntPtr(1L << coreId);
                         break;

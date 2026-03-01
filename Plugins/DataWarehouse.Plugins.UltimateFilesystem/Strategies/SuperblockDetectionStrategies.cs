@@ -107,6 +107,21 @@ internal static class SuperblockReader
     /// </summary>
     public static string? ResolveDevicePath(string path)
     {
+        // P2-3026: validate caller-supplied path before resolving to a raw device.
+        // Reject null/empty, path-traversal sequences, and UNC-style raw device paths
+        // that could expose arbitrary block devices in elevated contexts.
+        if (string.IsNullOrWhiteSpace(path))
+            return null;
+        var normalised = Path.GetFullPath(path);
+        if (normalised.Contains("..", StringComparison.Ordinal))
+            return null;
+        // Block direct raw device path injection (\\.\PhysicalDriveN, \\.\X:, /dev/sdX etc.)
+        // when the input path is NOT an existing file (image) — callers must use a mount point.
+        var isRawDeviceInput = path.StartsWith(@"\\.\", StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith("/dev/", StringComparison.Ordinal);
+        if (isRawDeviceInput && !File.Exists(path))
+            return null;
+
         try
         {
             // If path is already a device or image file, use it directly

@@ -252,9 +252,11 @@ public sealed class TopicModelIndex : ContextIndexBase
                 {
                     if (_topics.TryGetValue(topicId, out var topic))
                     {
+                        // P2-3182: Guard DocumentCount from going negative if concurrent
+                        // removes race or if AddToIndex was never called for this entry.
                         _topics[topicId] = topic with
                         {
-                            DocumentCount = topic.DocumentCount - 1,
+                            DocumentCount = Math.Max(0, topic.DocumentCount - 1),
                             LastUpdated = DateTimeOffset.UtcNow
                         };
                     }

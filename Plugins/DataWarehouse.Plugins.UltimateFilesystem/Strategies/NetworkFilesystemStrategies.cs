@@ -34,7 +34,7 @@ public sealed class NfsStrategy : FilesystemStrategyBase
             if (!File.Exists("/proc/mounts"))
                 return Task.FromResult<FilesystemMetadata?>(null);
 
-            var mounts = File.ReadAllLines("/proc/mounts");
+            var mounts = File.ReadLines("/proc/mounts");
             var normalizedPath = Path.GetFullPath(path);
 
             foreach (var line in mounts)
@@ -154,7 +154,7 @@ public sealed class SmbStrategy : FilesystemStrategyBase
                 // Parse /proc/mounts for cifs/smb
                 if (File.Exists("/proc/mounts"))
                 {
-                    var mounts = File.ReadAllLines("/proc/mounts");
+                    var mounts = File.ReadLines("/proc/mounts");
                     var normalizedPath = Path.GetFullPath(path);
 
                     foreach (var line in mounts)
@@ -248,7 +248,7 @@ public sealed class GlusterFsStrategy : FilesystemStrategyBase
             if (!File.Exists("/proc/mounts"))
                 return Task.FromResult<FilesystemMetadata?>(null);
 
-            var mounts = File.ReadAllLines("/proc/mounts");
+            var mounts = File.ReadLines("/proc/mounts");
             var normalizedPath = Path.GetFullPath(path);
 
             foreach (var line in mounts)
@@ -335,7 +335,7 @@ public sealed class CephFsStrategy : FilesystemStrategyBase
             if (!File.Exists("/proc/mounts"))
                 return Task.FromResult<FilesystemMetadata?>(null);
 
-            var mounts = File.ReadAllLines("/proc/mounts");
+            var mounts = File.ReadLines("/proc/mounts");
             var normalizedPath = Path.GetFullPath(path);
 
             foreach (var line in mounts)
@@ -423,7 +423,7 @@ public sealed class LustreStrategy : FilesystemStrategyBase
             if (!File.Exists("/proc/mounts"))
                 return Task.FromResult<FilesystemMetadata?>(null);
 
-            var mounts = File.ReadAllLines("/proc/mounts");
+            var mounts = File.ReadLines("/proc/mounts");
             var normalizedPath = Path.GetFullPath(path);
 
             foreach (var line in mounts)
@@ -511,7 +511,7 @@ public sealed class GpfsStrategy : FilesystemStrategyBase
             if (!File.Exists("/proc/mounts"))
                 return Task.FromResult<FilesystemMetadata?>(null);
 
-            var mounts = File.ReadAllLines("/proc/mounts");
+            var mounts = File.ReadLines("/proc/mounts");
             var normalizedPath = Path.GetFullPath(path);
 
             foreach (var line in mounts)
@@ -599,7 +599,7 @@ public sealed class BeeGfsStrategy : FilesystemStrategyBase
             if (!File.Exists("/proc/mounts"))
                 return Task.FromResult<FilesystemMetadata?>(null);
 
-            var mounts = File.ReadAllLines("/proc/mounts");
+            var mounts = File.ReadLines("/proc/mounts");
             var normalizedPath = Path.GetFullPath(path);
 
             foreach (var line in mounts)

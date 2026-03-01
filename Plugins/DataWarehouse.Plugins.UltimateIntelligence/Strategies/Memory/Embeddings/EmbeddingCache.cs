@@ -22,6 +22,7 @@ public sealed class EmbeddingCache : IDisposable
     private readonly object _lruLock = new();
     private readonly int _maxEntries;
     private readonly TimeSpan _defaultTtl;
+    private readonly TimeSpan _cleanupInterval;
     private readonly Timer _cleanupTimer;
     private readonly CacheStatistics _statistics = new();
     private bool _disposed;
@@ -57,9 +58,8 @@ public sealed class EmbeddingCache : IDisposable
 
         _maxEntries = maxEntries;
         _defaultTtl = defaultTtl ?? TimeSpan.FromHours(1);
-
-        var interval = cleanupInterval ?? TimeSpan.FromMinutes(5);
-        _cleanupTimer = new Timer(CleanupExpiredEntries, null, interval, interval);
+        _cleanupInterval = cleanupInterval ?? TimeSpan.FromMinutes(5);
+        _cleanupTimer = new Timer(CleanupExpiredEntries, null, _cleanupInterval, _cleanupInterval);
     }
 
     /// <summary>
@@ -216,11 +216,22 @@ public sealed class EmbeddingCache : IDisposable
     /// </summary>
     public void Clear()
     {
-        lock (_lruLock)
+        // Finding 3126: Suspend the cleanup timer while clearing to prevent it from firing
+        // on an empty cache and racing with concurrent insertions during reset.
+        _cleanupTimer.Change(Timeout.Infinite, Timeout.Infinite);
+        try
         {
-            _cache.Clear();
-            _lruList.Clear();
-            _statistics.TotalBytesStored = 0;
+            lock (_lruLock)
+            {
+                _cache.Clear();
+                _lruList.Clear();
+                _statistics.TotalBytesStored = 0;
+            }
+        }
+        finally
+        {
+            // Restart the timer with the same interval used at construction.
+            _cleanupTimer.Change(_cleanupInterval, _cleanupInterval);
         }
     }
 

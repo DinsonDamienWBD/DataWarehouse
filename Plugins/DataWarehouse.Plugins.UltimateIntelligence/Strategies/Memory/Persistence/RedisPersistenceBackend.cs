@@ -806,7 +806,10 @@ public sealed class RedisPersistenceBackend : IProductionPersistenceBackend
             AvgWriteLatencyMs = _metrics.AvgWriteLatencyMs,
             P99ReadLatencyMs = _metrics.P99ReadLatencyMs,
             P99WriteLatencyMs = _metrics.P99WriteLatencyMs,
-            ActiveConnections = _activeConnections,
+            // P2-3178: Use Volatile.Read so the compiler/CPU cannot cache a stale value.
+            // _activeConnections is mutated exclusively via Interlocked so only a memory
+            // visibility barrier is needed; no additional lock is required.
+            ActiveConnections = Volatile.Read(ref _activeConnections),
             ConnectionPoolSize = _config.ConnectionPoolSize,
             IsHealthy = IsConnected,
             HealthCheckTime = DateTimeOffset.UtcNow,

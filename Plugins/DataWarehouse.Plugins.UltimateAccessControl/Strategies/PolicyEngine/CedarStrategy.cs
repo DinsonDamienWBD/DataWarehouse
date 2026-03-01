@@ -36,8 +36,12 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
     /// </remarks>
     public sealed class CedarStrategy : AccessControlStrategyBase
     {
+        // LOW-1311: Shared static HttpClient reuses connections via the connection pool, avoiding
+        // socket exhaustion from creating a new instance per strategy activation.
+        private static readonly HttpClient SharedHttpClient = new();
+
         private readonly BoundedDictionary<string, CedarPolicy> _policies = new BoundedDictionary<string, CedarPolicy>(1000);
-        private readonly HttpClient _httpClient = new();
+        private readonly HttpClient _httpClient = SharedHttpClient;
         private string? _cedarEndpoint;
         private TimeSpan _requestTimeout = TimeSpan.FromSeconds(5);
         private bool _useLocalEvaluation = true;

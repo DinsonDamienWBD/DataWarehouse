@@ -1014,8 +1014,10 @@ public sealed class DistributedMemoryStore : IPersistentMemoryStore
     {
         var tasks = _shards.Select(s => s.GetEntryCountAsync(scopeFilter, ct));
         var counts = await Task.WhenAll(tasks);
-        // Divide by replication factor to get approximate unique count
-        return counts.Sum() / _replicationFactor;
+        // P2-3187: Guard against DivideByZeroException when _replicationFactor is 0.
+        // Divide by replication factor to get approximate unique count.
+        var factor = _replicationFactor > 0 ? _replicationFactor : 1;
+        return counts.Sum() / factor;
     }
 
     /// <inheritdoc/>
@@ -1023,7 +1025,9 @@ public sealed class DistributedMemoryStore : IPersistentMemoryStore
     {
         var tasks = _shards.Select(s => s.GetTotalBytesAsync(scopeFilter, ct));
         var bytes = await Task.WhenAll(tasks);
-        return bytes.Sum() / _replicationFactor;
+        // P2-3187: Guard against DivideByZeroException when _replicationFactor is 0.
+        var factor = _replicationFactor > 0 ? _replicationFactor : 1;
+        return bytes.Sum() / factor;
     }
 
     /// <inheritdoc/>
@@ -1062,14 +1066,16 @@ public sealed class DistributedMemoryStore : IPersistentMemoryStore
         var tasks = _shards.Select(s => s.GetStatisticsAsync(ct));
         var stats = await Task.WhenAll(tasks);
 
+        // P2-3187: Guard against DivideByZeroException when _replicationFactor is 0.
+        var rf = _replicationFactor > 0 ? _replicationFactor : 1;
         return new PersistentStoreStatistics
         {
-            TotalEntries = stats.Sum(s => s.TotalEntries) / _replicationFactor,
-            TotalBytes = stats.Sum(s => s.TotalBytes) / _replicationFactor,
-            HotTierEntries = stats.Sum(s => s.HotTierEntries) / _replicationFactor,
-            WarmTierEntries = stats.Sum(s => s.WarmTierEntries) / _replicationFactor,
-            ColdTierEntries = stats.Sum(s => s.ColdTierEntries) / _replicationFactor,
-            ArchiveTierEntries = stats.Sum(s => s.ArchiveTierEntries) / _replicationFactor,
+            TotalEntries = stats.Sum(s => s.TotalEntries) / rf,
+            TotalBytes = stats.Sum(s => s.TotalBytes) / rf,
+            HotTierEntries = stats.Sum(s => s.HotTierEntries) / rf,
+            WarmTierEntries = stats.Sum(s => s.WarmTierEntries) / rf,
+            ColdTierEntries = stats.Sum(s => s.ColdTierEntries) / rf,
+            ArchiveTierEntries = stats.Sum(s => s.ArchiveTierEntries) / rf,
             PendingWrites = stats.Sum(s => s.PendingWrites),
             CompactionCount = _compactionCount,
             LastCompaction = _lastCompaction,

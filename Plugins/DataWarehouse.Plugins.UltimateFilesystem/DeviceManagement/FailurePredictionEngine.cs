@@ -2,6 +2,7 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 using DataWarehouse.SDK.VirtualDiskEngine.PhysicalDevice;
 using System;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -262,11 +263,17 @@ public sealed class FailurePredictionEngine
         }
     }
 
+    // LOW-2988: static Dictionary for O(1) risk-level lookup instead of allocating array + IndexOf per call.
+    private static readonly System.Collections.Frozen.FrozenDictionary<string, int> _riskOrder =
+        new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            ["None"] = 0, ["Low"] = 1, ["Medium"] = 2, ["High"] = 3, ["Critical"] = 4
+        }.ToFrozenDictionary();
+
     private static string HigherRisk(string current, string candidate)
     {
-        var order = new[] { "None", "Low", "Medium", "High", "Critical" };
-        var currentIdx = Array.IndexOf(order, current);
-        var candidateIdx = Array.IndexOf(order, candidate);
+        int currentIdx = _riskOrder.GetValueOrDefault(current, 0);
+        int candidateIdx = _riskOrder.GetValueOrDefault(candidate, 0);
         return candidateIdx > currentIdx ? candidate : current;
     }
 }

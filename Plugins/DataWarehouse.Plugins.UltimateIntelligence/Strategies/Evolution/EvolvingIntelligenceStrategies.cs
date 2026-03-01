@@ -386,9 +386,14 @@ public sealed class EvolvingExpertStrategy : FeatureStrategyBase
     private async Task PersistMetricsAsync(string domain, EvolutionMetrics metrics, CancellationToken ct)
     {
         _storagePath ??= GetConfig("StoragePath") ?? "./evolution-data/expert";
-        Directory.CreateDirectory(_storagePath);
+        // Finding 3102: Validate StoragePath to prevent path traversal attacks.
+        var safeBase = Path.GetFullPath(_storagePath);
+        Directory.CreateDirectory(safeBase);
 
-        var filePath = Path.Combine(_storagePath, $"{domain}.json");
+        var filePath = Path.GetFullPath(Path.Combine(safeBase, $"{domain}.json"));
+        if (!filePath.StartsWith(safeBase, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"Domain name '{domain}' resolves outside StoragePath.");
+
         var json = JsonSerializer.Serialize(metrics, new JsonSerializerOptions { WriteIndented = true });
         await File.WriteAllTextAsync(filePath, json, ct);
     }
@@ -754,10 +759,15 @@ public sealed class CollectiveIntelligenceStrategy : FeatureStrategyBase
             _sharedKnowledge[knowledgePackage.PackageId] = knowledgePackage;
 
             // Persist to storage for other agents
-            var storagePath = GetConfig("StoragePath") ?? "./evolution-data/collective";
-            Directory.CreateDirectory(storagePath);
+            // P2-3102: Validate StoragePath and PackageId to prevent path traversal attacks.
+            var rawPath = GetConfig("StoragePath") ?? "./evolution-data/collective";
+            var safeBase = Path.GetFullPath(rawPath);
+            Directory.CreateDirectory(safeBase);
 
-            var filePath = Path.Combine(storagePath, $"{knowledgePackage.PackageId}.json");
+            var filePath = Path.GetFullPath(Path.Combine(safeBase, $"{knowledgePackage.PackageId}.json"));
+            if (!filePath.StartsWith(safeBase, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException($"PackageId '{knowledgePackage.PackageId}' resolves outside StoragePath.");
+
             var json = JsonSerializer.Serialize(knowledgePackage, new JsonSerializerOptions { WriteIndented = true });
             await File.WriteAllTextAsync(filePath, json, ct);
 
