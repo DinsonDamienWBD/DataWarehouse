@@ -229,7 +229,10 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
             }
         }
 
-        // Connection not found in any pool - just dispose it
+        // P2-2716: Connection not found in any pool — dispose and trace so callers are aware.
+        System.Diagnostics.Trace.TraceWarning(
+            "[ConnectionPool] ReleaseAsync: connection not found in any pool; disposing directly. " +
+            "This may indicate a pool mismatch or the connection was never acquired via this manager.");
         connection.Dispose();
     }
 

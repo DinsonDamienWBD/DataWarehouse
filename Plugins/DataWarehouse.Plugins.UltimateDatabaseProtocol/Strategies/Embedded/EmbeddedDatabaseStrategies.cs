@@ -692,7 +692,8 @@ public sealed class LevelDbProtocolStrategy : DatabaseProtocolStrategyBase
             return new QueryResult { Success = true, RowsAffected = 0, Rows = rows };
         }
 
-        foreach (var file in Directory.GetFiles(dataDir, "*.dat").OrderBy(f => f).Take(limit))
+        foreach (var file in // P2-2717: EnumerateFiles avoids materialising the full array before OrderBy/Take.
+                Directory.EnumerateFiles(dataDir, "*.dat").OrderBy(f => f).Take(limit))
         {
             var key = Path.GetFileNameWithoutExtension(file);
             if (string.Compare(key, startKey, StringComparison.Ordinal) >= 0 &&
@@ -1015,7 +1016,8 @@ public sealed class RocksDbProtocolStrategy : DatabaseProtocolStrategyBase
 
         try
         {
-            foreach (var file in Directory.GetFiles(dataDir, "*.dat").OrderBy(f => f).Take(limit))
+            foreach (var file in // P2-2717: EnumerateFiles avoids materialising the full array before OrderBy/Take.
+                Directory.EnumerateFiles(dataDir, "*.dat").OrderBy(f => f).Take(limit))
             {
                 var key = Encoding.UTF8.GetString(Convert.FromHexString(Path.GetFileNameWithoutExtension(file)));
                 if (string.Compare(key, startKey, StringComparison.Ordinal) >= 0 &&
@@ -1296,10 +1298,11 @@ public sealed class BerkeleyDbProtocolStrategy : DatabaseProtocolStrategyBase
         if (!Directory.Exists(dataDir))
             return new QueryResult { Success = true, RowsAffected = 0, Rows = rows };
 
-        string[] files;
+        IEnumerable<string> files;
         try
         {
-            files = Directory.GetFiles(dataDir, "*.dat");
+            // P2-2717: EnumerateFiles avoids materialising the full array upfront.
+            files = Directory.EnumerateFiles(dataDir, "*.dat");
         }
         catch (IOException ex)
         {

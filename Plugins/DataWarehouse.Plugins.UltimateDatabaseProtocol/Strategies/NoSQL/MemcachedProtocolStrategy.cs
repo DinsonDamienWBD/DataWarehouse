@@ -248,6 +248,8 @@ public sealed class MemcachedProtocolStrategy : DatabaseProtocolStrategyBase
                         var lastResponse = await SendBinaryCommandAsync(OpGetK, keys[^1], null, 0, 0, ct);
 
                         // Read all queued responses
+                        // P2-2705: Log partial-result errors instead of silently swallowing them.
+                        string? multiGetError = null;
                         while (true)
                         {
                             try
@@ -268,10 +270,24 @@ public sealed class MemcachedProtocolStrategy : DatabaseProtocolStrategyBase
                                 if (response.Key == keys[^1])
                                     break;
                             }
-                            catch
+                            catch (Exception ex)
                             {
+                                multiGetError = ex.Message;
+                                System.Diagnostics.Trace.TraceWarning(
+                                    "[Memcached] Multi-get read interrupted after {0} keys: {1}",
+                                    rowsAffected, ex.Message);
                                 break;
                             }
+                        }
+                        if (multiGetError != null)
+                        {
+                            return new QueryResult
+                            {
+                                Success = false,
+                                ErrorMessage = $"Multi-get incomplete ({rowsAffected} of {keys.Length} retrieved): {multiGetError}",
+                                Rows = rows.Select(r => (IReadOnlyDictionary<string, object?>)r).ToList(),
+                                RowsAffected = rowsAffected
+                            };
                         }
 
                         if (lastResponse.Status == StatusNoError && lastResponse.Key != null)
