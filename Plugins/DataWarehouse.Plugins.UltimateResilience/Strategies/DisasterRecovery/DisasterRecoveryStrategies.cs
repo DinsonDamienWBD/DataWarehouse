@@ -295,6 +295,9 @@ public sealed class GeoReplicationFailoverStrategy : ResilienceStrategyBase
         }
         catch (Exception ex)
         {
+            IncrementCounter("dr.primary.failure");
+            RecordError("dr.primary.failure", ex.Message);
+
             bool shouldFailover;
             lock (_lock)
             {
@@ -307,7 +310,7 @@ public sealed class GeoReplicationFailoverStrategy : ResilienceStrategyBase
                 var failoverResult = await FailoverAsync(cancellationToken);
                 if (failoverResult.Success)
                 {
-                    // Retry on new region
+                    // Retry on new region after successful failover
                     try
                     {
                         var retryResult = await operation(cancellationToken);
@@ -324,11 +327,11 @@ public sealed class GeoReplicationFailoverStrategy : ResilienceStrategyBase
                             }
                         };
                     }
-                    catch
+                    catch (Exception retryEx)
                     {
-
-                        // Failover retry also failed
-                        System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+                        // Failover retry also failed — log and fall through to failure result
+                        IncrementCounter("dr.failover.retry.failure");
+                        RecordError("dr.failover.retry.failure", retryEx.Message);
                     }
                 }
             }

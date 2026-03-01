@@ -600,14 +600,10 @@ public sealed class AdaptiveBulkheadStrategy : ResilienceStrategyBase
         _currentCapacity = baseCapacity;
         _targetLatency = targetLatency;
         _adaptationInterval = adaptationInterval;
-        _semaphore = new SemaphoreSlim(maxCapacity, maxCapacity);
+        // Initialize semaphore at base capacity directly — avoid blocking Wait() calls
+        // in the constructor which can block the thread pool if called from an async context.
+        _semaphore = new SemaphoreSlim(baseCapacity, maxCapacity);
         _lastAdaptation = DateTimeOffset.UtcNow;
-
-        // Initially restrict to base capacity
-        for (int i = 0; i < maxCapacity - baseCapacity; i++)
-        {
-            _semaphore.Wait();
-        }
     }
 
     public override string StrategyId => "bulkhead-adaptive";

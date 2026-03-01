@@ -381,7 +381,9 @@ public sealed class ResilienceScalingManager : IScalableSubsystem, IDisposable
     /// <summary>
     /// Gets all tracked strategy identifiers.
     /// </summary>
-    internal IReadOnlyCollection<string> TrackedStrategies => _strategyMetrics.Keys.ToArray();
+    // Return Keys directly (ICollection<TKey> is already IReadOnlyCollection<string>-compatible
+    // via explicit cast) to avoid the ToArray() allocation on every adaptation cycle.
+    internal IReadOnlyCollection<string> TrackedStrategies => (IReadOnlyCollection<string>)_strategyMetrics.Keys;
 
     #endregion
 
