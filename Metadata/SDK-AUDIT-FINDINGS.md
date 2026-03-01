@@ -2045,12 +2045,12 @@
 | 1170 | 2 | P2 | `UltimateAccessControl/Strategies/Core/FederatedIdentityStrategy.cs:205-220` | Token refresh uses `ConcurrentDictionary` for token cache but `GetOrAdd` with async factory has race — two threads may both execute token refresh for same key. | [X]
 | 1171 | 14 | P2 | `UltimateAccessControl/Strategies/DataProtection/AnonymizationStrategy.cs:128-140` | `GenerateConsistentPseudonym` uses `MD5.HashData` — MD5 collision attacks allow different inputs to produce same pseudonym, breaking pseudonymization uniqueness. | [X]
 | 1172 | 14 | P2 | `UltimateAccessControl/Strategies/DataProtection/DifferentialPrivacyStrategy.cs:122-135` | `SampleLaplace` uses `Random.Shared` (not crypto-secure) — noise distribution is predictable, weakening differential privacy guarantees. | [X]
-| 1173 | 15 | LOW | `UltimateAccessControl/Strategies/Core/DynamicAuthorizationStrategy.cs:125-135` | Metadata claims `risk_engine=ml-based`, `context_factors=15` — no ML model, only hardcoded score. | [ ]
-| 1174 | 15 | LOW | `UltimateAccessControl/Strategies/Core/ZeroTrustStrategy.cs:148-158` | Metadata claims `device_posture=continuous`, `attestation=tpm-based` — no device check, no TPM attestation. | [ ]
-| 1175 | 15 | LOW | `UltimateAccessControl/Strategies/Core/MultiTenancyIsolationStrategy.cs:120-128` | Metadata claims `isolation_model=full-namespace`, `cross_tenant=blocked` — prefix check doesn't provide namespace isolation. | [ ]
-| 1176 | 15 | LOW | `UltimateAccessControl/Strategies/Core/PolicyBasedAccessControlStrategy.cs:162-170` | Metadata claims `policy_language=cedar-like`, `evaluation=compiled` — no Cedar-like language parser exists. | [ ]
-| 1177 | 15 | LOW | `UltimateAccessControl/Strategies/DataProtection/DlpStrategy.cs:125-132` | Metadata claims `detection_methods=[regex,ml,fingerprint]` — only exact string match implemented. | [ ]
-| 1178 | 15 | LOW | `UltimateAccessControl/Strategies/DataProtection/EntropyAnalysisStrategy.cs:108-115` | Metadata claims `analysis_mode=adaptive` — thresholds are hardcoded, no adaptation. | [ ]
+| 1173 | 15 | LOW | `UltimateAccessControl/Strategies/Core/DynamicAuthorizationStrategy.cs:125-135` | Metadata claims `risk_engine=ml-based`, `context_factors=15` — no ML model, only hardcoded score. | [X]
+| 1174 | 15 | LOW | `UltimateAccessControl/Strategies/Core/ZeroTrustStrategy.cs:148-158` | Metadata claims `device_posture=continuous`, `attestation=tpm-based` — no device check, no TPM attestation. | [X]
+| 1175 | 15 | LOW | `UltimateAccessControl/Strategies/Core/MultiTenancyIsolationStrategy.cs:120-128` | Metadata claims `isolation_model=full-namespace`, `cross_tenant=blocked` — prefix check doesn't provide namespace isolation. | [X]
+| 1176 | 15 | LOW | `UltimateAccessControl/Strategies/Core/PolicyBasedAccessControlStrategy.cs:162-170` | Metadata claims `policy_language=cedar-like`, `evaluation=compiled` — no Cedar-like language parser exists. | [X]
+| 1177 | 15 | LOW | `UltimateAccessControl/Strategies/DataProtection/DlpStrategy.cs:125-132` | Metadata claims `detection_methods=[regex,ml,fingerprint]` — only exact string match implemented. | [X]
+| 1178 | 15 | LOW | `UltimateAccessControl/Strategies/DataProtection/EntropyAnalysisStrategy.cs:108-115` | Metadata claims `analysis_mode=adaptive` — thresholds are hardcoded, no adaptation. | [X]
 
 **Clean files:** HierarchyVerificationStrategy, MacStrategy, RbacStrategy, ReBacStrategy, DataMaskingStrategy
 
@@ -2131,9 +2131,9 @@
 | 1234 | 6 | P2 | `UltimateAccessControl/Strategies/Honeypot/DeceptionNetworkStrategy.cs:573-578` | Timer callbacks for `RotateEnvironments`/`PerformAdaptation` — exceptions terminate timer silently. | [X]
 | 1235 | 9 | P2 | `UltimateAccessControl/Strategies/Identity/IamStrategy.cs:184-190` | Account lockout mutates `user.FailedLoginAttempts++` without synchronization — race condition on concurrent auth failures for same user. | [X]
 | 1236 | 4 | P2 | `UltimateAccessControl/Strategies/Identity/IamStrategy.cs:422-424` | `VerifyPassword` uses `computedHash == hash` string equality instead of constant-time comparison for auth hash comparison. | [X]
-| 1237 | 13 | LOW | `UltimateAccessControl/Strategies/Honeypot/CanaryStrategy.cs:605` | `_alertQueue.FirstOrDefault` O(n) linear scan of ConcurrentQueue (up to 10K alerts). Should use indexed dictionary. | [ ]
-| 1238 | 13 | LOW | `UltimateAccessControl/Strategies/Honeypot/DeceptionNetworkStrategy.cs:754` | `_eventQueue.ToArray().Where(...)` materializes entire queue (10K) on every adaptation tick. | [ ]
-| 1239 | 12 | LOW | `UltimateAccessControl/Strategies/Identity/Fido2Strategy.cs:471-475` | `credential.SignCount` updated from authenticator data then incremented again — double-increment causes stored count to be ahead of reality, rejecting valid authenticator on next use. | [ ]
+| 1237 | 13 | LOW | `UltimateAccessControl/Strategies/Honeypot/CanaryStrategy.cs:605` | `_alertQueue.FirstOrDefault` O(n) linear scan of ConcurrentQueue (up to 10K alerts). Should use indexed dictionary. | [X]
+| 1238 | 13 | LOW | `UltimateAccessControl/Strategies/Honeypot/DeceptionNetworkStrategy.cs:754` | `_eventQueue.ToArray().Where(...)` materializes entire queue (10K) on every adaptation tick. | [X]
+| 1239 | 12 | LOW | `UltimateAccessControl/Strategies/Identity/Fido2Strategy.cs:471-475` | `credential.SignCount` updated from authenticator data then incremented again — double-increment causes stored count to be ahead of reality, rejecting valid authenticator on next use. | [X]
 
 **Clean files:** EphemeralSharingStrategy, JwksTypes, LdapStrategy
 
@@ -2238,7 +2238,7 @@
 | 1308 | 5 | P2 | `UltimateAccessControl/Strategies/PolicyEngine/CedarStrategy.cs:315` | Remote-evaluation catch swallows all exceptions into deny with only `ex.Message`. No logging, no metric, transient failures indistinguishable from auth errors. | [X]
 | 1309 | 14 | P2 | `UltimateAccessControl/Strategies/PolicyEngine/CedarStrategy.cs:81` | `_httpClient.Timeout` set in `InitializeAsync` after construction — requests before init use default 100s timeout. | [X]
 | 1310 | 12 | P1 | `UltimateAccessControl/Strategies/PolicyEngine/CasbinStrategy.cs:162-184` | `GetRolesForUser` only resolves one level of role inheritance. Deep hierarchy silently stops at depth 2. | [X]
-| 1311 | 13 | LOW | `UltimateAccessControl/Strategies/PolicyEngine/CedarStrategy.cs:39` | `new HttpClient()` bypasses connection pooling → socket exhaustion under load. | [ ]
+| 1311 | 13 | LOW | `UltimateAccessControl/Strategies/PolicyEngine/CedarStrategy.cs:39` | `new HttpClient()` bypasses connection pooling → socket exhaustion under load. | [X]
 
 **Clean files:** SdWanStrategy, VpnStrategy
 
@@ -2262,9 +2262,9 @@
 | 1321 | 7 | P2 | `UltimateAccessControl/Strategies/PolicyEngine/PermifyStrategy.cs:38` | Same `HttpClient` field pattern. | [X]
 | 1322 | 7 | P2 | `UltimateAccessControl/Strategies/PolicyEngine/ZanzibarStrategy.cs:37` | Same `HttpClient` field pattern. | [X]
 | 1323 | 1 | P2 | `UltimateAccessControl/Strategies/Steganography/ShardDistributionStrategy.cs:717-718` | `ReconstructFromErasure` throws `NotImplementedException` — reachable at runtime when ErasureCoding mode selected and data shards lost. | [X]
-| 1324 | 4 | LOW | `UltimateAccessControl/Strategies/Steganography/DecoyLayersStrategy.cs:453` | `OrderBy(_ => Guid.NewGuid())` for shuffling — not cryptographically secure, non-uniform distribution. | [ ]
-| 1325 | 4 | LOW | `UltimateAccessControl/Strategies/Steganography/DecoyLayersStrategy.cs:624-627` | PBKDF2 uses static salt `"DecoyLayersSalt2024"`. Shared salt weakens derivation. | [ ]
-| 1326 | 1 | LOW | `UltimateAccessControl/Strategies/Steganography/SteganographyStrategy.cs:541-542` | `HideInVideo` hardcodes `videoHeaderSize=512` for all formats. Wrong for most containers, silently corrupts video. | [ ]
+| 1324 | 4 | LOW | `UltimateAccessControl/Strategies/Steganography/DecoyLayersStrategy.cs:453` | `OrderBy(_ => Guid.NewGuid())` for shuffling — not cryptographically secure, non-uniform distribution. | [X]
+| 1325 | 4 | LOW | `UltimateAccessControl/Strategies/Steganography/DecoyLayersStrategy.cs:624-627` | PBKDF2 uses static salt `"DecoyLayersSalt2024"`. Shared salt weakens derivation. | [X]
+| 1326 | 1 | LOW | `UltimateAccessControl/Strategies/Steganography/SteganographyStrategy.cs:541-542` | `HideInVideo` hardcodes `videoHeaderSize=512` for all formats. Wrong for most containers, silently corrupts video. | [X]
 
 **Clean files:** CapacityCalculatorStrategy, CarrierSelectionStrategy, DctCoefficientHidingStrategy, SteganalysisResistanceStrategy, ExtractionEngineStrategy
 
@@ -2289,12 +2289,12 @@
 | 1338 | 2 | P2 | `UltimateAccessControl/Strategies/ThreatResponse/PredictiveThreatStrategy.cs:113` | `_predictionHistory` plain `List` — same issue. | [X]
 | 1339 | 12 | P2 | `UltimateAccessControl/Strategies/Steganography/WatermarkEmbeddingStrategy.cs:475-485` | `CheckWatermarkHealthAsync` uses `|| true` in detection condition — health check always reports watermark as present even when detection fails. | [X]
 | 1340 | 13 | P2 | `UltimateAccessControl/Strategies/ThreatResponse/SoarIntegrationStrategy.cs:105-115` | `EnrichIncidentAsync` performs sequential HTTP-style enrichment calls with no parallelism. For 5+ enrichment sources, latency compounds linearly. | [X]
-| 1341 | 15 | LOW | `UltimateAccessControl/Strategies/Steganography/WatermarkEmbeddingStrategy.cs:42` | Class is `WatermarkEmbeddingStrategy` but handles both embedding and detection. Name suggests embedding only. | [ ]
-| 1342 | 15 | LOW | `UltimateAccessControl/Strategies/ThreatResponse/AdaptiveThreatProfileStrategy.cs:35` | `GetThreatProfile` returns `ThreatProfile` but XML doc says "risk assessment." Naming mismatch. | [ ]
-| 1343 | 15 | LOW | `UltimateAccessControl/Strategies/ThreatResponse/ContextualThreatStrategy.cs:38` | `EvaluateContext` returns `ContextEvaluation` but property is called `ThreatLevel`. Inconsistent. | [ ]
-| 1344 | 15 | LOW | `UltimateAccessControl/Strategies/ZeroTrust/ContinuousVerificationStrategy.cs:188` | `VerifySessionContinuity` logs at `Debug` level even on verification failure. Should be `Warning`. | [ ]
-| 1345 | 15 | LOW | `UltimateAccessControl/Strategies/ZeroTrust/DeviceTrustStrategy.cs:142` | `AssessDeviceTrust` returns percentage score but no documentation of scale or thresholds. | [ ]
-| 1346 | 15 | LOW | `UltimateAccessControl/Strategies/ZeroTrust/MtlsStrategy.cs:355` | Method `ValidateCertificateChainAsync` has `async` modifier but no `await` — produces compiler warning. | [ ]
+| 1341 | 15 | LOW | `UltimateAccessControl/Strategies/Steganography/WatermarkEmbeddingStrategy.cs:42` | Class is `WatermarkEmbeddingStrategy` but handles both embedding and detection. Name suggests embedding only. | [X]
+| 1342 | 15 | LOW | `UltimateAccessControl/Strategies/ThreatResponse/AdaptiveThreatProfileStrategy.cs:35` | `GetThreatProfile` returns `ThreatProfile` but XML doc says "risk assessment." Naming mismatch. | [X]
+| 1343 | 15 | LOW | `UltimateAccessControl/Strategies/ThreatResponse/ContextualThreatStrategy.cs:38` | `EvaluateContext` returns `ContextEvaluation` but property is called `ThreatLevel`. Inconsistent. | [X]
+| 1344 | 15 | LOW | `UltimateAccessControl/Strategies/ZeroTrust/ContinuousVerificationStrategy.cs:188` | `VerifySessionContinuity` logs at `Debug` level even on verification failure. Should be `Warning`. | [X]
+| 1345 | 15 | LOW | `UltimateAccessControl/Strategies/ZeroTrust/DeviceTrustStrategy.cs:142` | `AssessDeviceTrust` returns percentage score but no documentation of scale or thresholds. | [X]
+| 1346 | 15 | LOW | `UltimateAccessControl/Strategies/ZeroTrust/MtlsStrategy.cs:355` | Method `ValidateCertificateChainAsync` has `async` modifier but no `await` — produces compiler warning. | [X]
 
 **Clean files:** ThreatDetectionStrategy, MicroSegmentationStrategy, ServiceMeshStrategy
 
@@ -3638,15 +3638,15 @@
 | 2231 | 5 | P1 | **SYSTEMIC** — `UltimateDataCatalog/UltimateDataCatalogPlugin.cs:525,537,549` | Three `catch { /* corrupted state — start fresh */ }` blocks swallow deserialization errors for assets, relationships, and glossary. Silent data loss on startup with zero diagnostics. | [X]
 | 2232 | 9 | P1 | `UltimateDataFormat/Strategies/AI/SafeTensorsStrategy.cs:118-119,154` | `headerLength` read as `long`, cast to `(int)headerLength` for allocation without overflow check. Malicious file with header >2GB causes unchecked integer overflow. Same at line 154 `(int)tensorSize`. | [X]
 | 2233 | 7 | P1 | **SYSTEMIC** — `UltimateDataFormat/Strategies/AI/OnnxStrategy.cs:117`, `UltimateDataFormat/Strategies/Columnar/OrcStrategy.cs:81`, `UltimateDataFormat/Strategies/Columnar/ArrowStrategy.cs:110,194` | Unbounded allocation from untrusted stream length: `new byte[stream.Length]` with no upper bound. 2GB+ stream causes immediate OOM. | [X]
-| 2234 | 14 | P2 | `UltimateDataFormat/Strategies/Columnar/OrcStrategy.cs:723` | Unsafe `long`→`int` cast: `new MemoryStream(fileBytes, (int)sOffset, sLength)` silently truncates stripe offset. Files >2GB get wrong slices or `ArgumentOutOfRangeException`. | [ ]
-| 2235 | 2 | P2 | `UltimateDataFormat/Strategies/Columnar/ArrowFlightStrategy.cs:97` | `_flights` is plain `Dictionary<string, FlightRegistration>` accessed concurrently from `DoPut` (write) and `GetFlightInfo`/`DoGet`/`ListFlights` (reads). Race condition → data corruption or `InvalidOperationException`. Use `ConcurrentDictionary`. | [ ]
-| 2236 | 13 | P2 | `UltimateDataFormat/Strategies/AI/SafeTensorsStrategy.cs:152-154` | O(n) random-access seeks per tensor in `ParseAsync`. Non-seekable streams (network) throw at runtime with no guard. `Capabilities.Streaming = false` mitigates but no explicit check. | [ ]
-| 2237 | 12 | P2 | `UltimateDataFormat/Strategies/Columnar/ArrowFlightStrategy.cs:409` | `SerializeAsync` calls `output.Write(payload, 0, payload.Length)` synchronously in an async method. Blocks thread pool on large Arrow payloads. Should use `WriteAsync`. | [ ]
-| 2238 | 14 | P2 | `UltimateDataFormat/Strategies/Columnar/OrcStrategy.cs:760` | `allColumns.Add(null!)` fills list with null references via null-forgiving operator. If zero stripes, nulls propagate to `ColumnarBatch`. Error-prone initialization pattern. | [ ]
-| 2239 | 14 | P2 | `UltimateDataFormat/Strategies/Columnar/ParquetStrategy.cs:99` | `await foreach` over `ReadFromStream(input)` without `.WithCancellation(ct)`. Cancellation only checked between batches via `ct.ThrowIfCancellationRequested()`. Large files delay or ignore cancellation. | [ ]
-| 2240 | 1 | P2 | `UltimateDataFormat/Strategies/Binary/ProtobufStrategy.cs:99-111` | `ValidateCoreAsync` returns `Valid` when schema provided without reading any bytes. Non-protobuf file with any schema object reported as valid — contract lie. | [ ]
-| 2241 | 15 | LOW | `UltimateDataFormat/Strategies/Columnar/OrcStrategy.cs:477` | `PostscriptSize = 13` hardcoded constant. Any layout change without updating this constant silently breaks the entire format. Should be computed. | [ ]
-| 2242 | 10 | LOW | `UltimateDataFormat/Strategies/Columnar/OrcStrategy.cs:435` | Variable `offset` reused as both row offset and byte position. Name collision with `stripeOffset` pattern could cause maintenance bugs. | [ ]
+| 2234 | 14 | P2 | `UltimateDataFormat/Strategies/Columnar/OrcStrategy.cs:723` | Unsafe `long`→`int` cast: `new MemoryStream(fileBytes, (int)sOffset, sLength)` silently truncates stripe offset. Files >2GB get wrong slices or `ArgumentOutOfRangeException`. | [X]
+| 2235 | 2 | P2 | `UltimateDataFormat/Strategies/Columnar/ArrowFlightStrategy.cs:97` | `_flights` is plain `Dictionary<string, FlightRegistration>` accessed concurrently from `DoPut` (write) and `GetFlightInfo`/`DoGet`/`ListFlights` (reads). Race condition → data corruption or `InvalidOperationException`. Use `ConcurrentDictionary`. | [X]
+| 2236 | 13 | P2 | `UltimateDataFormat/Strategies/AI/SafeTensorsStrategy.cs:152-154` | O(n) random-access seeks per tensor in `ParseAsync`. Non-seekable streams (network) throw at runtime with no guard. `Capabilities.Streaming = false` mitigates but no explicit check. | [X]
+| 2237 | 12 | P2 | `UltimateDataFormat/Strategies/Columnar/ArrowFlightStrategy.cs:409` | `SerializeAsync` calls `output.Write(payload, 0, payload.Length)` synchronously in an async method. Blocks thread pool on large Arrow payloads. Should use `WriteAsync`. | [X]
+| 2238 | 14 | P2 | `UltimateDataFormat/Strategies/Columnar/OrcStrategy.cs:760` | `allColumns.Add(null!)` fills list with null references via null-forgiving operator. If zero stripes, nulls propagate to `ColumnarBatch`. Error-prone initialization pattern. | [X]
+| 2239 | 14 | P2 | `UltimateDataFormat/Strategies/Columnar/ParquetStrategy.cs:99` | `await foreach` over `ReadFromStream(input)` without `.WithCancellation(ct)`. Cancellation only checked between batches via `ct.ThrowIfCancellationRequested()`. Large files delay or ignore cancellation. | [X]
+| 2240 | 1 | P2 | `UltimateDataFormat/Strategies/Binary/ProtobufStrategy.cs:99-111` | `ValidateCoreAsync` returns `Valid` when schema provided without reading any bytes. Non-protobuf file with any schema object reported as valid — contract lie. | [X]
+| 2241 | 15 | LOW | `UltimateDataFormat/Strategies/Columnar/OrcStrategy.cs:477` | `PostscriptSize = 13` hardcoded constant. Any layout change without updating this constant silently breaks the entire format. Should be computed. | [X]
+| 2242 | 10 | LOW | `UltimateDataFormat/Strategies/Columnar/OrcStrategy.cs:435` | Variable `offset` reused as both row offset and byte position. Name collision with `stripeOffset` pattern could cause maintenance bugs. | [X]
 
 **Clean files:** MarketplaceStrategies.cs, SchemaRegistryStrategies.cs, SearchDiscoveryStrategies.cs, MessagePackStrategy.cs, ColumnarFormatVerification.cs, ArrowStrategy.cs, GeoJsonStrategy.cs
 
@@ -3662,17 +3662,17 @@
 | 2244 | 5 | P1 | `UltimateDataFormat/UltimateDataFormatPlugin.cs:141-145` | Silent bare `catch` in `DiscoverAndRegisterStrategies()` swallows all strategy instantiation failures. Misconfigured strategies silently omitted from registry with no diagnostics. | [X]
 | 2245 | 5 | P1 | `UltimateDataFormat/UltimateDataFormatPlugin.cs:224-229` | Silent bare `catch` in `DetectFormat()` per strategy swallows all exceptions including `OutOfMemoryException`. Detection falls through to `null` with no logging. | [X]
 | 2246 | 1 | P1 | **SYSTEMIC** — `UltimateDataFormat/Strategies/Simulation/CgnsStrategy.cs:76-86`, `VtkStrategy.cs:68-81` | Rule 13 stubs: `ParseAsync` always returns `DataFormatResult.Fail(...)` citing absent native library. Code comments explicitly say "Stub". Strategies registered as production-capable but no parse path works. | [X]
-| 2247 | 12 | P2 | **SYSTEMIC** — `UltimateDataFormat/Strategies/Simulation/VtkStrategy.cs:93,240` | `stream.Length` accessed without seekability check. `NetworkStream`, `GZipStream` throw `NotSupportedException`. CGNS counterpart uses fixed buffer. | [ ]
-| 2248 | 13 | P2 | `UltimateDataFormat/Strategies/Text/CsvStrategy.cs:163` | Per-character `c.ToString() == delimiter` allocates on heap every char in every CSV line. Millions of rows = massive GC pressure. Compare as `char` instead. | [ ]
-| 2249 | 12 | P2 | `UltimateDataFormat/Strategies/Text/XmlStrategy.cs:71,95,99,122` | `Task.Run` wraps synchronous `XDocument.Load`/`Save` — `CancellationToken` not honored. Large XML loads ignore cancellation. Use `XDocument.LoadAsync`. | [ ]
-| 2250 | 14 | P2 | `UltimateDataFormat/Strategies/Text/TomlStrategy.cs:57-61` | Over-permissive detection: returns `true` for any content with `[`, `=`, or `#`. INI files, properties files, shell scripts all match. | [ ]
-| 2251 | 14 | P2 | `UltimateDataFormat/Strategies/Text/YamlStrategy.cs:59-63` | Over-permissive detection: returns `true` for any content with `: ` (colon-space). HTTP headers, log lines, Python dicts all match. | [ ]
+| 2247 | 12 | P2 | **SYSTEMIC** — `UltimateDataFormat/Strategies/Simulation/VtkStrategy.cs:93,240` | `stream.Length` accessed without seekability check. `NetworkStream`, `GZipStream` throw `NotSupportedException`. CGNS counterpart uses fixed buffer. | [X]
+| 2248 | 13 | P2 | `UltimateDataFormat/Strategies/Text/CsvStrategy.cs:163` | Per-character `c.ToString() == delimiter` allocates on heap every char in every CSV line. Millions of rows = massive GC pressure. Compare as `char` instead. | [X]
+| 2249 | 12 | P2 | `UltimateDataFormat/Strategies/Text/XmlStrategy.cs:71,95,99,122` | `Task.Run` wraps synchronous `XDocument.Load`/`Save` — `CancellationToken` not honored. Large XML loads ignore cancellation. Use `XDocument.LoadAsync`. | [X]
+| 2250 | 14 | P2 | `UltimateDataFormat/Strategies/Text/TomlStrategy.cs:57-61` | Over-permissive detection: returns `true` for any content with `[`, `=`, or `#`. INI files, properties files, shell scripts all match. | [X]
+| 2251 | 14 | P2 | `UltimateDataFormat/Strategies/Text/YamlStrategy.cs:59-63` | Over-permissive detection: returns `true` for any content with `: ` (colon-space). HTTP headers, log lines, Python dicts all match. | [X]
 | 2252 | 5 | P2 | **SYSTEMIC** — `UltimateDataFormat/Strategies/Simulation/CgnsStrategy.cs:160-164`, `VtkStrategy.cs:229-233` | `ExtractSchemaCoreAsync` has `catch (Exception) { return null; }` — silent swallow including `OutOfMemoryException`. No logging. | [X]
 | 2253 | 7 | P2 | `UltimateDataGovernance/DataGovernanceStrategyBase.cs:69-80` | `async Task` + `await Task.CompletedTask` in no-op `InitializeAsyncCore`/`ShutdownAsyncCore` creates unnecessary state machine allocations. Systemic across governance hierarchy. | [X]
 | 2254 | 2 | LOW | `UltimateDataGovernance/Moonshots/CrossMoonshot/CrossMoonshotWiringRegistrar.cs:28` | `_registeredWirings` is plain `List<WiringEntry>` mutated by `RegisterAllAsync`/`UnregisterAllAsync` without synchronization. Concurrent calls corrupt list. | [X]
-| 2255 | 15 | LOW | `UltimateDataFormat/Strategies/Text/XmlStrategy.cs:40` | `Extensions` includes `.xsd` but parse logic treats all XML identically. XSD has schema-specific semantics requiring different handling. | [ ]
-| 2256 | 15 | LOW | `UltimateDataFormat/Strategies/Text/JsonStrategy.cs:98` | `(bool)context.Options["indent"]` — direct cast without type guard. String `"true"` throws `InvalidCastException` that propagates unhandled. | [ ]
-| 2257 | 1 | LOW | `UltimateDataFormat/Strategies/Simulation/CgnsStrategy.cs:99-103` | `ExtractSchemaCoreAsync` returns hardcoded template schema without reading stream. Comment acknowledges "simplified stub". Rule 13 fake data. | [ ]
+| 2255 | 15 | LOW | `UltimateDataFormat/Strategies/Text/XmlStrategy.cs:40` | `Extensions` includes `.xsd` but parse logic treats all XML identically. XSD has schema-specific semantics requiring different handling. | [X]
+| 2256 | 15 | LOW | `UltimateDataFormat/Strategies/Text/JsonStrategy.cs:98` | `(bool)context.Options["indent"]` — direct cast without type guard. String `"true"` throws `InvalidCastException` that propagates unhandled. | [X]
+| 2257 | 1 | LOW | `UltimateDataFormat/Strategies/Simulation/CgnsStrategy.cs:99-103` | `ExtractSchemaCoreAsync` returns hardcoded template schema without reading stream. Comment acknowledges "simplified stub". Rule 13 fake data. | [X]
 
 **Clean files:** ChaosImmunityWiring.cs, ComplianceSovereigntyWiring.cs, FabricPlacementWiring.cs, PlacementCarbonWiring.cs, SyncConsciousnessWiring.cs
 

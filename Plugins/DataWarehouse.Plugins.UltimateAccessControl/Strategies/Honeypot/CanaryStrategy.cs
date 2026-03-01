@@ -24,6 +24,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Honeypot
         private readonly BoundedDictionary<string, CanaryObject> _canaries = new BoundedDictionary<string, CanaryObject>(1000);
         private readonly BoundedDictionary<string, ExclusionRule> _exclusionRules = new BoundedDictionary<string, ExclusionRule>(1000);
         private readonly ConcurrentQueue<CanaryAlert> _alertQueue = new();
+        // LOW-1237: O(1) lookup index so MarkAsFalsePositive avoids O(n) linear scan
+        private readonly BoundedDictionary<string, CanaryAlert> _alertIndex = new BoundedDictionary<string, CanaryAlert>(10_000);
         private readonly BoundedDictionary<string, CanaryMetrics> _metrics = new BoundedDictionary<string, CanaryMetrics>(1000);
         private readonly List<IAlertChannel> _alertChannels = new();
         private readonly CanaryGenerator _generator;
@@ -604,7 +606,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Honeypot
         /// </summary>
         public void MarkAsFalsePositive(string alertId, string reason)
         {
-            var alert = _alertQueue.FirstOrDefault(a => a.Id == alertId);
+            // LOW-1237: O(1) index lookup replaces O(n) ConcurrentQueue scan
+            _alertIndex.TryGetValue(alertId, out var alert);
             if (alert != null)
             {
                 alert.IsFalsePositive = true;
@@ -792,9 +795,11 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Honeypot
                 // Queue the alert
                 while (_alertQueue.Count >= _maxAlertsInQueue)
                 {
-                    _alertQueue.TryDequeue(out _);
+                    if (_alertQueue.TryDequeue(out var evicted))
+                        _alertIndex.TryRemove(evicted.Id, out _);
                 }
                 _alertQueue.Enqueue(alert);
+                _alertIndex.TryAdd(alert.Id, alert);
 
                 // Send alerts through pipeline
                 await SendAlertsAsync(alert);

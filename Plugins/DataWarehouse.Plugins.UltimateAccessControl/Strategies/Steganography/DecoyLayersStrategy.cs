@@ -449,8 +449,14 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
                 });
             }
 
-            // Shuffle to hide real layer positions
-            var shuffled = result.OrderBy(_ => Guid.NewGuid()).ToList();
+            // LOW-1324: Cryptographically secure Fisher-Yates shuffle replaces Guid.NewGuid() sort
+            // (non-uniform distribution and not CSPRNG-backed)
+            var shuffled = result;
+            for (int si = shuffled.Count - 1; si > 0; si--)
+            {
+                int sj = System.Security.Cryptography.RandomNumberGenerator.GetInt32(si + 1);
+                (shuffled[si], shuffled[sj]) = (shuffled[sj], shuffled[si]);
+            }
 
             // Reassign indices
             for (int i = 0; i < shuffled.Count; i++)

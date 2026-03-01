@@ -753,7 +753,14 @@ public sealed class DeceptionNetworkStrategy : AccessControlStrategyBase, IDispo
     private void PerformAdaptation()
     {
         // Analyze recent events and adapt deception strategies
-        var recentEvents = _eventQueue.ToArray().Where(e => e.Timestamp > DateTime.UtcNow.AddHours(-1)).ToList();
+        // LOW-1238: Filter while iterating instead of materialising the full queue then LINQ-filtering
+        var cutoff = DateTime.UtcNow.AddHours(-1);
+        var recentEvents = new List<DeceptionEvent>();
+        foreach (var ev in _eventQueue)
+        {
+            if (ev.Timestamp > cutoff)
+                recentEvents.Add(ev);
+        }
 
         if (recentEvents.Count > 10)
         {
