@@ -319,6 +319,7 @@ internal sealed class TransferState
     public required List<PathInfo> Paths { get; set; }
     public required List<DataSegment> Segments { get; init; }
     public long BytesTransferred;
+    public int CompletedSegmentCount;
     public TransitRequest? Request { get; init; }
 }
 ```

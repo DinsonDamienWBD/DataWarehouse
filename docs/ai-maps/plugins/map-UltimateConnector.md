@@ -4167,6 +4167,7 @@ public class DremioConnectionStrategy : DatabaseConnectionStrategyBase
 ```csharp
 public class RedshiftConnectionStrategy : DatabaseConnectionStrategyBase
 {
+// P2-2132: ParseHostPort replaced by base class ParseHostPortSafe to correctly handle IPv6.
 }
     public override string StrategyId;;
     public override string DisplayName;;
@@ -4272,6 +4273,7 @@ public class BigQueryConnectionStrategy : DatabaseConnectionStrategyBase
 ```csharp
 public class GoogleAlloyDbConnectionStrategy : DatabaseConnectionStrategyBase
 {
+// P2-2132: ParseHostPort replaced by base class ParseHostPortSafe to correctly handle IPv6.
 }
     public override string StrategyId;;
     public override string DisplayName;;
@@ -4314,6 +4316,7 @@ public class FireboltConnectionStrategy : DatabaseConnectionStrategyBase
 ```csharp
 public class AzureSynapseConnectionStrategy : DatabaseConnectionStrategyBase
 {
+// P2-2132: ParseHostPort replaced by base class ParseHostPortSafe to correctly handle IPv6.
 }
     public override string StrategyId;;
     public override string DisplayName;;
