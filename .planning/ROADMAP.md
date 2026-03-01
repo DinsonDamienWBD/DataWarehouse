@@ -1526,10 +1526,11 @@ Phase 68 (SDK Foundation)
     +---> Phase 89 (Ecosystem Compatibility) -- depends on Phase 83 (Integration Testing) + Phase 88 (Dynamic Subsystem Scaling)
     +---> Phase 90 (Device Discovery & Physical Block Device) -- depends on Phase 71 (VDE Format) + Phase 87 (VDE Scalable Internals)
     |       +---> Phase 91 (CompoundBlockDevice & Device-Level RAID) -- depends on Phase 90
-    |               +---> Phase 92 (VDE 2.0B Federation Router) -- depends on Phase 86 (Adaptive Index) + Phase 87 (VDE Scalable) + Phase 91 (CompoundBlockDevice)
-    |                       +---> Phase 93 (VDE 2.0B Shard Lifecycle) -- depends on Phase 92
+    |               +---> Phase 91.5 (VDE v2.1 Format Completion) -- depends on Phase 87 (VDE Scalable) + Phase 91 (CompoundBlockDevice)
+    |                       +---> Phase 92 (VDE 2.0B Federation Router) -- depends on Phase 86 (Adaptive Index) + Phase 91.5 (VDE v2.1 Format)
+    |                               +---> Phase 93 (VDE 2.0B Shard Lifecycle) -- depends on Phase 92
     +---> Phase 94 (Data Plugin Consolidation) -- depends on Phase 82 (Plugin Consolidation Audit) + Phase 88 (Dynamic Subsystem Scaling)
-    +---> Phase 95 (Bare-Metal-to-User E2E Testing) -- depends on ALL prior phases (68-94)
+    +---> Phase 95 (Bare-Metal-to-User E2E Testing) -- depends on ALL prior phases (68-94, 91.5)
 ```
 
 ### Phases
@@ -1558,6 +1559,7 @@ Phase 68 (SDK Foundation)
 - [ ] **Phase 89: Ecosystem Compatibility** -- Verify existing PostgreSQL wire protocol (964-line strategy) and Parquet/Arrow/ORC strategies; fix gaps; wire PostgreSQL protocol to SQL engine; multi-language client SDKs (Python/Java/Go/Rust/JS from shared .proto); Terraform provider + Pulumi bridge; Helm chart; Jepsen distributed correctness testing; connection pooling SDK contract
 - [ ] **Phase 90: Device Discovery & Physical Block Device Management** -- DeviceDiscoveryService (NVMe, SCSI, virtio, iSCSI, NVMe-oF enumeration), PhysicalDeviceManager (SMART health, wear leveling, hot-swap, failure prediction), DevicePoolManager (tier/locality/redundancy grouping, replaces OS LVM/ZFS), IPhysicalBlockDevice interface, device topology mapping, bare-metal bootstrap without OS storage stack
 - [ ] **Phase 91: CompoundBlockDevice & Device-Level RAID** -- CompoundBlockDevice implementing IBlockDevice over device arrays, logical-to-physical block mapping with device ID, wire UltimateRAID strategies to IBlockDevice[] arrays (device-level RAID 0/1/5/6/10 + erasure coding), extent-aware allocation across devices, hot-spare management, rebuild orchestration, device failure isolation
+- [ ] **Phase 91.5: VDE v2.1 Format Completion** -- Complete all remaining VDE v2.1 format features per finalized spec (v6.0-VDE-FORMAT-v2.0-SPEC.md): format-level modules (CPSH, EKEY, WALS, DELT, ZNSM, STEX, polymorphic RAID, module registration), core VDE internals (sharded WAL, epoch Merkle, metaslab allocator, vacuum GC, GDPR tombstone, quorum-sealed writes, wear-leveling, lazy deletion), runtime features (dedup, instant clone, heat tiering, temporal queries, cold analytics, tag scans, corruption radar, integrity chain/caching, forensic recovery, portable export, A/B testing, physical custody, panic fork), operations (observability MLOG, QoS modules, OPJR online ops, disaster recovery footer), block device layer (DirectFile, Windows overlapped, IoRing, kqueue, SPDK, raw partition), bootable preamble (header, SPDK integration, stripped kernel, NativeAOT runtime, composition profiles, preamble integrity), mount providers (VdeFilesystemAdapter, WinFsp, FUSE3, macFUSE), I/O pipeline (framework, module populator/extractor, E2E integration). 53 plans in 8 waves.
 - [ ] **Phase 92: VDE 2.0B Federation Router & Hierarchical Shard Catalog** -- VdeFederationRouter (namespace resolution, routing table, path-embedded routing), ShardCatalog (4-level hierarchy: Root Catalog → Domain Catalogs → Index Shards → Data Shards), catalog VDE replication via Raft, bloom filter negative lookups, LRU catalog caching, transparent user experience (admins see shards, users see continuous namespace), recursive VDE 2.0B+ composition
 - [ ] **Phase 93: VDE 2.0B Shard Lifecycle** -- PlacementPolicyEngine (hot/warm/cold/frozen tiers, NVMe/SSD/HDD/tape mapping), shard split at capacity (key range bisection), shard merge on underutilization, background shard migration between tiers, cross-shard transactions, shard health monitoring, automatic rebalancing, zero-overhead guarantee at small scale (federation layer dormant until multi-VDE activated)
 - [ ] **Phase 94: Data Plugin Consolidation** -- Deduplicate triple-implemented lineage (UltimateDataLineage is authoritative, remove private stores from UltimateDataCatalog and UltimateDataLake), deduplicate triple-implemented catalog (UltimateDataCatalog is authoritative, remove private stores from UltimateDataLake and UltimateDataFabric), clarify UniversalFabric vs UltimateDataFabric naming/scope, wire all plugins to use authoritative stores via message bus, verify no data loss
@@ -2317,9 +2319,106 @@ Plans:
 - [ ] 91-04-PLAN.md -- Hot-spare management: automatic failover, background rebuild, I/O continuation, rebuild progress tracking, device-aware FreeExtent
 - [ ] 91-05-PLAN.md -- Dual RAID integration tests: device-level + data-level simultaneous operation, independent failure domain verification, VDE transparency test
 
+#### Phase 91.5: VDE v2.1 Format Completion
+**Goal**: Implement all remaining VDE v2.1 format features per the finalized spec (`v6.0-VDE-FORMAT-v2.0-SPEC.md`). This phase completes the 53 unexecuted plans from Phase 87 (87-16 through 87-68), covering format-level modules, core VDE internals, runtime features, operations, block device I/O layer, bootable preamble, mount providers, and I/O pipeline integration. The spec is the **sole source of truth** for all format-level decisions — all byte offsets, bit assignments, module placements, and block types match the spec exactly.
+**Depends on**: Phase 87 (VDE Scalable Internals — core format structures), Phase 91 (CompoundBlockDevice — device-level RAID for polymorphic RAID integration)
+**Requirements**: VOPT-29 through VOPT-90 (from Phase 87 original scope)
+
+**Spec Cross-Reference Notes:**
+- All 53 plans verified against `v6.0-VDE-FORMAT-v2.0-SPEC.md` — **ALL spec-compliant**
+- 3 plans have minor description discrepancies (updated offsets/approaches in implementation):
+  - 87-36: InlineTagArea is 176B at inode offset 320 (not 128B at 308 as in original plan)
+  - 87-52: QoS is in QOS module (overflow block) + extent flags bits 6-7 (not InodeFlags bits 5-7)
+  - 87-51: Only MLOG block type is in spec (not DLOG/TLOG); implementation limited to spec-defined types
+- v7.0 reserved features (SDUP bit 25, ZKPA bit 26) are NOT included — only v6.0 features
+- All format-level features gate on ModuleManifest bits per spec; zero overhead when off
+
+**Success Criteria** (what must be TRUE):
+  1. All 9 format-level data OS features implemented: CPSH (Smart Extents), EKEY (Crypto Ephemerality), WALS (WAL Streaming), Polymorphic RAID (per-inode), DELT (Delta Extents), ZNSM (ZNS Symbiosis), STEX (4D Spatiotemporal)
+  2. ModuleManifest expanded to uint64 with all v6.0 module bits registered per spec
+  3. Thread-affinity sharded WAL with N shards for N CPU cores, per-core lock-free ring buffers
+  4. Epoch-batched Merkle, hierarchical metaslab allocator, vacuum/GC all operational
+  5. 15 format-implicit runtime features implemented (TPQR, MCDA, CAED, ICLN, PCRD, EGLD, PFAB, CEIC, HDAG, ITPS, ELIC, SPSE, NECR, PPOC, ETPF)
+  6. OPJR online operations journal, Recovery Footer (AD-67), MLOG metrics region all functional
+  7. 5 platform block devices operational: DirectFile, Windows overlapped, IoRing, kqueue, SPDK
+  8. Bootable preamble (optional, INCOMPAT_HAS_PREAMBLE bit 8): PreambleHeader, detection logic, composition profiles
+  9. 3 mount providers: WinFsp (Windows), FUSE3 low-level (Linux), macFUSE (macOS)
+  10. VDE I/O Pipeline Framework with module populator/extractor stages, full E2E integration verified
+  11. Full solution builds with 0 errors, all format byte offsets match spec exactly
+**Plans**: 53 plans in 8 waves
+
+**Wave 1 — Format-Level Modules (8 plans, spec-defined module bits):**
+- [ ] 87-20-PLAN.md -- EKEY: Cryptographic Ephemerality (bit 20), volatile key ring, TTL reaper (VOPT-33)
+- [ ] 87-21-PLAN.md -- ZNSM: Epoch-to-ZNS hardware symbiosis (bit 23), ZnsZoneMapRegion (VOPT-34)
+- [ ] 87-22-PLAN.md -- WALS: WAL streaming pub/sub (bit 21), WalSubscriberCursorTable (VOPT-35)
+- [ ] 87-23-PLAN.md -- DELT: Sub-block delta extents (bit 22), VCDIFF patching, compaction (VOPT-36)
+- [ ] 87-24-PLAN.md -- CPSH: Smart Extents WASM pushdown (bit 19), io_uring filtered reads (VOPT-37)
+- [ ] 87-25-PLAN.md -- Polymorphic RAID: per-inode erasure coding via extent flag topology bits (VOPT-38+60)
+- [ ] 87-26-PLAN.md -- STEX: Spatiotemporal 4D extent addressing (bit 24), Hilbert curve clustering (VOPT-39)
+- [ ] 87-65-PLAN.md -- Module Registration: expand ModuleManifest to uint64, register bits 19-33, update FormatConstants (VOPT-87)
+
+**Wave 2 — Core VDE Internals (8 plans, algorithms and data structures):**
+- [ ] 87-16-PLAN.md -- Thread-affinity sharded WAL: N shards, lock-free ring buffers, io_uring 1:1 mapping (VOPT-29)
+- [ ] 87-17-PLAN.md -- Epoch-batched Merkle updates: background computation, configurable interval (VOPT-30)
+- [ ] 87-18-PLAN.md -- Hierarchical metaslab allocator: zones/regions/AGs, lazy bitmap loading (VOPT-31)
+- [ ] 87-19-PLAN.md -- Vacuum and epoch-based GC: MVCC dead version reclamation, SLA lease timeout (VOPT-32)
+- [ ] 87-27-PLAN.md -- GDPR Tombstone Engine: provable erasure, BLAKE3 deletion proofs, delta flattening (VOPT-40)
+- [ ] 87-28-PLAN.md -- Quorum-Sealed Write Path: FROST threshold signatures, 79B overflow (VOPT-42)
+- [ ] 87-29-PLAN.md -- Semantic Wear-Leveling Allocator: TTL-hint grouping, ZNS gate (VOPT-41)
+- [ ] 87-32-PLAN.md -- Epoch-Gated Lazy Deletion: retention-to-epoch mapping, vacuum scan (VOPT-49)
+
+**Wave 3 — Runtime Features (14 plans, no format changes needed):**
+- [ ] 87-30-PLAN.md -- Content-Addressable Extent Dedup: ExpectedHash matching, SHARED_COW (VOPT-46+59)
+- [ ] 87-31-PLAN.md -- Instant Clone Engine: O(metadata) clone, CoW split on write (VOPT-47)
+- [ ] 87-33-PLAN.md -- Heat-Driven Allocation Tiering: hot/cold shards via ShardId, background migration (VOPT-51)
+- [ ] 87-34-PLAN.md -- Temporal Point Query Engine: epoch-indexed extent resolver, O(log N) bisection (VOPT-44+58)
+- [ ] 87-35-PLAN.md -- Metadata-Only Cold Analytics: inode/TRLR/tag sequential scanners (VOPT-45)
+- [ ] 87-36-PLAN.md -- Inline Tag Predicate Scans: fixed-offset columnar scan (176B at offset 320 per spec), SIMD (VOPT-54)
+- [ ] 87-37-PLAN.md -- Probabilistic Corruption Radar: statistical TRLR sampling (VOPT-48)
+- [ ] 87-38-PLAN.md -- Cross-Extent Integrity Chain: 3-level hash verifier (VOPT-50)
+- [ ] 87-39-PLAN.md -- Extent-Level Integrity Caching: in-memory cache with generation tracking (VOPT-52)
+- [ ] 87-40-PLAN.md -- Forensic Necromancy Recovery Tool: TRLR stride-scan reconstruction (VOPT-43)
+- [ ] 87-41-PLAN.md -- Self-Describing Portable Export: predicate selection, standalone .dwvd output (VOPT-53)
+- [ ] 87-42-PLAN.md -- Progressive Feature A/B Testing: per-inode module activation policies (VOPT-55)
+- [ ] 87-43-PLAN.md -- Proof of Physical Custody: TPM PCR + MerkleRootHash binding (VOPT-56)
+- [ ] 87-44-PLAN.md -- Entropy-Triggered Panic Fork: Shannon entropy threshold, immutable snapshot (VOPT-57)
+
+**Wave 4 — Operations, QoS, Disaster Recovery (5 plans):**
+- [ ] 87-51-PLAN.md -- Format-native observability: MLOG metrics region (spec-defined block type only) (VOPT-68-70)
+- [ ] 87-52-PLAN.md -- Format-native QoS: QOS module in overflow block + extent flags bits 6-7 per spec (VOPT-71-73)
+- [ ] 87-53-PLAN.md -- OPJR operation journal + online resize/RAID migration (VOPT-74-75)
+- [ ] 87-54-PLAN.md -- Online encryption + defrag + tier migration (VOPT-76)
+- [ ] 87-55-PLAN.md -- Format-native disaster recovery: Recovery Footer (AD-67), RCVR block type (VOPT-77-78)
+
+**Wave 5 — Block Device I/O Layer (5 plans, platform-specific backends):**
+- [ ] 87-56-PLAN.md -- DirectFileBlockDevice + BlockDeviceFactory: cross-platform file I/O (VOPT-79)
+- [ ] 87-57-PLAN.md -- WindowsOverlappedBlockDevice + IoRingBlockDevice: Windows async I/O (VOPT-80)
+- [ ] 87-58-PLAN.md -- KqueueBlockDevice: macOS/FreeBSD kqueue + POSIX AIO (VOPT-81)
+- [ ] 87-59-PLAN.md -- SpdkBlockDevice: SPDK userspace NVMe via P/Invoke (VOPT-63 refined)
+- [ ] 87-60-PLAN.md -- RawPartitionBlockDevice + AlignedMemoryAllocator: direct partition I/O (VOPT-82)
+
+**Wave 6 — Bootable Preamble (6 plans, optional INCOMPAT_HAS_PREAMBLE):**
+- [ ] 87-45-PLAN.md -- PreambleHeader struct (64B), VDE detection logic, PreambleReader/Writer (VOPT-61+62)
+- [ ] 87-46-PLAN.md -- SPDK Integration: SpdkBlockDevice via P/Invoke, DMA allocator (VOPT-63)
+- [ ] 87-47-PLAN.md -- Stripped Linux kernel build pipeline: minimal bzImage <8MB (VOPT-64) [DevOps/build artifact]
+- [ ] 87-48-PLAN.md -- NativeAOT DW Runtime packaging: single-binary publish <25MB (VOPT-65) [DevOps/build artifact]
+- [ ] 87-49-PLAN.md -- Composition flag updates: profiles (server-full, embedded-minimal, airgap-readonly) (VOPT-66)
+- [ ] 87-50-PLAN.md -- Preamble integrity and update: BLAKE3 verification, `dw preamble update` CLI (VOPT-67)
+
+**Wave 7 — VDE Mount Providers (4 plans, FUSE integration):**
+- [ ] 87-61-PLAN.md -- VDE Mount Provider + VdeFilesystemAdapter: abstract mount API (VOPT-83)
+- [ ] 87-62-PLAN.md -- WinFspMountProvider: Windows WinFsp.Net bindings, drive letter mounting (VOPT-84)
+- [ ] 87-63-PLAN.md -- Fuse3LowLevelMountProvider: Linux libfuse3 P/Invoke, low-level inode API (VOPT-85)
+- [ ] 87-64-PLAN.md -- MacFuseMountProvider: macOS macFUSE 4.x, Spotlight metadata provider (VOPT-86)
+
+**Wave 8 — I/O Pipeline + Integration (3 plans, end-to-end verification):**
+- [ ] 87-66-PLAN.md -- VDE I/O Pipeline Framework: stage chain, context propagation (VOPT-88)
+- [ ] 87-67-PLAN.md -- Module Populator + Module Extractor stages: per-module read/write dispatch (VOPT-89)
+- [ ] 87-68-PLAN.md -- Full-stack E2E pipeline integration: all waves wired, format compliance verified (VOPT-90)
+
 #### Phase 92: VDE 2.0B Federation Router & Hierarchical Shard Catalog
 **Goal**: Multiple VDE 2.0A instances are federated into a single logical namespace (VDE 2.0B). A hierarchical shard catalog (library-style: Root → Domain → Index → Data) routes operations to the correct VDE shard. Users see one continuous storage space; admins see the shard topology. The federation layer is dormant at small scale (zero overhead for single-VDE deployments).
-**Depends on**: Phase 86 (Adaptive Index Engine — morphing indexes for catalog), Phase 87 (VDE Scalable Internals — extent-based addressing, allocation groups), Phase 91 (CompoundBlockDevice — VDE sits on compound devices)
+**Depends on**: Phase 86 (Adaptive Index Engine — morphing indexes for catalog), Phase 91.5 (VDE v2.1 Format Completion — all format features, I/O pipeline, mount providers)
 **Requirements**: VFED-01 through VFED-15
 **Success Criteria** (what must be TRUE):
   1. VdeFederationRouter resolves any namespace path to (shardVdeId, inodeNumber) in ≤5 hops for cold paths, ≤1 hop for warm-cached paths

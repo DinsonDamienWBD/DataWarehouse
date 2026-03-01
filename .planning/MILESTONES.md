@@ -66,11 +66,11 @@
 
 ---
 
-## v5.0 Differentiators & Security Wiring (IN PROGRESS)
+## v5.0 Differentiators & Security Wiring (Shipped: 2026-02-22)
 
-**Phases:** 52-67 (16 phases, ~146 plans) | **Completed:** 52-65 (14 phases, 132 plans)
+**Phases:** 52-67 (16 phases, ~146 plans) | **Security Score:** 92/100 (Certified Conditional)
 
-**Key accomplishments (completed phases):**
+**Key accomplishments:**
 - Phase 52: Clean House — dead code removal, dependency cleanup
 - Phase 53: Security Wiring — AccessEnforcementInterceptor, IAuthenticatedMessageBus, inter-node auth (security 38→91)
 - Phase 54: Feature Gap Closure — 3,549 feature gaps addressed across all plugins
@@ -84,51 +84,49 @@
 - Phase 62: Carbon-Aware Tiering — sustainability metrics, renewable placement, carbon budgets
 - Phase 63: Universal Fabric & S3 — S3-compatible server, fabric mesh, backend routing
 - Phase 64: Moonshot Wiring — self-emulating objects, psychometric indexing, AR spatial anchors
-- Phase 65: Infrastructure — installer, packaging, deployment, monitoring
-
-**Remaining:** Phase 66 (Integration, 8 plans) + Phase 67 (Final Certification, 7 plans)
+- Phase 65: Infrastructure — SQL engine, GPU interop, installer, packaging, deployment, monitoring
+- Phase 66: Cross-Feature Orchestration — message bus topology, strategy registry, E2E integration
+- Phase 67: Final Certification — certified conditional (92/100 security, 52 plugins verified)
 
 ---
 
-## v6.0 Intelligent Policy Engine & Composable VDE (PLANNING)
+## v6.0 Intelligent Policy Engine & Composable VDE (IN PROGRESS)
 
-**Phases:** 68-92 (25 phases, ~175 plans) | **Requirements:** 339 across 28 categories
+**Phases:** 68-95 (28 phases, 350+ requirements, 210+ plans) | **Completed:** Phases 68-90.5 (23 phases)
 
-**Goal:** Transform every applicable feature (94+ across 8 categories) into a multi-level, cascade-aware, AI-tunable policy with performance optimization. Implement composable DWVD v2.0 format with runtime VDE composition. Consolidate non-Ultimate plugins. Deliver deployment topology selection (DW-only/VDE-only/DW+VDE) with VDE Composer integration and fix all existing CLI stubs. Close all competitive gaps against ~80 storage/data products.
+**Phase 90.5 Production Audit:** Comprehensive codebase audit yielding 4,656 findings (227 P0, 1,745 P1, 1,857 P2, 816 LOW) — ALL FIXED across 11 commits.
 
-**Planned deliverables:**
-- PolicyEngine SDK: IPolicyEngine, IEffectivePolicy, cascade resolution, compiled policies
-- Multi-level hierarchy: Block → Chunk → Object → Container → VDE with 5 cascade strategies
-- Operational profiles: Speed/Balanced/Standard/Strict/Paranoid with per-feature intensity
-- AI policy intelligence: observation pipeline, hardware/workload/threat awareness, auto-tuning
-- Authority chain: Admin → AI Emergency → Super Admin Quorum (3-of-5 multi-key)
-- Composable DWVD v2.0: 19 modules, runtime VDE composition, three-tier performance model
-- dw:// namespace integration with Ed25519-signed authority
-- External tamper detection: HMAC seals, chain hashes, 5 response levels
-- .dwvd file extension with OS registration (Windows/Linux/macOS)
-- Plugin consolidation audit: 17 non-Ultimate plugins reviewed
-- IntelligenceAwarePluginBase for AI hooks on all plugins (except UltimateIntelligence)
-- Deployment topology: DW-only, VDE-only, DW+VDE deployment modes with CLI/GUI selection
-- VDE Composer/Builder: CLI command (`dw vde create`) + GUI wizard for composable VDE creation
-- Shell handler & file extension registration integrated into install mode (mode c)
-- CLI stub fixes: real ServerCommands implementation, sync-over-async bug fix
-- Deployment mode integration tests for all three modes (connect/live/install) × all topologies
-- Metadata Residency Strategy: per-feature VdeOnly/VdePrimary/PluginOnly configuration, write ordering (Atomic/Sync/Lazy), hardware key reference pattern, corruption fallback + auto-repair, lazy/eager migration
-- Competitive Edge: VDE-native NAS/SAN block export, AD/Kerberos auth, TLA+ formal verification, OS-level security (seccomp/pledge/W^X), streaming SQL engine, deterministic I/O, yottabyte addressing, ML pipelines, native Delta Lake/Iceberg
-- Adaptive Index Engine: 7-level continuous morphing spectrum (Direct Pointer → Sorted Array → ART → Bε-tree → Learned Overlay → Sharded Forest → Distributed Probabilistic Routing) with bidirectional morph (shrinks backward on delete), autonomous IndexMorphAdvisor, Index RAID (striping/mirroring/sharding/tiering), Bw-Tree lock-free concurrency, Masstree hot-path namespace, Disruptor message bus (100M+ msgs/sec), extendible hashing inode table (trillion objects), native HNSW+PQ with ILGPU GPU acceleration, Hilbert curve mapping, ALEX learned index, native io_uring (LibraryImport, NVMe passthrough, 33x throughput), trained Zstd dictionaries, SIMD-accelerated hot paths, Bloofi distributed filter, Clock-SI transactions, count-min sketch access tracking
-- Variable-Width Addressing: 32/48/64/128-bit dynamic (default 32-bit = zero overhead for 99% of VDEs, online width promotion)
-- Dynamic Scaling: configurable write concurrency, dynamic extents, auto-growing DVV/inode cache, hierarchical replication
-- VDE Scalable Internals: allocation groups, ARC 3-tier cache, variable-width inodes (compact 64B/standard 256B/extended 512B), extent-based addressing, sub-block packing, MVCC (WAL-based versioning, 3 isolation levels), SQL OLTP+OLAP (columnar regions, zone maps, SIMD execution, spill-to-disk, predicate pushdown), persistent roaring bitmap tag index, per-extent encryption/compression, hierarchical checksums (Merkle tree), extent-aware CoW snapshots and replication delta, online defragmentation
-- Dynamic Subsystem Scaling: SDK scaling contract (BoundedCache, IPersistentBackingStore, IScalingPolicy, IBackpressureAware), critical bug fixes (streaming stubs, resilience no-op, blockchain int cast), all 60 plugins migrated from unbounded ConcurrentDictionary to bounded persistent caches, runtime-reconfigurable limits for 23 subsystems (blockchain, AEDS, WASM, consensus, message bus, replication, streaming, ACL, resilience, catalog, governance, lineage, mesh, filesystem, backup, compression, encryption, search, database, pipeline, fabric, tamperproof, compliance)
-- Ecosystem Compatibility: verify and fix existing PostgreSQL wire protocol (964-line strategy) and Parquet/Arrow/ORC strategies, wire PostgreSQL to SQL engine, multi-language client SDKs (Python/Java/Go/Rust/JS from shared .proto definitions), Terraform provider + Pulumi bridge, Helm chart for Kubernetes, Jepsen distributed correctness testing with published report, connection pooling SDK contract
-- Device-Level RAID: CompoundBlockDevice aggregating physical drives (RAID-0/1/5/6/10/Z1/Z2/Z3/JBOD), DeviceRaidStrategyBase, hot spare management, SMART predictive rebuild, background scrub, auto-configuration profiles, CLI device commands
-- VDE 2.0B Federation: multi-VDE unified namespace (dw://federation/), federation coordinator election (Raft), federated store/retrieve/list/search/migrate/snapshot, placement policy (sovereignty+tiering+capacity), cross-VDE replication, federation-level policy cascade
-- Hardware-to-Storage Integration: complete 7-layer flow from bare metal hardware through device RAID → VDE → federation → fabric → pipeline → user-visible storage, plugin adjustments for device RAID (UltimateRAID, Fabric, Observability, ResourceManager, Deployment), end-to-end integration tests, deployment wizard
+**Key accomplishments (completed phases 68-90.5):**
+- Phase 68: SDK Foundation — PolicyEngine contracts, IntelligenceAwarePluginBase, policy model types
+- Phase 69: Policy Persistence — 5 implementations (InMemory, File, Database, TamperProof, Hybrid)
+- Phase 70: Cascade Resolution Engine — full cascade algorithm, 5 strategies, compliance scoring
+- Phase 71: VDE Format v2.0 — Superblock, region directory, block trailer, module manifest, inode layout
+- Phase 72-73: VDE Regions — 18 foundational + operational regions implemented
+- Phase 74: VDE Identity & Tamper Detection — dw:// namespace, header seal, emergency recovery
+- Phase 75: Authority Chain — 3-of-5 quorum, emergency escalation, hardware token support
+- Phase 76: Performance Optimization — MaterializedPolicyCache, BloomFilterSkipIndex, CompiledPolicyDelegate
+- Phase 77: AI Policy Intelligence — observation pipeline, 5 advisors, autonomy levels
+- Phase 78: Online Module Addition — 3 addition options, atomic manifest update
+- Phase 79: File Extension & OS Integration — .dwvd MIME, Windows/Linux/macOS registration, content detection
+- Phase 80: Three-Tier Performance Verification — Tier 1/2/3 validation for all modules
+- Phase 81: Backward Compatibility & Migration — v1.0 auto-detect, dw migrate command
+- Phase 82: Plugin Consolidation Audit — 17 non-Ultimate plugins reviewed, 52 plugins final
+- Phase 83: Integration Testing — ~660 tests across unit, multi-level, cross-feature, AI, performance
+- Phase 84: Deployment Topology & CLI Modes — DW-only/VDE-only/DW+VDE deployment modes
+- Phase 85: Competitive Edge — VDE-native block export, AD/Kerberos, TLA+ verification, streaming SQL
+- Phase 86: Adaptive Index Engine — 7-level morphing index, Bw-Tree, io_uring, SIMD hot paths
+- Phase 87 (partial, 87-01 to 87-15): VDE Scalable Internals — allocation groups, ARC cache, MVCC, extent trees, variable-width inodes, sub-block packing, SQL OLTP+OLAP
+- Phase 88: Dynamic Subsystem Scaling — bounded persistent caches, runtime-reconfigurable limits for 23 subsystems
+- Phase 89: Ecosystem Compatibility — PostgreSQL wire protocol, Parquet/Arrow/ORC, client SDKs, Terraform, Helm
+- Phase 90: Device Discovery & Physical Block Device — NVMe/SCSI/virtio enumeration, SMART health, DevicePoolManager
+- Phase 90.5: Production Code Review & Gap Closure — 4,656/4,656 findings fixed (zero remaining)
+
+**Remaining:** Phase 91 (CompoundBlockDevice RAID) → Phase 91.5 (VDE v2.1 Format Completion) → Phase 92 (Federation Router) → Phase 93 (Shard Lifecycle) → Phase 94 (Data Plugin Consolidation) → Phase 95 (E2E Testing)
 
 **Design documents:**
-- `.planning/v6.0-DESIGN-DISCUSSION.md` — 24 architectural decisions (AD-01 through AD-24)
-- `.planning/v6.0-VDE-FORMAT-v2.0-SPEC.md` — 1,760-line format specification
-- `.planning/v6.0-FEATURE-STORAGE-REQUIREMENTS.md` — 23-category storage requirements catalog
+- `.planning/v6.0-DESIGN-DISCUSSION.md` — 41 architectural decisions
+- `.planning/v6.0-VDE-FORMAT-v2.0-SPEC.md` — VDE v2.1 format specification (architecture locked)
+- `.planning/ADAPTIVE-SCALING-ANALYSIS.md` — 97 features × 6 scale levels
 
 **Started:** 2026-02-20
 

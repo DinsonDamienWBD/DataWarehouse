@@ -67,30 +67,19 @@ See `.planning/MILESTONES.md` for full accomplishment list.
 - ✓ Build health (warnings 1,201→16, 121 null! fixed, 37 TODOs resolved)
 - ✓ Plugin cleanup (88 deprecated dirs removed, 60 active plugins)
 
-### Active (v2.0 — SDK Hardening & Distributed Infrastructure)
+### Active (v6.0 — Remaining Phases)
 
-- [ ] Refactor plugin base class hierarchy (PluginBase → IntelligentPluginBase → feature-specific bases)
-- [ ] Refactor strategy base class hierarchy (unified multi-tier StrategyBase)
-- [ ] Add auto-scaling, load balancing, P2P, auto-sync, auto-tier, auto-governance SDK contracts
-- [ ] Verify and enforce plugin/kernel decoupling (SDK-only deps, message bus only)
-- [ ] Update all Ultimate plugins to new base class hierarchy
-- [ ] Update all standalone plugins to new base class hierarchy
-- [ ] Fix DataWarehouse.CLI System.CommandLine deprecation
-- [ ] Memory safety: IDisposable on PluginBase, secure memory wiping, bounded collections
-- [ ] Cryptographic hygiene: constant-time comparisons, key rotation contracts, algorithm agility
-- [ ] Input validation at all SDK boundaries with ReDoS protection
-- [ ] Resilience contracts: circuit breakers, timeouts, bulkhead isolation in SDK
-- [ ] Observability contracts: ActivitySource, health checks, resource metering per plugin
-- [ ] API contract safety: immutable DTOs, strong typing, versioned interfaces
-- [ ] Static analysis: TreatWarningsAsErrors, Roslyn analyzers, banned API checks
-- [ ] Supply chain security: vulnerability audit, dependency pinning, SBOM
-- [ ] Comprehensive test suite for all new/refactored base classes
+- [ ] Phase 91: CompoundBlockDevice & Device-Level RAID
+- [ ] Phase 91.5: VDE v2.1 Format Completion (53 plans — format modules, runtime features, I/O layer, preamble, mount providers, pipeline)
+- [ ] Phase 92: VDE 2.0B Federation Router & Hierarchical Shard Catalog
+- [ ] Phase 93: VDE 2.0B Shard Lifecycle
+- [ ] Phase 94: Data Plugin Consolidation
+- [ ] Phase 95: Bare-Metal-to-User E2E Testing
 
-### Out of Scope
+### Out of Scope (v6.0)
 
-- Creating new plugins beyond what's in SDK_REFACTOR_PLAN.md
-- Deployment/CI/CD pipeline setup
-- UI/Dashboard changes (SDK-only milestone)
+- v7.0 reserved features: SDUP (Semantic Dedup), ZKPA (zk-SNARK Compliance), Ghost Enclaves
+- New plugins beyond what exists in current 52-plugin set
 
 ## Constraints
 
@@ -117,44 +106,42 @@ See `.planning/MILESTONES.md` for full accomplishment list.
 - **v3.0** (2026-02-17): Universal Platform — 10 phases, 64 plans
 - **v4.0-v4.4** (2026-02-18): Feature Verification & Hardening — 10 phases, ~50 plans, 5 fix rounds
 - **v4.5** (2026-02-19): Certification Authority — NOT CERTIFIED (50 pentest findings, security 38/100)
-- **v5.0** (IN PROGRESS): 10 Differentiators + Universal Tags + Security Wiring + Feature Gaps — Phases 52-65 COMPLETE, 66-67 remaining
+- **v5.0** (2026-02-22): Differentiators & Security Wiring — 16 phases, ~146 plans, certified conditional (92/100 security)
+- **v6.0** (IN PROGRESS): Intelligent Policy Engine & Composable VDE — Phases 68-90.5 COMPLETE (23 phases), 91-95 remaining
 
 See `.planning/MILESTONES.md` for full history.
 
 ## Current Milestone: v6.0 — Intelligent Policy Engine & Composable VDE
 
-**Goal:** Transform every applicable feature (94+ across 8 categories) into a multi-level, cascade-aware, AI-tunable policy with performance optimization. Implement composable DWVD v2.0 format with runtime VDE composition. Consolidate non-Ultimate plugins.
+**Goal:** Transform every applicable feature (94+ across 8 categories) into a multi-level, cascade-aware, AI-tunable policy. Implement composable DWVD v2.1 format with runtime VDE composition. Complete VDE v2.1 format-level features (CPSH, EKEY, WALS, DELT, ZNSM, STEX, polymorphic RAID). Build bare-metal device RAID, multi-VDE federation, and deliver full bare-metal-to-user integration testing.
 
-**Target features:**
-- Multi-level policy hierarchy (Block → Chunk → Object → Container → VDE) with cascade resolution
-- Operational profiles (Speed/Balanced/Standard/Strict/Paranoid) with per-feature intensity sliders
-- Performance optimization (MaterializedPolicyCache, BloomFilterSkipIndex, CompiledPolicyDelegate)
-- AI-driven policy intelligence (auto-tuning, anomaly-based adjustment, predictive optimization)
-- Composable DWVD v2.0 format (19 modules, runtime VDE composition, three-tier performance model)
-- dw:// namespace integration with Ed25519-signed authority
-- External tamper detection with configurable response levels
-- .dwvd file extension with OS registration (Windows/Linux/macOS)
-- Plugin consolidation audit (17 non-Ultimate plugins reviewed for merge or standalone justification)
-- Authority chain: Admin → AI Emergency → Super Admin Quorum (3-of-5 multi-key)
+**Progress:** Phases 68-90.5 COMPLETE (23 phases, 157+ plans executed). 4,656 audit findings fixed. Phases 91-95 remaining (6 phases including Phase 91.5 VDE v2.1 Format Completion).
+
+**Completed deliverables (Phases 68-90.5):**
+- PolicyEngine SDK with cascade resolution, compiled policies, 5 persistence backends
+- Multi-level hierarchy with 5 cascade strategies + compliance scoring
+- AI policy intelligence with 5 advisors, autonomy levels, overhead throttling
+- Authority chain with 3-of-5 quorum, emergency escalation, hardware token support
+- DWVD v2.0 format: superblock, 18 regions, block trailers, module manifest, composable inodes
+- .dwvd file extension with content detection, OS registration, VHD/VMDK import
+- Adaptive Index Engine with 7-level morphing spectrum, io_uring, SIMD hot paths
+- VDE Scalable Internals: allocation groups, ARC cache, MVCC, extent trees, SQL OLTP+OLAP
+- Dynamic subsystem scaling: bounded persistent caches for all 52 plugins
+- Ecosystem: PostgreSQL wire, Parquet/Arrow/ORC, client SDKs, Terraform, Helm
+- Device discovery: NVMe/SCSI/virtio enumeration, SMART health, DevicePoolManager
+
+**Remaining deliverables (Phases 91-95):**
+- CompoundBlockDevice & device-level RAID (Phase 91)
+- VDE v2.1 format completion: 9 format-level features, bootable preamble, I/O pipeline, mount providers (Phase 91.5)
+- Multi-VDE federation router & shard catalog (Phase 92)
+- Shard lifecycle: split/merge, placement, migration (Phase 93)
+- Data plugin consolidation: lineage/catalog dedup (Phase 94)
+- Full bare-metal-to-user E2E testing (Phase 95)
 
 **Design documents:**
-- `.planning/v6.0-DESIGN-DISCUSSION.md` — 12 architectural decisions
-- `.planning/v6.0-VDE-FORMAT-v2.0-SPEC.md` — 1,760-line format specification
-- `.planning/v6.0-FEATURE-STORAGE-REQUIREMENTS.md` — 23-category storage requirements catalog
-
-**Key decisions (see design discussion for full details):**
-1. Policy at Plugin level, not Strategy level
-2. AI integration through IntelligenceAwarePluginBase (UltimateIntelligence excluded)
-3. Quorum failsafe enables AI management of ALL policies
-4. Pluggable persistence (not TamperProof-mandatory)
-5. Custom VDE format (not VHDX/VMDK)
-6. Policy data embedded in VDE with cryptographic binding
-7. VDE-level policy outside user capacity
-8. Composable VDE — spec is max envelope, user selects modules
-9. dw:// namespace embedded in VDE
-10. External tamper detection with 5 response levels
-11. File extension `.dwvd` with full OS integration
-12. Plugin consolidation audit as late v6.0 phase
+- `.planning/v6.0-DESIGN-DISCUSSION.md` — 41 architectural decisions
+- `.planning/v6.0-VDE-FORMAT-v2.0-SPEC.md` — VDE v2.1 format specification (architecture locked)
+- `.planning/ADAPTIVE-SCALING-ANALYSIS.md` — 97 features × 6 scale levels
 
 ---
-*Last updated: 2026-02-20 — v6.0 milestone started*
+*Last updated: 2026-03-01 — Phase 90.5 complete, Phase 91.5 added*
