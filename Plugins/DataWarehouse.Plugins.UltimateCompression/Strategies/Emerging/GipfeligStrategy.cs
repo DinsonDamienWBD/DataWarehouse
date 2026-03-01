@@ -138,20 +138,12 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
                 int offset = i * BlockSize;
                 int count = Math.Min(BlockSize, input.Length - offset);
 
-                var blockData = ArrayPool<byte>.Shared.Rent(count);
-                try
-                {
-                    Array.Copy(input, offset, blockData, 0, count);
-
-                    byte[] compressed = CompressBlock(blockData.AsSpan(0, count).ToArray());
-
-                    writer.Write(compressed.Length);
-                    writer.Write(compressed);
-                }
-                finally
-                {
-                    ArrayPool<byte>.Shared.Return(blockData);
-                }
+                // P2-1601: Pass block slice directly to CompressBlock without unnecessary pool+copy.
+                var blockSlice = new byte[count];
+                Array.Copy(input, offset, blockSlice, 0, count);
+                byte[] compressed = CompressBlock(blockSlice);
+                writer.Write(compressed.Length);
+                writer.Write(compressed);
             }
 
             return output.ToArray();
@@ -361,9 +353,18 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
                 {
                     // Literals
                     uint length = ReadVarint(stream);
-                    for (uint i = 0; i < length; i++)
+                    // P2-1602: Read literals in a buffer rather than byte-by-byte.
+                    if (length > 0)
                     {
-                        output.WriteByte((byte)stream.ReadByte());
+                        var litBuf = new byte[length];
+                        int totalRead = 0;
+                        while (totalRead < (int)length)
+                        {
+                            int n = stream.Read(litBuf, totalRead, (int)length - totalRead);
+                            if (n <= 0) throw new InvalidDataException("Unexpected end of stream reading literals.");
+                            totalRead += n;
+                        }
+                        output.Write(litBuf, 0, (int)length);
                     }
                 }
                 else

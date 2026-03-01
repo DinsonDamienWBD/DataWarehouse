@@ -458,7 +458,10 @@ public class InMemoryAuthProvider : IIntelligenceAuthProvider
     /// </summary>
     public InMemoryAuthProvider()
     {
-        // Add default development keys
+        // P2-3080: Hardcoded dev API keys removed from production code.
+        // Register keys explicitly via RegisterApiKeyAsync or inject via constructor.
+        // #if DEBUG block retained for local testing only — never shipped in Release.
+#if DEBUG
         _apiKeyToUserId["dev-free"] = "user-free";
         _apiKeyToUserId["dev-basic"] = "user-basic";
         _apiKeyToUserId["dev-pro"] = "user-pro";
@@ -470,6 +473,7 @@ public class InMemoryAuthProvider : IIntelligenceAuthProvider
         _quotas["user-pro"] = new UserQuota("user-pro", QuotaTier.Pro);
         _quotas["user-enterprise"] = new UserQuota("user-enterprise", QuotaTier.Enterprise);
         _quotas["user-byok"] = new UserQuota("user-byok", QuotaTier.BringYourOwnKey);
+#endif
     }
 
     /// <inheritdoc/>

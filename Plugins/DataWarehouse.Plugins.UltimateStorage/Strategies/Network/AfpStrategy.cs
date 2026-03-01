@@ -3,6 +3,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -184,25 +185,36 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
 
         /// <summary>
         /// Ensures connection is alive and reconnects if necessary.
+        /// Reads of _tcpClient and _lastConnectionTime are taken under _connectionLock to
+        /// prevent TOCTOU races against ConnectAsync which writes those fields under the same lock.
         /// </summary>
         private async Task EnsureConnectedAsync(CancellationToken ct)
         {
-            if (_tcpClient == null || !_tcpClient.Connected || _networkStream == null)
+            // Snapshot volatile fields under lock to avoid TOCTOU.
+            await _connectionLock.WaitAsync(ct);
+            bool needsConnect;
+            bool isConnected;
+            DateTime lastConn;
+            try
             {
-                if (_autoReconnect)
-                {
-                    await ConnectAsync(ct);
-                }
-                else
-                {
-                    throw new InvalidOperationException("AFP connection is not established. Call InitializeAsync first.");
-                }
+                isConnected = _tcpClient != null && _tcpClient.Connected && _networkStream != null;
+                lastConn = _lastConnectionTime;
+                needsConnect = !isConnected || (_autoReconnect && (DateTime.UtcNow - lastConn) > _connectionTimeout);
+            }
+            finally
+            {
+                _connectionLock.Release();
             }
 
-            // Check if connection has timed out
-            if (_autoReconnect && (DateTime.UtcNow - _lastConnectionTime) > _connectionTimeout)
+            if (!needsConnect) return;
+
+            if (_autoReconnect)
             {
                 await ConnectAsync(ct);
+            }
+            else
+            {
+                throw new InvalidOperationException("AFP connection is not established. Call InitializeAsync first.");
             }
         }
 
@@ -222,7 +234,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     }
                     catch (Exception ex)
                     {
-                        System.Diagnostics.Debug.WriteLine($"[AfpStrategy.DisconnectInternalAsync] {ex.GetType().Name}: {ex.Message}");
+                        Trace.TraceWarning($"[AfpStrategy.DisconnectInternalAsync] {ex.GetType().Name}: {ex.Message}");
                         // Ignore close errors
                     }
                 }
@@ -237,7 +249,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     }
                     catch (Exception ex)
                     {
-                        System.Diagnostics.Debug.WriteLine($"[AfpStrategy.DisconnectInternalAsync] {ex.GetType().Name}: {ex.Message}");
+                        Trace.TraceWarning($"[AfpStrategy.DisconnectInternalAsync] {ex.GetType().Name}: {ex.Message}");
                         // Ignore close errors
                     }
                 }
@@ -249,7 +261,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[AfpStrategy.DisconnectInternalAsync] {ex.GetType().Name}: {ex.Message}");
+                    Trace.TraceWarning($"[AfpStrategy.DisconnectInternalAsync] {ex.GetType().Name}: {ex.Message}");
                     // Ignore logout errors
                 }
 
@@ -262,7 +274,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     }
                     catch (Exception ex)
                     {
-                        System.Diagnostics.Debug.WriteLine($"[AfpStrategy.DisconnectInternalAsync] {ex.GetType().Name}: {ex.Message}");
+                        Trace.TraceWarning($"[AfpStrategy.DisconnectInternalAsync] {ex.GetType().Name}: {ex.Message}");
                         // Ignore close errors
                     }
                 }
@@ -276,7 +288,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[AfpStrategy.DisconnectInternalAsync] {ex.GetType().Name}: {ex.Message}");
+                Trace.TraceWarning($"[AfpStrategy.DisconnectInternalAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore disconnection errors
             }
 
@@ -445,8 +457,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                         "AFP cleartext password authentication is disabled. " +
                         "Set AllowCleartextPassword=true in configuration only if AFP traffic is protected by TLS/VPN, " +
                         "or switch to AuthMethod=DHX2 or Kerberos.");
-                System.Diagnostics.Debug.WriteLine(
-                    "[AfpStrategy] WARNING: AFP Cleartext Password UAM transmits credentials in cleartext over TCP. " +
+                Trace.TraceWarning(
+                    "[AfpStrategy] AFP Cleartext Password UAM transmits credentials in cleartext over TCP. " +
                     "Use DHX2, Kerberos, or wrap AFP traffic in TLS/VPN in production environments.");
                 // Pad username to 8-byte boundary
                 var usernamePadding = (8 - (_username.Length + 1) % 8) % 8;

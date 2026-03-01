@@ -737,6 +737,8 @@ public sealed class TransformationTracker
 {
     private readonly BoundedDictionary<string, TransformationPipeline> _activePipelines = new BoundedDictionary<string, TransformationPipeline>(1000);
     private readonly BoundedDictionary<string, List<TransformationRecord>> _history = new BoundedDictionary<string, List<TransformationRecord>>(1000);
+    // P2-3076: Lock protects per-knowledgeId List<TransformationRecord> mutations.
+    private readonly object _historyLock = new();
     private readonly ProvenanceRecorder _recorder;
 
     /// <summary>
@@ -830,14 +832,19 @@ public sealed class TransformationTracker
         }
 
         // Store in history
+        // P2-3076: GetOrAdd is atomic on BoundedDictionary but the returned List<T> is shared
+        // across callers — AddRange must be inside a lock to prevent concurrent corruption.
         var historyList = _history.GetOrAdd(pipeline.KnowledgeId, _ => new List<TransformationRecord>());
-        historyList.AddRange(pipeline.Steps.Select(s => new TransformationRecord
+        lock (_historyLock)
         {
-            Type = s.TransformationType,
-            Actor = s.Actor,
-            Timestamp = s.Timestamp,
-            Description = s.Description
-        }));
+            historyList.AddRange(pipeline.Steps.Select(s => new TransformationRecord
+            {
+                Type = s.TransformationType,
+                Actor = s.Actor,
+                Timestamp = s.Timestamp,
+                Description = s.Description
+            }));
+        }
 
         return pipeline;
     }

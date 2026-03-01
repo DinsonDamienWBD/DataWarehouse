@@ -47,7 +47,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
         /// <inheritdoc/>
         public override CompressionCharacteristics Characteristics { get; } = new()
         {
-            AlgorithmName = "RAR-Compatible",
+            AlgorithmName = "RAR-InternalFormat",
             TypicalCompressionRatio = 0.30,
             CompressionSpeed = 3,
             DecompressionSpeed = 4,

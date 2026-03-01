@@ -43,7 +43,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private long _providerQuotaBytes = 1_000_000_000_000L; // 1TB per provider
         private readonly SemaphoreSlim _initLock = new(1, 1);
         private readonly SortedDictionary<uint, string> _consistentHashRing = new();
-        private readonly Random _random = new();
         private Timer? _healthCheckTimer = null;
 
         public override string StrategyId => "infinite-storage";

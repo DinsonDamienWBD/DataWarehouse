@@ -43,7 +43,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private double _totalCarbonEmittedKg;
         private double _totalCarbonOffsetKg;
         private readonly Dictionary<string, DatacenterInfo> _datacenters = new();
-        private readonly Random _random = new();
 
         public override string StrategyId => "carbon-neutral-storage";
         public override string Name => "Carbon-Neutral Storage (Green Cloud)";

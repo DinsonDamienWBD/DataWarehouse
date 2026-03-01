@@ -83,8 +83,17 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
 
         private async Task LoadExistingSSTables(CancellationToken ct)
         {
+            // Sort by filename-embedded timestamp for reliable ordering regardless of filesystem precision.
+            // Filename format: sstable-L{level}-{ticks}.sst — parse the ticks from the name.
             var sstableFiles = Directory.GetFiles(_dataDirectory, "sstable-*.sst")
-                .OrderByDescending(f => File.GetCreationTimeUtc(f))
+                .OrderByDescending(f =>
+                {
+                    var name = Path.GetFileNameWithoutExtension(f);
+                    var dashIdx = name.LastIndexOf('-');
+                    return dashIdx >= 0 && long.TryParse(name.AsSpan(dashIdx + 1), out var ticks)
+                        ? ticks
+                        : File.GetCreationTimeUtc(f).Ticks; // Fallback for non-standard names
+                })
                 .ToList();
 
             foreach (var filePath in sstableFiles)
@@ -249,16 +258,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
             // Collect all results in a dictionary to handle overwrites and tombstones
             var results = new SortedDictionary<byte[], byte[]?>(ByteArrayComparer.Instance);
 
-            // Scan MemTable
-            foreach (var kvp in _memTable.Scan(prefix))
-            {
-                results[kvp.Key] = kvp.Value;
-            }
-
-            // Take a snapshot of the current SSTable list under lock (same reason as GetAsync).
+            // Snapshot both MemTable and SSTable list under _writeLock to prevent concurrent
+            // DisposeAsync from clearing the MemTable mid-scan (finding 4142).
             List<SSTableReader> scanSnapshot;
             await _writeLock.WaitAsync(ct);
-            try { scanSnapshot = new List<SSTableReader>(_sstables); }
+            try
+            {
+                foreach (var kvp in _memTable.Scan(prefix))
+                    results[kvp.Key] = kvp.Value;
+                scanSnapshot = new List<SSTableReader>(_sstables);
+            }
             finally { _writeLock.Release(); }
 
             // Scan SSTables from newest to oldest
@@ -288,63 +297,61 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
         /// </summary>
         private async Task FlushMemTableAsync(CancellationToken ct)
         {
+            // Acquire flush-lock first to serialize flushes.
+            // IMPORTANT: The SSTable write and reader-open happen OUTSIDE _writeLock to avoid
+            // the lock-order inversion (PutAsync: _writeLock → flush; FlushMemTableAsync: flush → _writeLock).
+            // _writeLock is only held for the brief MemTable.Clear + _sstables.Insert critical section.
             await _flushLock.WaitAsync(ct);
+            IEnumerable<KeyValuePair<byte[], byte[]?>> entries;
             try
             {
                 if (_memTable.Count == 0)
-                {
                     return;
-                }
 
-                // Get snapshot of MemTable
-                var entries = _memTable.GetSortedEntries();
-
-                // Create new SSTable
-                var timestamp = DateTime.UtcNow.Ticks;
-                var sstablePath = Path.Combine(_dataDirectory, $"sstable-L0-{timestamp}.sst");
-
-                var sstable = await SSTableWriter.WriteAsync(entries, sstablePath, ct);
-                sstable = sstable with { Level = 0 };
-
-                // Open reader for the new SSTable
-                var reader = await SSTableReader.OpenAsync(sstablePath, ct);
-
-                // Add to front of list (newest first)
-                await _writeLock.WaitAsync(ct);
-                try
-                {
-                    _sstables.Insert(0, reader);
-
-                    // Clear MemTable and truncate WAL
-                    _memTable.Clear();
-                    await _wal.TruncateAsync(ct);
-                    await _wal.OpenAsync(ct);
-                }
-                finally
-                {
-                    _writeLock.Release();
-                }
-
-                // Check if compaction is needed
-                if (_options.EnableBackgroundCompaction)
-                {
-                    var level0Size = _sstables
-                        .Where(s => s.Metadata?.Level == 0)
-                        .Sum(s => s.Metadata?.FileSize ?? 0);
-
-                    if (_compactionManager.NeedsCompaction(0, level0Size))
-                    {
-                        _ = Task.Run(async () =>
-                        {
-                            try { await CompactLevel0Async(CancellationToken.None); }
-                            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[LsmTreeEngine.FlushMemTableAsync] background compaction: {ex.GetType().Name}: {ex.Message}"); }
-                        });
-                    }
-                }
+                // Snapshot under flush-lock but outside write-lock.
+                entries = _memTable.GetSortedEntries().ToList();
             }
             finally
             {
                 _flushLock.Release();
+            }
+
+            // Perform I/O without holding any lock.
+            var timestamp = DateTime.UtcNow.Ticks;
+            var sstablePath = Path.Combine(_dataDirectory, $"sstable-L0-{timestamp}.sst");
+            var sstable = await SSTableWriter.WriteAsync(entries, sstablePath, ct);
+            sstable = sstable with { Level = 0 };
+            var reader = await SSTableReader.OpenAsync(sstablePath, ct);
+
+            // Now hold only _writeLock for the critical section.
+            await _writeLock.WaitAsync(ct);
+            try
+            {
+                _sstables.Insert(0, reader);
+                _memTable.Clear();
+                await _wal.TruncateAsync(ct);
+                await _wal.OpenAsync(ct);
+            }
+            finally
+            {
+                _writeLock.Release();
+            }
+
+            // Check if compaction is needed
+            if (_options.EnableBackgroundCompaction)
+            {
+                var level0Size = _sstables
+                    .Where(s => s.Metadata?.Level == 0)
+                    .Sum(s => s.Metadata?.FileSize ?? 0);
+
+                if (_compactionManager.NeedsCompaction(0, level0Size))
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        try { await CompactLevel0Async(CancellationToken.None); }
+                        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[LsmTreeEngine.FlushMemTableAsync] background compaction: {ex.GetType().Name}: {ex.Message}"); }
+                    });
+                }
             }
         }
 

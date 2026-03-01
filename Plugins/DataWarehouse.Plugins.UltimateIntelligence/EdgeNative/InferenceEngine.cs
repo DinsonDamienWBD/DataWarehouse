@@ -606,12 +606,23 @@ public class WasiNnModelCache
             return cached.Data;
         }
 
-        // Load model
+        // Load model outside the lock (may be loaded redundantly by a racing thread).
         var data = await loader();
         var sizeBytes = data.Length;
 
         lock (_lock)
         {
+            // P2-3055: Re-check cache inside lock to prevent two concurrent callers both
+            // calling loader() and storing duplicate entries (TOCTOU window).
+            if (_cache.TryGetValue(modelPath, out var existing))
+            {
+                existing.LastAccessTime = DateTime.UtcNow;
+                existing.HitCount++;
+                _lruList.Remove(existing.LruNode);
+                _lruList.AddFirst(existing.LruNode);
+                return existing.Data;
+            }
+
             // Evict if necessary
             while ((_cache.Count >= _maxCacheSize || _currentMemoryUsage + sizeBytes > _maxMemoryBytes) && _lruList.Count > 0)
             {

@@ -957,13 +957,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                     var request = new HttpRequestMessage(HttpMethod.Post, $"{_endpoint}{logoutPath}");
                     request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _authToken);
 
-                    await _httpClient.SendAsync(request);
+                    // Use a short timeout to avoid blocking shutdown indefinitely.
+                    using var logoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                    await _httpClient.SendAsync(request, logoutCts.Token);
                 }
-                catch
+                catch (Exception ex)
                 {
-
-                    // Ignore logout failures
-                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+                    System.Diagnostics.Debug.WriteLine($"[HpeStoreOnceStrategy] Logout error during dispose: {ex.GetType().Name}: {ex.Message}");
                 }
             }
 

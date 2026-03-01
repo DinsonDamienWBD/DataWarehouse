@@ -189,7 +189,10 @@ public sealed class AIAdvancedContextRegenerator : IAdvancedContextRegenerator
     private readonly BoundedDictionary<string, RegenerationStrategy> _strategies = new BoundedDictionary<string, RegenerationStrategy>(1000);
     private long _totalRegenerations;
     private long _successfulRegenerations;
+    // P2-3120: Use a lock for _cumulativeAccuracy; Interlocked.Exchange doesn't provide an
+    // atomic read-add because the read and add are two separate operations.
     private double _cumulativeAccuracy;
+    private readonly object _accuracyLock = new();
 
     /// <summary>
     /// Initializes a new AI context regenerator.
@@ -241,7 +244,9 @@ public sealed class AIAdvancedContextRegenerator : IAdvancedContextRegenerator
             var integrity = await CalculateSemanticIntegrityAsync(result, contextStr, ct);
 
             Interlocked.Increment(ref _successfulRegenerations);
-            Interlocked.Exchange(ref _cumulativeAccuracy, _cumulativeAccuracy + accuracy);
+            // P2-3120: Lock ensures the read-add-write is atomic; Interlocked.Exchange alone
+            // reads _cumulativeAccuracy non-atomically before passing to Exchange.
+            lock (_accuracyLock) { _cumulativeAccuracy += accuracy; }
 
             return new AdvancedRegenerationResult
             {

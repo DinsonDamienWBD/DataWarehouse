@@ -248,6 +248,12 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
 
             public override void Write(byte[] buffer, int offset, int count)
             {
+                // LOW-1604: Validate Stream.Write contract parameters.
+                ArgumentNullException.ThrowIfNull(buffer);
+                ArgumentOutOfRangeException.ThrowIfNegative(offset);
+                ArgumentOutOfRangeException.ThrowIfNegative(count);
+                if (offset + count > buffer.Length) throw new ArgumentException("offset + count exceeds buffer length.");
+
                 if (!_headerWritten)
                 {
                     _output.Write(Magic, 0, 4);

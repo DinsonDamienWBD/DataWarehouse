@@ -47,7 +47,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         private int _writeSizeKb = 32;
         private bool _autoMount = true;
         private bool _useAdvisoryLocks = true;
-        private bool _isMounted = false;
+        private volatile bool _isMounted = false;
         private bool _isWindowsNfsClient = false;
         private string? _kerberosRealm = null;
         private string? _kerberosPrincipal = null;

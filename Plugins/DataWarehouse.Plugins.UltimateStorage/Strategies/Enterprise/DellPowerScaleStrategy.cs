@@ -982,21 +982,20 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
         {
             await base.DisposeCoreAsync();
 
-            // Logout and invalidate session token
+            // Logout and invalidate session token — use a short timeout to avoid blocking shutdown.
             if (_httpClient != null && _authToken != null)
             {
                 try
                 {
+                    using var logoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
                     var url = $"{_endpoint}/session/1/session";
                     var request = new HttpRequestMessage(HttpMethod.Delete, url);
                     request.Headers.Add("Cookie", $"isisessid={_authToken}");
-                    await _httpClient.SendAsync(request);
+                    await _httpClient.SendAsync(request, logoutCts.Token);
                 }
-                catch
+                catch (Exception ex)
                 {
-
-                    // Ignore logout errors during disposal
-                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+                    System.Diagnostics.Debug.WriteLine($"[DellPowerScaleStrategy] Logout error during dispose: {ex.GetType().Name}: {ex.Message}");
                 }
             }
 

@@ -216,18 +216,23 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             await Task.CompletedTask;
         }
 
-        protected override async Task<bool> ExistsAsyncCore(string key, CancellationToken ct)
+        protected override Task<bool> ExistsAsyncCore(string key, CancellationToken ct)
         {
             EnsureInitialized();
 
+            // Check origin in-memory cache
             if (_originCache.ContainsKey(key))
+                return Task.FromResult(true);
+
+            // Check all edge caches — objects may exist in an edge node even after origin eviction.
+            foreach (var edgeCache in _edgeCaches.Values)
             {
-                return true;
+                if (edgeCache.ContainsKey(key))
+                    return Task.FromResult(true);
             }
 
             var originFilePath = GetSafeOriginPath(key);
-            await Task.CompletedTask;
-            return File.Exists(originFilePath);
+            return Task.FromResult(File.Exists(originFilePath));
         }
 
         protected override async IAsyncEnumerable<StorageObjectMetadata> ListAsyncCore(string? prefix, [EnumeratorCancellation] CancellationToken ct)

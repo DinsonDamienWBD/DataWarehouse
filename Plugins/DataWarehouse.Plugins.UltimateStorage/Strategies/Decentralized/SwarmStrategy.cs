@@ -44,6 +44,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
         private bool _verifyAfterStore = true;
         private readonly Dictionary<string, string> _keyToReferenceMap = new();
         private readonly object _mapLock = new();
+        private string? _localIndexPath;
         private string? _feedTopic;
         private string? _feedOwner;
         private bool _useSingleOwnerChunks = false;
@@ -91,6 +92,32 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             _feedTopic = GetConfiguration<string?>("FeedTopic", null);
             _feedOwner = GetConfiguration<string?>("FeedOwner", null);
             _useSingleOwnerChunks = GetConfiguration<bool>("UseSingleOwnerChunks", false);
+            _localIndexPath = GetConfiguration<string?>("LocalIndexPath", null);
+
+            // Load persisted key→reference map from disk to survive restarts
+            if (!string.IsNullOrEmpty(_localIndexPath))
+            {
+                try
+                {
+                    if (File.Exists(_localIndexPath))
+                    {
+                        var json = await File.ReadAllTextAsync(_localIndexPath, ct);
+                        var loaded = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+                        if (loaded != null)
+                        {
+                            lock (_mapLock)
+                            {
+                                foreach (var kvp in loaded)
+                                    _keyToReferenceMap[kvp.Key] = kvp.Value;
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[SwarmStrategy] Failed to load local index from '{_localIndexPath}': {ex.GetType().Name}: {ex.Message}");
+                }
+            }
 
             // Validate configuration
             if (string.IsNullOrWhiteSpace(_beeApiUrl))
@@ -135,8 +162,29 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
 
         protected override async ValueTask DisposeCoreAsync()
         {
+            // Flush the in-memory index to disk before closing.
+            await PersistLocalIndexAsync(CancellationToken.None);
             await base.DisposeCoreAsync();
             _httpClient?.Dispose();
+        }
+
+        /// <summary>Persists the key→reference map to LocalIndexPath if configured.</summary>
+        private async Task PersistLocalIndexAsync(CancellationToken ct)
+        {
+            if (string.IsNullOrEmpty(_localIndexPath)) return;
+            try
+            {
+                Dictionary<string, string> snapshot;
+                lock (_mapLock) { snapshot = new Dictionary<string, string>(_keyToReferenceMap); }
+                var json = JsonSerializer.Serialize(snapshot);
+                var dir = Path.GetDirectoryName(_localIndexPath);
+                if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                await File.WriteAllTextAsync(_localIndexPath, json, ct);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[SwarmStrategy] Failed to persist local index to '{_localIndexPath}': {ex.GetType().Name}: {ex.Message}");
+            }
         }
 
         #endregion
@@ -238,6 +286,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 throw new IOException($"Failed to store object '{key}' to Swarm: {ex.Message}", ex);
             }
 
+            // Persist the updated index so the mapping survives restarts.
+            await PersistLocalIndexAsync(ct);
+
             // Update statistics
             IncrementBytesStored(dataSize);
             IncrementOperationCounter(StorageOperationType.Store);
@@ -337,6 +388,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             {
                 _keyToReferenceMap.Remove(key);
             }
+
+            // Persist the updated index so the deletion survives restarts.
+            await PersistLocalIndexAsync(ct);
 
             // Update statistics
             IncrementBytesDeleted(size);

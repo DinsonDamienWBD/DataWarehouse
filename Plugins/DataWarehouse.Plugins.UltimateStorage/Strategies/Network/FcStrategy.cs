@@ -227,7 +227,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 }
             }
 
-            // Initialize HTTP client for fabric management API
+            // Initialize HTTP client for fabric management API — dispose prior instance on re-init.
+            _fabricApiClient?.Dispose();
             _fabricApiClient = new HttpClient
             {
                 BaseAddress = new Uri($"https://{_fabricSwitchAddress}:{_fabricManagementPort}"),
@@ -659,11 +660,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 IncrementOperationCounter(StorageOperationType.Exists);
                 return lunMapping != null;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is FileNotFoundException || ex is KeyNotFoundException)
             {
-                System.Diagnostics.Debug.WriteLine($"[FcStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
+                // Object truly does not exist.
                 IncrementOperationCounter(StorageOperationType.Exists);
                 return false;
+            }
+            catch (Exception)
+            {
+                // Auth failure, transport error, etc. — rethrow so callers are not misled.
+                throw;
             }
         }
 

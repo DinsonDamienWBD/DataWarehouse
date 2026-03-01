@@ -90,9 +90,10 @@ public sealed class SovereigntyObservabilityStrategy : ComplianceStrategyBase
     // ==================================================================================
 
     /// <inheritdoc/>
-    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
+    public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
     {
-        base.InitializeAsync(configuration, cancellationToken);
+        // P1-1543: await base so base-class initialization completes before reading config.
+        await base.InitializeAsync(configuration, cancellationToken).ConfigureAwait(false);
 
         if (configuration.TryGetValue("expirationRateThreshold", out var ert) && ert is double ertVal)
             _expirationRateThreshold = ertVal;
@@ -100,8 +101,6 @@ public sealed class SovereigntyObservabilityStrategy : ComplianceStrategyBase
             _enforcementDenialRateThreshold = edrtVal;
         if (configuration.TryGetValue("transferDenialRateThreshold", out var tdrt) && tdrt is double tdrtVal)
             _transferDenialRateThreshold = tdrtVal;
-
-        return Task.CompletedTask;
     }
 
     // ==================================================================================

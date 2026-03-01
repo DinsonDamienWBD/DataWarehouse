@@ -1,6 +1,7 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -156,8 +157,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                     var balanceAr = balanceWinston / 1_000_000_000_000m; // Convert Winston to AR
                     if (balanceAr < _minArBalance)
                     {
-                        System.Diagnostics.Debug.WriteLine(
-                            $"Warning: Arweave wallet balance ({balanceAr:F4} AR) is below minimum threshold ({_minArBalance} AR)");
+                        // Publish a WARNING-level diagnostic so operators see it in production
+                        // (Debug.WriteLine is stripped in Release builds and invisible without debugger).
+                        Trace.TraceWarning(
+                            $"[ArweaveStrategy] Wallet balance ({balanceAr:F4} AR) is below minimum threshold " +
+                            $"({_minArBalance} AR). Top up your wallet to avoid failed uploads.");
                     }
                 }
             }

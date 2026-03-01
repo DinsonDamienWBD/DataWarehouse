@@ -861,7 +861,9 @@ public sealed class CollectiveIntelligenceStrategy : FeatureStrategyBase
 public sealed class MetaLearningStrategy : FeatureStrategyBase
 {
     private readonly BoundedDictionary<string, MetaKnowledge> _metaKnowledge = new BoundedDictionary<string, MetaKnowledge>(1000);
+    // P2-3096: Use a lock for read-modify-write to prevent torn updates on concurrent calls.
     private double _learningEfficiency = 0.5;
+    private readonly object _efficiencyLock = new();
 
     /// <inheritdoc/>
     public override string StrategyId => "evolution-metalearning";
@@ -931,8 +933,11 @@ public sealed class MetaLearningStrategy : FeatureStrategyBase
 
             _metaKnowledge[taskType] = updated;
 
-            // Improve learning efficiency
-            _learningEfficiency = Math.Min(0.95, _learningEfficiency + 0.01);
+            // Improve learning efficiency (P2-3096: lock prevents torn read-modify-write).
+            lock (_efficiencyLock)
+            {
+                _learningEfficiency = Math.Min(0.95, _learningEfficiency + 0.01);
+            }
 
             await Task.CompletedTask;
             return modelId;

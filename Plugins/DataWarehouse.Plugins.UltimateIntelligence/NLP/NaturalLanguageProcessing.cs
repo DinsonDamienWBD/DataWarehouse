@@ -260,6 +260,13 @@ public sealed class QueryParser
     private readonly Func<string, string, CancellationToken, Task<string?>>? _messageBusPublisher;
     private static readonly Regex WhitespaceRegex = new(@"\s+", RegexOptions.Compiled);
     private static readonly Regex WordBoundaryRegex = new(@"\b\w+\b", RegexOptions.Compiled);
+    // P2-3074: Cache compiled regex objects as static to avoid per-call compilation.
+    private static readonly Regex QuotedPhraseRegex = new(@"""([^""]+)""|'([^']+)'", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
+    private static readonly Regex FilePathEntityRegex = new(@"(?:[a-zA-Z]:\\|/)?(?:[\w.-]+[/\\])*[\w.-]+\.\w+", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
+    private static readonly Regex SizeEntityRegex = new(@"\b(\d+(?:\.\d+)?)\s*(bytes?|[KMGTPE]B|[KMGTPE]iB)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled, TimeSpan.FromSeconds(5));
+    private static readonly Regex DateEntityRegex = new(@"\b(\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}/\d{2,4}|today|yesterday|tomorrow|last\s+(?:week|month|year)|next\s+(?:week|month|year))\b", RegexOptions.IgnoreCase | RegexOptions.Compiled, TimeSpan.FromSeconds(5));
+    private static readonly Regex EmailEntityRegex = new(@"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
+    private static readonly Regex UrlEntityRegex = new(@"https?://[^\s]+", RegexOptions.IgnoreCase | RegexOptions.Compiled, TimeSpan.FromSeconds(5));
     private static readonly HashSet<string> DefaultStopWords = new(StringComparer.OrdinalIgnoreCase)
     {
         "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
@@ -387,8 +394,7 @@ public sealed class QueryParser
         var phrases = new List<QueryPhrase>();
 
         // Extract quoted phrases
-        var quotedRegex = new Regex(@"""([^""]+)""|'([^']+)'", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
-        foreach (Match match in quotedRegex.Matches(originalText))
+        foreach (Match match in QuotedPhraseRegex.Matches(originalText))
         {
             var phraseText = match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value;
             phrases.Add(new QueryPhrase
@@ -409,8 +415,7 @@ public sealed class QueryParser
         var entities = new List<ExtractedEntity>();
 
         // File path pattern
-        var filePathRegex = new Regex(@"(?:[a-zA-Z]:\\|/)?(?:[\w.-]+[/\\])*[\w.-]+\.\w+", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
-        foreach (Match match in filePathRegex.Matches(query))
+        foreach (Match match in FilePathEntityRegex.Matches(query))
         {
             entities.Add(new ExtractedEntity
             {
@@ -422,8 +427,7 @@ public sealed class QueryParser
         }
 
         // Size pattern (e.g., 10MB, 5.2 GB, 100KB)
-        var sizeRegex = new Regex(@"\b(\d+(?:\.\d+)?)\s*(bytes?|[KMGTPE]B|[KMGTPE]iB)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled, TimeSpan.FromSeconds(5));
-        foreach (Match match in sizeRegex.Matches(query))
+        foreach (Match match in SizeEntityRegex.Matches(query))
         {
             entities.Add(new ExtractedEntity
             {
@@ -436,8 +440,7 @@ public sealed class QueryParser
         }
 
         // Date patterns
-        var dateRegex = new Regex(@"\b(\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}/\d{2,4}|today|yesterday|tomorrow|last\s+(?:week|month|year)|next\s+(?:week|month|year))\b", RegexOptions.IgnoreCase | RegexOptions.Compiled, TimeSpan.FromSeconds(5));
-        foreach (Match match in dateRegex.Matches(query))
+        foreach (Match match in DateEntityRegex.Matches(query))
         {
             entities.Add(new ExtractedEntity
             {
@@ -450,8 +453,7 @@ public sealed class QueryParser
         }
 
         // Email pattern
-        var emailRegex = new Regex(@"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
-        foreach (Match match in emailRegex.Matches(query))
+        foreach (Match match in EmailEntityRegex.Matches(query))
         {
             entities.Add(new ExtractedEntity
             {
@@ -463,8 +465,7 @@ public sealed class QueryParser
         }
 
         // URL pattern
-        var urlRegex = new Regex(@"https?://[^\s]+", RegexOptions.IgnoreCase | RegexOptions.Compiled, TimeSpan.FromSeconds(5));
-        foreach (Match match in urlRegex.Matches(query))
+        foreach (Match match in UrlEntityRegex.Matches(query))
         {
             entities.Add(new ExtractedEntity
             {
@@ -630,6 +631,29 @@ public sealed class IntentDetector
 {
     private readonly IntentDetectorOptions _options;
     private readonly Func<string, string, CancellationToken, Task<string?>>? _messageBusPublisher;
+    // P2-3075: Precompiled intent pattern regexes to avoid per-call compilation in DetermineIntentWithConfidence.
+    private static readonly (Regex Pattern, double Confidence)[] CommandIntentPatterns =
+    [
+        (new Regex(@"^delete\b", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100)), 0.95),
+        (new Regex(@"^remove\b", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100)), 0.95),
+        (new Regex(@"^create\b", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100)), 0.90),
+        (new Regex(@"^add\b", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100)), 0.85),
+        (new Regex(@"^update\b", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100)), 0.90),
+        (new Regex(@"^execute\b", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100)), 0.95),
+        (new Regex(@"^run\b", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100)), 0.85),
+        (new Regex(@"^please\s+(delete|remove|create|add|update)", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100)), 0.85),
+    ];
+    private static readonly (Regex Pattern, double Confidence)[] QueryIntentPatterns =
+    [
+        (new Regex(@"^(what|which|where|when|who|how)\b", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100)), 0.90),
+        (new Regex(@"^find\b", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100)), 0.90),
+        (new Regex(@"^search\b", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100)), 0.90),
+        (new Regex(@"^show\b", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100)), 0.85),
+        (new Regex(@"^list\b", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100)), 0.90),
+        (new Regex(@"^get\b", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100)), 0.80),
+        (new Regex(@"^count\b", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100)), 0.90),
+        (new Regex(@"\?$", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100)), 0.70),
+    ];
 
     /// <summary>
     /// Creates a new IntentDetector.
@@ -771,46 +795,19 @@ public sealed class IntentDetector
 
     private (UserIntent Intent, double Confidence) DetermineIntentWithConfidence(string query)
     {
+        // P2-3075: Use precompiled static regex arrays instead of per-call string patterns.
         // Strong command indicators
-        var commandPatterns = new[]
+        foreach (var (pattern, confidence) in CommandIntentPatterns)
         {
-            ("^delete\\b", 0.95),
-            ("^remove\\b", 0.95),
-            ("^create\\b", 0.9),
-            ("^add\\b", 0.85),
-            ("^update\\b", 0.9),
-            ("^execute\\b", 0.95),
-            ("^run\\b", 0.85),
-            ("^please\\s+(delete|remove|create|add|update)", 0.85)
-        };
-
-        foreach (var (pattern, confidence) in commandPatterns)
-        {
-            if (Regex.IsMatch(query, pattern))
-            {
+            if (pattern.IsMatch(query))
                 return (UserIntent.Command, confidence);
-            }
         }
 
         // Strong query indicators
-        var queryPatterns = new[]
+        foreach (var (pattern, confidence) in QueryIntentPatterns)
         {
-            ("^(what|which|where|when|who|how)\\b", 0.9),
-            ("^find\\b", 0.9),
-            ("^search\\b", 0.9),
-            ("^show\\b", 0.85),
-            ("^list\\b", 0.9),
-            ("^get\\b", 0.8),
-            ("^count\\b", 0.9),
-            ("\\?$", 0.7)
-        };
-
-        foreach (var (pattern, confidence) in queryPatterns)
-        {
-            if (Regex.IsMatch(query, pattern))
-            {
+            if (pattern.IsMatch(query))
                 return (UserIntent.Query, confidence);
-            }
         }
 
         // Clarification

@@ -80,6 +80,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         public override string StrategyId => "nvmeof";
         public override string Name => "NVMe over Fabrics Storage";
         public override StorageTier Tier => StorageTier.Hot;
+        /// <summary>
+        /// Returns false: data path uses HTTP REST simulation, not real NVMe-oF fabric protocol.
+        /// Requires nvme-fabrics kernel driver (Linux) or Windows NVMe-oF host driver with P/Invoke.
+        /// </summary>
+        public override bool IsProductionReady => false;
 
         public override StorageCapabilities Capabilities => new StorageCapabilities
         {

@@ -40,6 +40,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private bool _enableAutoMigration = true;
         private int _migrationCheckIntervalSeconds = 300;
         private readonly SemaphoreSlim _initLock = new(1, 1);
+        private readonly SemaphoreSlim _migrationLock = new(1, 1); // Re-entry guard for timer callback
         private readonly BoundedDictionary<string, ObjectAccessProfile> _accessProfiles = new BoundedDictionary<string, ObjectAccessProfile>(1000);
         private readonly BoundedDictionary<string, StorageTier> _objectTiers = new BoundedDictionary<string, StorageTier>(1000);
         private readonly BoundedDictionary<string, byte[]> _dataCache = new BoundedDictionary<string, byte[]>(1000);
@@ -592,6 +593,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         /// </summary>
         private async Task PerformAutoMigrationAsync(CancellationToken ct)
         {
+            // Re-entry guard: skip this cycle if a migration is already in progress.
+            if (!await _migrationLock.WaitAsync(0))
+                return;
             try
             {
                 foreach (var kvp in _accessProfiles.ToArray())
@@ -617,9 +621,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             }
             catch (Exception ex)
             {
-
                 // Best effort migration
-                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[AiTieredStorageStrategy.PerformAutoMigrationAsync] {ex.GetType().Name}: {ex.Message}");
+            }
+            finally
+            {
+                _migrationLock.Release();
             }
         }
 
