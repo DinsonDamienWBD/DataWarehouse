@@ -69,6 +69,7 @@ internal sealed class ManifestStateMachine : IDisposable
     /// <param name="snapshot">The JSON-serialized snapshot data.</param>
     public void RestoreSnapshot(byte[] snapshot)
     {
+        if (snapshot == null || snapshot.Length == 0) return;
         _lock.EnterWriteLock();
         try
         {
@@ -91,6 +92,7 @@ internal sealed class ManifestStateMachine : IDisposable
     /// <param name="logEntry">The JSON-serialized ManifestCommand.</param>
     public void Apply(byte[] logEntry)
     {
+        if (logEntry == null || logEntry.Length == 0) return;
         var command = JsonSerializer.Deserialize<ManifestCommand>(logEntry);
         if (command == null) return;
 

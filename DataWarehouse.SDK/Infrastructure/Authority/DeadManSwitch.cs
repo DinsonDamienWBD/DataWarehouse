@@ -210,6 +210,11 @@ namespace DataWarehouse.SDK.Infrastructure.Authority
 
             ct.ThrowIfCancellationRequested();
 
+            // Guard: only unlock if actually locked; calling UnlockAsync on an unlocked system
+            // is a no-op that should NOT reset warning state or produce a misleading audit entry.
+            if (!_isLocked)
+                return;
+
             _isLocked = false;
             _warningIssued = false;
 

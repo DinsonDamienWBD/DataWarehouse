@@ -284,6 +284,11 @@ public sealed class DataflowParallelStrategy : WorkflowStrategyBase
 
         var taskDict = workflow.Tasks.ToDictionary(t => t.TaskId);
 
+        // Build downstream adjacency list once so each executor doesn't O(n) scan workflow.Tasks.
+        var downstreamOf = workflow.Tasks.ToDictionary(
+            t => t.TaskId,
+            t => workflow.Tasks.Where(other => other.Dependencies.Contains(t.TaskId)).ToList());
+
         var executors = workflow.Tasks.Select(async task =>
         {
             foreach (var dep in task.Dependencies)
@@ -295,15 +300,17 @@ public sealed class DataflowParallelStrategy : WorkflowStrategyBase
             var result = await ExecuteTaskAsync(task, context, cancellationToken);
             context.TaskResults[task.TaskId] = result;
 
-            foreach (var downstream in workflow.Tasks.Where(t => t.Dependencies.Contains(task.TaskId)))
+            // Write output to all downstream task channels, then complete this channel.
+            // TryComplete() is called AFTER writes so readers can always drain the written value.
+            foreach (var downstream in downstreamOf[task.TaskId])
                 await channels[task.TaskId].Writer.WriteAsync(result.Output, cancellationToken);
 
             channels[task.TaskId].Writer.TryComplete();
             return result;
         }).ToArray();
 
-        foreach (var task in workflow.Tasks.Where(t => t.Dependencies.Count == 0))
-            channels[task.TaskId].Writer.TryComplete();
+        // Do NOT pre-complete root-task channels here — the executor above already completes them
+        // after writing any output. Pre-completing would race with WriteAsync and cause ChannelClosedException.
 
         await Task.WhenAll(executors);
 

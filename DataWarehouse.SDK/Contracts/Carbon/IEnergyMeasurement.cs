@@ -47,6 +47,6 @@ namespace DataWarehouse.SDK.Contracts.Carbon
         /// </summary>
         /// <param name="ct">Cancellation token.</param>
         /// <returns>Current power consumption in watts.</returns>
-        Task<double> GetCurrentPowerDrawWatts(CancellationToken ct = default);
+        Task<double> GetCurrentPowerDrawWattsAsync(CancellationToken ct = default);
     }
 }

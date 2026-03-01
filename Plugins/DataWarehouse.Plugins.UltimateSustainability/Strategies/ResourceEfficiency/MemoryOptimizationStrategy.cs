@@ -8,7 +8,9 @@ public sealed class MemoryOptimizationStrategy : SustainabilityStrategyBase
 {
     private long _totalMemoryBytes;
     private long _usedMemoryBytes;
-    private long _compressedBytes;
+    // Tracks GC managed bytes before compaction vs after, to compute actual GC compression ratio.
+    private long _managedBytesBeforeGc;
+    private long _managedBytesAfterGc;
     private Timer? _monitorTimer;
     private readonly object _lock = new();
 
@@ -30,8 +32,11 @@ public sealed class MemoryOptimizationStrategy : SustainabilityStrategyBase
     /// <summary>Memory usage percent.</summary>
     public double UsagePercent { get { lock (_lock) return _totalMemoryBytes > 0 ? (double)_usedMemoryBytes / _totalMemoryBytes * 100 : 0; } }
 
-    /// <summary>Compression ratio achieved.</summary>
-    public double CompressionRatio { get { lock (_lock) return _compressedBytes > 0 ? (double)_usedMemoryBytes / _compressedBytes : 1; } }
+    /// <summary>
+    /// GC heap compaction ratio: bytes before last GC / bytes after last GC.
+    /// Returns 1.0 when no GC has occurred yet.
+    /// </summary>
+    public double CompressionRatio { get { lock (_lock) return _managedBytesAfterGc > 0 && _managedBytesBeforeGc > 0 ? (double)_managedBytesBeforeGc / _managedBytesAfterGc : 1.0; } }
 
     /// <summary>Target memory usage percent.</summary>
     public double TargetUsagePercent { get; set; } = 70;
@@ -65,7 +70,10 @@ public sealed class MemoryOptimizationStrategy : SustainabilityStrategyBase
         lock (_lock)
         {
             _usedMemoryBytes = GC.GetTotalMemory(false);
-            _compressedBytes = info.MemoryLoadBytes;
+            // Track GC compaction ratio: HeapSizeBytes is total committed, MemoryLoadBytes is system physical usage.
+            // We approximate compaction as the ratio of heap fragmentation reclaimed during the last GC.
+            _managedBytesBeforeGc = info.HeapSizeBytes;
+            _managedBytesAfterGc = Math.Max(1, info.HeapSizeBytes - info.FragmentedBytes);
         }
 
         // Estimate power: ~3W per 8GB of active DRAM

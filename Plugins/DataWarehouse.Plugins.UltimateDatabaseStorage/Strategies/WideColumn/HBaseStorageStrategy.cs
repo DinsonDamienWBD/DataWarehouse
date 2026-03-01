@@ -262,9 +262,10 @@ public sealed class HBaseStorageStrategy : DatabaseStorageStrategyBase
                         ETag = cells.TryGetValue($"{_columnFamily}:etag", out var etag) ? FromBase64(etag) : null,
                         CustomMetadata = customMetadata,
                         Created = cells.TryGetValue($"{_columnFamily}:createdAt", out var created)
-                            ? DateTime.Parse(FromBase64(created)) : DateTime.UtcNow,
+                            // P2-2866: InvariantCulture prevents FormatException on non-invariant locale hosts.
+                            ? DateTime.Parse(FromBase64(created), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind) : DateTime.UtcNow,
                         Modified = cells.TryGetValue($"{_columnFamily}:modifiedAt", out var modified)
-                            ? DateTime.Parse(FromBase64(modified)) : DateTime.UtcNow,
+                            ? DateTime.Parse(FromBase64(modified), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind) : DateTime.UtcNow,
                         Tier = Tier
                     };
                 }
@@ -323,9 +324,10 @@ public sealed class HBaseStorageStrategy : DatabaseStorageStrategyBase
             ETag = cells.TryGetValue($"{_columnFamily}:etag", out var etag) ? FromBase64(etag) : null,
             CustomMetadata = customMetadata,
             Created = cells.TryGetValue($"{_columnFamily}:createdAt", out var created)
-                ? DateTime.Parse(FromBase64(created)) : DateTime.UtcNow,
+                // P2-2866: InvariantCulture prevents FormatException on non-invariant locale hosts.
+                            ? DateTime.Parse(FromBase64(created), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind) : DateTime.UtcNow,
             Modified = cells.TryGetValue($"{_columnFamily}:modifiedAt", out var modified)
-                ? DateTime.Parse(FromBase64(modified)) : DateTime.UtcNow,
+                ? DateTime.Parse(FromBase64(modified), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind) : DateTime.UtcNow,
             Tier = Tier
         };
     }

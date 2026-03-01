@@ -69,11 +69,18 @@ public sealed class ConnectionTarget
     /// <param name="port">Remote port (default 8080).</param>
     /// <param name="useTls">Whether to use TLS/SSL (default true).</param>
     /// <returns>A <see cref="ConnectionTarget"/> configured for remote connection.</returns>
-    public static ConnectionTarget Remote(string host, int port = 8080, bool useTls = true) => new()
+    public static ConnectionTarget Remote(string host, int port = 8080, bool useTls = true)
     {
-        Type = ConnectionType.Remote,
-        Host = host,
-        Port = port,
-        UseTls = useTls
-    };
+        if (string.IsNullOrWhiteSpace(host))
+            throw new ArgumentException("Host must not be null or empty.", nameof(host));
+        if (port < 1 || port > 65535)
+            throw new ArgumentOutOfRangeException(nameof(port), port, "Port must be between 1 and 65535.");
+        return new()
+        {
+            Type = ConnectionType.Remote,
+            Host = host,
+            Port = port,
+            UseTls = useTls
+        };
+    }
 }

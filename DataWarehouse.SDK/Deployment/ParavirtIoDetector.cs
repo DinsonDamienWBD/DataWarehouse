@@ -162,8 +162,10 @@ public sealed class ParavirtIoDetector
             };
         }
 
-        // VirtIO SCSI (driver: virtio_scsi)
-        if (vendorId.Contains("1AF4", StringComparison.OrdinalIgnoreCase) ||
+        // VirtIO SCSI (VEN_1AF4&DEV_1004 or driver: virtio_scsi)
+        // Require the SCSI-specific device ID (DEV_1004) — bare vendor ID 1AF4 is shared by all
+        // VirtIO device classes (Net DEV_1000, Block DEV_1001, Balloon DEV_1002, SCSI DEV_1004).
+        if (deviceId.Contains("VEN_1AF4&DEV_1004", StringComparison.OrdinalIgnoreCase) ||
             driverName.Contains("virtio_scsi", StringComparison.OrdinalIgnoreCase))
         {
             return new ParavirtDevice

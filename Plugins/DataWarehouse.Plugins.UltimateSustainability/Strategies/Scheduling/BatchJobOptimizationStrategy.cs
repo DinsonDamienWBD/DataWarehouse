@@ -42,8 +42,21 @@ public sealed class BatchJobOptimizationStrategy : SustainabilityStrategyBase
     public void SetElectricityPriceProvider(Func<Task<double>> provider) => _electricityPriceProvider = provider;
 
     /// <summary>Submits a batch job for scheduling.</summary>
+    /// <param name="name">Job name (required, non-empty).</param>
+    /// <param name="estimatedKwh">Estimated energy consumption in kWh (must be &gt; 0).</param>
+    /// <param name="maxDelay">Maximum scheduling delay (must be positive).</param>
+    /// <param name="priority">Job priority 1-10 (default 5).</param>
     public string SubmitJob(string name, double estimatedKwh, TimeSpan maxDelay, int priority = 5)
     {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Job name must not be empty.", nameof(name));
+        if (estimatedKwh <= 0)
+            throw new ArgumentOutOfRangeException(nameof(estimatedKwh), estimatedKwh, "Estimated energy consumption must be greater than zero.");
+        if (maxDelay <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(maxDelay), maxDelay, "Maximum delay must be a positive duration.");
+        if (priority < 1 || priority > 10)
+            throw new ArgumentOutOfRangeException(nameof(priority), priority, "Priority must be between 1 and 10 inclusive.");
+
         var job = new BatchJob
         {
             JobId = Guid.NewGuid().ToString("N"),

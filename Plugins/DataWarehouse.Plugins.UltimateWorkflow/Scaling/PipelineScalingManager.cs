@@ -257,13 +257,9 @@ public sealed class PipelineScalingManager : IScalableSubsystem, IDisposable
             isSpilled,
             dependsOnStages ?? Array.Empty<int>());
 
-        // Get or create the snapshot list for this pipeline
-        var snapshots = _stateSnapshots.GetOrDefault(pipelineId);
-        if (snapshots == null)
-        {
-            snapshots = new List<PipelineStageCapturedState>();
-            _stateSnapshots.Put(pipelineId, snapshots);
-        }
+        // GetOrAdd is atomic on BoundedDictionary (ConcurrentDictionary) — eliminates the TOCTOU
+        // between GetOrDefault and Put that allowed concurrent callers to orphan list objects.
+        var snapshots = _stateSnapshots.GetOrAdd(pipelineId, _ => new List<PipelineStageCapturedState>());
 
         // Insert at correct index position (pad if needed)
         lock (snapshots)

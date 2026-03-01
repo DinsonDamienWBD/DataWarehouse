@@ -194,7 +194,7 @@ public sealed class EnergyMeasurementService : IEnergyMeasurementService
     }
 
     /// <inheritdoc/>
-    public async Task<double> GetCurrentPowerDrawWatts(CancellationToken ct = default)
+    public async Task<double> GetCurrentPowerDrawWattsAsync(CancellationToken ct = default)
     {
         try
         {
@@ -225,7 +225,7 @@ public sealed class EnergyMeasurementService : IEnergyMeasurementService
         CancellationToken ct)
     {
         // For the SDK interface, take a power draw snapshot and estimate based on data size
-        var watts = await GetCurrentPowerDrawWatts(ct);
+        var watts = await GetCurrentPowerDrawWattsAsync(ct);
 
         // Estimate duration from data size (rough: 500 MB/s for SSD, 150 MB/s for HDD)
         var estimatedDurationMs = dataSizeBytes > 0

@@ -68,7 +68,7 @@ public sealed class FederationOrchestrator : IFederationOrchestrator, ITopologyP
     }
 
     /// <inheritdoc />
-    public async Task StartAsync(CancellationToken ct = default)
+    public Task StartAsync(CancellationToken ct = default)
     {
         // Subscribe to membership changes
         _membership.OnMembershipChanged += HandleMembershipChanged;
@@ -76,15 +76,15 @@ public sealed class FederationOrchestrator : IFederationOrchestrator, ITopologyP
         // Start health check loop
         _ = RunHealthCheckLoopAsync(_cts.Token);
 
-        await Task.CompletedTask;
+        return Task.CompletedTask;
     }
 
     /// <inheritdoc />
-    public async Task StopAsync(CancellationToken ct = default)
+    public Task StopAsync(CancellationToken ct = default)
     {
         _cts.Cancel();
         _membership.OnMembershipChanged -= HandleMembershipChanged;
-        await Task.CompletedTask;
+        return Task.CompletedTask;
     }
 
     /// <inheritdoc />
@@ -226,7 +226,6 @@ public sealed class FederationOrchestrator : IFederationOrchestrator, ITopologyP
 
         _topology.AddOrUpdateNode(updated);
 
-        await Task.CompletedTask;
     }
 
     /// <inheritdoc />

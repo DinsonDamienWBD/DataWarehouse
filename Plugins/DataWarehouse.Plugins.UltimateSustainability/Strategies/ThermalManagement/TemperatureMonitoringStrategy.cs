@@ -103,7 +103,13 @@ public sealed class TemperatureMonitoringStrategy : SustainabilityStrategyBase
                 if (zone.CurrentTempC > zone.MaxTempC) zone.MaxTempC = zone.CurrentTempC;
             }
         }
-        var maxTemp = _zones.Values.Max(z => z.CurrentTempC);
+
+        // Take snapshot of max temperature inside the lock to avoid racing with concurrent zone updates.
+        double maxTemp;
+        lock (_lock)
+        {
+            maxTemp = _zones.Count > 0 ? _zones.Values.Max(z => z.CurrentTempC) : 0;
+        }
         RecordSample(0, 0);
         UpdateRecommendations(maxTemp);
     }

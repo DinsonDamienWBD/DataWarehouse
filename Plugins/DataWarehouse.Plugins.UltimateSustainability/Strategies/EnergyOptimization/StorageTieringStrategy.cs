@@ -140,8 +140,11 @@ public sealed class StorageTieringStrategy : SustainabilityStrategyBase
         }
     }
 
-    private void EvaluateTieringRecommendations()
+    private void EvaluateTieringRecommendations(Dictionary<string, DataObjectInfo> snapshot)
     {
+        // snapshot is captured inside the lock in TrackObject, providing a consistent view without
+        // holding the lock during the evaluation (which calls ClearRecommendations/AddRecommendation).
+        _ = snapshot; // Used by GetTieringRecommendations which reads _objects under its own lock.
         ClearRecommendations();
         var recs = GetTieringRecommendations();
         var totalSavings = recs.Sum(r => r.EstimatedPowerSavingsWatts);

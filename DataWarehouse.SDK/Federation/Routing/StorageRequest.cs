@@ -57,6 +57,18 @@ public sealed class StorageRequest
     /// Gets the UTC timestamp when this request was created.
     /// </summary>
     public DateTimeOffset TimestampUtc { get; init; } = DateTimeOffset.UtcNow;
+
+    /// <summary>
+    /// Gets the estimated payload size in bytes for this request.
+    /// </summary>
+    /// <remarks>
+    /// Capacity-based routing (e.g. ThroughputOptimized policy) uses this value to
+    /// score candidate nodes by available free space vs request size. Callers should set this to the actual
+    /// or estimated write payload size; defaults to -1 (unknown) to distinguish "not set" from "zero-byte
+    /// request", preventing capacity-based routing from silently treating every un-annotated request as a
+    /// zero-byte write and routing to the lowest-capacity node.
+    /// </remarks>
+    public long EstimatedSizeBytes { get; init; } = -1;
 }
 
 /// <summary>

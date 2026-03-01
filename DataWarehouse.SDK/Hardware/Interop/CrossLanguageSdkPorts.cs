@@ -143,7 +143,11 @@ public sealed class InteropConnectionHandle : IDisposable
 public static class NativeInteropExports
 {
     private static readonly BoundedDictionary<long, byte[]> _resultBuffers = new BoundedDictionary<long, byte[]>(1000);
+    private static readonly BoundedDictionary<long, string> _lastErrors = new BoundedDictionary<long, string>(1000);
     private static long _nextBufferId;
+
+    /// <summary>Records an error message for a handle (used internally by operations).</summary>
+    internal static void SetLastError(long handleId, string message) => _lastErrors[handleId] = message;
 
     /// <summary>
     /// Creates a new connection to DataWarehouse.
@@ -272,13 +276,19 @@ public static class NativeInteropExports
     /// Gets the last error message for a handle.
     /// C ABI: const char* dw_get_error(int64_t handle)
     /// </summary>
-    public static string GetLastError(long handleId) => "No error";
+    public static string GetLastError(long handleId)
+        => _lastErrors.TryGetValue(handleId, out var msg) ? msg : "No error";
 
     /// <summary>
     /// Gets SDK version.
     /// C ABI: const char* dw_version()
     /// </summary>
-    public static string GetVersion() => "4.5.0";
+    public static string GetVersion()
+    {
+        var asm = System.Reflection.Assembly.GetExecutingAssembly();
+        var ver = asm.GetName().Version;
+        return ver != null ? $"{ver.Major}.{ver.Minor}.{ver.Build}" : "unknown";
+    }
 }
 
 /// <summary>
@@ -523,6 +533,8 @@ public sealed class AppToken
 public sealed class AppPlatformRegistry
 {
     private readonly BoundedDictionary<string, AppRegistration> _apps = new BoundedDictionary<string, AppRegistration>(1000);
+    // clientId → appId index for O(1) FindByClientId lookups (avoids O(n) scan on every token issuance).
+    private readonly BoundedDictionary<string, string> _clientIdIndex = new BoundedDictionary<string, string>(1000);
     // Maps access-token → (token, owning AppId) to enable O(1) app lookup on ValidateToken.
     private readonly BoundedDictionary<string, (AppToken Token, string AppId)> _activeTokens = new BoundedDictionary<string, (AppToken Token, string AppId)>(1000);
     private readonly BoundedDictionary<string, (int Count, DateTimeOffset WindowStart)> _rateLimits = new BoundedDictionary<string, (int Count, DateTimeOffset WindowStart)>(1000);
@@ -552,6 +564,7 @@ public sealed class AppPlatformRegistry
         };
 
         _apps[appId] = registration;
+        _clientIdIndex[clientId] = appId;
         return registration;
     }
 
@@ -627,9 +640,9 @@ public sealed class AppPlatformRegistry
 
     private AppRegistration? FindByClientId(string clientId)
     {
-        foreach (var app in _apps.Values)
-            if (app.Credentials.ClientId == clientId)
-                return app;
+        // O(1) lookup via clientId→appId reverse index (populated in RegisterApp).
+        if (_clientIdIndex.TryGetValue(clientId, out var appId) && _apps.TryGetValue(appId, out var app))
+            return app;
         return null;
     }
 

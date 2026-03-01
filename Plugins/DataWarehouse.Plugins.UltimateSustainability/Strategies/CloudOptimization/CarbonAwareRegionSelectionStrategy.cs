@@ -97,7 +97,8 @@ public sealed class CarbonAwareRegionSelectionStrategy : SustainabilityStrategyB
         {
             var carbonScore = maxCarbon > minCarbon ? 1 - (s.CarbonIntensity - minCarbon) / (maxCarbon - minCarbon) : 1;
             var latencyScore = maxLatency > 0 ? 1 - (double)s.LatencyMs / maxLatency : 1;
-            var costScore = maxCost > 0 ? 1 - (s.CostMultiplier - 1) / (maxCost - 1) : 1;
+            // Guard against division by zero when all regions have the same cost multiplier (maxCost == 1.0).
+            var costScore = maxCost > 1.0 ? 1 - (s.CostMultiplier - 1.0) / (maxCost - 1.0) : 1.0;
 
             var cw = prioritizeCarbon ? CarbonWeight : CarbonWeight * 0.5;
             var lw = prioritizeCarbon ? LatencyWeight : LatencyWeight * 1.5;

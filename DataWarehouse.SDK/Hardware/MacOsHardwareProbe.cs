@@ -25,7 +25,7 @@ namespace DataWarehouse.SDK.Hardware
     public sealed class MacOsHardwareProbe : IHardwareProbe
     {
         private readonly SemaphoreSlim _lock = new(1, 1);
-        private IReadOnlyList<HardwareDevice>? _lastDiscovery;
+        private volatile IReadOnlyList<HardwareDevice>? _lastDiscovery;
         private bool _disposed;
 
         /// <inheritdoc />

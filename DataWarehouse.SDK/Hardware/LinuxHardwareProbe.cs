@@ -19,7 +19,7 @@ namespace DataWarehouse.SDK.Hardware
     public sealed class LinuxHardwareProbe : IHardwareProbe
     {
         private readonly SemaphoreSlim _lock = new(1, 1);
-        private IReadOnlyList<HardwareDevice>? _lastDiscovery;
+        private volatile IReadOnlyList<HardwareDevice>? _lastDiscovery;
         private FileSystemWatcher? _devWatcher;
         private Timer? _debounceTimer;
         private volatile bool _disposed;

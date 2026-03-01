@@ -252,22 +252,63 @@ namespace DataWarehouse.SDK.Infrastructure.Authority
         /// </summary>
         /// <param name="authorityConfig">Authority resolution configuration, or null for defaults.</param>
         /// <param name="escalationConfig">Escalation service configuration, or null for defaults.</param>
-        /// <param name="quorumConfig">Quorum service configuration, or null for defaults (3-of-5 quorum).</param>
+        /// <param name="quorumConfig">
+        /// Quorum service configuration, or null for defaults (3-of-5 quorum).
+        /// When null, callers MUST supply <paramref name="adminMemberIds"/> to identify the actual
+        /// quorum members; otherwise a <see cref="ArgumentException"/> is thrown in production builds.
+        /// </param>
         /// <param name="deadManConfig">Dead man's switch configuration, or null for defaults (30-day threshold).</param>
+        /// <param name="adminMemberIds">
+        /// Explicit admin member IDs used when <paramref name="quorumConfig"/> is null.
+        /// Must contain exactly 5 entries. Pass null only in development/test environments where the
+        /// built-in dev-seed IDs are acceptable.
+        /// </param>
         /// <returns>A fully wired <see cref="AuthorityChainFacade"/> with all subsystems connected.</returns>
+        /// <exception cref="ArgumentException">
+        /// Thrown when <paramref name="quorumConfig"/> is null and <paramref name="adminMemberIds"/>
+        /// is provided but does not contain exactly 5 entries.
+        /// </exception>
         public static AuthorityChainFacade CreateDefault(
             AuthorityConfiguration? authorityConfig = null,
             EscalationConfiguration? escalationConfig = null,
             QuorumConfiguration? quorumConfig = null,
-            DeadManSwitchConfiguration? deadManConfig = null)
+            DeadManSwitchConfiguration? deadManConfig = null,
+            string[]? adminMemberIds = null)
         {
-            // Default quorum config: 3-of-5 with standard member placeholders
-            var effectiveQuorumConfig = quorumConfig ?? new QuorumConfiguration
+            // Resolve effective quorum config
+            QuorumConfiguration effectiveQuorumConfig;
+            if (quorumConfig != null)
             {
-                RequiredApprovals = 3,
-                TotalMembers = 5,
-                MemberIds = new[] { "admin-1", "admin-2", "admin-3", "admin-4", "admin-5" }
-            };
+                effectiveQuorumConfig = quorumConfig;
+            }
+            else if (adminMemberIds != null)
+            {
+                if (adminMemberIds.Length != 5)
+                    throw new ArgumentException("adminMemberIds must contain exactly 5 entries for a 3-of-5 quorum.", nameof(adminMemberIds));
+                effectiveQuorumConfig = new QuorumConfiguration
+                {
+                    RequiredApprovals = 3,
+                    TotalMembers = 5,
+                    MemberIds = adminMemberIds
+                };
+            }
+            else
+            {
+                // Dev/test seed IDs — NOT suitable for production deployments.
+                // Production callers must supply adminMemberIds or a full QuorumConfiguration.
+#if !DEBUG
+                throw new InvalidOperationException(
+                    "AuthorityChainFacade.CreateDefault requires explicit adminMemberIds or a QuorumConfiguration " +
+                    "in non-debug builds. Provide real admin member IDs via the adminMemberIds parameter.");
+#else
+                effectiveQuorumConfig = new QuorumConfiguration
+                {
+                    RequiredApprovals = 3,
+                    TotalMembers = 5,
+                    MemberIds = new[] { "dev-admin-1", "dev-admin-2", "dev-admin-3", "dev-admin-4", "dev-admin-5" }
+                };
+#endif
+            }
 
             // Wire up authority resolution
             var authorityResolver = new AuthorityResolutionEngine(authorityConfig);

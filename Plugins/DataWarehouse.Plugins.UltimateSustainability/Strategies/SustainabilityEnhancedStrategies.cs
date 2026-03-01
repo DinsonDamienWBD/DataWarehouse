@@ -44,11 +44,11 @@ public sealed class CarbonAwareSchedulingStrategy : SustainabilityStrategyBase
     public CarbonSchedulingRecommendation RecommendRegion(string workloadId, string[] candidateRegions,
         double estimatedKwh, bool preferRenewable = true)
     {
+        // Use TryGetValue to avoid TOCTOU race between ContainsKey and indexer access.
         var validRegions = candidateRegions
-            .Where(r => _intensityData.ContainsKey(r))
-            .Select(r => _intensityData[r])
-            .Where(d => d.ValidUntil > DateTimeOffset.UtcNow)
-            .OrderBy(d => d.GCo2PerKwh)
+            .Select(r => _intensityData.TryGetValue(r, out var d) ? d : null)
+            .Where(d => d != null && d.ValidUntil > DateTimeOffset.UtcNow)
+            .OrderBy(d => d!.GCo2PerKwh)
             .ToList();
 
         if (validRegions.Count == 0)
@@ -195,7 +195,10 @@ public sealed class EnergyTrackingStrategy : SustainabilityStrategyBase
     /// </summary>
     public GhgReport GenerateGhgReport(DateTimeOffset from, DateTimeOffset to)
     {
-        var allMeasurements = _measurements.Values
+        // Snapshot dictionary values first (BoundedDictionary.Values is ConcurrentDictionary snapshot),
+        // then lock each per-type list individually to get a consistent view without a global lock.
+        var valueSnapshot = _measurements.Values.ToList();
+        var allMeasurements = valueSnapshot
             .SelectMany(l => { lock (l) { return l.ToList(); } })
             .Where(m => m.Timestamp >= from && m.Timestamp <= to)
             .ToList();

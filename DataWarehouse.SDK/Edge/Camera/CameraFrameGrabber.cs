@@ -58,8 +58,26 @@ public sealed class CameraFrameGrabber : ICameraDevice
         // avoid starvation on constrained single-threaded schedulers (finding P1-274).
         return Task.Run(() =>
         {
-            // Parse device path as integer index (0, 1, 2, etc.) or use 0 as default
-            var deviceIndex = int.TryParse(settings.DevicePath, out var idx) ? idx : 0;
+            // Parse device path: numeric string → device index, Linux /dev/videoN → extract N,
+            // otherwise throw so the caller isn't silently redirected to device 0.
+            int deviceIndex;
+            if (int.TryParse(settings.DevicePath, out var idx))
+            {
+                deviceIndex = idx;
+            }
+            else if (!string.IsNullOrEmpty(settings.DevicePath) &&
+                     settings.DevicePath.StartsWith("/dev/video", StringComparison.Ordinal) &&
+                     int.TryParse(settings.DevicePath.Substring("/dev/video".Length), out var linuxIdx))
+            {
+                deviceIndex = linuxIdx;
+            }
+            else
+            {
+                throw new ArgumentException(
+                    $"Unsupported DevicePath format '{settings.DevicePath}'. " +
+                    "Use an integer index (e.g. '0') or a Linux path of the form '/dev/videoN'.",
+                    nameof(settings));
+            }
 
             var capture = new VideoCapture(deviceIndex);
             if (!capture.IsOpened())

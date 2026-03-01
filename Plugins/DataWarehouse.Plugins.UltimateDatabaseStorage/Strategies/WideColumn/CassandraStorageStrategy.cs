@@ -102,10 +102,12 @@ public sealed class CassandraStorageStrategy : DatabaseStorageStrategyBase
 
     protected override async Task EnsureSchemaCoreAsync(CancellationToken ct)
     {
-        // Create keyspace if not exists
+        // Create keyspace if not exists.
+        // P2-2865: use NetworkTopologyStrategy (production-safe for multi-DC) instead of SimpleStrategy.
+        // DefaultDataCenter is the standard local datacenter; adjust via config for multi-DC deployments.
         await _session!.ExecuteAsync(new SimpleStatement($@"
             CREATE KEYSPACE IF NOT EXISTS {_keyspace}
-            WITH replication = {{'class': 'SimpleStrategy', 'replication_factor': 3}}
+            WITH replication = {{'class': 'NetworkTopologyStrategy', 'datacenter1': 3}}
             AND durable_writes = true"));
 
         await _session.ExecuteAsync(new SimpleStatement($"USE {_keyspace}"));

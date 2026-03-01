@@ -165,6 +165,19 @@ namespace DataWarehouse.SDK.Edge.Protocols
         {
             ArgumentNullException.ThrowIfNull(message);
 
+            // Validate MQTT topic: must not be null/empty, must not contain wildcards ('+', '#')
+            // or null characters (\0), which are rejected by brokers with cryptic errors.
+            if (string.IsNullOrEmpty(message.Topic))
+                throw new ArgumentException("MQTT topic must not be null or empty.", nameof(message));
+            if (message.Topic.Contains('+') || message.Topic.Contains('#'))
+                throw new ArgumentException(
+                    $"MQTT publish topic '{message.Topic}' must not contain wildcard characters ('+' or '#').",
+                    nameof(message));
+            if (message.Topic.Contains('\0'))
+                throw new ArgumentException(
+                    "MQTT publish topic must not contain null characters.",
+                    nameof(message));
+
             if (!IsConnected)
             {
                 throw new InvalidOperationException("MQTT client is not connected. Call ConnectAsync first.");

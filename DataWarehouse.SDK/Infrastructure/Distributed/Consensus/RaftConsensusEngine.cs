@@ -1079,7 +1079,10 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             var expectedHash = hmac.ComputeHash(cleanBytes);
             var expectedHmac = Convert.ToBase64String(expectedHash);
 
-            return string.Equals(receivedHmac, expectedHmac, StringComparison.Ordinal);
+            // Use constant-time comparison to prevent HMAC timing side-channel attacks
+            return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+                System.Text.Encoding.UTF8.GetBytes(receivedHmac),
+                System.Text.Encoding.UTF8.GetBytes(expectedHmac));
         }
 
         /// <summary>

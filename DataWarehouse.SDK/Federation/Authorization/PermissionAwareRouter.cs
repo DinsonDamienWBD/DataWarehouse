@@ -196,7 +196,7 @@ public sealed class PermissionAwareRouter : IStorageRouter
                 ["operation"] = request.Operation.ToString(),
                 ["reason"] = check.Reason,
                 ["fromCache"] = check.FromCache,
-                ["timestampUtc"] = DateTime.UtcNow
+                ["timestampUtc"] = DateTimeOffset.UtcNow
             }
         };
 

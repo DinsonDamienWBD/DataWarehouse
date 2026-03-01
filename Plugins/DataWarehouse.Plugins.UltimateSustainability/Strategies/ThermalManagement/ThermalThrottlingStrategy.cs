@@ -153,15 +153,24 @@ public sealed class ThermalThrottlingStrategy : SustainabilityStrategyBase
 
     private void UpdateRecommendations()
     {
+        // Capture shared fields under lock before using them outside the lock.
+        ThrottleLevel level;
+        double temp;
+        lock (_lock)
+        {
+            level = _currentLevel;
+            temp = _currentTemp;
+        }
+
         ClearRecommendations();
-        if (_currentLevel >= ThrottleLevel.Heavy)
+        if (level >= ThrottleLevel.Heavy)
         {
             AddRecommendation(new SustainabilityRecommendation
             {
                 RecommendationId = $"{StrategyId}-improve-cooling",
                 Type = "ImproveCooling",
                 Priority = 9,
-                Description = $"Heavy thermal throttling active ({_currentTemp:F0}C). Improve cooling or reduce workload.",
+                Description = $"Heavy thermal throttling active ({temp:F0}C). Improve cooling or reduce workload.",
                 CanAutoApply = false
             });
         }

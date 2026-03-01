@@ -9,6 +9,7 @@ namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.Scheduling;
 public sealed class OffPeakSchedulingStrategy : SustainabilityStrategyBase
 {
     private readonly BoundedDictionary<string, ScheduledJob> _pendingJobs = new BoundedDictionary<string, ScheduledJob>(1000);
+    private readonly CancellationTokenSource _shutdownCts = new();
     private Timer? _schedulerTimer;
 
     /// <inheritdoc/>
@@ -61,7 +62,9 @@ public sealed class OffPeakSchedulingStrategy : SustainabilityStrategyBase
     /// <inheritdoc/>
     protected override Task DisposeCoreAsync()
     {
+        _shutdownCts.Cancel();
         _schedulerTimer?.Dispose();
+        _shutdownCts.Dispose();
         return Task.CompletedTask;
     }
 
@@ -106,7 +109,7 @@ public sealed class OffPeakSchedulingStrategy : SustainabilityStrategyBase
             {
                 try
                 {
-                    await job.Job(CancellationToken.None);
+                    await job.Job(_shutdownCts.Token);
                     RecordOptimizationAction();
                     RecordEnergySaved(5); // Estimated savings from off-peak
                 }

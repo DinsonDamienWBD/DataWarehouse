@@ -103,7 +103,12 @@ public sealed class FederatedLearningOrchestrator
                 dataProvider,
                 ct);
 
-            // Check minimum participation
+            // Check minimum participation.
+            // P2-2925: guard against division by zero when no nodes are registered.
+            if (nodeIds.Length == 0)
+            {
+                continue; // Skip round if no nodes available
+            }
             var participationRate = (double)updates.Length / nodeIds.Length;
             if (participationRate < _config.MinParticipation)
             {

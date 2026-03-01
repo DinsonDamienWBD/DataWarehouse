@@ -35,7 +35,7 @@ public sealed class DemandResponseStrategy : SustainabilityStrategyBase
     public DemandResponseEvent? ActiveEvent { get { lock (_lock) return _activeEvent; } }
 
     /// <summary>Whether currently in DR event.</summary>
-    public bool InDemandResponseEvent => _activeEvent != null;
+    public bool InDemandResponseEvent { get { lock (_lock) return _activeEvent != null; } }
 
     /// <inheritdoc/>
     protected override Task InitializeCoreAsync(CancellationToken ct)
