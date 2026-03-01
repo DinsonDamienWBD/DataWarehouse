@@ -10,6 +10,9 @@ public sealed class EpsilonDeltaTrackingStrategy : DataPrivacyStrategyBase
 {
     private readonly BoundedDictionary<string, PrivacyBudget> _budgets = new BoundedDictionary<string, PrivacyBudget>(1000);
     private readonly BoundedDictionary<string, List<PrivacyQuery>> _queryHistory = new BoundedDictionary<string, List<PrivacyQuery>>(1000);
+    // P2-2517: Per-dataset lock serialises budget check + update so concurrent queries cannot both
+    // pass the budget check and overshoot the epsilon/delta totals.
+    private readonly BoundedDictionary<string, object> _budgetLocks = new BoundedDictionary<string, object>(1000);
 
     public override string StrategyId => "epsilon-delta-tracking";
     public override string DisplayName => "Epsilon-Delta Tracking";
@@ -50,6 +53,12 @@ public sealed class EpsilonDeltaTrackingStrategy : DataPrivacyStrategyBase
     /// </summary>
     public PrivacyQueryResult ConsumePrivacy(string datasetId, double queryEpsilon, double queryDelta, string queryDescription)
     {
+        // P2-2517: Serialise entire check+update under a per-dataset lock to prevent concurrent
+        // callers from both passing the budget check and overspending the privacy budget.
+        var datasetLock = _budgetLocks.GetOrAdd(datasetId, _ => new object());
+        lock (datasetLock)
+        {
+
         if (!_budgets.TryGetValue(datasetId, out var budget))
             return new PrivacyQueryResult { Allowed = false, Reason = "No budget initialized" };
 
@@ -86,10 +95,10 @@ public sealed class EpsilonDeltaTrackingStrategy : DataPrivacyStrategyBase
             Timestamp = DateTimeOffset.UtcNow
         };
 
-        _queryHistory.AddOrUpdate(
-            datasetId,
-            _ => new List<PrivacyQuery> { query },
-            (_, list) => { lock (list) { list.Add(query); } return list; });
+        // P2-2516: Use GetOrAdd to ensure a single canonical list; then mutate under lock.
+        // AddOrUpdate add-factory may be called multiple times under contention, dropping entries.
+        var historyList = _queryHistory.GetOrAdd(datasetId, _ => new List<PrivacyQuery>());
+        lock (historyList) { historyList.Add(query); }
 
         // Update budget
         var updatedBudget = budget with
@@ -113,6 +122,8 @@ public sealed class EpsilonDeltaTrackingStrategy : DataPrivacyStrategyBase
             RemainingDelta = updatedBudget.RemainingDelta,
             BudgetUtilization = composedEpsilon / budget.TotalEpsilon
         };
+
+        } // end lock(datasetLock)
     }
 
     /// <summary>
