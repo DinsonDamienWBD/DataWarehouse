@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
@@ -55,12 +56,30 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
             if (!client.Connected)
                 throw new InvalidOperationException($"Failed to connect to LDAP server at {host}:{port}");
 
+            var stream = client.GetStream();
+
+            // P2-2134: Perform a real LDAP anonymous BindRequest (RFC 4511 §4.2).
+            // BindRequest PDU (BER-encoded):
+            //   LDAPMessage ::= SEQUENCE { messageID INTEGER, protocolOp BindRequest }
+            //   BindRequest ::= [APPLICATION 0] SEQUENCE { version INTEGER (1..127), name LDAPDN, authentication AuthenticationChoice }
+            //   Anonymous bind: version=3, name="", authentication=simple("")
+            var bindRequest = BuildAnonymousBindRequest(messageId: 1);
+            await stream.WriteAsync(bindRequest, 0, bindRequest.Length, ct).ConfigureAwait(false);
+
+            // Read BindResponse — minimum 7 bytes (SEQUENCE tag + length + MessageID + BindResponse tag + length + resultCode + matchedDN + diagnosticMessage)
+            var responseBuffer = new byte[256];
+            var bytesRead = await ReadLdapMessageAsync(stream, responseBuffer, ct).ConfigureAwait(false);
+
+            // Validate BindResponse resultCode (offset varies; we parse the BER envelope minimally)
+            ParseAndValidateBindResponse(responseBuffer, bytesRead);
+
             var info = new Dictionary<string, object>
             {
                 ["host"] = host,
                 ["port"] = port,
                 ["protocol"] = useTls ? "LDAPS" : "LDAP",
                 ["tls"] = useTls,
+                ["bind"] = "anonymous",
                 ["connected_at"] = DateTimeOffset.UtcNow
             };
 
