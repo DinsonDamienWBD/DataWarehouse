@@ -283,10 +283,12 @@ public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
         var username = parameters.Username ?? "";
         var database = parameters.Database ?? "";
 
-        // Calculate packet size
+        // Calculate packet size.
+        // P2-2746: auth response length prefix is 1 byte for <=255, 3 bytes (0xFC + 2-byte LE) for >255.
+        var authLenPrefixBytes = authResponse.Length > 255 ? 3 : 1;
         var packetSize = 4 + 4 + 1 + 23 +
             Encoding.UTF8.GetByteCount(username) + 1 +
-            1 + authResponse.Length +
+            authLenPrefixBytes + authResponse.Length +
             (string.IsNullOrEmpty(database) ? 0 : Encoding.UTF8.GetByteCount(database) + 1) +
             Encoding.UTF8.GetByteCount(_authPluginName) + 1;
 

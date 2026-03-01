@@ -29,6 +29,12 @@ public sealed record AutoScalingPolicy
 
     /// <summary>Gets the auto-scaling evaluation interval.</summary>
     public TimeSpan EvaluationInterval { get; init; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>Gets the instance type for new nodes. Configurable to match cloud provider SKUs.</summary>
+    public string InstanceType { get; init; } = "general-purpose";
+
+    /// <summary>Gets the storage allocation in GB for each new node.</summary>
+    public int StorageGb { get; init; } = 100;
 }
 
 /// <summary>
@@ -79,7 +85,7 @@ public sealed class HyperscaleProvisioner : IDisposable
     /// <summary>
     /// Starts auto-scaling with periodic evaluation.
     /// </summary>
-    public async Task StartAutoScalingAsync(CancellationToken ct = default)
+    public Task StartAutoScalingAsync(CancellationToken ct = default)
     {
         _isActive = true;
         _logger.LogInformation(
@@ -119,7 +125,7 @@ public sealed class HyperscaleProvisioner : IDisposable
             }
         }, ct);
 
-        await Task.CompletedTask;
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -224,8 +230,8 @@ public sealed class HyperscaleProvisioner : IDisposable
     {
         var vmSpec = new VmSpec
         {
-            InstanceType = "general-purpose",
-            StorageGb = 100,
+            InstanceType = _policy.InstanceType,
+            StorageGb = _policy.StorageGb,
             Tags = new Dictionary<string, string>
             {
                 ["ManagedBy"] = "DataWarehouse",

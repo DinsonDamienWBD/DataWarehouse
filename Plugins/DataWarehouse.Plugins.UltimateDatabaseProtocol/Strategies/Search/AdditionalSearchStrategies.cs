@@ -70,6 +70,8 @@ public sealed class SolrProtocolStrategy : DatabaseProtocolStrategyBase
         // of the cert-skip callback (finding 2729). Certificate pinning or custom CA
         // should be configured via X509 stores, not by disabling validation globally.
 
+        // P2-2740: dispose the previous HttpClient to prevent handler leak on reconnect.
+        _httpClient?.Dispose();
         _httpClient = new HttpClient(handler) { BaseAddress = new Uri(_baseUrl) };
 
         if (!string.IsNullOrEmpty(parameters.Username))
