@@ -399,7 +399,7 @@ public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposab
         var categoryFilter = message.Payload.TryGetValue("category", out var catObj) && catObj is string catStr
             && Enum.TryParse<DataLakeCategory>(catStr, true, out var cat) ? cat : (DataLakeCategory?)null;
 
-        var strategies = categoryFilter.HasValue ? _registry.GetByPredicate(s => s.Category ==categoryFilter.Value) : _registry.GetAll();
+        var strategies = categoryFilter.HasValue ? _registry.GetByPredicate(s => s.Category == categoryFilter.Value) : _registry.GetAll();
 
         message.Payload["strategies"] = strategies.Select(s => new Dictionary<string, object>
         {
@@ -440,7 +440,7 @@ public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposab
         _registry.Get(strategyId) ?? throw new ArgumentException($"Data lake strategy '{strategyId}' not found");
 
     private List<IDataLakeStrategy> GetStrategiesByCategory(DataLakeCategory category) =>
-        _registry.GetByPredicate(s => s.Category ==category).ToList();
+        _registry.GetByPredicate(s => s.Category == category).ToList();
 
     private void IncrementUsageStats(string strategyId) =>
         _usageStats.AddOrUpdate(strategyId, 1, (_, count) => count + 1);

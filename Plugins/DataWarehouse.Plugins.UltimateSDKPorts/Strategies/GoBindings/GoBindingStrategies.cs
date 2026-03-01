@@ -72,13 +72,19 @@ public sealed class GoGrpcStrategy : SDKPortStrategyBase
         sb.AppendLine("import (");
         sb.AppendLine("    \"context\"");
         sb.AppendLine("    \"google.golang.org/grpc\"");
+        sb.AppendLine("    \"google.golang.org/grpc/credentials\"");
         sb.AppendLine(")\n");
         sb.AppendLine("type Client struct {");
         sb.AppendLine("    conn   *grpc.ClientConn");
         sb.AppendLine("    client DataWarehouseServiceClient");
         sb.AppendLine("}\n");
+        // Cat 15 (finding 3800): use grpc.WithTransportCredentials(credentials.NewTLS(...)) for TLS-enabled connections.
+        // grpc.WithInsecure() ships TLS-disabled gRPC to consumers — unsafe for production.
         sb.AppendLine("func NewClient(addr string) (*Client, error) {");
-        sb.AppendLine("    conn, err := grpc.Dial(addr, grpc.WithInsecure())");
+        sb.AppendLine("    // Use TLS by default. For insecure connections (e.g. localhost loopback),");
+        sb.AppendLine("    // replace credentials.NewTLS(nil) with insecure.NewCredentials() from google.golang.org/grpc/credentials/insecure.");
+        sb.AppendLine("    creds := credentials.NewTLS(nil) // system CA pool");
+        sb.AppendLine("    conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(creds))");
         sb.AppendLine("    if err != nil { return nil, err }");
         sb.AppendLine("    return &Client{conn: conn, client: NewDataWarehouseServiceClient(conn)}, nil");
         sb.AppendLine("}\n");

@@ -102,8 +102,13 @@ public sealed record ResourceRequest
 /// </summary>
 public sealed record ResourceAllocation
 {
-    /// <summary>Original request ID.</summary>
+    /// <summary>Original request ID (GUID).</summary>
     public required string RequestId { get; init; }
+    /// <summary>
+    /// The entity that made the allocation request (plugin, tenant, process).
+    /// Used for quota enforcement during preemption.
+    /// </summary>
+    public string? RequesterId { get; init; }
     /// <summary>Whether allocation succeeded.</summary>
     public bool Success { get; init; }
     /// <summary>Allocated CPU cores.</summary>

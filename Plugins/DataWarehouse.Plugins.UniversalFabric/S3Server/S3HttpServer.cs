@@ -626,6 +626,28 @@ public sealed class S3HttpServer : IS3CompatibleServer
             var operation = _parser.ParseOperation(context.Request);
             var (bucket, key) = _parser.ExtractBucketAndKey(context.Request);
 
+            // Finding 4546: validate bucket/key before using null-forgiving operators
+            // so malformed URLs return 400 rather than throwing NullReferenceException.
+            bool needsBucket = operation != S3Operation.ListBuckets;
+            bool needsKey = operation is S3Operation.GetObject or S3Operation.PutObject
+                or S3Operation.DeleteObject or S3Operation.HeadObject
+                or S3Operation.InitiateMultipartUpload or S3Operation.UploadPart
+                or S3Operation.CompleteMultipartUpload or S3Operation.AbortMultipartUpload
+                or S3Operation.CopyObject;
+
+            if (needsBucket && string.IsNullOrEmpty(bucket))
+            {
+                _writer.WriteErrorResponse(context.Response, 400, "InvalidBucketName",
+                    "Bucket name is required for this operation.");
+                return;
+            }
+            if (needsKey && string.IsNullOrEmpty(key))
+            {
+                _writer.WriteErrorResponse(context.Response, 400, "InvalidArgument",
+                    "Object key is required for this operation.");
+                return;
+            }
+
             switch (operation)
             {
                 case S3Operation.ListBuckets:

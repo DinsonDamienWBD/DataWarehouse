@@ -31,6 +31,14 @@ public sealed class EpsilonDeltaTrackingStrategy : DataPrivacyStrategyBase
     /// </summary>
     public PrivacyBudget InitializeBudget(string datasetId, double totalEpsilon, double totalDelta)
     {
+        // Cat 14 (finding 2519): validate DP parameters — zero/negative epsilon produces nonsensical results.
+        if (totalEpsilon <= 0)
+            throw new ArgumentOutOfRangeException(nameof(totalEpsilon), totalEpsilon,
+                "Differential privacy epsilon must be positive (ε > 0).");
+        if (totalDelta < 0)
+            throw new ArgumentOutOfRangeException(nameof(totalDelta), totalDelta,
+                "Differential privacy delta must be non-negative (δ ≥ 0).");
+
         var budget = new PrivacyBudget
         {
             DatasetId = datasetId,

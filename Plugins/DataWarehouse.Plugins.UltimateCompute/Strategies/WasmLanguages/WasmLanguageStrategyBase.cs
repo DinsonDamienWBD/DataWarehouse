@@ -147,13 +147,20 @@ internal abstract class WasmLanguageStrategyBase : ComputeRuntimeStrategyBase
     }
 
     /// <summary>
-    /// Verifies the WASM language pipeline by creating a compute task with the sample WASM bytes,
-    /// executing it via wasmtime, and comparing the actual output against the expected output.
+    /// Verifies the WASM language pipeline by creating a compute task with the pre-compiled sample WASM bytes,
+    /// executing them via wasmtime, and comparing the actual output against the expected output.
     /// </summary>
+    /// <remarks>
+    /// Cat 15 (finding 1747): This verifies that wasmtime can execute pre-compiled WASM artifacts produced
+    /// by the language toolchain. ToolchainAvailable=true means "wasmtime executed the sample successfully".
+    /// It does NOT verify that the upstream compiler (Javy, TeaVM, CPython, etc.) is installed.
+    /// Compile-time toolchain presence is a build/deploy concern, not a runtime execution concern.
+    /// Override <see cref="VerifyLanguageAsync"/> in a subclass to add compiler presence checks if needed.
+    /// </remarks>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>
-    /// A <see cref="WasmLanguageVerificationResult"/> indicating whether the toolchain is available,
-    /// compilation was successful (sample bytes are valid WASM), and execution produced the expected output.
+    /// A <see cref="WasmLanguageVerificationResult"/> indicating whether wasmtime is available (ToolchainAvailable),
+    /// the sample bytes are valid WASM (CompilationSuccessful), and execution produced expected output.
     /// </returns>
     public async Task<WasmLanguageVerificationResult> VerifyLanguageAsync(CancellationToken cancellationToken = default)
     {

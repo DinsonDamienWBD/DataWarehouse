@@ -19,7 +19,9 @@ public sealed class SDKPortStrategyRegistry
     private readonly BoundedDictionary<string, SDKPortStrategyBase> _strategies = new BoundedDictionary<string, SDKPortStrategyBase>(1000);
 
     public int Count => _strategies.Count;
-    public IReadOnlyCollection<string> RegisteredStrategies => _strategies.Keys.ToList().AsReadOnly();
+    // Cat 13 (finding 3803): expose as IEnumerable to avoid .ToList().AsReadOnly() GC pressure on every access.
+    // Callers that need materialized collection should call .ToList() themselves when needed.
+    public IEnumerable<string> RegisteredStrategies => _strategies.Keys;
 
     public void Register(SDKPortStrategyBase strategy) => _strategies[strategy.StrategyId] = strategy;
     public SDKPortStrategyBase? Get(string name) => _strategies.TryGetValue(name, out var s) ? s : null;

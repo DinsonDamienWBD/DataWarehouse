@@ -628,15 +628,15 @@ internal sealed class ChunkedResumableStrategy : DataTransitStrategyBase
             "Chunked resumable transfers require a known total size.");
     }
 
+    // Cat 14 (finding 2686): cap chunk size to avoid massive allocations (e.g. int.MaxValue ~2 GB).
+    private const int MaxChunkSizeBytes = 256 * 1024 * 1024; // 256 MiB upper bound
+
     /// <summary>
     /// Determines the chunk size from request metadata or falls back to <see cref="DefaultChunkSizeBytes"/>.
     /// Callers can specify a custom chunk size via the <c>chunkSizeBytes</c> metadata key.
     /// </summary>
     /// <param name="request">The transfer request with optional metadata.</param>
-    /// <returns>The chunk size in bytes.</returns>
-    // Cat 14 (finding 2686): cap chunk size to avoid massive allocations (e.g. int.MaxValue ~2 GB).
-    private const int MaxChunkSizeBytes = 256 * 1024 * 1024; // 256 MiB upper bound
-
+    /// <returns>The chunk size in bytes, clamped to [1, 256 MiB].</returns>
     private static int DetermineChunkSize(TransitRequest request)
     {
         if (request.Metadata.TryGetValue("chunkSizeBytes", out var chunkSizeStr) &&

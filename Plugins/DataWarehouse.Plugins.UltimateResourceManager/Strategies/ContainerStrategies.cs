@@ -225,14 +225,17 @@ public sealed class KubernetesResourceStrategy : ResourceStrategyBase
         var handle = Guid.NewGuid().ToString("N");
         var podName = $"pod-{handle[..8]}";
 
-        // Determine QoS class based on request/limit relationship
+        // Cat 14 (finding 3802): hasLimits gates whether resource limits should be enforced.
+        // Requests with no CPU or memory constraints fall back to BestEffort QoS regardless of priority.
         var hasLimits = request.CpuCores > 0 || request.MemoryBytes > 0;
-        var qosClass = request.Priority switch
-        {
-            > 80 => QosClass.Guaranteed,  // High priority: guaranteed resources
-            > 40 => QosClass.Burstable,   // Medium: can burst
-            _ => QosClass.BestEffort      // Low: best effort
-        };
+        var qosClass = hasLimits
+            ? request.Priority switch
+            {
+                > 80 => QosClass.Guaranteed,  // High priority: guaranteed resources
+                > 40 => QosClass.Burstable,   // Medium: can burst
+                _ => QosClass.BestEffort      // Low: best effort
+            }
+            : QosClass.BestEffort; // No limits requested → best effort only
 
         var cpuLimit = qosClass == QosClass.Guaranteed ? request.CpuCores : request.CpuCores * 1.5;
         var memLimit = qosClass == QosClass.Guaranteed ? request.MemoryBytes : request.MemoryBytes * 2;
@@ -471,8 +474,9 @@ public sealed class WindowsContainerStrategy : ResourceStrategyBase
         var handle = Guid.NewGuid().ToString("N");
         var containerId = $"wc-{handle[..12]}";
 
-        // Processor weight: 0-10000 scale, higher = more CPU
-        var weight = (int)(request.Priority * 100);
+        // Processor weight: Windows job objects accept 1-10000.
+        // Cat 14 (finding 3804): clamp to [1, 10000] — Priority > 100 would produce an invalid Win32 weight.
+        var weight = Math.Clamp((int)(request.Priority * 100), 1, 10_000);
 
         // Use Hyper-V isolation for high-priority workloads
         var isolation = request.Priority > 70 ? IsolationMode.HyperV : IsolationMode.Process;

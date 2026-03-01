@@ -168,7 +168,7 @@ internal sealed class VoiceFirstApiStrategy : SdkInterface.InterfaceStrategyBase
         {
             return (
                 Intent: "status",
-                Data: new { status = "healthy", uptime = "72 hours" },
+                Data: new { status = "healthy", uptimeSeconds = (long)(DateTimeOffset.UtcNow - System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime()).TotalSeconds },
                 ShouldEndSession: false
             );
         }
@@ -198,7 +198,7 @@ internal sealed class VoiceFirstApiStrategy : SdkInterface.InterfaceStrategyBase
         {
             "list_datasets" => "<speak>I found <prosody rate=\"medium\">2 datasets</prosody>: Sales Data at 1.2 gigabytes, and Customer Analytics at 3.4 gigabytes. <break time=\"500ms\"/> Would you like details on any of these?</speak>",
             "count" => "<speak>There are currently <emphasis level=\"strong\">3 datasets</emphasis> in the data warehouse.</speak>",
-            "status" => "<speak>The system is <prosody pitch=\"high\">healthy</prosody> and has been running for 72 hours. All services are operational.</speak>",
+            "status" => "<speak>The system is <prosody pitch=\"high\">healthy</prosody> and has been running for " + (long)(DateTimeOffset.UtcNow - System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime()).TotalSeconds + " seconds. All services are operational.</speak>",
             "stop" => "<speak>Goodbye! <break time=\"300ms\"/> Have a great day.</speak>",
             _ => "<speak>I'm sorry, I didn't understand that request. <break time=\"500ms\"/> Could you please rephrase?</speak>"
         };
@@ -213,7 +213,7 @@ internal sealed class VoiceFirstApiStrategy : SdkInterface.InterfaceStrategyBase
         {
             "list_datasets" => "I found 2 datasets: Sales Data (1.2 GB) and Customer Analytics (3.4 GB). Would you like details?",
             "count" => "There are currently 3 datasets in the data warehouse.",
-            "status" => "The system is healthy and has been running for 72 hours. All services are operational.",
+            "status" => "The system is healthy and has been running for " + (long)(DateTimeOffset.UtcNow - System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime()).TotalSeconds + " seconds. All services are operational.",
             "stop" => "Goodbye! Have a great day.",
             _ => "I didn't understand that request. Could you please rephrase?"
         };

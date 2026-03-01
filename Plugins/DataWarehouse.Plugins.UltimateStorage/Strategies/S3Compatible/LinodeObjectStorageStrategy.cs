@@ -544,7 +544,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
                      s3ex.StatusCode == System.Net.HttpStatusCode.Unauthorized))
                     throw;
                 IncrementOperationCounter(StorageOperationType.Exists);
-                RecordFailure();
+
                 return false;
             }
         }

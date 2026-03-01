@@ -237,7 +237,9 @@ public sealed class UltimateResourceManagerPlugin : InfrastructurePluginBase, ID
 
         if (allocation.Success && allocation.AllocationHandle != null)
         {
-            _activeAllocations[allocation.AllocationHandle] = allocation;
+            // Cat 12 (finding 3801): store RequesterId alongside allocation so preemption can find
+            // the correct quota entry (quotas are keyed by requesterId, not by the GUID RequestId).
+            _activeAllocations[allocation.AllocationHandle] = allocation with { RequesterId = requesterId };
             Interlocked.Increment(ref _totalAllocations);
             IncrementUsageStats(strategyId);
         }
@@ -454,11 +456,16 @@ public sealed class UltimateResourceManagerPlugin : InfrastructurePluginBase, ID
 
         var priority = message.Payload.TryGetValue("priority", out var pri) && pri is int p ? p : 100;
 
-        // Find and preempt lower priority allocations
+        // Find and preempt lower priority allocations.
+        // Cat 12 (finding 3801): use RequesterId (not RequestId/GUID) to look up quotas — quotas are keyed by requesterId.
         var preempted = 0;
         foreach (var kvp in _activeAllocations.ToArray())
         {
-            if (_quotas.TryGetValue(kvp.Value.RequestId, out var quota) && quota.Priority < priority)
+            var alloc = kvp.Value;
+            var requesterId = alloc.RequesterId;
+            if (requesterId != null &&
+                _quotas.TryGetValue(requesterId, out var quota) &&
+                quota.Priority < priority)
             {
                 if (_activeAllocations.TryRemove(kvp.Key, out _))
                 {

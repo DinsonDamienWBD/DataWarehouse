@@ -57,7 +57,8 @@ public sealed class OpenAiProviderStrategy : AIProviderStrategyBase
         Tags = new[] { "openai", "gpt", "gpt-4", "chatgpt", "embeddings", "dalle" }
     };
 
-    private static readonly HttpClient SharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+    private static readonly HttpClient SharedHttpClient = // Cat 15 (finding 3246): AI completions routinely take 60-120s; 30s causes spurious timeouts.
+new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
     public OpenAiProviderStrategy() : this(SharedHttpClient) { }
 
     public OpenAiProviderStrategy(HttpClient httpClient)

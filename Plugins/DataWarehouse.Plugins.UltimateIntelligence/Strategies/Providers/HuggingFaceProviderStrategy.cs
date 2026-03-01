@@ -57,7 +57,8 @@ public sealed class HuggingFaceProviderStrategy : AIProviderStrategyBase
         Tags = new[] { "huggingface", "open-source", "mistral", "llama", "embeddings", "transformers" }
     };
 
-    private static readonly HttpClient SharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+    private static readonly HttpClient SharedHttpClient = // Cat 15 (finding 3246): AI completions routinely take 60-120s; 30s causes spurious timeouts.
+new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
     public HuggingFaceProviderStrategy() : this(SharedHttpClient) { }
 
     public HuggingFaceProviderStrategy(HttpClient httpClient)

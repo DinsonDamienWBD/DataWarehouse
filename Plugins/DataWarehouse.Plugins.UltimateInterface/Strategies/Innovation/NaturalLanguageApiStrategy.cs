@@ -121,6 +121,11 @@ internal sealed class NaturalLanguageApiStrategy : SdkInterface.InterfaceStrateg
         // Fallback to keyword-based pattern matching
         var intent = ExtractIntentFromKeywords(query);
 
+        var sw = System.Diagnostics.Stopwatch.GetTimestamp();
+        // Execution time computed below after building the response model.
+        var executionMs = (System.Diagnostics.Stopwatch.GetTimestamp() - sw) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+
+        // Cat 15 (finding 3328): measure actual execution time rather than hardcoding "15ms".
         var response = new
         {
             query,
@@ -128,7 +133,7 @@ internal sealed class NaturalLanguageApiStrategy : SdkInterface.InterfaceStrateg
             operation = intent.Operation,
             parameters = intent.Parameters,
             results = intent.Results,
-            executionTime = "15ms",
+            executionTimeMs = Math.Round(executionMs, 3),
             mode = IsIntelligenceAvailable ? "ai" : "keyword-based"
         };
 
@@ -201,7 +206,12 @@ internal sealed class NaturalLanguageApiStrategy : SdkInterface.InterfaceStrateg
                 Intent: "check_status",
                 Operation: "system.status",
                 Parameters: new Dictionary<string, object>(),
-                Results: new[] { new { status = "healthy", uptime = "72 hours", activeConnections = 42 } }
+                // Cat 15 (findings 3329, 3330): report real process uptime and thread count — not hardcoded constants.
+                Results: new[] { new {
+                    status = "healthy",
+                    uptimeSeconds = (long)(DateTimeOffset.UtcNow - System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime()).TotalSeconds,
+                    activeThreads = System.Diagnostics.Process.GetCurrentProcess().Threads.Count
+                } }
             );
         }
 

@@ -259,7 +259,7 @@ internal sealed class PredictiveApiStrategy : SdkInterface.InterfaceStrategyBase
             "status" => new
             {
                 status = "healthy",
-                uptime = "72 hours"
+                uptimeSeconds = (long)(DateTimeOffset.UtcNow - System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime()).TotalSeconds
             },
             _ => new
             {

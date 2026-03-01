@@ -190,18 +190,13 @@ public sealed class BlockchainScalingManager : IScalableSubsystem, IDisposable
             ["segment.count"] = _blockStore.SegmentCount,
             ["journal.shardCount"] = _blockStore.JournalShardCount,
             ["cache.block.size"] = blockCacheStats.ItemCount,
-            ["cache.block.hitRate"] = (blockCacheStats.Hits + blockCacheStats.Misses) > 0
-                ? (double)blockCacheStats.Hits / (blockCacheStats.Hits + blockCacheStats.Misses)
-                : 0.0,
+            // Cat 10 (finding 1366): use HitRatio property directly — it's already computed on CacheStatistics.
+            ["cache.block.hitRate"] = blockCacheStats.HitRatio,
             ["cache.block.memoryBytes"] = blockCacheStats.TotalSizeBytes,
             ["cache.manifest.size"] = manifestStats.ItemCount,
-            ["cache.manifest.hitRate"] = (manifestStats.Hits + manifestStats.Misses) > 0
-                ? (double)manifestStats.Hits / (manifestStats.Hits + manifestStats.Misses)
-                : 0.0,
+            ["cache.manifest.hitRate"] = manifestStats.HitRatio,
             ["cache.validation.size"] = validationStats.ItemCount,
-            ["cache.validation.hitRate"] = (validationStats.Hits + validationStats.Misses) > 0
-                ? (double)validationStats.Hits / (validationStats.Hits + validationStats.Misses)
-                : 0.0,
+            ["cache.validation.hitRate"] = validationStats.HitRatio,
             ["backpressure.queueDepth"] = Interlocked.Read(ref _pendingAppends),
             ["backpressure.state"] = CurrentBackpressureState.ToString(),
             ["concurrency.maxWrites"] = _currentLimits.MaxConcurrentOperations,
