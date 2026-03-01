@@ -119,7 +119,7 @@ public abstract class DataPrivacyStrategyBase : StrategyBase, IDataPrivacyStrate
     public abstract string[] Tags { get; }
     protected override async Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public bool IsHealthy();
+    public bool IsHealthy();;
     public IReadOnlyDictionary<string, long> GetCounters();;
 }
 ```
