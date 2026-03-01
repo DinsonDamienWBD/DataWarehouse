@@ -227,6 +227,10 @@ public static class TlaPlusModelGenerator
     {
         ArgumentNullException.ThrowIfNull(tlcStdout);
 
+        // Cat 13 (finding 802): string.Split allocates proportional to TLC output size.
+        // TLC output is bounded (≤ few MB) and ParseTlcOutput is called once per model-check
+        // run — not in a hot path. For large outputs, prefer MemoryExtensions.Split or
+        // StreamReader line-by-line enumeration to avoid the intermediate array allocation.
         var lines = tlcStdout.Split('\n');
         var passed = true;
         long statesExplored = 0;

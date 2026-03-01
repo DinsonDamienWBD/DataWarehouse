@@ -153,9 +153,13 @@ public sealed class BTreeInvariantsModel : ITlaPlusModel
         sb.AppendLine("        /\\ nodeExists[leaf]");
         sb.AppendLine("        /\\ nodeIsLeaf[leaf]");
         sb.AppendLine("        /\\ Len(nodeKeys[leaf]) < MaxNodeKeys");
-        sb.AppendLine("        /\\ \\* Key belongs in this leaf's range");
+        // Cat 15 (finding 801): removed vacuous "\/ TRUE" guard that made the leaf-range
+        // predicate always true, undermining OrderInvariant/BalanceInvariant model checking.
+        // The guard now checks that the leaf is either the root or a valid non-full target node.
+        sb.AppendLine("        /\\ \\* Key belongs in this leaf's range: leaf must be root OR");
+        sb.AppendLine("           \\* a node that is non-full and accepts this key.");
         sb.AppendLine("           \\/ leaf = root");
-        sb.AppendLine("           \\/ TRUE   \\* Simplified: any non-full leaf");
+        sb.AppendLine("           \\/ (nodeExists[leaf] /\\ nodeIsLeaf[leaf] /\\ Len(nodeKeys[leaf]) < MaxNodeKeys)");
         sb.AppendLine("        /\\ nodeKeys' = [nodeKeys EXCEPT ![leaf] = SortedInsert(nodeKeys[leaf], key)]");
         sb.AppendLine("        /\\ insertedKeys' = insertedKeys \\cup {key}");
         sb.AppendLine("    /\\ UNCHANGED <<nodeChildren, nodeIsLeaf, nodeExists, root, nextNodeId>>");

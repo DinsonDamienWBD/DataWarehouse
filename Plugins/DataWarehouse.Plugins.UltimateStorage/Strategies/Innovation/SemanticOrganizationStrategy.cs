@@ -102,11 +102,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             // Store actual file path in semantic data for retrieval
             semanticData.FilePath = filePath;
 
-            if (!_categoryIndex.ContainsKey(category))
+            // GetOrAdd is atomic; lock the list before mutating to prevent concurrent Add races.
+            var categoryList = _categoryIndex.GetOrAdd(category, _ => new List<string>());
+            lock (categoryList)
             {
-                _categoryIndex[category] = new List<string>();
+                categoryList.Add(key);
             }
-            _categoryIndex[category].Add(key);
 
             var fileInfo = new FileInfo(filePath);
             return new StorageObjectMetadata
@@ -165,7 +166,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
                 if (_categoryIndex.TryGetValue(semanticData.Category, out var categoryList))
                 {
-                    categoryList.Remove(key);
+                    lock (categoryList)
+                    {
+                        categoryList.Remove(key);
+                    }
                 }
             }
 

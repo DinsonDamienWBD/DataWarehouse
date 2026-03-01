@@ -346,6 +346,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
 
         private static List<byte[]> ComputeParityShards(List<byte[]> dataShards, int parityCount)
         {
+            if (dataShards.Count == 0) return new List<byte[]>(parityCount); // LOW-3714: empty-list guard
             var parityShards = new List<byte[]>(parityCount);
             var shardSize = dataShards[0].Length;
 

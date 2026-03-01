@@ -588,6 +588,12 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Core
         {
             public required string VersionId { get; init; }
             public required byte[] Delta { get; init; }
+            /// <summary>
+            /// Full snapshot of the data at this version. Used as the correct XOR base when
+            /// computing the next delta (LOW-3773: previous code used lastVersion.Delta as base,
+            /// which produced garbage output from ApplyDelta).
+            /// </summary>
+            public required byte[] FullData { get; init; }
             public required EnhancedVectorClock Clock { get; init; }
             public required DateTimeOffset Timestamp { get; init; }
             public string? ParentVersionId { get; init; }
@@ -682,19 +688,23 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Core
             const int MaxVersionsPerChain = 100;
             var chain = _versionChains.GetOrAdd(dataId, _ => new List<DeltaVersion>());
             string? parentId = null;
-            byte[] delta = data.ToArray();
+            var fullData = data.ToArray();
+            byte[] delta = fullData;
 
             if (chain.Count > 0)
             {
                 var lastVersion = chain[^1];
                 parentId = lastVersion.VersionId;
-                delta = ComputeDelta(lastVersion.Delta, data.ToArray());
+                // LOW-3773: use lastVersion.FullData (the actual previous snapshot) as the XOR
+                // base, not lastVersion.Delta. ApplyDelta(prevFullData, delta) == newFullData.
+                delta = ComputeDelta(lastVersion.FullData, fullData);
             }
 
             chain.Add(new DeltaVersion
             {
                 VersionId = versionId,
                 Delta = delta,
+                FullData = fullData,
                 Clock = VectorClock.Clone(),
                 Timestamp = DateTimeOffset.UtcNow,
                 ParentVersionId = parentId

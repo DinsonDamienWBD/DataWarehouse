@@ -387,6 +387,12 @@ public static class TierPerformanceBenchmark
             operation();
         }
 
+        // Cat 13 (finding 938): trigger full GC collection and wait for finalizers before measuring
+        // so that GC pauses from warmup allocations do not skew the measured timings.
+        GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+        GC.WaitForPendingFinalizers();
+        GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+
         // Measured iterations
         var sw = Stopwatch.StartNew();
         for (int i = 0; i < MeasuredIterations; i++)

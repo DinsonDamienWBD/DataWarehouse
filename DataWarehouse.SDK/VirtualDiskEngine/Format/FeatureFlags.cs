@@ -147,8 +147,15 @@ public readonly struct FormatVersionInfo : IEquatable<FormatVersionInfo>
     public bool CanWrite(ushort writerVersion) => writerVersion >= MinWriterVersion;
 
     /// <summary>
-    /// Returns true if any of the specified incompatible feature flags are set.
+    /// Returns <c>true</c> if <em>any</em> of the specified incompatible feature flags are set
+    /// in the container (OR semantics, not AND).
     /// </summary>
+    /// <remarks>
+    /// Cat 15 (finding 813): the method name might suggest AND semantics ("has ALL of these
+    /// incompatible features"), but the implementation uses bitwise OR — it returns true if
+    /// at least one flag in <paramref name="check"/> is set. This is the correct behavior
+    /// for compatibility gating: a single unknown feature is sufficient to reject the container.
+    /// </remarks>
     public bool HasIncompatibleFeatures(IncompatibleFeatureFlags check) =>
         (IncompatibleFeatures & check) != 0;
 

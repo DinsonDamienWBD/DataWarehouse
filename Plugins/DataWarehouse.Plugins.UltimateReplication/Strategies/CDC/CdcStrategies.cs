@@ -83,7 +83,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.CDC
         private readonly BoundedDictionary<string, long> _consumerOffsets = new BoundedDictionary<string, long>(1000);
         private readonly BoundedDictionary<string, (byte[] Data, long Offset)> _dataStore = new BoundedDictionary<string, (byte[] Data, long Offset)>(1000);
         private int _partitionCount = 8;
-        private string _bootstrapServers = "localhost:9092";
+        // LOW-3775: no default — callers must call Configure(...) before producing/consuming.
+        // Using localhost default silently fails in non-local deployments.
+        private string? _bootstrapServers;
         private bool _enableExactlyOnce = true;
 
         /// <inheritdoc/>

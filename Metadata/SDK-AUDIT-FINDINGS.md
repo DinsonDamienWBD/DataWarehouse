@@ -1254,12 +1254,12 @@
 | 709 | 12 | P2 | `VDE/AdaptiveIndex/BeTree.cs:637` | Flush writes pending messages into leaf nodes but doesn't clear them from pending list within same lock — concurrent reader sees both pending and flushed copy. | [X]
 | 710 | 13 | LOW | `Validation/SqlSecurity.cs:378` | `IsReservedWord` allocates new `HashSet<string>` per call — should be static readonly. | [ ]
 | 711 | 13 | LOW | `Validation/SqlSecurity.cs:575` | `ValidateOperator` allocates new `HashSet<string>` per call — same pattern. | [ ]
-| 712 | 15 | LOW | `VDE/AdaptiveIndex/BeTree.cs:223` | Upsert message type used in UpdateAsync — contract lie, named "Update" but semantically an upsert. | [ ]
-| 713 | 13 | LOW | `VDE/AdaptiveIndex/ArtIndex.cs:149` | Gratuitous `await Task.CompletedTask` in synchronous path — unnecessary allocation. | [ ]
-| 714 | 2 | LOW | `VDE/AdaptiveIndex/BeTreeForest.cs:243` | `_shards.Count` accessed without lock in property getter — stale read possible during concurrent shard creation. | [ ]
-| 715 | 12 | LOW | `VDE/AdaptiveIndex/BloofiFilter.cs:507` | `IsLeaf` invariant undocumented — tree correctness depends on fragile child-count check with no assertion or comment. | [ ]
+| 712 | 15 | LOW | `VDE/AdaptiveIndex/BeTree.cs:223` | Upsert message type used in UpdateAsync — contract lie, named "Update" but semantically an upsert. | [X]
+| 713 | 13 | LOW | `VDE/AdaptiveIndex/ArtIndex.cs:149` | Gratuitous `await Task.CompletedTask` in synchronous path — unnecessary allocation. | [X]
+| 714 | 2 | LOW | `VDE/AdaptiveIndex/BeTreeForest.cs:243` | `_shards.Count` accessed without lock in property getter — stale read possible during concurrent shard creation. | [X]
+| 715 | 12 | LOW | `VDE/AdaptiveIndex/BloofiFilter.cs:507` | `IsLeaf` invariant undocumented — tree correctness depends on fragile child-count check with no assertion or comment. | [X]
 | 716 | 1 | LOW | `Validation/SqlSecurity.cs:55-59` | `_cacheMaxSize` parameter accepted but ignored — cache grows unbounded regardless of configured limit. | [ ]
-| 717 | 13 | LOW | `VDE/AdaptiveIndex/BwTree.cs:465` | Hash-based page lookup O(1) amortized but worst-case unbounded on collision chains — no rehash threshold. | [ ]
+| 717 | 13 | LOW | `VDE/AdaptiveIndex/BwTree.cs:465` | Hash-based page lookup O(1) amortized but worst-case unbounded on collision chains — no rehash threshold. | [X]
 
 **Clean files:** SizeLimitOptions.cs, AlexModel.cs, ArtNode.cs, BwTreeDeltaRecord.cs
 
@@ -1286,12 +1286,12 @@
 | 730 | 15 | P2 | `VDE/AdaptiveIndex/HilbertPartitioner.cs:65` | Hardcoded 2-dimensional in general-purpose API — `DimensionCount` parameter accepted but `HilbertToXY` only works for 2D, silently returns garbage for higher dimensions. | [X]
 | 731 | 2 | P2 | `VDE/AdaptiveIndex/DisruptorRingBuffer.cs:374-394` | TOCTOU in `MinimumGatingSequence` — reads multiple sequence values without snapshot, result inconsistent if producers advance between reads. | [X]
 | 732 | 5 | P2 | `VDE/AdaptiveIndex/GpuVectorKernels.cs:combined` | Multiple silent catch blocks across GPU initialization paths — all swallow exceptions without logging or metrics. | [X]
-| 733 | 13 | LOW | `VDE/AdaptiveIndex/HilbertCurveEngine.cs:525-554` | 1M point materialization — `GetAllPointsInRegion` generates all Hilbert indices for region before filtering, extreme memory for large volumes. | [ ]
-| 734 | 13 | LOW | `VDE/AdaptiveIndex/DistributedRoutingIndex.cs:433-445` | Naive k-way merge — sequential merge of k sorted streams, should use heap-based merge for O(n log k). | [ ]
-| 735 | 12 | LOW | `VDE/AdaptiveIndex/BwTreeMappingTable.cs:115-118` | `pageId` long → int truncation — `Interlocked.Increment(ref _nextPageId)` returns long but used as int index, overflow after 2B pages. | [ ]
-| 736 | 7 | LOW | `VDE/AdaptiveIndex/ClockSiTransaction.cs:446-454` | Unsynchronized Dispose — no disposed guard, concurrent Dispose+Commit can corrupt transaction state. | [ ]
-| 737 | 12 | LOW | `VDE/AdaptiveIndex/DirectPointerIndex.cs:146-152` | `RecommendLevelAsync` dead-code conditional — always returns same level regardless of input, recommendation logic is no-op. | [ ]
-| 738 | 13 | LOW | `VDE/AdaptiveIndex/EpochManager.cs:160-193` | `TryCollect` O(n) scan over all threads every collection cycle — performance cliff with many concurrent threads. | [ ]
+| 733 | 13 | LOW | `VDE/AdaptiveIndex/HilbertCurveEngine.cs:525-554` | 1M point materialization — `GetAllPointsInRegion` generates all Hilbert indices for region before filtering, extreme memory for large volumes. | [X]
+| 734 | 13 | LOW | `VDE/AdaptiveIndex/DistributedRoutingIndex.cs:433-445` | Naive k-way merge — sequential merge of k sorted streams, should use heap-based merge for O(n log k). | [X]
+| 735 | 12 | LOW | `VDE/AdaptiveIndex/BwTreeMappingTable.cs:115-118` | `pageId` long → int truncation — `Interlocked.Increment(ref _nextPageId)` returns long but used as int index, overflow after 2B pages. | [X]
+| 736 | 7 | LOW | `VDE/AdaptiveIndex/ClockSiTransaction.cs:446-454` | Unsynchronized Dispose — no disposed guard, concurrent Dispose+Commit can corrupt transaction state. | [X]
+| 737 | 12 | LOW | `VDE/AdaptiveIndex/DirectPointerIndex.cs:146-152` | `RecommendLevelAsync` dead-code conditional — always returns same level regardless of input, recommendation logic is no-op. | [X]
+| 738 | 13 | LOW | `VDE/AdaptiveIndex/EpochManager.cs:160-193` | `TryCollect` O(n) scan over all threads every collection cycle — performance cliff with many concurrent threads. | [X]
 | 739 | 6 | LOW | `VDE/AdaptiveIndex/DisruptorMessageBus.cs:383-390` | `RemoveSubscription` doesn't await ReaderTask — fire-and-forget cleanup, reader may still be processing when caller assumes unsubscribed. | [X]
 
 **Clean files:** IAdaptiveIndex.cs
@@ -1316,10 +1316,10 @@
 | 749 | 13 | P2 | `VDE/AdaptiveIndex/PersistentExtentTree.cs:685-702` | `SnapshotExtents` destructively extracts and reinserts all extents O(n log n) — mutates live tree during what should be a read. | [X]
 | 750 | 12 | P2 | `VDE/AdaptiveIndex/LearnedShardRouter.cs:209-212` | TOCTOU in `DecrementShardCount` — non-atomic read-check-decrement can drive count to -1, corrupting shard load tracking. | [X]
 | 751 | 9 | P2 | `VDE/AdaptiveIndex/PersistentExtentTree.cs:461` | `AllocateBlock` return value not validated — error sentinel (-1/0) used as block number, corrupts superblock. | [X]
-| 752 | 15 | LOW | `VDE/AdaptiveIndex/IndexMorphAdvisor.cs:253-269` | `EvaluateAsync` named Async but does no async work and no interface forces the signature — misleading. | [ ]
-| 753 | 9 | LOW | `VDE/AdaptiveIndex/MorphTransitionEngine.cs:408-416` | OperationCanceledException caught but no WAL abort marker written — crash recovery may resume aborted transition. | [ ]
-| 754 | 2 | LOW | `VDE/AdaptiveIndex/IndexMorphAdvisor.cs:76,225` | `DisabledLevels ??=` inside lock but property publicly mutable — external assignment can race. | [ ]
-| 755 | 1 | LOW | `VDE/AdaptiveIndex/MorphTransitionEngine.cs:493-498` | `JournalEntry.TransactionId` hardcoded to -1 — prevents crash-recovery correlation with transaction scope. | [ ]
+| 752 | 15 | LOW | `VDE/AdaptiveIndex/IndexMorphAdvisor.cs:253-269` | `EvaluateAsync` named Async but does no async work and no interface forces the signature — misleading. | [X]
+| 753 | 9 | LOW | `VDE/AdaptiveIndex/MorphTransitionEngine.cs:408-416` | OperationCanceledException caught but no WAL abort marker written — crash recovery may resume aborted transition. | [X]
+| 754 | 2 | LOW | `VDE/AdaptiveIndex/IndexMorphAdvisor.cs:76,225` | `DisabledLevels ??=` inside lock but property publicly mutable — external assignment can race. | [X]
+| 755 | 1 | LOW | `VDE/AdaptiveIndex/MorphTransitionEngine.cs:493-498` | `JournalEntry.TransactionId` hardcoded to -1 — prevents crash-recovery correlation with transaction scope. | [X]
 
 **Clean files:** IndexMorphPolicy.cs, IndexRaid.cs, IoUringBindings.cs, MorphLevel.cs, MorphMetrics.cs, Masstree.cs, IndexStriping.cs
 
@@ -1339,9 +1339,9 @@
 | 761 | 7 | P2 | `VDE/AdaptiveIndex/TrainedZstdDictionary.cs:868-871` | `DictionaryRetrainer.Dispose()` doesn't dispose `_currentCompressor` (IDisposable) — final compressor leaked. | [X]
 | 762 | 14 | P2 | `VDE/AdaptiveIndex/ProductQuantizer.cs:229-255` | `Deserialize` reads `dimension`, `m`, `k`, `subDim` from untrusted stream without bounds validation — crafted input causes OOM via arbitrary allocation. | [X]
 | 763 | 13 | P2 | `VDE/Allocation/AllocationGroup.cs:78-98` | `FragmentationRatio` iterates every block individually O(n) with read lock held — 32K iterations for 128MB group, blocks all concurrent writes. | [X]
-| 764 | 15 | LOW | `VDE/AdaptiveIndex/SimdOperations.cs:372` | `XxHash64Simd` name implies SIMD but implementation is pure scalar — contract lie, misleads callers. | [ ]
-| 765 | 14 | LOW | `VDE/AdaptiveIndex/TrainedZstdDictionary.cs:582-584` | `dictSize` read as uint from untrusted block device, cast to int without bounds check — overflow to negative causes invalid block reads. | [ ]
-| 766 | 2 | LOW | `VDE/Allocation/SubBlockBitmap.cs:26` | `_blockSlotBitmaps` is plain `Dictionary<long, byte[]>` on public class with no thread-safety contract — external callers bypass SubBlockPacker lock. | [ ]
+| 764 | 15 | LOW | `VDE/AdaptiveIndex/SimdOperations.cs:372` | `XxHash64Simd` name implies SIMD but implementation is pure scalar — contract lie, misleads callers. | [X]
+| 765 | 14 | LOW | `VDE/AdaptiveIndex/TrainedZstdDictionary.cs:582-584` | `dictSize` read as uint from untrusted block device, cast to int without bounds check — overflow to negative causes invalid block reads. | [X]
+| 766 | 2 | LOW | `VDE/Allocation/SubBlockBitmap.cs:26` | `_blockSlotBitmaps` is plain `Dictionary<long, byte[]>` on public class with no thread-safety contract — external callers bypass SubBlockPacker lock. | [X]
 
 **Clean files:** SortedArrayIndex.cs, AllocationPolicy.cs, AllocationGroupDescriptorTable.cs, ExtentTreeNode.cs, IBlockAllocator.cs
 
@@ -1360,7 +1360,7 @@
 | 771 | 13 | P2 | `VDE/BlockExport/ZeroCopyBlockReader.cs:74-75` | Entire VDE file read into managed byte[] in constructor — LOH allocation, Gen2 GC pressure, defeats zero-copy purpose. | [X]
 | 772 | 12 | P2 | `VDE/Compatibility/VdeMigrationEngine.cs:279-293` | Partial-batch short-read writes truncated data but `blocksCopied` increments by full batch — silent data corruption on migration. | [X]
 | 773 | 9 | P2 | `VDE/Compression/PerExtentCompressor.cs:144-149` | BrotliStream decompression truncation silently returns zero-padded buffer — caller cannot distinguish success from corruption. | [X]
-| 774 | 15 | LOW | `VDE/Concurrency/StripedWriteLock.cs:54-59` | `AcquireAsync(null)` throws NullReferenceException instead of ArgumentNullException; stripe collision semantics undocumented. | [ ]
+| 774 | 15 | LOW | `VDE/Concurrency/StripedWriteLock.cs:54-59` | `AcquireAsync(null)` throws NullReferenceException instead of ArgumentNullException; stripe collision semantics undocumented. | [X]
 
 **Clean files:** SimdBitmapScanner.cs, IVdeBlockExporter.cs, VdeBlockExportPath.cs, IArcCache.cs, CompatibilityModeContext.cs, MigrationModuleSelector.cs, V1CompatibilityLayer.cs, VdeFormatDetector.cs, AdaptiveReplacementCache.cs
 
@@ -1385,11 +1385,11 @@
 | 785 | 1 | P2 | `VDE/FileExtension/Import/DwvdImporter.cs:479-493` | `GetSourceDataOffset` returns hardcoded offsets with explicit "simplified approach" comment — VMDK/QCOW2 imports include format metadata as data. | [X]
 | 786 | 14 | P2 | `VDE/CopyOnWrite/ExtentAwareCowManager.cs:391-411` | `DeserializeRefCounts` reads `entryCount` from untrusted data without sanity check — corrupt/malicious value silently truncated by offset guard with no corruption detection. | [X]
 | 787 | 9 | P2 | `VDE/FileExtension/Import/DwvdImporter.cs:314-316` | VMDK descriptor parsing — malformed descriptor line could cause IndexOutOfRangeException on `parts[1]`. | [X]
-| 788 | 15 | LOW | `VDE/Encryption/PerExtentEncryptor.cs:71,108` | `EncryptExtentAsync`/`DecryptExtentAsync` named Async but entirely synchronous with Task.FromResult — contract lie. | [ ]
+| 788 | 15 | LOW | `VDE/Encryption/PerExtentEncryptor.cs:71,108` | `EncryptExtentAsync`/`DecryptExtentAsync` named Async but entirely synchronous with Task.FromResult — contract lie. | [X]
 | 789 | 12 | LOW | `VDE/CopyOnWrite/SpaceReclaimer.cs:226` | Hardcoded `blockSize = 4096` with "use VdeConstants.DefaultBlockSize in production" comment — wrong estimates on non-default block sizes. | [X]
-| 790 | 14 | LOW | `VDE/Container/Superblock.cs:186-187` | Deserialized `blockSize` not validated against Min/MaxBlockSize — extreme values pass checksum but cause downstream exceptions. | [ ]
-| 791 | 13 | LOW | `VDE/CopyOnWrite/SnapshotManager.cs:106,173,219` | `_snapshots.Any()`/`FirstOrDefault()` O(n) scans on every mutation — performance cliff with thousands of snapshots. | [ ]
-| 792 | 9 | LOW | `VDE/CopyOnWrite/CowBlockManager.cs:238` | B-Tree operations in `DecrementRefInternalAsync` bypass WAL transaction — crash between WAL entry and B-Tree update leaves inconsistent state. | [ ]
+| 790 | 14 | LOW | `VDE/Container/Superblock.cs:186-187` | Deserialized `blockSize` not validated against Min/MaxBlockSize — extreme values pass checksum but cause downstream exceptions. | [X]
+| 791 | 13 | LOW | `VDE/CopyOnWrite/SnapshotManager.cs:106,173,219` | `_snapshots.Any()`/`FirstOrDefault()` O(n) scans on every mutation — performance cliff with thousands of snapshots. | [X]
+| 792 | 9 | LOW | `VDE/CopyOnWrite/CowBlockManager.cs:238` | B-Tree operations in `DecrementRefInternalAsync` bypass WAL transaction — crash between WAL entry and B-Tree update leaves inconsistent state. | [X]
 
 **Clean files:** WriteRegion.cs, ICowEngine.cs, ContentDetectionResult.cs, DwvdMimeType.cs
 
@@ -1408,9 +1408,9 @@
 | 797 | 13 | P2 | `VDE/FileExtension/Import/ImportSuggestion.cs:50` | `format.ToString().ToLowerInvariant()` allocates via reflection per call — should use switch lookup for fixed enum set. | [X]
 | 798 | 4 | P2 | `VDE/FileExtension/OsIntegration/WindowsRegistryBuilder.cs:80` | `$ErrorActionPreference = 'SilentlyContinue'` at script level swallows all PowerShell errors — partial registration undetectable. | [X]
 | 799 | 12 | P2 | `VDE/FormalVerification/TlaPlusModels.cs:183-192` | Generated CI script references `${ModuleName_SPEC}` bash variables that are never populated — all generated .tla/.cfg files empty, TLC fails. | [X]
-| 800 | 9 | LOW | `VDE/FileExtension/OsIntegration/LinuxMimeInfo.cs:107-108` | `BuildSharedMimeInfoXml()` brittle against XML-unsafe characters in MIME type constants — no validation guard. | [ ]
-| 801 | 15 | LOW | `VDE/FormalVerification/BTreeInvariantsModel.cs:158-159` | TLA+ `InsertIntoLeaf` uses `\\/ TRUE` vacuously-true guard — undermines OrderInvariant/BalanceInvariant model checking. | [ ]
-| 802 | 13 | LOW | `VDE/FormalVerification/TlaPlusModels.cs:332` | `string.Split('\n')` allocates proportional to TLC output size — should use span-based enumeration. | [ ]
+| 800 | 9 | LOW | `VDE/FileExtension/OsIntegration/LinuxMimeInfo.cs:107-108` | `BuildSharedMimeInfoXml()` brittle against XML-unsafe characters in MIME type constants — no validation guard. | [X]
+| 801 | 15 | LOW | `VDE/FormalVerification/BTreeInvariantsModel.cs:158-159` | TLA+ `InsertIntoLeaf` uses `\\/ TRUE` vacuously-true guard — undermines OrderInvariant/BalanceInvariant model checking. | [X]
+| 802 | 13 | LOW | `VDE/FormalVerification/TlaPlusModels.cs:332` | `string.Split('\n')` allocates proportional to TLC output size — should use span-based enumeration. | [X]
 
 **Clean files:** ImportResult.cs, VirtualDiskFormat.cs, LinuxMagicRule.cs, MacOsUti.cs, WindowsProgId.cs, SecondaryExtension.cs, RaftConsensusModel.cs, WalRecoveryModel.cs
 
@@ -1432,9 +1432,9 @@
 | 810 | 14 | P2 | `VDE/Format/InodeLayoutDescriptor.cs:281-294` | `moduleFieldCount` from untrusted buffer used to allocate array without upper-bound check — DoS via 255-element allocation per inode read. | [X]
 | 811 | 12 | P2 | `VDE/Format/ExtendedInode512.cs:191-193` | `CreatedUtc * 100` tick-to-nanosecond conversion overflows for any modern date (2026 ticks * 100 > long.MaxValue) — silently wraps to garbage. | [X]
 | 812 | 15 | P2 | `VDE/Format/BlockAddressing.cs:34-42` | `ByteOffsetToBlock` documented as requiring block-aligned offset but silently truncates non-aligned — contract lie. | [X]
-| 813 | 15 | LOW | `VDE/Format/FeatureFlags.cs:152-153` | `HasIncompatibleFeatures` uses OR semantics but name implies AND — confusing for callers checking specific flag pairs. | [ ]
-| 814 | 15 | LOW | `VDE/Format/InodeLayoutDescriptor.cs:307-311` | `Equals` excludes ModuleFields — structurally incomplete equality for layout descriptors. | [ ]
-| 815 | 13 | LOW | `VDE/Format/BlockTypeTags.cs:153-162` | `StringToTag` doesn't validate ASCII — non-ASCII chars silently produce wrong tag values. | [ ]
+| 813 | 15 | LOW | `VDE/Format/FeatureFlags.cs:152-153` | `HasIncompatibleFeatures` uses OR semantics but name implies AND — confusing for callers checking specific flag pairs. | [X]
+| 814 | 15 | LOW | `VDE/Format/InodeLayoutDescriptor.cs:307-311` | `Equals` excludes ModuleFields — structurally incomplete equality for layout descriptors. | [X]
+| 815 | 13 | LOW | `VDE/Format/BlockTypeTags.cs:153-162` | `StringToTag` doesn't validate ASCII — non-ASCII chars silently produce wrong tag values. | [X]
 
 **Clean files:** FormatConstants.cs, MagicSignature.cs, InodeSizeCalculator.cs, InodeV2.cs
 
@@ -1454,10 +1454,10 @@
 | 821 | 14 | P2 | `VDE/Format/VdeCreator.cs:361-415` | `ValidateVde` reads `blockSize` from on-disk superblock and uses it for allocation calculations without validating range — corrupt/malicious superblock causes divide-by-zero or massive allocation. | [X]
 | 822 | 14 | P2 | `VDE/Format/MixedInodeAllocator.cs:164-170` | `blockSize` parameter used in division without zero-check — `DivideByZeroException` if caller passes 0. | [X]
 | 823 | 14 | P2 | `VDE/Identity/EmergencyRecoveryBlock.cs:277-294` | `blockSize` parameter used for `stackalloc` and division without validation — zero or negative value causes stack overflow or divide-by-zero. | [X]
-| 824 | 15 | LOW | `VDE/Format/VdeCreator.cs:67-70` | `InodeTableDefaultBlocks` name implies a default but acts as a hard maximum — misleading constant name causes confusion about scalability. | [ ]
+| 824 | 15 | LOW | `VDE/Format/VdeCreator.cs:67-70` | `InodeTableDefaultBlocks` name implies a default but acts as a hard maximum — misleading constant name causes confusion about scalability. | [X]
 | 825 | 5 | LOW | `VDE/Format/SuperblockV2.cs:255-259` | `BinaryPrimitives.TryWriteInt64LittleEndian` return value discarded — if buffer is too small, the write silently fails and superblock is corrupt. | [X]
-| 826 | 2 | LOW | `VDE/Format/RegionDirectory.cs:23,68-79` | `_regions` list is a mutable `List<RegionEntry>` in a sealed class with no synchronization — concurrent readers and writers cause data races. | [ ]
-| 827 | 15 | LOW | `VDE/Format/ModuleDefinitions.cs:280-288` | `ComplianceModule` and `AuditLogModule` both use `ALOG` block type tag — on-disk blocks are ambiguous, recovery cannot distinguish the two module types. | [ ]
+| 826 | 2 | LOW | `VDE/Format/RegionDirectory.cs:23,68-79` | `_regions` list is a mutable `List<RegionEntry>` in a sealed class with no synchronization — concurrent readers and writers cause data races. | [X]
+| 827 | 15 | LOW | `VDE/Format/ModuleDefinitions.cs:280-288` | `ComplianceModule` and `AuditLogModule` both use `ALOG` block type tag — on-disk blocks are ambiguous, recovery cannot distinguish the two module types. | [X]
 
 **Clean files:** ModuleConfig.cs, ModuleManifest.cs, RegionPointerTable.cs, UniversalBlockTrailer.cs, VdeCreationProfile.cs, WideBlockAddress.cs, IBlockDevice.cs
 
@@ -1480,9 +1480,9 @@
 | 836 | 14 | P2 | `VDE/Index/BTreeNode.cs:284-299` | `keyLengths` array values read from disk are not validated against `MaxKeySize` or remaining buffer length — malicious data causes `ArgumentOutOfRangeException` or buffer over-read. | [X]
 | 837 | 13 | P2 | `VDE/Index/BulkLoader.cs:113-126` | `IAsyncEnumerable<KeyValuePair>` fully materialized to `List` before processing — defeats the streaming purpose, OOM risk on large datasets. | [X]
 | 838 | 9 | P2 | `VDE/Identity/VdeNestingValidator.cs:65-83` | Unbounded recursive I/O scan — a chain of nested VDEs causes unbounded recursion with disk reads at each level, no depth limit. | [X]
-| 839 | 15 | LOW | `VDE/Identity/NamespaceAuthority.cs:159` | Comment says "deterministic UUID" but implementation uses `Guid.NewGuid()` — contract lie, UUID is random not deterministic. | [ ]
-| 840 | 1 | LOW | `VDE/Identity/MetadataChainHasher.cs:89` | `Generation` field hardcoded to `1L` always — chain versioning is non-functional, all entries appear to be generation 1. | [ ]
-| 841 | 14 | LOW | `VDE/Identity/TamperDetectionOrchestrator.cs:134-188` | `blockSize` from external source used for `stackalloc` and division without validation — zero or extreme values cause stack overflow or divide-by-zero. | [ ]
+| 839 | 15 | LOW | `VDE/Identity/NamespaceAuthority.cs:159` | Comment says "deterministic UUID" but implementation uses `Guid.NewGuid()` — contract lie, UUID is random not deterministic. | [X]
+| 840 | 1 | LOW | `VDE/Identity/MetadataChainHasher.cs:89` | `Generation` field hardcoded to `1L` always — chain versioning is non-functional, all entries appear to be generation 1. | [X]
+| 841 | 14 | LOW | `VDE/Identity/TamperDetectionOrchestrator.cs:134-188` | `blockSize` from external source used for `stackalloc` and division without validation — zero or extreme values cause stack overflow or divide-by-zero. | [X]
 
 **Clean files:** FileSizeSentinel.cs, FormatFingerprintValidator.cs, HeaderIntegritySeal.cs, LastWriterIdentity.cs, TamperResponse.cs, VdeHealthMetadata.cs, VdeIdentityException.cs, IBTreeIndex.cs
 
@@ -1555,11 +1555,11 @@
 | 878 | 12 | P2 | `VDE/Mvcc/MvccManager.cs:247-260` | Snapshot isolation read path returns `currentBuffer` unconditionally without walking version chain — `MvccVersionStore.GetVersionChainAsync` exists but is never invoked. Snapshot isolation does not actually isolate. | [X]
 | 879 | 12 | P2 | `VDE/Mvcc/MvccManager.cs:130` | Serializable conflict check compares `committedTxId` (transaction counter) against `tx.SnapshotSequence` (WAL sequence number) — two independent counters, comparison is meaningless. Produces spurious aborts or misses real conflicts. | [X]
 | 880 | 14 | P2 | `VDE/ModuleManagement/ModuleAdditionOrchestrator.cs:321` | `AnalyzeMultipleAsync` missing null check on `modules` parameter — throws `NullReferenceException` instead of `ArgumentNullException`. | [X]
-| 881 | 15 | LOW | `VDE/ModuleManagement/Tier2FallbackGuard.cs:137-143` | `EnsureTier2Active` always returns `true` unconditionally — guarded failure path in `ModuleAdditionOrchestrator.ExecuteAsync` is dead code. | [ ]
-| 882 | 15 | LOW | `VDE/PhysicalDevice/DeviceDiscoveryService.cs:314,538` | `SupportsVolatileWriteCache` hardcoded `false` on both Linux and Windows — callers conservatively flush always, suboptimal for devices that support write-back caching. | [ ]
-| 883 | 13 | LOW | `VDE/Mvcc/MvccIsolationEnforcer.cs:201-252` | O(n) scan of `_committedWrites` on every commit — quadratic degradation under sustained throughput without aggressive pruning. | [ ]
-| 884 | 13 | LOW | `VDE/Mvcc/MvccVersionStore.cs:219` | `GetVersionChainAsync` allocates `new byte[blockSize]` per chain link in loop — unbounded GC pressure for long version chains; should use `ArrayPool`. | [ ]
-| 885 | 15 | LOW | `VDE/PhysicalDevice/DeviceDiscoveryService.cs:565-570` | SATA fixed disk unconditionally mapped to `MediaType.SSD` — spinning rust on SATA misclassified, causes wrong tier placement (warm instead of cold). | [ ]
+| 881 | 15 | LOW | `VDE/ModuleManagement/Tier2FallbackGuard.cs:137-143` | `EnsureTier2Active` always returns `true` unconditionally — guarded failure path in `ModuleAdditionOrchestrator.ExecuteAsync` is dead code. | [X]
+| 882 | 15 | LOW | `VDE/PhysicalDevice/DeviceDiscoveryService.cs:314,538` | `SupportsVolatileWriteCache` hardcoded `false` on both Linux and Windows — callers conservatively flush always, suboptimal for devices that support write-back caching. | [X]
+| 883 | 13 | LOW | `VDE/Mvcc/MvccIsolationEnforcer.cs:201-252` | O(n) scan of `_committedWrites` on every commit — quadratic degradation under sustained throughput without aggressive pruning. | [X]
+| 884 | 13 | LOW | `VDE/Mvcc/MvccVersionStore.cs:219` | `GetVersionChainAsync` allocates `new byte[blockSize]` per chain link in loop — unbounded GC pressure for long version chains; should use `ArrayPool`. | [X]
+| 885 | 15 | LOW | `VDE/PhysicalDevice/DeviceDiscoveryService.cs:565-570` | SATA fixed disk unconditionally mapped to `MediaType.SSD` — spinning rust on SATA misclassified, causes wrong tier placement (warm instead of cold). | [X]
 
 **Clean files:** PaddingInventory.cs, RegionIndirectionLayer.cs, MvccTransaction.cs, DevicePoolDescriptor.cs, DeviceTopology.cs
 
@@ -1580,8 +1580,8 @@
 | 892 | 14 | P1 | `VDE/Regions/IntegrityTreeRegion.cs:448-453` | `leafCount` has no upper bound — values near `Int32.MaxValue` cause integer overflow in `NextPowerOfTwo` computation and `new byte[totalNodes][]` allocation, producing `IndexOutOfRangeException` or OOM. | [X]
 | 893 | 4 | P1 | `VDE/Regions/PolicyVaultRegion.cs:112,127` | HMAC key exposed via public `byte[]` property and stored by reference — callers retain array reference and can mutate the live cryptographic key post-construction. | [X]
 | 894 | 2 | P1 | `VDE/Regions/AuditLogRegion.cs:137,188` | `_entries` (`List<AuditLogEntry>`) and `NextSequenceNumber` have no synchronization — concurrent `Append` calls corrupt the list, produce duplicate sequence numbers, and break the hash chain that provides tamper-evidence. | [X]
-| 895 | 14 | LOW | `VDE/Regions/AnonymizationTableRegion.cs:390` | `mappingCount` from buffer not upper-bounded — corrupt value produces `ArgumentOutOfRangeException` instead of `InvalidDataException`. | [ ]
-| 896 | 12 | LOW | `VDE/Regions/MetricsLogRegion.cs:136` | `_samples.Count` (int) compared to `(long)(MaxCapacitySamples * CompactionThreshold)` — if `MaxCapacitySamples > Int32.MaxValue`, compaction never triggers since `List.Count` can't exceed `int.MaxValue`. | [ ]
+| 895 | 14 | LOW | `VDE/Regions/AnonymizationTableRegion.cs:390` | `mappingCount` from buffer not upper-bounded — corrupt value produces `ArgumentOutOfRangeException` instead of `InvalidDataException`. | [X]
+| 896 | 12 | LOW | `VDE/Regions/MetricsLogRegion.cs:136` | `_samples.Count` (int) compared to `(long)(MaxCapacitySamples * CompactionThreshold)` — if `MaxCapacitySamples > Int32.MaxValue`, compaction never triggers since `List.Count` can't exceed `int.MaxValue`. | [X]
 
 **Clean files:** IPhysicalBlockDevice.cs, PhysicalDeviceInfo.cs, CompressionDictionaryRegion.cs, ConsensusLogRegion.cs, CrossVdeReferenceRegion.cs, EncryptionHeaderRegion.cs, IntelligenceCacheRegion.cs, RaidMetadataRegion.cs
 
@@ -1607,9 +1607,9 @@
 | 908 | 14 | P1 | `VDE/Replication/ExtentDeltaReplicator.cs:405-414` | `dataLength` from network payload not upper-bounded before `data.Slice(offset, dataLength).ToArray()` — malicious delta causes multi-GB allocation or OOM. DoS via replication channel. | [X]
 | 909 | 1 | P2 | `VDE/Sql/PredicatePushdownPlanner.cs:401` | `IsNull => rowValue == 0` — uses zero as null sentinel. Legitimate zero values incorrectly treated as null. Comment: "Simplified null check". | [X]
 | 910 | 14 | P2 | `VDE/Sql/ColumnarRegionEngine.cs:283-295` | `dataLen` from disk not bounded before multi-block allocation — corrupt value causes OOM with no diagnostic. | [X]
-| 911 | 13 | LOW | `VDE/Sql/ArrowColumnarBridge.cs:282-289` | `AsReadOnlyMemory<T>` documented as "zero-copy" but allocates and copies — misleading comment and unnecessary GC pressure. | [ ]
-| 912 | 15 | LOW | `VDE/Sql/ArrowColumnarBridge.cs:282-289` | Method name implies wrapping semantics but implementation copies — contract lie in name and XML doc. | [ ]
-| 913 | 13 | LOW | `VDE/Regions/TagIndexRegion.cs:466-469` | `CountNodes` is O(N) recursive traversal on every `RequiredBlocks` call — should maintain running counter. | [ ]
+| 911 | 13 | LOW | `VDE/Sql/ArrowColumnarBridge.cs:282-289` | `AsReadOnlyMemory<T>` documented as "zero-copy" but allocates and copies — misleading comment and unnecessary GC pressure. | [X]
+| 912 | 15 | LOW | `VDE/Sql/ArrowColumnarBridge.cs:282-289` | Method name implies wrapping semantics but implementation copies — contract lie in name and XML doc. | [X]
+| 913 | 13 | LOW | `VDE/Regions/TagIndexRegion.cs:466-469` | `CountNodes` is O(N) recursive traversal on every `RequiredBlocks` call — should maintain running counter. | [X]
 
 **Clean files:** StreamingAppendRegion.cs, WormImmutableRegion.cs, VdeSeparationManager.cs, ColumnarEncoding.cs, MergeJoinExecutor.cs, IndexOnlyScan.cs
 
@@ -1630,7 +1630,7 @@
 | 920 | 9 | P2 | `VDE/Sql/ZoneMapIndex.cs:332-363` | `entryCount` from disk header not upper-bounded — corrupt value causes runaway I/O reading thousands of non-existent blocks. | [X]
 | 921 | 1 | P2 | `VDE/Verification/Tier3BasicFallbackVerifier.cs:196` | `BasicFunctionalityAvailable = true` hardcoded unconditionally — Tier 3 verification is purely declarative (checks descriptions, not behavior). False confidence. | [X]
 | 922 | 14 | P2 | `VDE/VdeStorageStrategy.cs:63` | `ContainerPath` defaults to relative path `"datawarehouse.dwvd"` — resolves to unpredictable CWD. No absolute-path validation. Data silently created in wrong location. | [X]
-| 923 | 13 | LOW | `VDE/Sql/SpillToDiskOperator.cs:353,514,533,587` | Base64 encode/decode for every dictionary key lookup — unnecessary CPU/GC overhead per row in large aggregation workloads. | [ ]
+| 923 | 13 | LOW | `VDE/Sql/SpillToDiskOperator.cs:353,514,533,587` | Base64 encode/decode for every dictionary key lookup — unnecessary CPU/GC overhead per row in large aggregation workloads. | [X]
 
 **Clean files:** SimdAggregator.cs, VdeConstants.cs, VdeOptions.cs, ThreeTierVerificationSuite.cs, Tier1ModuleVerifier.cs, Tier1VerificationResult.cs, Tier2PipelineVerifier.cs, Tier2VerificationResult.cs, Tier3VerificationResult.cs
 
@@ -1656,7 +1656,7 @@
 | 935 | 9 | P2 | `VDE/VirtualDiskEngine.cs:262-264` | Large-file rejection after all blocks already allocated — blocks leaked because exception bypasses cleanup. Each failed store permanently leaks up to `DirectBlockCount` blocks. | [X]
 | 936 | 15 | P2 | `VDE/VirtualDiskEngine.cs:500-503` | `ListAsync` silently skips missing inodes with no log/metric — index inconsistency (key in B-Tree, inode missing) invisible to operators. | [X]
 | 937 | 9 | P2 | `VDE/VirtualDiskEngine.cs:654` | `scanResult.Events` not null-checked before `.Select()` — `NullReferenceException` in integrity scan path. | [X]
-| 938 | 13 | LOW | `VDE/Verification/TierPerformanceBenchmark.cs:383-402` | Only 1000 iterations with no GC stabilization — allocation-heavy loop produces jittery measurements. | [ ]
+| 938 | 13 | LOW | `VDE/Verification/TierPerformanceBenchmark.cs:383-402` | Only 1000 iterations with no GC stabilization — allocation-heavy loop produces jittery measurements. | [X]
 | 939 | 14 | LOW | `Virtualization/IHypervisorSupport.cs:201-204` | `TrimAsync` interface takes user-controlled `devicePath` with no contract documentation for path validation guidance. | [ ]
 
 **Clean files:** None (all 4 files have findings)
@@ -5599,12 +5599,12 @@
 | 3683 | 15 | P2 | `UltimateRTOSBridge/Strategies/RtosProtocolAdapters.cs:162-163` | VxWorks queue has no backpressure. Unbounded growth violates RTOS bounded-latency guarantee. | [ ]
 | 3684 | 15 | P2 | `UltimateRTOSBridge/Strategies/RtosProtocolAdapters.cs:354-379` | QNX `SemaphoreSlim` per message never disposed on timeout path. Resource leak. | [ ]
 | 3685 | 12 | P2 | `UltimateRAID/Strategies/Nested/AdvancedNestedRaidStrategies.cs:737-739` | Raid60 `ReadAsync` returns zeroed buffers for all groups. Always returns zeros. | [ ]
-| 3686 | 14 | P2 | `UltimateReplication/Features/CrossCloudReplicationFeature.cs:104-115` | `GetProviderStatus` returns null for unknown providers → silently treated as healthy. | [ ]
-| 3687 | 9 | P2 | `UltimateReplication/Features/CrossCloudReplicationFeature.cs:255-259` | Broad `catch { return false }` swallows `OperationCanceledException`. Cancellation silently returns false instead of propagating. | [ ]
+| 3686 | 14 | P2 | `UltimateReplication/Features/CrossCloudReplicationFeature.cs:104-115` | `GetProviderStatus` returns null for unknown providers → silently treated as healthy. | [X]
+| 3687 | 9 | P2 | `UltimateReplication/Features/CrossCloudReplicationFeature.cs:255-259` | Broad `catch { return false }` swallows `OperationCanceledException`. Cancellation silently returns false instead of propagating. | [X]
 | 3688 | 15 | LOW | `UltimateRAID/Strategies/Vendor/VendorRaidStrategiesB5.cs:100,146` | `WriteAsync` increments `_cacheHits` — a write is not a cache hit. Metrics lie. | [ ]
 | 3689 | 13 | LOW | `UltimateRAID/Strategies/Vendor/VendorRaidStrategiesB5.cs:163-165` | `GetFromCache` iterates entire ConcurrentQueue on every read — O(n) scan. | [ ]
 | 3690 | 14 | LOW | `UltimateRTOSBridge/Strategies/DeterministicIoStrategies.cs:877-879` | `taskId` defaults to 0 — all tasks without explicit ID share same `TaskInfo`, priority inheritance bleeds. | [ ]
-| 3691 | 9 | LOW | `UltimateReplication/Features/BandwidthAwareSchedulingFeature.cs:312-325` | `HandleBandwidthReportAsync` silently ignores messages with null/empty sourceNode. No logging. | [ ]
+| 3691 | 9 | LOW | `UltimateReplication/Features/BandwidthAwareSchedulingFeature.cs:312-325` | `HandleBandwidthReportAsync` silently ignores messages with null/empty sourceNode. No logging. | [X]
 | 3692 | 9 | LOW | `UltimateRAID/UltimateRaidPlugin.cs` | Strategy discovery catches all exceptions with bare `catch { }`. Should exclude fatal CLR exceptions. | [ ]
 | 3693 | 1 | LOW | `UltimateRTOSBridge/Strategies/RtosProtocolAdapters.cs:179` | VxWorks `SynchronizeAsync` body is `Task.Delay(1)` — "Simulated critical section." | [ ]
 
@@ -5624,21 +5624,21 @@
 | 3699 | 2 | P1 | `UltimateReplication/Features/ReplicationLagMonitoringFeature.cs:118-130` | `LagNodeStatus` fields (`CurrentLagMs`, `MaxLagMs`, `SampleCount`, etc.) are plain non-volatile properties mutated concurrently without sync. Rolling stats corrupted. | [X]
 | 3700 | 1 | P1 | `UltimateReplication/Strategies/AI/AiReplicationStrategies.cs:262,422,633,849` | All four AI strategies (`Predictive`, `Semantic`, `Adaptive`, `Intelligent`) implement `ReplicateAsync` as `Task.Delay(30-40ms)` — no actual replication. Data only stored in-memory `_dataStore`. | [X]
 | 3701 | 1 | P1 | `UltimateReplication/Strategies/AI/AiReplicationStrategies.cs:283,442,654,877` | `VerifyConsistencyAsync` in all four AI strategies only checks local `_dataStore`. No cross-node verification. Method name claims consistency but only reflects local writes. | [X]
-| 3702 | 2 | P2 | `UltimateReplication/Features/GlobalTransactionCoordinationFeature.cs:333-354` | `WaitForVotesAsync` uses busy-wait polling with 50ms sleep instead of `TaskCompletionSource`. CPU churn and latency. | [ ]
-| 3703 | 2 | P2 | `UltimateReplication/Features/GlobalTransactionCoordinationFeature.cs:126-128` | `TransactionState.Phase` is non-volatile mutable property modified concurrently. `GetTransactionState` can observe torn state. | [ ]
-| 3704 | 12 | P2 | `UltimateReplication/Features/GlobalTransactionCoordinationFeature.cs:410` | `state.Votes[nodeId] = vote` uses direct indexing on `BoundedDictionary`. `Clear()` at line 208 then written concurrently → race. | [ ]
+| 3702 | 2 | P2 | `UltimateReplication/Features/GlobalTransactionCoordinationFeature.cs:333-354` | `WaitForVotesAsync` uses busy-wait polling with 50ms sleep instead of `TaskCompletionSource`. CPU churn and latency. | [X]
+| 3703 | 2 | P2 | `UltimateReplication/Features/GlobalTransactionCoordinationFeature.cs:126-128` | `TransactionState.Phase` is non-volatile mutable property modified concurrently. `GetTransactionState` can observe torn state. | [X]
+| 3704 | 12 | P2 | `UltimateReplication/Features/GlobalTransactionCoordinationFeature.cs:410` | `state.Votes[nodeId] = vote` uses direct indexing on `BoundedDictionary`. `Clear()` at line 208 then written concurrently → race. | [X]
 | 3705 | 5 | P2 | `UltimateReplication/ReplicationStrategyBase.cs:687-689,808-810,931-933` | Three `catch { }` blocks in prediction/lag/conflict reporting. "Best-effort" but no logging at all. | [X]
-| 3706 | 13 | P2 | `UltimateReplication/Features/PartialReplicationFeature.cs:219` | `Regex.IsMatch` without compiled regex or timeout on every `ShouldReplicate` call. ReDoS vulnerable with complex patterns. | [ ]
-| 3707 | 14 | P2 | `UltimateReplication/Features/GeoDistributedShardingFeature.cs:484` | `correlationId = $"shard-write-{shardId}"` not sanitized. Predictable/injectable if shardId is attacker-controlled. | [ ]
-| 3708 | 10 | P2 | `UltimateReplication/Scaling/ReplicationScalingManager.cs:393-400` | `PurgeExpiredWalEntriesAsync` — `cutoff` variable computed but never used in condition. Only checks `seq <= minOffset`. Entries older than retention never purged if not yet acknowledged → unbounded growth. | [ ]
-| 3709 | 12 | P2 | `UltimateReplication/Scaling/ReplicationScalingManager.cs:255-258` | `lock (_walLock)` around `Interlocked.Increment` is redundant. Same `_walSequence` read via `Interlocked.Read` outside lock elsewhere. Confusing but not broken. | [ ]
+| 3706 | 13 | P2 | `UltimateReplication/Features/PartialReplicationFeature.cs:219` | `Regex.IsMatch` without compiled regex or timeout on every `ShouldReplicate` call. ReDoS vulnerable with complex patterns. | [X]
+| 3707 | 14 | P2 | `UltimateReplication/Features/GeoDistributedShardingFeature.cs:484` | `correlationId = $"shard-write-{shardId}"` not sanitized. Predictable/injectable if shardId is attacker-controlled. | [X]
+| 3708 | 10 | P2 | `UltimateReplication/Scaling/ReplicationScalingManager.cs:393-400` | `PurgeExpiredWalEntriesAsync` — `cutoff` variable computed but never used in condition. Only checks `seq <= minOffset`. Entries older than retention never purged if not yet acknowledged → unbounded growth. | [X]
+| 3709 | 12 | P2 | `UltimateReplication/Scaling/ReplicationScalingManager.cs:255-258` | `lock (_walLock)` around `Interlocked.Increment` is redundant. Same `_walSequence` read via `Interlocked.Read` outside lock elsewhere. Confusing but not broken. | [X]
 | 3710 | 5 | P2 | `UltimateReplication/Scaling/ReplicationScalingManager.cs:808-841` | `DeserializeWalEntry` has bare `catch { return null; }`. Corrupted WAL entries silently skipped — data loss masked. | [X]
-| 3711 | 2 | P2 | `UltimateReplication/Strategies/AI/AiReplicationStrategies.cs:899-900` | `_episodes` plain `List<TuningEpisode>` appended from concurrent `ReplicateAsync` tasks. No lock. | [ ]
-| 3712 | 13 | P2 | `UltimateReplication/Strategies/AI/AiReplicationStrategies.cs:570-604` | `AdaptConfiguration` does `.Sum()` and `.Average()` across all metrics on every `RecordMetrics` call. O(n) per write. | [ ]
-| 3713 | 15 | LOW | `UltimateReplication/ReplicationStrategyBase.cs:573,578` | Method named `ResolveBytMergeAsync` (typo: "Byt" → "By"). | [ ]
-| 3714 | 14 | LOW | `UltimateReplication/Features/GeoDistributedShardingFeature.cs:350` | `dataShards[0].Length` without empty check. Empty list → `IndexOutOfRangeException`. | [ ]
-| 3715 | 12 | LOW | `UltimateReplication/ReplicationStrategyRegistry.cs:209-222` | `DiscoverFromAssembly` with bare `catch {}` silently skips failed strategy instantiations. | [ ]
-| 3716 | 13 | LOW | `UltimateReplication/Strategies/AI/AiReplicationStrategies.cs:1018` | `_episodes.Average()` iterates unbounded history. Grows without cap. | [ ]
+| 3711 | 2 | P2 | `UltimateReplication/Strategies/AI/AiReplicationStrategies.cs:899-900` | `_episodes` plain `List<TuningEpisode>` appended from concurrent `ReplicateAsync` tasks. No lock. | [X]
+| 3712 | 13 | P2 | `UltimateReplication/Strategies/AI/AiReplicationStrategies.cs:570-604` | `AdaptConfiguration` does `.Sum()` and `.Average()` across all metrics on every `RecordMetrics` call. O(n) per write. | [X]
+| 3713 | 15 | LOW | `UltimateReplication/ReplicationStrategyBase.cs:573,578` | Method named `ResolveBytMergeAsync` (typo: "Byt" → "By"). | [X]
+| 3714 | 14 | LOW | `UltimateReplication/Features/GeoDistributedShardingFeature.cs:350` | `dataShards[0].Length` without empty check. Empty list → `IndexOutOfRangeException`. | [X]
+| 3715 | 12 | LOW | `UltimateReplication/ReplicationStrategyRegistry.cs:209-222` | `DiscoverFromAssembly` with bare `catch {}` silently skips failed strategy instantiations. | [X]
+| 3716 | 13 | LOW | `UltimateReplication/Strategies/AI/AiReplicationStrategies.cs:1018` | `_episodes.Average()` iterates unbounded history. Grows without cap. | [X]
 
 **Clean files:** ReplicationTopics.cs (constants only), PriorityBasedQueueFeature.cs, RaidIntegrationFeature.cs, SmartConflictResolutionFeature.cs, StorageIntegrationFeature.cs
 
@@ -5702,20 +5702,20 @@
 | 3759 | 2 | P1 | `UltimateReplication/Strategies/Specialized/SpecializedReplicationStrategies.cs:457` | `_masterKey = new byte[32]` — encryption key all zeros. No security if `SetMasterKey`/`GenerateMasterKey` never called. | [X]
 | 3760 | 2 | P1 | `UltimateReplication/Strategies/Specialized/SpecializedReplicationStrategies.cs:512-516` | `GenerateMasterKey` returns reference to internal `_masterKey` field. Caller can corrupt key; stale refs after rotation. | [X]
 | 3761 | 2 | P1 | `UltimateReplication/Strategies/ActiveActive/ActiveActiveStrategies.cs:869-876` | `RouteWriteConflictFree` uses `dataId.GetHashCode()` — non-deterministic across processes. Different processes route same key to different regions. | [X]
-| 3762 | 1 | P2 | `UltimateReplication/Strategies/CDC/CdcStrategies.cs:537` | `_currentPosition++` non-interlocked on `long` shared across concurrent calls. Positions duplicated/skipped. | [ ]
-| 3763 | 2 | P2 | `UltimateReplication/Strategies/ActiveActive/ActiveActiveStrategies.cs:354-355` | NWayActive `_writeQuorum`/`_readQuorum` plain `int` fields settable without sync. Torn reads during concurrent replication. | [ ]
-| 3764 | 13 | P2 | `UltimateReplication/Strategies/Core/CoreReplicationStrategies.cs:671-699` | `_versionChains` unbounded growth per dataId. No cap or compaction. Memory exhaustion on long-lived deployments. | [ ]
-| 3765 | 13 | P2 | `UltimateReplication/Strategies/Cloud/CloudReplicationStrategies.cs:845` | `_pendingSyncs` is plain `Queue<T>` (not `ConcurrentQueue<T>`) accessed concurrently from Replicate/Sync. Data race. | [ ]
-| 3766 | 2 | P2 | `UltimateReplication/Strategies/DR/DisasterRecoveryStrategies.cs:567` | `_failoverHistory` plain `List<FailoverEvent>` appended/read concurrently. `InvalidOperationException` or torn reads. | [ ]
-| 3767 | 1 | P2 | `UltimateReplication/Strategies/Core/CoreReplicationStrategies.cs:268-276` | CRDT merge is payload-size heuristic: "take the larger payload". Not a real CRDT merge despite CRDT types existing in same file. | [ ]
-| 3768 | 13 | P2 | `UltimateReplication/Strategies/Topology/TopologyStrategies.cs:970-975` | `GetNodeLevel` uses `nodes.Contains(nodeId)` on `List<string>` per level. O(levels × nodes) per call. Need reverse lookup. | [ ]
-| 3769 | 5 | P2 | `UltimateReplication/Strategies/DR/DisasterRecoveryStrategies.cs:899-904` | `InitiateFailoverAsync` catches all exceptions, returns `false` without logging. Failover failure invisible to operators. | [ ]
+| 3762 | 1 | P2 | `UltimateReplication/Strategies/CDC/CdcStrategies.cs:537` | `_currentPosition++` non-interlocked on `long` shared across concurrent calls. Positions duplicated/skipped. | [X]
+| 3763 | 2 | P2 | `UltimateReplication/Strategies/ActiveActive/ActiveActiveStrategies.cs:354-355` | NWayActive `_writeQuorum`/`_readQuorum` plain `int` fields settable without sync. Torn reads during concurrent replication. | [X]
+| 3764 | 13 | P2 | `UltimateReplication/Strategies/Core/CoreReplicationStrategies.cs:671-699` | `_versionChains` unbounded growth per dataId. No cap or compaction. Memory exhaustion on long-lived deployments. | [X]
+| 3765 | 13 | P2 | `UltimateReplication/Strategies/Cloud/CloudReplicationStrategies.cs:845` | `_pendingSyncs` is plain `Queue<T>` (not `ConcurrentQueue<T>`) accessed concurrently from Replicate/Sync. Data race. | [X]
+| 3766 | 2 | P2 | `UltimateReplication/Strategies/DR/DisasterRecoveryStrategies.cs:567` | `_failoverHistory` plain `List<FailoverEvent>` appended/read concurrently. `InvalidOperationException` or torn reads. | [X]
+| 3767 | 1 | P2 | `UltimateReplication/Strategies/Core/CoreReplicationStrategies.cs:268-276` | CRDT merge is payload-size heuristic: "take the larger payload". Not a real CRDT merge despite CRDT types existing in same file. | [X]
+| 3768 | 13 | P2 | `UltimateReplication/Strategies/Topology/TopologyStrategies.cs:970-975` | `GetNodeLevel` uses `nodes.Contains(nodeId)` on `List<string>` per level. O(levels × nodes) per call. Need reverse lookup. | [X]
+| 3769 | 5 | P2 | `UltimateReplication/Strategies/DR/DisasterRecoveryStrategies.cs:899-904` | `InitiateFailoverAsync` catches all exceptions, returns `false` without logging. Failover failure invisible to operators. | [X]
 | 3770 | 5 | P2 | `UltimateReplication/Strategies/Federation/FederationStrategies.cs:294-299` | `CommitTransactionAsync` catch transitions to Aborted without logging exception. Distributed transaction failures silent. | [X]
-| 3771 | 1 | LOW | `UltimateReplication/Strategies/GeoReplication/PrimarySecondaryReplicationStrategy.cs:164` | `Task.Delay(Random.Shared.Next(10, 30))` replaces real primary write. Comment: "In production, this would..." — stub. | [ ]
-| 3772 | 15 | LOW | `UltimateReplication/Strategies/ActiveActive/ActiveActiveStrategies.cs:782` | `CheckTargets` RTO hardcoded `true` — "RTO requires actual failover measurement." Contract lies about RTO checking. | [ ]
-| 3773 | 12 | LOW | `UltimateReplication/Strategies/Core/CoreReplicationStrategies.cs:679-680` | Delta computation XORs previous delta vs new data instead of previous full data vs new data. ApplyDelta produces wrong output. | [ ]
-| 3774 | 13 | LOW | `UltimateReplication/Strategies/Asynchronous/AsynchronousReplicationStrategy.cs:165-173` | `GetReplicationLagAsync` adds `Random.Shared.Next(50, 200)` noise. Monitoring/alerting gets unstable telemetry. | [ ]
-| 3775 | 8 | LOW | `UltimateReplication/UltimateReplicationPlugin.cs:86` | KafkaConnectCdcStrategy `_bootstrapServers = "localhost:9092"` hardcoded. Fails silently in non-local deployments. | [ ]
+| 3771 | 1 | LOW | `UltimateReplication/Strategies/GeoReplication/PrimarySecondaryReplicationStrategy.cs:164` | `Task.Delay(Random.Shared.Next(10, 30))` replaces real primary write. Comment: "In production, this would..." — stub. | [X]
+| 3772 | 15 | LOW | `UltimateReplication/Strategies/ActiveActive/ActiveActiveStrategies.cs:782` | `CheckTargets` RTO hardcoded `true` — "RTO requires actual failover measurement." Contract lies about RTO checking. | [X]
+| 3773 | 12 | LOW | `UltimateReplication/Strategies/Core/CoreReplicationStrategies.cs:679-680` | Delta computation XORs previous delta vs new data instead of previous full data vs new data. ApplyDelta produces wrong output. | [X]
+| 3774 | 13 | LOW | `UltimateReplication/Strategies/Asynchronous/AsynchronousReplicationStrategy.cs:165-173` | `GetReplicationLagAsync` adds `Random.Shared.Next(50, 200)` noise. Monitoring/alerting gets unstable telemetry. | [X]
+| 3775 | 8 | LOW | `UltimateReplication/UltimateReplicationPlugin.cs:86` | KafkaConnectCdcStrategy `_bootstrapServers = "localhost:9092"` hardcoded. Fails silently in non-local deployments. | [X]
 
 **Clean files:** AirGapReplicationStrategies.cs, ConflictResolutionStrategies.cs
 

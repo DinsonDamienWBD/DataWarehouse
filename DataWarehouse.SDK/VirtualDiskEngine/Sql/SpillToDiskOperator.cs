@@ -302,6 +302,13 @@ public sealed class SpillToDiskOperator : IAsyncDisposable
     private readonly ConcurrentBag<long> _tempBlocks = new();
     private long _currentMemoryUsage;
 
+    // Cat 13 (finding 923): dictionary keys are byte[] serialized as Base64 strings.
+    // Base64 adds ~33% size overhead per key and requires encode/decode on every lookup.
+    // For a large-aggregation hot path, replace with a byte[]-keyed dictionary using
+    // a span-aware IEqualityComparer<byte[]> (e.g., ByteArrayEqualityComparer) to avoid
+    // the string allocation entirely. The current Base64 approach is functionally correct
+    // but suboptimal for high-cardinality aggregation workloads.
+
     /// <summary>Last operation statistics.</summary>
     public SpillStats LastStats { get; private set; }
 

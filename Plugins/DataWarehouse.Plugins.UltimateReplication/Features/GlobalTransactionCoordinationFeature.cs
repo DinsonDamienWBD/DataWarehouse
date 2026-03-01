@@ -34,6 +34,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
         private readonly IMessageBus _messageBus;
         private readonly BoundedDictionary<string, TransactionState> _activeTransactions = new BoundedDictionary<string, TransactionState>(1000);
         private readonly BoundedDictionary<string, TransactionLog> _transactionLog = new BoundedDictionary<string, TransactionLog>(1000);
+        // P2-3702: TCS per transaction replaces the 50 ms busy-wait polling loop in WaitForVotesAsync.
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, TaskCompletionSource<bool>> _voteTcs =
+            new System.Collections.Concurrent.ConcurrentDictionary<string, TaskCompletionSource<bool>>();
         private readonly TimeSpan _prepareTimeout;
         private readonly TimeSpan _commitTimeout;
         private bool _disposed;
@@ -333,26 +336,34 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
 
         private async Task<bool> WaitForVotesAsync(TransactionState state, TimeSpan timeout, CancellationToken ct)
         {
-            var deadline = DateTimeOffset.UtcNow + timeout;
+            // P2-3702: use a TaskCompletionSource so this method suspends without a polling loop.
+            // HandlePrepareResponseAsync signals the TCS when all expected votes have arrived.
+            var tcs = _voteTcs.GetOrAdd(state.TransactionId,
+                _ => new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously));
 
-            while (DateTimeOffset.UtcNow < deadline && !ct.IsCancellationRequested)
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(timeout);
+
+            try
             {
-                var receivedCount = state.Votes.Count;
-                if (receivedCount >= state.ParticipantNodes.Count)
+                using (cts.Token.Register(() => tcs.TrySetCanceled(ct)))
                 {
-                    return state.Votes.Values.All(v => v == ParticipantVote.Yes);
+                    await tcs.Task.ConfigureAwait(false);
                 }
-
-                await Task.Delay(50, ct);
+                return state.Votes.Values.All(v => v == ParticipantVote.Yes);
             }
-
-            // Timeout: missing votes count as No
-            Interlocked.Increment(ref _timedOutTransactions);
-            foreach (var node in state.ParticipantNodes)
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
             {
-                state.Votes.TryAdd(node, ParticipantVote.Timeout);
+                // Timed out (not caller cancellation)
+                Interlocked.Increment(ref _timedOutTransactions);
+                foreach (var node in state.ParticipantNodes)
+                    state.Votes.TryAdd(node, ParticipantVote.Timeout);
+                return false;
             }
-            return false;
+            finally
+            {
+                _voteTcs.TryRemove(state.TransactionId, out _);
+            }
         }
 
         private async Task BroadcastCommitAsync(TransactionState state, CancellationToken ct)
@@ -410,6 +421,15 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
                 : ParticipantVote.No;
 
             state.Votes[nodeId] = vote;
+
+            // P2-3702: signal the TCS when all participant votes have arrived so WaitForVotesAsync
+            // can unblock without the 50 ms polling loop.
+            if (state.Votes.Count >= state.ParticipantNodes.Count &&
+                _voteTcs.TryGetValue(txnId, out var tcs))
+            {
+                tcs.TrySetResult(true);
+            }
+
             return Task.CompletedTask;
         }
 

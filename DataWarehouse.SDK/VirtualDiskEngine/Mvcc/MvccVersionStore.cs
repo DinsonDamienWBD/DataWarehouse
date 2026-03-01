@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using System;
+using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO.Hashing;
@@ -214,17 +215,26 @@ public sealed class MvccVersionStore
         var visited = new HashSet<long>();
         long currentBlock = headBlock;
 
-        while (currentBlock > 0 && visited.Add(currentBlock))
+        // Cat 13 (finding 884): rent a single block buffer from ArrayPool and reuse it across
+        // all loop iterations to avoid unbounded GC pressure for long version chains.
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(_blockSize);
+        try
         {
-            var buffer = new byte[_blockSize];
-            await _device.ReadBlockAsync(currentBlock, buffer, ct);
+            while (currentBlock > 0 && visited.Add(currentBlock))
+            {
+                await _device.ReadBlockAsync(currentBlock, buffer.AsMemory(0, _blockSize), ct);
 
-            long transactionId = BinaryPrimitives.ReadInt64LittleEndian(buffer.AsSpan(0, 8));
-            // Skip InodeNumber at offset 8
-            long previousVersionBlock = BinaryPrimitives.ReadInt64LittleEndian(buffer.AsSpan(16, 8));
+                long transactionId = BinaryPrimitives.ReadInt64LittleEndian(buffer.AsSpan(0, 8));
+                // Skip InodeNumber at offset 8
+                long previousVersionBlock = BinaryPrimitives.ReadInt64LittleEndian(buffer.AsSpan(16, 8));
 
-            chain.Add((transactionId, currentBlock));
-            currentBlock = previousVersionBlock;
+                chain.Add((transactionId, currentBlock));
+                currentBlock = previousVersionBlock;
+            }
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
         }
 
         return chain;

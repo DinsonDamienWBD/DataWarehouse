@@ -133,7 +133,10 @@ public sealed class MetricsLogRegion
     /// <param name="sample">The sample to record.</param>
     public void RecordSample(MetricsSample sample)
     {
-        if (_samples.Count >= (long)(MaxCapacitySamples * CompactionThreshold))
+        // Cat 12 (finding 896): _samples.Count is int (List<T>.Count cannot exceed int.MaxValue),
+        // so cast the threshold to int before comparison to avoid compaction never triggering
+        // when MaxCapacitySamples > int.MaxValue (the list would never reach that count anyway).
+        if (_samples.Count >= (int)Math.Min(MaxCapacitySamples * CompactionThreshold, int.MaxValue))
             AutoCompact();
 
         _samples.Add(sample);

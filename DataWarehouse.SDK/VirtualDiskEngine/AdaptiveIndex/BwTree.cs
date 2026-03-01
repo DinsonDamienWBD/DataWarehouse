@@ -23,6 +23,7 @@ namespace DataWarehouse.SDK.VirtualDiskEngine.AdaptiveIndex;
 /// <item><description>Append-only delta chains avoid page overwrites</description></item>
 /// <item><description>Epoch-based garbage collection safely reclaims old delta chains</description></item>
 /// <item><description>Automatic consolidation when delta chains exceed a configurable threshold</description></item>
+/// <item><description>Page lookup uses <see cref="BwTreeMappingTable"/> backed by <see cref="System.Collections.Concurrent.ConcurrentDictionary{TKey,TValue}"/> which auto-rehashes at 0.75 load factor — worst-case collision chains are bounded by the runtime (Cat 13, finding 717)</description></item>
 /// <item><description>Two-phase split/merge protocol for structural modifications</description></item>
 /// </list>
 /// </para>

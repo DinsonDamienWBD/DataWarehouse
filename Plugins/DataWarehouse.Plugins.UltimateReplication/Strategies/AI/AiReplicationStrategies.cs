@@ -920,6 +920,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
         private readonly TuningParameters _params = new();
         private readonly List<TuningEpisode> _episodes = new();
         private readonly object _episodesLock = new();
+        private const int MaxEpisodes = 1000; // LOW-3716: cap episode history to prevent unbounded growth
 
         /// <summary>
         /// Tuning parameters that can be adjusted.
@@ -1038,6 +1039,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
             lock (_episodesLock)
             {
                 _episodes.Add(episode);
+                // LOW-3716: evict oldest episodes when cap is exceeded.
+                if (_episodes.Count > MaxEpisodes)
+                    _episodes.RemoveRange(0, _episodes.Count - MaxEpisodes);
                 averageReward = _episodes.Average(e => e.Reward);
             }
 

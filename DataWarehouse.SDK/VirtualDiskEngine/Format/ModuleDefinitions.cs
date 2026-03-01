@@ -129,8 +129,10 @@ public static class ModuleRegistry
             Id = ModuleId.Compliance,
             Name = "Compliance",
             Abbreviation = "CMPL",
-            BlockTypeTags = new[] { Format.BlockTypeTags.CMVT, Format.BlockTypeTags.ALOG },
-            RegionNames = new[] { "ComplianceVault", "AuditLog" },
+            // Cat 9 (finding 827): use CMAL (Compliance Audit Log) instead of ALOG to avoid
+            // on-disk ambiguity with the AuditLog module's ALOG blocks during crash recovery.
+            BlockTypeTags = new[] { Format.BlockTypeTags.CMVT, Format.BlockTypeTags.CMAL },
+            RegionNames = new[] { "ComplianceVault", "ComplianceAuditLog" },
             InodeFieldBytes = 12,
         },
         [ModuleId.Intelligence] = new VdeModule

@@ -63,7 +63,11 @@ public static class VdeCreator
     /// <summary>Minimum number of blocks required for a valid VDE.</summary>
     private const long MinimumBlocks = 64;
 
-    /// <summary>Default initial inode table size as a fraction of total blocks.</summary>
+    /// <summary>
+    /// Minimum (floor) inode table size in blocks. Used via <c>Math.Max</c> to ensure
+    /// the inode table is at least this large even on small volumes.
+    /// Cat 15 (finding 824): the name "DefaultBlocks" is a minimum/floor, not a hard maximum.
+    /// </summary>
     private const long InodeTableDefaultBlocks = 1024;
 
     /// <summary>Inode table fraction of total blocks (1/256).</summary>

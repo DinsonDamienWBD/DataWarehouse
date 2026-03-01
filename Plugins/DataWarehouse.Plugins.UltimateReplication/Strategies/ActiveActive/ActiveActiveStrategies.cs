@@ -661,6 +661,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.ActiveActive
         private readonly BoundedDictionary<string, RegionHealthMetrics> _healthMetrics = new BoundedDictionary<string, RegionHealthMetrics>(1000);
         private TimeSpan _rpoTarget = TimeSpan.FromSeconds(5);
         private TimeSpan _rtoTarget = TimeSpan.FromSeconds(30);
+        // LOW-3772: track last measured failover duration (in ticks) to enable real RTO compliance check.
+        private long _lastFailoverDurationTicks = 0L;
 
         /// <summary>
         /// Geographic region in the active-active topology.
@@ -746,6 +748,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.ActiveActive
             if (!_regions.TryGetValue(failedRegionId, out var failedRegion))
                 return false;
 
+            // LOW-3772: measure actual failover duration so CheckTargets can evaluate RTO compliance.
+            var failoverStart = DateTimeOffset.UtcNow;
+
             failedRegion.Status = NodeHealthStatus.Failed;
 
             // If this was primary, promote another region
@@ -764,10 +769,12 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.ActiveActive
                 {
                     failedRegion.IsPrimary = false;
                     newPrimary.IsPrimary = true;
+                    Interlocked.Exchange(ref _lastFailoverDurationTicks, (DateTimeOffset.UtcNow - failoverStart).Ticks);
                     return true;
                 }
             }
 
+            Interlocked.Exchange(ref _lastFailoverDurationTicks, (DateTimeOffset.UtcNow - failoverStart).Ticks);
             return true;
         }
 
@@ -791,7 +798,10 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.ActiveActive
         public (bool RpoMet, bool RtoMet) CheckTargets()
         {
             var currentRpo = GetCurrentRpo();
-            return (currentRpo <= _rpoTarget, true); // RTO requires actual failover measurement
+            // LOW-3772: use measured failover duration (zero means no failover has occurred — treat as met).
+            var lastFailoverDuration = TimeSpan.FromTicks(Interlocked.Read(ref _lastFailoverDurationTicks));
+            var rtoMet = lastFailoverDuration == TimeSpan.Zero || lastFailoverDuration <= _rtoTarget;
+            return (currentRpo <= _rpoTarget, rtoMet);
         }
     }
 

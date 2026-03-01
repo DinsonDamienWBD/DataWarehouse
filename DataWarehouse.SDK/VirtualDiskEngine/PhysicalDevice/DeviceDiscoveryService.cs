@@ -311,7 +311,11 @@ public sealed class DeviceDiscoveryService
             LogicalSectorSize: logSector,
             OptimalIoSize: optIoSize,
             SupportsTrim: supportsTrim,
-            SupportsVolatileWriteCache: false, // Would require hdparm or device-specific ioctl
+            // Cat 15 (finding 882): volatile write-cache detection on Linux requires
+            // `hdparm -W /dev/<device>` or ATA IDENTIFY via ioctl(HDIO_GET_WCACHE).
+            // Conservative false prevents fsync bypass; future: query sysfs
+            // `/sys/block/<dev>/queue/write_cache` ("write back" / "write through").
+            SupportsVolatileWriteCache: false,
             NvmeNamespaceId: nvmeNamespaceId,
             ControllerPath: controllerPath,
             NumaNode: numaNode);
@@ -539,7 +543,10 @@ public sealed class DeviceDiscoveryService
             LogicalSectorSize: bytesPerSector,
             OptimalIoSize: 0, // Not available via WMI; would need IOCTL_STORAGE_QUERY_PROPERTY
             SupportsTrim: supportsTrim,
-            SupportsVolatileWriteCache: false, // Would require IOCTL_STORAGE_QUERY_PROPERTY
+            // Cat 15 (finding 882): volatile write-cache detection on Windows requires
+            // IOCTL_STORAGE_QUERY_PROPERTY with StorageAdapterWriteCacheProperty.
+            // Conservative false prevents unnecessary fsync bypass.
+            SupportsVolatileWriteCache: false,
             NvmeNamespaceId: busType == BusType.NVMe ? 1 : 0, // Windows exposes NVMe as single namespace
             ControllerPath: null, // Would require SetupAPI for topology
             NumaNode: null); // Would require SetupAPI P/Invoke for NUMA affinity
@@ -568,9 +575,15 @@ public sealed class DeviceDiscoveryService
 
         if (upper.Contains("FIXED HARD DISK") || upper.Contains("FIXED"))
         {
-            // Could be SSD or HDD; NVMe already handled above
-            // Without rotational info, default based on bus
-            return busType == BusType.SATA ? MediaType.SSD : MediaType.HDD;
+            // Cat 9 (finding 885): WMI MediaType does not distinguish SSD from HDD for SATA devices.
+            // Without a rotational flag (which requires IOCTL_STORAGE_QUERY_PROPERTY), we cannot
+            // determine whether a SATA "Fixed Hard Disk" is spinning or solid-state.
+            // Return Unknown so callers do not incorrectly place spinning SATA disks on the warm tier.
+            // NVMe is already handled above; SAS/SCSI without rotational data defaults to HDD.
+            if (busType == BusType.NVMe) return MediaType.NVMe;
+            if (busType == BusType.SAS || busType == BusType.SCSI) return MediaType.HDD;
+            // SATA: cannot distinguish SSD vs HDD without IOCTL — return Unknown to avoid misclassification.
+            return MediaType.Unknown;
         }
 
         if (upper.Contains("REMOVABLE"))

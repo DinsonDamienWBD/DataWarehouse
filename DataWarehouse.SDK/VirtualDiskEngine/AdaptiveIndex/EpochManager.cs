@@ -155,6 +155,12 @@ public sealed class EpochManager : IDisposable
     /// <remarks>
     /// Finds the minimum epoch across all active threads. Any garbage registered
     /// at an epoch strictly less than this minimum is safe to collect.
+    /// <para>
+    /// <b>Performance note (Cat 13, finding 738):</b> <see cref="FindMinActiveEpoch"/> iterates
+    /// all registered thread entries — O(n) in the number of concurrent threads. This is
+    /// acceptable for moderate thread counts (≤256). For larger pools, replace
+    /// <see cref="_threadEntries"/> with a lock-free sorted structure.
+    /// </para>
     /// </remarks>
     public int TryCollect()
     {

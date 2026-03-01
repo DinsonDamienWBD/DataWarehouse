@@ -13,6 +13,12 @@ namespace DataWarehouse.SDK.VirtualDiskEngine.Format;
 /// The Region Directory is a standalone copy of region pointers kept in sync with the
 /// Region Pointer Table in Superblock Block 1 at a higher level.
 /// </summary>
+/// <remarks>
+/// <b>Thread safety (Cat 2, finding 826):</b> This class is <em>not</em> thread-safe.
+/// The internal <c>_slots</c> array is modified by <see cref="AddRegion"/> and
+/// <see cref="RemoveRegion"/>. Callers that share a <see cref="RegionDirectory"/> instance
+/// across threads must provide their own synchronization.
+/// </remarks>
 [SdkCompatibility("6.0.0", Notes = "Phase 71: VDE v2.0 region directory (VDE2-03)")]
 public sealed class RegionDirectory
 {

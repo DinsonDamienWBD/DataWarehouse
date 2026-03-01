@@ -72,6 +72,9 @@ public sealed class SnapshotManager
     // are serialized under write lock.
     private readonly ReaderWriterLockSlim _snapshotsLock = new(LockRecursionPolicy.NoRecursion);
     private List<Snapshot> _snapshots = new();
+    // Cat 13 (finding 791): secondary name index for O(1) snapshot lookup by name, replacing
+    // O(n) FirstOrDefault scans on the hot CreateSnapshot/DeleteSnapshot/CloneSnapshot paths.
+    private Dictionary<string, Snapshot> _snapshotsByName = new(StringComparer.OrdinalIgnoreCase);
     private long _nextSnapshotId = 1;
 
     /// <summary>
@@ -123,7 +126,8 @@ public sealed class SnapshotManager
         bool nameExists;
         try
         {
-            nameExists = _snapshots.Any(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+            // Cat 13 (finding 791): O(1) dictionary lookup instead of O(n) Any() scan.
+            nameExists = _snapshotsByName.ContainsKey(name);
         }
         finally
         {
@@ -162,6 +166,7 @@ public sealed class SnapshotManager
             };
 
             _snapshots.Add(snapshot);
+            _snapshotsByName[snapshot.Name] = snapshot; // Cat 13 (finding 791): maintain name index
         }
         finally
         {
@@ -206,7 +211,8 @@ public sealed class SnapshotManager
         _snapshotsLock.EnterReadLock();
         try
         {
-            var snapshot = _snapshots.FirstOrDefault(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+            // Cat 13 (finding 791): O(1) dictionary lookup.
+            _snapshotsByName.TryGetValue(name, out var snapshot);
             return Task.FromResult(snapshot);
         }
         finally
@@ -227,7 +233,8 @@ public sealed class SnapshotManager
         _snapshotsLock.EnterReadLock();
         try
         {
-            snapshot = _snapshots.FirstOrDefault(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+            // Cat 13 (finding 791): O(1) dictionary lookup.
+            _snapshotsByName.TryGetValue(name, out snapshot);
         }
         finally
         {
@@ -250,11 +257,12 @@ public sealed class SnapshotManager
         // Free the snapshot root inode
         await _inodeTable.FreeInodeAsync(snapshot.RootInodeNumber, ct);
 
-        // Remove from snapshot list
+        // Remove from snapshot list and name index
         _snapshotsLock.EnterWriteLock();
         try
         {
             _snapshots.Remove(snapshot);
+            _snapshotsByName.Remove(snapshot.Name); // Cat 13 (finding 791): maintain name index
         }
         finally
         {
@@ -286,12 +294,13 @@ public sealed class SnapshotManager
         _snapshotsLock.EnterReadLock();
         try
         {
-            if (_snapshots.Any(s => s.Name.Equals(cloneName, StringComparison.OrdinalIgnoreCase)))
+            // Cat 13 (finding 791): O(1) dictionary lookups.
+            if (_snapshotsByName.ContainsKey(cloneName))
             {
                 throw new InvalidOperationException($"A snapshot with the name '{cloneName}' already exists.");
             }
 
-            sourceSnapshot = _snapshots.FirstOrDefault(s => s.Name.Equals(snapshotName, StringComparison.OrdinalIgnoreCase));
+            _snapshotsByName.TryGetValue(snapshotName, out sourceSnapshot);
         }
         finally
         {
@@ -346,6 +355,7 @@ public sealed class SnapshotManager
             };
 
             _snapshots.Add(clone);
+            _snapshotsByName[clone.Name] = clone; // Cat 13 (finding 791): maintain name index
         }
         finally
         {
@@ -484,6 +494,10 @@ public sealed class SnapshotManager
         try
         {
             _snapshots = loaded;
+            // Cat 13 (finding 791): rebuild name index from loaded list.
+            _snapshotsByName = new Dictionary<string, Snapshot>(StringComparer.OrdinalIgnoreCase);
+            foreach (var s in loaded)
+                _snapshotsByName[s.Name] = s;
             _nextSnapshotId = nextId;
         }
         finally
