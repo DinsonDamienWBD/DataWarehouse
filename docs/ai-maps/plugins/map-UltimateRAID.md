@@ -1840,7 +1840,7 @@ public sealed class SnapshotTree
 {
 }
     public SnapshotTree(string arrayId);
-    public string? ActiveSnapshotId { get; private set; }
+    public string? ActiveSnapshotId;;
     public void AddSnapshot(Snapshot snapshot);
     public Snapshot? GetSnapshot(string snapshotId);;
     public void RemoveSnapshot(string snapshotId);;

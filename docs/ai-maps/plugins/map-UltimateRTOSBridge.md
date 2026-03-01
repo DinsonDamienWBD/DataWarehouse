@@ -165,6 +165,7 @@ public sealed class VxWorksProtocolAdapter : RtosStrategyBase
 private class VxWorksQueue
 {
 }
+    public const int MaxDepth = 4096;
     public ConcurrentQueue<byte[]> Messages { get; };
     public SemaphoreSlim MessageAvailable { get; };
 }
