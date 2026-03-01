@@ -134,7 +134,7 @@ public abstract class LineageStrategyBase : StrategyBase, ILineageStrategy
     public virtual Task<ImpactAnalysisResult> AnalyzeImpactAsync(string nodeId, string changeType, CancellationToken ct = default);
     public IReadOnlyDictionary<string, long> GetCounters();;
     protected void AddNode(LineageNode node);;
-    protected void AddEdge(LineageEdge edge);;
+    protected void AddEdge(LineageEdge edge);
 }
 ```
 ```csharp
