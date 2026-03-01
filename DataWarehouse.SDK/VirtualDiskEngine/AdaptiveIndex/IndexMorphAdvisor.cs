@@ -221,8 +221,13 @@ public sealed class IndexMorphAdvisor
 
                 // If reverted 3 times for same transition, permanently disable it
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
                 // Cat 2 (finding 754): snapshot the reference inside the lock to avoid the
                 // ??= TOCTOU race when an external caller concurrently assigns DisabledLevels.
+=======
+                // Cat 2 (finding 754): snapshot the reference inside the lock and use a local variable
+                // so that a concurrent external assignment to DisabledLevels cannot race with our write.
+>>>>>>> Stashed changes
 =======
                 // Cat 2 (finding 754): snapshot the reference inside the lock and use a local variable
                 // so that a concurrent external assignment to DisabledLevels cannot race with our write.
@@ -232,6 +237,10 @@ public sealed class IndexMorphAdvisor
                     if (_policy.DisabledLevels is null)
                         _policy.DisabledLevels = new Dictionary<MorphLevel, bool>();
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+=======
+                    // Work on the captured reference to avoid TOCTOU across the ??= boundary
+>>>>>>> Stashed changes
 =======
                     // Work on the captured reference to avoid TOCTOU across the ??= boundary
 >>>>>>> Stashed changes
