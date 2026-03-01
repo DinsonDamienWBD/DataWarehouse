@@ -259,6 +259,8 @@ public sealed class ChildWorkflowRecord
     public DateTime? CompletedAt { get; set; }
     public WorkflowResult? Result { get; set; }
     public ParentClosePolicy CancellationOnParentClose { get; init; }
+    public CancellationTokenSource Cts { get; };
+    public CancellationToken CancellationToken;;
 }
 ```
 ```csharp

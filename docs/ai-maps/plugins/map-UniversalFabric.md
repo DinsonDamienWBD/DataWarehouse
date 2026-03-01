@@ -89,7 +89,20 @@ public record MigrationProgress
     public double PercentComplete;;
     public TimeSpan Elapsed { get; init; }
     public double BytesPerSecond;;
-    public TimeSpan? EstimatedRemaining;;
+    public TimeSpan? EstimatedRemaining
+{
+    get
+    {
+        // Finding 4551: guard against MigratedBytes > TotalBytes (e.g., due to torn read)
+        // and BytesPerSecond == 0 (division by zero / infinite time).
+        if (BytesPerSecond <= 0)
+            return null;
+        var remaining = TotalBytes - MigratedBytes;
+        if (remaining <= 0)
+            return TimeSpan.Zero;
+        return TimeSpan.FromSeconds(remaining / BytesPerSecond);
+    }
+}
 }
 ```
 
@@ -218,6 +231,7 @@ public class BackendAbstractionLayer : IStorageStrategy
         }
     }
 }
+    public BackendMetrics GetMetrics();;
 }
 ```
 ```csharp
