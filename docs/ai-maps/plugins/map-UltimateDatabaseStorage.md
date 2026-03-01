@@ -2050,7 +2050,7 @@ private sealed class ConsulLock : IDistributedLock
 {
 }
     public ConsulLock(Consul.IDistributedLock lockHandle);
-    public async Task ReleaseAsync(CancellationToken ct = default);
+    public Task ReleaseAsync(CancellationToken ct = default);
     public async ValueTask DisposeAsync();
 }
 ```
