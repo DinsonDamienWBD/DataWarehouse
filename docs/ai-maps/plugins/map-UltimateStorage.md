@@ -468,7 +468,7 @@ public sealed class ForwardingConfig
 public sealed class QuorumConsistencyManager
 {
 }
-    public QuorumConsistencyManager(TimeSpan? defaultTimeout = null);
+    public QuorumConsistencyManager(TimeSpan? defaultTimeout = null, string? localRegion = null);
     public void RegisterReplica(string replicaId, string region, string datacenter);
     public async Task<QuorumReadResult> ReadAsync(string key, ConsistencyLevel consistency, Func<string, Task<VersionedValue?>> readFromReplica, CancellationToken ct = default);
     public async Task<QuorumWriteResult> WriteAsync(string key, byte[] value, long version, ConsistencyLevel consistency, Func<string, byte[], long, Task<bool>> writeToReplica, CancellationToken ct = default);

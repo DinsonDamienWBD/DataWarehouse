@@ -521,9 +521,9 @@ internal sealed class PooledConnection<TConnection>
 }
     public TConnection Connection { get; }
     public DateTime CreatedAt { get; }
-    public DateTime LastUsedAt { get; private set; }
-    public int UseCount { get; private set; }
-    public bool IsInUse { get; private set; }
+    public DateTime LastUsedAt;;
+    public int UseCount;;
+    public bool IsInUse;;
     public string PoolKey { get; }
     public PooledConnection(TConnection connection, string poolKey);
     public void MarkInUse();
