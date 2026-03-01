@@ -1293,14 +1293,19 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
 
         private string GetEndpointUrl(string key)
         {
+            // Cat 15 (finding 4153): escape the object key so characters like #, ?, space, +
+            // do not corrupt the URL path or query string.
+            var escapedKey = string.Join("/",
+                key.Split('/').Select(segment => Uri.EscapeDataString(segment)));
+
             if (_usePathStyle)
             {
-                return $"{_endpoint}/{_bucket}/{key}";
+                return $"{_endpoint}/{_bucket}/{escapedKey}";
             }
 
             // Virtual-hosted style
             var endpoint = new Uri(_endpoint);
-            return $"{endpoint.Scheme}://{_bucket}.{endpoint.Host}/{key}";
+            return $"{endpoint.Scheme}://{_bucket}.{endpoint.Host}/{escapedKey}";
         }
 
         private async Task SignRequestAsync(HttpRequestMessage request, byte[]? content, CancellationToken ct)

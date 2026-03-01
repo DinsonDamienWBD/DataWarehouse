@@ -389,14 +389,20 @@ public sealed class IndexManager : IAsyncDisposable
     /// <returns>Manager statistics.</returns>
     public IndexManagerStats GetStats()
     {
+        // P2-3156: Use Volatile.Read so the compiler/CPU cannot serve a cached register value.
+        // The fields are mutated exclusively via Interlocked; Volatile.Read provides the
+        // required acquire barrier without a full lock.
+        var pending = Volatile.Read(ref _pendingTasks);
+        var completed = Volatile.Read(ref _completedTasks);
+        var failed = Volatile.Read(ref _failedTasks);
         return new IndexManagerStats
         {
-            PendingTasks = _pendingTasks,
-            CompletedTasks = _completedTasks,
-            FailedTasks = _failedTasks,
+            PendingTasks = pending,
+            CompletedTasks = completed,
+            FailedTasks = failed,
             Uptime = DateTimeOffset.UtcNow - _startTime,
             IndexCount = _compositeIndex.Indexes.Count,
-            ThroughputPerSecond = _completedTasks / Math.Max(1, (DateTimeOffset.UtcNow - _startTime).TotalSeconds)
+            ThroughputPerSecond = completed / Math.Max(1, (DateTimeOffset.UtcNow - _startTime).TotalSeconds)
         };
     }
 
