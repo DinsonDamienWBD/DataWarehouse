@@ -181,13 +181,17 @@ internal sealed class PredictiveApiStrategy : SdkInterface.InterfaceStrategyBase
                 _clientQueryHistory[clientId].RemoveAt(0);
             }
 
-            // Track global popularity
-            if (!_popularQueries.ContainsKey(query))
+            // P2-3325: Cap _popularQueries at 10,000 entries. When the cap is reached,
+            // evict the least-popular entry to prevent unbounded memory growth.
+            if (!_popularQueries.ContainsKey(query) && _popularQueries.Count >= 10_000)
             {
-                _popularQueries[query] = 0;
+                var leastPopular = _popularQueries.MinBy(kv => kv.Value);
+                if (leastPopular.Key != null)
+                    _popularQueries.Remove(leastPopular.Key);
             }
 
-            _popularQueries[query]++;
+            _popularQueries.TryGetValue(query, out var current);
+            _popularQueries[query] = current + 1;
         }
     }
 

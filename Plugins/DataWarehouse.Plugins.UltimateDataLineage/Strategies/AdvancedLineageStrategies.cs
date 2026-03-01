@@ -76,7 +76,7 @@ public sealed class CryptoProvenanceStrategy : LineageStrategyBase
             : ComputeHash("genesis:" + record.DataObjectId);
 
         // AfterHash includes the actual change content for tamper detection
-        var contentKey = string.Concat(record.DataObjectId, record.Timestamp.Ticks, record.OperationType);
+        var contentKey = string.Concat(record.DataObjectId, record.Timestamp.Ticks, record.Operation);
         var afterHash = ComputeHash(beforeHash + contentKey);
 
         return base.TrackAsync(record with

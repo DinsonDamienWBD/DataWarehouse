@@ -81,11 +81,8 @@ public sealed class ExponentialBackoffRetryStrategy : ResilienceStrategyBase
                 lastException = ex;
                 RecordRetry();
 
-                if (attempts <= _maxRetries)
-                {
-                    var delay = CalculateDelay(attempts);
-                    await Task.Delay(delay, cancellationToken);
-                }
+                var delay = CalculateDelay(attempts);
+                await Task.Delay(delay, cancellationToken);
             }
             catch (Exception ex)
             {
