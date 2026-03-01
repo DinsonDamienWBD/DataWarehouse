@@ -36,11 +36,12 @@ public sealed class UltimateEdgeComputingPlugin : OrchestrationPluginBase, EC.IE
 }
 ```
 ```csharp
-internal sealed class EdgeNodeManagerImpl : EC.IEdgeNodeManager
+internal sealed class EdgeNodeManagerImpl : EC.IEdgeNodeManager, IDisposable
 {
 }
     public event EventHandler<EC.EdgeNodeStatusChangedEventArgs>? NodeStatusChanged;
     public EdgeNodeManagerImpl(IMessageBus? messageBus);
+    public void Dispose();
     public async Task<EC.EdgeNodeRegistration> RegisterNodeAsync(EC.EdgeNodeInfo node, CancellationToken ct = default);
     public async Task<bool> DeregisterNodeAsync(string nodeId, CancellationToken ct = default);
     public Task<EC.EdgeNodeInfo?> GetNodeAsync(string nodeId, CancellationToken ct = default);;

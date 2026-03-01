@@ -23,7 +23,7 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
     public IReadOnlyCollection<IDataTransitStrategy> GetRegisteredStrategies();
     public async Task<IReadOnlyCollection<TransitHealthStatus>> GetHealthAsync(CancellationToken ct = default);
     protected override void Dispose(bool disposing);
-    public override Task<Dictionary<string, object>> TransferAsync(string key, Dictionary<string, object> target, CancellationToken ct = default);
+    public override async Task<Dictionary<string, object>> TransferAsync(string key, Dictionary<string, object> target, CancellationToken ct = default);
     public override Task<Dictionary<string, object>> GetTransferStatusAsync(string transferId, CancellationToken ct = default);
 }
 ```
