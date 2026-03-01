@@ -30,6 +30,25 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
         private readonly BoundedDictionary<string, BlockchainAnchoredMetadata> _backups = new BoundedDictionary<string, BlockchainAnchoredMetadata>(1000);
         private readonly BoundedDictionary<string, List<BlockchainAnchor>> _anchors = new BoundedDictionary<string, List<BlockchainAnchor>>(1000);
 
+        // Configurable smart contract addresses (set via RegisterContractAddressAsync or Options).
+        // Defaults are empty — operators must supply real deployed contract addresses before use.
+        private string _ethereumContractAddress = string.Empty;
+        private string _polygonContractAddress = string.Empty;
+
+        /// <summary>
+        /// Registers the smart contract address for a specific blockchain network.
+        /// Must be called before any backup or verification that targets that network.
+        /// </summary>
+        public void RegisterContractAddress(BlockchainNetwork network, string contractAddress)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(contractAddress);
+            switch (network)
+            {
+                case BlockchainNetwork.Ethereum: _ethereumContractAddress = contractAddress; break;
+                case BlockchainNetwork.Polygon:  _polygonContractAddress  = contractAddress; break;
+            }
+        }
+
         /// <summary>
         /// Supported blockchain networks.
         /// </summary>
@@ -602,7 +621,10 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             {
                 case BlockchainNetwork.Ethereum:
                     anchor.TransactionHash = await AnchorToEthereumAsync(backupHash, merkleRoot, ct);
-                    anchor.ContractAddress = "0x1234...abcd"; // Smart contract address
+                    anchor.ContractAddress = string.IsNullOrEmpty(_ethereumContractAddress)
+                        ? throw new InvalidOperationException(
+                            "Ethereum contract address not configured. Call RegisterContractAddress(BlockchainNetwork.Ethereum, address) first.")
+                        : _ethereumContractAddress;
                     anchor.BlockNumber = 18000000;
                     break;
 
@@ -613,7 +635,10 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 
                 case BlockchainNetwork.Polygon:
                     anchor.TransactionHash = await AnchorToPolygonAsync(backupHash, merkleRoot, ct);
-                    anchor.ContractAddress = "0x5678...efgh";
+                    anchor.ContractAddress = string.IsNullOrEmpty(_polygonContractAddress)
+                        ? throw new InvalidOperationException(
+                            "Polygon contract address not configured. Call RegisterContractAddress(BlockchainNetwork.Polygon, address) first.")
+                        : _polygonContractAddress;
                     anchor.BlockNumber = 50000000;
                     break;
 

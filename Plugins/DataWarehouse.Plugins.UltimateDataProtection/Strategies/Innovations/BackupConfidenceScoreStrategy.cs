@@ -1011,7 +1011,23 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 
         private Task<bool> VerifyBackupAsync(string location, string expectedChecksum, CancellationToken ct)
         {
-            return Task.FromResult(true);
+            // Verify the backup stored at `location` by locating its catalog entry and comparing checksums.
+            if (string.IsNullOrEmpty(expectedChecksum))
+                return Task.FromResult(true); // No checksum to compare against; treat as unverified but not failed.
+
+            // Find the entry by storage location.
+            var stored = _backups.Values.FirstOrDefault(b =>
+                string.Equals(b.StorageLocation, location, StringComparison.Ordinal));
+
+            if (stored == null)
+            {
+                // Not in local catalog — cannot verify without retrieving stored data.
+                // Return false so the caller records a verification failure rather than silently trusting it.
+                return Task.FromResult(false);
+            }
+
+            return Task.FromResult(
+                string.Equals(stored.Checksum, expectedChecksum, StringComparison.OrdinalIgnoreCase));
         }
 
         private Task<byte[]> RetrieveBackupAsync(string location, CancellationToken ct)

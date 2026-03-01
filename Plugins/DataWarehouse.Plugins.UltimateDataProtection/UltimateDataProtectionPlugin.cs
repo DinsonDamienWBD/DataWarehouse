@@ -625,57 +625,59 @@ namespace DataWarehouse.Plugins.UltimateDataProtection
             };
         }
 
-        private Task<Dictionary<string, object>> RecommendRecoveryPointAsync(string backupId, Dictionary<string, object> context)
+        private async Task<Dictionary<string, object>> RecommendRecoveryPointAsync(string backupId, Dictionary<string, object> context)
         {
             // Analyze registered strategies to find the best recovery point.
-            // Collect all catalog entries synchronously from strategy registries where available.
+            // Collect all catalog entries asynchronously from all registered strategies.
             var allEntries = new List<BackupCatalogEntry>();
+            var query = new BackupListQuery();
             foreach (var strategy in _registry.Strategies)
             {
                 try
                 {
-                    // Use synchronous catalog access if the strategy exposes it
-                    var entries = strategy.GetCatalogEntries();
+                    var entries = await strategy.ListBackupsAsync(query, CancellationToken.None).ConfigureAwait(false);
                     allEntries.AddRange(entries);
                 }
                 catch
                 {
-                    // Strategy doesn't support sync catalog access; skip
+                    // Strategy doesn't support catalog listing; skip
                 }
             }
 
+            // IsValid == null means not yet validated; IsValid == false means failed validation.
             var candidates = allEntries
-                .Where(e => !e.IsCorrupted)
-                .OrderByDescending(e => e.IsVerified ? 1 : 0)
+                .Where(e => e.IsValid != false)
+                .OrderByDescending(e => e.IsValid == true ? 1 : 0)
                 .ThenByDescending(e => e.CreatedAt)
                 .ToList();
 
             if (candidates.Count == 0)
             {
                 // No catalog entries; return the input backupId with low confidence
-                return Task.FromResult(new Dictionary<string, object>
+                return new Dictionary<string, object>
                 {
                     ["success"] = true,
                     ["recommendedBackupId"] = backupId,
                     ["confidence"] = 0.5,
                     ["reasoning"] = "No catalog entries available; returning requested backup ID as-is"
-                });
+                };
             }
 
             // Prefer the requested backup if it is among valid candidates, otherwise suggest best.
             var best = candidates.FirstOrDefault(e => e.BackupId == backupId) ?? candidates[0];
             var isRequested = best.BackupId == backupId;
-            var confidence = best.IsVerified ? 0.95 : 0.7;
+            var isVerified = best.IsValid == true;
+            var confidence = isVerified ? 0.95 : 0.7;
 
-            return Task.FromResult(new Dictionary<string, object>
+            return new Dictionary<string, object>
             {
                 ["success"] = true,
                 ["recommendedBackupId"] = best.BackupId,
                 ["confidence"] = confidence,
                 ["reasoning"] = isRequested
-                    ? $"Requested backup '{backupId}' is valid and {(best.IsVerified ? "integrity-verified" : "not yet verified")}"
+                    ? $"Requested backup '{backupId}' is valid and {(isVerified ? "integrity-verified" : "not yet verified")}"
                     : $"Requested backup not found; most recent valid backup '{best.BackupId}' recommended (age: {(DateTimeOffset.UtcNow - best.CreatedAt).TotalHours:F1}h)"
-            });
+            };
         }
 
         #endregion

@@ -717,9 +717,26 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             {
                 transaction.ProviderStates[provider] = ProviderTransactionState.Uploading;
 
-                // In production, this would upload to the actual cloud provider
+                // Upload to the cloud provider via the message bus (provider-specific connector plugin).
+                // Publish an upload request and wait for acknowledgement on the response topic.
                 var totalBytes = catalog.TotalBytes;
-                await Task.Delay(100, ct); // Simulate upload
+                if (MessageBus != null)
+                {
+                    await MessageBus.PublishAsync(
+                        DataProtectionTopics.CrossCloudUpload,
+                        new PluginMessage
+                        {
+                            Type = "crosscloud.upload.request",
+                            Source = StrategyId,
+                            Payload = new Dictionary<string, object>
+                            {
+                                ["BackupId"] = transaction.BackupId,
+                                ["Provider"] = provider.ToString(),
+                                ["TotalBytes"] = totalBytes,
+                                ["Files"] = catalog.Files.Select(f => f.Path).ToArray()
+                            }
+                        }, ct).ConfigureAwait(false);
+                }
                 progressCallback(totalBytes);
 
                 var location = provider switch
@@ -818,7 +835,24 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             Action<long> progressCallback,
             CancellationToken ct)
         {
-            await Task.Delay(100, ct);
+            // Publish restore request via message bus for provider-specific connector plugin.
+            if (MessageBus != null)
+            {
+                await MessageBus.PublishAsync(
+                    DataProtectionTopics.RestoreRequest,
+                    new PluginMessage
+                    {
+                        Type = "crosscloud.restore.request",
+                        Source = StrategyId,
+                        Payload = new Dictionary<string, object>
+                        {
+                            ["BackupId"] = metadata.BackupId,
+                            ["Provider"] = provider.ToString(),
+                            ["TargetPath"] = targetPath,
+                            ["Items"] = items?.ToArray() ?? Array.Empty<string>()
+                        }
+                    }, ct).ConfigureAwait(false);
+            }
             progressCallback(metadata.TotalBytes);
             return metadata.FileCount;
         }
@@ -909,11 +943,37 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             CancellationToken ct)
         {
             await Task.CompletedTask;
+            long totalBytes = 0;
+            long fileCount = 0;
+            var files = new List<FileEntry>();
+
+            foreach (var source in sources)
+            {
+                ct.ThrowIfCancellationRequested();
+                if (Directory.Exists(source))
+                {
+                    var di = new DirectoryInfo(source);
+                    foreach (var fi in di.EnumerateFiles("*", SearchOption.AllDirectories))
+                    {
+                        totalBytes += fi.Length;
+                        fileCount++;
+                        files.Add(new FileEntry { Path = fi.FullName, Size = fi.Length });
+                    }
+                }
+                else if (File.Exists(source))
+                {
+                    var fi = new FileInfo(source);
+                    totalBytes += fi.Length;
+                    fileCount++;
+                    files.Add(new FileEntry { Path = fi.FullName, Size = fi.Length });
+                }
+            }
+
             return new CatalogResult
             {
-                FileCount = 30000,
-                TotalBytes = 20L * 1024 * 1024 * 1024,
-                Files = new List<FileEntry>()
+                FileCount = fileCount,
+                TotalBytes = totalBytes,
+                Files = files
             };
         }
 

@@ -51,12 +51,13 @@ public sealed class SqlSecurityAnalyzer
         @"(--[^\r\n]*)|(/\*[\s\S]*?\*/)",
         RegexOptions.Compiled);
 
-    private readonly BoundedDictionary<string, SqlAnalysisResult> _analysisCache = new BoundedDictionary<string, SqlAnalysisResult>(1000);
-    private readonly int _cacheMaxSize;
+    private readonly BoundedDictionary<string, SqlAnalysisResult> _analysisCache;
 
     public SqlSecurityAnalyzer(int cacheMaxSize = 10000)
     {
-        _cacheMaxSize = cacheMaxSize;
+        // Finding 716: honour the configured limit — use cacheMaxSize as BoundedDictionary capacity
+        // so LRU eviction kicks in at the caller-specified size, not a hardcoded 1000.
+        _analysisCache = new BoundedDictionary<string, SqlAnalysisResult>(Math.Max(1, cacheMaxSize));
     }
 
     /// <summary>
@@ -80,11 +81,8 @@ public sealed class SqlSecurityAnalyzer
 
         var result = PerformAnalysis(query, options);
 
-        // Cache result (with size limit)
-        if (_analysisCache.Count < _cacheMaxSize)
-        {
-            _analysisCache.TryAdd(cacheKey, result);
-        }
+        // BoundedDictionary enforces LRU eviction at the configured capacity.
+        _analysisCache.TryAdd(cacheKey, result);
 
         return result;
     }

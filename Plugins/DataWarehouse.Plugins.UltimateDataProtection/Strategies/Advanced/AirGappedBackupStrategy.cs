@@ -549,11 +549,13 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 
         private async Task<string> CreatePackageSignatureAsync(byte[] data, CancellationToken ct)
         {
-            // In production, use RSA or Ed25519 signature
+            // Computes a SHA-256 integrity hash of the package data.
+            // For a real digital signature, publish an asymmetric signing key via the key-management plugin
+            // and use RSA-PSS or Ed25519 via the SDK crypto contract.
             using var sha256 = SHA256.Create();
             var hash = sha256.ComputeHash(data);
             await Task.CompletedTask;
-            return Convert.ToBase64String(hash);
+            return "sha256:" + Convert.ToBase64String(hash);
         }
 
         private PackageManifest CreatePackageManifest(AirGappedPackage package, List<FileInfo> files)

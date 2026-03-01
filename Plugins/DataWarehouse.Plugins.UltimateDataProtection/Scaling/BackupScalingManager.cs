@@ -275,6 +275,8 @@ public sealed class BackupScalingManager : IScalableSubsystem, IDisposable
     {
         if (string.IsNullOrWhiteSpace(jobId))
             throw new ArgumentException("Job ID must not be empty.", nameof(jobId));
+        if (string.IsNullOrWhiteSpace(sourcePath))
+            throw new ArgumentException("Source path must not be empty.", nameof(sourcePath));
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         var metadata = new BackupJobMetadata

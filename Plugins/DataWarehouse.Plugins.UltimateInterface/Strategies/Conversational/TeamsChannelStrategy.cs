@@ -158,7 +158,11 @@ internal sealed class TeamsChannelStrategy : SdkInterface.InterfaceStrategyBase,
         // Route to NLP for intent parsing via message bus
         if (IsIntelligenceAvailable)
         {
-            // In production, this would send to "nlp.intent.parse" topic
+            await MessageBus!.SendAsync(new DataWarehouse.SDK.Contracts.PluginMessage
+            {
+                Type = "nlp.intent.parse",
+                Payload = new System.Collections.Generic.Dictionary<string, object> { ["query"] = query }
+            }, ct).ConfigureAwait(false);
         }
 
         // Build Adaptive Card response

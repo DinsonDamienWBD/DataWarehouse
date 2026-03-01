@@ -152,6 +152,16 @@ namespace DataWarehouse.Plugins.UltimateDataProtection
 
         #endregion
 
+        #region Cross-Cloud Topics
+
+        /// <summary>Request to upload a backup to a cloud provider.</summary>
+        public const string CrossCloudUpload = $"{Prefix}.crosscloud.upload";
+
+        /// <summary>Upload to cloud provider completed.</summary>
+        public const string CrossCloudUploadCompleted = $"{Prefix}.crosscloud.upload.completed";
+
+        #endregion
+
         #region Metrics Topics
 
         /// <summary>Backup metrics update.</summary>

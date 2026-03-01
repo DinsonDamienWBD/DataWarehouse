@@ -194,12 +194,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
         {
             if (MessageBus == null) return;
 
-            // P2-3602: Wrap async handler in a non-fire-and-forget delegate so exceptions
-            // are surfaced rather than swallowed by the async-void equivalent.
-            MessageBus.Subscribe("intelligence.request.key-rotation-prediction", msg =>
-            {
-                _ = HandleKeyRotationPredictionAsync(msg);
-            });
+            // P2-3602: Use async lambda returning Task so exceptions propagate to the bus
+            // rather than being fire-and-forget.
+            MessageBus.Subscribe("intelligence.request.key-rotation-prediction",
+                msg => HandleKeyRotationPredictionAsync(msg));
         }
 
         /// <summary>
@@ -278,7 +276,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
             }
             catch (Exception ex)
             {
-                Logger?.LogError(ex, "[UltimateKeyManagementPlugin] HandleKeyRotationPredictionAsync failed for correlationId={CorrelationId}", msg.CorrelationId);
+                System.Diagnostics.Trace.TraceError($"[UltimateKeyManagementPlugin] HandleKeyRotationPredictionAsync failed: correlationId={msg.CorrelationId}, error={ex.Message}");
             }
         }
 
@@ -662,4 +660,62 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
 
         public override Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
         {
-            if (request.Context !=
+            if (request.Context != null)
+            {
+            }
+
+            if (request.Config != null && request.Config.TryGetValue("MessageBus", out var messageBusObj) && messageBusObj is IMessageBus messageBus)
+            {
+                SetMessageBus(messageBus);
+            }
+
+            return base.OnHandshakeAsync(request);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                if (_disposed) return;
+                _disposed = true;
+
+                // Synchronous dispose: dispose strategies directly.
+                // Prefer DisposeAsyncCore for graceful async shutdown.
+                foreach (var strategy in _strategies.Values)
+                {
+                    if (strategy is IDisposable disposable)
+                    {
+                        disposable.Dispose();
+                    }
+                }
+
+                _strategies.Clear();
+                _keyStores.Clear();
+                _envelopeKeyStores.Clear();
+            }
+            base.Dispose(disposing);
+        }
+
+        protected override async ValueTask DisposeAsyncCore()
+        {
+            if (_disposed) return;
+            _disposed = true;
+
+            await StopAsync().ConfigureAwait(false);
+
+            foreach (var strategy in _strategies.Values)
+            {
+                if (strategy is IDisposable disposable)
+                {
+                    disposable.Dispose();
+                }
+            }
+
+            _strategies.Clear();
+            _keyStores.Clear();
+            _envelopeKeyStores.Clear();
+
+            await base.DisposeAsyncCore().ConfigureAwait(false);
+        }
+    }
+}

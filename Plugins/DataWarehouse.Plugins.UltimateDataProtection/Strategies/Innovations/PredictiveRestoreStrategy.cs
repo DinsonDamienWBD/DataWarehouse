@@ -102,10 +102,25 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             {
                 ct.ThrowIfCancellationRequested();
 
-                await Task.Delay(50, ct); // Simulate work
-                totalBytes += 1024 * 1024 * 100;
-                storedBytes += 1024 * 1024 * 30;
-                fileCount += 500;
+                // Measure actual source size instead of using hardcoded stub values.
+                long sourceBytes = 0;
+                long sourceFiles = 0;
+                if (!string.IsNullOrEmpty(source.SourcePath) && Directory.Exists(source.SourcePath))
+                {
+                    var di = new DirectoryInfo(source.SourcePath);
+                    var files = di.GetFiles("*", SearchOption.AllDirectories);
+                    sourceFiles = files.Length;
+                    sourceBytes = files.Sum(f => f.Length);
+                }
+                else if (!string.IsNullOrEmpty(source.SourcePath) && File.Exists(source.SourcePath))
+                {
+                    sourceBytes = new FileInfo(source.SourcePath).Length;
+                    sourceFiles = 1;
+                }
+
+                totalBytes += sourceBytes;
+                storedBytes += sourceBytes;
+                fileCount += sourceFiles;
             }
 
             progressCallback(new BackupProgress

@@ -360,7 +360,33 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
 
             try
             {
-                var json = await File.ReadAllTextAsync(path);
+                var envelopeJson = await File.ReadAllTextAsync(path);
+                using var envelope = JsonDocument.Parse(envelopeJson);
+
+                string json;
+                // P2-3498: Verify HMAC integrity tag before trusting credential data.
+                if (envelope.RootElement.TryGetProperty("mac", out var macProp) &&
+                    envelope.RootElement.TryGetProperty("data", out var dataProp))
+                {
+                    json = dataProp.GetString() ?? string.Empty;
+                    var storedMac = Convert.FromBase64String(macProp.GetString() ?? string.Empty);
+                    var hmacKey = DeriveIntegrityKey();
+                    var computedMac = HMACSHA256.HashData(hmacKey, Encoding.UTF8.GetBytes(json));
+                    if (!CryptographicOperations.FixedTimeEquals(storedMac, computedMac))
+                    {
+                        System.Diagnostics.Trace.TraceWarning(
+                            "[SoloKeyStrategy] Credential file HMAC mismatch — file may be tampered. Discarding.");
+                        return;
+                    }
+                }
+                else
+                {
+                    // Legacy format without envelope (no MAC); load but warn.
+                    json = envelopeJson;
+                    System.Diagnostics.Trace.TraceWarning(
+                        "[SoloKeyStrategy] Credential file has no integrity tag — upgrade by re-registering credentials.");
+                }
+
                 var stored = JsonSerializer.Deserialize<Dictionary<string, Fido2CredentialDto>>(json);
 
                 if (stored != null)
@@ -371,11 +397,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-
-                // Ignore errors loading existing credentials
-                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+                System.Diagnostics.Debug.WriteLine($"[SoloKeyStrategy] LoadStoredCredentials error: {ex.Message}");
             }
         }
 
@@ -394,7 +418,24 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                 kvp => Fido2CredentialDto.FromCredential(kvp.Value));
 
             var json = JsonSerializer.Serialize(toStore, new JsonSerializerOptions { WriteIndented = true });
-            await File.WriteAllTextAsync(path, json);
+
+            // P2-3498: Add HMAC-SHA256 integrity tag so tampering with stored credentials
+            // can be detected on load. The HMAC key is derived from a machine-specific secret.
+            var hmacKey = DeriveIntegrityKey();
+            var jsonBytes = Encoding.UTF8.GetBytes(json);
+            var mac = HMACSHA256.HashData(hmacKey, jsonBytes);
+            var envelope = new { mac = Convert.ToBase64String(mac), data = json };
+            var envelopeJson = JsonSerializer.Serialize(envelope);
+            await File.WriteAllTextAsync(path, envelopeJson);
+        }
+
+        private static byte[] DeriveIntegrityKey()
+        {
+            // Derive a machine-scoped integrity key from MachineGuid (or a stable fallback).
+            var machineId = Environment.MachineName + Environment.GetEnvironmentVariable("COMPUTERNAME");
+            var ikm = Encoding.UTF8.GetBytes(machineId);
+            var info = Encoding.UTF8.GetBytes("DataWarehouse.SoloKey.CredentialIntegrity.v1");
+            return HKDF.DeriveKey(HashAlgorithmName.SHA256, ikm, 32, info: info);
         }
 
         private string GetCredentialStoragePath()

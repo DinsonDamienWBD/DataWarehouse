@@ -147,10 +147,22 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             foreach (var source in request.Sources)
             {
                 ct.ThrowIfCancellationRequested();
-                await Task.Delay(50, ct);
-                totalBytes += 1024 * 1024 * 80;
-                storedBytes += 1024 * 1024 * 25;
-                fileCount += 400;
+                // Measure actual source size.
+                if (!string.IsNullOrEmpty(source.SourcePath) && Directory.Exists(source.SourcePath))
+                {
+                    var di = new DirectoryInfo(source.SourcePath);
+                    var files = di.GetFiles("*", SearchOption.AllDirectories);
+                    totalBytes += files.Sum(f => f.Length);
+                    storedBytes += files.Sum(f => f.Length);
+                    fileCount += files.Length;
+                }
+                else if (!string.IsNullOrEmpty(source.SourcePath) && File.Exists(source.SourcePath))
+                {
+                    var fi = new FileInfo(source.SourcePath);
+                    totalBytes += fi.Length;
+                    storedBytes += fi.Length;
+                    fileCount += 1;
+                }
             }
 
             progressCallback(new BackupProgress
@@ -501,7 +513,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                 if (Regex.IsMatch(query, pattern, RegexOptions.IgnoreCase))
                 {
                     var resolved = resolver();
-                    if (resolved != DateTimeOffset.MinValue)
+                    // DateTimeOffset.UnixEpoch is the sentinel for the year-capture pattern;
+                    // callers that need the actual year should parse the match group directly.
+                    if (resolved != DateTimeOffset.UnixEpoch)
                     {
                         references.Add(new TemporalReference
                         {
@@ -509,6 +523,21 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                             ResolvedDate = resolved,
                             IsExact = pattern.Contains(@"\d")
                         });
+                    }
+                    else if (pattern.Contains(@"\d{4}"))
+                    {
+                        // Extract the actual year from the query and resolve it.
+                        var yearMatch = Regex.Match(query, @"\b(\d{4})\b");
+                        if (yearMatch.Success && int.TryParse(yearMatch.Groups[1].Value, out var year)
+                            && year >= 1970 && year <= DateTimeOffset.UtcNow.Year + 1)
+                        {
+                            references.Add(new TemporalReference
+                            {
+                                Pattern = pattern,
+                                ResolvedDate = new DateTimeOffset(year, 1, 1, 0, 0, 0, TimeSpan.Zero),
+                                IsExact = true
+                            });
+                        }
                     }
                 }
             }

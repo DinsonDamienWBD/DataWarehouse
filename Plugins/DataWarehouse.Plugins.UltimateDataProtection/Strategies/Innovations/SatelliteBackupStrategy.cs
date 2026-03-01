@@ -815,9 +815,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                     "No satellite providers configured. Register at least one provider via RegisterProviderAsync before creating a backup.");
             }
 
-            // Select provider with best signal quality (highest SignalStrengthDb), falling back to first.
+            // Select provider with highest available upload bandwidth as proxy for best connection quality.
             var bestProvider = _providerConfigs
-                .OrderByDescending(kvp => kvp.Value.MinSignalStrengthDb)
+                .OrderByDescending(kvp => kvp.Value.MaxUploadBandwidth)
                 .Select(kvp => kvp.Key)
                 .First();
 

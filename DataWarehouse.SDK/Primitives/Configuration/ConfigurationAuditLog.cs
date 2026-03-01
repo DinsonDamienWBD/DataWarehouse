@@ -82,12 +82,13 @@ public class ConfigurationAuditLog
             var previousHash = _chainHeadHash;
 
             // Create entry without hash first to compute hash
+            // Finding 534: serialize complex objects to JSON rather than calling .ToString()
             var entryData = new AuditEntry(
                 DateTime.UtcNow,
                 user ?? "System",
                 settingPath,
-                oldValue?.ToString(),
-                newValue?.ToString(),
+                SerializeValue(oldValue),
+                SerializeValue(newValue),
                 reason,
                 IntegrityHash: null,
                 PreviousHash: previousHash);
@@ -254,5 +255,22 @@ public class ConfigurationAuditLog
         }
 
         return GenesisHash;
+    }
+
+    /// <summary>
+    /// Serializes a value for audit recording.
+    /// Primitives use their string representation; complex objects are serialized to JSON
+    /// so the audit record contains actual content rather than type names.
+    /// </summary>
+    private static string? SerializeValue(object? value)
+    {
+        if (value is null) return null;
+        return value switch
+        {
+            string s => s,
+            bool or byte or sbyte or short or ushort or int or uint or long or ulong
+                or float or double or decimal => value.ToString(),
+            _ => JsonSerializer.Serialize(value)
+        };
     }
 }

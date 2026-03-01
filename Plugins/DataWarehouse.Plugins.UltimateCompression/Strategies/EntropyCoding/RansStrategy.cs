@@ -154,19 +154,22 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
                 frequencies[b]++;
 
             // Normalize frequencies
-            var (normalized, cumulative) = NormalizeFrequencies(frequencies);
+            int tableLog = TableLog;
+            int tableSize = TableSize;
+            uint ransL = RansL;
+            var (normalized, cumulative) = NormalizeFrequencies(frequencies, tableSize);
 
             // Write frequency table
             WriteFrequencyTable(output, normalized);
 
             // Encode data
             var compressedData = new MemoryStream(65536);
-            uint state = RansL;
+            uint state = ransL;
 
             for (int i = 0; i < input.Length; i++)
             {
                 byte symbol = input[i];
-                EncodeSymbol(compressedData, ref state, symbol, normalized, cumulative);
+                EncodeSymbol(compressedData, ref state, symbol, normalized, cumulative, ransL, tableLog, tableSize);
             }
 
             // Write final state
@@ -233,14 +236,17 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
             var result = new byte[originalLength];
             int dataPos = 0;
 
+            int tableLog = TableLog;
+            int tableSize = TableSize;
+            uint ransL = RansL;
             for (int i = 0; i < originalLength; i++)
             {
-                var (symbol, newState) = DecodeSymbol(state, normalized, cumulative);
+                var (symbol, newState) = DecodeSymbol(state, normalized, cumulative, tableLog);
                 result[i] = symbol;
                 state = newState;
 
                 // Renormalize state
-                while (state < RansL && dataPos < compressedData.Length)
+                while (state < ransL && dataPos < compressedData.Length)
                 {
                     state = (state << 8) | compressedData[dataPos++];
                 }
@@ -252,7 +258,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
         /// <summary>
         /// Normalizes frequencies to sum to TableSize and builds cumulative table.
         /// </summary>
-        private static (int[] normalized, int[] cumulative) NormalizeFrequencies(int[] frequencies)
+        private static (int[] normalized, int[] cumulative) NormalizeFrequencies(int[] frequencies, int tableSize)
         {
             var normalized = new int[256];
             var cumulative = new int[257];
@@ -270,9 +276,9 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
 
             if (total == 0 || nonZeroCount == 0)
             {
-                normalized[0] = TableSize;
+                normalized[0] = tableSize;
                 cumulative[0] = 0;
-                cumulative[1] = TableSize;
+                cumulative[1] = tableSize;
                 return (normalized, cumulative);
             }
 
@@ -281,14 +287,14 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
             {
                 if (frequencies[i] > 0)
                 {
-                    int norm = Math.Max(1, (int)((long)frequencies[i] * TableSize / total));
+                    int norm = Math.Max(1, (int)((long)frequencies[i] * tableSize / total));
                     normalized[i] = norm;
                     assigned += norm;
                 }
             }
 
-            // Adjust to exactly TableSize
-            int diff = TableSize - assigned;
+            // Adjust to exactly tableSize
+            int diff = tableSize - assigned;
             if (diff != 0)
             {
                 for (int i = 0; i < 256 && diff != 0; i++)
@@ -352,30 +358,30 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
         }
 
         private static void EncodeSymbol(Stream output, ref uint state, byte symbol,
-            int[] normalized, int[] cumulative)
+            int[] normalized, int[] cumulative, uint ransL, int tableLog, int tableSize)
         {
             int freq = normalized[symbol];
             int start = cumulative[symbol];
 
             // Renormalize if needed
-            uint maxState = ((RansL >> TableLog) << 16) * (uint)freq;
+            uint maxState = ((ransL >> tableLog) << 16) * (uint)freq;
             while (state >= maxState)
             {
                 output.WriteByte((byte)(state & 0xFF));
                 state >>= 8;
             }
 
-            // Encode symbol: state = (state / freq) * TableSize + (state % freq) + start
-            state = ((state / (uint)freq) << TableLog) + (state % (uint)freq) + (uint)start;
+            // Encode symbol: state = (state / freq) * tableSize + (state % freq) + start
+            state = ((state / (uint)freq) << tableLog) + (state % (uint)freq) + (uint)start;
         }
 
         private static (byte symbol, uint newState) DecodeSymbol(uint state,
-            int[] normalized, int[] cumulative)
+            int[] normalized, int[] cumulative, int tableLog)
         {
             // Extract slot from state
-            uint slot = state & (TableSize - 1);
+            uint slot = state & (uint)((1 << tableLog) - 1);
 
-            // Find symbol via binary search in cumulative table
+            // Find symbol via linear search in cumulative table
             byte symbol = 0;
             for (int s = 0; s < 256; s++)
             {
@@ -389,8 +395,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
             int freq = normalized[symbol];
             int start = cumulative[symbol];
 
-            // Decode: newState = (state >> TableLog) * freq + (slot - start)
-            uint newState = (state >> TableLog) * (uint)freq + (slot - (uint)start);
+            // Decode: newState = (state >> tableLog) * freq + (slot - start)
+            uint newState = (state >> tableLog) * (uint)freq + (slot - (uint)start);
 
             return (symbol, newState);
         }
