@@ -638,6 +638,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 return encoded;
             }
 
+            // Validate that encoded buffer is large enough before indexing
+            int requiredBits = 32 + metadataLength * 8;
+            if (encoded.Length < requiredBits)
+            {
+                // Malformed data — insufficient bits for declared metadata length
+                return encoded;
+            }
+
             // Extract metadata bytes
             var metadataBytes = new byte[metadataLength];
             for (int i = 0; i < metadataLength * 8; i++)

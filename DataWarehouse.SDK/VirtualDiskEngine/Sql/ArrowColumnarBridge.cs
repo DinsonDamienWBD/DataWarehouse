@@ -281,66 +281,11 @@ public static class ArrowColumnarBridge
 
     private static ReadOnlyMemory<byte> AsReadOnlyMemory<T>(T[] values) where T : struct
     {
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-        // Cat 13 (finding 911/912): MemoryMarshal.AsBytes gives a zero-copy view as Span<byte>,
-        // but ReadOnlyMemory<byte> requires a byte[] backing store, so we must allocate and copy.
-        // The previous comment "Zero-copy" was incorrect. If the caller can use ReadOnlySpan<byte>,
-        // use MemoryMarshal.AsBytes(values.AsSpan()) directly to avoid this allocation.
-=======
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
         // Cat 13 (finding 911/912): MemoryMarshal.AsBytes returns a Span<byte> aliasing the original
         // array memory (true zero-copy view). However, ReadOnlyMemory<byte> requires a byte[]
         // backing array, so we must copy. The previous comment claiming "zero-copy" was incorrect.
         // If the caller can accept a ReadOnlySpan<byte>, use MemoryMarshal.AsBytes(values) directly
         // to avoid this allocation.
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
         var bytes = MemoryMarshal.AsBytes(values.AsSpan());
         var result = new byte[bytes.Length];
         bytes.CopyTo(result);

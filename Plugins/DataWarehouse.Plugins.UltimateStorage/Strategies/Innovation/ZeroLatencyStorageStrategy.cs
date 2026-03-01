@@ -517,27 +517,38 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
         private void EvictIfNeeded(long requiredSpace)
         {
-            // Use _l1SizeLock to make the read-then-evict decision consistent with store's check-then-add
+            // Evict entries until there is room, using a single O(n) scan per iteration
+            // (compared to the O(n) OrderBy().First() pattern which is identical complexity
+            // but creates intermediate allocations). We snapshot the LRU key in one pass.
             while (true)
             {
+                bool needsEviction;
                 lock (_l1SizeLock)
                 {
-                    if (_currentL1Size + requiredSpace <= _l1CacheMaxBytes || !_l1Cache.Any())
-                        break;
+                    needsEviction = _currentL1Size + requiredSpace > _l1CacheMaxBytes && _l1Cache.Any();
                 }
 
-                // Evict least recently used
-                var lruKey = _l1Cache.OrderBy(kvp => kvp.Value.LastAccess).First().Key;
-                if (_l1Cache.TryRemove(lruKey, out var evicted))
+                if (!needsEviction)
+                    break;
+
+                // Single O(n) scan: find the entry with the oldest LastAccess
+                string? lruKey = null;
+                DateTime lruTime = DateTime.MaxValue;
+                foreach (var kvp in _l1Cache)
                 {
-                    lock (_l1SizeLock)
+                    if (kvp.Value.LastAccess < lruTime)
                     {
-                        _currentL1Size -= evicted.Size;
+                        lruTime = kvp.Value.LastAccess;
+                        lruKey = kvp.Key;
                     }
                 }
-                else
+
+                if (lruKey == null || !_l1Cache.TryRemove(lruKey, out var evicted))
+                    break; // Concurrent eviction handled it
+
+                lock (_l1SizeLock)
                 {
-                    break; // Concurrent eviction — stop to avoid spin
+                    _currentL1Size -= evicted.Size;
                 }
             }
         }

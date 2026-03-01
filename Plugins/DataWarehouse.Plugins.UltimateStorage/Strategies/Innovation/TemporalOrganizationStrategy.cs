@@ -18,6 +18,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private string _baseStoragePath = string.Empty;
         private string _organizationPattern = "yyyy/MM/dd";
         private readonly SemaphoreSlim _initLock = new(1, 1);
+        // Key → full file path index, prevents duplicate-filename collisions and enables O(1) lookup.
+        private readonly ConcurrentDictionary<string, string> _keyToPath = new();
 
         public override string StrategyId => "temporal-organization";
         public override string Name => "Temporal Organization Storage";
@@ -66,7 +68,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
             var timestamp = DateTime.UtcNow;
             var datePath = timestamp.ToString(_organizationPattern);
-            var fullPath = Path.Combine(_baseStoragePath, datePath, Path.GetFileName(key));
+            // Use a hash of the key as filename to avoid collisions between keys that share the same Path.GetFileName.
+            var safeFileName = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(key))).ToLowerInvariant() + ".bin";
+            var fullPath = Path.Combine(_baseStoragePath, datePath, safeFileName);
             var dir = Path.GetDirectoryName(fullPath);
             if (!string.IsNullOrEmpty(dir))
             {
@@ -74,6 +79,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             }
 
             await File.WriteAllBytesAsync(fullPath, dataBytes, ct);
+            _keyToPath[key] = fullPath;
 
             var fileInfo = new FileInfo(fullPath);
             return new StorageObjectMetadata
@@ -90,74 +96,56 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         {
             EnsureInitialized();
 
-            foreach (var directory in Directory.EnumerateDirectories(_baseStoragePath, "*", SearchOption.AllDirectories))
+            // O(1) lookup via in-memory index
+            if (_keyToPath.TryGetValue(key, out var filePath) && File.Exists(filePath))
             {
-                var filePath = Path.Combine(directory, Path.GetFileName(key));
-                if (File.Exists(filePath))
-                {
-                    var data = await File.ReadAllBytesAsync(filePath, ct);
-                    return new MemoryStream(data);
-                }
+                var data = await File.ReadAllBytesAsync(filePath, ct);
+                return new MemoryStream(data);
             }
 
             throw new FileNotFoundException($"Object with key '{key}' not found", key);
         }
 
-        protected override async Task DeleteAsyncCore(string key, CancellationToken ct)
+        protected override Task DeleteAsyncCore(string key, CancellationToken ct)
         {
             EnsureInitialized();
 
-            foreach (var directory in Directory.EnumerateDirectories(_baseStoragePath, "*", SearchOption.AllDirectories))
+            if (_keyToPath.TryRemove(key, out var filePath) && File.Exists(filePath))
             {
-                var filePath = Path.Combine(directory, Path.GetFileName(key));
-                if (File.Exists(filePath))
-                {
-                    File.Delete(filePath);
-                    break;
-                }
+                File.Delete(filePath);
             }
 
-            await Task.CompletedTask;
+            return Task.CompletedTask;
         }
 
-        protected override async Task<bool> ExistsAsyncCore(string key, CancellationToken ct)
+        protected override Task<bool> ExistsAsyncCore(string key, CancellationToken ct)
         {
             EnsureInitialized();
-
-            foreach (var directory in Directory.EnumerateDirectories(_baseStoragePath, "*", SearchOption.AllDirectories))
-            {
-                var filePath = Path.Combine(directory, Path.GetFileName(key));
-                if (File.Exists(filePath))
-                {
-                    return true;
-                }
-            }
-
-            await Task.CompletedTask;
-            return false;
+            return Task.FromResult(_keyToPath.TryGetValue(key, out var path) && File.Exists(path));
         }
 
         protected override async IAsyncEnumerable<StorageObjectMetadata> ListAsyncCore(string? prefix, [EnumeratorCancellation] CancellationToken ct)
         {
             EnsureInitialized();
 
-            foreach (var file in Directory.EnumerateFiles(_baseStoragePath, "*", SearchOption.AllDirectories))
+            foreach (var kvp in _keyToPath)
             {
                 ct.ThrowIfCancellationRequested();
-                var fileName = Path.GetFileName(file);
+                if (!string.IsNullOrEmpty(prefix) && !kvp.Key.StartsWith(prefix, StringComparison.Ordinal))
+                    continue;
 
-                if (string.IsNullOrEmpty(prefix) || fileName.StartsWith(prefix))
+                if (!File.Exists(kvp.Value))
+                    continue;
+
+                var fileInfo = new FileInfo(kvp.Value);
+                yield return new StorageObjectMetadata
                 {
-                    var fileInfo = new FileInfo(file);
-                    yield return new StorageObjectMetadata
-                    {
-                        Key = fileName,
-                        Size = fileInfo.Length,
-                        Created = fileInfo.CreationTimeUtc,
-                        Modified = fileInfo.LastWriteTimeUtc,
-                        Tier = Tier
-                    };
-                }
+                    Key = kvp.Key,
+                    Size = fileInfo.Length,
+                    Created = fileInfo.CreationTimeUtc,
+                    Modified = fileInfo.LastWriteTimeUtc,
+                    Tier = Tier
+                };
             }
 
             await Task.CompletedTask;

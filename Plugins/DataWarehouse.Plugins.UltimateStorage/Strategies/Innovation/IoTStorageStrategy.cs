@@ -75,19 +75,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 _timeSeriesBuffers[deviceId] = buffer;
             }
 
-            bool shouldCompact;
-            lock (buffer.SamplesLock)
+            buffer.Samples.Add(new TelemetrySample
             {
-                buffer.Samples.Add(new TelemetrySample
-                {
-                    Timestamp = DateTime.UtcNow,
-                    Data = telemetryData,
-                    Size = telemetryData.Length
-                });
-                shouldCompact = buffer.Samples.Count >= 1000;
-            }
+                Timestamp = DateTime.UtcNow,
+                Data = telemetryData,
+                Size = telemetryData.Length
+            });
 
-            if (shouldCompact)
+            // Compact if buffer is full
+            if (buffer.Samples.Count >= 1000)
             {
                 await CompactTimeSeriesAsync(deviceId, buffer, shard, ct);
             }
@@ -180,15 +176,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
         private async Task CompactTimeSeriesAsync(string deviceId, TimeSeriesBuffer buffer, DeviceShard shard, CancellationToken ct)
         {
-            byte[] compactedData;
-            lock (buffer.SamplesLock)
-            {
-                compactedData = buffer.Samples.SelectMany(s => s.Data).ToArray();
-                buffer.Samples.Clear();
-            }
-
             var filePath = Path.Combine(shard.Path, $"{deviceId}.dat");
+            var compactedData = buffer.Samples.SelectMany(s => s.Data).ToArray();
             await File.WriteAllBytesAsync(filePath, compactedData, ct);
+            buffer.Samples.Clear();
         }
 
         private class DeviceShard
@@ -202,42 +193,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         {
             public string DeviceId { get; set; } = string.Empty;
             public List<TelemetrySample> Samples { get; set; } = new();
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-=======
             /// <summary>Lock protecting Samples list from concurrent Add/Clear races.</summary>
->>>>>>> Stashed changes
-=======
-            /// <summary>Lock protecting Samples list from concurrent Add/Clear races.</summary>
->>>>>>> Stashed changes
-=======
-            /// <summary>Lock protecting Samples list from concurrent Add/Clear races.</summary>
->>>>>>> Stashed changes
-=======
-            /// <summary>Lock protecting Samples list from concurrent Add/Clear races.</summary>
->>>>>>> Stashed changes
-=======
-            /// <summary>Lock protecting Samples list from concurrent Add/Clear races.</summary>
->>>>>>> Stashed changes
-=======
-            /// <summary>Lock protecting Samples list from concurrent Add/Clear races.</summary>
->>>>>>> Stashed changes
-=======
-            /// <summary>Lock protecting Samples list from concurrent Add/Clear races.</summary>
->>>>>>> Stashed changes
-=======
-            /// <summary>Lock protecting Samples list from concurrent Add/Clear races.</summary>
->>>>>>> Stashed changes
-=======
-            /// <summary>Lock protecting Samples list from concurrent Add/Clear races.</summary>
->>>>>>> Stashed changes
             public readonly object SamplesLock = new();
         }
 

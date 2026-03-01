@@ -215,13 +215,37 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             IncrementBytesStored(dataBytes.Length);
 
             // Extract time-lock parameters from metadata
-            var unlockTime = metadata?.ContainsKey("UnlockTime") == true
-                ? DateTime.Parse(metadata["UnlockTime"])
-                : DateTime.UtcNow.AddDays(30); // Default: 30 days
+            DateTime unlockTime;
+            if (metadata?.ContainsKey("UnlockTime") == true)
+            {
+                if (!DateTime.TryParse(metadata["UnlockTime"],
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.RoundtripKind | System.Globalization.DateTimeStyles.AssumeUniversal,
+                    out unlockTime))
+                {
+                    throw new ArgumentException(
+                        $"Invalid UnlockTime value '{metadata["UnlockTime"]}'. Use ISO 8601 format (e.g. '2030-01-01T00:00:00Z').",
+                        "metadata");
+                }
+                unlockTime = unlockTime.ToUniversalTime();
+                if (unlockTime <= DateTime.UtcNow)
+                    throw new ArgumentException("UnlockTime must be in the future.", "metadata");
+            }
+            else
+            {
+                unlockTime = DateTime.UtcNow.AddDays(30); // Default: 30 days
+            }
 
-            var enableDeadManSwitch = metadata?.ContainsKey("EnableDeadManSwitch") == true
-                ? bool.Parse(metadata["EnableDeadManSwitch"])
-                : _enableDeadManSwitch;
+            bool enableDeadManSwitch;
+            if (metadata?.ContainsKey("EnableDeadManSwitch") == true)
+            {
+                if (!bool.TryParse(metadata["EnableDeadManSwitch"], out enableDeadManSwitch))
+                    enableDeadManSwitch = _enableDeadManSwitch;
+            }
+            else
+            {
+                enableDeadManSwitch = _enableDeadManSwitch;
+            }
 
             // Perform time-lock encryption
             var (encryptedData, timeLockKey, vdfProof) = PerformTimeLockEncryption(dataBytes, unlockTime);

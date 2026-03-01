@@ -33,52 +33,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
     public class InfiniteStorageStrategy : UltimateStorageStrategyBase
     {
         private readonly List<ProviderEndpoint> _providers = new();
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-        private readonly Dictionary<string, ProviderEndpoint> _providerById = new(); // O(1) lookup
-=======
         // O(1) lookup by provider ID — updated in sync with _providers
         private readonly Dictionary<string, ProviderEndpoint> _providerById = new();
->>>>>>> Stashed changes
-=======
-        // O(1) lookup by provider ID — updated in sync with _providers
-        private readonly Dictionary<string, ProviderEndpoint> _providerById = new();
->>>>>>> Stashed changes
-=======
-        // O(1) lookup by provider ID — updated in sync with _providers
-        private readonly Dictionary<string, ProviderEndpoint> _providerById = new();
->>>>>>> Stashed changes
-=======
-        // O(1) lookup by provider ID — updated in sync with _providers
-        private readonly Dictionary<string, ProviderEndpoint> _providerById = new();
->>>>>>> Stashed changes
-=======
-        // O(1) lookup by provider ID — updated in sync with _providers
-        private readonly Dictionary<string, ProviderEndpoint> _providerById = new();
->>>>>>> Stashed changes
-=======
-        // O(1) lookup by provider ID — updated in sync with _providers
-        private readonly Dictionary<string, ProviderEndpoint> _providerById = new();
->>>>>>> Stashed changes
-=======
-        // O(1) lookup by provider ID — updated in sync with _providers
-        private readonly Dictionary<string, ProviderEndpoint> _providerById = new();
->>>>>>> Stashed changes
-=======
-        // O(1) lookup by provider ID — updated in sync with _providers
-        private readonly Dictionary<string, ProviderEndpoint> _providerById = new();
->>>>>>> Stashed changes
-=======
-        // O(1) lookup by provider ID — updated in sync with _providers
-        private readonly Dictionary<string, ProviderEndpoint> _providerById = new();
->>>>>>> Stashed changes
         private readonly BoundedDictionary<string, string> _keyToProvider = new BoundedDictionary<string, string>(1000);
         private readonly BoundedDictionary<string, ProviderMetrics> _providerMetrics = new BoundedDictionary<string, ProviderMetrics>(1000);
         private int _replicationFactor = 3;
@@ -490,43 +446,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             var selectedProviderIds = new HashSet<string>();
             var result = new List<ProviderEndpoint>();
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-            // Find providers using consistent hashing — O(1) lookup via _providerById
-=======
             // Find providers using consistent hashing — O(log n) ring traversal, O(1) provider lookup
->>>>>>> Stashed changes
-=======
-            // Find providers using consistent hashing — O(log n) ring traversal, O(1) provider lookup
->>>>>>> Stashed changes
-=======
-            // Find providers using consistent hashing — O(log n) ring traversal, O(1) provider lookup
->>>>>>> Stashed changes
-=======
-            // Find providers using consistent hashing — O(log n) ring traversal, O(1) provider lookup
->>>>>>> Stashed changes
-=======
-            // Find providers using consistent hashing — O(log n) ring traversal, O(1) provider lookup
->>>>>>> Stashed changes
-=======
-            // Find providers using consistent hashing — O(log n) ring traversal, O(1) provider lookup
->>>>>>> Stashed changes
-=======
-            // Find providers using consistent hashing — O(log n) ring traversal, O(1) provider lookup
->>>>>>> Stashed changes
-=======
-            // Find providers using consistent hashing — O(log n) ring traversal, O(1) provider lookup
->>>>>>> Stashed changes
-=======
-            // Find providers using consistent hashing — O(log n) ring traversal, O(1) provider lookup
->>>>>>> Stashed changes
             foreach (var kvp in _consistentHashRing.Where(kvp => kvp.Key >= hash).Concat(_consistentHashRing))
             {
                 if (selectedProviderIds.Add(kvp.Value) && _providerById.TryGetValue(kvp.Value, out var provider))
