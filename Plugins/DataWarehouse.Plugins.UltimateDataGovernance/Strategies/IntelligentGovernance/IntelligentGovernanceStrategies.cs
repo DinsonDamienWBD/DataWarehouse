@@ -613,7 +613,7 @@ public sealed class SensitivityClassifierStrategy : DataGovernanceStrategyBase
         _rules.AddOrUpdate(
             sensitivityLevel,
             _ => new List<ClassificationRule> { rule },
-            (_, existing) => { existing.Add(rule); return existing; });
+            (_, existing) => { lock (existing) { existing.Add(rule); } return existing; });
     }
 
     /// <summary>

@@ -66,17 +66,19 @@ public abstract class DataGovernanceStrategyBase : StrategyBase, IDataGovernance
     public abstract string[] Tags { get; }
 
     /// <summary>Initializes the strategy. Idempotent.</summary>
-    protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
+    // P2-2253: Avoid async state-machine allocation for no-op override — use synchronous base call.
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
         IncrementCounter("initialized");
-        await Task.CompletedTask;
+        return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <summary>Shuts down the strategy gracefully.</summary>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    // P2-2253: Avoid async state-machine allocation for no-op override — use synchronous base call.
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
         IncrementCounter("shutdown");
-        await Task.CompletedTask;
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     /// <summary>Gets a cached health status, refreshing every 60 seconds.</summary>

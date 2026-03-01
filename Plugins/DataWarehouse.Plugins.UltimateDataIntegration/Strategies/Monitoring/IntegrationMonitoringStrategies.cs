@@ -82,7 +82,11 @@ public sealed class PipelineHealthMonitoringStrategy : DataIntegrationStrategyBa
             Timestamp = DateTime.UtcNow
         };
 
-        history.Add(check);
+        lock (history)
+        {
+            history.Add(check);
+        }
+
         health.Status = check.Status;
         health.LastCheck = check;
         health.LastCheckedAt = DateTime.UtcNow;
@@ -90,14 +94,17 @@ public sealed class PipelineHealthMonitoringStrategy : DataIntegrationStrategyBa
         // Generate alerts if needed
         if (check.Status == PipelineHealthStatus.Critical || check.Status == PipelineHealthStatus.Warning)
         {
-            health.ActiveAlerts.Add(new HealthAlert
+            lock (health.ActiveAlerts)
             {
-                AlertId = Guid.NewGuid().ToString("N"),
-                PipelineId = pipelineId,
-                Severity = check.Status == PipelineHealthStatus.Critical ? AlertSeverity.Critical : AlertSeverity.Warning,
-                Message = GetAlertMessage(metrics, health.Config),
-                TriggeredAt = DateTime.UtcNow
-            });
+                health.ActiveAlerts.Add(new HealthAlert
+                {
+                    AlertId = Guid.NewGuid().ToString("N"),
+                    PipelineId = pipelineId,
+                    Severity = check.Status == PipelineHealthStatus.Critical ? AlertSeverity.Critical : AlertSeverity.Warning,
+                    Message = GetAlertMessage(metrics, health.Config),
+                    TriggeredAt = DateTime.UtcNow
+                });
+            }
         }
 
         RecordOperation("RecordHealthCheck");
@@ -127,9 +134,13 @@ public sealed class PipelineHealthMonitoringStrategy : DataIntegrationStrategyBa
         if (!_healthHistory.TryGetValue(pipelineId, out var history))
             throw new KeyNotFoundException($"Pipeline {pipelineId} not registered");
 
-        var result = since.HasValue
-            ? history.Where(h => h.Timestamp > since.Value).TakeLast(limit).ToList()
-            : history.TakeLast(limit).ToList();
+        List<HealthCheck> result;
+        lock (history)
+        {
+            result = since.HasValue
+                ? history.Where(h => h.Timestamp > since.Value).TakeLast(limit).ToList()
+                : history.TakeLast(limit).ToList();
+        }
 
         return Task.FromResult(result);
     }
@@ -280,14 +291,17 @@ public sealed class SlaTrackingStrategy : DataIntegrationStrategyBase
         // Record violations
         if (!result.IsCompliant)
         {
-            violations.Add(new SlaViolation
+            lock (violations)
             {
-                ViolationId = Guid.NewGuid().ToString("N"),
-                SlaId = slaId,
-                Violations = result.Violations,
-                Metrics = metrics,
-                OccurredAt = DateTime.UtcNow
-            });
+                violations.Add(new SlaViolation
+                {
+                    ViolationId = Guid.NewGuid().ToString("N"),
+                    SlaId = slaId,
+                    Violations = result.Violations,
+                    Metrics = metrics,
+                    OccurredAt = DateTime.UtcNow
+                });
+            }
         }
 
         sla.LastChecked = DateTime.UtcNow;
@@ -312,9 +326,13 @@ public sealed class SlaTrackingStrategy : DataIntegrationStrategyBase
         if (!_violations.TryGetValue(slaId, out var violations))
             throw new InvalidOperationException($"Violations list not found for SLA {slaId}");
 
-        var periodViolations = violations
-            .Where(v => v.OccurredAt >= fromDate && v.OccurredAt <= toDate)
-            .ToList();
+        List<SlaViolation> periodViolations;
+        lock (violations)
+        {
+            periodViolations = violations
+                .Where(v => v.OccurredAt >= fromDate && v.OccurredAt <= toDate)
+                .ToList();
+        }
 
         var totalChecks = Math.Max(1, (int)(toDate - fromDate).TotalHours);
         var complianceRate = (double)(totalChecks - periodViolations.Count) / totalChecks;
@@ -428,12 +446,15 @@ public sealed class DataQualityMonitoringStrategy : DataIntegrationStrategyBase
         evaluation.OverallScore = evaluation.RuleResults.Average(r => r.Score);
 
         // Record score history
-        scores.Add(new QualityScore
+        lock (scores)
         {
-            ProfileId = profileId,
-            Score = evaluation.OverallScore,
-            RecordedAt = DateTime.UtcNow
-        });
+            scores.Add(new QualityScore
+            {
+                ProfileId = profileId,
+                Score = evaluation.OverallScore,
+                RecordedAt = DateTime.UtcNow
+            });
+        }
 
         profile.LastEvaluated = DateTime.UtcNow;
         profile.LastScore = evaluation.OverallScore;
@@ -453,7 +474,11 @@ public sealed class DataQualityMonitoringStrategy : DataIntegrationStrategyBase
         if (!_scores.TryGetValue(profileId, out var scores))
             throw new KeyNotFoundException($"Profile {profileId} not found");
 
-        var recentScores = scores.TakeLast(periods).ToList();
+        List<QualityScore> recentScores;
+        lock (scores)
+        {
+            recentScores = scores.TakeLast(periods).ToList();
+        }
         var trend = recentScores.Count >= 2
             ? (recentScores.Last().Score - recentScores.First().Score) / recentScores.Count
             : 0;
@@ -611,7 +636,10 @@ public sealed class IntegrationLineageTrackingStrategy : DataIntegrationStrategy
 
         if (_edges.TryGetValue(sourceNodeId, out var edges))
         {
-            edges.Add(edge);
+            lock (edges)
+            {
+                edges.Add(edge);
+            }
         }
 
         RecordOperation("RecordEdge");
@@ -701,9 +729,11 @@ public sealed class IntegrationLineageTrackingStrategy : DataIntegrationStrategy
         if (currentDepth >= maxDepth) return;
 
         // Find all edges where this node is the target
-        foreach (var edges in _edges.Values)
+        foreach (var edgeList in _edges.Values)
         {
-            foreach (var edge in edges.Where(e => e.TargetNodeId == nodeId && !visited.Contains(e.SourceNodeId)))
+            List<LineageEdge> snapshot;
+            lock (edgeList) { snapshot = new List<LineageEdge>(edgeList); }
+            foreach (var edge in snapshot.Where(e => e.TargetNodeId == nodeId && !visited.Contains(e.SourceNodeId)))
             {
                 visited.Add(edge.SourceNodeId);
                 if (_nodes.TryGetValue(edge.SourceNodeId, out var sourceNode))
@@ -720,9 +750,11 @@ public sealed class IntegrationLineageTrackingStrategy : DataIntegrationStrategy
     {
         if (currentDepth >= maxDepth) return;
 
-        if (_edges.TryGetValue(nodeId, out var edges))
+        if (_edges.TryGetValue(nodeId, out var edgeList))
         {
-            foreach (var edge in edges.Where(e => !visited.Contains(e.TargetNodeId)))
+            List<LineageEdge> snapshot;
+            lock (edgeList) { snapshot = new List<LineageEdge>(edgeList); }
+            foreach (var edge in snapshot.Where(e => !visited.Contains(e.TargetNodeId)))
             {
                 visited.Add(edge.TargetNodeId);
                 if (_nodes.TryGetValue(edge.TargetNodeId, out var targetNode))
@@ -739,9 +771,11 @@ public sealed class IntegrationLineageTrackingStrategy : DataIntegrationStrategy
     {
         if (currentDepth >= maxDepth) return;
 
-        if (_edges.TryGetValue(nodeId, out var edges))
+        if (_edges.TryGetValue(nodeId, out var edgeList2))
         {
-            foreach (var edge in edges.Where(e => !visited.Contains(e.TargetNodeId)))
+            List<LineageEdge> snapshot;
+            lock (edgeList2) { snapshot = new List<LineageEdge>(edgeList2); }
+            foreach (var edge in snapshot.Where(e => !visited.Contains(e.TargetNodeId)))
             {
                 visited.Add(edge.TargetNodeId);
                 TraverseDownstreamIds(edge.TargetNodeId, visited, maxDepth, currentDepth + 1);
@@ -867,7 +901,10 @@ public sealed class AlertNotificationStrategy : DataIntegrationStrategyBase
             TriggeredAt = DateTime.UtcNow
         };
 
-        alerts.Add(alert);
+        lock (alerts)
+        {
+            alerts.Add(alert);
+        }
 
         // Send notifications
         if (rule.Action.NotifyChannels != null)
@@ -893,9 +930,13 @@ public sealed class AlertNotificationStrategy : DataIntegrationStrategyBase
         string acknowledgedBy,
         CancellationToken ct = default)
     {
-        foreach (var alerts in _alerts.Values)
+        foreach (var alertList in _alerts.Values)
         {
-            var alert = alerts.FirstOrDefault(a => a.AlertId == alertId);
+            Alert? alert;
+            lock (alertList)
+            {
+                alert = alertList.FirstOrDefault(a => a.AlertId == alertId);
+            }
             if (alert != null)
             {
                 alert.Status = AlertStatus.Acknowledged;
@@ -916,8 +957,13 @@ public sealed class AlertNotificationStrategy : DataIntegrationStrategyBase
         AlertSeverity? minSeverity = null,
         CancellationToken ct = default)
     {
-        var activeAlerts = _alerts.Values
-            .SelectMany(a => a)
+        var snapshots = new List<Alert>();
+        foreach (var alertList in _alerts.Values)
+        {
+            lock (alertList) { snapshots.AddRange(alertList); }
+        }
+
+        var activeAlerts = snapshots
             .Where(a => a.Status == AlertStatus.Triggered || a.Status == AlertStatus.Acknowledged)
             .Where(a => !minSeverity.HasValue || a.Severity >= minSeverity.Value)
             .OrderByDescending(a => a.Severity)

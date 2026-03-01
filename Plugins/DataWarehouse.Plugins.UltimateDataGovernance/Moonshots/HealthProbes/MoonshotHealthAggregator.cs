@@ -57,6 +57,13 @@ public sealed class MoonshotHealthAggregator
     /// <returns>All health reports from the parallel probe execution.</returns>
     public async Task<IReadOnlyList<MoonshotHealthReport>> CheckAllAsync(CancellationToken ct)
     {
+        // P2-2259: Warn when no probes are registered so operators know monitoring is non-functional.
+        if (_probes.Count == 0)
+        {
+            _logger.LogWarning("CheckAllAsync called with 0 registered health probes — health monitoring is non-functional. Register probes via IServiceCollection before starting.");
+            return Array.Empty<MoonshotHealthReport>();
+        }
+
         var sw = Stopwatch.StartNew();
         _logger.LogInformation("Starting health check for {ProbeCount} moonshot probes", _probes.Count);
 

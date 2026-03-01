@@ -123,7 +123,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
                     var lsn = await WriteLogEntryAsync(transactionId, "WRITE_FILE", file.Path, token);
 
                     // Perform file write
-                    var written = await WriteFileWithJournalingAsync(file, lsn, token);
+                    var written = await WriteFileWithJournalingAsync(file, lsn, request.Destination, token);
                     Interlocked.Add(ref storedBytes, written);
 
                     // Mark operation complete in WAL
@@ -567,15 +567,32 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
             }
         }
 
-        private async Task<long> WriteFileWithJournalingAsync(FileMetadata file, long lsn, CancellationToken ct)
+        private async Task<long> WriteFileWithJournalingAsync(FileMetadata file, long lsn, string? destinationRoot, CancellationToken ct)
         {
-            // In production, write file with journaling
-            await Task.Delay(1, ct); // Simulate write
-            return file.Size;
+            if (string.IsNullOrEmpty(destinationRoot) || !File.Exists(file.Path))
+                return file.Size; // Non-file sources (DB, etc.) — metadata-only, size already known
+
+            // Compute relative path so the backup mirrors the source tree layout.
+            var relativePath = Path.IsPathRooted(file.Path)
+                ? file.Path.TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                : file.Path;
+
+            var destPath = Path.Combine(destinationRoot, relativePath);
+            var destDir = Path.GetDirectoryName(destPath)!;
+            if (!Directory.Exists(destDir))
+                Directory.CreateDirectory(destDir);
+
+            await using var src = new FileStream(file.Path, FileMode.Open, FileAccess.Read, FileShare.Read, 65536, useAsync: true);
+            await using var dst = new FileStream(destPath, FileMode.Create, FileAccess.Write, FileShare.None, 65536, useAsync: true);
+            await src.CopyToAsync(dst, ct);
+            return src.Length;
         }
 
         private async Task<Checkpoint> CreateCheckpointAsync(string backupId, string transactionId, CancellationToken ct)
         {
+            // Write a CHECKPOINT entry into the WAL to mark the consistent point.
+            await WriteLogEntryAsync(transactionId, "CHECKPOINT", backupId, ct);
+
             var checkpoint = new Checkpoint
             {
                 CheckpointId = Guid.NewGuid().ToString("N"),
@@ -585,8 +602,6 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
                 LogSequenceNumber = Interlocked.Read(ref _currentLogSequenceNumber)
             };
 
-            // In production, flush all pending operations and write checkpoint
-            await Task.Delay(10, ct);
             return checkpoint;
         }
 

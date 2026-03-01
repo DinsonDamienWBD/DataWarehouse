@@ -99,9 +99,34 @@ public sealed class AvroStrategy : DataFormatStrategyBase
         });
     }
 
-    protected override Task<FormatValidationResult> ValidateCoreAsync(Stream stream, FormatSchema? schema, CancellationToken ct)
+    protected override async Task<FormatValidationResult> ValidateCoreAsync(Stream stream, FormatSchema? schema, CancellationToken ct)
     {
-        // Stub: Full validation requires Apache.Avro library
-        return Task.FromResult(FormatValidationResult.Valid);
+        if (stream.Length < 4)
+        {
+            return FormatValidationResult.Invalid(new ValidationError
+            {
+                Message = "File too small to be a valid Avro Object Container File (minimum 4 bytes for magic header)"
+            });
+        }
+
+        stream.Position = 0;
+        if (!await DetectFormatCoreAsync(stream, ct))
+        {
+            return FormatValidationResult.Invalid(new ValidationError
+            {
+                Message = "Missing Avro magic header (expected 'Obj\\x01' at file start)"
+            });
+        }
+
+        // Basic structural check: Avro files require at least the magic + sync marker (16 bytes)
+        if (stream.Length < 20)
+        {
+            return FormatValidationResult.Invalid(new ValidationError
+            {
+                Message = "Avro file too small to contain a valid sync marker. Full schema validation requires the Apache.Avro library."
+            });
+        }
+
+        return FormatValidationResult.Valid;
     }
 }

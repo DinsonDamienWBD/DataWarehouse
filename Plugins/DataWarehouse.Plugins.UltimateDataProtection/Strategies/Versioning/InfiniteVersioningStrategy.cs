@@ -683,12 +683,12 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Versioning
 
         private int GetNextVersionNumber(string itemId)
         {
-            if (!_versionIndex.TryGetValue(itemId, out var versions) || versions.Count == 0)
-            {
+            if (!_versionIndex.TryGetValue(itemId, out var versions))
                 return 1;
+            lock (_globalLock)
+            {
+                return versions.Count == 0 ? 1 : versions.Max(v => v.VersionNumber) + 1;
             }
-
-            return versions.Max(v => v.VersionNumber) + 1;
         }
 
         private void AddVersionToIndex(string itemId, VersionInfo version)

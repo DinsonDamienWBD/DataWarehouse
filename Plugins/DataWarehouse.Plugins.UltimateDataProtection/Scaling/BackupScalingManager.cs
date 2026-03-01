@@ -190,7 +190,7 @@ public sealed class BackupScalingManager : IScalableSubsystem, IDisposable
     }
 
     /// <inheritdoc/>
-    public async Task ReconfigureLimitsAsync(ScalingLimits limits, CancellationToken ct = default)
+    public Task ReconfigureLimitsAsync(ScalingLimits limits, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(limits);
 
@@ -205,7 +205,7 @@ public sealed class BackupScalingManager : IScalableSubsystem, IDisposable
         RecalculateDynamicConcurrency();
         UpdateBackpressureState();
 
-        await Task.CompletedTask;
+        return Task.CompletedTask;
     }
 
     /// <inheritdoc/>

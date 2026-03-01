@@ -654,10 +654,14 @@ public sealed class EventSourcingCdcStrategy : DataIntegrationStrategyBase
         if (!_events.TryGetValue(streamId, out var events))
             throw new KeyNotFoundException($"Stream {streamId} not found");
 
-        var result = events
-            .Where(e => (!fromVersion.HasValue || e.Version >= fromVersion.Value) &&
-                        (!toVersion.HasValue || e.Version <= toVersion.Value))
-            .ToList();
+        List<DomainEvent> result;
+        lock (events)
+        {
+            result = events
+                .Where(e => (!fromVersion.HasValue || e.Version >= fromVersion.Value) &&
+                            (!toVersion.HasValue || e.Version <= toVersion.Value))
+                .ToList();
+        }
 
         RecordOperation("ReadEvents");
         return Task.FromResult(result);

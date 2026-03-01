@@ -43,23 +43,25 @@ public sealed class ForwardCompatibleSchemaStrategy : DataIntegrationStrategyBas
         IReadOnlyList<FieldDefinition> fields,
         CancellationToken ct = default)
     {
-        var version = GetNextVersion(schemaId);
+        // GetOrAdd atomically creates the list if absent; then lock it for all mutations.
+        var history = _versionHistory.GetOrAdd(schemaId, _ => new List<SchemaVersion>());
 
-        var schema = new SchemaVersion
+        SchemaVersion schema;
+        lock (history)
         {
-            SchemaId = schemaId,
-            SchemaName = schemaName,
-            Version = version,
-            Fields = fields.ToList(),
-            Compatibility = SchemaCompatibility.Forward,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        if (!_versionHistory.ContainsKey(schemaId))
-            _versionHistory[schemaId] = new List<SchemaVersion>();
-
-        _versionHistory[schemaId].Add(schema);
-        _schemas[$"{schemaId}:v{version}"] = schema;
+            var version = history.Count + 1;
+            schema = new SchemaVersion
+            {
+                SchemaId = schemaId,
+                SchemaName = schemaName,
+                Version = version,
+                Fields = fields.ToList(),
+                Compatibility = SchemaCompatibility.Forward,
+                CreatedAt = DateTime.UtcNow
+            };
+            history.Add(schema);
+            _schemas[$"{schemaId}:v{version}"] = schema;
+        }
 
         RecordOperation("RegisterSchema");
         return Task.FromResult(schema);
@@ -115,14 +117,10 @@ public sealed class ForwardCompatibleSchemaStrategy : DataIntegrationStrategyBas
         });
     }
 
-    private int GetNextVersion(string schemaId)
-    {
-        return _versionHistory.TryGetValue(schemaId, out var history) ? history.Count + 1 : 1;
-    }
-
     private SchemaVersion? GetLatestVersion(string schemaId)
     {
-        return _versionHistory.TryGetValue(schemaId, out var history) ? history.LastOrDefault() : null;
+        if (!_versionHistory.TryGetValue(schemaId, out var history)) return null;
+        lock (history) { return history.LastOrDefault(); }
     }
 
     private bool IsTypeCompatible(string oldType, string newType)
@@ -186,23 +184,24 @@ public sealed class BackwardCompatibleSchemaStrategy : DataIntegrationStrategyBa
         IReadOnlyList<FieldDefinition> fields,
         CancellationToken ct = default)
     {
-        var version = GetNextVersion(schemaId);
+        var history = _versionHistory.GetOrAdd(schemaId, _ => new List<SchemaVersion>());
 
-        var schema = new SchemaVersion
+        SchemaVersion schema;
+        lock (history)
         {
-            SchemaId = schemaId,
-            SchemaName = schemaName,
-            Version = version,
-            Fields = fields.ToList(),
-            Compatibility = SchemaCompatibility.Backward,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        if (!_versionHistory.ContainsKey(schemaId))
-            _versionHistory[schemaId] = new List<SchemaVersion>();
-
-        _versionHistory[schemaId].Add(schema);
-        _schemas[$"{schemaId}:v{version}"] = schema;
+            var version = history.Count + 1;
+            schema = new SchemaVersion
+            {
+                SchemaId = schemaId,
+                SchemaName = schemaName,
+                Version = version,
+                Fields = fields.ToList(),
+                Compatibility = SchemaCompatibility.Backward,
+                CreatedAt = DateTime.UtcNow
+            };
+            history.Add(schema);
+            _schemas[$"{schemaId}:v{version}"] = schema;
+        }
 
         RecordOperation("RegisterSchema");
         return Task.FromResult(schema);
@@ -248,14 +247,10 @@ public sealed class BackwardCompatibleSchemaStrategy : DataIntegrationStrategyBa
         });
     }
 
-    private int GetNextVersion(string schemaId)
-    {
-        return _versionHistory.TryGetValue(schemaId, out var history) ? history.Count + 1 : 1;
-    }
-
     private SchemaVersion? GetLatestVersion(string schemaId)
     {
-        return _versionHistory.TryGetValue(schemaId, out var history) ? history.LastOrDefault() : null;
+        if (!_versionHistory.TryGetValue(schemaId, out var history)) return null;
+        lock (history) { return history.LastOrDefault(); }
     }
 }
 
@@ -302,23 +297,24 @@ public sealed class FullCompatibleSchemaStrategy : DataIntegrationStrategyBase
         IReadOnlyList<FieldDefinition> fields,
         CancellationToken ct = default)
     {
-        var version = GetNextVersion(schemaId);
+        var history = _versionHistory.GetOrAdd(schemaId, _ => new List<SchemaVersion>());
 
-        var schema = new SchemaVersion
+        SchemaVersion schema;
+        lock (history)
         {
-            SchemaId = schemaId,
-            SchemaName = schemaName,
-            Version = version,
-            Fields = fields.ToList(),
-            Compatibility = SchemaCompatibility.Full,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        if (!_versionHistory.ContainsKey(schemaId))
-            _versionHistory[schemaId] = new List<SchemaVersion>();
-
-        _versionHistory[schemaId].Add(schema);
-        _schemas[$"{schemaId}:v{version}"] = schema;
+            var version = history.Count + 1;
+            schema = new SchemaVersion
+            {
+                SchemaId = schemaId,
+                SchemaName = schemaName,
+                Version = version,
+                Fields = fields.ToList(),
+                Compatibility = SchemaCompatibility.Full,
+                CreatedAt = DateTime.UtcNow
+            };
+            history.Add(schema);
+            _schemas[$"{schemaId}:v{version}"] = schema;
+        }
 
         RecordOperation("RegisterSchema");
         return Task.FromResult(schema);
@@ -386,14 +382,10 @@ public sealed class FullCompatibleSchemaStrategy : DataIntegrationStrategyBase
         });
     }
 
-    private int GetNextVersion(string schemaId)
-    {
-        return _versionHistory.TryGetValue(schemaId, out var history) ? history.Count + 1 : 1;
-    }
-
     private SchemaVersion? GetLatestVersion(string schemaId)
     {
-        return _versionHistory.TryGetValue(schemaId, out var history) ? history.LastOrDefault() : null;
+        if (!_versionHistory.TryGetValue(schemaId, out var history)) return null;
+        lock (history) { return history.LastOrDefault(); }
     }
 }
 

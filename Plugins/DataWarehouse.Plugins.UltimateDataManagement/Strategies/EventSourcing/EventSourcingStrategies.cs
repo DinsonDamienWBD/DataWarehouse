@@ -502,7 +502,8 @@ public sealed class EventStoreStrategy : DataManagementStrategyBase
             }
             foreach (var handler in handlersCopy)
             {
-                try { handler(@event); } catch { /* Log error */ }
+                try { handler(@event); }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[EventStore] Stream subscriber threw for event {{{@event.EventId}}}: {ex}"); }
             }
         }
 
@@ -516,7 +517,8 @@ public sealed class EventStoreStrategy : DataManagementStrategyBase
             }
             foreach (var handler in handlersCopy)
             {
-                try { handler(@event); } catch { /* Log error */ }
+                try { handler(@event); }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[EventStore] Global subscriber threw for event {{{@event.EventId}}}: {ex}"); }
             }
         }
     }

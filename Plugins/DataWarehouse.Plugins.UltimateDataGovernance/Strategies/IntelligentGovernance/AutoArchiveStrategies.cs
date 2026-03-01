@@ -139,6 +139,8 @@ public sealed class ThresholdAutoArchiveStrategy : ConsciousnessStrategyBase
         }
 
         // Check minimum age requirement
+        // P2-2270: When created_at is absent, do NOT skip the age check — treat as age=0 so
+        // newly-created objects without timestamps are also protected by the minimum-age guard.
         if (metadata.TryGetValue("created_at", out var createdObj))
         {
             DateTime createdAt = Convert.ToDateTime(createdObj);
@@ -149,6 +151,13 @@ public sealed class ThresholdAutoArchiveStrategy : ConsciousnessStrategyBase
                 return new ArchiveDecision(score.ObjectId, false, "none",
                     $"Object is only {ageDays:F0} days old; minimum age is {_policy.MinAgeDays} days.", score, DateTime.UtcNow);
             }
+        }
+        else
+        {
+            // created_at missing — treat as age 0 so the minimum-age guard still applies.
+            IncrementCounter("too_young_skips");
+            return new ArchiveDecision(score.ObjectId, false, "none",
+                $"Object has no 'created_at' metadata; assuming age 0 days (minimum age is {_policy.MinAgeDays} days).", score, DateTime.UtcNow);
         }
 
         // Check score threshold
@@ -294,12 +303,20 @@ public sealed class AgeBasedAutoArchiveStrategy : ConsciousnessStrategyBase
             }
         }
 
-        // Compute decay factor based on last access time
-        double daysSinceAccess = 0;
+        // Compute decay factor based on last access time.
+        // P2-2271: When last_accessed is absent the object has never been accessed — it should
+        // decay MORE aggressively, not less. Use _policy.MinAgeDays as the floor so the decay
+        // factor reflects at minimum MinAgeDays of idleness, not 0.
+        double daysSinceAccess;
         if (metadata.TryGetValue("last_accessed", out var lastAccessedObj))
         {
             DateTime lastAccessed = Convert.ToDateTime(lastAccessedObj);
             daysSinceAccess = (DateTime.UtcNow - lastAccessed).TotalDays;
+        }
+        else
+        {
+            // Never accessed — assume idle for at least MinAgeDays to force aggressive decay.
+            daysSinceAccess = Math.Max(_policy.MinAgeDays, 365.0);
         }
 
         double decayFactor = ComputeDecayFactor(daysSinceAccess);
@@ -467,7 +484,7 @@ public sealed class TieredAutoArchiveStrategy : ConsciousnessStrategyBase
         _transitionLog.AddOrUpdate(
             score.ObjectId,
             _ => new List<TierTransition> { transition },
-            (_, existing) => { existing.Add(transition); return existing; });
+            (_, existing) => { lock (existing) { existing.Add(transition); } return existing; });
 
         IncrementCounter("tier_transitions");
         return new ArchiveDecision(score.ObjectId, true, nextTier,

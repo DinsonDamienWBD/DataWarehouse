@@ -245,6 +245,20 @@ namespace DataWarehouse.SDK.Contracts
         }
 
         /// <summary>
+        /// Increments a named counter by <paramref name="amount"/> in a single atomic operation.
+        /// Prefer this overload over calling <see cref="IncrementCounter(string)"/> in a loop.
+        /// Thread-safe.
+        /// </summary>
+        /// <param name="name">The counter name.</param>
+        /// <param name="amount">The amount to add (must be &gt;= 0).</param>
+        protected void IncrementCounter(string name, long amount)
+        {
+            if (amount <= 0) return;
+            // P2-2274: Use AddOrUpdate with the full amount to avoid O(n) loop over Interlocked.Increment.
+            _counters.AddOrUpdate(name, amount, (_, current) => current + amount);
+        }
+
+        /// <summary>
         /// Gets the current value of a named counter.
         /// Returns 0 if the counter does not exist.
         /// </summary>

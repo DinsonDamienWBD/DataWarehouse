@@ -634,10 +634,10 @@ public sealed class ElasticsearchProtocolStrategy : DatabaseProtocolStrategyBase
     }
 
     /// <inheritdoc/>
-    protected override async Task SendDisconnectMessageAsync(CancellationToken ct)
+    protected override Task SendDisconnectMessageAsync(CancellationToken ct)
     {
         // No disconnect message for HTTP
-        await Task.CompletedTask;
+        return Task.CompletedTask;
     }
 
     /// <inheritdoc/>
