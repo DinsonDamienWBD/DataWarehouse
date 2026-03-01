@@ -736,8 +736,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                     }
                 };
             }
-            catch
+            catch (OperationCanceledException)
             {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // P2-3495: Surface PKCS#11 errors (token removal, session expiry) via Trace so
+                // they are visible in production instead of silently returning null.
+                System.Diagnostics.Trace.TraceWarning(
+                    $"[NitrokeyStrategy] GetKeyMetadataAsync failed for keyId '{keyId}': {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
             finally

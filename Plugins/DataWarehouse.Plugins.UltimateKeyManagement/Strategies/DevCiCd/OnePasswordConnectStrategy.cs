@@ -79,7 +79,12 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
 
         public OnePasswordConnectStrategy()
         {
-            _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+            // P2-3470: Disable auto-redirect so DefaultRequestHeaders.Authorization is never
+            // forwarded to a redirect target outside the configured ConnectHost.
+            _httpClient = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false })
+            {
+                Timeout = TimeSpan.FromSeconds(30)
+            };
         }
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
