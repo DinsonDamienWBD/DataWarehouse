@@ -9,7 +9,6 @@
 ```csharp
 public sealed class UltimateConnectorPlugin : DataWarehouse.SDK.Contracts.Hierarchy.InterfacePluginBase
 {
-#endregion
 }
     public override string Id;;
     public override string Name;;
@@ -23,6 +22,8 @@ public sealed class UltimateConnectorPlugin : DataWarehouse.SDK.Contracts.Hierar
 {
     get
     {
+        if (_cachedCapabilities != null)
+            return _cachedCapabilities;
         var capabilities = new List<RegisteredCapability>
         {
             // Main plugin capability
@@ -58,7 +59,8 @@ public sealed class UltimateConnectorPlugin : DataWarehouse.SDK.Contracts.Hierar
             capabilities.Add(new() { CapabilityId = $"{Id}.{strategy.StrategyId.ToLowerInvariant().Replace(".", "-").Replace(" ", "-")}", DisplayName = strategy.DisplayName, Description = strategy.SemanticDescription, Category = SDK.Contracts.CapabilityCategory.Connector, SubCategory = strategy.Category.ToString(), PluginId = Id, PluginName = Name, PluginVersion = Version, Tags = [..tags] });
         }
 
-        return capabilities.AsReadOnly();
+        _cachedCapabilities = capabilities.AsReadOnly();
+        return _cachedCapabilities;
     }
 }
     public UltimateConnectorPlugin();
@@ -74,6 +76,17 @@ public sealed class UltimateConnectorPlugin : DataWarehouse.SDK.Contracts.Hierar
     public IConnectionStrategy? GetStrategy(string strategyId);
     public IReadOnlyCollection<IConnectionStrategy> GetStrategiesByCategory(ConnectorCategory category);
     public IReadOnlyCollection<IConnectionStrategy> ListStrategies();
+}
+```
+```csharp
+private sealed class StaticKnowledgeStats
+{
+}
+    public required Dictionary<string, int> CategoryCounts { get; init; }
+    public required int PoolingCount { get; init; }
+    public required int StreamingCount { get; init; }
+    public required int TransactionCount { get; init; }
+    public required int TotalCount { get; init; }
 }
 ```
 
@@ -1650,11 +1663,14 @@ public sealed record GitHubRepo
 }
     public long Id { get; init; }
     public string Name { get; init; };
-    public string Full_Name { get; init; };
+    [System.Text.Json.Serialization.JsonPropertyName("full_name")]
+public string FullName { get; init; };
     public bool Private { get; init; }
     public string? Description { get; init; }
-    public string Html_Url { get; init; };
-    public string Default_Branch { get; init; };
+    [System.Text.Json.Serialization.JsonPropertyName("html_url")]
+public string HtmlUrl { get; init; };
+    [System.Text.Json.Serialization.JsonPropertyName("default_branch")]
+public string DefaultBranch { get; init; };
 }
 ```
 ```csharp
@@ -3738,7 +3754,7 @@ public class ApacheDruidConnectionStrategy : DatabaseConnectionStrategyBase
     protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
-    public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
+    public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
     public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default);
 }
 ```
@@ -4471,7 +4487,7 @@ public class WebSocketConnectionStrategy : ConnectionStrategyBase
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateConnector/Strategies/Protocol/DnsConnectionStrategy.cs
 ```csharp
-public class DnsConnectionStrategy : ConnectionStrategyBase
+public sealed class DnsConnectionStrategy : ConnectionStrategyBase
 {
 }
     public override string StrategyId;;
@@ -4585,7 +4601,7 @@ public class SshConnectionStrategy : ConnectionStrategyBase
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateConnector/Strategies/Protocol/GrpcConnectionStrategy.cs
 ```csharp
-public class GrpcConnectionStrategy : ConnectionStrategyBase
+public sealed class GrpcConnectionStrategy : ConnectionStrategyBase
 {
 }
     public override string StrategyId;;
@@ -4626,7 +4642,7 @@ public class GraphQlConnectionStrategy : ConnectionStrategyBase
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateConnector/Strategies/Protocol/FtpConnectionStrategy.cs
 ```csharp
-public class FtpConnectionStrategy : ConnectionStrategyBase
+public sealed class FtpConnectionStrategy : ConnectionStrategyBase
 {
 }
     public override string StrategyId;;
@@ -4639,7 +4655,7 @@ public class FtpConnectionStrategy : ConnectionStrategyBase
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
 }
 ```
 
@@ -5259,7 +5275,6 @@ public sealed class AwsBedrockConnectionStrategy : AiConnectionStrategyBase
     public override ConnectionStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public override bool IsProductionReady;;
     public AwsBedrockConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
@@ -6065,9 +6080,9 @@ public sealed class GcpCloudMonitoringConnectionStrategy : ObservabilityConnecti
     public override string[] Tags;;
     public GcpCloudMonitoringConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task PushMetricsAsync(IConnectionHandle handle, IReadOnlyList<Dictionary<string, object>> metrics, CancellationToken ct = default);
     public override async Task PushLogsAsync(IConnectionHandle handle, IReadOnlyList<Dictionary<string, object>> logs, CancellationToken ct = default);
     public override async Task PushTracesAsync(IConnectionHandle handle, IReadOnlyList<Dictionary<string, object>> traces, CancellationToken ct = default);
@@ -6191,9 +6206,9 @@ public sealed class LogzioConnectionStrategy : ObservabilityConnectionStrategyBa
     public override string[] Tags;;
     public LogzioConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
-    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);;
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task PushMetricsAsync(IConnectionHandle handle, IReadOnlyList<Dictionary<string, object>> metrics, CancellationToken ct = default);
     public override async Task PushLogsAsync(IConnectionHandle handle, IReadOnlyList<Dictionary<string, object>> logs, CancellationToken ct = default);
     public override async Task PushTracesAsync(IConnectionHandle handle, IReadOnlyList<Dictionary<string, object>> traces, CancellationToken ct = default);

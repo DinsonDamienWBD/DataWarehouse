@@ -2413,6 +2413,7 @@ public sealed class Lz4TransitStrategy : CompressionStrategyBase
 public sealed class SnappyTransitStrategy : CompressionStrategyBase
 {
 }
+    public SnappyTransitStrategy() : base(CompressionLevel.Default);
     public SnappyTransitStrategy(CompressionLevel level) : base(level);
     public override CompressionCharacteristics Characteristics;;
     public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
