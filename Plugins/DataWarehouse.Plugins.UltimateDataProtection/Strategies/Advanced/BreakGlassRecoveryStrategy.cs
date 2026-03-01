@@ -559,8 +559,16 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 
         private string ComputeKeyId(byte[] key)
         {
-            using var sha256 = SHA256.Create();
-            return Convert.ToHexString(sha256.ComputeHash(key))[..16];
+            // P2-2556: Do not log a raw SHA-256 of the master key — it leaks a detectable hash of
+            // the secret and enables offline dictionary attacks. Use HMAC-SHA256 with a fixed
+            // context label so the output is bound to this specific use and not invertible to key.
+            var keyIdBytes = System.Security.Cryptography.HKDF.DeriveKey(
+                System.Security.Cryptography.HashAlgorithmName.SHA256,
+                key,
+                8, // 8 bytes → 16 hex chars
+                System.Text.Encoding.UTF8.GetBytes("BreakGlass_KeyId_v1"),
+                System.Text.Encoding.UTF8.GetBytes("break-glass-key-id"));
+            return Convert.ToHexString(keyIdBytes);
         }
 
         private List<KeyShare> SplitSecretKey(byte[] secret, int threshold, int totalShares)

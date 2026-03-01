@@ -512,9 +512,16 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 
         private byte[] DeriveEncryptionKey(string keyMaterial)
         {
-            // In production, use PBKDF2 or similar
-            using var sha256 = SHA256.Create();
-            return sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(keyMaterial));
+            // P2-2555: Use PBKDF2 with a fixed salt (backup context) and 100K iterations instead of
+            // raw SHA-256 with no salt. A fixed salt provides a unique key-space domain without
+            // requiring caller-supplied salt storage; 100K iterations provides brute-force resistance.
+            var salt = System.Text.Encoding.UTF8.GetBytes("AirGappedBackup_v1_KeyDerivation");
+            return System.Security.Cryptography.Rfc2898DeriveBytes.Pbkdf2(
+                System.Text.Encoding.UTF8.GetBytes(keyMaterial),
+                salt,
+                100_000,
+                System.Security.Cryptography.HashAlgorithmName.SHA256,
+                32);
         }
 
         private async Task<byte[]> EncryptBackupDataAsync(byte[] data, byte[] key, CancellationToken ct)

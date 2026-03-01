@@ -295,7 +295,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
     {
         private readonly BoundedDictionary<string, ConfidenceBackup> _backups = new BoundedDictionary<string, ConfidenceBackup>(1000);
         private readonly BoundedDictionary<string, List<BackupOutcome>> _outcomeHistory = new BoundedDictionary<string, List<BackupOutcome>>(1000);
-        private readonly List<ScoreTrend> _scoreTrends = new();
+        // P2-2579: Use ConcurrentQueue so concurrent CalculateConfidenceScoreAsync (Add) and
+        // ReportOutcome (read/query) do not race on a plain List<T>.
+        private readonly System.Collections.Concurrent.ConcurrentQueue<ScoreTrend> _scoreTrends = new();
         private PredictionModel _model = new();
 
         /// <inheritdoc/>
@@ -353,7 +355,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             };
 
             // Record for trend
-            _scoreTrends.Add(new ScoreTrend
+            _scoreTrends.Enqueue(new ScoreTrend
             {
                 Timestamp = DateTimeOffset.UtcNow,
                 Score = score
