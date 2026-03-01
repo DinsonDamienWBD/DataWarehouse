@@ -265,11 +265,13 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
     }
 
     /// <inheritdoc/>
-    protected override async Task NotifySslUpgradeAsync(CancellationToken ct)
+    protected override Task NotifySslUpgradeAsync(CancellationToken ct)
     {
-        // TDS SSL negotiation is done via pre-login ENCRYPTION option
-        // If encryption is required, the SSL handshake happens after pre-login
-        // but the actual TLS upgrade is handled by the base class
+        // TDS SSL upgrade is initiated by the base class after we return from PerformHandshakeAsync.
+        // The pre-login ENCRYPTION option (set during PerformHandshakeAsync) signals the server to
+        // accept TLS; the actual SslStream wrap is performed by the base class ConnectCoreAsync.
+        // This override is synchronous — delegate up so the base class applies the TLS wrap.
+        return base.NotifySslUpgradeAsync(ct);
     }
 
     /// <inheritdoc/>
@@ -495,12 +497,12 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
                     break;
 
                 default:
-                    // Skip unknown tokens
-                    if (index + 2 <= payload.Length)
-                    {
-                        var length = payload[index] | (payload[index + 1] << 8);
-                        index += 2 + length;
-                    }
+                    // P2-2747: TDS tokens have variable header formats (2-byte, 4-byte, or fixed).
+                    // Blindly reading 2-byte length and skipping would corrupt parsing for other formats.
+                    // Abort parsing for the current response on unknown tokens to prevent misinterpretation.
+                    System.Diagnostics.Trace.TraceWarning(
+                        $"[TDS] Unknown token type 0x{token:X2} at offset {index - 1}; stopping token parse.");
+                    index = payload.Length; // Exit loop
                     break;
             }
         }

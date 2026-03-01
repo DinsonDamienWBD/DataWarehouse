@@ -143,16 +143,23 @@ public sealed class CassandraCqlProtocolStrategy : DatabaseProtocolStrategyBase
         // Parse supported options
         var supportedOptions = ParseStringMultimap(payload);
 
-        // Negotiate protocol version
-        if (supportedOptions.TryGetValue("CQL_VERSION", out var versions))
+        // Negotiate CQL version — P2-2714: use the latest version the server advertises in SUPPORTED.
+        // Fall back to "3.0.0" (baseline supported by all Cassandra 2.1+ servers) if unspecified.
+        string cqlVersion;
+        if (supportedOptions.TryGetValue("CQL_VERSION", out var versions) && versions.Length > 0)
         {
-            // Use latest supported version
+            // Prefer the highest version the server supports (versions are sorted ascending by convention)
+            cqlVersion = versions[versions.Length - 1];
+        }
+        else
+        {
+            cqlVersion = "3.0.0";
         }
 
         // Send STARTUP
         var startupOptions = new Dictionary<string, string>
         {
-            ["CQL_VERSION"] = "3.4.5",
+            ["CQL_VERSION"] = cqlVersion,
             ["DRIVER_NAME"] = "DataWarehouse.UltimateDatabaseProtocol",
             ["DRIVER_VERSION"] = "1.0.0"
         };

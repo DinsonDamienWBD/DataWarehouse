@@ -269,7 +269,8 @@ public interface IDeploymentStrategy
 /// Abstract base class for deployment strategy implementations.
 /// Provides common functionality including health checks, statistics tracking, and rollback triggers.
 /// </summary>
-public abstract class DeploymentStrategyBase : IDeploymentStrategy
+// P2-2861: Implement IDisposable to dispose the per-instance HttpClient and release sockets.
+public abstract class DeploymentStrategyBase : IDeploymentStrategy, IDisposable
 {
     private readonly DeploymentStatistics _statistics = new();
     private readonly object _statsLock = new();
@@ -280,10 +281,20 @@ public abstract class DeploymentStrategyBase : IDeploymentStrategy
     private DateTime? _healthCacheExpiry;
     private bool? _cachedHealthy;
     private readonly object _healthCacheLock = new();
+    private bool _disposed;
 
     protected DeploymentStrategyBase()
     {
         _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+    }
+
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        _httpClient.Dispose();
+        GC.SuppressFinalize(this);
     }
 
     /// <summary>Gets whether this strategy has been initialized.</summary>

@@ -619,9 +619,11 @@ public sealed class MemcachedProtocolStrategy : DatabaseProtocolStrategyBase
                         {
                             var valueParts = line.Split(' ');
                             var key = valueParts[1];
-                            var flags = uint.Parse(valueParts[2]);
-                            var length = int.Parse(valueParts[3]);
-                            var cas = valueParts.Length > 4 ? ulong.Parse(valueParts[4]) : 0UL;
+                            if (!uint.TryParse(valueParts[2], out var flags))
+                                throw new InvalidDataException($"Memcached VALUE line has non-numeric flags: '{valueParts[2]}'");
+                            if (!int.TryParse(valueParts[3], out var length))
+                                throw new InvalidDataException($"Memcached VALUE line has non-numeric length: '{valueParts[3]}'");
+                            var cas = valueParts.Length > 4 && ulong.TryParse(valueParts[4], out var casVal) ? casVal : 0UL;
 
                             var valueBuffer = new char[length];
                             await _textReader.ReadBlockAsync(valueBuffer, 0, length);

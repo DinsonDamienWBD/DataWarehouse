@@ -519,6 +519,11 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
                 return false;
             }
 
+            // P2-2707: only release semaphore when connection is returned to the available queue.
+            // Disposing an expired or invalid connection does NOT release a slot because that
+            // connection was never "available" — it is being destroyed. Releasing the semaphore in
+            // those paths inflates available slot count beyond MaxPoolSize.
+            bool releaseSlot = false;
             try
             {
                 // Check if should be recycled
@@ -540,13 +545,15 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
                     }
                 }
 
-                // Return to pool
+                // Return to pool — slot is becoming available
                 pooled.MarkAvailable();
                 _available.Enqueue(pooled);
+                releaseSlot = true;
             }
             finally
             {
-                _acquireSemaphore.Release();
+                if (releaseSlot)
+                    _acquireSemaphore.Release();
             }
 
             return true;

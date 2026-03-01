@@ -562,9 +562,16 @@ public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
                 break;
             }
 
-            if (packet[0] == 0xff) // ERR
+            if (packet[0] == 0xff) // ERR — P2-2709: return failure, not partial success
             {
-                break;
+                var errCode = ReadInt16LE(packet.AsSpan(1, 2));
+                var errMsg = Encoding.UTF8.GetString(packet.AsSpan(9)); // skip marker + 5-byte SQL state
+                return new QueryResult
+                {
+                    Success = false,
+                    ErrorMessage = errMsg,
+                    ErrorCode = errCode.ToString()
+                };
             }
 
             var row = ParseTextResultRow(packet, columns);

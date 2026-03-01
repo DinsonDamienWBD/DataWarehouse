@@ -231,6 +231,8 @@ public sealed class PipelineScalingManager : IScalableSubsystem, IDisposable
     {
         ArgumentException.ThrowIfNullOrEmpty(pipelineId);
         ArgumentNullException.ThrowIfNull(stateData);
+        if (stageIndex < 0)
+            throw new ArgumentOutOfRangeException(nameof(stageIndex), stageIndex, "Stage index must be zero or greater.");
 
         bool isSpilled = false;
         byte[]? storedData = stateData;

@@ -52,10 +52,30 @@ public sealed class ClickHouseStorageStrategy : DatabaseStorageStrategyBase
         _database = GetConfiguration("Database", "datawarehouse");
         _tableName = GetConfiguration("TableName", "storage");
 
+        // P2-2773: Validate identifiers to prevent DDL injection via misconfigured values.
+        ValidateSqlIdentifier(_database, nameof(_database));
+        ValidateSqlIdentifier(_tableName, nameof(_tableName));
+
         var connectionString = GetConnectionString();
         _connection = new ClickHouseConnection(connectionString);
 
         await EnsureSchemaCoreAsync(ct);
+    }
+
+    /// <summary>
+    /// Validates that an SQL identifier contains only safe characters (letters, digits, underscores).
+    /// Throws <see cref="ArgumentException"/> if the identifier is invalid.
+    /// </summary>
+    private static void ValidateSqlIdentifier(string identifier, string paramName)
+    {
+        if (string.IsNullOrWhiteSpace(identifier))
+            throw new ArgumentException($"SQL identifier '{paramName}' must not be empty.", paramName);
+        foreach (var ch in identifier)
+        {
+            if (!char.IsLetterOrDigit(ch) && ch != '_')
+                throw new ArgumentException(
+                    $"SQL identifier '{paramName}' contains invalid character '{ch}'. Only letters, digits and underscores are allowed.", paramName);
+        }
     }
 
     protected override async Task ConnectCoreAsync(CancellationToken ct)

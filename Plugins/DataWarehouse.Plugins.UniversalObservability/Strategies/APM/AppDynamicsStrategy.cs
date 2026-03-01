@@ -95,31 +95,31 @@ public sealed class AppDynamicsStrategy : ObservabilityStrategyBase
 
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
+        var metricList = metrics.Select(metric => new
+        {
+            metricPath = $"Custom Metrics|DataWarehouse|{metric.Name.Replace(".", "|")}",
+            aggregatorType = metric.Type == MetricType.Counter ? "OBSERVATION" : "AVERAGE",
+            value = (long)metric.Value
+        }).ToList();
+
+        if (metricList.Count == 0) return;
+
         IncrementCounter("app_dynamics.metrics_sent");
 
-        foreach (var metric in metrics)
+        // Batch all metrics in a single POST request rather than one per metric.
+        var json = JsonSerializer.Serialize(metricList);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+        using var request = await CreateAuthenticatedRequestAsync(
+            HttpMethod.Post,
+            $"{_controllerUrl}/controller/rest/applications/{_applicationName}/metric-data",
+            content, cancellationToken);
+        using var resp = await _httpClient.SendAsync(request, cancellationToken);
+        if (!resp.IsSuccessStatusCode)
         {
-            var metricData = new
-            {
-                metricPath = $"Custom Metrics|DataWarehouse|{metric.Name.Replace(".", "|")}",
-                aggregatorType = metric.Type == MetricType.Counter ? "OBSERVATION" : "AVERAGE",
-                value = (long)metric.Value
-            };
-
-            var json = JsonSerializer.Serialize(new[] { metricData });
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-            using var request = await CreateAuthenticatedRequestAsync(
-                HttpMethod.Post,
-                $"{_controllerUrl}/controller/rest/applications/{_applicationName}/metric-data",
-                content, cancellationToken);
-            using var resp = await _httpClient.SendAsync(request, cancellationToken);
-            if (!resp.IsSuccessStatusCode)
-            {
-                var body = await resp.Content.ReadAsStringAsync(cancellationToken);
-                IncrementCounter("app_dynamics.metrics_error");
-                System.Diagnostics.Trace.TraceWarning(
-                    "[AppDynamics] Metrics POST returned {0}: {1}", (int)resp.StatusCode, body);
-            }
+            var body = await resp.Content.ReadAsStringAsync(cancellationToken);
+            IncrementCounter("app_dynamics.metrics_error");
+            System.Diagnostics.Trace.TraceWarning(
+                "[AppDynamics] Metrics POST returned {0}: {1}", (int)resp.StatusCode, body);
         }
     }
 

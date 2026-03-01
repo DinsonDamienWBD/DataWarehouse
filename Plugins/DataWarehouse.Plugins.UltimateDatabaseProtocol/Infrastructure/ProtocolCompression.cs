@@ -806,8 +806,20 @@ public static class ProtocolCompressionExtensions
         if (opts.Algorithm == CompressionAlgorithm.None)
             return stream;
 
-        // This would need proper integration with the protocol
-        return stream;
+        // Wrap the stream with the appropriate compression algorithm.
+        return opts.Algorithm switch
+        {
+            CompressionAlgorithm.GZip => new System.IO.Compression.GZipStream(
+                stream, System.IO.Compression.CompressionMode.Compress, leaveOpen: true),
+            CompressionAlgorithm.Deflate => new System.IO.Compression.DeflateStream(
+                stream, System.IO.Compression.CompressionMode.Compress, leaveOpen: true),
+            CompressionAlgorithm.Brotli => new System.IO.Compression.BrotliStream(
+                stream, System.IO.Compression.CompressionMode.Compress, leaveOpen: true),
+            // Zstd uses ZLib envelope (RFC 1950) as the closest .NET built-in.
+            CompressionAlgorithm.Zstd => new System.IO.Compression.ZLibStream(
+                stream, System.IO.Compression.CompressionMode.Compress, leaveOpen: true),
+            _ => stream
+        };
     }
 }
 

@@ -510,8 +510,13 @@ public sealed class Neo4jBoltProtocolStrategy : DatabaseProtocolStrategyBase
         var message = ms.ToArray();
         var offset = 0;
 
-        // Unpack structure
+        // Unpack structure — P2-2710: validate the marker is a Bolt struct marker (0xB0-0xBF).
+        // A non-struct marker means the message was malformed; reading the next byte as a signature
+        // would parse garbage. Throw a meaningful exception rather than silently misinterpreting.
         var marker = message[offset++];
+        if ((marker & 0xF0) != 0xB0)
+            throw new InvalidDataException(
+                $"Bolt protocol: expected struct marker (0xB0-0xBF) but got 0x{marker:X2}. Message may be malformed.");
         var fieldCount = marker & 0x0F;
         var signature = message[offset++];
 
