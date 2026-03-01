@@ -1862,7 +1862,7 @@ public sealed class RleStrategy : CompressionStrategyBase
 private sealed class RleCompressionStream : Stream
 {
 }
-    public RleCompressionStream(Stream output, bool leaveOpen);
+    public RleCompressionStream(Stream output, bool leaveOpen, int minRunLength = MinRunLength);
     public override bool CanRead;;
     public override bool CanSeek;;
     public override bool CanWrite;;

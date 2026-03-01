@@ -119,7 +119,7 @@ public sealed class UltimateServerlessPlugin : ComputePluginBase, IDisposable
 {
     get
     {
-        return _strategies.Values.GroupBy(s => s.Category).ToDictionary(g => g.Key, g => (IReadOnlyList<ServerlessStrategyBase>)g.ToList());
+        return _strategiesByCategoryCache ??= _strategies.Values.GroupBy(s => s.Category).ToDictionary(g => g.Key, g => (IReadOnlyList<ServerlessStrategyBase>)g.ToList());
     }
 }
     public UltimateServerlessPlugin();
@@ -165,7 +165,7 @@ public sealed class UltimateServerlessPlugin : ComputePluginBase, IDisposable
     protected override Task OnStartCoreAsync(CancellationToken ct);;
     protected override async Task OnStartWithIntelligenceAsync(CancellationToken ct);
     public override Task OnMessageAsync(PluginMessage message);
-    public override Task<Dictionary<string, object>> ExecuteWorkloadAsync(Dictionary<string, object> workload, CancellationToken ct = default);;
+    public override Task<Dictionary<string, object>> ExecuteWorkloadAsync(Dictionary<string, object> workload, CancellationToken ct = default);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -1174,6 +1174,7 @@ public sealed class TargetTrackingStrategy : ServerlessStrategyBase
     public override string SemanticDescription;;
     public override string[] Tags;;
     public Task<TargetTrackingPolicy> CreatePolicyAsync(TargetTrackingConfig config, CancellationToken ct = default);
+    public void RecordActivity(ScalingActivity activity);
     public Task<IReadOnlyList<ScalingActivity>> GetActivitiesAsync(string policyName, int limit = 10, CancellationToken ct = default);
 }
 ```
@@ -1440,7 +1441,7 @@ public sealed class DistributedTracingStrategy : ServerlessStrategyBase
     public override string[] Tags;;
     public Task<TraceSegment> StartSegmentAsync(string name, string? parentId = null, CancellationToken ct = default);
     public Task AddAnnotationAsync(string segmentId, string key, object value, CancellationToken ct = default);
-    public Task<TraceSegment> EndSegmentAsync(string segmentId, bool success = true, string? error = null, CancellationToken ct = default);
+    public Task<TraceSegment?> EndSegmentAsync(string segmentId, bool success = true, string? error = null, CancellationToken ct = default);
     public Task<TraceSummary> GetTraceSummaryAsync(string traceId, CancellationToken ct = default);
 }
 ```
@@ -1778,6 +1779,7 @@ public sealed class CostAnomalyDetectionStrategy : ServerlessStrategyBase
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
+    public void RecordCost(string service, decimal cost);
     public Task<IReadOnlyList<CostAnomaly>> DetectAnomaliesAsync(TimeSpan lookbackPeriod, CancellationToken ct = default);
 }
 ```
@@ -1791,6 +1793,7 @@ public sealed class SavingsPlansStrategy : ServerlessStrategyBase
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
+    public void RecordHourlyUsage(decimal hourlyCost);
     public Task<SavingsPlanRecommendation> GetRecommendationAsync(CancellationToken ct = default);
 }
 ```
@@ -2200,6 +2203,7 @@ public sealed record HttpTriggerConfig
     public IReadOnlyList<string> Methods { get; init; };
     public bool RequireAuth { get; init; }
     public bool EnableCors { get; init; };
+    public string? BaseUrl { get; init; }
 }
 ```
 ```csharp
@@ -2344,6 +2348,7 @@ public sealed record WebhookConfig
     public required string WebhookId { get; init; }
     public required string FunctionId { get; init; }
     public string? SecretHeader { get; init; }
+    public string? BaseUrl { get; init; }
 }
 ```
 ```csharp
@@ -2445,6 +2450,7 @@ public sealed class LambdaSnapStartStrategy : ServerlessStrategyBase
     public Task<SnapStartResult> EnableAsync(string functionArn, SnapStartConfig config, CancellationToken ct = default);
     public Task<SnapStartStatus> GetStatusAsync(string functionArn, CancellationToken ct = default);
     public Task RegisterRestoreHookAsync(string functionArn, string hookName, Func<Task> hook, CancellationToken ct = default);
+    public async Task InvokeRestoreHooksAsync(string functionArn, CancellationToken ct = default);
 }
 ```
 ```csharp

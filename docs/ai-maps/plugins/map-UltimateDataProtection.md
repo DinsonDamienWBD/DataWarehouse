@@ -2644,6 +2644,7 @@ private sealed class RestorePlan
 {
 }
     public string PlanId { get; set; };
+    public string BackupId { get; set; };
     public DateTimeOffset GeneratedAt { get; set; }
     public List<RestorePhase> Phases { get; set; };
 }
