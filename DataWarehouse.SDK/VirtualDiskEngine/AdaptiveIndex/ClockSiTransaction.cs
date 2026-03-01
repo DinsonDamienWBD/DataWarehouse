@@ -152,6 +152,7 @@ public sealed class ClockSiTransaction : IDisposable
     private readonly SemaphoreSlim _lock = new(1, 1);
     private readonly List<WriteRecord> _writeSet = new();
     private TransactionState _state;
+    private int _disposed; // Cat 7 (finding 736): Interlocked guard for exactly-once Dispose
 
     /// <summary>
     /// Gets the unique identifier for this transaction.
@@ -454,6 +455,11 @@ public sealed class ClockSiTransaction : IDisposable
     /// <inheritdoc />
     public void Dispose()
     {
+        // Cat 7 (finding 736): Interlocked.Exchange ensures exactly-once disposal even under
+        // concurrent Dispose+Commit — the first caller wins, subsequent calls are safe no-ops.
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            return;
+
         if (_state == TransactionState.Active)
         {
             _state = TransactionState.Aborted;

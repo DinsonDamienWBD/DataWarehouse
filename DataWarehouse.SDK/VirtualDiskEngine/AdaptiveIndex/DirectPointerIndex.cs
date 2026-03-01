@@ -145,9 +145,12 @@ public sealed class DirectPointerIndex : IAdaptiveIndex
     /// <inheritdoc />
     public Task<MorphLevel> RecommendLevelAsync(CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
         lock (_lock)
         {
-            return Task.FromResult(_entry.HasValue ? MorphLevel.DirectPointer : MorphLevel.DirectPointer);
+            // Cat 12 (finding 737): DirectPointerIndex holds at most one entry.
+            // Recommend promoting to SortedArray when the single slot is occupied (capacity exhausted).
+            return Task.FromResult(_entry.HasValue ? MorphLevel.SortedArray : MorphLevel.DirectPointer);
         }
     }
 }

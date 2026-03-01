@@ -33,6 +33,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
     public class InfiniteStorageStrategy : UltimateStorageStrategyBase
     {
         private readonly List<ProviderEndpoint> _providers = new();
+        private readonly Dictionary<string, ProviderEndpoint> _providerById = new(); // O(1) lookup
         private readonly BoundedDictionary<string, string> _keyToProvider = new BoundedDictionary<string, string>(1000);
         private readonly BoundedDictionary<string, ProviderMetrics> _providerMetrics = new BoundedDictionary<string, ProviderMetrics>(1000);
         private int _replicationFactor = 3;
@@ -405,6 +406,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             Directory.CreateDirectory(path);
 
             _providers.Add(provider);
+            _providerById[provider.Id] = provider;
             _providerMetrics[providerId] = new ProviderMetrics
             {
                 ProviderId = providerId,
@@ -443,12 +445,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             var selectedProviderIds = new HashSet<string>();
             var result = new List<ProviderEndpoint>();
 
-            // Find providers using consistent hashing
+            // Find providers using consistent hashing — O(1) lookup via _providerById
             foreach (var kvp in _consistentHashRing.Where(kvp => kvp.Key >= hash).Concat(_consistentHashRing))
             {
-                if (selectedProviderIds.Add(kvp.Value))
+                if (selectedProviderIds.Add(kvp.Value) && _providerById.TryGetValue(kvp.Value, out var provider))
                 {
-                    var provider = _providers.First(p => p.Id == kvp.Value);
                     if (provider.IsHealthy)
                     {
                         result.Add(provider);

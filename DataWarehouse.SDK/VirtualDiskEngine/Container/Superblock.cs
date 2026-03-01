@@ -1,4 +1,5 @@
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.VirtualDiskEngine.Format;
 using System;
 using System.Buffers.Binary;
 using System.IO.Hashing;
@@ -228,6 +229,14 @@ public readonly struct Superblock
         ulong computedChecksum = ComputeChecksum(buffer[..(offset)]);
 
         if (checksum != computedChecksum)
+        {
+            return false;
+        }
+
+        // Cat 14 (finding 790): validate blockSize against known Min/MaxBlockSize so that
+        // a corrupt superblock cannot propagate an extreme value into downstream allocations.
+        if (blockSize < FormatConstants.MinBlockSize || blockSize > FormatConstants.MaxBlockSize ||
+            (blockSize & (blockSize - 1)) != 0) // must be a power of two
         {
             return false;
         }

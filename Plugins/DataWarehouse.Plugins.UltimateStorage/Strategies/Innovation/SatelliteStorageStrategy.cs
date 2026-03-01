@@ -365,7 +365,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 try
                 {
                     var response = await _httpClient!.GetAsync(
-                        $"/api/v1/storage/download?key={Uri.EscapeDataString(key)}&satelliteId={satellite.SatelliteId}&groundStationId={groundStation.StationId}",
+                        $"/api/v1/storage/download?key={Uri.EscapeDataString(key)}&satelliteId={Uri.EscapeDataString(satellite.SatelliteId)}&groundStationId={Uri.EscapeDataString(groundStation.StationId)}",
                         ct);
 
                     if (response.IsSuccessStatusCode)
