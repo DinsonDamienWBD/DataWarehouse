@@ -410,10 +410,26 @@ public sealed class ReplicationTask
     public DateTimeOffset QueuedAt { get; init; }
 }
 
+/// <summary>
+/// Thread-safe vector clock for multi-master conflict resolution (RFC-style).
+/// </summary>
 public sealed class VectorClock
 {
-    public Dictionary<string, long> Clocks { get; } = new();
-    public void Increment(string nodeId) => Clocks[nodeId] = Clocks.GetValueOrDefault(nodeId) + 1;
+    // Cat 14 (finding 3630): use ConcurrentDictionary — plain Dictionary + concurrent Increment corrupts the dictionary.
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, long> _clocks = new();
+
+    /// <summary>Snapshot of clock values (thread-safe read).</summary>
+    public IReadOnlyDictionary<string, long> Clocks => _clocks;
+
+    /// <summary>Atomically increments the clock for the given node ID.</summary>
+    public void Increment(string nodeId) => _clocks.AddOrUpdate(nodeId, 1L, (_, v) => v + 1L);
+
+    /// <summary>Merges another vector clock into this one by taking the maximum for each node.</summary>
+    public void Merge(VectorClock other)
+    {
+        foreach (var kvp in other._clocks)
+            _clocks.AddOrUpdate(kvp.Key, kvp.Value, (_, existing) => Math.Max(existing, kvp.Value));
+    }
 }
 
 public sealed class ReplicaVersion
@@ -462,8 +478,9 @@ public sealed class QuorumWriteResult
 /// </summary>
 public sealed class BandwidthThrottledReplicationStrategy : MultiCloudStrategyBase
 {
-    private readonly TokenBucketRateLimiter _rateLimiter;
-    private readonly int _maxBytesPerSecond;
+    private TokenBucketRateLimiter _rateLimiter;
+    private int _maxBytesPerSecond;
+    private readonly object _limiterLock = new();
 
     public override string StrategyId => "replication-bandwidth-throttled";
     public override string StrategyName => "Bandwidth-Throttled Replication";
@@ -549,11 +566,32 @@ public sealed class BandwidthThrottledReplicationStrategy : MultiCloudStrategyBa
     }
 
     /// <summary>Sets bandwidth limit dynamically.</summary>
+    /// <summary>
+    /// Dynamically reconfigures the bandwidth limit by replacing the underlying rate limiter.
+    /// Cat 12 (finding 3628): TokenBucketRateLimiter doesn't support in-place reconfiguration,
+    /// so a new limiter is constructed and atomically swapped in.
+    /// </summary>
     public void SetBandwidthLimit(int bytesPerSecond)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(bytesPerSecond);
-        // Note: TokenBucketRateLimiter doesn't support dynamic reconfiguration
-        // In production, create a new limiter with the new limit
+        var newLimiter = new TokenBucketRateLimiter(new TokenBucketRateLimiterOptions
+        {
+            TokenLimit = bytesPerSecond,
+            ReplenishmentPeriod = TimeSpan.FromSeconds(1),
+            TokensPerPeriod = bytesPerSecond,
+            AutoReplenishment = true,
+            QueueLimit = bytesPerSecond * 4,
+            QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst
+        });
+        TokenBucketRateLimiter? oldLimiter;
+        lock (_limiterLock)
+        {
+            oldLimiter = _rateLimiter;
+            _rateLimiter = newLimiter;
+            _maxBytesPerSecond = bytesPerSecond;
+        }
+        // Dispose previous limiter outside lock to avoid holding lock during disposal
+        oldLimiter?.Dispose();
     }
 
     /// <summary>Gets current bandwidth utilization.</summary>

@@ -21,7 +21,11 @@ public sealed class DefaultTierManager : ITierManager
     private int _coldThresholdDays = 90;
     private int _archiveThresholdDays = 365;
 
-    /// <summary>Days since last access before recommending Cool tier. Default: 30. Must be at least 1.</summary>
+    /// <summary>
+    /// Days since last access before recommending the Warm (Cool) tier. Default: 30. Must be at least 1.
+    /// <para><b>Note:</b> Maps to <see cref="StorageTier.Warm"/> which is equivalent to the "Cool" tier
+    /// in Azure terminology. Objects not accessed within this many days are moved from Hot to Warm storage.</para>
+    /// </summary>
     public int CoolThresholdDays
     {
         get => _coolThresholdDays;

@@ -120,10 +120,27 @@ public sealed class CarbonIntensityTrackingStrategy : SustainabilityStrategyBase
         while (_history.Count > MaxHistorySize)
             _history.TryDequeue(out _);
 
+        // Finding 4421: compute the average outside the lock to avoid O(n) LINQ under lock.
+        var now = DateTimeOffset.UtcNow;
+        var cutoff = now.AddHours(-24);
+        double newAverage = 0.0;
+        bool hasData = false;
+        double sum = 0.0;
+        int count = 0;
+        foreach (var p in _history)
+        {
+            if (p.Timestamp >= cutoff)
+            {
+                sum += p.Intensity;
+                count++;
+            }
+        }
+        if (count > 0) { newAverage = sum / count; hasData = true; }
+
         lock (_lock)
         {
             _currentIntensity = intensityGCO2ePerKwh;
-            RecalculateAverages();
+            if (hasData) _24HourAverage = newAverage;
         }
 
         RecordSample(0, intensityGCO2ePerKwh);
@@ -296,15 +313,8 @@ public sealed class CarbonIntensityTrackingStrategy : SustainabilityStrategyBase
         return baseIntensity * (1 + variation);
     }
 
-    private void RecalculateAverages()
-    {
-        var now = DateTimeOffset.UtcNow;
-        var last24h = _history.Where(p => p.Timestamp >= now.AddHours(-24)).ToList();
-        if (last24h.Any())
-        {
-            _24HourAverage = last24h.Average(p => p.Intensity);
-        }
-    }
+    // Finding 4421: RecalculateAverages removed — average now computed in RecordIntensity
+    // without holding _lock, using a lock-free pass over the ConcurrentQueue.
 
     private void UpdateRecommendations(double currentIntensity)
     {

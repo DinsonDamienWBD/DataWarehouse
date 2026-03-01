@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
@@ -9,7 +10,9 @@ namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.EnergyOptimiza
 /// </summary>
 public sealed class GpuPowerManagementStrategy : SustainabilityStrategyBase
 {
-    private readonly Dictionary<string, GpuInfo> _gpus = new();
+    // P2-4448: ConcurrentDictionary so MonitorGpus (timer thread) and GetGpus/SetPowerLimit
+    // (caller thread) can access without a data race.
+    private readonly ConcurrentDictionary<string, GpuInfo> _gpus = new();
     private Timer? _monitorTimer;
 
     /// <inheritdoc/>

@@ -45,15 +45,17 @@ public static class FfmpegTranscodeHelper
                     return new MemoryStream(result.OutputData);
                 }
 
-                // FFmpeg execution failed - fall back to package
-                // (this allows downstream systems to retry with different settings)
+                // Cat 15 (finding 1063): log FFmpeg execution failure so callers can distinguish
+                // real output from fallback package output.
+                System.Diagnostics.Trace.TraceWarning(
+                    $"[FfmpegTranscodeHelper] FFmpeg execution failed (non-fatal); falling back to package generation.");
             }
         }
         catch (FfmpegNotFoundException ex)
         {
-
-            // FFmpeg not installed - fall back to package generation
-            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
+            // Cat 15 (finding 1063): log so callers know FFmpeg is not installed.
+            System.Diagnostics.Trace.TraceInformation(
+                $"[FfmpegTranscodeHelper] FFmpeg not found ({ex.Message}); using package generation fallback.");
         }
 
         // Fallback: generate transcode package

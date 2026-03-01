@@ -125,9 +125,8 @@ internal sealed class DashStreamingStrategy : MediaStrategyBase
     /// </summary>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        // Cancel active segment generation
-        // Flush MPD manifest
-        // Clean up temporary segment files
+        // Cat 15 (finding 1089): DashStreamingStrategy is stateless — no per-instance buffers, segments,
+        // or manifests require cleanup here. Each Transcode call is self-contained and releases its own streams.
         return Task.CompletedTask;
     }
 

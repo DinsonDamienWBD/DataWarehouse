@@ -467,8 +467,10 @@ public sealed class RansomwareVaccinationService
             var response = await _messageBus.SendAsync("timelock.lock", lockRequest, TimeSpan.FromSeconds(10), ct);
             return response.Success;
         }
-        catch
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            // Cat 9 (finding 1064): log exception so vaccination failures are diagnosable.
+            System.Diagnostics.Trace.TraceError($"[RansomwareVaccinationService] Bus coordination failed: {ex.GetType().Name}: {ex.Message}");
             return false;
         }
     }
@@ -506,8 +508,9 @@ public sealed class RansomwareVaccinationService
 
             return (false, null);
         }
-        catch
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            System.Diagnostics.Trace.TraceError($"[RansomwareVaccinationService] Bus coordination failed: {ex.GetType().Name}: {ex.Message}");
             return (false, null);
         }
     }
@@ -547,8 +550,9 @@ public sealed class RansomwareVaccinationService
 
             return (false, null);
         }
-        catch
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            System.Diagnostics.Trace.TraceError($"[RansomwareVaccinationService] Bus coordination failed: {ex.GetType().Name}: {ex.Message}");
             return (null, null);
         }
     }
@@ -588,8 +592,9 @@ public sealed class RansomwareVaccinationService
 
             return (false, null);
         }
-        catch
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            System.Diagnostics.Trace.TraceError($"[RansomwareVaccinationService] Bus coordination failed: {ex.GetType().Name}: {ex.Message}");
             return (null, null);
         }
     }
@@ -626,8 +631,10 @@ public sealed class RansomwareVaccinationService
 
             return false;
         }
-        catch
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            // Cat 9 (finding 1064): log exception so vaccination failures are diagnosable.
+            System.Diagnostics.Trace.TraceError($"[RansomwareVaccinationService] Bus coordination failed: {ex.GetType().Name}: {ex.Message}");
             return false;
         }
     }
@@ -664,8 +671,10 @@ public sealed class RansomwareVaccinationService
 
             return false;
         }
-        catch
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            // Cat 9 (finding 1064): log exception so vaccination failures are diagnosable.
+            System.Diagnostics.Trace.TraceError($"[RansomwareVaccinationService] Bus coordination failed: {ex.GetType().Name}: {ex.Message}");
             return false;
         }
     }
@@ -704,8 +713,10 @@ public sealed class RansomwareVaccinationService
 
             return false;
         }
-        catch
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            // Cat 9 (finding 1064): log exception so vaccination failures are diagnosable.
+            System.Diagnostics.Trace.TraceError($"[RansomwareVaccinationService] Bus coordination failed: {ex.GetType().Name}: {ex.Message}");
             return false;
         }
     }
@@ -743,8 +754,10 @@ public sealed class RansomwareVaccinationService
 
             return false;
         }
-        catch
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            // Cat 9 (finding 1064): log exception so vaccination failures are diagnosable.
+            System.Diagnostics.Trace.TraceError($"[RansomwareVaccinationService] Bus coordination failed: {ex.GetType().Name}: {ex.Message}");
             return false;
         }
     }
@@ -766,11 +779,11 @@ public sealed class RansomwareVaccinationService
             };
             await _messageBus.PublishAsync(topic, message, ct);
         }
-        catch
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-
-            // Event publication failure must not disrupt vaccination operations
-            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+            // Cat 9 (finding 1064): Event publication failure must not disrupt vaccination operations,
+            // but log so failures are diagnosable.
+            System.Diagnostics.Trace.TraceError($"[RansomwareVaccinationService] Event publish failed for topic '{topic}': {ex.GetType().Name}: {ex.Message}");
         }
     }
 

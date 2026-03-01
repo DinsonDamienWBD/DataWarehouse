@@ -116,9 +116,8 @@ internal sealed class HlsStreamingStrategy : MediaStrategyBase
     /// </summary>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        // Cancel active segment generation
-        // Flush manifest files
-        // Clean up temporary segment files
+        // Cat 15 (finding 1089): HlsStreamingStrategy is stateless — no per-instance buffers, segments,
+        // or manifest files require cleanup here. Each TranscodeAsync call is self-contained.
         return Task.CompletedTask;
     }
 

@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
+using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.EnergyOptimization;
 
@@ -19,6 +21,9 @@ public sealed class PowerCappingStrategy : SustainabilityStrategyBase
     // Ring buffer for power history — holds up to 3600 seconds (1 hour at 1s intervals)
     private readonly ConcurrentQueue<PowerReading> _powerHistory = new();
     private const int MaxHistorySize = 3600;
+    // P2-4442: Delta-power tracking to avoid Thread.Sleep in ReadRaplDomain.
+    private long _raplLastEnergyUj = -1;
+    private long _raplLastSampleTick = System.Diagnostics.Stopwatch.GetTimestamp();
 
     /// <inheritdoc/>
     public override string StrategyId => "power-capping";
@@ -262,14 +267,24 @@ public sealed class PowerCappingStrategy : SustainabilityStrategyBase
             if (!File.Exists(energyPath))
                 return null;
 
-            // Read twice to calculate power
-            var energy1 = long.Parse(File.ReadAllText(energyPath).Trim());
-            Thread.Sleep(100);
-            var energy2 = long.Parse(File.ReadAllText(energyPath).Trim());
+            // P2-4442: Avoid Thread.Sleep blocking by using delta-power between successive calls.
+            // First call: store baseline; return null (no delta yet).
+            // Subsequent calls: compute average power = deltaUJ / elapsed_seconds.
+            if (!long.TryParse(File.ReadAllText(energyPath).Trim(), out var energyNow))
+                return null;
 
-            var deltaUj = energy2 - energy1;
-            var deltaSeconds = 0.1;
-            return (deltaUj / 1_000_000.0) / deltaSeconds;
+            var now = System.Diagnostics.Stopwatch.GetTimestamp();
+            var prev = Interlocked.Exchange(ref _raplLastEnergyUj, energyNow);
+            var prevTick = Interlocked.Exchange(ref _raplLastSampleTick, now);
+
+            if (prev < 0) return null; // first sample — no delta yet
+
+            var elapsedSec = (double)(now - prevTick) / System.Diagnostics.Stopwatch.Frequency;
+            if (elapsedSec < 0.001) return null; // guard against near-zero elapsed
+
+            var deltaUj = energyNow - prev;
+            if (deltaUj < 0) deltaUj += 262_143_328_850L; // counter wrap
+            return (deltaUj / 1_000_000.0) / elapsedSec;
         }
         catch
         {

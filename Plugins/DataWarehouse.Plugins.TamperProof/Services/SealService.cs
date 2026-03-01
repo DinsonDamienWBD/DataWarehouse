@@ -414,9 +414,17 @@ public class SealService : ISealService
                 "Date range {From} to {To} sealed successfully",
                 from, to);
 
-            // Note: SealedCount would need to be determined by querying actual blocks in range
-            // For now, we return 1 to indicate the range seal itself
-            return SealResult.CreateSuccess(sealToken, reason, sealedCount: 1);
+            // Cat 1 (finding 1040): SealedCount = number of individual block seals covered by this range seal.
+            // Since SealRangeAsync operates on a date range (not a block list), count existing _blockSeals
+            // whose SealedAt falls within [from, to] as a best-effort count. Future implementations
+            // can query the storage layer for an authoritative block count.
+            int coveredCount;
+            lock (_rangeSealLock)
+            {
+                coveredCount = _blockSeals.Values.Count(b => b.SealedAt >= from && b.SealedAt <= to);
+            }
+            // Add 1 for the range seal record itself if no block seals exist in range.
+            return SealResult.CreateSuccess(sealToken, reason, sealedCount: Math.Max(coveredCount, 1));
         }
         catch (Exception ex)
         {
