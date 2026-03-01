@@ -76,8 +76,20 @@ public sealed class JsonSchemaRegenerationStrategy : RegenerationStrategyBase
                 Debug.WriteLine($"Caught exception in JsonSchemaRegenerationStrategy.cs: {ex.Message}");
                 warnings.Add($"Initial parse failed: {ex.Message}");
                 jsonContent = RepairJson(jsonContent);
-                doc = JsonDocument.Parse(jsonContent);
-                diagnostics["json_repaired"] = true;
+                // P2-3227: Wrap the second parse — RepairJson may still produce invalid JSON.
+                // Without this guard, a second JsonException leaves doc==null and line 84
+                // (doc.RootElement) throws NullReferenceException instead of a clear error.
+                try
+                {
+                    doc = JsonDocument.Parse(jsonContent);
+                    diagnostics["json_repaired"] = true;
+                }
+                catch (JsonException repairEx)
+                {
+                    throw new InvalidOperationException(
+                        $"[JsonSchemaRegenerationStrategy] JSON repair failed: {repairEx.Message}. " +
+                        $"Original error: {ex.Message}", repairEx);
+                }
             }
 
             // Reconstruct with proper formatting
