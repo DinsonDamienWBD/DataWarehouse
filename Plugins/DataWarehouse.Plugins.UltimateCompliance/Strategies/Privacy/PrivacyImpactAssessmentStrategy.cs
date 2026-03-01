@@ -691,10 +691,12 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
             });
         }
 
-        private double CalculateRiskScore(int likelihood, int impact)
+        private static double CalculateRiskScore(int likelihood, int impact)
         {
-            // 5x5 risk matrix
-            return likelihood * impact;
+            // P2-1517: clamp to [1, 5] before multiplying — negative inputs reverse priority ordering
+            var l = Math.Clamp(likelihood, 1, 5);
+            var i = Math.Clamp(impact, 1, 5);
+            return l * i;
         }
 
         private double CalculateResidualRisk(double inherentRisk, MitigationEffectiveness effectiveness)
