@@ -678,9 +678,11 @@ public sealed class SchemaRegistryStrategy : DataIntegrationStrategyBase
         string subjectName,
         CancellationToken ct = default)
     {
+        // P2-2301: Guard int.Parse — keys with ":v" appearing mid-name or non-numeric suffix throw.
         var versions = _schemas.Keys
             .Where(k => k.StartsWith($"{subjectName}:v"))
-            .Select(k => int.Parse(k.Split(":v")[1]))
+            .Select(k => { var parts = k.Split(":v"); return parts.Length >= 2 && int.TryParse(parts[^1], out var v) ? v : -1; })
+            .Where(v => v > 0)
             .OrderBy(v => v)
             .ToList();
 

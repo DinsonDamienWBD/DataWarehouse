@@ -37,6 +37,13 @@ public sealed class PolicyDashboardDataLayer : DataGovernanceStrategyBase
     public PolicyDashboardItem CreatePolicy(string name, string description, string category,
         Dictionary<string, object> rules, string createdBy)
     {
+        // P2-2329: Validate required fields — empty strings silently produce unusable policies.
+        ArgumentException.ThrowIfNullOrWhiteSpace(name, nameof(name));
+        ArgumentException.ThrowIfNullOrWhiteSpace(description, nameof(description));
+        ArgumentException.ThrowIfNullOrWhiteSpace(category, nameof(category));
+        ArgumentNullException.ThrowIfNull(rules, nameof(rules));
+        ArgumentException.ThrowIfNullOrWhiteSpace(createdBy, nameof(createdBy));
+
         var id = Guid.NewGuid().ToString("N")[..12];
         var item = new PolicyDashboardItem
         {

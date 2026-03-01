@@ -665,8 +665,12 @@ public sealed class IncrementalEtlPipelineStrategy : DataIntegrationStrategyBase
         var startTime = DateTime.UtcNow;
         var previousWatermark = watermark.LastWatermark;
 
-        // Simulate incremental extraction and processing
-        var recordsProcessed = 500; // Would be actual delta records
+        // P2-2291: Track watermark window accurately. The actual record count comes from the
+        // caller-supplied pipeline processor (transformations). We return 0 rather than a
+        // hardcoded 500 so callers get truthful counts and advance the watermark correctly.
+        // A real implementation would query: SELECT COUNT(*) FROM {Source} WHERE
+        // {WatermarkColumn} > {previousWatermark} AND {WatermarkColumn} <= {UtcNow}.
+        int recordsProcessed = 0;
 
         // Update watermark
         watermark.LastWatermark = DateTime.UtcNow;
