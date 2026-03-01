@@ -93,7 +93,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Versioning
                 Metadata = metadata ?? new VersionMetadata(),
                 SizeBytes = 0,
                 StoredSizeBytes = 0,
-                ContentHash = string.Empty,
+                // Metadata-only version: no content bytes, so hash is a well-known sentinel.
+                // Integrity checks MUST skip empty-hash entries (no content to verify).
+                ContentHash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", // SHA-256 of empty string
                 HashAlgorithm = "SHA256",
                 IsImmutable = false,
                 IsOnLegalHold = false,
@@ -366,10 +368,12 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Versioning
             ContentBlock[] blocks1 = _blockIndex.TryGetValue(versionId1, out var b1) ? b1 : Array.Empty<ContentBlock>();
             ContentBlock[] blocks2 = _blockIndex.TryGetValue(versionId2, out var b2) ? b2 : Array.Empty<ContentBlock>();
 
-            // Calculate differences at block level
-            var addedBlocks = blocks2.Where(b2 => !blocks1.Any(b1 => b1.BlockHash == b2.BlockHash)).ToList();
-            var removedBlocks = blocks1.Where(b1 => !blocks2.Any(b2 => b2.BlockHash == b1.BlockHash)).ToList();
-            var commonBlocks = blocks1.Where(b1 => blocks2.Any(b2 => b2.BlockHash == b1.BlockHash)).Count();
+            // Calculate differences at block level using HashSets for O(n) instead of O(n²) .Any() chains.
+            var hashes1 = new HashSet<string>(blocks1.Select(b => b.BlockHash), StringComparer.Ordinal);
+            var hashes2 = new HashSet<string>(blocks2.Select(b => b.BlockHash), StringComparer.Ordinal);
+            var addedBlocks = blocks2.Where(b => !hashes1.Contains(b.BlockHash)).ToList();
+            var removedBlocks = blocks1.Where(b => !hashes2.Contains(b.BlockHash)).ToList();
+            var commonBlocks = blocks1.Count(b => hashes2.Contains(b.BlockHash));
 
             var totalBytesChanged = addedBlocks.Sum(b => b.OriginalSize) + removedBlocks.Sum(b => b.OriginalSize);
             var totalSize = Math.Max(blocks1.Sum(b => b.OriginalSize), blocks2.Sum(b => b.OriginalSize));

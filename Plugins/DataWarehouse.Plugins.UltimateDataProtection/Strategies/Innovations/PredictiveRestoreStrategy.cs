@@ -33,7 +33,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
         private readonly BoundedDictionary<string, PreStagedBackup> _preStagedBackups = new BoundedDictionary<string, PreStagedBackup>(1000);
         private readonly BoundedDictionary<string, PredictionModel> _userModels = new BoundedDictionary<string, PredictionModel>(1000);
         private readonly object _predictionLock = new();
-        private Timer? _predictionTimer;
+        private volatile Timer? _predictionTimer;
 
         /// <summary>
         /// Default interval for running prediction updates.

@@ -627,13 +627,54 @@ namespace DataWarehouse.Plugins.UltimateDataProtection
 
         private Task<Dictionary<string, object>> RecommendRecoveryPointAsync(string backupId, Dictionary<string, object> context)
         {
-            // AI-driven recovery point recommendation
+            // Analyze registered strategies to find the best recovery point.
+            // Collect all catalog entries synchronously from strategy registries where available.
+            var allEntries = new List<BackupCatalogEntry>();
+            foreach (var strategy in _registry.Strategies)
+            {
+                try
+                {
+                    // Use synchronous catalog access if the strategy exposes it
+                    var entries = strategy.GetCatalogEntries();
+                    allEntries.AddRange(entries);
+                }
+                catch
+                {
+                    // Strategy doesn't support sync catalog access; skip
+                }
+            }
+
+            var candidates = allEntries
+                .Where(e => !e.IsCorrupted)
+                .OrderByDescending(e => e.IsVerified ? 1 : 0)
+                .ThenByDescending(e => e.CreatedAt)
+                .ToList();
+
+            if (candidates.Count == 0)
+            {
+                // No catalog entries; return the input backupId with low confidence
+                return Task.FromResult(new Dictionary<string, object>
+                {
+                    ["success"] = true,
+                    ["recommendedBackupId"] = backupId,
+                    ["confidence"] = 0.5,
+                    ["reasoning"] = "No catalog entries available; returning requested backup ID as-is"
+                });
+            }
+
+            // Prefer the requested backup if it is among valid candidates, otherwise suggest best.
+            var best = candidates.FirstOrDefault(e => e.BackupId == backupId) ?? candidates[0];
+            var isRequested = best.BackupId == backupId;
+            var confidence = best.IsVerified ? 0.95 : 0.7;
+
             return Task.FromResult(new Dictionary<string, object>
             {
                 ["success"] = true,
-                ["recommendedBackupId"] = backupId,
-                ["confidence"] = 0.95,
-                ["reasoning"] = "Most recent valid backup with complete integrity verification"
+                ["recommendedBackupId"] = best.BackupId,
+                ["confidence"] = confidence,
+                ["reasoning"] = isRequested
+                    ? $"Requested backup '{backupId}' is valid and {(best.IsVerified ? "integrity-verified" : "not yet verified")}"
+                    : $"Requested backup not found; most recent valid backup '{best.BackupId}' recommended (age: {(DateTimeOffset.UtcNow - best.CreatedAt).TotalHours:F1}h)"
             });
         }
 

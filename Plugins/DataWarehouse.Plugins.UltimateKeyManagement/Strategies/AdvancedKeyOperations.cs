@@ -26,6 +26,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies
     {
         private readonly BoundedDictionary<string, byte[]> _derivedKeys = new BoundedDictionary<string, byte[]>(1000);
         private readonly BoundedDictionary<string, byte[]> _salts = new BoundedDictionary<string, byte[]>(1000);
+        // P2-3449: Track actual creation time per derived key so rotation policies can compute key age.
+        private readonly BoundedDictionary<string, DateTime> _keyCreatedAt = new BoundedDictionary<string, DateTime>(1000);
         private HashAlgorithmName _hashAlgorithm = HashAlgorithmName.SHA256;
         private int _derivedKeyLength = 32; // 256 bits default
         private byte[]? _masterIkm; // Input keying material
@@ -112,6 +114,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies
             // Derive key on demand using keyId as info parameter
             var derived = DeriveKey(keyId);
             _derivedKeys[keyId] = derived;
+            _keyCreatedAt.TryAdd(keyId, DateTime.UtcNow);
             IncrementCounter("hkdf.derive");
             return Task.FromResult(derived);
         }
@@ -119,6 +122,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies
         protected override Task SaveKeyToStorage(string keyId, byte[] keyData, ISecurityContext context)
         {
             _derivedKeys[keyId] = keyData;
+            _keyCreatedAt.TryAdd(keyId, DateTime.UtcNow);
             IncrementCounter("hkdf.save");
             return Task.CompletedTask;
         }
@@ -245,10 +249,12 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies
             if (!_derivedKeys.TryGetValue(keyId, out var key))
                 return Task.FromResult<KeyMetadata?>(null);
 
+            // P2-3449: Use the recorded creation time so rotation policies can compute actual key age.
+            var createdAt = _keyCreatedAt.TryGetValue(keyId, out var ts) ? ts : DateTime.UtcNow;
             return Task.FromResult<KeyMetadata?>(new KeyMetadata
             {
                 KeyId = keyId,
-                CreatedAt = DateTime.UtcNow,
+                CreatedAt = createdAt,
                 KeySizeBytes = key.Length,
                 IsActive = true,
                 Metadata = new Dictionary<string, object>

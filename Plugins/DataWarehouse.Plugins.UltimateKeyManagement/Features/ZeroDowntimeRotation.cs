@@ -175,7 +175,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
             }
             else
             {
-                var metadata = await keyStore.GetKeyMetadataAsync(keyId, context).ConfigureAwait(false);
+                // GetKeyMetadataAsync is on IKeyStoreStrategy (not IKeyStore); cast if available.
+                // context may be null when called without one; skip metadata check in that case.
+                KeyMetadata? metadata = null;
+                if (keyStore is IKeyStoreStrategy strategy && context != null)
+                    metadata = await strategy.GetKeyMetadataAsync(keyId, context).ConfigureAwait(false);
                 result.IsValid = metadata != null;
                 result.IsCurrentKey = result.IsValid;
                 result.RecommendedAction = result.IsValid

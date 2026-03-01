@@ -39,6 +39,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
         private readonly HttpClient _httpClient;
         private BitwardenSecretsConfig _config = new();
         private readonly BoundedDictionary<string, byte[]> _keyCache = new BoundedDictionary<string, byte[]>(1000);
+        // P2-3472: Cache secret IDs to avoid O(n) list-all on every key lookup.
+        private readonly BoundedDictionary<string, string> _secretIdCache = new BoundedDictionary<string, string>(1000);
         private string? _currentKeyId;
         private string? _authToken;
         private DateTime _tokenExpiry = DateTime.MinValue;
@@ -234,6 +236,17 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
                     createPayload);
 
                 response.EnsureSuccessStatusCode();
+
+                // P2-3472: Populate secretId cache from the create response so subsequent
+                // lookups by name don't require an O(n) list-all round-trip.
+                var createJson = await response.Content.ReadAsStringAsync();
+                using var createDoc = JsonDocument.Parse(createJson);
+                if (createDoc.RootElement.TryGetProperty("id", out var idProp))
+                {
+                    var newId = idProp.GetString();
+                    if (!string.IsNullOrEmpty(newId))
+                        _secretIdCache[keyId] = newId;
+                }
             }
 
             // Update cache
@@ -297,6 +310,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
 
             response.EnsureSuccessStatusCode();
             _keyCache.TryRemove(keyId, out _);
+            _secretIdCache.TryRemove(keyId, out _); // P2-3472: Evict secretId cache on delete
         }
 
         public override async Task<KeyMetadata?> GetKeyMetadataAsync(string keyId, ISecurityContext context, CancellationToken cancellationToken = default)
@@ -472,6 +486,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
 
         private async Task<string?> GetSecretIdByNameAsync(string keyName, CancellationToken cancellationToken = default)
         {
+            // P2-3472: Return cached secret ID to avoid O(n) list-all API call on every lookup.
+            if (_secretIdCache.TryGetValue(keyName, out var cachedId))
+                return cachedId;
+
             string url;
             if (!string.IsNullOrEmpty(_config.ProjectId))
             {
@@ -489,6 +507,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
             var result = JsonSerializer.Deserialize<BitwardenSecretsListResponse>(json, _jsonOptions);
+
+            // Populate cache for all returned secrets to amortise future lookups.
+            if (result?.Secrets != null)
+            {
+                foreach (var secret in result.Secrets)
+                {
+                    if (!string.IsNullOrEmpty(secret.Key) && !string.IsNullOrEmpty(secret.Id))
+                        _secretIdCache[secret.Key] = secret.Id;
+                }
+            }
 
             return result?.Secrets?.FirstOrDefault(s => s.Key == keyName)?.Id;
         }

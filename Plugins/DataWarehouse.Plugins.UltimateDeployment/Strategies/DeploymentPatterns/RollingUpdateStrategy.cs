@@ -186,15 +186,10 @@ public sealed class RollingUpdateStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
-        var results = new List<HealthCheckResult>();
-
-        for (var i = 0; i < currentState.DeployedInstances; i++)
-        {
-            var result = await HealthCheckInstanceAsync(deploymentId, i, null, ct);
-            results.Add(result);
-        }
-
-        return results.ToArray();
+        // P2-2893: Parallelise health checks with Task.WhenAll instead of serial await per instance
+        var tasks = Enumerable.Range(0, currentState.DeployedInstances)
+            .Select(i => HealthCheckInstanceAsync(deploymentId, i, null, ct));
+        return await Task.WhenAll(tasks).ConfigureAwait(false);
     }
 
     protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct)

@@ -194,28 +194,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
         {
             if (MessageBus == null) return;
 
-            MessageBus.Subscribe("intelligence.request.key-rotation-prediction", async msg =>
+            // P2-3602: Wrap async handler in a non-fire-and-forget delegate so exceptions
+            // are surfaced rather than swallowed by the async-void equivalent.
+            MessageBus.Subscribe("intelligence.request.key-rotation-prediction", msg =>
             {
-                if (msg.Payload.TryGetValue("keyId", out var kidObj) && kidObj is string keyId)
-                {
-                    var prediction = PredictKeyRotation(keyId, msg.Payload);
-
-                    await MessageBus.PublishAsync("intelligence.request.key-rotation-prediction.response", new PluginMessage
-                    {
-                        Type = "key-rotation-prediction.response",
-                        CorrelationId = msg.CorrelationId,
-                        Source = Id,
-                        Payload = new Dictionary<string, object>
-                        {
-                            ["success"] = true,
-                            ["keyId"] = keyId,
-                            ["shouldRotate"] = prediction.ShouldRotate,
-                            ["recommendedRotationDate"] = prediction.RecommendedDate,
-                            ["reasoning"] = prediction.Reasoning,
-                            ["confidence"] = prediction.Confidence
-                        }
-                    });
-                }
+                _ = HandleKeyRotationPredictionAsync(msg);
             });
         }
 
@@ -259,6 +242,44 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
             return (false, DateTimeOffset.UtcNow.AddDays(daysUntilRotation),
                 $"Key is within policy. Next rotation in {daysUntilRotation} days.",
                 0.88);
+        }
+
+        /// <summary>
+        /// Handles key-rotation-prediction messages. Extracted from the Subscribe callback
+        /// so exceptions are awaitable and not silently swallowed.
+        /// </summary>
+        private async Task HandleKeyRotationPredictionAsync(PluginMessage msg)
+        {
+            try
+            {
+                if (!msg.Payload.TryGetValue("keyId", out var kidObj) || kidObj is not string keyId)
+                    return;
+
+                var prediction = PredictKeyRotation(keyId, msg.Payload);
+
+                if (MessageBus != null)
+                {
+                    await MessageBus.PublishAsync("intelligence.request.key-rotation-prediction.response", new PluginMessage
+                    {
+                        Type = "key-rotation-prediction.response",
+                        CorrelationId = msg.CorrelationId,
+                        Source = Id,
+                        Payload = new Dictionary<string, object>
+                        {
+                            ["success"] = true,
+                            ["keyId"] = keyId,
+                            ["shouldRotate"] = prediction.ShouldRotate,
+                            ["recommendedRotationDate"] = prediction.RecommendedDate,
+                            ["reasoning"] = prediction.Reasoning,
+                            ["confidence"] = prediction.Confidence
+                        }
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger?.LogError(ex, "[UltimateKeyManagementPlugin] HandleKeyRotationPredictionAsync failed for correlationId={CorrelationId}", msg.CorrelationId);
+            }
         }
 
         protected override async Task OnBeforeStatePersistAsync(CancellationToken ct)
@@ -641,62 +662,4 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
 
         public override Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
         {
-            if (request.Context != null)
-            {
-            }
-
-            if (request.Config != null && request.Config.TryGetValue("MessageBus", out var messageBusObj) && messageBusObj is IMessageBus messageBus)
-            {
-                SetMessageBus(messageBus);
-            }
-
-            return base.OnHandshakeAsync(request);
-        }
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing)
-            {
-                if (_disposed) return;
-                _disposed = true;
-
-                // Synchronous dispose: dispose strategies directly.
-                // Prefer DisposeAsyncCore for graceful async shutdown.
-                foreach (var strategy in _strategies.Values)
-                {
-                    if (strategy is IDisposable disposable)
-                    {
-                        disposable.Dispose();
-                    }
-                }
-
-                _strategies.Clear();
-                _keyStores.Clear();
-                _envelopeKeyStores.Clear();
-            }
-            base.Dispose(disposing);
-        }
-
-        protected override async ValueTask DisposeAsyncCore()
-        {
-            if (_disposed) return;
-            _disposed = true;
-
-            await StopAsync().ConfigureAwait(false);
-
-            foreach (var strategy in _strategies.Values)
-            {
-                if (strategy is IDisposable disposable)
-                {
-                    disposable.Dispose();
-                }
-            }
-
-            _strategies.Clear();
-            _keyStores.Clear();
-            _envelopeKeyStores.Clear();
-
-            await base.DisposeAsyncCore().ConfigureAwait(false);
-        }
-    }
-}
+            if (request.Context !=

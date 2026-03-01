@@ -349,13 +349,30 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Database
                 IsValid = true
             };
 
-            // Import private key if available
+            // P2-3471: Only set HasPrivateKey=true when the .pvk file is present AND its
+            // header can be confirmed (4-byte magic 0xB0B5F154 for RSA private keys).
+            // Setting the flag without parsing is a contract lie that misleads callers.
             if (!string.IsNullOrEmpty(_config.PrivateKeyFilePath) && File.Exists(_config.PrivateKeyFilePath))
             {
-                // Note: .pvk files require special handling - this is a placeholder
-                // Full implementation would use BouncyCastle or similar library to parse .pvk
-                metadata.HasPrivateKey = true;
-                metadata.PrivateKeyEncrypted = true;
+                try
+                {
+                    // Read the first 4 bytes to verify the PVK magic number.
+                    using var fs = new FileStream(_config.PrivateKeyFilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                    var magic = new byte[4];
+                    var read = await fs.ReadAsync(magic.AsMemory(0, 4));
+                    // PVK magic: 0xB0B5F154 (little-endian)
+                    var isValidPvk = read == 4 && magic[0] == 0x54 && magic[1] == 0xF1 && magic[2] == 0xB5 && magic[3] == 0xB0;
+                    if (isValidPvk)
+                    {
+                        metadata.HasPrivateKey = true;
+                        metadata.PrivateKeyEncrypted = true;
+                    }
+                    // If magic doesn't match, HasPrivateKey remains as-is (set from cert.HasPrivateKey above).
+                }
+                catch (IOException)
+                {
+                    // File unreadable — leave HasPrivateKey at the value from the certificate itself.
+                }
             }
 
             return metadata;

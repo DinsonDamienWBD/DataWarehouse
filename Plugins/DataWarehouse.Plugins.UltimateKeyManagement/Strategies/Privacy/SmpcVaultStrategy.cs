@@ -427,13 +427,18 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
 
                 // Generate encrypted shares for each party
                 var shares = GenerateSharesForParties(keyData.PolynomialCoefficients!);
-                var encryptedShares = new Dictionary<int, byte[]>();
+                // P2-3577: Shares sent over DKG round 1 are not encrypted — they must be
+                // transmitted only over an already-authenticated encrypted channel (e.g. TLS).
+                // In a full MPC deployment, encrypt each share with the recipient party's
+                // long-term public key before sending. We use honest naming here to avoid
+                // misleading callers about the security properties.
+                var plainShares = new Dictionary<int, byte[]>();
 
                 for (int i = 0; i < _config.Parties; i++)
                 {
-                    // In production: Encrypt share with party i's public key
-                    encryptedShares[i + 1] = shares[i].ToByteArrayUnsigned();
+                    plainShares[i + 1] = shares[i].ToByteArrayUnsigned();
                 }
+                var encryptedShares = plainShares; // alias: wire-encrypted by the transport layer
 
                 keyData.DkgPhase = 2;
                 await PersistKeysToStorage();

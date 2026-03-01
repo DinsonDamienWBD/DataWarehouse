@@ -788,6 +788,8 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             });
         }
 
+        private readonly object _destructLock = new();
+
         /// <summary>
         /// Timer callback to check and destroy expired backups.
         /// </summary>
@@ -795,23 +797,34 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
         {
             var now = DateTimeOffset.UtcNow;
 
-            foreach (var kvp in _backups)
+            // Snapshot keys first; avoid mutating _backups while iterating.
+            var keysToCheck = _backups.Keys.ToArray();
+
+            foreach (var key in keysToCheck)
             {
-                var metadata = kvp.Value;
-
-                // Skip if already destroyed or under legal hold
-                if (metadata.Status == TimeCapsuleStatus.Destroyed)
+                if (!_backups.TryGetValue(key, out var metadata))
                     continue;
 
-                if (_legalHolds.ContainsKey(kvp.Key))
-                    continue;
-
-                // Check if destruct date has passed
-                if (metadata.SelfDestructEnabled &&
-                    metadata.DestructDate.HasValue &&
-                    now >= metadata.DestructDate.Value)
+                // Serialize destruction decisions under a lock to prevent concurrent
+                // CheckAndDestroy invocations from double-destroying the same backup.
+                lock (_destructLock)
                 {
-                    DestroyBackup(kvp.Key, metadata);
+                    // Re-check inside the lock after acquiring it
+                    if (!_backups.TryGetValue(key, out metadata))
+                        continue;
+
+                    if (metadata.Status == TimeCapsuleStatus.Destroyed)
+                        continue;
+
+                    if (_legalHolds.ContainsKey(key))
+                        continue;
+
+                    if (metadata.SelfDestructEnabled &&
+                        metadata.DestructDate.HasValue &&
+                        now >= metadata.DestructDate.Value)
+                    {
+                        DestroyBackup(key, metadata);
+                    }
                 }
             }
         }

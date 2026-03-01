@@ -246,7 +246,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
         private readonly BoundedDictionary<string, SatelliteBackup> _backups = new BoundedDictionary<string, SatelliteBackup>(1000);
         private readonly BoundedDictionary<string, SatelliteTransfer> _activeTransfers = new BoundedDictionary<string, SatelliteTransfer>(1000);
         private readonly BoundedDictionary<SatelliteProvider, SatelliteUplinkConfiguration> _providerConfigs = new BoundedDictionary<SatelliteProvider, SatelliteUplinkConfiguration>(1000);
-        private SatelliteConnectionStatus _connectionStatus = new();
+        private volatile SatelliteConnectionStatus _connectionStatus = new();
 
         /// <inheritdoc/>
         public override string StrategyId => "satellite-relay";
@@ -392,7 +392,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                     Provider = selectedProvider,
                     OriginalSize = backupData.LongLength,
                     TransmittedSize = encryptedData.LongLength,
-                    FileCount = request.Sources.Count * 50 // Simulated
+                    FileCount = request.Sources.Count // One source = one logical file unit
                 };
 
                 // Phase 4: Initialize satellite transfer
@@ -809,8 +809,18 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 
         private Task<SatelliteProvider> SelectOptimalProviderAsync(BackupRequest request, CancellationToken ct)
         {
-            // Select provider with best current connection
-            var bestProvider = _providerConfigs.Keys.FirstOrDefault();
+            if (_providerConfigs.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    "No satellite providers configured. Register at least one provider via RegisterProviderAsync before creating a backup.");
+            }
+
+            // Select provider with best signal quality (highest SignalStrengthDb), falling back to first.
+            var bestProvider = _providerConfigs
+                .OrderByDescending(kvp => kvp.Value.MinSignalStrengthDb)
+                .Select(kvp => kvp.Key)
+                .First();
+
             return Task.FromResult(bestProvider);
         }
 

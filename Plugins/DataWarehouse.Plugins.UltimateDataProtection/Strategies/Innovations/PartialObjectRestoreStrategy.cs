@@ -433,8 +433,11 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             };
 
             int objectId = 0;
+            // Materialize sources once to get O(1) index lookup (avoids O(n²) IndexOf in loop).
+            var sourceList = sources.ToList();
+            int sourceIndex = 0;
 
-            foreach (var source in sources)
+            foreach (var source in sourceList)
             {
                 ct.ThrowIfCancellationRequested();
 
@@ -463,7 +466,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                         break;
                 }
 
-                var progress = 5 + (sources.ToList().IndexOf(source) + 1) * 20.0 / sources.Count;
+                var progress = 5 + (++sourceIndex) * 20.0 / sourceList.Count;
                 progressCallback(new BackupProgress
                 {
                     BackupId = backupId,

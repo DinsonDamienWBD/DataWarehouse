@@ -677,16 +677,69 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
 
         private TrezorFeatures ParseFeatures(byte[] payload)
         {
-            // Simplified parsing - in production, use proper protobuf
+            // P2-3499: Parse the Trezor Features protobuf response using wire-format field tags.
+            // Without a generated protobuf binding, we walk the wire format manually.
+            // Field numbers (from trezor/messages-management.proto Features message):
+            //   1 = vendor (string), 2 = major_version (varint), 3 = minor_version (varint),
+            //   4 = patch_version (varint), 10 = model (string), 14 = initialized (bool),
+            //   17 = label (string).
             var features = new TrezorFeatures();
-
-            // Extract common fields from protobuf-like structure
-            var text = Encoding.UTF8.GetString(payload);
-
-            if (payload.Length > 10)
+            int pos = 0;
+            while (pos < payload.Length)
             {
-                features.Initialized = true;
-                features.Model = payload.Length > 50 ? "Model T" : "Model One";
+                // Read tag byte: field_number << 3 | wire_type
+                int tagByte = payload[pos++];
+                int wireType = tagByte & 0x07;
+                int fieldNumber = tagByte >> 3;
+
+                switch (wireType)
+                {
+                    case 0: // varint
+                    {
+                        long varint = 0;
+                        int shift = 0;
+                        while (pos < payload.Length)
+                        {
+                            byte b = payload[pos++];
+                            varint |= (long)(b & 0x7F) << shift;
+                            if ((b & 0x80) == 0) break;
+                            shift += 7;
+                        }
+                        if (fieldNumber == 2) features.MajorVersion = (int)varint;
+                        else if (fieldNumber == 3) features.MinorVersion = (int)varint;
+                        else if (fieldNumber == 4) features.PatchVersion = (int)varint;
+                        else if (fieldNumber == 14) features.Initialized = varint != 0;
+                        break;
+                    }
+                    case 2: // length-delimited (string, bytes)
+                    {
+                        int len = 0, shift = 0;
+                        while (pos < payload.Length)
+                        {
+                            byte b = payload[pos++];
+                            len |= (b & 0x7F) << shift;
+                            if ((b & 0x80) == 0) break;
+                            shift += 7;
+                        }
+                        if (pos + len > payload.Length) break; // truncated
+                        var strVal = Encoding.UTF8.GetString(payload, pos, len);
+                        if (fieldNumber == 1) features.Vendor = strVal;
+                        else if (fieldNumber == 10) features.Model = strVal;
+                        else if (fieldNumber == 17) features.Label = strVal;
+                        pos += len;
+                        break;
+                    }
+                    case 5: // 32-bit fixed
+                        pos += 4;
+                        break;
+                    case 1: // 64-bit fixed
+                        pos += 8;
+                        break;
+                    default:
+                        // Unknown wire type — stop parsing to avoid corruption
+                        pos = payload.Length;
+                        break;
+                }
             }
 
             return features;
@@ -831,6 +884,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
     /// </summary>
     public class TrezorFeatures
     {
+        public string? Vendor { get; set; }
+        public int MajorVersion { get; set; }
+        public int MinorVersion { get; set; }
+        public int PatchVersion { get; set; }
         public string? Model { get; set; }
         public string? Label { get; set; }
         public bool Initialized { get; set; }

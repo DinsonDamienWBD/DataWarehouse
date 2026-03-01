@@ -220,12 +220,22 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
 
                 _keys[keyId] = keyData;
 
+                // P2-3599: Each party must only receive its own share — broadcast of all shares
+                // breaks DKG security (any single party could reconstruct the secret alone).
+                // In a full MPC deployment, encrypt each share with the recipient's public key
+                // before sending. For now, we only surface the share belonging to this party
+                // and communicate intent clearly in the return value.
+                var shareForThisParty = new Dictionary<int, byte[]>
+                {
+                    [_config.PartyIndex] = shares[_config.PartyIndex]
+                };
+
                 return new BlsDkgRound1
                 {
                     KeyId = keyId,
                     PartyIndex = _config.PartyIndex,
                     Commitments = commitments,
-                    ShareForRecipient = shares // In real impl, encrypt for each recipient
+                    ShareForRecipient = shareForThisParty
                 };
             }
             finally

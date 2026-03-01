@@ -33,6 +33,14 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
         private readonly BoundedDictionary<string, BackupSemanticMetadata> _semanticCatalog = new BoundedDictionary<string, BackupSemanticMetadata>(1000);
         private readonly BoundedDictionary<string, QueryInterpretation> _interpretationCache = new BoundedDictionary<string, QueryInterpretation>(1000);
 
+        // Pre-compiled patterns for IsSemanticQuery — avoids per-call Regex compilation.
+        private static readonly Regex GuidHashPattern = new Regex(@"^[a-f0-9]{32}$", RegexOptions.IgnoreCase | RegexOptions.Compiled, TimeSpan.FromMilliseconds(50));
+        private static readonly Regex CommonWordsPattern = new Regex(@"\b(my|the|from|restore|get|find|recover)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled, TimeSpan.FromMilliseconds(50));
+        // Pre-compiled temporal pattern union for O(1) IsSemanticQuery checks.
+        private static readonly Regex CompiledTemporalPattern = new Regex(
+            string.Join("|", new[] { @"today", @"yesterday", @"last\s+week", @"last\s+month", @"last\s+year", @"last\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)", @"(\d{4})" }),
+            RegexOptions.IgnoreCase | RegexOptions.Compiled, TimeSpan.FromMilliseconds(50));
+
         /// <summary>
         /// Patterns for extracting temporal references from queries.
         /// </summary>
@@ -45,7 +53,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             [@"last\s+year"] = () => DateTimeOffset.UtcNow.AddYears(-1),
             [@"last\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)"] =
                 () => GetLastDayOfWeek(DateTimeOffset.UtcNow),
-            [@"(\d{4})"] = () => DateTimeOffset.MinValue // Year pattern, extracted separately
+            // Year pattern extracted separately via regex capture; use a sentinel that callers can detect.
+            // Callers that need the actual year must parse the captured group, not use this lambda.
+            [@"(\d{4})"] = () => DateTimeOffset.UnixEpoch // Sentinel: indicates year-only pattern
         };
 
         /// <summary>
@@ -262,10 +272,20 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 
             // Perform restore
             var metadata = _semanticCatalog.GetValueOrDefault(resolvedBackupId);
-            long totalBytes = metadata?.SizeBytes ?? 1024 * 1024 * 100;
-            long fileCount = metadata?.FileCount ?? 500;
+            if (metadata == null)
+            {
+                return new RestoreResult
+                {
+                    Success = false,
+                    RestoreId = restoreId,
+                    StartTime = startTime,
+                    EndTime = DateTimeOffset.UtcNow,
+                    ErrorMessage = $"Backup '{resolvedBackupId}' not found in semantic catalog. Run a backup first."
+                };
+            }
 
-            await Task.Delay(200, ct);
+            long totalBytes = metadata.SizeBytes;
+            long fileCount = metadata.FileCount;
 
             progressCallback(new RestoreProgress
             {
@@ -372,13 +392,12 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 
             // Backup IDs are typically GUIDs or structured IDs
             if (Guid.TryParse(input.Replace("-", ""), out _)) return false;
-            if (Regex.IsMatch(input, @"^[a-f0-9]{32}$", RegexOptions.IgnoreCase)) return false;
+            if (GuidHashPattern.IsMatch(input)) return false;
 
-            // Check for natural language indicators
+            // Check for natural language indicators (pre-compiled patterns for performance)
             var hasSpaces = input.Contains(' ');
-            var hasCommonWords = Regex.IsMatch(input.ToLower(), @"\b(my|the|from|restore|get|find|recover)\b");
-            var hasTemporalReference = TemporalPatterns.Keys.Any(p =>
-                Regex.IsMatch(input.ToLower(), p));
+            var hasCommonWords = CommonWordsPattern.IsMatch(input);
+            var hasTemporalReference = CompiledTemporalPattern.IsMatch(input);
 
             return hasSpaces || hasCommonWords || hasTemporalReference;
         }
@@ -816,12 +835,14 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
         }
 
         /// <summary>
-        /// Gets the date of the last occurrence of a day of week.
+        /// Gets the date of the last occurrence of a specific day of week relative to <paramref name="from"/>.
         /// </summary>
-        private static DateTimeOffset GetLastDayOfWeek(DateTimeOffset from)
+        private static DateTimeOffset GetLastDayOfWeek(DateTimeOffset from, DayOfWeek targetDay = DayOfWeek.Monday)
         {
-            // Simplified - returns last week's same day
-            return from.AddDays(-7);
+            var daysDiff = ((int)from.DayOfWeek - (int)targetDay + 7) % 7;
+            // If daysDiff == 0, today IS that day; go back a full week to get the "last" occurrence.
+            if (daysDiff == 0) daysDiff = 7;
+            return from.AddDays(-daysDiff);
         }
 
         #endregion
