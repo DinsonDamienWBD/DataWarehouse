@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
@@ -405,11 +406,12 @@ public sealed class HtmlOutputStrategy : DocGenStrategyBase
         sb.AppendLine("  </style>");
         sb.AppendLine("</head>");
         sb.AppendLine("<body>");
-        sb.AppendLine($"  <h1>{title}</h1>");
-        sb.AppendLine($"  <p class=\"meta\">Generated at {DateTime.UtcNow:u} | Theme: {theme} | Operation: {request.OperationId}</p>");
+        // P2-2902: HTML-encode all user-supplied strings before embedding in HTML to prevent XSS.
+        sb.AppendLine($"  <h1>{WebUtility.HtmlEncode(title)}</h1>");
+        sb.AppendLine($"  <p class=\"meta\">Generated at {DateTime.UtcNow:u} | Theme: {WebUtility.HtmlEncode(theme)} | Operation: {WebUtility.HtmlEncode(request.OperationId)}</p>");
         sb.AppendLine("  <nav><strong>Navigation:</strong> <a href=\"#overview\">Overview</a> <a href=\"#details\">Details</a></nav>");
         sb.AppendLine("  <h2 id=\"overview\">Overview</h2>");
-        sb.AppendLine($"  <p>Documentation for <code>{request.SourceType}</code> content.</p>");
+        sb.AppendLine($"  <p>Documentation for <code>{WebUtility.HtmlEncode(request.SourceType?.ToString() ?? string.Empty)}</code> content.</p>");
         sb.AppendLine("  <h2 id=\"details\">Details</h2>");
         sb.AppendLine("  <p><em>Content sections are populated from the source schema/API definition.</em></p>");
         sb.AppendLine("</body></html>");
@@ -488,12 +490,15 @@ public sealed class InteractiveDocStrategy : DocGenStrategyBase
         var startTime = System.Diagnostics.Stopwatch.StartNew();
         var title = request.Options.GetValueOrDefault("title")?.ToString() ?? "Interactive API Explorer";
         var apiBaseUrl = request.Options.GetValueOrDefault("apiBaseUrl")?.ToString() ?? "/api/v1";
+        // P2-2902: HTML-encode user-supplied values before embedding in HTML attributes/text.
+        var safeTitle = WebUtility.HtmlEncode(title);
+        var safeApiBaseUrl = WebUtility.HtmlEncode(apiBaseUrl);
 
         var sb = new StringBuilder();
         sb.AppendLine("<!DOCTYPE html>");
         sb.AppendLine("<html lang=\"en\">");
         sb.AppendLine("<head>");
-        sb.AppendLine($"  <meta charset=\"UTF-8\"><title>{title}</title>");
+        sb.AppendLine($"  <meta charset=\"UTF-8\"><title>{safeTitle}</title>");
         sb.AppendLine("  <style>");
         sb.AppendLine("    body { font-family: -apple-system, sans-serif; max-width: 1200px; margin: 0 auto; padding: 2rem; }");
         sb.AppendLine("    .endpoint { border: 1px solid #ddd; border-radius: 4px; margin: 1em 0; padding: 1em; }");
@@ -505,14 +510,15 @@ public sealed class InteractiveDocStrategy : DocGenStrategyBase
         sb.AppendLine("  </style>");
         sb.AppendLine("</head>");
         sb.AppendLine("<body>");
-        sb.AppendLine($"  <h1>{title}</h1>");
-        sb.AppendLine($"  <p>Base URL: <code>{apiBaseUrl}</code></p>");
+        sb.AppendLine($"  <h1>{safeTitle}</h1>");
+        sb.AppendLine($"  <p>Base URL: <code>{safeApiBaseUrl}</code></p>");
         sb.AppendLine("  <div id=\"playground\">");
         sb.AppendLine("    <h2>Try It Out</h2>");
         sb.AppendLine("    <div class=\"endpoint\">");
         sb.AppendLine("      <label><strong>Method:</strong></label>");
         sb.AppendLine("      <select id=\"method\"><option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option></select>");
-        sb.AppendLine($"      <label><strong>URL:</strong></label><input type=\"text\" id=\"url\" value=\"{apiBaseUrl}/\" style=\"width:60%\">");
+        // P2-2902: Use safeApiBaseUrl (already HTML-encoded) in attribute value to prevent XSS.
+        sb.AppendLine($"      <label><strong>URL:</strong></label><input type=\"text\" id=\"url\" value=\"{safeApiBaseUrl}/\" style=\"width:60%\">");
         sb.AppendLine("      <br><br><label><strong>Body:</strong></label><textarea id=\"body\" placeholder=\"{}\"></textarea>");
         sb.AppendLine("      <br><button onclick=\"sendRequest()\">Send Request</button>");
         sb.AppendLine("    </div>");
