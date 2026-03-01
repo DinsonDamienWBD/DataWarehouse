@@ -1375,6 +1375,7 @@ private sealed class EventStream : IDisposable
     public long LastEventId { get; set; }
     public EventStream(string streamId, string topic, string? filter);
     public bool MatchesFilter(string eventType);
+    public bool TryDequeueEvent(out string? sseMessage);
     public void QueueEvent(string sseMessage);
     public void Dispose();
 }

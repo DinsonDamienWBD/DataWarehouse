@@ -2839,6 +2839,7 @@ public sealed class GeoShardingStrategy : ShardingStrategyBase
     public IReadOnlyList<ShardInfo> GetResidencyCompliantShards(string countryCode);
     public static double CalculateDistance(GeoLocation loc1, GeoLocation loc2);
     public static GeoRegion GetRegionForCountry(string countryCode);
+    public static GeoRegion GetRegionForCountryOrDefault(string countryCode, GeoRegion defaultRegion);
 }
 ```
 
@@ -5314,7 +5315,7 @@ public sealed class ObjectFeatures
     public double BusinessValue { get; set; }
     public double UserImportanceRating { get; set; }
     public required List<AccessEvent> AccessHistory { get; init; }
-    public required List<ValueSignal> BusinessValueSignals { get; init; }
+    public required System.Collections.Concurrent.ConcurrentBag<ValueSignal> BusinessValueSignals { get; init; }
 }
 ```
 ```csharp
@@ -6088,6 +6089,7 @@ public sealed class ContentSignature
     public float[]? Embedding { get; init; }
     public long SizeBytes { get; init; }
     public DateTime CreatedAt { get; init; };
+    public HashSet<string>? ExtractedTokens { get; init; }
 }
 ```
 ```csharp
