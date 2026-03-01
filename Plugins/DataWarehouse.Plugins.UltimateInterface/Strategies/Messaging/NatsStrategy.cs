@@ -346,7 +346,11 @@ internal sealed class NatsStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
         while (pIndex < patternTokens.Length && sIndex < subjectTokens.Length)
         {
             if (patternTokens[pIndex] == ">")
-                return true; // Multi-token wildcard matches rest
+            {
+                // P2-3324: > must be the last token per NATS spec (matches one or more tokens).
+                // Returning true here is only valid when > is the final pattern token.
+                return pIndex == patternTokens.Length - 1;
+            }
 
             if (patternTokens[pIndex] != "*" && patternTokens[pIndex] != subjectTokens[sIndex])
                 return false;
@@ -354,6 +358,10 @@ internal sealed class NatsStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
             pIndex++;
             sIndex++;
         }
+
+        // Handle trailing > reached after consuming all subject tokens
+        if (pIndex < patternTokens.Length && patternTokens[pIndex] == ">")
+            return pIndex == patternTokens.Length - 1;
 
         return pIndex == patternTokens.Length && sIndex == subjectTokens.Length;
     }

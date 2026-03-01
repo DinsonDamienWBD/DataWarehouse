@@ -404,7 +404,11 @@ internal sealed class AmqpStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
         while (pIndex < patternParts.Length && kIndex < keyParts.Length)
         {
             if (patternParts[pIndex] == "#")
-                return true; // Multi-word wildcard matches rest
+            {
+                // P2-3322: # must be the last segment per AMQP spec (matches zero or more words).
+                // Returning true here is only valid when # is the final pattern token.
+                return pIndex == patternParts.Length - 1;
+            }
 
             if (patternParts[pIndex] != "*" && patternParts[pIndex] != keyParts[kIndex])
                 return false;
@@ -412,6 +416,10 @@ internal sealed class AmqpStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
             pIndex++;
             kIndex++;
         }
+
+        // Handle trailing # with remaining key parts when loop exits normally
+        if (pIndex < patternParts.Length && patternParts[pIndex] == "#")
+            return pIndex == patternParts.Length - 1;
 
         return pIndex == patternParts.Length && kIndex == keyParts.Length;
     }

@@ -333,7 +333,11 @@ internal sealed class MqttStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
         while (subIndex < subParts.Length && msgIndex < msgParts.Length)
         {
             if (subParts[subIndex] == "#")
-                return true; // Multi-level wildcard matches rest
+            {
+                // P2-3323: # must be the last segment per MQTT spec (multi-level wildcard).
+                // Return true only when # is the final subscription token.
+                return subIndex == subParts.Length - 1;
+            }
 
             if (subParts[subIndex] != "+" && subParts[subIndex] != msgParts[msgIndex])
                 return false;
@@ -341,6 +345,10 @@ internal sealed class MqttStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
             subIndex++;
             msgIndex++;
         }
+
+        // Handle trailing # reached after consuming all key parts
+        if (subIndex < subParts.Length && subParts[subIndex] == "#")
+            return subIndex == subParts.Length - 1;
 
         return subIndex == subParts.Length && msgIndex == msgParts.Length;
     }

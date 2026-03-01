@@ -132,8 +132,10 @@ public sealed class ApacheSupersetStrategy : DashboardStrategyBase
         EnsureConfigured();
         await EnsureAuthenticatedAsync(ct);
         var startTime = DateTimeOffset.UtcNow;
-        var sql = $"INSERT INTO {targetId} VALUES " + string.Join(", ", data.Select(r =>
-            "(" + string.Join(", ", r.Values.Select(v => v is string s ? $"'{s}'" : v?.ToString() ?? "NULL")) + ")"));
+        // P2-3298: Quote identifier to prevent SQL injection via caller-supplied targetId.
+        var safeTable = "\"" + targetId.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
+        var sql = $"INSERT INTO {safeTable} VALUES " + string.Join(", ", data.Select(r =>
+            "(" + string.Join(", ", r.Values.Select(v => v is string s ? $"'{s.Replace("'", "''", StringComparison.Ordinal)}'" : v?.ToString() ?? "NULL")) + ")"));
         var payload = new { database_id = int.TryParse(Config!.ProjectId, out var id) ? id : 1, sql = sql };
         var response = await SendAuthenticatedRequestAsync(HttpMethod.Post, "/api/v1/sqllab/execute/", CreateJsonContent(payload), ct);
         var duration = (DateTimeOffset.UtcNow - startTime).TotalMilliseconds;
