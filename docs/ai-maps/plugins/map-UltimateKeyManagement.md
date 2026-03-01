@@ -1096,7 +1096,7 @@ public sealed class ZeroDowntimeRotation : IDisposable
     public int MaxConcurrentReEncryption { get; set; };
     public ZeroDowntimeRotation(IKeyStoreRegistry registry, IMessageBus? messageBus = null);
     public async Task<RotationSession> InitiateRotationAsync(string keyStoreId, string currentKeyId, ISecurityContext context, RotationOptions? options = null, CancellationToken ct = default);
-    public KeyValidationResult ValidateKey(string keyStoreId, string keyId);
+    public async Task<KeyValidationResult> ValidateKeyAsync(string keyStoreId, string keyId, ISecurityContext? context = null, CancellationToken ct = default);
     public async Task<RecommendedKey> GetRecommendedKeyAsync(string keyStoreId, ISecurityContext context, CancellationToken ct = default);
     public async Task<ReEncryptionJob> StartReEncryptionAsync(string sessionId, IEnumerable<ReEncryptionItem> items, ISecurityContext context, CancellationToken ct = default);
     public async Task<RotationCompletionResult> CompleteRotationAsync(string sessionId, ISecurityContext context, bool force = false, CancellationToken ct = default);
@@ -5170,6 +5170,10 @@ public class TrezorConfig
 public class TrezorFeatures
 {
 }
+    public string? Vendor { get; set; }
+    public int MajorVersion { get; set; }
+    public int MinorVersion { get; set; }
+    public int PatchVersion { get; set; }
     public string? Model { get; set; }
     public string? Label { get; set; }
     public bool Initialized { get; set; }
@@ -7358,7 +7362,6 @@ public sealed class AkeylessStrategy : KeyStoreStrategyBase, IEnvelopeKeyStore
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     public IReadOnlyList<string> SupportedWrappingAlgorithms;;
     public bool SupportsHsmKeyGeneration;;
-    public AkeylessStrategy();
     protected override async Task InitializeStorage(CancellationToken cancellationToken);
     public override Task<string> GetCurrentKeyIdAsync();
     public override async Task<bool> HealthCheckAsync(CancellationToken cancellationToken = default);

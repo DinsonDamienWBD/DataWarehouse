@@ -108,7 +108,7 @@ public abstract class DataQualityStrategyBase : StrategyBase, IDataQualityStrate
     protected void RecordDuplicateResolved();
     protected void UpdateQualityScore(double newScore);
     protected void RecordFailure();
-    public bool IsHealthy();
+    public bool IsHealthy();;
     public IReadOnlyDictionary<string, long> GetCounters();;
 }
 ```

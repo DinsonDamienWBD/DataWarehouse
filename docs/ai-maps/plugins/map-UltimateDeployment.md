@@ -231,7 +231,7 @@ public sealed class AppRuntimeStrategy : DeploymentStrategyBase
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct);
     protected override Task<DeploymentState> ScaleCoreAsync(string deploymentId, int targetInstances, DeploymentState currentState, CancellationToken ct);;
     protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);;
-    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
+    protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);
     public void ConfigureAiWorkflow(string appId, AiWorkflowConfig config);
     public bool RemoveAiWorkflow(string appId);
     public AiWorkflowConfig? GetAiWorkflow(string appId);;

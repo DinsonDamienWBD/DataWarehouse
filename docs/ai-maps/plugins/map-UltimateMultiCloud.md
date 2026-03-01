@@ -1595,6 +1595,7 @@ public sealed class CloudProviderAdapter
     public required string Region { get; init; }
     public required ICloudStorageAbstraction Storage { get; init; }
     public required ICloudComputeAbstraction Compute { get; init; }
+    public IReadOnlyDictionary<string, string>? Credentials { get; init; }
     public Task<object?> ExecuteOperationAsync(string operation, Dictionary<string, object> parameters, CancellationToken ct);
 }
 ```

@@ -130,6 +130,7 @@ public sealed record RestoreProgress
     public double CurrentRate { get; init; }
     public TimeSpan? EstimatedTimeRemaining { get; init; }
     public string? CurrentItem { get; init; }
+    public string? Warning { get; init; }
 }
 ```
 ```csharp
@@ -547,6 +548,8 @@ public static class DataProtectionTopics
     public const string IntelligenceAnomalyResponse = $"{Prefix}.intelligence.anomaly.response";
     public const string IntelligenceRecoveryPoint = $"{Prefix}.intelligence.recovery.point";
     public const string IntelligenceRecoveryPointResponse = $"{Prefix}.intelligence.recovery.point.response";
+    public const string CrossCloudUpload = $"{Prefix}.crosscloud.upload";
+    public const string CrossCloudUploadCompleted = $"{Prefix}.crosscloud.upload.completed";
     public const string MetricsBackup = $"{Prefix}.metrics.backup";
     public const string MetricsRestore = $"{Prefix}.metrics.restore";
     public const string MetricsStorage = $"{Prefix}.metrics.storage";
@@ -4074,6 +4077,7 @@ public sealed class BlockchainAnchoredBackupStrategy : DataProtectionStrategyBas
 {
 #endregion
 }
+    public void RegisterContractAddress(BlockchainNetwork network, string contractAddress);
     public enum BlockchainNetwork;
     public override string StrategyId;;
     public override bool IsProductionReady;;
@@ -5192,7 +5196,7 @@ private sealed class PreStagedBackup
 }
     public string BackupId { get; set; };
     public DateTimeOffset PreStagedAt { get; set; }
-    public DateTimeOffset ReadyAt { get; set; }
+    public DateTimeOffset ReadyAt { get; set; };
     public long SizeBytes { get; set; }
     public long FileCount { get; set; }
     public bool IsReady { get; set; }
