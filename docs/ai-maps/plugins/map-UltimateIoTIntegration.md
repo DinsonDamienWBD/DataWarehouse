@@ -1103,8 +1103,9 @@ public sealed class EdgeCacheEntry
     public DateTimeOffset CachedAt { get; init; }
     public DateTimeOffset? ExpiresAt { get; init; }
     public Dictionary<string, string> Metadata { get; init; };
-    public bool IsDirty { get; set; }
-    public long HitCount { get; set; }
+    public bool IsDirty { get => _isDirty; set => _isDirty = value; }
+    public long HitCount;;
+    public void IncrementHitCount();;
 }
 ```
 ```csharp
@@ -3072,7 +3073,16 @@ public sealed class SensorFusionStrategy : IoTStrategyBase
 public sealed class KalmanFilter
 {
 }
-    public bool IsInitialized;;
+    public bool IsInitialized
+{
+    get
+    {
+        lock (_stateLock)
+        {
+            return _state != null;
+        }
+    }
+}
     public void Initialize(double[] initialPosition);
     public void Predict(double dt);
     public void Update(double[] measurement, double[] measurementNoise);

@@ -1132,7 +1132,9 @@ public sealed class PrefetchCache
 }
     public bool TryGet(long offset, int length, out byte[]? data);;
     public bool Contains(long offset);;
-    public void Add(long offset, byte[] data);;
+    public void Add(long offset, byte[] data);
+    public void MarkPending(long offset, int length);;
+    public bool IsPending(long offset);;
 }
 ```
 ```csharp
@@ -2087,7 +2089,7 @@ public class AdaptiveRaidStrategy : SdkRaidStrategyBase
     public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
     public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
     public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
-    public override Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
+    public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
 }
 ```
 ```csharp
