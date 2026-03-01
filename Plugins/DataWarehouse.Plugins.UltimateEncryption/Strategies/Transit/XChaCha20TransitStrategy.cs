@@ -206,7 +206,7 @@ public sealed class XChaCha20TransitStrategy : TransitEncryptionPluginBase
     }
 
     /// <inheritdoc/>
-    public override async Task<EndpointCapabilities> GetCapabilitiesAsync(CancellationToken cancellationToken = default)
+    public override Task<EndpointCapabilities> GetCapabilitiesAsync(CancellationToken cancellationToken = default)
     {
         var capabilities = new EndpointCapabilities(
             SupportedCipherPresets: new List<string>
