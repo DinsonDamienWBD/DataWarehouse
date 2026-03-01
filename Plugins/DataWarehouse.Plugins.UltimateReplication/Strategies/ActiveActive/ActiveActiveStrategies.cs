@@ -258,8 +258,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.ActiveActive
     {
         private readonly BoundedDictionary<string, ActiveNode> _nodes = new BoundedDictionary<string, ActiveNode>(1000);
         private readonly BoundedDictionary<string, (byte[] Data, EnhancedVectorClock Clock, int AckCount)> _dataStore = new BoundedDictionary<string, (byte[] Data, EnhancedVectorClock Clock, int AckCount)>(1000);
-        private int _writeQuorum = 2;
-        private int _readQuorum = 1;
+        private volatile int _writeQuorum = 2;
+        private volatile int _readQuorum = 1;
 
         /// <inheritdoc/>
         public override ReplicationCharacteristics Characteristics { get; } = new()

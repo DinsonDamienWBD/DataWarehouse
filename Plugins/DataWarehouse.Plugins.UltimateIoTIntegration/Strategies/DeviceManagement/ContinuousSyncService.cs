@@ -165,6 +165,7 @@ public class ContinuousSyncService
 {
     private readonly ContinuousSyncOptions _options;
     private readonly BoundedDictionary<string, DeviceSyncState> _syncStates = new BoundedDictionary<string, DeviceSyncState>(1000);
+    private readonly object _registerLock = new();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ContinuousSyncService"/> class.
@@ -182,15 +183,20 @@ public class ContinuousSyncService
     /// <param name="twin">Device twin to sync.</param>
     public void RegisterTwin(string deviceId, DeviceTwin twin)
     {
-        if (_syncStates.Count >= _options.MaxDevices)
-            throw new InvalidOperationException($"Maximum device limit ({_options.MaxDevices}) reached");
-
-        _syncStates[deviceId] = new DeviceSyncState
+        // Lock covers both the count check and the write to prevent concurrent
+        // RegisterTwin calls from exceeding MaxDevices (TOCTOU race).
+        lock (_registerLock)
         {
-            Twin = twin,
-            LastSyncAt = DateTimeOffset.UtcNow,
-            SyncCount = 0
-        };
+            if (_syncStates.Count >= _options.MaxDevices)
+                throw new InvalidOperationException($"Maximum device limit ({_options.MaxDevices}) reached");
+
+            _syncStates[deviceId] = new DeviceSyncState
+            {
+                Twin = twin,
+                LastSyncAt = DateTimeOffset.UtcNow,
+                SyncCount = 0
+            };
+        }
     }
 
     /// <summary>

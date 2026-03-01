@@ -117,7 +117,8 @@ public sealed class OpenTelemetryStrategy : ObservabilityStrategyBase
                                 name = s.OperationName,
                                 kind = (int)s.Kind + 1,
                                 startTimeUnixNano = ToUnixTimeNanoseconds(s.StartTime).ToString(),
-                                endTimeUnixNano = (ToUnixTimeNanoseconds(s.StartTime) + (long)s.Duration.TotalMilliseconds * 1_000_000).ToString(),
+                                // P2-4670: use Ticks * 100L for nanosecond precision; TotalMilliseconds truncates sub-ms.
+                                endTimeUnixNano = (ToUnixTimeNanoseconds(s.StartTime) + s.Duration.Ticks * 100L).ToString(),
                                 attributes = s.Attributes?.Select(a => new { key = a.Key, value = new { stringValue = a.Value?.ToString() ?? "" } }).ToArray(),
                                 status = new { code = s.Status == SpanStatus.Error ? 2 : 1 },
                                 events = s.Events?.Select(e => new
@@ -200,7 +201,9 @@ public sealed class OpenTelemetryStrategy : ObservabilityStrategyBase
 
     private static long ToUnixTimeNanoseconds(DateTimeOffset timestamp)
     {
-        return timestamp.ToUnixTimeMilliseconds() * 1_000_000;
+        // P2-4670: use Ticks for sub-millisecond precision (1 tick = 100 ns).
+        // UnixEpoch ticks = 621_355_968_000_000_000; remaining ticks * 100 = nanoseconds.
+        return (timestamp.UtcTicks - DateTimeOffset.UnixEpoch.UtcTicks) * 100L;
     }
 
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken ct)

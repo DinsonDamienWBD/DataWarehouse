@@ -382,18 +382,37 @@ public sealed class ReplicationScalingManager : IScalableSubsystem, IDisposable
 
         var paths = await _walStore.ListAsync("dw://replication/wal/", ct).ConfigureAwait(false);
         int purged = 0;
-        var cutoff = DateTimeOffset.UtcNow - _walRetention;
+        var retentionCutoff = DateTimeOffset.UtcNow - _walRetention;
 
         foreach (var path in paths)
         {
             var seqStr = path.Split('/').LastOrDefault() ?? "0";
             if (!long.TryParse(seqStr, out var seq)) continue;
 
-            // Only purge if acknowledged by all replicas and past retention
+            // Case 1: Entry is acknowledged by all replicas — safe to purge immediately.
+            // Case 2: Entry is past the retention window regardless of acknowledgment — purge
+            //         to prevent unbounded growth when a lagging replica stalls indefinitely.
+            //         Read the entry to check its timestamp only in the non-ack path.
             if (seq <= minOffset)
             {
                 await _walStore.DeleteAsync(path, ct).ConfigureAwait(false);
                 purged++;
+            }
+            else
+            {
+                // Deserialize to check timestamp for retention-based eviction
+                try
+                {
+                    var data = await _walStore.ReadAsync(path, ct).ConfigureAwait(false);
+                    if (data == null) continue;
+                    var entry = DeserializeWalEntry(data);
+                    if (entry != null && entry.Timestamp < retentionCutoff)
+                    {
+                        await _walStore.DeleteAsync(path, ct).ConfigureAwait(false);
+                        purged++;
+                    }
+                }
+                catch { /* Best-effort: skip unreadable entries */ }
             }
         }
 

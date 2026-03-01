@@ -101,6 +101,9 @@ public sealed class PrometheusStrategy : ObservabilityStrategyBase
         await PushMetricsAsync(metricsText.ToString(), cancellationToken);
     }
 
+    // P2-4633: Cap histogram observation list to prevent unbounded memory growth.
+    private const int MaxHistogramObservations = 10_000;
+
     private void RecordHistogram(string metricName, string labelString, double value, StringBuilder metricsText)
     {
         var bucketKey = $"{metricName}{labelString}";
@@ -108,6 +111,8 @@ public sealed class PrometheusStrategy : ObservabilityStrategyBase
 
         lock (buckets)
         {
+            if (buckets.Count >= MaxHistogramObservations)
+                buckets.RemoveAt(0); // drop oldest to keep bounded
             buckets.Add(value);
         }
 

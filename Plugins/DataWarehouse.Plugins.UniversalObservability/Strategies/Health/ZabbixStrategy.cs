@@ -136,7 +136,10 @@ public sealed class ZabbixStrategy : ObservabilityStrategyBase
 
         if (!string.IsNullOrEmpty(severity))
         {
-            @params["severities"] = new[] { int.Parse(severity) };
+            // P2-4606: guard against non-numeric severity strings — FormatException on bare int.Parse.
+            if (!int.TryParse(severity, out var severityInt))
+                throw new ArgumentException($"Invalid severity value '{severity}': must be a numeric Zabbix severity level (0-5).", nameof(severity));
+            @params["severities"] = new[] { severityInt };
         }
 
         var request = new

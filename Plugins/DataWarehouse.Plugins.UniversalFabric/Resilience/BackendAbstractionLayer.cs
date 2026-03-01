@@ -329,14 +329,17 @@ public class BackendAbstractionLayer : IStorageStrategy
     /// timeout, an <see cref="OperationCanceledException"/> is thrown.
     /// </summary>
     private static async Task<T> ExecuteWithTimeoutAsync<T>(
-        Func<Task<T>> operation, TimeSpan timeout, CancellationToken ct)
+        Func<CancellationToken, Task<T>> operation, TimeSpan timeout, CancellationToken ct)
     {
+        // P2-4544: link timeout token into a combined CTS and pass it to the operation so
+        // inner async I/O (network, disk) actually cancels when the deadline fires.
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeoutCts.CancelAfter(timeout);
+        var linkedToken = timeoutCts.Token;
 
         try
         {
-            return await operation();
+            return await operation(linkedToken);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
@@ -345,6 +348,11 @@ public class BackendAbstractionLayer : IStorageStrategy
                 $"Operation timed out after {timeout.TotalSeconds:F1}s");
         }
     }
+
+    // Backward-compatible overload for callers that capture the token in a closure.
+    private static Task<T> ExecuteWithTimeoutAsync<T>(
+        Func<Task<T>> operation, TimeSpan timeout, CancellationToken ct)
+        => ExecuteWithTimeoutAsync<T>(_ => operation(), timeout, ct);
 
     #endregion
 }

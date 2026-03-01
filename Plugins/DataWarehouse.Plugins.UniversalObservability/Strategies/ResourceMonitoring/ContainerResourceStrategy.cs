@@ -126,10 +126,12 @@ public sealed class ContainerResourceStrategy : ObservabilityStrategyBase
 
             if (File.Exists(cpuQuotaPath) && File.Exists(cpuPeriodPath))
             {
-                var quota = long.Parse(await File.ReadAllTextAsync(cpuQuotaPath, ct));
-                var period = long.Parse(await File.ReadAllTextAsync(cpuPeriodPath, ct));
-
-                if (quota > 0 && period > 0)
+                // P2-4675: cgroup files may include trailing whitespace/newlines or "-1" (unlimited).
+                // Use TryParse with Trim() to avoid FormatException.
+                var quotaStr = (await File.ReadAllTextAsync(cpuQuotaPath, ct)).Trim();
+                var periodStr = (await File.ReadAllTextAsync(cpuPeriodPath, ct)).Trim();
+                if (long.TryParse(quotaStr, out var quota) && long.TryParse(periodStr, out var period)
+                    && quota > 0 && period > 0)
                 {
                     limits.CpuLimitCores = (double)quota / period;
                 }
@@ -189,8 +191,10 @@ public sealed class ContainerResourceStrategy : ObservabilityStrategyBase
             var cpuUsagePath = Path.Combine(_cgroupPath, "cpu", "cpuacct.usage");
             if (File.Exists(cpuUsagePath))
             {
-                var usageNs = long.Parse(await File.ReadAllTextAsync(cpuUsagePath, ct));
-                metrics.Add(MetricValue.Counter("container.cpu.usage_nanoseconds", usageNs));
+                // P2-4675: Trim before parse to handle trailing newlines from cgroup virtual files.
+                var raw = (await File.ReadAllTextAsync(cpuUsagePath, ct)).Trim();
+                if (long.TryParse(raw, out var usageNs))
+                    metrics.Add(MetricValue.Counter("container.cpu.usage_nanoseconds", usageNs));
             }
 
             var cpuStatPath = Path.Combine(_cgroupPath, "cpu", "cpu.stat");
@@ -242,8 +246,10 @@ public sealed class ContainerResourceStrategy : ObservabilityStrategyBase
             var memUsagePath = Path.Combine(_cgroupPath, "memory", "memory.usage_in_bytes");
             if (File.Exists(memUsagePath))
             {
-                var usage = long.Parse(await File.ReadAllTextAsync(memUsagePath, ct));
-                metrics.Add(MetricValue.Gauge("container.memory.usage_bytes", usage));
+                // P2-4675: Trim before parse.
+                var raw = (await File.ReadAllTextAsync(memUsagePath, ct)).Trim();
+                if (long.TryParse(raw, out var usage))
+                    metrics.Add(MetricValue.Gauge("container.memory.usage_bytes", usage));
             }
 
             var memLimitPath = Path.Combine(_cgroupPath, "memory", "memory.limit_in_bytes");
@@ -257,9 +263,12 @@ public sealed class ContainerResourceStrategy : ObservabilityStrategyBase
                     var usagePath = Path.Combine(_cgroupPath, "memory", "memory.usage_in_bytes");
                     if (File.Exists(usagePath))
                     {
-                        var usage = long.Parse(await File.ReadAllTextAsync(usagePath, ct));
-                        var utilization = (double)usage / limit * 100;
-                        metrics.Add(MetricValue.Gauge("container.memory.utilization_percent", utilization));
+                        var rawUsage = (await File.ReadAllTextAsync(usagePath, ct)).Trim();
+                        if (long.TryParse(rawUsage, out var usage))
+                        {
+                            var utilization = (double)usage / limit * 100;
+                            metrics.Add(MetricValue.Gauge("container.memory.utilization_percent", utilization));
+                        }
                     }
                 }
             }
@@ -295,8 +304,9 @@ public sealed class ContainerResourceStrategy : ObservabilityStrategyBase
             var memCurrentPath = Path.Combine(_cgroupPath, "memory.current");
             if (File.Exists(memCurrentPath))
             {
-                var usage = long.Parse(await File.ReadAllTextAsync(memCurrentPath, ct));
-                metrics.Add(MetricValue.Gauge("container.memory.usage_bytes", usage));
+                var rawCurrent = (await File.ReadAllTextAsync(memCurrentPath, ct)).Trim();
+                if (long.TryParse(rawCurrent, out var usage))
+                    metrics.Add(MetricValue.Gauge("container.memory.usage_bytes", usage));
             }
 
             var memMaxPath = Path.Combine(_cgroupPath, "memory.max");

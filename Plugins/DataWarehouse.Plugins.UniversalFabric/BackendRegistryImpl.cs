@@ -30,7 +30,8 @@ public sealed class BackendRegistryImpl : IBackendRegistry
         ArgumentNullException.ThrowIfNull(strategy);
         ArgumentNullException.ThrowIfNullOrEmpty(descriptor.BackendId);
 
-        var added = !_backends.ContainsKey(descriptor.BackendId);
+        // P2-4545: Remove TOCTOU ContainsKey+set. The ConcurrentDictionary indexer is atomic
+        // for upsert; fire BackendChanged unconditionally (register or update).
         _backends[descriptor.BackendId] = (descriptor, strategy);
 
         BackendChanged?.Invoke(descriptor, true);

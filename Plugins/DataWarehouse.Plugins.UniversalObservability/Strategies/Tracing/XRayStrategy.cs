@@ -49,8 +49,10 @@ public sealed class XRayStrategy : ObservabilityStrategyBase
                 ["name"] = span.OperationName,
                 ["id"] = span.SpanId.Length >= 16 ? span.SpanId[..16] : span.SpanId.PadLeft(16, '0'),
                 ["trace_id"] = FormatXRayTraceId(span.TraceId, span.StartTime),
-                ["start_time"] = span.StartTime.ToUnixTimeSeconds() + (span.StartTime.Millisecond / 1000.0),
-                ["end_time"] = span.StartTime.Add(span.Duration).ToUnixTimeSeconds() + ((span.StartTime.Millisecond + span.Duration.Milliseconds) / 1000.0),
+                // P2-4669: .Millisecond / .Duration.Milliseconds are 0-999 components — use
+                // ToUnixTimeMilliseconds() / 1000.0 to get sub-second precision across boundaries.
+                ["start_time"] = span.StartTime.ToUnixTimeMilliseconds() / 1000.0,
+                ["end_time"] = span.StartTime.Add(span.Duration).ToUnixTimeMilliseconds() / 1000.0,
                 ["service"] = new { version = "1.0" },
                 ["origin"] = "AWS::EC2::Instance"
             };

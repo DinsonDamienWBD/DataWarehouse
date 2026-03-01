@@ -118,13 +118,16 @@ public sealed class InfluxDbStrategy : ObservabilityStrategyBase
     /// <returns>Query results as CSV.</returns>
     public async Task<string> QueryAsync(string fluxQuery, CancellationToken ct = default)
     {
-        var content = new StringContent(fluxQuery, Encoding.UTF8, "application/vnd.flux");
+        // P2-4641: Do NOT mutate _httpClient.DefaultRequestHeaders.Accept — that is shared state
+        // and causes race conditions when QueryAsync is called concurrently. Use a per-request
+        // HttpRequestMessage so Accept is scoped to this call only.
         var url = $"{_url}/api/v2/query?org={Uri.EscapeDataString(_org)}";
+        var content = new StringContent(fluxQuery, Encoding.UTF8, "application/vnd.flux");
 
-        _httpClient.DefaultRequestHeaders.Accept.Clear();
-        _httpClient.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/csv"));
+        using var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = content };
+        request.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/csv"));
 
-        using var response = await _httpClient.PostAsync(url, content, ct);
+        using var response = await _httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
 
         return await response.Content.ReadAsStringAsync(ct);
