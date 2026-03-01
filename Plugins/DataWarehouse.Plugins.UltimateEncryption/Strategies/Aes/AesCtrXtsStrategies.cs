@@ -67,7 +67,7 @@ public sealed class AesCtrStrategy : EncryptionStrategyBase
     {
         // Split key: first half for encryption, second half for HMAC
         var encKey = key.AsSpan(0, KeySize).ToArray();
-        var macKey = SHA256.HashData(key);
+        var macKey = HKDF.DeriveKey(System.Security.Cryptography.HashAlgorithmName.SHA256, key, 32, salt: null, info: "hmac-key"u8);
 
         var nonce = GenerateIv();
         var ciphertext = new byte[plaintext.Length];
@@ -140,7 +140,7 @@ public sealed class AesCtrStrategy : EncryptionStrategyBase
         CancellationToken cancellationToken)
     {
         var encKey = key.AsSpan(0, KeySize).ToArray();
-        var macKey = SHA256.HashData(key);
+        var macKey = HKDF.DeriveKey(System.Security.Cryptography.HashAlgorithmName.SHA256, key, 32, salt: null, info: "hmac-key"u8);
 
         var (nonce, encryptedData, tag) = SplitCiphertext(ciphertext);
 

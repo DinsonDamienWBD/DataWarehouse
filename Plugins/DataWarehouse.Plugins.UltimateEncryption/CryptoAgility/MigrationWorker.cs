@@ -63,7 +63,11 @@ public sealed class MigrationWorker : IDisposable
     private long _successCount;
     private long _failureCount;
     private long _totalProcessed;
+    private volatile string? _lastFailureMessage;
     private bool _disposed;
+
+    /// <summary>Gets the last per-object migration failure message, or null if no failures.</summary>
+    public string? LastFailureMessage => _lastFailureMessage;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MigrationWorker"/> class.
@@ -263,10 +267,12 @@ public sealed class MigrationWorker : IDisposable
                     Interlocked.Increment(ref _successCount);
                     _plan.ObjectsMigrated = Interlocked.Read(ref _successCount);
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
                     Interlocked.Increment(ref _failureCount);
                     _plan.ObjectsFailed = Interlocked.Read(ref _failureCount);
+                    // Surface failure reason — visible via LastFailureMessage and plan metadata
+                    _lastFailureMessage = $"[{ex.GetType().Name}] {ex.Message}";
                 }
                 finally
                 {

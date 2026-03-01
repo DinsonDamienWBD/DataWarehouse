@@ -66,7 +66,7 @@ public sealed class Aes256CbcStrategy : EncryptionStrategyBase
     {
         // Split key: first half for encryption, second half for HMAC
         var encKey = key.AsSpan(0, KeySize).ToArray();
-        var macKey = SHA256.HashData(key);
+        var macKey = HKDF.DeriveKey(System.Security.Cryptography.HashAlgorithmName.SHA256, key, 32, salt: null, info: "hmac-key"u8);
 
         var iv = GenerateIv();
         byte[] ciphertext;
@@ -114,7 +114,7 @@ public sealed class Aes256CbcStrategy : EncryptionStrategyBase
         CancellationToken cancellationToken)
     {
         var encKey = key.AsSpan(0, KeySize).ToArray();
-        var macKey = SHA256.HashData(key);
+        var macKey = HKDF.DeriveKey(System.Security.Cryptography.HashAlgorithmName.SHA256, key, 32, salt: null, info: "hmac-key"u8);
 
         var (iv, encryptedData, tag) = SplitCiphertext(ciphertext);
 
@@ -199,7 +199,7 @@ public sealed class Aes128CbcStrategy : EncryptionStrategyBase
     /// <inheritdoc/>
     protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken ct)
     {
-        var macKey = SHA256.HashData(key);
+        var macKey = HKDF.DeriveKey(System.Security.Cryptography.HashAlgorithmName.SHA256, key, 32, salt: null, info: "hmac-key"u8);
         var iv = GenerateIv();
         byte[] ciphertext;
 
@@ -227,7 +227,7 @@ public sealed class Aes128CbcStrategy : EncryptionStrategyBase
     /// <inheritdoc/>
     protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken ct)
     {
-        var macKey = SHA256.HashData(key);
+        var macKey = HKDF.DeriveKey(System.Security.Cryptography.HashAlgorithmName.SHA256, key, 32, salt: null, info: "hmac-key"u8);
         var (iv, encryptedData, tag) = SplitCiphertext(ciphertext);
 
         var dataToMac = new byte[iv.Length + encryptedData.Length];

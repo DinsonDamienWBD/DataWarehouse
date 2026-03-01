@@ -604,21 +604,26 @@ public sealed class EndpointCapabilitiesDetector : IEndpointCapabilitiesDetector
 
     /// <summary>
     /// Detects AES-NI hardware acceleration support.
+    /// Uses the .NET intrinsics API which directly reflects CPUID AES leaf — unlike
+    /// constructing AesGcm which always succeeds (even with software AES fallback).
     /// </summary>
     private static bool DetectAesNi()
     {
-        // On .NET, we can check if AES hardware acceleration is available
-        // This is a simplified check - production code would use CPUID on x86/x64
-        try
+        // x86/x64: use Intel AES-NI intrinsics flag
+        if (RuntimeInformation.ProcessArchitecture == Architecture.X64 ||
+            RuntimeInformation.ProcessArchitecture == Architecture.X86)
         {
-            // If we can create an AesGcm instance, hardware support is likely available
-            using var aes = new AesGcm(new byte[32], 16);
-            return true;
+            return System.Runtime.Intrinsics.X86.Aes.IsSupported;
         }
-        catch
+
+        // ARM: use ARM AES crypto extension flag
+        if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64 ||
+            RuntimeInformation.ProcessArchitecture == Architecture.Arm)
         {
-            return false;
+            return System.Runtime.Intrinsics.Arm.Aes.IsSupported;
         }
+
+        return false;
     }
 }
 

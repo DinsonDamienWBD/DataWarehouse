@@ -384,11 +384,16 @@ public sealed class SeedStrategy : EncryptionStrategyBase
 
         cipher.Init(true, parameters);
 
-        // Add PKCS7 padding
-        var paddedLength = ((plaintext.Length / 16) + 1) * 16;
+        // PKCS7 padding: always add 1-16 bytes (add a full block when block-aligned,
+        // not an extra block on top).  Previous formula always added a block even for
+        // block-aligned inputs, wasting 16 bytes on every aligned encrypt.
+        var blockSize = 16;
+        var padBytes = blockSize - (plaintext.Length % blockSize);
+        // PKCS7: if already aligned, add a full padding block (pad = 16)
+        var paddedLength = plaintext.Length + padBytes;
         var paddedPlaintext = new byte[paddedLength];
         Buffer.BlockCopy(plaintext, 0, paddedPlaintext, 0, plaintext.Length);
-        var paddingValue = (byte)(paddedLength - plaintext.Length);
+        var paddingValue = (byte)padBytes;
         for (int i = plaintext.Length; i < paddedLength; i++)
             paddedPlaintext[i] = paddingValue;
 
@@ -399,7 +404,7 @@ public sealed class SeedStrategy : EncryptionStrategyBase
         }
 
         // Compute HMAC
-        var macKey = SHA256.HashData(key);
+        var macKey = HKDF.DeriveKey(System.Security.Cryptography.HashAlgorithmName.SHA256, key, 32, salt: null, info: "hmac-key"u8);
         var dataToMac = new byte[iv.Length + ciphertext.Length];
         Buffer.BlockCopy(iv, 0, dataToMac, 0, iv.Length);
         Buffer.BlockCopy(ciphertext, 0, dataToMac, iv.Length, ciphertext.Length);
@@ -418,7 +423,7 @@ public sealed class SeedStrategy : EncryptionStrategyBase
         var (iv, encryptedData, tag) = SplitCiphertext(ciphertext);
 
         // Verify HMAC
-        var macKey = SHA256.HashData(key);
+        var macKey = HKDF.DeriveKey(System.Security.Cryptography.HashAlgorithmName.SHA256, key, 32, salt: null, info: "hmac-key"u8);
         var dataToMac = new byte[iv.Length + encryptedData.Length];
         Buffer.BlockCopy(iv, 0, dataToMac, 0, iv.Length);
         Buffer.BlockCopy(encryptedData, 0, dataToMac, iv.Length, encryptedData.Length);
@@ -592,7 +597,7 @@ public sealed class MagmaStrategy : EncryptionStrategyBase
         }
 
         // Compute HMAC
-        var macKey = SHA256.HashData(key);
+        var macKey = HKDF.DeriveKey(System.Security.Cryptography.HashAlgorithmName.SHA256, key, 32, salt: null, info: "hmac-key"u8);
         var dataToMac = new byte[nonce.Length + ciphertext.Length];
         Buffer.BlockCopy(nonce, 0, dataToMac, 0, nonce.Length);
         Buffer.BlockCopy(ciphertext, 0, dataToMac, nonce.Length, ciphertext.Length);
@@ -611,7 +616,7 @@ public sealed class MagmaStrategy : EncryptionStrategyBase
         var (nonce, encryptedData, tag) = SplitCiphertext(ciphertext);
 
         // Verify HMAC
-        var macKey = SHA256.HashData(key);
+        var macKey = HKDF.DeriveKey(System.Security.Cryptography.HashAlgorithmName.SHA256, key, 32, salt: null, info: "hmac-key"u8);
         var dataToMac = new byte[nonce.Length + encryptedData.Length];
         Buffer.BlockCopy(nonce, 0, dataToMac, 0, nonce.Length);
         Buffer.BlockCopy(encryptedData, 0, dataToMac, nonce.Length, encryptedData.Length);

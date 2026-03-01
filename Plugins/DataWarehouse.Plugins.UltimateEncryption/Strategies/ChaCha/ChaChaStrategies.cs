@@ -268,7 +268,7 @@ public sealed class ChaCha20Strategy : EncryptionStrategyBase
         CancellationToken cancellationToken)
     {
         var nonce = GenerateIv();
-        var macKey = SHA256.HashData(key);
+        var macKey = HKDF.DeriveKey(System.Security.Cryptography.HashAlgorithmName.SHA256, key, 32, salt: null, info: "hmac-key"u8);
 
         // Encrypt with ChaCha20-Poly1305. The Poly1305 tag IS used as the authentication tag
         // stored in the output envelope so that decrypt can verify it directly (#2941).
@@ -316,7 +316,7 @@ public sealed class ChaCha20Strategy : EncryptionStrategyBase
         byte[]? associatedData,
         CancellationToken cancellationToken)
     {
-        var macKey = SHA256.HashData(key);
+        var macKey = HKDF.DeriveKey(System.Security.Cryptography.HashAlgorithmName.SHA256, key, 32, salt: null, info: "hmac-key"u8);
         var (nonce, encryptedData, combinedTag) = SplitCiphertext(ciphertext);
 
         if (combinedTag == null || combinedTag.Length < 48)

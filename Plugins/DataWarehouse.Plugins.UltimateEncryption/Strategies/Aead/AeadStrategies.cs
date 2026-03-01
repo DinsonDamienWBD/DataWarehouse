@@ -31,7 +31,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Aead;
 /// </summary>
 public sealed class AsconStrategy : EncryptionStrategyBase
 {
-    private readonly SecureRandom _secureRandom;
     private const int KeySize = 16; // 128 bits
     private const int NonceSize = 16; // 128 bits
     private const int TagSize = 16; // 128 bits
@@ -93,7 +92,6 @@ public sealed class AsconStrategy : EncryptionStrategyBase
     /// </summary>
     public AsconStrategy()
     {
-        _secureRandom = new SecureRandom();
     }
 
     /// <inheritdoc/>
@@ -200,7 +198,6 @@ public sealed class AsconStrategy : EncryptionStrategyBase
 /// </summary>
 public sealed class Aegis128LStrategy : EncryptionStrategyBase
 {
-    private readonly SecureRandom _secureRandom;
     private const int KeySize = 16; // 128 bits
     private const int NonceSize = 16; // 128 bits
     private const int TagSize = 16; // 128 bits
@@ -243,7 +240,6 @@ public sealed class Aegis128LStrategy : EncryptionStrategyBase
     /// </summary>
     public Aegis128LStrategy()
     {
-        _secureRandom = new SecureRandom();
     }
 
     /// <inheritdoc/>
@@ -298,7 +294,6 @@ public sealed class Aegis128LStrategy : EncryptionStrategyBase
 /// </summary>
 public sealed class Aegis256Strategy : EncryptionStrategyBase
 {
-    private readonly SecureRandom _secureRandom;
     private const int KeySize = 32; // 256 bits
     private const int NonceSize = 32; // 256 bits
     private const int TagSize = 16; // 128 bits
@@ -341,7 +336,6 @@ public sealed class Aegis256Strategy : EncryptionStrategyBase
     /// </summary>
     public Aegis256Strategy()
     {
-        _secureRandom = new SecureRandom();
     }
 
     /// <inheritdoc/>

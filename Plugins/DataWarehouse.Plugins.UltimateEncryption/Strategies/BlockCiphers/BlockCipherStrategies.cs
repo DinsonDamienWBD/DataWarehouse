@@ -68,7 +68,7 @@ public sealed class SerpentStrategy : EncryptionStrategyBase
     {
         var nonce = GenerateIv();
         var encKey = key.AsSpan(0, 32).ToArray();
-        var macKey = SHA256.HashData(key);
+        var macKey = HKDF.DeriveKey(System.Security.Cryptography.HashAlgorithmName.SHA256, key, 32, salt: null, info: "hmac-key"u8);
 
         var ciphertext = new byte[plaintext.Length];
         var subkeys = GenerateSerpentSubkeys(encKey);
@@ -105,7 +105,7 @@ public sealed class SerpentStrategy : EncryptionStrategyBase
     {
         var (nonce, encryptedData, tag) = SplitCiphertext(ciphertext);
         var encKey = key.AsSpan(0, 32).ToArray();
-        var macKey = SHA256.HashData(key);
+        var macKey = HKDF.DeriveKey(System.Security.Cryptography.HashAlgorithmName.SHA256, key, 32, salt: null, info: "hmac-key"u8);
 
         // Verify HMAC
         var dataToMac = new byte[nonce.Length + encryptedData.Length];
@@ -430,7 +430,7 @@ public sealed class TwofishStrategy : EncryptionStrategyBase
     {
         var nonce = GenerateIv();
         var encKey = key.AsSpan(0, 32).ToArray();
-        var macKey = SHA256.HashData(key);
+        var macKey = HKDF.DeriveKey(System.Security.Cryptography.HashAlgorithmName.SHA256, key, 32, salt: null, info: "hmac-key"u8);
 
         var ctx = InitializeContext(encKey);
 
@@ -466,7 +466,7 @@ public sealed class TwofishStrategy : EncryptionStrategyBase
     {
         var (nonce, encryptedData, tag) = SplitCiphertext(ciphertext);
         var encKey = key.AsSpan(0, 32).ToArray();
-        var macKey = SHA256.HashData(key);
+        var macKey = HKDF.DeriveKey(System.Security.Cryptography.HashAlgorithmName.SHA256, key, 32, salt: null, info: "hmac-key"u8);
 
         var dataToMac = new byte[nonce.Length + encryptedData.Length];
         Array.Copy(nonce, dataToMac, nonce.Length);

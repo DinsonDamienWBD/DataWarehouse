@@ -63,11 +63,12 @@ public sealed class TlsBridgeTransitStrategy : TransitEncryptionPluginBase
         {
             metadata["TlsVersion"] = TlsStream.SslProtocol.ToString();
             var cipherSuite = TlsStream.NegotiatedCipherSuite;
+            var (cipherAlg, hashAlg, kexAlg) = ParseCipherSuiteComponents(cipherSuite.ToString());
             metadata["CipherSuite"] = cipherSuite.ToString();
-            metadata["CipherAlgorithm"] = cipherSuite.ToString();
+            metadata["CipherAlgorithm"] = cipherAlg;
             metadata["CipherStrength"] = 256; // Modern cipher suites use 256-bit keys
-            metadata["HashAlgorithm"] = cipherSuite.ToString();
-            metadata["KeyExchangeAlgorithm"] = cipherSuite.ToString();
+            metadata["HashAlgorithm"] = hashAlg;
+            metadata["KeyExchangeAlgorithm"] = kexAlg;
 
             if (TlsStream.RemoteCertificate != null)
             {

@@ -95,7 +95,7 @@ public sealed class EncryptionScalingManager : IScalableSubsystem, IDisposable
 
     // Concurrency control for key migration operations
     private SemaphoreSlim _migrationSemaphore;
-    private ScalingLimits _currentLimits;
+    private volatile ScalingLimits _currentLimits;
     // Protects atomic semaphore swap in ReconfigureLimitsAsync
     private readonly SemaphoreSlim _reconfigLock = new(1, 1);
 
@@ -299,7 +299,7 @@ public sealed class EncryptionScalingManager : IScalableSubsystem, IDisposable
         {
             aesNi = System.Runtime.Intrinsics.X86.Aes.IsSupported;
             avx2 = System.Runtime.Intrinsics.X86.Avx2.IsSupported;
-            sha = System.Runtime.Intrinsics.X86.X86Base.IsSupported; // SHA as proxy for modern CPU
+            sha = System.Runtime.Intrinsics.X86.Sha.IsSupported; // Intel SHA extensions (SHA-NI)
         }
 
         // ARM detection
