@@ -53,7 +53,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
             SupportsVersioning = true,
             SupportsPerKeyAcl = true,
             SupportsAuditLogging = true,
-            MaxKeySizeBytes = 0,
+            // Nitrokey HSMs support AES-256 (32B), RSA-4096 (512B), ECC-521 (66B).
+            // Set to a generous upper bound; consumers validating against this should use > 0 check.
+            MaxKeySizeBytes = 512, // RSA-4096 private key bytes (max supported key size)
             MinKeySizeBytes = 16,
             Metadata = new Dictionary<string, object>
             {

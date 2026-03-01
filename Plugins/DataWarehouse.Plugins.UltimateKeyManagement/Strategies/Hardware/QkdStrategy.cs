@@ -232,7 +232,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                 Interlocked.Add(ref _totalBitsGenerated, siftedBits.Count * 8);
 
                 // Simulate QBER (introduce small error rate)
-                var simulatedQber = 0.02 + (new Random().NextDouble() * 0.03); // 2-5% QBER
+                var simulatedQber = 0.02 + (Random.Shared.NextDouble() * 0.03); // 2-5% QBER
                 var errorBits = (int)(siftedBits.Count * 8 * simulatedQber);
                 Interlocked.Add(ref _totalErrors, errorBits);
 

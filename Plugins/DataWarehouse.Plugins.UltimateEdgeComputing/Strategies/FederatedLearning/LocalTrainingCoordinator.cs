@@ -96,38 +96,40 @@ public sealed class LocalTrainingCoordinator
     }
 
     /// <summary>
-    /// Computes gradients using numerical approximation.
+    /// Computes analytic MSE gradients for a linear model (y = w·x + b).
+    /// Gradient is O(W×B) — one forward pass per sample, no weight perturbations.
+    /// dL/dw_i = (2/n) * Σ (ŷ_j - y_j) * x_ji
+    /// dL/db   = (2/n) * Σ (ŷ_j - y_j)
     /// </summary>
     private Dictionary<string, double[]> ComputeGradients(
         Dictionary<string, double[]> weights,
         double[][] batchData,
         double[][] batchLabels)
     {
+        int n = batchData.Length;
         var gradients = new Dictionary<string, double[]>();
-
         foreach (var layer in weights.Keys)
-        {
             gradients[layer] = new double[weights[layer].Length];
 
-            for (int i = 0; i < weights[layer].Length; i++)
-            {
-                // Compute gradient via finite difference
-                var originalWeight = weights[layer][i];
+        if (!weights.ContainsKey("weights") || !weights.ContainsKey("bias"))
+            return gradients;
 
-                // Perturb weight positively
-                weights[layer][i] = originalWeight + GradientEpsilon;
-                var lossPlus = ComputeLoss(weights, batchData, batchLabels);
+        var w = weights["weights"];
+        var scale = 2.0 / Math.Max(1, n);
 
-                // Perturb weight negatively
-                weights[layer][i] = originalWeight - GradientEpsilon;
-                var lossMinus = ComputeLoss(weights, batchData, batchLabels);
+        for (int j = 0; j < n; j++)
+        {
+            var prediction = ForwardPass(weights, batchData[j]);
+            var label = batchLabels[j][0];
+            var residual = prediction - label;  // (ŷ - y)
 
-                // Restore original weight
-                weights[layer][i] = originalWeight;
+            // Gradient w.r.t. weights
+            var wGrad = gradients["weights"];
+            for (int i = 0; i < Math.Min(batchData[j].Length, w.Length); i++)
+                wGrad[i] += scale * residual * batchData[j][i];
 
-                // Gradient is the slope
-                gradients[layer][i] = (lossPlus - lossMinus) / (2 * GradientEpsilon);
-            }
+            // Gradient w.r.t. bias
+            gradients["bias"][0] += scale * residual;
         }
 
         return gradients;

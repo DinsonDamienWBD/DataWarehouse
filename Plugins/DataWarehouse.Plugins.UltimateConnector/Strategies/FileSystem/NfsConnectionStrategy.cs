@@ -21,9 +21,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':');
-            var host = parts[0];
-            var port = parts.Length > 1 && int.TryParse(parts[1], out var p2049) ? p2049 : 2049;
+            // P2-2132: Use ParseHostPortSafe to correctly handle IPv6 addresses like [::1]:2049
+            var (host, port) = ParseHostPortSafe(config.ConnectionString ?? throw new ArgumentException("Connection string required"), 2049);
             var client = new TcpClient();
             await client.ConnectAsync(host, port, ct);
             return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "NFS", ["host"] = host, ["port"] = port });

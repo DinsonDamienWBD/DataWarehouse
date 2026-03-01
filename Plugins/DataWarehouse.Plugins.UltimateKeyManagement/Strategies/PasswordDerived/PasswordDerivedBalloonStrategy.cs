@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using DataWarehouse.SDK.Security;
 using Org.BouncyCastle.Crypto.Digests;
 using System.Security.Cryptography;
@@ -340,13 +341,14 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.PasswordDerived
                     buffer[m] = HashWithCounter(ref counter, prev, buffer[m]);
 
                     // Step 2b: Hash delta pseudo-random blocks
+                    // Use a pre-allocated 12-byte buffer for INTS_TO_BLOCK to avoid ~3 allocations per iteration.
+                    var idxInput = new byte[12];
                     for (int i = 0; i < delta; i++)
                     {
-                        // idx_block = INTS_TO_BLOCK(t, m, i)
-                        var idxInput = BitConverter.GetBytes(t)
-                            .Concat(BitConverter.GetBytes(m))
-                            .Concat(BitConverter.GetBytes(i))
-                            .ToArray();
+                        // idx_block = INTS_TO_BLOCK(t, m, i) — written in-place to avoid per-call allocations.
+                        BinaryPrimitives.WriteInt32LittleEndian(idxInput.AsSpan(0, 4), t);
+                        BinaryPrimitives.WriteInt32LittleEndian(idxInput.AsSpan(4, 4), m);
+                        BinaryPrimitives.WriteInt32LittleEndian(idxInput.AsSpan(8, 4), i);
 
                         // other = INT(H(counter++ || salt || idx_block)) mod sCost
                         var otherHash = HashWithCounter(ref counter, salt, idxInput);

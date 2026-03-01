@@ -31,7 +31,21 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
     /// </summary>
     public sealed class DigitalOceanVaultStrategy : KeyStoreStrategyBase
     {
-        private readonly HttpClient _httpClient;
+        // P2-3450: Shared static HttpClient to prevent socket exhaustion
+        private static readonly HttpClient _httpClient = CreateHttpClient();
+        private static HttpClient CreateHttpClient()
+        {
+            var client = new HttpClient(new SocketsHttpHandler
+            {
+                PooledConnectionLifetime = TimeSpan.FromMinutes(15),
+                PooledConnectionIdleTimeout = TimeSpan.FromMinutes(5)
+            })
+            {
+                Timeout = TimeSpan.FromSeconds(30)
+            };
+            client.DefaultRequestHeaders.Add("User-Agent", "DataWarehouse-UltimateKeyManagement/1.0");
+            return client;
+        }
         private DigitalOceanVaultConfig _config = new();
         private string? _currentKeyId;
         // #3433: Replace plain Dictionary with ConcurrentDictionary for thread safety
@@ -75,9 +89,6 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
         public DigitalOceanVaultStrategy()
         {
-            _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
-            _httpClient.DefaultRequestHeaders.Remove("User-Agent");
-            _httpClient.DefaultRequestHeaders.Add("User-Agent", "DataWarehouse-UltimateKeyManagement/1.0");
         }
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
@@ -425,7 +436,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
         public override void Dispose()
         {
-            _httpClient?.Dispose();
+            // _httpClient is shared (static) — not disposed here to prevent breaking other callers.
             CryptographicOperations.ZeroMemory(_masterSecret);
             CryptographicOperations.ZeroMemory(_masterSalt);
             foreach (var key in _keyCache.Values)

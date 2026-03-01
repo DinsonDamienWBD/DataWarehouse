@@ -360,10 +360,13 @@ internal sealed class MultiPathParallelStrategy : DataTransitStrategyBase
 
         try
         {
+            // P2-2680: Use Interlocked counter rather than O(n) Count(predicate) for resume.
+            // Seed the counter from actual segment state on resume (one-time O(n) scan).
+            var completedSegments = transferState.Segments.Count(s => s.Completed);
+            Interlocked.Exchange(ref transferState.CompletedSegmentCount, completedSegments);
             var previouslyTransferred = transferState.Segments
                 .Where(s => s.Completed)
                 .Sum(s => s.Size);
-            var completedSegments = transferState.Segments.Count(s => s.Completed);
             var totalSegments = transferState.Segments.Count;
 
             progress?.Report(new TransitProgress
@@ -739,7 +742,8 @@ internal sealed class MultiPathParallelStrategy : DataTransitStrategyBase
 
                 Interlocked.Add(ref state.BytesTransferred, segment.Size);
 
-                var completed = state.Segments.Count(s => s.Completed);
+                // P2-2680: Use pre-incremented atomic counter instead of O(n) Count(predicate).
+                var completed = Interlocked.Increment(ref state.CompletedSegmentCount);
                 var pct = totalSegments > 0 ? (double)completed / totalSegments * 100.0 : 0;
 
                 progress?.Report(new TransitProgress
@@ -1251,6 +1255,12 @@ internal sealed class MultiPathParallelStrategy : DataTransitStrategyBase
         /// Updated via <see cref="Interlocked.Add(ref long, long)"/>.
         /// </summary>
         public long BytesTransferred;
+
+        /// <summary>
+        /// P2-2680: Thread-safe counter for completed segments.
+        /// Updated via <see cref="Interlocked.Increment(ref int)"/> to avoid O(n) Count(predicate) per completion.
+        /// </summary>
+        public int CompletedSegmentCount;
 
         /// <summary>
         /// The original transfer request, stored for resume operations.

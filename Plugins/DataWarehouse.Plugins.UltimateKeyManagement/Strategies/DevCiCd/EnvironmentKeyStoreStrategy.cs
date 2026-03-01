@@ -142,12 +142,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
             _generatedKeys[keyId] = keyData;
             _currentKeyId = keyId;
 
-            // Optionally, we could suggest setting the environment variable
+            // Emit hint without exposing key material. The actual key value must never be logged.
             var envVarName = GetEnvironmentVariableName(keyId);
-            var keyBase64 = Convert.ToBase64String(keyData);
-
             System.Diagnostics.Trace.TraceInformation(
-                $"Key '{keyId}' generated. To persist, set environment variable: {envVarName}={keyBase64}");
+                $"Key '{keyId}' generated ({keyData.Length} bytes). To persist, set environment variable: {envVarName}=<base64-encoded-key>");
 
             return Task.CompletedTask;
         }

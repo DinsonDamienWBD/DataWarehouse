@@ -22,9 +22,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
         public MqttConnectionStrategy(ILogger? logger = null) : base(logger) { }
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':');
-            var host = parts[0];
-            var port = parts.Length > 1 && int.TryParse(parts[1], out var p1883) ? p1883 : 1883;
+            // P2-2132: Use ParseHostPortSafe to correctly handle IPv6 addresses like [::1]:1883
+            var (host, port) = ParseHostPortSafe(config.ConnectionString ?? throw new ArgumentException("Connection string required"), 1883);
             var tcpClient = new TcpClient();
             await tcpClient.ConnectAsync(host, port, ct);
             var stream = tcpClient.GetStream();

@@ -440,7 +440,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
                 {
                     // Extract the key value
                     var valueAttr = _session.GetAttributeValue(unwrappedKeyHandle, new List<CKA> { CKA.CKA_VALUE });
-                    IncrementCounter("hsm.sign");
+                    IncrementCounter("hsm.unwrap");
                     return valueAttr[0].GetValueAsByteArray();
                 }
                 finally

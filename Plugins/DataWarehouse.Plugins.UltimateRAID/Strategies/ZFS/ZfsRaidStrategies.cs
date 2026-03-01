@@ -29,7 +29,6 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ZFS
                 throw new ArgumentException("RAID-Z1 requires at least 2 data disks", nameof(stripeWidth));
 
             _defaultStripeWidth = stripeWidth;
-            _checksumCache = new Dictionary<string, byte[]>();
         }
 
         public override RaidLevel Level => RaidLevel.RaidZ1;
@@ -89,10 +88,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ZFS
 
             // Calculate checksum for data integrity (ZFS-style)
             var checksum = CalculateZfsChecksum(data);
-            lock (_checksumLock)
-            {
-                _checksumCache[$"{offset}"] = checksum;
-            }
+            _checksumCache[$"{offset}"] = checksum;
 
             // Distribute data across data disks
             var dataChunks = DistributeData(data, stripe);
@@ -271,14 +267,11 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ZFS
 
         private bool VerifyZfsChecksum(byte[] data, long offset)
         {
-            lock (_checksumLock)
-            {
                 if (!_checksumCache.TryGetValue($"{offset}", out var expectedChecksum))
                     return true; // No checksum stored
 
                 var actualChecksum = CalculateZfsChecksum(data);
                 return expectedChecksum.SequenceEqual(actualChecksum);
-            }
         }
 
         private async Task<ReadOnlyMemory<byte>> SelfHealAndRead(
@@ -464,7 +457,6 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ZFS
                 throw new ArgumentException("RAID-Z2 requires at least 2 data disks", nameof(stripeWidth));
 
             _defaultStripeWidth = stripeWidth;
-            _checksumCache = new Dictionary<string, byte[]>();
         }
 
         public override RaidLevel Level => RaidLevel.RaidZ2;
@@ -537,10 +529,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ZFS
             var stripe = CalculateStripe(blockIndex, diskList.Count);
 
             var checksum = CalculateZfsChecksum(data);
-            lock (_checksumLock)
-            {
-                _checksumCache[$"{offset}"] = checksum;
-            }
+            _checksumCache[$"{offset}"] = checksum;
 
             var dataChunks = DistributeData(data, stripe);
 
@@ -853,7 +842,6 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ZFS
                 throw new ArgumentException("RAID-Z3 requires at least 2 data disks", nameof(stripeWidth));
 
             _defaultStripeWidth = stripeWidth;
-            _checksumCache = new Dictionary<string, byte[]>();
         }
 
         public override RaidLevel Level => RaidLevel.RaidZ3;
@@ -916,10 +904,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ZFS
             var stripe = CalculateStripe(blockIndex, diskList.Count);
 
             var checksum = CalculateZfsChecksum(data);
-            lock (_checksumLock)
-            {
-                _checksumCache[$"{offset}"] = checksum;
-            }
+            _checksumCache[$"{offset}"] = checksum;
 
             var dataChunks = DistributeData(data, stripe);
 

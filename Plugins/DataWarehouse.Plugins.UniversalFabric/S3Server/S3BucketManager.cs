@@ -122,10 +122,14 @@ public sealed class S3BucketManager
             throw new ArgumentException($"Bucket '{name}' does not exist.", nameof(name));
         }
 
+        // LOW-4554: ObjectCount is maintained by callers via UpdateBucketStats. It MUST be kept
+        // authoritative — do not call DeleteBucket before all objects are removed and stats are
+        // flushed. Callers that bypass UpdateBucketStats will see a stale count here.
         if (bucket.ObjectCount > 0)
         {
             throw new InvalidOperationException(
-                $"Cannot delete bucket '{name}': bucket is not empty ({bucket.ObjectCount} objects remaining).");
+                $"Cannot delete bucket '{name}': bucket is not empty ({bucket.ObjectCount} objects remaining). " +
+                "Ensure all objects are deleted and stats are updated before deleting the bucket.");
         }
 
         _buckets.TryRemove(name, out _);

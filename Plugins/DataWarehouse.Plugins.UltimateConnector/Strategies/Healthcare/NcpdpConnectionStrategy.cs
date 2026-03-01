@@ -20,9 +20,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Healthcare
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':');
+            // P2-2132: Use ParseHostPortSafe to correctly handle IPv6 addresses like [::1]:5555
+            var (host, port) = ParseHostPortSafe(config.ConnectionString ?? throw new ArgumentException("Connection string required"), 5555);
             var client = new TcpClient();
-            await client.ConnectAsync(parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p5555) ? p5555 : 5555, ct);
+            await client.ConnectAsync(host, port, ct);
             return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "NCPDP/TCP" });
         }
 

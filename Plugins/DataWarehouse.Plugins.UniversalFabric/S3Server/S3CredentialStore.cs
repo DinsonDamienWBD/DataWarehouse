@@ -72,6 +72,13 @@ public sealed class S3CredentialStore
     /// <returns>The newly created credentials.</returns>
     public S3Credentials CreateCredentials(string? userId = null, IReadOnlySet<string>? allowedBuckets = null, bool isAdmin = false)
     {
+        // P2-4547: Reject empty userId — callers should pass null when there is no user, not an empty string.
+        if (userId != null && string.IsNullOrWhiteSpace(userId))
+            throw new ArgumentException("userId must not be empty or whitespace. Pass null to omit.", nameof(userId));
+        // P2-4547: Reject allowedBuckets with empty entries — they can never match a real bucket name.
+        if (allowedBuckets != null && allowedBuckets.Any(string.IsNullOrWhiteSpace))
+            throw new ArgumentException("allowedBuckets must not contain null, empty, or whitespace entries.", nameof(allowedBuckets));
+
         var accessKeyId = GenerateRandomBase62(AccessKeyLength);
         var secretAccessKey = GenerateRandomBase62(SecretKeyLength);
 

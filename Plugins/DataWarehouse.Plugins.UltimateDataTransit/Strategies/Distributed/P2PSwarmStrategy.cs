@@ -551,10 +551,19 @@ internal sealed class P2PSwarmStrategy : DataTransitStrategyBase
     {
         try
         {
-            // Sort pieces by rarity (fewest peers having the piece first)
+            // P2-2681: Pre-compute per-piece peer counts in a single O(N×M) pass,
+            // then sort O(P log P) once. Avoids O(N×M) per-piece count on every sort.
+            var peerCounts = new int[state.Pieces.Length];
+            foreach (var peer in state.Peers.Values)
+            {
+                var bitmap = peer.PieceBitmap;
+                var limit = Math.Min(bitmap.Length, peerCounts.Length);
+                for (int i = 0; i < limit; i++)
+                    if (bitmap[i]) peerCounts[i]++;
+            }
             var piecesByRarity = Enumerable.Range(0, state.Pieces.Length)
                 .Where(i => !state.Pieces[i].Downloaded)
-                .OrderBy(i => state.Peers.Values.Count(p => p.PieceBitmap.Length > i && p.PieceBitmap[i]))
+                .OrderBy(i => peerCounts[i])
                 .ToList();
 
             foreach (var pieceIndex in piecesByRarity)

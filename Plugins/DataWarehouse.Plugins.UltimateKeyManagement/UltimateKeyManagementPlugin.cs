@@ -660,10 +660,6 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
 
         public override Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
         {
-            if (request.Context != null)
-            {
-            }
-
             if (request.Config != null && request.Config.TryGetValue("MessageBus", out var messageBusObj) && messageBusObj is IMessageBus messageBus)
             {
                 SetMessageBus(messageBus);

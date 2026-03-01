@@ -102,9 +102,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
         /// <inheritdoc/>
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':');
-            var host = parts[0];
-            var port = parts.Length > 1 && int.TryParse(parts[1], out var p5683) ? p5683 : 5683;
+            // P2-2132: Use ParseHostPortSafe to correctly handle IPv6 addresses like [::1]:5683
+            var (host, port) = ParseHostPortSafe(config.ConnectionString ?? throw new ArgumentException("Connection string required"), 5683);
 
             // NET-05: Load security configuration
             _useDtls = GetConfiguration(config, "UseDtls", true);

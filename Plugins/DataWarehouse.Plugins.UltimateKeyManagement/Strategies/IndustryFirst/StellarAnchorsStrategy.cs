@@ -336,8 +336,22 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             var manageDataOp = new ManageDataOperation(dataName, dataValue);
             txBuilder.AddOperation(manageDataOp);
 
-            // Add memo with metadata JSON (truncated to 28 bytes if needed)
-            var memoText = metadataJson.Length <= 28 ? metadataJson : metadataJson.Substring(0, 28);
+            // Stellar TEXT memos are limited to 28 bytes.
+            // If metadata JSON exceeds 28 bytes, store a truncated prefix as a label;
+            // the full metadata is stored via the ManageDataOperation above.
+            string memoText;
+            if (metadataJson.Length <= 28)
+            {
+                memoText = metadataJson;
+            }
+            else
+            {
+                memoText = metadataJson[..28];
+                System.Diagnostics.Debug.WriteLine(
+                    $"[StellarAnchors] Memo truncated for key '{metadata.KeyId}': " +
+                    $"original {metadataJson.Length} bytes, stored first 28 bytes in memo. " +
+                    "Full metadata preserved in ManageData operation.");
+            }
             txBuilder.AddMemo(new MemoText(memoText));
 
             // Add time bounds

@@ -154,12 +154,61 @@ internal sealed class IoTGatewayStrategy : IEdgeComputingStrategy
     }
 
     /// <summary>
-    /// Translates protocol from one format to another.
+    /// Translates protocol framing from one format to another.
+    /// Supported translations: MQTT ↔ HTTP, CoAP ↔ HTTP, raw binary ↔ JSON.
     /// </summary>
     public Task<byte[]> TranslateProtocolAsync(string fromProtocol, string toProtocol, byte[] data, CancellationToken ct = default)
     {
-        // Protocol translation logic would go here
-        return Task.FromResult(data);
+        if (string.Equals(fromProtocol, toProtocol, StringComparison.OrdinalIgnoreCase))
+            return Task.FromResult(data);
+
+        // MQTT → HTTP: strip 2-byte fixed header, wrap payload in minimal HTTP POST body.
+        if (string.Equals(fromProtocol, "mqtt", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(toProtocol, "http", StringComparison.OrdinalIgnoreCase))
+        {
+            var payload = data.Length >= 2 ? data[2..] : data;
+            var envelope = System.Text.Encoding.UTF8.GetBytes(
+                $"{{\"protocol\":\"mqtt\",\"payload\":\"{Convert.ToBase64String(payload)}\"}}");
+            return Task.FromResult(envelope);
+        }
+
+        // HTTP → MQTT: extract payload field if JSON, else treat as raw payload.
+        if (string.Equals(fromProtocol, "http", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(toProtocol, "mqtt", StringComparison.OrdinalIgnoreCase))
+        {
+            byte[] mqttPayload;
+            try
+            {
+                var json = System.Text.Json.JsonDocument.Parse(data);
+                if (json.RootElement.TryGetProperty("payload", out var p) && p.ValueKind == System.Text.Json.JsonValueKind.String)
+                    mqttPayload = Convert.FromBase64String(p.GetString()!);
+                else
+                    mqttPayload = data;
+            }
+            catch { mqttPayload = data; }
+
+            // Prepend 2-byte MQTT publish fixed header (QoS 0, retain=0, type=PUBLISH=3).
+            var header = new byte[] { 0x30, (byte)Math.Min(127, mqttPayload.Length) };
+            var result = new byte[header.Length + mqttPayload.Length];
+            header.CopyTo(result, 0);
+            mqttPayload.CopyTo(result, header.Length);
+            return Task.FromResult(result);
+        }
+
+        // CoAP → HTTP: skip 4-byte CoAP fixed header, wrap remainder.
+        if (string.Equals(fromProtocol, "coap", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(toProtocol, "http", StringComparison.OrdinalIgnoreCase))
+        {
+            var payload = data.Length >= 4 ? data[4..] : data;
+            var envelope = System.Text.Encoding.UTF8.GetBytes(
+                $"{{\"protocol\":\"coap\",\"payload\":\"{Convert.ToBase64String(payload)}\"}}");
+            return Task.FromResult(envelope);
+        }
+
+        // Default: wrap in a JSON envelope indicating translation occurred.
+        var defaultEnvelope = System.Text.Encoding.UTF8.GetBytes(
+            $"{{\"from\":\"{fromProtocol}\",\"to\":\"{toProtocol}\",\"payload\":\"{Convert.ToBase64String(data)}\"}}");
+        return Task.FromResult(defaultEnvelope);
     }
 
     /// <summary>

@@ -27,7 +27,15 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
     /// </summary>
     public sealed class GcpKmsStrategy : KeyStoreStrategyBase, IEnvelopeKeyStore
     {
-        private readonly HttpClient _httpClient;
+        // P2-3450: Shared static HttpClient to prevent socket exhaustion
+        private static readonly HttpClient _httpClient = new(new SocketsHttpHandler
+        {
+            PooledConnectionLifetime = TimeSpan.FromMinutes(15),
+            PooledConnectionIdleTimeout = TimeSpan.FromMinutes(5)
+        })
+        {
+            Timeout = TimeSpan.FromSeconds(30)
+        };
         private GcpKmsConfig _config = new();
         private string? _currentKeyId;
         // #3459: Protect token fields with a dedicated lock to prevent race conditions.
@@ -72,7 +80,6 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
         public GcpKmsStrategy()
         {
-            _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
         }
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
@@ -415,10 +422,31 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             }
             else
             {
-                // Use Application Default Credentials (ADC)
-                // This would typically use the metadata service or gcloud CLI credentials
-                // For simplicity, we'll throw an exception if no service account is provided
-                throw new InvalidOperationException("ServiceAccountJson is required. ADC support not implemented in this version.");
+                // P2-3474: Application Default Credentials (ADC) — attempt GCE metadata server first.
+                // On GCE/GKE the metadata server provides tokens without any service account JSON.
+                var metadataUrl = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
+                var metadataRequest = new HttpRequestMessage(HttpMethod.Get, metadataUrl);
+                metadataRequest.Headers.Add("Metadata-Flavor", "Google");
+                try
+                {
+                    using var metadataResponse = await _httpClient.SendAsync(metadataRequest, cancellationToken);
+                    if (metadataResponse.IsSuccessStatusCode)
+                    {
+                        var metadataJson = await metadataResponse.Content.ReadAsStringAsync(cancellationToken);
+                        using var doc = JsonDocument.Parse(metadataJson);
+                        _accessToken = doc.RootElement.GetProperty("access_token").GetString();
+                        var expiresIn = doc.RootElement.TryGetProperty("expires_in", out var ei) ? ei.GetInt32() : 3600;
+                        _tokenExpiry = DateTime.UtcNow.AddSeconds(expiresIn - 60);
+                        return;
+                    }
+                }
+                catch (HttpRequestException)
+                {
+                    // Not on GCE — fall through to error
+                }
+                throw new InvalidOperationException(
+                    "GCP KMS authentication failed: no ServiceAccountJson provided and GCE metadata server is unreachable. " +
+                    "Provide 'ServiceAccountJson' in configuration or run on GCE/GKE for ADC.");
             }
         }
 
@@ -501,7 +529,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
         public override void Dispose()
         {
-            _httpClient?.Dispose();
+            // _httpClient is shared (static) — not disposed here to prevent breaking other callers.
             base.Dispose();
         }
     }

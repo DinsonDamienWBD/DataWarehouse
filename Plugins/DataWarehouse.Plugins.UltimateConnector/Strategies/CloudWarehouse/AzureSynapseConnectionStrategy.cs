@@ -47,6 +47,6 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
             => throw new NotSupportedException("Azure Synapse DML execution requires Microsoft.Data.SqlClient NuGet package with a valid SQL connection string including user/password or AAD token.");
         public override Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
             => throw new NotSupportedException("Azure Synapse schema discovery requires Microsoft.Data.SqlClient NuGet package.");
-        private (string host, int port) ParseHostPort(string connectionString, int defaultPort) { var parts = connectionString.Split(':'); return (parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : defaultPort); }
+        // P2-2132: ParseHostPort replaced by base class ParseHostPortSafe to correctly handle IPv6.
     }
 }
