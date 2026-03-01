@@ -131,8 +131,25 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
 
             var json = await response.Content.ReadAsStringAsync();
             var result = JsonSerializer.Deserialize<JsonElement>(json);
-            var keyBase64 = result.GetProperty(secretPath).GetString();
-            return Convert.FromBase64String(keyBase64!);
+            // P2-3575: Validate keyBase64 before calling FromBase64String.
+            // Unexpected API response formats (null, missing property, non-Base64)
+            // produce unhandled exceptions that expose no useful context.
+            if (!result.TryGetProperty(secretPath, out var secretProp))
+                throw new InvalidOperationException(
+                    $"[AkeylessStrategy] Response does not contain property '{secretPath}' for key '{keyId}'.");
+            var keyBase64 = secretProp.GetString();
+            if (string.IsNullOrWhiteSpace(keyBase64))
+                throw new InvalidOperationException(
+                    $"[AkeylessStrategy] Key '{keyId}' returned null or empty Base64 value from Akeyless.");
+            try
+            {
+                return Convert.FromBase64String(keyBase64);
+            }
+            catch (FormatException ex)
+            {
+                throw new InvalidOperationException(
+                    $"[AkeylessStrategy] Key '{keyId}' value is not valid Base64 (length={keyBase64.Length}).", ex);
+            }
         }
 
         protected override async Task SaveKeyToStorage(string keyId, byte[] keyData, ISecurityContext context)

@@ -750,7 +750,14 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
                 using var reader = new BinaryReader(ms);
 
                 // Parse ephemeral public key
+                // P2-3576: Bound-check ephemeralLen before allocating to prevent a large
+                // wire value from causing a huge heap allocation / OOM attack.
+                const int MaxEphemeralKeyBytes = 256; // 2048-bit EC point upper bound
                 var ephemeralLen = reader.ReadInt32();
+                if (ephemeralLen <= 0 || ephemeralLen > MaxEphemeralKeyBytes)
+                    throw new InvalidOperationException(
+                        $"[SmpcVaultStrategy.UnwrapKeyAsync] Invalid ephemeralLen {ephemeralLen}; " +
+                        $"expected 1-{MaxEphemeralKeyBytes} bytes.");
                 var ephemeralBytes = reader.ReadBytes(ephemeralLen);
                 var ephemeralPublic = DomainParams.Curve.DecodePoint(ephemeralBytes);
 

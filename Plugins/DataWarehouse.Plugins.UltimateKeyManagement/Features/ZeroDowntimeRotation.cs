@@ -123,7 +123,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
         /// Checks if a key is valid during a rotation session.
         /// Both current and new keys are valid during the dual-key period.
         /// </summary>
-        public KeyValidationResult ValidateKey(string keyStoreId, string keyId)
+        public async Task<KeyValidationResult> ValidateKeyAsync(string keyStoreId, string keyId,
+            ISecurityContext? context = null, CancellationToken ct = default)
         {
             var result = new KeyValidationResult
             {
@@ -162,11 +163,25 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
                 }
             }
 
-            // No active rotation - key is valid if it exists in the store
+            // P2-3447: Verify the keyId actually exists in the store, not just that the
+            // store itself is present. Any keyId was previously "valid" as long as the store
+            // existed, allowing callers to use non-existent keys without error.
             var keyStore = _registry.GetKeyStore(keyStoreId);
-            result.IsValid = keyStore != null;
-            result.IsCurrentKey = result.IsValid;
-            result.RecommendedAction = result.IsValid ? "Key is valid for use." : "Key store not found.";
+            if (keyStore == null)
+            {
+                result.IsValid = false;
+                result.IsCurrentKey = false;
+                result.RecommendedAction = "Key store not found.";
+            }
+            else
+            {
+                var metadata = await keyStore.GetKeyMetadataAsync(keyId, context).ConfigureAwait(false);
+                result.IsValid = metadata != null;
+                result.IsCurrentKey = result.IsValid;
+                result.RecommendedAction = result.IsValid
+                    ? "Key is valid for use."
+                    : $"Key '{keyId}' not found in store '{keyStoreId}'.";
+            }
 
             return result;
         }
@@ -263,20 +278,31 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
             // Process items with semaphore for concurrency control
             using var semaphore = new SemaphoreSlim(MaxConcurrentReEncryption);
 
-            var tasks = itemList.Select(async item =>
+            ReEncryptionResult[] results;
+            try
             {
-                await semaphore.WaitAsync(ct);
-                try
+                var tasks = itemList.Select(async item =>
                 {
-                    return await ReEncryptItemAsync(item, oldKey, newKey, ct);
-                }
-                finally
-                {
-                    semaphore.Release();
-                }
-            });
+                    await semaphore.WaitAsync(ct);
+                    try
+                    {
+                        return await ReEncryptItemAsync(item, oldKey, newKey, ct);
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
+                });
 
-            var results = await Task.WhenAll(tasks);
+                results = await Task.WhenAll(tasks);
+            }
+            finally
+            {
+                // P2-3445: Zero key material from memory after re-encryption to minimize
+                // the window during which plaintext key bytes reside in heap memory.
+                System.Security.Cryptography.CryptographicOperations.ZeroMemory(oldKey);
+                System.Security.Cryptography.CryptographicOperations.ZeroMemory(newKey);
+            }
 
             // Update job status
             job.ProcessedItems = results.Length;

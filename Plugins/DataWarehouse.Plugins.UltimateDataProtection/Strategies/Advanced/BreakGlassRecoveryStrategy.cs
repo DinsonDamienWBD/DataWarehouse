@@ -26,6 +26,8 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
         private readonly BoundedDictionary<string, EmergencyBackup> _emergencyBackups = new BoundedDictionary<string, EmergencyBackup>(1000);
         private readonly BoundedDictionary<string, BreakGlassSession> _activeSessions = new BoundedDictionary<string, BreakGlassSession>(1000);
         private readonly BoundedDictionary<string, EmergencyAccessToken> _activeTokens = new BoundedDictionary<string, EmergencyAccessToken>(1000);
+        private readonly BoundedDictionary<string, List<KeyShare>> _keyShareStore = new BoundedDictionary<string, List<KeyShare>>(1000);
+        private readonly object _keyShareLock = new();
         private readonly List<AuditLogEntry> _auditLog = new();
         private readonly object _auditLock = new();
 
@@ -239,7 +241,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
                     await AuditLogAsync(
                         request.BackupId,
                         "EMERGENCY_ACCESS_DENIED",
-                        $"Invalid token: {token[..8]}...",
+                        $"Invalid token: {(token.Length >= 8 ? token[..8] : token)}...",
                         ct);
 
                     return new RestoreResult
@@ -740,7 +742,15 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 
         private Task StoreKeySharesAsync(string backupId, List<KeyShare> shares, CancellationToken ct)
         {
-            // In production, distribute shares to secure storage/personnel
+            // Store key shares in the in-memory secure store keyed by backupId.
+            // In a production deployment these would be distributed to separate custodians/HSMs;
+            // here they are held in a bounded in-memory dictionary so CountAvailableKeySharesAsync
+            // returns a real count and reconstruction can use the stored shares.
+            ct.ThrowIfCancellationRequested();
+            lock (_keyShareLock)
+            {
+                _keyShareStore[backupId] = shares.ToList();
+            }
             return Task.CompletedTask;
         }
 
@@ -803,8 +813,12 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 
         private Task<int> CountAvailableKeySharesAsync(string backupId, CancellationToken ct)
         {
-            // In production, check availability of key shares
-            return Task.FromResult(5);
+            ct.ThrowIfCancellationRequested();
+            lock (_keyShareLock)
+            {
+                return Task.FromResult(
+                    _keyShareStore.TryGetValue(backupId, out var shares) ? shares.Count : 0);
+            }
         }
 
         private Task<bool> VerifyBackupDataIntegrityAsync(string backupId, CancellationToken ct)

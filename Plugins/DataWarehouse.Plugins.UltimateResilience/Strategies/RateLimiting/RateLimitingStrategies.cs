@@ -685,10 +685,15 @@ public sealed class AdaptiveRateLimitingStrategy : ResilienceStrategyBase
         lock (_lock)
         {
             AdaptLimit();
+
+            // Prune stale window entries before checking count to avoid false positives
+            // under sustained load where AdaptLimit() intervals haven't fired yet
+            var now2 = DateTimeOffset.UtcNow;
+            var cutoff2 = now2 - _historyWindow;
+            while (_history.TryPeek(out var stale) && stale.timestamp < cutoff2)
+                _history.TryDequeue(out _);
         }
 
-        // Simple token bucket implementation with adaptive limit
-        // In production, this would be more sophisticated
         if (_history.Count >= _currentLimit)
         {
             return new ResilienceResult<T>

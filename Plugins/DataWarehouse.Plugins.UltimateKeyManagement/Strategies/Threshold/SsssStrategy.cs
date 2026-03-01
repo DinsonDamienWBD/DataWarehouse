@@ -415,9 +415,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
                     throw new InvalidOperationException("Guardian not found for this key.");
 
                 // Verify share hash
+                // P2-3603: Reject shares whose hash was never recorded (ShareHash == null).
+                // FixedTimeEquals on two empty arrays returns true, which would allow any
+                // share value to pass the check for legacy/uninitialised shares.
+                if (share.ShareHash == null || share.ShareHash.Length == 0)
+                    throw new CryptographicException("Share has no recorded hash; cannot verify integrity.");
                 var providedHash = SHA256.HashData(shareValue);
-                var expectedHash = share.ShareHash ?? Array.Empty<byte>();
-                if (!(providedHash.Length == expectedHash.Length && CryptographicOperations.FixedTimeEquals(providedHash, expectedHash)))
+                if (!CryptographicOperations.FixedTimeEquals(providedHash, share.ShareHash))
                     throw new CryptographicException("Invalid share provided.");
 
                 // Verify identity if required

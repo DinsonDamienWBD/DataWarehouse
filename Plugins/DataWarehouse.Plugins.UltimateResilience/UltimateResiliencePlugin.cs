@@ -252,9 +252,34 @@ public sealed class UltimateResiliencePlugin : ResiliencePluginBase, IDisposable
 
     private Task HandleExecuteAsync(PluginMessage message)
     {
-        // This would be implemented with actual operation execution
+        // resilience.execute validates the requested strategy and records the invocation.
+        // Actual operation execution is performed by the caller using the strategy returned
+        // here; the operation Func<CancellationToken,Task<T>> cannot be passed over the bus.
+        if (!message.Payload.TryGetValue("strategyId", out var sidObj) || sidObj is not string strategyId)
+        {
+            message.Payload["success"] = false;
+            message.Payload["error"] = "Missing required parameter 'strategyId'";
+            return Task.CompletedTask;
+        }
+
+        var strategy = _registry.Get(strategyId);
+        if (strategy == null)
+        {
+            message.Payload["success"] = false;
+            message.Payload["error"] = $"Strategy '{strategyId}' not found. Call resilience.list-strategies to enumerate available strategies.";
+            return Task.CompletedTask;
+        }
+
+        Interlocked.Increment(ref _totalExecutions);
+        _usageStats.AddOrUpdate(strategyId, 1, (_, v) => v + 1);
+
+        var stats = strategy.GetStatistics();
         message.Payload["success"] = true;
-        message.Payload["message"] = "Operation executed with resilience protection";
+        message.Payload["strategyId"] = strategyId;
+        message.Payload["strategyName"] = strategy.StrategyName;
+        message.Payload["category"] = strategy.Category;
+        message.Payload["currentState"] = stats.CurrentState ?? "Active";
+        message.Payload["totalExecutions"] = stats.TotalExecutions;
         return Task.CompletedTask;
     }
 

@@ -292,10 +292,23 @@ internal sealed class QuantumSafeApiStrategy : SdkInterface.InterfaceStrategyBas
 
         await MessageBus.PublishAndWaitAsync("encryption.encrypt", message, cancellationToken);
 
-        var encrypted = (byte[])message.Payload["result"];
-        var generatedKey = message.Payload.ContainsKey("generatedKey")
-            ? (byte[])message.Payload["generatedKey"]
-            : null;
+        // P2-3369: Guard against null/type-mismatch on the bus response payload before casting.
+        if (!message.Payload.TryGetValue("result", out var rawResult) || rawResult == null)
+            return (502, new { error = "Encryption service returned no result" });
+        byte[] encrypted;
+        if (rawResult is byte[] directBytes)
+            encrypted = directBytes;
+        else if (rawResult is string b64)
+            encrypted = Convert.FromBase64String(b64);
+        else
+            return (502, new { error = $"Unexpected result type from encryption service: {rawResult.GetType().Name}" });
+
+        byte[]? generatedKey = null;
+        if (message.Payload.TryGetValue("generatedKey", out var rawKey) && rawKey != null)
+        {
+            if (rawKey is byte[] keyBytes) generatedKey = keyBytes;
+            else if (rawKey is string keyB64) generatedKey = Convert.FromBase64String(keyB64);
+        }
 
         string ciphertextBase64 = Convert.ToBase64String(encrypted);
         string? keyBase64 = generatedKey != null ? Convert.ToBase64String(generatedKey) : null;

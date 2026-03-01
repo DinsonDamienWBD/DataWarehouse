@@ -2,7 +2,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -551,9 +550,17 @@ public sealed class IpHashLoadBalancingStrategy : LoadBalancingStrategyBase
 
     private static uint ComputeHash(string key)
     {
+        // FNV-1a 32-bit — safe for distribution, no security-scanner false positives
+        const uint FnvPrime = 16777619u;
+        const uint FnvOffsetBasis = 2166136261u;
         var bytes = Encoding.UTF8.GetBytes(key);
-        var hash = MD5.HashData(bytes);
-        return BitConverter.ToUInt32(hash, 0);
+        uint hash = FnvOffsetBasis;
+        foreach (var b in bytes)
+        {
+            hash ^= b;
+            hash *= FnvPrime;
+        }
+        return hash;
     }
 
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(
@@ -703,9 +710,17 @@ public sealed class ConsistentHashingLoadBalancingStrategy : LoadBalancingStrate
 
     private static uint ComputeHash(string key)
     {
+        // FNV-1a 32-bit — safe for distribution, no security-scanner false positives
+        const uint FnvPrime = 16777619u;
+        const uint FnvOffsetBasis = 2166136261u;
         var bytes = Encoding.UTF8.GetBytes(key);
-        var hash = MD5.HashData(bytes);
-        return BitConverter.ToUInt32(hash, 0);
+        uint hash = FnvOffsetBasis;
+        foreach (var b in bytes)
+        {
+            hash ^= b;
+            hash *= FnvPrime;
+        }
+        return hash;
     }
 
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(

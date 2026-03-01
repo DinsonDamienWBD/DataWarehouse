@@ -330,7 +330,7 @@ public sealed class GeoReplicationFailoverStrategy : ResilienceStrategyBase
                     {
                         // Failover retry also failed — log and fall through to failure result below
                         IncrementCounter("dr.failover.retry.failure");
-                        RecordFailure(retryEx);
+                        System.Diagnostics.Debug.WriteLine($"[DR] Failover retry also failed for region '{_activeRegionId}': {retryEx.Message}");
                     }
                 }
             }

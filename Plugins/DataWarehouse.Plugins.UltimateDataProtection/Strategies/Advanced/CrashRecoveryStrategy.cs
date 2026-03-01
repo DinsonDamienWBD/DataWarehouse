@@ -637,7 +637,39 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 
         private Task RestoreFromCheckpointAsync(Checkpoint checkpoint, string targetPath, CancellationToken ct)
         {
-            // In production, restore data state from checkpoint
+            ct.ThrowIfCancellationRequested();
+
+            // Restore the transaction log state to the checkpoint's LSN by rolling forward the
+            // in-memory log cursor.  Any log entries before the checkpoint LSN are considered
+            // applied; the caller (RestoreCoreAsync) then replays only the entries AFTER this LSN.
+            if (_transactionLogs.TryGetValue(checkpoint.BackupId, out var log))
+            {
+                // Mark the log as recovered to the checkpoint LSN so that subsequent
+                // log replay starts from the correct position.
+                log.CurrentLsn = checkpoint.LogSequenceNumber;
+                log.RecoveryState = RecoveryState.CheckpointRestored;
+            }
+
+            // If a targetPath is provided and the backup has data, write a checkpoint marker file
+            // so the hosting process can verify the checkpoint was applied before replaying.
+            if (!string.IsNullOrEmpty(targetPath))
+            {
+                try
+                {
+                    var markerDir = System.IO.Path.GetDirectoryName(targetPath);
+                    if (!string.IsNullOrEmpty(markerDir) && System.IO.Directory.Exists(markerDir))
+                    {
+                        var markerPath = System.IO.Path.Combine(markerDir, $".checkpoint-{checkpoint.CheckpointId}");
+                        System.IO.File.WriteAllText(markerPath,
+                            $"lsn={checkpoint.LogSequenceNumber}\ttimestamp={checkpoint.Timestamp:O}");
+                    }
+                }
+                catch
+                {
+                    // Non-fatal: marker file is optional
+                }
+            }
+
             return Task.CompletedTask;
         }
 
