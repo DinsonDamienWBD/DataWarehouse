@@ -886,11 +886,11 @@ public sealed class TransactionState
 }
     public required string TransactionId { get; init; }
     public required TransactionProtocol Protocol { get; init; }
-    public TransactionPhase Phase { get; set; }
+    public TransactionPhase Phase { get => (TransactionPhase)Volatile.Read(ref _phase); set => Volatile.Write(ref _phase, (int)value); }
     public required List<string> ParticipantNodes { get; init; }
     public required ReadOnlyMemory<byte> Data { get; init; }
     public required IReadOnlyDictionary<string, string> Metadata { get; init; }
-    public required BoundedDictionary<string, ParticipantVote> Votes { get; init; }
+    public BoundedDictionary<string, ParticipantVote> Votes { get; set; };
     public DateTimeOffset CreatedAt { get; init; }
 }
 ```
