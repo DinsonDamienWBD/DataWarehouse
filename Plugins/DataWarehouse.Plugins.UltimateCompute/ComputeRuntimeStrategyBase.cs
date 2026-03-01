@@ -257,6 +257,11 @@ internal abstract class ComputeRuntimeStrategyBase : StrategyBase, IComputeRunti
         ArgumentNullException.ThrowIfNull(task);
         if (string.IsNullOrWhiteSpace(task.Id))
             throw new ArgumentException("Task ID is required", nameof(task));
+        // P2-1656: Reject task IDs that could cause path traversal when interpolated into file paths.
+        // Allowed: letters, digits, hyphens, underscores. Reject anything else (dots, slashes, etc.).
+        if (!System.Text.RegularExpressions.Regex.IsMatch(task.Id, @"^[a-zA-Z0-9\-_]{1,128}$"))
+            throw new ArgumentException(
+                "Task ID must contain only letters, digits, hyphens, and underscores (max 128 chars).", nameof(task));
         if (string.IsNullOrWhiteSpace(task.Language))
             throw new ArgumentException("Task language is required", nameof(task));
     }

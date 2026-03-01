@@ -33,11 +33,15 @@ public sealed class DvfsCpuStrategy : ResourceStrategyBase
     {
         var proc = Process.GetCurrentProcess();
         var cpuTime = proc.TotalProcessorTime.TotalMilliseconds;
-        var estimatedFrequency = _minFrequencyMhz + (_currentPState * (_maxFrequencyMhz - _minFrequencyMhz) / 10.0);
+        // P2-3791: Use process wall-clock elapsed time (not system uptime) as the denominator.
+        // Environment.TickCount64 is milliseconds since system boot — dividing process CPU by
+        // system uptime gives a near-zero result for short-lived processes.
+        var elapsedMs = Math.Max(1.0, (DateTime.UtcNow - proc.StartTime.ToUniversalTime()).TotalMilliseconds);
 
         return Task.FromResult(new ResourceMetrics
         {
-            CpuPercent = (cpuTime / Environment.TickCount64) * 100 * Environment.ProcessorCount,
+            CpuPercent = Math.Min(100.0 * Environment.ProcessorCount,
+                (cpuTime / elapsedMs) * 100 * Environment.ProcessorCount),
             Timestamp = DateTime.UtcNow
         });
     }

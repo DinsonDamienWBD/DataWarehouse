@@ -834,8 +834,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                 SecurityLevel = level,
                 KemAlgorithm = "ML-KEM (Kyber)",
                 SignatureAlgorithm = signatureAlgorithm.ToString(),
-                EncapsulatedKeyHash = Convert.ToBase64String(SHA256.Create().ComputeHash(encapsulatedKey)),
-                SignatureHash = Convert.ToBase64String(SHA256.Create().ComputeHash(signature))
+                // P2-2613: Use SHA256.HashData (static, no IDisposable) to avoid resource leak.
+                EncapsulatedKeyHash = Convert.ToBase64String(SHA256.HashData(encapsulatedKey)),
+                SignatureHash = Convert.ToBase64String(SHA256.HashData(signature))
             };
         }
 

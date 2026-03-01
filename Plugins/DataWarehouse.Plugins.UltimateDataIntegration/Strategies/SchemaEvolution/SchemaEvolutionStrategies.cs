@@ -732,18 +732,23 @@ public sealed class SchemaRegistryStrategy : DataIntegrationStrategyBase
 
     private int GetNextVersionForSubject(string subjectName)
     {
+        // P2-2301: use TryParse to guard against keys with ":v" in the subject name
+        // or non-numeric suffixes that would throw IndexOutOfRangeException/FormatException.
         return _schemas.Keys
             .Where(k => k.StartsWith($"{subjectName}:v"))
-            .Select(k => int.Parse(k.Split(":v")[1]))
+            .Select(k => { var parts = k.Split(":v"); return parts.Length >= 2 && int.TryParse(parts[^1], out var v) ? v : -1; })
+            .Where(v => v >= 0)
             .DefaultIfEmpty(0)
             .Max() + 1;
     }
 
     private int GetLatestVersionForSubject(string subjectName)
     {
+        // P2-2301: use TryParse to guard against keys with ":v" in the subject name
         return _schemas.Keys
             .Where(k => k.StartsWith($"{subjectName}:v"))
-            .Select(k => int.Parse(k.Split(":v")[1]))
+            .Select(k => { var parts = k.Split(":v"); return parts.Length >= 2 && int.TryParse(parts[^1], out var v) ? v : -1; })
+            .Where(v => v >= 0)
             .DefaultIfEmpty(1)
             .Max();
     }
