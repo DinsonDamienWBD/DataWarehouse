@@ -547,7 +547,8 @@ public sealed class ProcessGroupStrategy : ResourceStrategyBase
     protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct)
     {
         var handle = Guid.NewGuid().ToString("N");
-        var pgid = Environment.ProcessId + handle.GetHashCode();
+        // P2-2548: GetHashCode can return negative values; use absolute value and avoid overflow.
+        var pgid = (int)((Environment.ProcessId + (uint)Math.Abs((long)handle.GetHashCode())) % int.MaxValue) + 1;
 
         // Nice value: -20 (highest) to 19 (lowest)
         var niceValue = request.Priority switch

@@ -317,7 +317,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
         {
             if (!metadata.TryGetValue("X-Webhook-Signature", out var signature))
             {
-                return false;
+                // Signature header absent — reject with a distinguishable exception so callers
+                // can differentiate "missing header" from "bad signature".
+                throw new InvalidOperationException("Webhook signature header 'X-Webhook-Signature' is missing.");
             }
 
             using var hmac = new System.Security.Cryptography.HMACSHA256(Encoding.UTF8.GetBytes(secret));
@@ -329,6 +331,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
 
         private void CleanOldCacheEntries()
         {
+            // Cache entries are retained for 2× the replay window (10 min when window = 5 min).
+            // The extra time allows for clock skew between senders and the server.
             var cutoff = DateTime.UtcNow.AddSeconds(-_replayWindowSeconds * 2);
 
             var oldKeys = new List<string>();

@@ -40,8 +40,12 @@ public sealed class DeadlineIoStrategy : ResourceStrategyBase
     {
         var handle = Guid.NewGuid().ToString("N");
 
-        if (_currentIops + request.Iops > _maxIops)
+        // P2-2560: Atomically check-and-add to prevent TOCTOU over-allocation.
+        // Interlocked.Add returns the new value; if it exceeds the limit, roll back.
+        var newIops = Interlocked.Add(ref _currentIops, request.Iops);
+        if (newIops > _maxIops)
         {
+            Interlocked.Add(ref _currentIops, -request.Iops); // roll back
             return Task.FromResult(new ResourceAllocation
             {
                 RequestId = request.RequestId,
@@ -49,8 +53,6 @@ public sealed class DeadlineIoStrategy : ResourceStrategyBase
                 FailureReason = "IOPS limit exceeded"
             });
         }
-
-        Interlocked.Add(ref _currentIops, request.Iops);
         Interlocked.Add(ref _currentBandwidth, request.IoBandwidth);
 
         return Task.FromResult(new ResourceAllocation

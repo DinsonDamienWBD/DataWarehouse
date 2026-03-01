@@ -150,12 +150,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.WORM
             });
         }
 
-        private T GetConfigValue<T>(string key, T defaultValue)
-        {
-            if (Configuration.TryGetValue(key, out var value) && value is T typedValue)
-                return typedValue;
-            return defaultValue;
-        }
+        // LOW-1459: GetConfigValue<T> is now on ComplianceStrategyBase — removed duplicate.
 
         private static List<string> GenerateRecommendations(List<ComplianceViolation> violations)
         {

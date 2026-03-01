@@ -1090,15 +1090,17 @@ public sealed class CrossBorderTransferControlStrategy : ComplianceStrategyBase
         }
 
         var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
-
-
         var isCompliant = !hasHighViolations;
+        // LOW-1541: Use PartiallyCompliant when only medium-or-lower violations exist.
+        var status = violations.Count == 0 ? ComplianceStatus.Compliant :
+                    hasHighViolations ? ComplianceStatus.NonCompliant :
+                    ComplianceStatus.PartiallyCompliant;
 
         return Task.FromResult(new ComplianceResult
         {
             IsCompliant = isCompliant,
             Framework = Framework,
-            Status = violations.Count == 0 ? ComplianceStatus.Compliant : ComplianceStatus.NonCompliant,
+            Status = status,
             Violations = violations,
             Recommendations = recommendations
         });

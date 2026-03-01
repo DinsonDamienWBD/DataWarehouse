@@ -226,22 +226,19 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             {
                 var archiveStatus = properties.Value.ArchiveStatus?.ToString();
 
-                // Check if blob is not being rehydrated
+                // If rehydration is not pending (or status unknown), the blob is not yet available.
                 if (string.IsNullOrEmpty(archiveStatus) ||
-                    (!archiveStatus.Contains("RehydratePending", StringComparison.OrdinalIgnoreCase)))
+                    !archiveStatus.Contains("RehydratePending", StringComparison.OrdinalIgnoreCase))
                 {
                     throw new InvalidOperationException(
                         $"Blob '{key}' is archived and not yet rehydrated. Call RehydrateBlobAsync first. " +
                         $"Archive status: {archiveStatus ?? "Not rehydrating"}");
                 }
 
-                // Check if rehydration is in progress
-                if (archiveStatus.Contains("RehydratePending", StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new InvalidOperationException(
-                        $"Blob '{key}' is currently being rehydrated. Please wait for rehydration to complete. " +
-                        $"Archive status: {archiveStatus}");
-                }
+                // Rehydration is in progress — blob is not yet readable.
+                throw new InvalidOperationException(
+                    $"Blob '{key}' is currently being rehydrated. Please wait for rehydration to complete. " +
+                    $"Archive status: {archiveStatus}");
             }
 
             // Download blob
@@ -676,7 +673,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
 
             string? newTier = null;
 
-            // Apply tiering rules based on age
+            // NOTE: _hotToCoolDays, _coolToColdDays, _coldToArchiveDays are cumulative ages measured
+            // from LastModified, not time-in-tier. The field names imply transition intervals; the
+            // checks below use cumulative thresholds (sum of all prior intervals) to determine when
+            // each tier boundary is crossed.
             if (currentTier.Equals("Hot", StringComparison.OrdinalIgnoreCase) && age.TotalDays >= _hotToCoolDays)
             {
                 newTier = "Cool";

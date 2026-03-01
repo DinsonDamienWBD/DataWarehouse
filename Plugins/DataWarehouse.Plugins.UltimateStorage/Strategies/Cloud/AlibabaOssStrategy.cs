@@ -153,15 +153,18 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             ValidateKey(key);
             ValidateStream(data);
 
-            // Determine if multipart upload is needed
-            var useMultipart = false;
-            long dataLength = 0;
-
-            if (data.CanSeek)
+            // Non-seekable streams cannot be rewound between retries — buffer them first.
+            if (!data.CanSeek)
             {
-                dataLength = data.Length - data.Position;
-                useMultipart = dataLength > _multipartThresholdBytes;
+                var buffer = new MemoryStream();
+                await data.CopyToAsync(buffer, 81920, ct);
+                buffer.Position = 0;
+                data = buffer;
             }
+
+            // Determine if multipart upload is needed
+            long dataLength = data.Length - data.Position;
+            var useMultipart = dataLength > _multipartThresholdBytes;
 
             ObjectMetadata? objectMetadata;
 
@@ -200,11 +203,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
         {
             return await ExecuteWithRetryAsync(async () =>
             {
-                // Reset stream position if possible
-                if (data.CanSeek)
-                {
-                    data.Position = 0;
-                }
+                // Stream is always seekable at this point: either it was seekable originally
+                // or was buffered into MemoryStream in StoreAsyncCore before calling here.
+                data.Position = 0;
 
                 var objectMetadata = new ObjectMetadata();
 

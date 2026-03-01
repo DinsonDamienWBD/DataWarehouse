@@ -302,8 +302,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
             using var connection = new OdbcConnection(_connectionString);
             await connection.OpenAsync(ct);
 
-            // List tables
-            var schemaTable = await Task.Run(() => connection.GetSchema("Tables"), ct);
+            // Apply prefix filter via GetSchema restrictions where supported — avoids loading
+            // the entire table catalog (OOM on large databases).  Restriction[2] = table name pattern
+            // (ODBC/JDBC convention). We pass a prefix pattern; the in-loop check below handles
+            // drivers that ignore the restriction.
+            string[]? restrictions = !string.IsNullOrEmpty(prefix)
+                ? new string[] { null!, null!, prefix + "%" }
+                : null;
+
+            var schemaTable = await Task.Run(() => connection.GetSchema("Tables", restrictions), ct);
 
             foreach (System.Data.DataRow row in schemaTable.Rows)
             {

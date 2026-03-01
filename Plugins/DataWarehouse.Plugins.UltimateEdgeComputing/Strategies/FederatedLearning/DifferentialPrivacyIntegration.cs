@@ -9,7 +9,8 @@ namespace DataWarehouse.Plugins.UltimateEdgeComputing.Strategies.FederatedLearni
 /// </summary>
 public sealed class DifferentialPrivacyIntegration
 {
-    private readonly Random _random = new();
+    // P2-2680: Random is not thread-safe; use Random.Shared which is thread-safe (per-thread instance under the hood).
+    private static readonly Random _random = Random.Shared;
     private double _remainingBudget;
 
     /// <summary>

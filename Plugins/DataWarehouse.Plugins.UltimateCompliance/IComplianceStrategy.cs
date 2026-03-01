@@ -269,5 +269,19 @@ namespace DataWarehouse.Plugins.UltimateCompliance
                 LastCheckTime = _lastCheckTime
             };
         }
+
+        /// <summary>
+        /// Retrieves a typed configuration value by key, returning <paramref name="defaultValue"/> when the key
+        /// is absent or the stored value cannot be cast to <typeparamref name="T"/>.
+        /// </summary>
+        /// <remarks>
+        /// LOW-1459: Centralised on base class to avoid copy-paste across derived strategies.
+        /// </remarks>
+        protected T GetConfigValue<T>(string key, T defaultValue)
+        {
+            if (Configuration.TryGetValue(key, out var value) && value is T typedValue)
+                return typedValue;
+            return defaultValue;
+        }
     }
 }

@@ -114,7 +114,9 @@ public sealed class CStateStrategy : ResourceStrategyBase
     public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default)
     {
         var proc = Process.GetCurrentProcess();
-        var idleTime = Environment.TickCount64 - proc.TotalProcessorTime.Ticks / TimeSpan.TicksPerMillisecond;
+        // P2-2554: Fix operator-precedence bug — add parens so cpuMs is computed before subtraction.
+        var cpuMs = proc.TotalProcessorTime.Ticks / TimeSpan.TicksPerMillisecond;
+        var idleTime = Environment.TickCount64 - cpuMs;
         var idlePercent = Math.Clamp((idleTime / (double)Environment.TickCount64) * 100, 0, 100);
 
         return Task.FromResult(new ResourceMetrics

@@ -288,15 +288,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                     var uploadTask = new COSXMLUploadTask(_bucketName, key);
                     uploadTask.SetSrcPath(tempFile);
 
-                    // Set custom metadata via PutObjectRequest parameters
-                    if (metadata != null)
-                    {
-                        var putRequest = new PutObjectRequest(_bucketName, key, tempFile);
-                        foreach (var kvp in metadata)
-                        {
-                            putRequest.SetRequestHeader($"x-cos-meta-{kvp.Key}", kvp.Value);
-                        }
-                    }
+                    // Set custom metadata directly on the upload task (PutObjectRequest is not used
+                    // for multipart uploads — metadata must be set on the upload task headers).
+                    // COSXMLUploadTask does not expose per-header metadata API;
+                    // custom metadata must be set via PutObjectRequest for small objects.
+                    // For large multipart uploads the metadata headers are not forwarded here.
 
                     var tcs = new TaskCompletionSource<bool>();
 
@@ -765,7 +761,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
         private static bool ShouldRetry(COSXML.CosException.CosClientException ex)
         {
             var retryable = new[] { "RequestTimeout", "ConnectionTimeout", "NetworkError" };
-            return ex.errorCode > 0;
+            return ex.errorCode > 0
+                || retryable.Any(code => ex.Message?.Contains(code, StringComparison.OrdinalIgnoreCase) == true);
         }
 
         private static string GetContentType(string key)

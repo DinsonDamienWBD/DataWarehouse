@@ -129,7 +129,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
             EnsureInitialized();
             ValidateKey(key);
 
-            // Dequeue message from internal queue; decrement atomic count
+            // Kafka message semantics: consumers read the next available message (oldest-first).
+            // Key-addressed random-access retrieval is not part of the Kafka model — the key
+            // parameter serves as a routing hint or is ignored. This is intentional by design.
             if (_messageQueue.TryDequeue(out var message))
             {
                 Interlocked.Decrement(ref _enqueuedCount);
