@@ -83,6 +83,7 @@ public abstract class ComplianceStrategyBase : SdkStrategyBase, IComplianceStrat
     public async Task<ComplianceResult> CheckComplianceAsync(ComplianceContext context, CancellationToken cancellationToken = default);
     protected abstract Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);;
     public ComplianceStatistics GetStatistics();
+    protected T GetConfigValue<T>(string key, T defaultValue);
 }
 ```
 
