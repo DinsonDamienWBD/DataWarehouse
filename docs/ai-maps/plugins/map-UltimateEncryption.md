@@ -1459,7 +1459,7 @@ public sealed class XChaCha20TransitStrategy : TransitEncryptionPluginBase
     public override string Version;;
     protected override Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
     protected override Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
-    public override async Task<EndpointCapabilities> GetCapabilitiesAsync(CancellationToken cancellationToken = default);
+    public override Task<EndpointCapabilities> GetCapabilitiesAsync(CancellationToken cancellationToken = default);
 }
 ```
 
