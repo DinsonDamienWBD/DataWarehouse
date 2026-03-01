@@ -106,6 +106,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance
             string strategyId,
             CancellationToken cancellationToken = default)
         {
+            // P2-1580: validate context so NRE is not propagated into strategy internals
+            ArgumentNullException.ThrowIfNull(context);
+
             var strategy = GetStrategy(strategyId)
                 ?? throw new ArgumentException($"Compliance strategy '{strategyId}' not found");
 

@@ -139,7 +139,7 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
     private readonly Func<ConnectionParameters, Task<TConnection>> _connectionFactory;
     private readonly CancellationTokenSource _shutdownCts = new();
     private readonly Task _maintenanceTask;
-    private bool _disposed;
+    private int _disposed; // 0 = not disposed; 1 = disposed; Interlocked for atomic check-and-set
 
     // Statistics
     private long _totalConnectionsCreated;
@@ -326,8 +326,7 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
 
     public void Dispose()
     {
-        if (_disposed) return;
-        _disposed = true;
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
 
         _shutdownCts.Cancel();
         try { _maintenanceTask.Wait(TimeSpan.FromSeconds(5)); } catch { /* Best-effort task wait */ }
@@ -342,8 +341,7 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
 
     public async ValueTask DisposeAsync()
     {
-        if (_disposed) return;
-        _disposed = true;
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
 
         _shutdownCts.Cancel();
         try { await _maintenanceTask.WaitAsync(TimeSpan.FromSeconds(5)); } catch { /* Best-effort task wait */ }
@@ -371,7 +369,8 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
         private readonly SemaphoreSlim _acquireSemaphore;
         private readonly SemaphoreSlim _createLock = new(1, 1);
         private int _totalCreated;
-        private bool _disposed;
+        // P2-2700: use int with Interlocked for atomic check-and-set; 0=not disposed, 1=disposed
+        private int _disposed;
 
         internal ConnectionPool(
             string key,
@@ -428,7 +427,7 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
 
         public async Task<TConnection> AcquireAsync(CancellationToken ct = default)
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
+            ObjectDisposedException.ThrowIf(_disposed != 0, this);
 
             // Wait for slot in pool
             if (!await _acquireSemaphore.WaitAsync(_options.AcquireTimeoutMs, ct))
@@ -631,8 +630,8 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
 
         public void Dispose()
         {
-            if (_disposed) return;
-            _disposed = true;
+            // P2-2700: atomic check-and-set prevents double-dispose from concurrent calls
+            if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
 
             // Dispose connections synchronously without blocking on DisposeAsync to avoid
             // deadlocks in ASP.NET Core synchronization contexts (finding 2691).
@@ -654,8 +653,8 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
 
         public async ValueTask DisposeAsync()
         {
-            if (_disposed) return;
-            _disposed = true;
+            // P2-2700: atomic check-and-set prevents double-dispose from concurrent calls
+            if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
 
             await ClearAsync();
             _acquireSemaphore.Dispose();
