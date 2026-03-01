@@ -17,7 +17,22 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
         public override string SemanticDescription => "Connects to Backblaze B2 using HTTPS REST API for cloud backup and storage.";
         public override string[] Tags => new[] { "backblaze", "b2", "backup", "object-storage", "rest-api" };
         public BackblazeB2ConnectionStrategy(ILogger? logger = null) : base(logger) { }
-        protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct) { var httpClient = new HttpClient { BaseAddress = new Uri("https://api.backblazeb2.com"), Timeout = config.Timeout }; return new DefaultConnectionHandle(httpClient, new Dictionary<string, object> { ["Endpoint"] = "https://api.backblazeb2.com" }); }
+        protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
+        {
+            // P2-1829: Read AccountId and ApplicationKey credentials from config.Properties.
+            // Without auth the API returns 401 for every call.
+            var httpClient = new HttpClient { BaseAddress = new Uri("https://api.backblazeb2.com"), Timeout = config.Timeout };
+            if (config.Properties.TryGetValue("AccountId", out var accountId) &&
+                config.Properties.TryGetValue("ApplicationKey", out var appKey) &&
+                accountId != null && appKey != null)
+            {
+                var credentials = Convert.ToBase64String(
+                    System.Text.Encoding.UTF8.GetBytes($"{accountId}:{appKey}"));
+                httpClient.DefaultRequestHeaders.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", credentials);
+            }
+            return new DefaultConnectionHandle(httpClient, new Dictionary<string, object> { ["Endpoint"] = "https://api.backblazeb2.com" });
+        }
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { try { var response = await handle.GetConnection<HttpClient>().GetAsync("/b2api/v2/b2_authorize_account", ct); return response.IsSuccessStatusCode; } catch { return false; } }
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<HttpClient>()?.Dispose(); await Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, isHealthy ? "Backblaze B2 is reachable" : "Backblaze B2 is not responding", sw.Elapsed, DateTimeOffset.UtcNow); }

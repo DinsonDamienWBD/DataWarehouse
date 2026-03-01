@@ -478,6 +478,13 @@ public sealed class DeltaCompressionDeduplicationStrategy : DeduplicationStrateg
             {
                 var offset = reader.ReadInt32();
                 var length = reader.ReadInt32();
+                // P2-2418: Validate bounds before Array.Copy to prevent IndexOutOfRangeException
+                // or silent data truncation from a corrupted delta stream.
+                if (offset < 0 || length < 0 || offset + length > baseData.Length
+                    || resultPos + length > result.Length)
+                    throw new InvalidDataException(
+                        $"Delta copy instruction out of bounds: offset={offset}, length={length}, " +
+                        $"baseLen={baseData.Length}, resultPos={resultPos}, resultLen={result.Length}.");
                 Array.Copy(baseData, offset, result, resultPos, length);
                 resultPos += length;
             }
@@ -485,6 +492,11 @@ public sealed class DeltaCompressionDeduplicationStrategy : DeduplicationStrateg
             {
                 var length = reader.ReadInt32();
                 var data = reader.ReadBytes(length);
+                // P2-2418: Validate bounds for literal writes as well.
+                if (length < 0 || resultPos + length > result.Length)
+                    throw new InvalidDataException(
+                        $"Delta literal instruction out of bounds: length={length}, " +
+                        $"resultPos={resultPos}, resultLen={result.Length}.");
                 Array.Copy(data, 0, result, resultPos, length);
                 resultPos += length;
             }

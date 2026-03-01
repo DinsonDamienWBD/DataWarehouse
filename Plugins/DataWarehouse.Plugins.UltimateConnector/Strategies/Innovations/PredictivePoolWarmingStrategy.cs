@@ -318,6 +318,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             private readonly int[] _sampleCounts = new int[1440];
             private readonly double _alpha;
             private readonly object _lock = new();
+            // P2-1945: Maintain a counter of populated buckets for O(1) GetCoveragePercent
+            // instead of iterating all 1440 elements with LINQ on every health-check tick.
+            private int _populatedBuckets;
 
             public TrafficHistogram(double alpha)
             {
@@ -335,6 +338,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                     if (_sampleCounts[bucket] == 0)
                     {
                         _buckets[bucket] = demand;
+                        _populatedBuckets++;
                     }
                     else
                     {
@@ -379,8 +383,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             {
                 lock (_lock)
                 {
-                    int populated = _sampleCounts.Count(c => c > 0);
-                    return populated / 1440.0 * 100.0;
+                    // P2-1945: O(1) read from pre-maintained counter instead of LINQ scan.
+                    return _populatedBuckets / 1440.0 * 100.0;
                 }
             }
         }

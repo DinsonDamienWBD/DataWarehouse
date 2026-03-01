@@ -266,14 +266,17 @@ public sealed class GlobalDeduplicationStrategy : DeduplicationStrategyBase
     /// <returns>Cluster-wide deduplication statistics.</returns>
     public GlobalDeduplicationStats GetGlobalStats()
     {
+        // P2-2417: Snapshot _globalIndex.Values before aggregating so concurrent dedup
+        // threads that modify entries don't produce torn ReferenceCount/Size reads.
+        var entries = _globalIndex.Values.ToArray();
         return new GlobalDeduplicationStats
         {
             TotalNodes = _nodes.Count,
             HealthyNodes = _nodes.Values.Count(n => n.IsHealthy),
             TotalVolumes = _volumes.Count,
-            TotalUniqueObjects = _globalIndex.Count,
-            TotalDataBytes = _globalIndex.Values.Sum(e => e.Size),
-            TotalReferences = _globalIndex.Values.Sum(e => e.ReferenceCount),
+            TotalUniqueObjects = entries.Length,
+            TotalDataBytes = entries.Sum(e => e.Size),
+            TotalReferences = entries.Sum(e => Volatile.Read(ref e.ReferenceCount)),
             ReplicationFactor = _replicationFactor
         };
     }

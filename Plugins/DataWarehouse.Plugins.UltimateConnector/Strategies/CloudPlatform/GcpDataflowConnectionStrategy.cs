@@ -17,7 +17,17 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
         public override string SemanticDescription => "Connects to Google Cloud Dataflow using HTTPS REST API for stream and batch data processing.";
         public override string[] Tags => new[] { "gcp", "dataflow", "streaming", "batch", "rest-api" };
         public GcpDataflowConnectionStrategy(ILogger? logger = null) : base(logger) { }
-        protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct) { var httpClient = new HttpClient { BaseAddress = new Uri("https://dataflow.googleapis.com"), Timeout = config.Timeout }; return new DefaultConnectionHandle(httpClient, new Dictionary<string, object> { ["Endpoint"] = "https://dataflow.googleapis.com" }); }
+        protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
+        {
+            // P2-1829: Read OAuth token / API key from config.Properties so requests are authenticated.
+            var httpClient = new HttpClient { BaseAddress = new Uri("https://dataflow.googleapis.com"), Timeout = config.Timeout };
+            if (config.Properties.TryGetValue("AccessToken", out var token) && token != null)
+                httpClient.DefaultRequestHeaders.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.ToString());
+            else if (config.Properties.TryGetValue("ApiKey", out var apiKey) && apiKey != null)
+                httpClient.DefaultRequestHeaders.Add("x-goog-api-key", apiKey.ToString()!);
+            return new DefaultConnectionHandle(httpClient, new Dictionary<string, object> { ["Endpoint"] = "https://dataflow.googleapis.com" });
+        }
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { try { var response = await handle.GetConnection<HttpClient>().GetAsync("/v1b3/projects", ct); return response.IsSuccessStatusCode; } catch { return false; } }
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<HttpClient>()?.Dispose(); await Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, isHealthy ? "GCP Dataflow is reachable" : "GCP Dataflow is not responding", sw.Elapsed, DateTimeOffset.UtcNow); }

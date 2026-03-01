@@ -213,9 +213,12 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                     }
                 }
 
-                foreach (var asn in asPath)
+                // P2-1944: Resolve ASN countries in parallel instead of sequentially to
+                // avoid O(N) latency when the AS path contains many hops.
+                var countryResults = await Task.WhenAll(
+                    asPath.Select(asn => ResolveAsnCountryAsync(client, asn, ct)));
+                foreach (var country in countryResults)
                 {
-                    var country = await ResolveAsnCountryAsync(client, asn, ct);
                     if (!string.IsNullOrEmpty(country) && !transitCountries.Contains(country))
                         transitCountries.Add(country);
                 }

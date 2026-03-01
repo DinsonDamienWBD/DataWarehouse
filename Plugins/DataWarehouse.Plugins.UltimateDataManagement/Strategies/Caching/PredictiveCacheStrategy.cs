@@ -72,7 +72,8 @@ public sealed class PredictiveCacheStrategy : CachingStrategyBase
     private readonly int _maxHistorySize;
     private readonly double _prefetchThreshold;
     private long _currentSize;
-    private string? _lastAccessedKey;
+    // P2-2411: volatile so concurrent readers see the latest written key without a torn read.
+    private volatile string? _lastAccessedKey;
     private DataLoaderDelegate? _prefetchLoader;
 
     private readonly Timer _patternAnalysisTimer;
@@ -189,11 +190,14 @@ public sealed class PredictiveCacheStrategy : CachingStrategyBase
     {
         var predictions = new List<AccessPrediction>();
 
-        // Check sequential patterns
+        // P2-2412: Take _patternLock before reading nextKeys to prevent concurrent
+        // RemoveRange (in RecordAccess) from modifying the list during GroupBy iteration.
         if (_sequentialPatterns.TryGetValue(currentKey, out var nextKeys))
         {
-            var keyCounts = nextKeys.GroupBy(k => k).ToDictionary(g => g.Key, g => g.Count());
-            var total = nextKeys.Count;
+            List<string> nextKeysCopy;
+            lock (_patternLock) { nextKeysCopy = new List<string>(nextKeys); }
+            var keyCounts = nextKeysCopy.GroupBy(k => k).ToDictionary(g => g.Key, g => g.Count());
+            var total = nextKeysCopy.Count;
 
             foreach (var (key, count) in keyCounts.OrderByDescending(kvp => kvp.Value).Take(maxPredictions))
             {

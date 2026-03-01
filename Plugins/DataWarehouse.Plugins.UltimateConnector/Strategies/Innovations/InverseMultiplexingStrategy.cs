@@ -73,6 +73,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             var channelSpecs = GetConfiguration<string>(config, "Channels",
                 "ethernet:reliable,wifi:fast,cellular:metered");
             var parityRatio = GetConfiguration<int>(config, "parity_ratio", 4);
+            // P2-1947: parityRatio must be >= 1; value of 0 results in only a parity chunk and
+            // no data chunks (totalChunks = 0 + 1), making reassembly impossible.
+            if (parityRatio < 1)
+                throw new ArgumentException($"parity_ratio must be >= 1, got {parityRatio}.");
             var chunkSizeKb = GetConfiguration<int>(config, "chunk_size_kb", 64);
             var probeTimeoutMs = GetConfiguration<int>(config, "probe_timeout_ms", 3000);
 

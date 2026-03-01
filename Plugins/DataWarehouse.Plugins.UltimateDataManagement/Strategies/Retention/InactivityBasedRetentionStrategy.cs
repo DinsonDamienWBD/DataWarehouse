@@ -317,20 +317,38 @@ public sealed class AccessRecord
     /// </summary>
     public required DateTime CreatedAt { get; init; }
 
+    // P2-2461: Store timestamps as long ticks with Interlocked to prevent torn writes
+    // on 32-bit platforms where a 64-bit DateTime struct assignment is not atomic.
+    private long _lastReadAtTicks;
+    private long _lastWriteAtTicks;
+    private long _lastAccessAtTicks;
+
     /// <summary>
     /// Last read access time.
     /// </summary>
-    public DateTime? LastReadAt { get; set; }
+    public DateTime? LastReadAt
+    {
+        get { var t = Interlocked.Read(ref _lastReadAtTicks); return t == 0 ? null : new DateTime(t, DateTimeKind.Utc); }
+        set { Interlocked.Exchange(ref _lastReadAtTicks, value?.Ticks ?? 0L); }
+    }
 
     /// <summary>
     /// Last write access time.
     /// </summary>
-    public DateTime? LastWriteAt { get; set; }
+    public DateTime? LastWriteAt
+    {
+        get { var t = Interlocked.Read(ref _lastWriteAtTicks); return t == 0 ? null : new DateTime(t, DateTimeKind.Utc); }
+        set { Interlocked.Exchange(ref _lastWriteAtTicks, value?.Ticks ?? 0L); }
+    }
 
     /// <summary>
     /// Last access time (read or write).
     /// </summary>
-    public DateTime LastAccessAt { get; set; }
+    public DateTime LastAccessAt
+    {
+        get { return new DateTime(Interlocked.Read(ref _lastAccessAtTicks), DateTimeKind.Utc); }
+        set { Interlocked.Exchange(ref _lastAccessAtTicks, value.Ticks); }
+    }
 
     /// <summary>
     /// Total read count.
