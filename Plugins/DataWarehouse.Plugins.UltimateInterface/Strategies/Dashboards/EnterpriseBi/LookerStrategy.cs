@@ -425,7 +425,10 @@ public sealed class LookerStrategy : DashboardStrategyBase
                 row.TryGetValue(c, out var v) ? FormatSqlValue(v) : "NULL")) + ")"
         );
 
-        return $"INSERT INTO {tableName} ({columnList}) VALUES {string.Join(", ", values)}";
+        // P2-3283: Quote identifier to prevent SQL injection via caller-supplied tableName.
+        // Double any embedded double-quotes per ANSI SQL quoting rules.
+        var safeTableName = "\"" + tableName.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
+        return $"INSERT INTO {safeTableName} ({columnList}) VALUES {string.Join(", ", values)}";
     }
 
     private static string FormatSqlValue(object? value)

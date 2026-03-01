@@ -18,6 +18,10 @@ public sealed class DashboardAccessControlService
     public void SetPermissions(string tenantId, string dashboardId, string ownerId,
         DashboardVisibility visibility = DashboardVisibility.Private)
     {
+        // P2-3263: guard null/empty parameters to prevent key corruption across tenant boundaries
+        ArgumentException.ThrowIfNullOrEmpty(tenantId);
+        ArgumentException.ThrowIfNullOrEmpty(dashboardId);
+        ArgumentException.ThrowIfNullOrEmpty(ownerId);
         var key = BuildKey(tenantId, dashboardId);
         _permissions[key] = new DashboardPermissions
         {
@@ -35,6 +39,9 @@ public sealed class DashboardAccessControlService
     public DashboardAccessGrant GrantAccess(string tenantId, string dashboardId, string granteeId,
         DashboardRole role, string grantedBy)
     {
+        ArgumentException.ThrowIfNullOrEmpty(tenantId);
+        ArgumentException.ThrowIfNullOrEmpty(dashboardId);
+        ArgumentException.ThrowIfNullOrEmpty(granteeId);
         var grant = new DashboardAccessGrant
         {
             GrantId = Guid.NewGuid().ToString("N"),
@@ -61,6 +68,8 @@ public sealed class DashboardAccessControlService
     /// </summary>
     public bool RevokeAccess(string tenantId, string dashboardId, string granteeId, string revokedBy)
     {
+        ArgumentException.ThrowIfNullOrEmpty(tenantId);
+        ArgumentException.ThrowIfNullOrEmpty(dashboardId);
         var key = BuildKey(tenantId, dashboardId);
         if (!_grants.TryGetValue(key, out var grants)) return false;
 
@@ -85,6 +94,9 @@ public sealed class DashboardAccessControlService
     public DashboardAccessCheck CheckAccess(string tenantId, string dashboardId, string userId,
         DashboardRole requiredRole = DashboardRole.Viewer)
     {
+        ArgumentException.ThrowIfNullOrEmpty(tenantId);
+        ArgumentException.ThrowIfNullOrEmpty(dashboardId);
+        ArgumentException.ThrowIfNullOrEmpty(userId);
         var key = BuildKey(tenantId, dashboardId);
 
         // Check ownership
@@ -173,7 +185,11 @@ public sealed class DashboardAccessControlService
         lock (grants) { return grants.ToList().AsReadOnly(); }
     }
 
-    private static string BuildKey(string tenantId, string dashboardId) => $"{tenantId}:{dashboardId}";
+    // P2-3262: Use a non-colliding separator. A colon in tenantId or dashboardId would produce
+    // the same key as a different (tenantId, dashboardId) pair with a colon-split value.
+    // Using \x1F (unit separator, U+001F) — a control character that cannot appear in
+    // well-formed tenant/dashboard identifiers.
+    private static string BuildKey(string tenantId, string dashboardId) => $"{tenantId}\x1F{dashboardId}";
 
     private void RecordAudit(string tenantId, string dashboardId, string userId, string action, string details)
     {

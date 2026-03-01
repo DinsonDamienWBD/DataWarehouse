@@ -36,8 +36,10 @@ public sealed class RedashStrategy : DashboardStrategyBase
         EnsureConfigured();
         var startTime = DateTimeOffset.UtcNow;
         // Redash uses queries to fetch data, not push
-        var query = $"INSERT INTO {targetId} VALUES " + string.Join(", ", data.Select(r =>
-            "(" + string.Join(", ", r.Values.Select(v => v is string s ? $"'{s}'" : v?.ToString() ?? "NULL")) + ")"));
+        // P2-3297: Quote identifier to prevent SQL injection via caller-supplied targetId.
+        var safeTable = "\"" + targetId.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
+        var query = $"INSERT INTO {safeTable} VALUES " + string.Join(", ", data.Select(r =>
+            "(" + string.Join(", ", r.Values.Select(v => v is string s ? $"'{s.Replace("'", "''", StringComparison.Ordinal)}'" : v?.ToString() ?? "NULL")) + ")"));
         var payload = new { query = query, data_source_id = int.TryParse(Config!.ProjectId, out var id) ? id : 1 };
         var response = await SendAuthenticatedRequestAsync(HttpMethod.Post, "/api/queries", CreateJsonContent(payload), ct);
         var duration = (DateTimeOffset.UtcNow - startTime).TotalMilliseconds;
