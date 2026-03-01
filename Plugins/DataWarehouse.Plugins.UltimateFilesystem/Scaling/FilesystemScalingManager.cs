@@ -242,8 +242,15 @@ public sealed class FilesystemScalingManager : IScalableSubsystem, IDisposable
         ArgumentNullException.ThrowIfNull(operation);
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        // Check caller quota
-        if (!string.IsNullOrEmpty(callerId) && IsCallerThrottled(callerId))
+        // Atomically check quota and increment in a single operation to avoid TOCTOU race
+        // between IsCallerThrottled and IncrementCallerQuota.
+        bool throttled = false;
+        if (!string.IsNullOrEmpty(callerId))
+        {
+            throttled = CheckAndIncrementCallerQuota(callerId);
+        }
+
+        if (throttled)
         {
             Interlocked.Increment(ref _opsThrottled);
 
@@ -276,12 +283,6 @@ public sealed class FilesystemScalingManager : IScalableSubsystem, IDisposable
         Interlocked.Increment(ref _opsScheduled);
         await channel.Writer.WriteAsync(ioOp, ct).ConfigureAwait(false);
         UpdateBackpressureState();
-
-        // Track quota usage
-        if (!string.IsNullOrEmpty(callerId))
-        {
-            IncrementCallerQuota(callerId);
-        }
     }
 
     // ---------------------------------------------------------------
@@ -523,44 +524,58 @@ public sealed class FilesystemScalingManager : IScalableSubsystem, IDisposable
     }
 
     /// <summary>
-    /// Checks whether a caller has exceeded their I/O quota.
+    /// Atomically checks whether a caller has exceeded their I/O quota and, if not,
+    /// increments their operation count in a single operation.
+    /// Returns true if the caller is throttled (quota exceeded); false if the operation
+    /// was accepted and the count has been incremented.
     /// </summary>
-    private bool IsCallerThrottled(string callerId)
+    private bool CheckAndIncrementCallerQuota(string callerId)
     {
-        var quota = _callerQuotas.GetOrDefault(callerId);
-        if (quota == null) return false;
-
-        // Reset quota window if expired (1-hour window)
-        if ((DateTime.UtcNow - quota.WindowStartUtc).TotalHours >= 1)
+        // Spin until we can atomically read + replace the quota record.
+        // BoundedCache.Put is a lock-free CAS replacement, so the loop terminates
+        // quickly under contention.
+        while (true)
         {
-            var resetQuota = quota with { CurrentOperations = 0, WindowStartUtc = DateTime.UtcNow };
-            _callerQuotas.Put(callerId, resetQuota);
-            return false;
-        }
+            var quota = _callerQuotas.GetOrDefault(callerId);
 
-        return quota.CurrentOperations >= quota.MaxOperations;
-    }
-
-    /// <summary>
-    /// Increments the I/O operation count for a caller's quota tracking.
-    /// </summary>
-    private void IncrementCallerQuota(string callerId)
-    {
-        var quota = _callerQuotas.GetOrDefault(callerId);
-        if (quota == null)
-        {
-            quota = new IoQuotaInfo
+            if (quota == null)
             {
-                CallerId = callerId,
-                MaxOperations = _defaultIoQuotaPerCaller,
-                CurrentOperations = 1,
-                WindowStartUtc = DateTime.UtcNow
-            };
-            _callerQuotas.Put(callerId, quota);
-        }
-        else
-        {
-            _callerQuotas.Put(callerId, quota with { CurrentOperations = quota.CurrentOperations + 1 });
+                // First time we see this caller — create a quota record with count 1 (not throttled).
+                var newQuota = new IoQuotaInfo
+                {
+                    CallerId = callerId,
+                    MaxOperations = _defaultIoQuotaPerCaller,
+                    CurrentOperations = 1,
+                    WindowStartUtc = DateTime.UtcNow
+                };
+                _callerQuotas.Put(callerId, newQuota);
+                return false; // not throttled
+            }
+
+            // Reset quota window if expired (1-hour window).
+            if ((DateTime.UtcNow - quota.WindowStartUtc).TotalHours >= 1)
+            {
+                var resetQuota = quota with { CurrentOperations = 1, WindowStartUtc = DateTime.UtcNow };
+                _callerQuotas.Put(callerId, resetQuota);
+                return false; // not throttled
+            }
+
+            // Over quota — throttle without incrementing.
+            if (quota.CurrentOperations >= quota.MaxOperations)
+                return true;
+
+            // Attempt to atomically increment the count.
+            var updated = quota with { CurrentOperations = quota.CurrentOperations + 1 };
+            // Re-read after constructing updated to detect a concurrent modification.
+            var current = _callerQuotas.GetOrDefault(callerId);
+            if (current?.CurrentOperations != quota.CurrentOperations ||
+                current?.WindowStartUtc != quota.WindowStartUtc)
+            {
+                // Another thread modified the record — retry.
+                continue;
+            }
+            _callerQuotas.Put(callerId, updated);
+            return false; // not throttled
         }
     }
 

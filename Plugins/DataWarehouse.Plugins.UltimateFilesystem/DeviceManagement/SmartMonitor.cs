@@ -302,12 +302,20 @@ public sealed class SmartMonitor
         long reallocatedSectors = 0;
         int powerOnHours = 0;
 
+        // Apply a WMI timeout to prevent indefinite thread-pool thread blocking.
+        // WMI queries can hang on poorly responding drivers; cancel after 10 s.
+        using var wmiCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        wmiCts.CancelAfter(TimeSpan.FromSeconds(10));
+        var wmiToken = wmiCts.Token;
+
         await Task.Run(() =>
         {
-            ct.ThrowIfCancellationRequested();
+            wmiToken.ThrowIfCancellationRequested();
 
             // Read MSStorageDriver_FailurePredictStatus for overall health
             isHealthy = ReadWmiFailurePredictStatus(devicePath, rawAttributes);
+
+            wmiToken.ThrowIfCancellationRequested();
 
             // Read MSStorageDriver_FailurePredictData for SMART attributes
             ReadWmiFailurePredictData(devicePath, rawAttributes,
@@ -315,7 +323,7 @@ public sealed class SmartMonitor
                 out totalBytesRead, out uncorrectableErrors, out reallocatedSectors,
                 out powerOnHours);
 
-        }, ct).ConfigureAwait(false);
+        }, wmiToken).ConfigureAwait(false);
 
         return new PhysicalDeviceHealth(
             IsHealthy: isHealthy,

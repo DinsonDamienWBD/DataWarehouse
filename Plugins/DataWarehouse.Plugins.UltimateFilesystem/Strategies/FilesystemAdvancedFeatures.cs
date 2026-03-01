@@ -795,11 +795,14 @@ public sealed class DistributedHaFilesystemManager
         var overloaded = healthy.Where(n => n.Utilization > avgUtilization + 0.1).ToList();
         var underloaded = healthy.Where(n => n.Utilization < avgUtilization - 0.1).ToList();
 
+        // Round-robin across underloaded nodes so movement is spread rather than
+        // concentrating all data on the first underloaded node (finding 3030).
+        int underloadedIndex = 0;
         foreach (var over in overloaded)
         {
-            var target = underloaded.FirstOrDefault();
-            if (target == null) break;
+            if (underloadedIndex >= underloaded.Count) break;
 
+            var target = underloaded[underloadedIndex++];
             var bytesToMove = (long)((over.Utilization - avgUtilization) * over.CapacityBytes);
             movements.Add(new RebalanceMovement
             {

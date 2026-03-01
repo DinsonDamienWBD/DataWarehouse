@@ -478,6 +478,13 @@ public sealed class DeviceJournal : IAsyncDisposable
                 return;
             }
         }
+
+        // Entry not found — it was evicted from the circular buffer before commit/rollback.
+        // Silently succeeding here would leave a dangling Intent on recovery.
+        throw new InvalidOperationException(
+            $"Journal entry {sequenceNumber} not found in journal area — " +
+            $"it may have been evicted by the circular buffer before the phase transition. " +
+            $"Recovery must treat this transaction as uncommitted and roll it back.");
     }
 
     /// <summary>
