@@ -280,9 +280,16 @@ public abstract class HybridStoragePluginBase<TConfig> : IndexableStoragePluginB
     /// </summary>
     public InstanceHealthStatus GetAggregateHealth()
     {
-        if (!_healthCache.Any()) return InstanceHealthStatus.Unknown;
-        if (_healthCache.Values.All(h => h == InstanceHealthStatus.Healthy)) return InstanceHealthStatus.Healthy;
-        if (_healthCache.Values.Any(h => h == InstanceHealthStatus.Healthy)) return InstanceHealthStatus.Degraded;
+        // Cat 13 (finding 636): single pass over Values to avoid O(3n) multiple enumerations.
+        int total = 0, healthy = 0;
+        foreach (var h in _healthCache.Values)
+        {
+            total++;
+            if (h == InstanceHealthStatus.Healthy) healthy++;
+        }
+        if (total == 0) return InstanceHealthStatus.Unknown;
+        if (healthy == total) return InstanceHealthStatus.Healthy;
+        if (healthy > 0) return InstanceHealthStatus.Degraded;
         return InstanceHealthStatus.Unhealthy;
     }
 

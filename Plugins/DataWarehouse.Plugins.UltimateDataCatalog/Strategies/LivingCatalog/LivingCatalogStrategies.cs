@@ -688,14 +688,8 @@ public sealed class RelationshipDiscoveryStrategy : DataCatalogStrategyBase
                 sourceAssetId, targetAssetId, sourceColumn, targetColumn, 1.0, "foreign_key");
         }
 
-        // Suffix match (e.g., both end with "_id" and have same suffix) = 0.9 "foreign_key"
-        if (srcLower.EndsWith("_id", StringComparison.Ordinal) &&
-            tgtLower.EndsWith("_id", StringComparison.Ordinal) &&
-            string.Equals(srcLower, tgtLower, StringComparison.Ordinal))
-        {
-            // Already handled above by exact match
-            return null;
-        }
+        // LOW-2226: The "_id" suffix-match branch that checked exact equality was dead code
+        // (exact match already handled above). Removed.
 
         // Prefix match after stripping _id suffix = 0.7 "reference"
         var srcStripped = StripIdSuffix(srcLower);

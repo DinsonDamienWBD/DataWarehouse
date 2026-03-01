@@ -45,7 +45,8 @@ public sealed class ConsistentHash : IDisposable
     /// <returns>Bucket index in [0, numBuckets).</returns>
     public static int GetBucket(string key, int numBuckets)
     {
-        if (numBuckets <= 0) return 0;
+        // LOW-2211: Throw instead of silently returning 0 for invalid numBuckets.
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(numBuckets, 0);
         var hash = XxHash32.HashToUInt32(Encoding.UTF8.GetBytes(key));
         return JumpHash(hash, numBuckets);
     }
