@@ -51,7 +51,13 @@ public sealed class JanusGraphStorageStrategy : DatabaseStorageStrategyBase
 
     protected override async Task InitializeCoreAsync(CancellationToken ct)
     {
-        _vertexLabel = GetConfiguration("VertexLabel", "StorageObject");
+        // P2-2805: Validate vertex label to prevent Gremlin injection via configuration.
+        // Label is interpolated directly into Gremlin strings; restrict to safe identifier chars.
+        var rawLabel = GetConfiguration("VertexLabel", "StorageObject");
+        if (!System.Text.RegularExpressions.Regex.IsMatch(rawLabel, @"^[A-Za-z][A-Za-z0-9_]{0,63}$"))
+            throw new ArgumentException(
+                $"VertexLabel '{rawLabel}' must start with a letter and contain only [A-Za-z0-9_] (max 64 chars).");
+        _vertexLabel = rawLabel;
 
         var connectionString = GetConnectionString();
         var uri = new Uri(connectionString);
@@ -82,9 +88,11 @@ public sealed class JanusGraphStorageStrategy : DatabaseStorageStrategyBase
 
     protected override async Task ConnectCoreAsync(CancellationToken ct)
     {
-        // Test connection with a simple query
-        var result = await _client!.SubmitAsync<object>("g.V().limit(1)");
-        await Task.CompletedTask;
+        // P2-2813: Use "g.inject(1)" (no graph traversal needed) to verify the connection
+        // without accidentally loading vertices. Await and consume the result to detect
+        // connectivity failures eagerly rather than discovering them on first real query.
+        var result = await _client!.SubmitAsync<int>("g.inject(1)").ConfigureAwait(false);
+        _ = result.ToList(); // consume to ensure the server responded
     }
 
     protected override async Task DisconnectCoreAsync(CancellationToken ct)

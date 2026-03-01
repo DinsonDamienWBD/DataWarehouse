@@ -121,10 +121,12 @@ public sealed class RangeShardingStrategy : ShardingStrategyBase
     /// <inheritdoc/>
     protected override Task InitializeCoreAsync(CancellationToken ct)
     {
-        // Create default ranges (A-Z split into 4 shards)
+        // Create default ranges covering the printable ASCII space split into 4 shards.
+        // Starting from '\x00' ensures the first range does not inadvertently match ALL keys
+        // (empty string "" compares less than every real key, routing everything to shard-0001).
         var ranges = new[]
         {
-            ("shard-0001", "", "G"),
+            ("shard-0001", "\x00", "G"),
             ("shard-0002", "G", "N"),
             ("shard-0003", "N", "T"),
             ("shard-0004", "T", null as string)

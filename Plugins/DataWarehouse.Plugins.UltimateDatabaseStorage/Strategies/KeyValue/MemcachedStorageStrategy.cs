@@ -28,6 +28,12 @@ public sealed class MemcachedStorageStrategy : DatabaseStorageStrategyBase
     private TimeSpan _defaultExpiration = TimeSpan.Zero;
     // Serializes index read-modify-write to prevent lost-update races.
     private readonly SemaphoreSlim _indexLock = new(1, 1);
+    // P2-2811: In-process index cache to avoid O(n) Memcached round-trips on every
+    // store/delete. Cache is invalidated on every mutation and refreshed from Memcached
+    // lazily. Multi-process deployments still round-trip Memcached under the lock.
+    private HashSet<string>? _cachedIndex;
+    private DateTime _cacheValidUntil = DateTime.MinValue;
+    private static readonly TimeSpan _cacheValidFor = TimeSpan.FromSeconds(5);
 
     public override string StrategyId => "memcached";
     public override string Name => "Memcached Storage";

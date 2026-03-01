@@ -527,7 +527,7 @@ public sealed class AutoShardingStrategy : ShardingStrategyBase
     /// </summary>
     private async Task<IReadOnlyList<ShardInfo>> ExecuteSplitAsync(ShardInfo sourceShard, CancellationToken ct)
     {
-        var operationId = $"split-{Guid.NewGuid():N}".Substring(0, 20);
+        var operationId = $"split-{Guid.NewGuid():N}";
         var record = new AutoShardingOperationRecord
         {
             OperationId = operationId,
@@ -614,7 +614,7 @@ public sealed class AutoShardingStrategy : ShardingStrategyBase
     /// </summary>
     private async Task<ShardInfo> ExecuteMergeAsync(ShardInfo shard1, ShardInfo shard2, CancellationToken ct)
     {
-        var operationId = $"merge-{Guid.NewGuid():N}".Substring(0, 20);
+        var operationId = $"merge-{Guid.NewGuid():N}";
         var record = new AutoShardingOperationRecord
         {
             OperationId = operationId,

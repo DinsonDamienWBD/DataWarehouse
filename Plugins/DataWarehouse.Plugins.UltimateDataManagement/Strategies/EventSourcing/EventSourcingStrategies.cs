@@ -289,10 +289,23 @@ public sealed class EventStoreStrategy : DataManagementStrategyBase
         CancellationToken ct = default)
     {
         ThrowIfNotInitialized();
+        ArgumentException.ThrowIfNullOrWhiteSpace(streamId);
+        ArgumentNullException.ThrowIfNull(events);
         ct.ThrowIfCancellationRequested();
 
         var sw = Stopwatch.StartNew();
         var eventList = events.ToList();
+
+        if (eventList.Count == 0)
+        {
+            return Task.FromResult(new AppendResult
+            {
+                Success = true,
+                StreamId = streamId,
+                EventCount = 0,
+                Duration = TimeSpan.Zero
+            });
+        }
 
         try
         {

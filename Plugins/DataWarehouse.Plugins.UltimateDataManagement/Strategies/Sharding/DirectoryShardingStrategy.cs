@@ -281,7 +281,7 @@ public sealed class DirectoryShardingStrategy : ShardingStrategyBase
         _directory[key] = entry;
         _cache[key] = shardId;
         // Maintain prefix index for wildcard keys (ending with '*') to enable O(log n) lookup.
-        if (key.EndsWith('*', StringComparison.Ordinal))
+        if (key.EndsWith('*'))
         {
             var prefix = key[..^1];
             lock (_prefixIndex) { _prefixIndex[prefix] = shardId; }

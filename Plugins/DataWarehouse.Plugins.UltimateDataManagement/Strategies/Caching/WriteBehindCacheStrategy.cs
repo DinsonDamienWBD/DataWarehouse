@@ -303,9 +303,27 @@ public sealed class WriteBehindCacheStrategy : CachingStrategyBase
     public async Task FlushAsync(CancellationToken ct = default)
     {
         var pending = _pendingWrites.Values.ToList();
+        List<Exception>? errors = null;
         foreach (var operation in pending)
         {
-            await ProcessOperationAsync(operation, ct);
+            try
+            {
+                await ProcessOperationAsync(operation, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                throw; // Propagate cancellation immediately
+            }
+            catch (Exception ex)
+            {
+                errors ??= new List<Exception>();
+                errors.Add(ex);
+            }
+        }
+
+        if (errors != null)
+        {
+            throw new AggregateException("One or more write-behind flush operations failed.", errors);
         }
     }
 

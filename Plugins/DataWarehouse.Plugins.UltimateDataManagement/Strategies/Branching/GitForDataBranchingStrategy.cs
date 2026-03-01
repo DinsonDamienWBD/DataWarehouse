@@ -435,13 +435,17 @@ public sealed class GitForDataBranchingStrategy : BranchingStrategyBase
 
     private string? FindCommonAncestor(ObjectStore store, DataBranch a, DataBranch b)
     {
+        // Build O(1) lookup index: branchId -> branch, to replace O(n) FirstOrDefault scans.
+        // This converts the worst-case O(n * depth) algorithm to O(n + depth).
+        var branchById = store.Branches; // already a dictionary keyed by BranchId
+
         var aAncestors = new HashSet<string>();
         var current = a;
         while (current != null)
         {
             aAncestors.Add(current.BranchId);
             if (current.ParentBranchId == null) break;
-            current = store.Branches.Values.FirstOrDefault(br => br.BranchId == current.ParentBranchId);
+            branchById.TryGetValue(current.ParentBranchId, out current!);
         }
 
         current = b;
@@ -450,7 +454,7 @@ public sealed class GitForDataBranchingStrategy : BranchingStrategyBase
             if (aAncestors.Contains(current.BranchId))
                 return current.Name;
             if (current.ParentBranchId == null) break;
-            current = store.Branches.Values.FirstOrDefault(br => br.BranchId == current.ParentBranchId);
+            branchById.TryGetValue(current.ParentBranchId, out current!);
         }
 
         return null;

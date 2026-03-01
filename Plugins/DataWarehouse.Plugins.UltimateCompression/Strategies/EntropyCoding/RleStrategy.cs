@@ -163,8 +163,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
                     runLength++;
                 }
 
-                // Decide whether to encode as run
-                if (runLength >= MinRunLength || currentByte == EscapeByte)
+                // Decide whether to encode as run (use configured _minRunLength)
+                if (runLength >= _minRunLength || currentByte == EscapeByte)
                 {
                     // Encode as run
                     output.WriteByte(EscapeByte);
@@ -256,7 +256,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
         /// <inheritdoc/>
         protected override Stream CreateCompressionStreamCore(Stream output, bool leaveOpen)
         {
-            return new RleCompressionStream(output, leaveOpen);
+            return new RleCompressionStream(output, leaveOpen, _minRunLength);
         }
 
         /// <inheritdoc/>
@@ -285,11 +285,13 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
             private int _bufferPos;
             private bool _disposed;
             private bool _headerWritten;
+            private readonly int _minRunLength;
 
-            public RleCompressionStream(Stream output, bool leaveOpen)
+            public RleCompressionStream(Stream output, bool leaveOpen, int minRunLength = MinRunLength)
             {
                 _output = output;
                 _leaveOpen = leaveOpen;
+                _minRunLength = minRunLength;
             }
 
             public override bool CanRead => false;
@@ -341,7 +343,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
                         runLength++;
                     }
 
-                    if (runLength >= MinRunLength || currentByte == EscapeByte)
+                    if (runLength >= _minRunLength || currentByte == EscapeByte)
                     {
                         _output.WriteByte(EscapeByte);
                         _output.WriteByte((byte)runLength);

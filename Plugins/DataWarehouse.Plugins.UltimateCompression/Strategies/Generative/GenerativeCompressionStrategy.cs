@@ -1604,15 +1604,26 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Generative
 
         private static byte[] DecompressGenerative(byte[] data)
         {
-            if (data.Length < 4) return Array.Empty<byte>();
+            if (data.Length < 4)
+                throw new InvalidDataException($"Generative decompression requires at least 4 header bytes, got {data.Length}.");
 
             int length = (data[0] << 24) | (data[1] << 16) | (data[2] << 8) | data[3];
-            if (length <= 0 || length > 100_000_000) return Array.Empty<byte>();
+            if (length < 0 || length > 100_000_000)
+                throw new InvalidDataException($"Generative decompression: invalid length header {length}.");
+
+            if (length == 0)
+                return Array.Empty<byte>();
+
+            // Validate that the compressed payload is large enough for all expected delta bytes
+            int expectedDataBytes = length + 4; // 4-byte header + 'length' delta bytes
+            if (data.Length < expectedDataBytes)
+                throw new InvalidDataException(
+                    $"Generative decompression: compressed data truncated. Expected {expectedDataBytes} bytes, got {data.Length}.");
 
             var result = new byte[length];
             byte prev = 0;
 
-            for (int i = 0; i < length && i + 4 < data.Length; i++)
+            for (int i = 0; i < length; i++)
             {
                 byte delta = data[i + 4];
                 result[i] = (byte)(prev + delta);

@@ -1,5 +1,8 @@
 using System.Diagnostics;
+using System.Net.Http;
 using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Lifecycle;
@@ -738,7 +741,25 @@ public sealed class DataArchivalStrategy : LifecycleStrategyBase
             // Notify via callback if configured
             if (!string.IsNullOrEmpty(request.CallbackUrl))
             {
-                // Would send HTTP callback notification
+                try
+                {
+                    var payload = JsonSerializer.Serialize(new
+                    {
+                        objectId = request.ObjectId,
+                        retrievalId = status.RetrievalId,
+                        completedAt = status.CompletedAt,
+                        bytesRestored = status.BytesRestored,
+                        success = true
+                    });
+                    using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+                    using var content = new StringContent(payload, Encoding.UTF8, "application/json");
+                    await httpClient.PostAsync(request.CallbackUrl, content).ConfigureAwait(false);
+                }
+                catch (Exception cbEx)
+                {
+                    // Callback failure is non-fatal; log and continue
+                    System.Diagnostics.Debug.WriteLine($"[DataArchival] Callback to '{request.CallbackUrl}' failed: {cbEx.Message}");
+                }
             }
         }
         catch (OperationCanceledException)

@@ -264,14 +264,14 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
                 var right = heap.Dequeue();
                 var rightFreq = right.Frequency;
 
+                long combinedFreq = leftFreq + rightFreq;
                 var parent = new HuffmanNode
                 {
                     Left = left,
                     Right = right,
-                    IsLeaf = false
+                    IsLeaf = false,
+                    Frequency = combinedFreq  // Stored for debugging/inspection; priority queue also uses combinedFreq
                 };
-                long combinedFreq = leftFreq + rightFreq;
-                parent.Frequency = combinedFreq;
                 heap.Enqueue(parent, combinedFreq);
             }
 
