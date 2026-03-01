@@ -43,10 +43,16 @@ namespace DataWarehouse.SDK.Contracts.Composition
         public SchemaEvolutionDecision Decision { get; init; } = SchemaEvolutionDecision.Pending;
 
         /// <summary>
-        /// Username who approved/rejected this proposal.
+        /// Username who approved this proposal.
         /// Null for auto-approved proposals.
         /// </summary>
         public string? ApprovedBy { get; init; }
+
+        /// <summary>
+        /// Username who rejected this proposal.
+        /// Null when not rejected.
+        /// </summary>
+        public string? RejectedBy { get; init; }
 
         /// <summary>
         /// Timestamp when the decision was made.

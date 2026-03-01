@@ -86,7 +86,8 @@ namespace DataWarehouse.Plugins.UltimateDataIntegration.Composition
 
             // Start periodic pattern detection timer
             _detectionTimer = new Timer(
-                callback: _ => RequestPatternDetection(),
+                // P2-2317: observe the returned Task so exceptions are not silently swallowed.
+                callback: _ => _ = RequestPatternDetection(),
                 state: null,
                 dueTime: _config.DetectionInterval,
                 period: _config.DetectionInterval);
@@ -236,7 +237,8 @@ namespace DataWarehouse.Plugins.UltimateDataIntegration.Composition
             var rejectedProposal = proposal with
             {
                 Decision = SchemaEvolutionDecision.Rejected,
-                ApprovedBy = rejectedBy,
+                // P2-2302: use RejectedBy — not ApprovedBy — for rejection records
+                RejectedBy = rejectedBy,
                 DecidedAt = DateTimeOffset.UtcNow
             };
 
@@ -495,7 +497,10 @@ namespace DataWarehouse.Plugins.UltimateDataIntegration.Composition
         /// </summary>
         public void Dispose()
         {
+            // P2-2318: set _disposed first so concurrent Start/Stop cannot use resources
+            // that are mid-disposal.
             if (_disposed) return;
+            _disposed = true;
 
             _detectionTimer?.Dispose();
             foreach (var sub in _subscriptions)
@@ -503,8 +508,6 @@ namespace DataWarehouse.Plugins.UltimateDataIntegration.Composition
                 sub.Dispose();
             }
             _subscriptions.Clear();
-
-            _disposed = true;
         }
     }
 }
