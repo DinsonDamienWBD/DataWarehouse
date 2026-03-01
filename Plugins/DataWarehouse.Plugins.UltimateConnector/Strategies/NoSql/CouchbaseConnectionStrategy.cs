@@ -81,9 +81,12 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
 
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
+            // P2-2180: Measure actual latency with Stopwatch instead of hardcoded value.
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             var isHealthy = await TestCoreAsync(handle, ct);
+            sw.Stop();
             return new ConnectionHealth(isHealthy, isHealthy ? "Couchbase healthy" : "Couchbase unhealthy",
-                TimeSpan.FromMilliseconds(10), DateTimeOffset.UtcNow);
+                sw.Elapsed, DateTimeOffset.UtcNow);
         }
 
         /// <summary>

@@ -46,8 +46,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
 
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
+            // P2-2180: Measure actual latency with Stopwatch instead of hardcoded value.
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             var isHealthy = await TestCoreAsync(handle, ct);
-            return new ConnectionHealth(isHealthy, isHealthy ? "DuckDB healthy" : "DuckDB unhealthy", TimeSpan.FromMilliseconds(1), DateTimeOffset.UtcNow);
+            sw.Stop();
+            return new ConnectionHealth(isHealthy, isHealthy ? "DuckDB healthy" : "DuckDB unhealthy", sw.Elapsed, DateTimeOffset.UtcNow);
         }
 
         public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
