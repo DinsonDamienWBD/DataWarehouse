@@ -4891,9 +4891,44 @@ public sealed class AccessRecord
     public required string ObjectId { get; init; }
     public string? ContentType { get; init; }
     public required DateTime CreatedAt { get; init; }
-    public DateTime? LastReadAt { get; set; }
-    public DateTime? LastWriteAt { get; set; }
-    public DateTime LastAccessAt { get; set; }
+    public DateTime? LastReadAt
+{
+    get
+    {
+        var t = Interlocked.Read(ref _lastReadAtTicks);
+        return t == 0 ? null : new DateTime(t, DateTimeKind.Utc);
+    }
+
+    set
+    {
+        Interlocked.Exchange(ref _lastReadAtTicks, value?.Ticks ?? 0L);
+    }
+}
+    public DateTime? LastWriteAt
+{
+    get
+    {
+        var t = Interlocked.Read(ref _lastWriteAtTicks);
+        return t == 0 ? null : new DateTime(t, DateTimeKind.Utc);
+    }
+
+    set
+    {
+        Interlocked.Exchange(ref _lastWriteAtTicks, value?.Ticks ?? 0L);
+    }
+}
+    public DateTime LastAccessAt
+{
+    get
+    {
+        return new DateTime(Interlocked.Read(ref _lastAccessAtTicks), DateTimeKind.Utc);
+    }
+
+    set
+    {
+        Interlocked.Exchange(ref _lastAccessAtTicks, value.Ticks);
+    }
+}
     public long ReadCount;
     public long WriteCount;
     public long TotalAccessCount;;
