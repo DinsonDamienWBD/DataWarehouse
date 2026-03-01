@@ -4054,10 +4054,10 @@
 | 2512 | 2 | P1 | `UltimateDataMesh/Scaling/DataMeshScalingManager.cs:344-371` | Non-atomic check-then-act on `_entityTimestamps` and `cache.Put`. Concurrent threads interleave between timestamp read and cache write. | [X]
 | 2513 | 5 | P1 | `UltimateDataMesh/UltimateDataMeshPlugin.cs:540,553,566,579,592` | Five `catch { /* corrupted state */ }` blocks in OnStartCoreAsync swallow all deserialization exceptions without logging. | [X]
 | 2514 | 5 | P1 | `UltimateDataPrivacy/DataPrivacyStrategyBase.cs:113` | Bare `catch { }` in `AutoDiscover` swallows all strategy instantiation exceptions. Registration failures invisible. | [X]
-| 2515 | 3 | P2 | `UltimateDataPrivacy/DataPrivacyStrategyBase.cs:78-81` | `IsHealthy()` calls `.GetAwaiter().GetResult()` on async method. Sync-over-async deadlock risk under thread-pool saturation. | [ ]
-| 2516 | 2 | P2 | `UltimateDataPrivacy/Strategies/DifferentialPrivacy/DifferentialPrivacyEnhancedStrategies.cs:89-92` | `_queryHistory.AddOrUpdate` initial-value lambda outside lock. Two concurrent first-calls for same key can drop a query. | [ ]
-| 2517 | 10 | P2 | `UltimateDataPrivacy/Strategies/DifferentialPrivacy/DifferentialPrivacyEnhancedStrategies.cs:51-115` | `ConsumePrivacy` performs budget check and update as two separate non-atomic operations. Concurrent callers can overshoot privacy budget. | [ ]
-| 2518 | 13 | P2 | `UltimateDataPrivacy/Strategies/DifferentialPrivacy/DifferentialPrivacyEnhancedStrategies.cs:416-439` | `PiiDetectionStrategy.Scan` compiles new Regex per call in nested loop over all PII patterns. Should pre-compile. | [ ]
+| 2515 | 3 | P2 | `UltimateDataPrivacy/DataPrivacyStrategyBase.cs:78-81` | `IsHealthy()` calls `.GetAwaiter().GetResult()` on async method. Sync-over-async deadlock risk under thread-pool saturation. | [X]
+| 2516 | 2 | P2 | `UltimateDataPrivacy/Strategies/DifferentialPrivacy/DifferentialPrivacyEnhancedStrategies.cs:89-92` | `_queryHistory.AddOrUpdate` initial-value lambda outside lock. Two concurrent first-calls for same key can drop a query. | [X]
+| 2517 | 10 | P2 | `UltimateDataPrivacy/Strategies/DifferentialPrivacy/DifferentialPrivacyEnhancedStrategies.cs:51-115` | `ConsumePrivacy` performs budget check and update as two separate non-atomic operations. Concurrent callers can overshoot privacy budget. | [X]
+| 2518 | 13 | P2 | `UltimateDataPrivacy/Strategies/DifferentialPrivacy/DifferentialPrivacyEnhancedStrategies.cs:416-439` | `PiiDetectionStrategy.Scan` compiles new Regex per call in nested loop over all PII patterns. Should pre-compile. | [X]
 | 2519 | 14 | LOW | `UltimateDataPrivacy/Strategies/DifferentialPrivacy/DifferentialPrivacyEnhancedStrategies.cs:29-45` | `InitializeBudget` no validation that `totalEpsilon > 0` or `totalDelta >= 0`. Zero/negative epsilon produces nonsensical results. | [ ]
 | 2520 | 14 | LOW | `UltimateDataPrivacy/Strategies/DifferentialPrivacy/DifferentialPrivacyEnhancedStrategies.cs:213-239` | `SubmitContribution` no finite check on `value`. NaN/Infinity corrupts aggregate result. | [ ]
 | 2521 | 15 | LOW | `UltimateDataPrivacy/Strategies/DifferentialPrivacy/DifferentialPrivacyEnhancedStrategies.cs:384-406` | `PiiDetectionStrategy` has `Category = DifferentialPrivacy` but PII detection is classification, not DP. Misleading category. | [ ]
@@ -4251,7 +4251,7 @@
 | 2655 | 3 | P1 | `UltimateDataTransit/QoS/QoSThrottlingManager.cs:490,501` | `ThrottledStream.Read`/`Write` use `Task.Run(() => ConsumeAsync()).GetResult()`. Sync-over-async blocks thread pool thread. | [X]
 | 2656 | 13 | P2 | `UltimateDataQuality/Strategies/DuplicateDetection/DuplicateDetectionStrategies.cs:255,506-527` | `SelectMaster` uses `List.Contains` O(n) in loop. `CalculateGroupSimilarity` O(n²) unbounded. | [X]
 | 2657 | 13 | P2 | `UltimateDataQuality/Strategies/PredictiveQuality/PredictiveQualityStrategies.cs:929-935` | `AnalyzeRootCause` O(n×m) nested foreach with Any() LINQ. | [X]
-| 2658 | 2 | P2 | `UltimateDataTransit/QoS/QoSThrottlingManager.cs:296-340` | `TokenBucket.TryConsumeAsync` double-release semaphore guard is fragile. SemaphoreFullException caught silently. | [ ]
+| 2658 | 2 | P2 | `UltimateDataTransit/QoS/QoSThrottlingManager.cs:296-340` | `TokenBucket.TryConsumeAsync` double-release semaphore guard is fragile. SemaphoreFullException caught silently. | [X]
 | 2659 | 10 | P2 | `UltimateDataQuality/Strategies/Reporting/ReportingStrategies.cs:497-523` | `GenerateCsvReport` does not escape field names or dimension names for CSV. Malformed output on commas/newlines. | [X]
 | 2660 | 12 | P2 | `UltimateDataQuality/Strategies/Scoring/ScoringStrategies.cs:443-446` | All aggregated top issues assigned `Dimension = Validity` regardless of actual dimension. Downstream filtering corrupted. | [X]
 | 2661 | 14 | P2 | `UltimateDataQuality/Strategies/Monitoring/MonitoringStrategies.cs:614-616` | `CheckThresholds` warning formula inverted: `warningLevel = minValue / warningThreshold`. For 0.9 threshold, fires when metric < 111 (above minimum). Always fires. | [X]
@@ -4281,11 +4281,11 @@
 | 2676 | 6 | P1 | `UltimateDataTransit/Strategies/P2PSwarmStrategy.cs:611` | `Task.Run` body: null-ref from `SelectPeer` before inner `try` would propagate without releasing semaphore slot. | [X]
 | 2677 | 10 | P1 | `UltimateDataTransit/Strategies/MultiPathParallelStrategy.cs:792` | `state.Request?.DataStream` null-conditional masks root cause — resume path may not have original stream, not validated before parallel transfer begins. | [X]
 | 2678 | 4 | P1 | `UltimateDataTransit/Strategies/ScpRsyncTransitStrategy.cs:126-131` | Catch block swallows all errors (file not found vs connection refused) during delta download, silently triggers full upload. | [X]
-| 2679 | 12 | P2 | `UltimateDataTransit/Strategies/ScpRsyncTransitStrategy.cs:172-173` | `TransferAsync` computes `dataToTransfer` via delta but uploads `sourceData` (full source) instead. Delta detection completely useless — logic bug. | [ ]
-| 2680 | 13 | P2 | `UltimateDataTransit/Strategies/MultiPathParallelStrategy.cs:735` | `state.Segments.Count(s => s.Completed)` O(n) LINQ scan on every segment completion in hot concurrent loop. O(n²) aggregate. | [ ]
-| 2681 | 13 | P2 | `UltimateDataTransit/Strategies/P2PSwarmStrategy.cs:556-557` | Rarity sort uses nested LINQ `Count(p => p.PieceBitmap[i])` per piece. O(N×M) for N pieces × M peers. | [ ]
-| 2682 | 13 | P2 | `UltimateDataTransit/Strategies/DeltaDifferentialStrategy.cs:382` | `ComputeDeltaInstructions` recomputes `Adler32` over full block per byte position instead of using implemented `RollHash` O(1) update. O(n) degrades to O(n×blockSize). | [ ]
-| 2683 | 7 | P2 | `UltimateDataTransit/Strategies/GrpcStreamingTransitStrategy.cs:140-142` | Pull-mode `HttpResponseMessage` never disposed. Same in `Http3TransitStrategy.cs:136-138`. | [ ]
+| 2679 | 12 | P2 | `UltimateDataTransit/Strategies/ScpRsyncTransitStrategy.cs:172-173` | `TransferAsync` computes `dataToTransfer` via delta but uploads `sourceData` (full source) instead. Delta detection completely useless — logic bug. | [X]
+| 2680 | 13 | P2 | `UltimateDataTransit/Strategies/MultiPathParallelStrategy.cs:735` | `state.Segments.Count(s => s.Completed)` O(n) LINQ scan on every segment completion in hot concurrent loop. O(n²) aggregate. | [X]
+| 2681 | 13 | P2 | `UltimateDataTransit/Strategies/P2PSwarmStrategy.cs:556-557` | Rarity sort uses nested LINQ `Count(p => p.PieceBitmap[i])` per piece. O(N×M) for N pieces × M peers. | [X]
+| 2682 | 13 | P2 | `UltimateDataTransit/Strategies/DeltaDifferentialStrategy.cs:382` | `ComputeDeltaInstructions` recomputes `Adler32` over full block per byte position instead of using implemented `RollHash` O(1) update. O(n) degrades to O(n×blockSize). | [X]
+| 2683 | 7 | P2 | `UltimateDataTransit/Strategies/GrpcStreamingTransitStrategy.cs:140-142` | Pull-mode `HttpResponseMessage` never disposed. Same in `Http3TransitStrategy.cs:136-138`. | [X]
 | 2684 | 2 | P2 | `UltimateDatabaseProtocol/DatabaseProtocolStrategyBase.cs:997` | `ResetStatistics` writes `_lastUpdateTime` without lock/volatile. Technically undefined in C# memory model. | [X]
 | 2685 | 12 | LOW | `UltimateDataTransit/UltimateDataTransitPlugin.cs:789-793` | `TransferAsync(string key, ...)` returns hardcoded `"delegated-to-strategy"` without delegating. Rule 13 placeholder. | [ ]
 | 2686 | 14 | LOW | `UltimateDataTransit/Strategies/ChunkedResumableStrategy.cs:637-646` | `DetermineChunkSize` no upper bound. `int.MaxValue` (2GB) chunk size accepted, causing massive allocation. | [ ]
@@ -5322,9 +5322,9 @@
 | 3447 | 12 | P2 | `UltimateKeyManagement/Features/ZeroDowntimeRotation.cs:166-169` | `ValidateKey` returns `IsValid = keyStore != null` without verifying keyId exists in store. Any keyId "valid" if store exists. | [X]
 | 3448 | 9 | P2 | `UltimateKeyManagement/Migration/PluginMigrationHelper.cs:113-115` | `ScanForDeprecatedReferencesAsync` fans out unlimited parallel file I/O via `Task.WhenAll`. Can exhaust thread pool + file handles. | [X]
 | 3449 | 12 | P2 | `UltimateKeyManagement/Strategies/AdvancedKeyOperations.cs:248-262` | `AdvancedHkdfStrategy.GetKeyMetadataAsync` returns `CreatedAt = DateTime.UtcNow` always. Key age unknowable for rotation policies. | [X]
-| 3450 | 15 | LOW | `UltimateKeyManagement/Strategies/CloudKms/AlibabaKmsStrategy.cs:70` | All 4 cloud KMS strategies create `new HttpClient()` in singleton constructors. Socket exhaustion over time. Use IHttpClientFactory. | [ ]
-| 3451 | 15 | LOW | `UltimateKeyManagement/Features/KeyEscrowRecovery.cs:992` | `EncryptedShares` property name is a lie — stores unencrypted shares. | [ ]
-| 3452 | 15 | LOW | `UltimateKeyManagement/Strategies/AdvancedKeyOperations.cs:81-85` | `_masterIkm` defaults to random 32 bytes on each restart if not configured. Silently breaks decryption across restarts. | [ ]
+| 3450 | 15 | LOW | `UltimateKeyManagement/Strategies/CloudKms/AlibabaKmsStrategy.cs:70` | All 4 cloud KMS strategies create `new HttpClient()` in singleton constructors. Socket exhaustion over time. Use IHttpClientFactory. | [X]
+| 3451 | 15 | LOW | `UltimateKeyManagement/Features/KeyEscrowRecovery.cs:992` | `EncryptedShares` property name is a lie — stores unencrypted shares. | [X]
+| 3452 | 15 | LOW | `UltimateKeyManagement/Strategies/AdvancedKeyOperations.cs:81-85` | `_masterIkm` defaults to random 32 bytes on each restart if not configured. Silently breaks decryption across restarts. | [X]
 
 **Clean files:** TamperProofEncryptionIntegration.cs
 
@@ -5349,11 +5349,11 @@
 | 3471 | 14 | P2 | `UltimateKeyManagement/Strategies/Database/SqlTdeMetadataStrategy.cs:348-354` | `ImportCertificateFromFileAsync` sets `HasPrivateKey=true` for .pvk file that is never parsed. Contract lie. | [X]
 | 3472 | 13 | P2 | `UltimateKeyManagement/Strategies/DevCiCd/BitwardenConnectStrategy.cs:440-461` | `GetSecretIdByNameAsync` lists all secrets on every key lookup. O(n) per operation. Cache not populated on save. | [X]
 | 3473 | 9 | P2 | `UltimateKeyManagement/Strategies/DevCiCd/EnvironmentKeyStoreStrategy.cs:104-114` | `LoadKeyFromStorage` silently swallows base64 decode errors, falls through to `DeriveKeyFromString`. Silent key substitution. | [X]
-| 3474 | 15 | LOW | `UltimateKeyManagement/Strategies/CloudKms/GcpKmsStrategy.cs:392-397` | ADC auth advertised in docs but throws `InvalidOperationException("not implemented")`. Contract lie. | [ ]
-| 3475 | 8 | LOW | `UltimateKeyManagement/Strategies/DevCiCd/EnvironmentKeyStoreStrategy.cs:146` | `Trace.TraceInformation` emits base64-encoded key material to trace log. Secret-in-logs violation. | [ ]
-| 3476 | 15 | LOW | `UltimateKeyManagement/Strategies/DevCiCd/GitCryptStrategy.cs:59` | `EncryptionType = "AES-256-CTR"` but git-crypt uses AES-256-GCM or CBC depending on version. | [ ]
-| 3477 | 13 | LOW | `UltimateKeyManagement/Strategies/DevCiCd/AgeStrategy.cs:601-602` | `SecureDeleteFile` caps overwrite at 1MB. Private keys >1MB partially survive on disk. | [ ]
-| 3478 | 15 | LOW | `UltimateKeyManagement/Strategies/Container/SopsStrategy.cs:58` | `Capabilities.SupportsHsm = true` unconditionally but only valid for specific backends, not age. | [ ]
+| 3474 | 15 | LOW | `UltimateKeyManagement/Strategies/CloudKms/GcpKmsStrategy.cs:392-397` | ADC auth advertised in docs but throws `InvalidOperationException("not implemented")`. Contract lie. | [X]
+| 3475 | 8 | LOW | `UltimateKeyManagement/Strategies/DevCiCd/EnvironmentKeyStoreStrategy.cs:146` | `Trace.TraceInformation` emits base64-encoded key material to trace log. Secret-in-logs violation. | [X]
+| 3476 | 15 | LOW | `UltimateKeyManagement/Strategies/DevCiCd/GitCryptStrategy.cs:59` | `EncryptionType = "AES-256-CTR"` but git-crypt uses AES-256-GCM or CBC depending on version. | [X]
+| 3477 | 13 | LOW | `UltimateKeyManagement/Strategies/DevCiCd/AgeStrategy.cs:601-602` | `SecureDeleteFile` caps overwrite at 1MB. Private keys >1MB partially survive on disk. | [X]
+| 3478 | 15 | LOW | `UltimateKeyManagement/Strategies/Container/SopsStrategy.cs:58` | `Capabilities.SupportsHsm = true` unconditionally but only valid for specific backends, not age. | [X]
 
 **Clean files:** KubernetesSecretsStrategy.cs (minor issues only)
 
@@ -5383,11 +5383,11 @@
 | 3499 | 1 | P2 | `UltimateKeyManagement/Strategies/Hardware/TrezorStrategy.cs:690-705` | `ParseFeatures` is heuristic stub — model detection uses `payload.Length > 50 ? "Model T" : "Model One"`. `text` variable assigned but never used. | [X]
 | 3500 | 2 | P2 | `UltimateKeyManagement/Strategies/Hsm/HsmRotationStrategy.cs:382-395` | Audit trail `List<T>` mutated without synchronisation via `AddOrUpdate`. Timer fires independently; concurrent mutations can corrupt the list. | [X]
 | 3501 | 2 | P2 | `UltimateKeyManagement/Strategies/Hsm/FortanixDsmStrategy.cs:447-482` | `_accessToken` and `_tokenExpiry` have no synchronisation. Concurrent calls can race on token refresh. | [X]
-| 3502 | 12 | LOW | `UltimateKeyManagement/Strategies/Hardware/LedgerStrategy.cs:246` | `string.GetHashCode()` used as BIP32 key index — randomised per-process in .NET 6+. Same keyId maps to different key on each restart. | [ ]
-| 3503 | 15 | LOW | `UltimateKeyManagement/Strategies/Hardware/NitrokeyStrategy.cs:56` | `MaxKeySizeBytes = 0`. Zero as "unlimited" is ambiguous; consumers validating `keyData.Length <= MaxKeySizeBytes` always fail. | [ ]
-| 3504 | 12 | LOW | `UltimateKeyManagement/Strategies/Hardware/QkdStrategy.cs:234` | `new Random()` inside hot path — unseeded, returns correlated values. Use `Random.Shared`. | [ ]
-| 3505 | 15 | LOW | `UltimateKeyManagement/Strategies/Hardware/TrezorStrategy.cs:234-248` | `SaveKeyToStorage` discards `keyData` without warning. Same contract lie as LedgerStrategy. | [ ]
-| 3506 | 12 | LOW | `UltimateKeyManagement/Strategies/Hsm/AzureDedicatedHsmStrategy.cs:450` | `Version = 1` hardcoded in `GetKeyMetadataAsync`. Comment says "Could parse" but always returns 1. | [ ]
+| 3502 | 12 | LOW | `UltimateKeyManagement/Strategies/Hardware/LedgerStrategy.cs:246` | `string.GetHashCode()` used as BIP32 key index — randomised per-process in .NET 6+. Same keyId maps to different key on each restart. | [X]
+| 3503 | 15 | LOW | `UltimateKeyManagement/Strategies/Hardware/NitrokeyStrategy.cs:56` | `MaxKeySizeBytes = 0`. Zero as "unlimited" is ambiguous; consumers validating `keyData.Length <= MaxKeySizeBytes` always fail. | [X]
+| 3504 | 12 | LOW | `UltimateKeyManagement/Strategies/Hardware/QkdStrategy.cs:234` | `new Random()` inside hot path — unseeded, returns correlated values. Use `Random.Shared`. | [X]
+| 3505 | 15 | LOW | `UltimateKeyManagement/Strategies/Hardware/TrezorStrategy.cs:234-248` | `SaveKeyToStorage` discards `keyData` without warning. Same contract lie as LedgerStrategy. | [X]
+| 3506 | 12 | LOW | `UltimateKeyManagement/Strategies/Hsm/AzureDedicatedHsmStrategy.cs:450` | `Version = 1` hardcoded in `GetKeyMetadataAsync`. Comment says "Could parse" but always returns 1. | [X]
 
 **Clean files:** NcipherStrategy.cs (inherits Pkcs11 base only), ThalesLunaStrategy.cs, UtimacoStrategy.cs
 
@@ -5431,11 +5431,11 @@
 | 3554 | 10 | P2 | `UltimateKeyManagement/Strategies/IndustryFirst/StellarAnchorsStrategy.cs:565` | `long.Parse(tx.PagingToken ?? "0")` — PagingToken is opaque Horizon cursor, not numeric sequence number. Semantically incorrect and fragile. | [X]
 | 3555 | 5 | P2 | `UltimateKeyManagement/Strategies/IndustryFirst/StellarAnchorsStrategy.cs:574-578` | Silent catch in inner loop of `ScanBlockchainHistory`. Per-transaction processing errors silently swallowed. | [X]
 | 3556 | 5 | P2 | `UltimateKeyManagement/Strategies/IndustryFirst/TimeLockPuzzleStrategy.cs:765-766` | Silent catch in `LoadKeysFromStorage`. Load failures silently ignored. | [X]
-| 3557 | 15 | LOW | `UltimateKeyManagement/Strategies/Hsm/Pkcs11HsmStrategyBase.cs:439` | Counter label `"hsm.sign"` emitted inside `UnwrapKeyAsync`. Should be `"hsm.unwrap"`. Misleads metrics dashboards. | [ ]
+| 3557 | 15 | LOW | `UltimateKeyManagement/Strategies/Hsm/Pkcs11HsmStrategyBase.cs:439` | Counter label `"hsm.sign"` emitted inside `UnwrapKeyAsync`. Should be `"hsm.unwrap"`. Misleads metrics dashboards. | [X]
 | 3558 | 13 | LOW | `UltimateKeyManagement/Strategies/IndustryFirst/BiometricDerivedKeyStrategy.cs:~631` | Dead code: `var prk = new byte[32]` allocated but never read or returned. | [X]
 | 3559 | 5 | LOW | `UltimateKeyManagement/Strategies/IndustryFirst/GeoLockedKeyStrategy.cs:625-626` | Silent catch in `LoadKeysFromStorage`. Startup load failures silently ignored. | [X]
 | 3560 | 5 | LOW | `UltimateKeyManagement/Strategies/IndustryFirst/QuantumKeyDistributionStrategy.cs:724-727` | Silent catch in `LoadCachedKeys`. Storage load failures silently ignored. | [X]
-| 3561 | 10 | LOW | `UltimateKeyManagement/Strategies/IndustryFirst/StellarAnchorsStrategy.cs:331` | Memo truncated to 28 bytes without logging. Metadata exceeding 28 bytes silently dropped. | [ ]
+| 3561 | 10 | LOW | `UltimateKeyManagement/Strategies/IndustryFirst/StellarAnchorsStrategy.cs:331` | Memo truncated to 28 bytes without logging. Metadata exceeding 28 bytes silently dropped. | [X]
 | 3562 | 5 | LOW | `UltimateKeyManagement/Strategies/IndustryFirst/VerifiableDelayStrategy.cs:781-782` | Silent catch in `LoadKeysFromStorage`. Load failures silently ignored. | [X]
 
 **Clean files:** ThalesLunaStrategy.cs, UtimacoStrategy.cs
@@ -5460,9 +5460,9 @@
 | 3575 | 14 | P2 | `UltimateKeyManagement/Strategies/SecretsManagement/AkeylessStrategy.cs:115-135` | `LoadKeyFromStorage` no null/format validation on `keyBase64` before `FromBase64String`. Unexpected API response → unhandled exception with no context. | [X]
 | 3576 | 14 | P2 | `UltimateKeyManagement/Strategies/Privacy/SmpcVaultStrategy.cs:746-752` | `UnwrapKeyAsync` reads `ephemeralLen` from untrusted wire data (`ReadInt32()`), passes directly to `ReadBytes`. Large value → huge heap allocation. Missing max-size bound check. | [X]
 | 3577 | 1 | P2 | `UltimateKeyManagement/Strategies/Privacy/SmpcVaultStrategy.cs:435` | DKG round 1 sends raw unencrypted shares in `encryptedShares`. Comment: "In production: Encrypt share with party i's public key." Variable name implies encryption that doesn't exist. | [X]
-| 3578 | 13 | LOW | `UltimateKeyManagement/Strategies/PasswordDerived/PasswordDerivedBalloonStrategy.cs:330-344` | `BalloonHash` inner loop allocates `byte[]` per iteration via `.Concat().ToArray()`. ~147K allocations per key derivation with default params. | [ ]
-| 3579 | 4 | LOW | `UltimateKeyManagement/Strategies/Platform/LinuxSecretServiceStrategy.cs:376-379` | `DeriveMachineKey` uses static salt `"DataWarehouse.Linux.SecretService.Salt.v1"`. Predictable salt eliminates per-key uniqueness benefit. | [ ]
-| 3580 | 15 | LOW | `UltimateKeyManagement/Strategies/SecretsManagement/BeyondTrustStrategy.cs:88` | `GetCurrentKeyIdAsync` always returns hardcoded `"default"`. Method name implies active key tracking that doesn't exist. | [ ]
+| 3578 | 13 | LOW | `UltimateKeyManagement/Strategies/PasswordDerived/PasswordDerivedBalloonStrategy.cs:330-344` | `BalloonHash` inner loop allocates `byte[]` per iteration via `.Concat().ToArray()`. ~147K allocations per key derivation with default params. | [X]
+| 3579 | 4 | LOW | `UltimateKeyManagement/Strategies/Platform/LinuxSecretServiceStrategy.cs:376-379` | `DeriveMachineKey` uses static salt `"DataWarehouse.Linux.SecretService.Salt.v1"`. Predictable salt eliminates per-key uniqueness benefit. | [X]
+| 3580 | 15 | LOW | `UltimateKeyManagement/Strategies/SecretsManagement/BeyondTrustStrategy.cs:88` | `GetCurrentKeyIdAsync` always returns hardcoded `"default"`. Method name implies active key tracking that doesn't exist. | [X]
 
 **Clean files:** None — all 15 files had findings.
 
@@ -5491,8 +5491,8 @@
 | 3602 | 2 | P2 | `UltimateKeyManagement/UltimateKeyManagementPlugin.cs:197-218` | Fire-and-forget async lambda in `SubscribeToKeyRotationRequests`. `async` lambda registered as `Action<PluginMessage>` — exceptions silently swallowed by `async void` equivalent. | [X]
 | 3603 | 14 | P2 | `UltimateKeyManagement/Strategies/Threshold/SsssStrategy.cs:416-419` | `expectedHash` falls back to `Array.Empty<byte>()` when `ShareHash` is null. `FixedTimeEquals` on two empty arrays returns true — any share value passes hash check for legacy shares without hashes. | [X]
 | 3604 | 15 | LOW | `UltimateKeyManagement/Strategies/Threshold/MultiPartyComputationStrategy.cs:382-386` | `CreatePartialSignatureAsync` formula `s_i = k + r * lambda_i * x_i` does not match ECDSA (requires `k^-1 * (m + r * lambda_i * x_i)`). | [X]
-| 3605 | 12 | LOW | `UltimateKeyManagement/UltimateKeyManagementPlugin.cs:641-645` | `OnHandshakeAsync` has dead empty `if` block: `if (request.Context != null) { }`. | [ ]
-| 3606 | 13 | LOW | `UltimateKeyManagement/Strategies/Threshold/SsssStrategy.cs:749-751` | Share export concatenates IV + Key + encrypted data without length tags. Parsing requires hardcoded field lengths — brittle. | [ ]
+| 3605 | 12 | LOW | `UltimateKeyManagement/UltimateKeyManagementPlugin.cs:641-645` | `OnHandshakeAsync` has dead empty `if` block: `if (request.Context != null) { }`. | [X]
+| 3606 | 13 | LOW | `UltimateKeyManagement/Strategies/Threshold/SsssStrategy.cs:749-751` | Share export concatenates IV + Key + encrypted data without length tags. Parsing requires hardcoded field lengths — brittle. | [X]
 | 3607 | 1 | P2 | `UltimateKeyManagement/Strategies/Threshold/FrostStrategy.cs:~989-993` | `DeleteKeyAsync` throws bare `UnauthorizedAccessException()` without message. Uninformative error in audit logs. | [X]
 
 **Clean files:** MicroservicesStrategyBase.cs, ApiGatewayStrategies.cs, CircuitBreakerStrategies.cs, CommunicationStrategies.cs, LoadBalancingStrategies.cs, MonitoringStrategies.cs, OrchestrationStrategies.cs

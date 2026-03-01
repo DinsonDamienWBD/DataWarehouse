@@ -502,9 +502,25 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
             var combinedEntropy = string.Join("|", entropyParts);
             var entropyBytes = Encoding.UTF8.GetBytes(combinedEntropy);
 
+            // P2-3579: Use machine-id as salt so the derived key is unique per machine.
+            // The static string salt made every machine produce the same key from the same entropy,
+            // defeating the purpose of per-key uniqueness. SHA-256 of machine-id provides
+            // a 32-byte salt that is stable per machine and differs between machines.
+            string machineIdForSalt;
+            try
+            {
+                machineIdForSalt = File.Exists("/etc/machine-id")
+                    ? File.ReadAllText("/etc/machine-id").Trim()
+                    : Environment.MachineName + Environment.UserName;
+            }
+            catch
+            {
+                machineIdForSalt = Environment.MachineName + Environment.UserName;
+            }
+            var saltBytes = SHA256.HashData(Encoding.UTF8.GetBytes(machineIdForSalt));
             return Rfc2898DeriveBytes.Pbkdf2(
                 entropyBytes,
-                SHA256.HashData(Encoding.UTF8.GetBytes("DataWarehouse.Linux.SecretService.Salt.v1")),
+                saltBytes,
                 100000,
                 HashAlgorithmName.SHA256,
                 32);

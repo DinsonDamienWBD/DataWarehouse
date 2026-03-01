@@ -1,6 +1,7 @@
 using DataWarehouse.SDK.Security;
 using Org.BouncyCastle.Math;
 using Org.BouncyCastle.Security;
+using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -753,8 +754,19 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
                     using var encryptor = aes.CreateEncryptor();
                     var encrypted = encryptor.TransformFinalBlock(share.ShareValue, 0, share.ShareValue.Length);
 
-                    // In real implementation, wrap AES key with guardian's public key
-                    encryptedShare = ConcatBytes(aes.IV, aes.Key, encrypted);
+                    // P2-3606: Use a length-prefixed format so the parser does not rely on hardcoded field sizes.
+                    // Layout: [ivLen:2LE][iv][keyLen:2LE][key][ciphertextLen:4LE][ciphertext]
+                    var iv = aes.IV;
+                    var key = aes.Key;
+                    var buf = new byte[2 + iv.Length + 2 + key.Length + 4 + encrypted.Length];
+                    int pos = 0;
+                    BinaryPrimitives.WriteUInt16LittleEndian(buf.AsSpan(pos, 2), (ushort)iv.Length); pos += 2;
+                    iv.CopyTo(buf.AsSpan(pos)); pos += iv.Length;
+                    BinaryPrimitives.WriteUInt16LittleEndian(buf.AsSpan(pos, 2), (ushort)key.Length); pos += 2;
+                    key.CopyTo(buf.AsSpan(pos)); pos += key.Length;
+                    BinaryPrimitives.WriteInt32LittleEndian(buf.AsSpan(pos, 4), encrypted.Length); pos += 4;
+                    encrypted.CopyTo(buf.AsSpan(pos));
+                    encryptedShare = buf;
                 }
 
                 return new GuardianShareExport

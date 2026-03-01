@@ -25,6 +25,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
     {
         private readonly HttpClient _httpClient;
         private BeyondTrustConfig _config = new();
+        // P2-3580: Track the most recently loaded key so GetCurrentKeyIdAsync is meaningful.
+        private string? _currentKeyId;
 
         public override KeyStoreCapabilities Capabilities => new()
         {
@@ -85,7 +87,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
 
         public override Task<string> GetCurrentKeyIdAsync()
         {
-            return Task.FromResult("default");
+            // P2-3580: Return the most recently loaded keyId rather than a hardcoded "default".
+            // Falls back to "default" only when no key has been loaded in this session.
+            return Task.FromResult(_currentKeyId ?? "default");
         }
 
         public override async Task<bool> HealthCheckAsync(CancellationToken cancellationToken = default)
@@ -132,6 +136,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
 
             // Extract credential from response
             var credential = doc.RootElement.GetProperty("Credentials")[0].GetProperty("Password").GetString();
+            // P2-3580: Track the most recently loaded key for GetCurrentKeyIdAsync.
+            _currentKeyId = keyId;
             return Encoding.UTF8.GetBytes(credential!);
         }
 
