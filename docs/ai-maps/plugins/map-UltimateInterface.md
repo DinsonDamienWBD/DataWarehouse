@@ -2340,7 +2340,8 @@ private sealed class MoonshotMetricState
     public long SuccessCount;
     public long FailureCount;
     public readonly ConcurrentQueue<double> LatencySamples = new();
-    public DateTimeOffset WindowStart = DateTimeOffset.UtcNow;
+    public long WindowStartTicks = DateTimeOffset.UtcNow.Ticks;
+    public DateTimeOffset WindowStart { get => new DateTimeOffset(Interlocked.Read(ref WindowStartTicks), TimeSpan.Zero); }
 }
 ```
 

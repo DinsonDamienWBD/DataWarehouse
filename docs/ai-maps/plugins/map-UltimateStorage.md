@@ -6820,6 +6820,7 @@ public class SelfReplicatingStorageStrategy : UltimateStorageStrategyBase
     protected override async Task<StorageObjectMetadata> GetMetadataAsyncCore(string key, CancellationToken ct);
     protected override async Task<StorageHealthInfo> GetHealthAsyncCore(CancellationToken ct);
     protected override async Task<long?> GetAvailableCapacityAsyncCore(CancellationToken ct);
+    protected override ValueTask DisposeCoreAsync();
 }
 ```
 ```csharp
@@ -7091,6 +7092,7 @@ public class ZeroLatencyStorageStrategy : UltimateStorageStrategyBase
     protected override async Task<StorageObjectMetadata> GetMetadataAsyncCore(string key, CancellationToken ct);
     protected override async Task<StorageHealthInfo> GetHealthAsyncCore(CancellationToken ct);
     protected override async Task<long?> GetAvailableCapacityAsyncCore(CancellationToken ct);
+    protected override ValueTask DisposeCoreAsync();
 }
 ```
 ```csharp
