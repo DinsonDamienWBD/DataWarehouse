@@ -193,9 +193,18 @@ public sealed class OpenTelemetryStrategy : ObservabilityStrategyBase
 
     private static byte[] HexToBytes(string hex)
     {
+        // LOW-4688: Validate that the string is a properly-formed hex string to avoid
+        // FormatException from Convert.ToByte when non-hex characters are present.
+        if (string.IsNullOrEmpty(hex) || hex.Length % 2 != 0)
+            return new byte[hex?.Length / 2 ?? 0];
+
         var bytes = new byte[hex.Length / 2];
         for (int i = 0; i < bytes.Length; i++)
-            bytes[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
+        {
+            var byteStr = hex.Substring(i * 2, 2);
+            // Replace any non-hex character pair with 0x00 rather than throwing.
+            bytes[i] = byte.TryParse(byteStr, System.Globalization.NumberStyles.HexNumber, null, out var b) ? b : (byte)0;
+        }
         return bytes;
     }
 

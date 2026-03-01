@@ -122,7 +122,8 @@ public sealed class GraylogStrategy : ObservabilityStrategyBase
                 _udpClient = new System.Net.Sockets.UdpClient();
             udpClient = _udpClient;
         }
-        await udpClient.SendAsync(data, data.Length, _host, _udpPort);
+        // LOW-4617: Forward the cancellation token so the send respects caller cancellation.
+        await udpClient.SendAsync(data, data.Length, _host, _udpPort).WaitAsync(ct);
     }
 
     protected override Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken ct)

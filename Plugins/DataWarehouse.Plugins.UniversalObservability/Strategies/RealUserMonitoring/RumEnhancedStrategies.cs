@@ -63,10 +63,13 @@ public sealed class SessionTrackingService
             Data = eventData ?? new Dictionary<string, object>()
         };
 
-        _sessionEvents.AddOrUpdate(
-            sessionId,
-            _ => new List<SessionEvent> { evt },
-            (_, list) => { lock (list) { list.Add(evt); } return list; });
+        // P2-4678: AddOrUpdate factories may be called multiple times under contention.
+        // Get-or-add the list first so only one list exists per sessionId, then lock it for the append.
+        var list = _sessionEvents.GetOrAdd(sessionId, _ => new List<SessionEvent>());
+        lock (list)
+        {
+            list.Add(evt);
+        }
     }
 
     /// <summary>
@@ -236,16 +239,20 @@ public sealed class FunnelAnalysisEngine
             userProgresses[userId] = progress;
         }
 
+        // P2-4677: Hold the lock for the entire add+check+write-back sequence to prevent a
+        // concurrent call from overwriting the CompletedAt that was just set.
+        bool isComplete;
+        int completedCount;
         lock (progress.CompletedSteps)
         {
             progress.CompletedSteps.Add(stepName);
-        }
-
-        var isComplete = funnel.Steps.All(s => progress.CompletedSteps.Contains(s));
-        if (isComplete)
-        {
-            progress = progress with { CompletedAt = DateTimeOffset.UtcNow };
-            userProgresses[userId] = progress;
+            isComplete = funnel.Steps.All(s => progress.CompletedSteps.Contains(s));
+            completedCount = progress.CompletedSteps.Count;
+            if (isComplete && !progress.CompletedAt.HasValue)
+            {
+                var completed = progress with { CompletedAt = DateTimeOffset.UtcNow };
+                userProgresses[userId] = completed;
+            }
         }
 
         return new FunnelStepResult
@@ -253,7 +260,7 @@ public sealed class FunnelAnalysisEngine
             Recorded = true,
             StepIndex = stepIndex,
             TotalSteps = funnel.Steps.Length,
-            CompletedSteps = progress.CompletedSteps.Count,
+            CompletedSteps = completedCount,
             IsComplete = isComplete
         };
     }
@@ -270,9 +277,11 @@ public sealed class FunnelAnalysisEngine
             return new FunnelMetrics { FunnelId = funnelId, FunnelName = funnel.Name };
 
         var allProgresses = progresses.Values.ToList();
+        // P2-4692/4693: Lock each progress's CompletedSteps before reading to avoid data race
+        // with RecordStep which modifies the HashSet under lock(progress.CompletedSteps).
         var stepConversions = funnel.Steps.Select((step, index) =>
         {
-            var count = allProgresses.Count(p => p.CompletedSteps.Contains(step));
+            var count = allProgresses.Count(p => { lock (p.CompletedSteps) { return p.CompletedSteps.Contains(step); } });
             return new StepConversion
             {
                 StepName = step,

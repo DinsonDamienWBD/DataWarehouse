@@ -89,10 +89,13 @@ public sealed class IcingaStrategy : ObservabilityStrategyBase
 
             var perfData = $"{SanitizeName(metric.Name)}={metric.Value}";
 
+            // P2-4612: Use EscapeFilterStringValue to prevent filter injection via metric names
+            // containing double-quotes, backticks, or backslashes.
+            var escapedName = EscapeFilterStringValue(SanitizeName(metric.Name));
             var checkResult = new
             {
                 type = "Service",
-                filter = $"service.name==\"{SanitizeName(metric.Name)}\" && host.name==\"datawarehouse\"",
+                filter = $"service.name==\"{escapedName}\" && host.name==\"datawarehouse\"",
                 exit_status = exitStatus,
                 plugin_output = pluginOutput,
                 performance_data = new[] { perfData },
@@ -133,7 +136,7 @@ public sealed class IcingaStrategy : ObservabilityStrategyBase
         var checkResult = new
         {
             type = "Service",
-            filter = $"service.name==\"{serviceName}\" && host.name==\"datawarehouse\"",
+            filter = $"service.name==\"{EscapeFilterStringValue(serviceName)}\" && host.name==\"datawarehouse\"",
             exit_status = exitStatus,
             plugin_output = pluginOutput,
             performance_data = performanceData ?? Array.Empty<string>(),
@@ -176,6 +179,20 @@ public sealed class IcingaStrategy : ObservabilityStrategyBase
     private static string SanitizeName(string name)
     {
         return name.Replace(" ", "_").Replace("-", "_").Replace(".", "_").ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// Sanitizes a value for safe embedding in an Icinga filter expression string literal.
+    /// Escapes backslash, double-quote, backtick, and newlines to prevent filter injection.
+    /// </summary>
+    private static string EscapeFilterStringValue(string value)
+    {
+        return value
+            .Replace("\\", "\\\\")   // backslash must come first
+            .Replace("\"", "\\\"")   // double-quote: literal " in Icinga DSL string
+            .Replace("`", "\\`")     // backtick: Icinga DSL template literal delimiter
+            .Replace("\r", "")
+            .Replace("\n", "");
     }
 
     /// <inheritdoc/>

@@ -165,6 +165,9 @@ public sealed class ConsulHealthStrategy : ObservabilityStrategyBase
             await FailTtlCheckAsync("Critical log entries detected", cancellationToken);
         else if (hasErrors)
             await WarnTtlCheckAsync("Error log entries detected", cancellationToken);
+        else
+            // LOW-4616: Without a Pass update the TTL check remains stuck in warn/fail state.
+            await PassTtlCheckAsync($"Logs OK - {logEntries.Count()} entries processed", cancellationToken);
     }
 
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken ct)

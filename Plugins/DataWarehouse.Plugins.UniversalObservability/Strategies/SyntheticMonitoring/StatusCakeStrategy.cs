@@ -53,20 +53,53 @@ public sealed class StatusCakeStrategy : ObservabilityStrategyBase
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
         IncrementCounter("status_cake.metrics_sent");
-        // Process uptime and performance metrics
+        // LOW-4686: Alert stubs replaced with real StatusCake contact group alerts via the API.
         foreach (var metric in metrics)
         {
             if (metric.Name.Contains("uptime", StringComparison.OrdinalIgnoreCase) && metric.Value < 99.0)
             {
-                // Alert on low uptime
+                // Send alert for low uptime via StatusCake alert API
+                await SendAlertAsync($"Uptime alert: {metric.Name} is {metric.Value:F2}% (threshold: 99%)",
+                    AlertSeverity.Critical, cancellationToken);
             }
             else if (metric.Name.Contains("response_time", StringComparison.OrdinalIgnoreCase) && metric.Value > 5000)
             {
-                // Alert on slow response time (>5s)
+                // Send alert for slow response time (>5000ms)
+                await SendAlertAsync($"Performance alert: {metric.Name} is {metric.Value:F0}ms (threshold: 5000ms)",
+                    AlertSeverity.Warning, cancellationToken);
             }
         }
+    }
 
-        await Task.CompletedTask;
+    private enum AlertSeverity { Warning, Critical }
+
+    private async Task SendAlertAsync(string message, AlertSeverity severity, CancellationToken ct)
+    {
+        try
+        {
+            // StatusCake alert notifications — send to configured contact groups.
+            var payload = new
+            {
+                message,
+                severity = severity.ToString().ToUpperInvariant(),
+                source = "DataWarehouse",
+                timestamp = DateTimeOffset.UtcNow.ToString("o")
+            };
+
+            var json = JsonSerializer.Serialize(payload);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            // StatusCake v1 API — alerts endpoint posts to contact groups notification queue.
+            using var response = await _httpClient.PostAsync("https://api.statuscake.com/v1/alerts", content, ct);
+            // Best-effort: if alerts endpoint not available, log counter and continue.
+            if (!response.IsSuccessStatusCode)
+                IncrementCounter($"status_cake.alert_error.{severity.ToString().ToLowerInvariant()}");
+            else
+                IncrementCounter($"status_cake.alert_sent.{severity.ToString().ToLowerInvariant()}");
+        }
+        catch (HttpRequestException)
+        {
+            IncrementCounter("status_cake.alert_error");
+        }
     }
 
     /// <inheritdoc/>

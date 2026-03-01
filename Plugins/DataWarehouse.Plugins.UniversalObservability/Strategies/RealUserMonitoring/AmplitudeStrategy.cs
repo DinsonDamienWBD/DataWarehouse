@@ -48,6 +48,9 @@ public sealed class AmplitudeStrategy : ObservabilityStrategyBase
     /// <param name="deviceId">Device identifier (generated if not provided).</param>
     public void Configure(string apiKey, string userId = "system", string? deviceId = null)
     {
+        // P2-4674: Reject empty apiKey early; blank key silently swallows 401 errors in SendEventsAsync.
+        if (string.IsNullOrWhiteSpace(apiKey))
+            throw new ArgumentException("Amplitude API key must not be empty.", nameof(apiKey));
         _apiKey = apiKey;
         _userId = userId;
         _deviceId = deviceId ?? Guid.NewGuid().ToString();
@@ -198,11 +201,10 @@ public sealed class AmplitudeStrategy : ObservabilityStrategyBase
     }
 
     /// <inheritdoc/>
-
-    /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        // Configuration validated via Configure method
+        if (string.IsNullOrWhiteSpace(_apiKey))
+            throw new InvalidOperationException("AmplitudeStrategy: API key is required. Call Configure() with a valid apiKey before initializing.");
         IncrementCounter("amplitude.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }

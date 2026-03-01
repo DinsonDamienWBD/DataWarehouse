@@ -178,7 +178,7 @@ public sealed class DevicePoolStrategy : FilesystemStrategyBase
     public Task<BootstrapResult> BootstrapAsync(CancellationToken ct)
     {
         var boot = _bootstrap ?? throw new InvalidOperationException("DevicePoolStrategy not initialized.");
-        return boot.BootstrapFromRawDevicesAsync(ct);
+        return boot.BootstrapFromRawDevicesAsync(physicalDevices: null, ct);
     }
 
     /// <summary>

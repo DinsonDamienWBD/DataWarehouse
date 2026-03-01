@@ -57,7 +57,12 @@ public sealed class StatsDStrategy : ObservabilityStrategyBase
 
         _udpClient?.Dispose();
         _udpClient = new UdpClient();
-        _endpoint = new IPEndPoint(Dns.GetHostAddresses(host)[0], port);
+        // LOW-4650: Dns.GetHostAddresses may return an empty array for unknown hostnames.
+        // Guard against index-out-of-range by throwing a clear exception with the hostname.
+        var addresses = Dns.GetHostAddresses(host);
+        if (addresses.Length == 0)
+            throw new InvalidOperationException($"StatsDStrategy: No IP address found for host '{host}'.");
+        _endpoint = new IPEndPoint(addresses[0], port);
     }
 
     /// <inheritdoc/>

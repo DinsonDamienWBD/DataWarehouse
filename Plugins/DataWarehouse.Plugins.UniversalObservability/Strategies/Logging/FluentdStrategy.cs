@@ -45,30 +45,35 @@ public sealed class FluentdStrategy : ObservabilityStrategyBase
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken)
     {
         IncrementCounter("fluentd.logs_sent");
-        var records = logEntries.Select(entry => new
+        // LOW-4618: Fluentd HTTP input expects one JSON object per request (or NDJSON), NOT a
+        // JSON array — an array is treated as a single event. Post each record individually.
+        foreach (var entry in logEntries)
         {
-            tag = _tag,
-            time = entry.Timestamp.ToUnixTimeSeconds(),
-            record = new Dictionary<string, object?>
+            var record = new
             {
-                ["level"] = entry.Level.ToString(),
-                ["message"] = entry.Message,
-                ["host"] = Environment.MachineName,
-                ["timestamp"] = entry.Timestamp.ToString("o"),
-                ["properties"] = entry.Properties ?? new Dictionary<string, object>(),
-                ["exception"] = entry.Exception != null ? new
+                tag = _tag,
+                time = entry.Timestamp.ToUnixTimeSeconds(),
+                record = new Dictionary<string, object?>
                 {
-                    type = entry.Exception.GetType().Name,
-                    message = entry.Exception.Message,
-                    stacktrace = entry.Exception.StackTrace ?? ""
-                } : null
-            }
-        });
+                    ["level"] = entry.Level.ToString(),
+                    ["message"] = entry.Message,
+                    ["host"] = Environment.MachineName,
+                    ["timestamp"] = entry.Timestamp.ToString("o"),
+                    ["properties"] = entry.Properties ?? new Dictionary<string, object>(),
+                    ["exception"] = entry.Exception != null ? new
+                    {
+                        type = entry.Exception.GetType().Name,
+                        message = entry.Exception.Message,
+                        stacktrace = entry.Exception.StackTrace ?? ""
+                    } : (object?)null
+                }
+            };
 
-        var json = JsonSerializer.Serialize(records);
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
-        using var response = await _httpClient.PostAsync($"{_url}/{_tag}", content, cancellationToken);
-        response.EnsureSuccessStatusCode();
+            var json = JsonSerializer.Serialize(record);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            using var response = await _httpClient.PostAsync($"{_url}/{_tag}", content, cancellationToken);
+            response.EnsureSuccessStatusCode();
+        }
     }
 
     protected override Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)

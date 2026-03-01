@@ -143,15 +143,26 @@ public sealed class InfluxDbStrategy : ObservabilityStrategyBase
     /// <returns>Query results.</returns>
     public Task<string> GetLastValuesAsync(string metricName, int count = 10, CancellationToken ct = default)
     {
+        // LOW-4651: Escape Flux string literals to prevent query injection.
+        // In Flux, backslash is the escape character inside double-quoted strings.
+        var escapedBucket = EscapeFluxString(_bucket);
+        var escapedMetricName = EscapeFluxString(metricName);
         var query = $@"
-from(bucket: ""{_bucket}"")
+from(bucket: ""{escapedBucket}"")
   |> range(start: -1h)
-  |> filter(fn: (r) => r._measurement == ""{metricName}"")
+  |> filter(fn: (r) => r._measurement == ""{escapedMetricName}"")
   |> last()
   |> limit(n: {count})";
 
         return QueryAsync(query, ct);
     }
+
+    /// <summary>
+    /// Escapes a value for safe embedding in a Flux double-quoted string literal.
+    /// Escapes backslash and double-quote characters as required by the Flux spec.
+    /// </summary>
+    private static string EscapeFluxString(string value)
+        => value.Replace("\\", "\\\\").Replace("\"", "\\\"");
 
     private static string EscapeMeasurement(string measurement)
     {

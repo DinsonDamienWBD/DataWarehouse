@@ -525,16 +525,9 @@ public sealed class AdiantumStrategy : EncryptionStrategyBase
     /// </summary>
     private static byte[] GenerateXChaChaKeystream(byte[] key, byte[] nonce, int length)
     {
-        // Use ChaCha20 as approximation (XChaCha12 not available in standard library)
-        var keystream = new byte[length];
-
-        // Derive subkey using HChaCha20 (simplified with HKDF)
-        var subkey = HKDF.DeriveKey(
-            HashAlgorithmName.SHA256,
-            key,
-            32,
-            nonce.Take(16).ToArray(),
-            "XChaCha"u8.ToArray());
+        // P2-2952: Use proper HChaCha20 subkey derivation (not HKDF-SHA256 approximation).
+        // XChaCha20 spec (draft-irtf-cfrg-xchacha): first 16 bytes of nonce feed HChaCha20.
+        var subkey = HChaCha20(key, nonce.AsSpan(0, 16).ToArray());
 
         var chachaNonce = new byte[12];
         Buffer.BlockCopy(nonce, 16, chachaNonce, 4, 8);
@@ -547,6 +540,53 @@ public sealed class AdiantumStrategy : EncryptionStrategyBase
 
         chacha.Encrypt(chachaNonce, plaintextZeros, ciphertext, tag);
         return ciphertext;
+    }
+
+    /// <summary>
+    /// HChaCha20 subkey derivation for XChaCha20 (draft-irtf-cfrg-xchacha).
+    /// Takes a 32-byte key and a 16-byte input nonce, returns a 32-byte subkey by running
+    /// 20 rounds of the ChaCha core and extracting the first and last 4 words.
+    /// </summary>
+    private static byte[] HChaCha20(byte[] key, byte[] inputNonce)
+    {
+        var state = new uint[16];
+        state[0] = 0x61707865; // "expa"
+        state[1] = 0x3320646e; // "nd 3"
+        state[2] = 0x79622d32; // "2-by"
+        state[3] = 0x6b206574; // "te k"
+        for (int i = 0; i < 8; i++)
+            state[4 + i] = BitConverter.ToUInt32(key, i * 4);
+        for (int i = 0; i < 4; i++)
+            state[12 + i] = BitConverter.ToUInt32(inputNonce, i * 4);
+
+        // 20 rounds (10 double rounds)
+        for (int r = 0; r < 10; r++)
+        {
+            ChaChaQuarterRound(ref state[0], ref state[4], ref state[8], ref state[12]);
+            ChaChaQuarterRound(ref state[1], ref state[5], ref state[9], ref state[13]);
+            ChaChaQuarterRound(ref state[2], ref state[6], ref state[10], ref state[14]);
+            ChaChaQuarterRound(ref state[3], ref state[7], ref state[11], ref state[15]);
+            ChaChaQuarterRound(ref state[0], ref state[5], ref state[10], ref state[15]);
+            ChaChaQuarterRound(ref state[1], ref state[6], ref state[11], ref state[12]);
+            ChaChaQuarterRound(ref state[2], ref state[7], ref state[8], ref state[13]);
+            ChaChaQuarterRound(ref state[3], ref state[4], ref state[9], ref state[14]);
+        }
+
+        // Output: first 4 words (state[0-3]) + last 4 words (state[12-15])
+        var output = new byte[32];
+        for (int i = 0; i < 4; i++)
+            BitConverter.GetBytes(state[i]).CopyTo(output, i * 4);
+        for (int i = 0; i < 4; i++)
+            BitConverter.GetBytes(state[12 + i]).CopyTo(output, 16 + i * 4);
+        return output;
+    }
+
+    private static void ChaChaQuarterRound(ref uint a, ref uint b, ref uint c, ref uint d)
+    {
+        a += b; d ^= a; d = (d << 16) | (d >> 16);
+        c += d; b ^= c; b = (b << 12) | (b >> 20);
+        a += b; d ^= a; d = (d << 8) | (d >> 24);
+        c += d; b ^= c; b = (b << 7) | (b >> 25);
     }
 
     /// <summary>

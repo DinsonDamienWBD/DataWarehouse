@@ -115,23 +115,33 @@ public sealed class TelegrafStrategy : ObservabilityStrategyBase
         return JsonSerializer.Serialize(new { metrics = telegrafMetrics });
     }
 
-    private string FormatAsGraphite(IEnumerable<MetricValue> metrics)
+    private static string FormatAsGraphite(IEnumerable<MetricValue> metrics)
     {
         var sb = new StringBuilder();
 
         foreach (var metric in metrics)
         {
-            var path = metric.Name.Replace(" ", "_").Replace("-", "_");
+            // Build the path using StringBuilder to avoid O(n) string allocation per label.
+            var pathBuilder = new StringBuilder();
+            pathBuilder.Append(metric.Name.Replace(" ", "_").Replace("-", "_"));
+
             if (metric.Labels != null)
             {
                 foreach (var label in metric.Labels)
                 {
-                    path += $".{label.Name}_{label.Value}".Replace(" ", "_");
+                    pathBuilder.Append('.');
+                    pathBuilder.Append(label.Name.Replace(" ", "_").Replace("-", "_"));
+                    pathBuilder.Append('_');
+                    pathBuilder.Append(label.Value.Replace(" ", "_").Replace("-", "_"));
                 }
             }
 
             var timestamp = metric.Timestamp.ToUnixTimeSeconds();
-            sb.AppendLine($"{path} {metric.Value} {timestamp}");
+            sb.Append(pathBuilder);
+            sb.Append(' ');
+            sb.Append(metric.Value);
+            sb.Append(' ');
+            sb.AppendLine(timestamp.ToString());
         }
 
         return sb.ToString();

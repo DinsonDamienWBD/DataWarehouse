@@ -161,10 +161,33 @@ public sealed class CloudWatchStrategy : ObservabilityStrategyBase
             ["message"] = FormatLogMessage(entry)
         }).ToList();
 
-        // CloudWatch Logs accepts max 10,000 events per request
-        foreach (var batch in logEvents.Chunk(10000))
+        // CloudWatch Logs: max 10,000 events AND max 1MB (1,048,576 bytes) per request.
+        // LOW-4649: Chunk by count first, then further split batches that exceed the byte limit.
+        const int MaxEventsPerBatch = 10000;
+        const int MaxBytesPerBatch = 1_048_576;
+        // Each event has a 26-byte overhead in the CloudWatch protocol.
+        const int PerEventOverhead = 26;
+
+        foreach (var countBatch in logEvents.Chunk(MaxEventsPerBatch))
         {
-            await PutLogEventsAsync(batch, cancellationToken);
+            var sizeBatch = new List<Dictionary<string, object>>();
+            int batchBytes = 0;
+
+            foreach (var evt in countBatch)
+            {
+                var msgBytes = Encoding.UTF8.GetByteCount(evt["message"]?.ToString() ?? "") + PerEventOverhead;
+                if (sizeBatch.Count > 0 && batchBytes + msgBytes > MaxBytesPerBatch)
+                {
+                    await PutLogEventsAsync(sizeBatch, cancellationToken);
+                    sizeBatch = new List<Dictionary<string, object>>();
+                    batchBytes = 0;
+                }
+                sizeBatch.Add(evt);
+                batchBytes += msgBytes;
+            }
+
+            if (sizeBatch.Count > 0)
+                await PutLogEventsAsync(sizeBatch, cancellationToken);
         }
     }
 

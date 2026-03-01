@@ -291,17 +291,19 @@ public sealed class IstioStrategy : ObservabilityStrategyBase
 
     private static bool IsImportantEnvoyMetric(string name)
     {
-        return name.StartsWith("cluster.") && (
-            name.Contains("upstream_rq") ||
-            name.Contains("upstream_cx") ||
-            name.Contains("health_check") ||
-            name.Contains("outlier_detection") ||
-            name.Contains("circuit_breaker")) ||
-            name.StartsWith("http.") && (
-            name.Contains("downstream_rq") ||
-            name.Contains("downstream_cx")) ||
-            name.StartsWith("server.") ||
-            name.StartsWith("listener.");
+        // P2-4681: Wrap each disjunct in explicit parentheses so operator precedence is unambiguous
+        // and the logic remains correct if conditions are ever reordered.
+        return (name.StartsWith("cluster.") && (
+                    name.Contains("upstream_rq") ||
+                    name.Contains("upstream_cx") ||
+                    name.Contains("health_check") ||
+                    name.Contains("outlier_detection") ||
+                    name.Contains("circuit_breaker")))
+            || (name.StartsWith("http.") && (
+                    name.Contains("downstream_rq") ||
+                    name.Contains("downstream_cx")))
+            || name.StartsWith("server.")
+            || name.StartsWith("listener.");
     }
 
     private static string SanitizeMetricName(string name)

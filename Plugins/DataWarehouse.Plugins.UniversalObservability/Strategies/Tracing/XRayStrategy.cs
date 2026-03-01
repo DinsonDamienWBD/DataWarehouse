@@ -102,7 +102,11 @@ public sealed class XRayStrategy : ObservabilityStrategyBase
 
     private async Task PutTraceSegmentsAsync(string documents, CancellationToken ct)
     {
-        var payload = JsonSerializer.Serialize(new { TraceSegmentDocuments = documents.Split('\n').Where(s => s.StartsWith("{\"name")).ToArray() });
+        // Filter only actual JSON segment lines (each starts with '{'); envelope header lines are excluded.
+        var segmentDocs = documents.Split('\n')
+            .Where(s => !string.IsNullOrWhiteSpace(s) && s.TrimStart().StartsWith("{\"name", StringComparison.Ordinal))
+            .ToArray();
+        var payload = JsonSerializer.Serialize(new { TraceSegmentDocuments = segmentDocs });
         var host = $"xray.{_region}.amazonaws.com";
         var endpoint = $"https://{host}/TraceSegments";
 
@@ -150,11 +154,28 @@ public sealed class XRayStrategy : ObservabilityStrategyBase
     protected override Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken ct)
         => throw new NotSupportedException("X-Ray does not support logging - use CloudWatch Logs");
 
-    protected override Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken ct)
+    protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken ct)
     {
-        return Task.FromResult(new HealthCheckResult(!string.IsNullOrEmpty(_accessKeyId),
-            !string.IsNullOrEmpty(_accessKeyId) ? "X-Ray configured" : "X-Ray not configured",
-            new Dictionary<string, object> { ["region"] = _region, ["service"] = _serviceName }));
+        // P2-4673: Verify actual connectivity by sending a minimal well-formed batch rather than
+        // only checking whether credentials are non-empty (wrong credentials still report healthy).
+        if (string.IsNullOrEmpty(_accessKeyId))
+        {
+            return new HealthCheckResult(false, "X-Ray not configured: accessKeyId is empty",
+                new Dictionary<string, object> { ["region"] = _region, ["service"] = _serviceName });
+        }
+
+        try
+        {
+            // Attempt a real API call with an empty segment list; X-Ray returns 200 for an empty batch.
+            await PutTraceSegmentsAsync(string.Empty, ct);
+            return new HealthCheckResult(true, "X-Ray configured and reachable",
+                new Dictionary<string, object> { ["region"] = _region, ["service"] = _serviceName });
+        }
+        catch (Exception ex)
+        {
+            return new HealthCheckResult(false, $"X-Ray connectivity check failed: {ex.Message}",
+                new Dictionary<string, object> { ["region"] = _region, ["service"] = _serviceName });
+        }
     }
 
 
