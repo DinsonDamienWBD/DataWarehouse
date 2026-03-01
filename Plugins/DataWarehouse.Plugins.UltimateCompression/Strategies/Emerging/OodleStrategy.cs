@@ -322,6 +322,11 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
                 throw new InvalidDataException("Invalid Oodle stream header.");
 
             int originalLength = reader.ReadInt32();
+
+            // P2-1616: Validate originalLength to prevent OOM from crafted streams.
+            if (originalLength < 0 || originalLength > 256 * 1024 * 1024)
+                throw new InvalidDataException($"Oodle header originalLength {originalLength} is out of valid range [0, 268435456].");
+
             using var output = new MemoryStream(originalLength);
 
             while (output.Length < originalLength && stream.Position < stream.Length)

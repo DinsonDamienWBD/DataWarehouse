@@ -205,8 +205,11 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Domain
 
         private static void WriteFrequencyTable(BinaryWriter writer, int[] frequencies)
         {
-            // Run-length encode the frequency table
-            int nonZeroCount = frequencies.Count(f => f > 0);
+            // Run-length encode the frequency table.
+            // P2-1599: Use a plain for-loop instead of LINQ Count() to avoid enumerator allocation.
+            int nonZeroCount = 0;
+            for (int fi = 0; fi < frequencies.Length; fi++)
+                if (frequencies[fi] > 0) nonZeroCount++;
             writer.Write((ushort)nonZeroCount);
 
             for (int i = 0; i < MaxSymbols; i++)

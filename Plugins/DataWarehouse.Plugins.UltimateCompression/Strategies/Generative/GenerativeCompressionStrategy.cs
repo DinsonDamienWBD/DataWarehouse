@@ -1850,8 +1850,12 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Generative
 
                 return false;
             }
-            catch
+            catch (Exception ex)
             {
+                // P2-1623: Log rather than swallow — GPU detection errors affect all subsequent
+                // compression decisions. Operators need to know if GPU configuration is broken.
+                System.Diagnostics.Debug.WriteLine(
+                    $"[GenerativeCompression] GPU availability detection failed (defaulting to CPU): {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }

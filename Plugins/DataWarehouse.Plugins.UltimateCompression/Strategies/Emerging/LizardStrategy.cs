@@ -295,6 +295,12 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
             int originalLength = reader.ReadInt32();
             int compressedLength = reader.ReadInt32();
 
+            // P2-1615: Validate header fields to prevent OOM from crafted streams.
+            if (originalLength < 0 || originalLength > 256 * 1024 * 1024) // 256 MB guard
+                throw new InvalidDataException($"Lizard header originalLength {originalLength} is out of valid range [0, 268435456].");
+            if (compressedLength < 0 || compressedLength > 256 * 1024 * 1024)
+                throw new InvalidDataException($"Lizard header compressedLength {compressedLength} is out of valid range [0, 268435456].");
+
             if (originalLength == 0)
                 return Array.Empty<byte>();
 
