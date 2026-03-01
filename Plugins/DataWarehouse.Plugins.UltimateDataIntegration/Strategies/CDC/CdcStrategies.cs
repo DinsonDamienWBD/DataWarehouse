@@ -375,7 +375,9 @@ public sealed class TimestampBasedCdcStrategy : DataIntegrationStrategyBase
             {
                 if (r.TryGetValue(tracker.TimestampColumn, out var ts))
                 {
-                    var timestamp = ts is DateTime dt ? dt : DateTime.Parse(ts.ToString()!);
+                    // P2-2284: Use TryParse to avoid FormatException on user-controlled timestamp values.
+                    if (ts is not DateTime dt && !DateTime.TryParse(ts?.ToString(), out dt)) return false;
+                    var timestamp = dt;
                     return timestamp > lastCheckpoint;
                 }
                 return false;

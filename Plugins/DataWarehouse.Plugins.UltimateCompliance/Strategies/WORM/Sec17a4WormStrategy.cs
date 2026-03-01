@@ -56,8 +56,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.WORM
             }
 
             // Check 3: Verify retention period (6 years for broker-dealer records)
+            // LOW-1566: Accept int, long, and double from JSON deserializer to avoid silent check skip.
             if (!context.Attributes.TryGetValue("RetentionPeriodYears", out var retention) ||
-                !(retention is int years && years >= 6))
+                !(retention is int or long or double) ||
+                Convert.ToDouble(retention) < 6)
             {
                 violations.Add(new ComplianceViolation
                 {
@@ -163,24 +165,26 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.WORM
 
         private static List<string> GenerateRecommendations(List<ComplianceViolation> violations)
         {
+            // LOW-1567: Build HashSet<string> of violation codes once for O(1) lookups instead of O(N) .Any() per check.
+            var codes = new HashSet<string>(violations.Select(v => v.Code), StringComparer.Ordinal);
             var recommendations = new List<string>();
 
-            if (violations.Any(v => v.Code == "SEC17A4-001" || v.Code == "SEC17A4-002"))
+            if (codes.Contains("SEC17A4-001") || codes.Contains("SEC17A4-002"))
                 recommendations.Add("Deploy SEC 17a-4 compliant WORM storage solution (hardware or software)");
 
-            if (violations.Any(v => v.Code == "SEC17A4-003"))
+            if (codes.Contains("SEC17A4-003"))
                 recommendations.Add("Configure 6-year retention policy for all broker-dealer records");
 
-            if (violations.Any(v => v.Code == "SEC17A4-004"))
+            if (codes.Contains("SEC17A4-004"))
                 recommendations.Add("Implement tiered storage with immediate accessibility for recent records");
 
-            if (violations.Any(v => v.Code == "SEC17A4-005"))
+            if (codes.Contains("SEC17A4-005"))
                 recommendations.Add("Deploy comprehensive audit and timestamp serialization system");
 
-            if (violations.Any(v => v.Code == "SEC17A4-006"))
+            if (codes.Contains("SEC17A4-006"))
                 recommendations.Add("Implement third-party download interface for regulatory access");
 
-            if (violations.Any(v => v.Code == "SEC17A4-007"))
+            if (codes.Contains("SEC17A4-007"))
                 recommendations.Add("Establish duplicate backup at geographically separate facility");
 
             return recommendations;

@@ -21,7 +21,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USState
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
-            if (!context.Attributes.TryGetValue("UniversalOptOutHonored", out var uooObj) || uooObj is not true)
+            // LOW-1564: Universal opt-out applies to data sales/sharing operations, not reads or audits.
+            var isSaleOrSharingOperation = string.IsNullOrEmpty(context.OperationType) ||
+                context.OperationType.Contains("sale", StringComparison.OrdinalIgnoreCase) ||
+                context.OperationType.Contains("share", StringComparison.OrdinalIgnoreCase) ||
+                context.OperationType.Contains("transfer", StringComparison.OrdinalIgnoreCase) ||
+                context.OperationType.Contains("write", StringComparison.OrdinalIgnoreCase);
+            if (isSaleOrSharingOperation &&
+                (!context.Attributes.TryGetValue("UniversalOptOutHonored", out var uooObj) || uooObj is not true))
             {
                 violations.Add(new ComplianceViolation
                 {

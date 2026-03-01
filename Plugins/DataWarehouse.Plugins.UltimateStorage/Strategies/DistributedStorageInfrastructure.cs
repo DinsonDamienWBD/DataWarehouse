@@ -13,13 +13,21 @@ public sealed class QuorumConsistencyManager
 {
     private readonly BoundedDictionary<string, ReplicaState> _replicas = new BoundedDictionary<string, ReplicaState>(1000);
     private readonly TimeSpan _defaultTimeout;
+    private readonly string? _localRegion;
     private long _totalReads;
     private long _totalWrites;
     private long _readRepairs;
 
-    public QuorumConsistencyManager(TimeSpan? defaultTimeout = null)
+    /// <param name="defaultTimeout">Per-replica RPC timeout.</param>
+    /// <param name="localRegion">
+    /// The local region identifier used for LOCAL_QUORUM replica selection.
+    /// When null, LOCAL_QUORUM falls back to the region of the first registered replica
+    /// (non-deterministic — prefer always supplying an explicit value).
+    /// </param>
+    public QuorumConsistencyManager(TimeSpan? defaultTimeout = null, string? localRegion = null)
     {
         _defaultTimeout = defaultTimeout ?? TimeSpan.FromSeconds(5);
+        _localRegion = localRegion;
     }
 
     /// <summary>Registers a replica node for quorum calculations.</summary>
@@ -44,7 +52,10 @@ public sealed class QuorumConsistencyManager
         Func<string, Task<VersionedValue?>> readFromReplica, CancellationToken ct = default)
     {
         var requiredReplicas = GetRequiredReplicas(consistency);
-        var activeReplicas = _replicas.Values.Where(r => r.Status == ReplicaStatus.Active).ToList();
+        // Avoid per-call LINQ allocation: enumerate once into a pre-sized list.
+        var activeReplicas = new List<ReplicaState>(_replicas.Count);
+        foreach (var r in _replicas.Values)
+            if (r.Status == ReplicaStatus.Active) activeReplicas.Add(r);
 
         if (activeReplicas.Count < requiredReplicas)
             throw new InsufficientReplicasException(
@@ -99,7 +110,10 @@ public sealed class QuorumConsistencyManager
         CancellationToken ct = default)
     {
         var requiredReplicas = GetRequiredReplicas(consistency);
-        var activeReplicas = _replicas.Values.Where(r => r.Status == ReplicaStatus.Active).ToList();
+        // Avoid per-call LINQ allocation: enumerate once into a pre-sized list.
+        var activeReplicas = new List<ReplicaState>(_replicas.Count);
+        foreach (var r in _replicas.Values)
+            if (r.Status == ReplicaStatus.Active) activeReplicas.Add(r);
 
         if (activeReplicas.Count < requiredReplicas)
             throw new InsufficientReplicasException(
@@ -152,10 +166,14 @@ public sealed class QuorumConsistencyManager
     {
         if (level == ConsistencyLevel.LOCAL_QUORUM)
         {
-            // Prefer local region replicas
-            var localRegion = replicas.First().Region;
-            var local = replicas.Where(r => r.Region == localRegion).Take(count).ToList();
-            if (local.Count >= count) return local;
+            // Use the configured local region; fall back to the first registered region only
+            // when no explicit local region was supplied to the constructor.
+            var localRegion = _localRegion ?? (replicas.Count > 0 ? replicas[0].Region : null);
+            if (localRegion != null)
+            {
+                var local = replicas.Where(r => r.Region == localRegion).Take(count).ToList();
+                if (local.Count >= count) return local;
+            }
         }
         return replicas.Take(count).ToList();
     }
@@ -304,20 +322,28 @@ public sealed class MultiRegionReplicationManager
     /// <summary>Routes a read to the nearest healthy region.</summary>
     public string RouteRead(double clientLatitude, double clientLongitude)
     {
-        var healthyRegions = _regions.Values.Where(r => r.IsHealthy).ToList();
-        if (healthyRegions.Count == 0)
+        // Avoid per-call LINQ allocation: find the nearest healthy region in one pass.
+        RegionNode? nearest = null;
+        double nearestDist = double.MaxValue;
+        foreach (var region in _regions.Values)
+        {
+            if (!region.IsHealthy) continue;
+            var dist = CalculateDistance(clientLatitude, clientLongitude, region.Latitude, region.Longitude);
+            if (dist < nearestDist) { nearestDist = dist; nearest = region; }
+        }
+        if (nearest == null)
             throw new InvalidOperationException("No healthy regions available.");
-
-        return healthyRegions
-            .OrderBy(r => CalculateDistance(clientLatitude, clientLongitude, r.Latitude, r.Longitude))
-            .First().RegionId;
+        return nearest.RegionId;
     }
 
     /// <summary>Replicates a write to all regions with conflict resolution.</summary>
     public async Task<ReplicationResult> ReplicateWriteAsync(string key, byte[] value,
         string sourceRegion, long version, CancellationToken ct = default)
     {
-        var targetRegions = _regions.Values.Where(r => r.RegionId != sourceRegion && r.IsHealthy).ToList();
+        // Avoid per-call LINQ allocation: enumerate once into a pre-sized list.
+        var targetRegions = new List<RegionNode>(_regions.Count);
+        foreach (var r in _regions.Values)
+            if (r.IsHealthy && r.RegionId != sourceRegion) targetRegions.Add(r);
         var results = new List<(string region, bool success)>();
 
         // Batch replication with WAN optimization
@@ -336,7 +362,14 @@ public sealed class MultiRegionReplicationManager
             batch.Add(evt);
 
             var log = _replicationLog.GetOrAdd(region.RegionId, _ => new List<ReplicationEvent>());
-            lock (log) { log.Add(evt); }
+            lock (log)
+            {
+                log.Add(evt);
+                // Cap the per-region log to 10 000 entries to prevent unbounded memory growth.
+                const int MaxLogEntries = 10_000;
+                if (log.Count > MaxLogEntries)
+                    log.RemoveRange(0, log.Count - MaxLogEntries);
+            }
 
             results.Add((region.RegionId, true));
             Interlocked.Increment(ref _totalReplicated);
@@ -638,6 +671,9 @@ public sealed class GeoDistributionManager
     private readonly BoundedDictionary<string, GeoNode> _topology = new BoundedDictionary<string, GeoNode>(1000);
     private readonly BoundedDictionary<string, FailoverRecord> _failoverHistory = new BoundedDictionary<string, FailoverRecord>(1000);
     private readonly TimeSpan _healthCheckInterval;
+    // Monotonic counter makes failover keys unique even when multiple failovers occur within
+    // the same 100-ns tick, preventing silent overwrites with DateTime.Ticks keys.
+    private long _failoverSeq;
 
     public GeoDistributionManager(TimeSpan? healthCheckInterval = null)
     {
@@ -673,7 +709,9 @@ public sealed class GeoDistributionManager
         if (wasHealthy && !node.IsHealthy)
         {
             action = FailoverAction.FailoverRequired;
-            _failoverHistory[$"{nodeId}:{DateTime.UtcNow.Ticks}"] = new FailoverRecord
+            // Use a monotonic sequence number to guarantee key uniqueness under rapid failovers.
+            var seq = Interlocked.Increment(ref _failoverSeq);
+            _failoverHistory[$"{nodeId}:{seq}"] = new FailoverRecord
             {
                 NodeId = nodeId,
                 Region = node.Region,

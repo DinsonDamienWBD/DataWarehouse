@@ -218,12 +218,19 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                 request.Headers.Add("X-HP-Compression-Enabled", "true");
             }
 
-            // Add custom metadata as headers
+            // Add custom metadata as headers.
+            // Validate metadata key names to prevent HTTP header injection.
             if (metadata != null)
             {
                 foreach (var kvp in metadata)
                 {
-                    request.Headers.Add($"X-HP-Meta-{kvp.Key}", kvp.Value);
+                    if (!System.Text.RegularExpressions.Regex.IsMatch(kvp.Key, @"^[A-Za-z0-9\-_]+$"))
+                    {
+                        System.Diagnostics.Debug.WriteLine(
+                            $"[HpeStoreOnceStrategy] Skipping metadata key '{kvp.Key}': contains unsafe characters.");
+                        continue;
+                    }
+                    request.Headers.TryAddWithoutValidation($"X-HP-Meta-{kvp.Key}", kvp.Value);
                 }
             }
 

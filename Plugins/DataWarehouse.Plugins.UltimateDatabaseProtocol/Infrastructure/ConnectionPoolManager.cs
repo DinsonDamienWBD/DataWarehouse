@@ -91,9 +91,15 @@ internal sealed class PooledConnection<TConnection> where TConnection : IDatabas
 {
     public TConnection Connection { get; }
     public DateTime CreatedAt { get; }
-    public DateTime LastUsedAt { get; private set; }
-    public int UseCount { get; private set; }
-    public bool IsInUse { get; private set; }
+    // P2-2308: volatile/Interlocked fields ensure visibility across the acquire/release path.
+    // DateTime cannot be volatile; store ticks as a long (Interlocked-safe).
+    private long _lastUsedAtTicks;
+    private volatile int _useCount;
+    private volatile bool _isInUse;
+
+    public DateTime LastUsedAt => new DateTime(Interlocked.Read(ref _lastUsedAtTicks), DateTimeKind.Utc);
+    public int UseCount => _useCount;
+    public bool IsInUse => _isInUse;
     public string PoolKey { get; }
 
     public PooledConnection(TConnection connection, string poolKey)
@@ -101,22 +107,22 @@ internal sealed class PooledConnection<TConnection> where TConnection : IDatabas
         Connection = connection;
         PoolKey = poolKey;
         CreatedAt = DateTime.UtcNow;
-        LastUsedAt = DateTime.UtcNow;
-        UseCount = 0;
-        IsInUse = false;
+        Interlocked.Exchange(ref _lastUsedAtTicks, DateTime.UtcNow.Ticks);
+        _useCount = 0;
+        _isInUse = false;
     }
 
     public void MarkInUse()
     {
-        IsInUse = true;
-        LastUsedAt = DateTime.UtcNow;
-        UseCount++;
+        _isInUse = true;
+        Interlocked.Exchange(ref _lastUsedAtTicks, DateTime.UtcNow.Ticks);
+        Interlocked.Increment(ref _useCount);
     }
 
     public void MarkAvailable()
     {
-        IsInUse = false;
-        LastUsedAt = DateTime.UtcNow;
+        _isInUse = false;
+        Interlocked.Exchange(ref _lastUsedAtTicks, DateTime.UtcNow.Ticks);
     }
 
     public bool IsExpired(int maxLifetimeMs) =>

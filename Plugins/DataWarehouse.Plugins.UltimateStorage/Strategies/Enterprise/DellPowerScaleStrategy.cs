@@ -252,12 +252,20 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                 request.Headers.Add("X-Isi-Ifs-Set-Worm", "true");
             }
 
-            // Add custom metadata as extended attributes
+            // Add custom metadata as extended attributes.
+            // Validate metadata key names to prevent HTTP header injection.
             if (metadata != null)
             {
                 foreach (var kvp in metadata)
                 {
-                    request.Headers.Add($"X-Isi-Ifs-Set-Attr-{kvp.Key}", kvp.Value);
+                    // Header names must be token characters: letters, digits, and safe symbols only.
+                    if (!System.Text.RegularExpressions.Regex.IsMatch(kvp.Key, @"^[A-Za-z0-9\-_]+$"))
+                    {
+                        System.Diagnostics.Debug.WriteLine(
+                            $"[DellPowerScaleStrategy] Skipping metadata key '{kvp.Key}': contains unsafe characters.");
+                        continue;
+                    }
+                    request.Headers.TryAddWithoutValidation($"X-Isi-Ifs-Set-Attr-{kvp.Key}", kvp.Value);
                 }
             }
 
@@ -405,19 +413,32 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             IncrementOperationCounter(StorageOperationType.List);
 
             var directoryPath = BuildNamespacePath(prefix ?? string.Empty);
-            var url = $"{_endpoint}/namespace{directoryPath}?detail=default&max=1000";
+            // Paginate using the `resume` token returned by PowerScale when more results exist.
+            string? resumeToken = null;
 
-            var request = new HttpRequestMessage(HttpMethod.Get, url);
-            request.Headers.Add("Cookie", $"isisessid={_authToken}");
-            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-            var response = await SendWithRetryAsync(request, ct);
-            var content = await response.Content.ReadAsStringAsync(ct);
-
-            using var doc = JsonDocument.Parse(content);
-
-            if (doc.RootElement.TryGetProperty("children", out var children))
+            do
             {
+                var pageUrl = resumeToken != null
+                    ? $"{_endpoint}/namespace{directoryPath}?detail=default&max=1000&resume={Uri.EscapeDataString(resumeToken)}"
+                    : $"{_endpoint}/namespace{directoryPath}?detail=default&max=1000";
+
+                var request = new HttpRequestMessage(HttpMethod.Get, pageUrl);
+                request.Headers.Add("Cookie", $"isisessid={_authToken}");
+                request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+                var response = await SendWithRetryAsync(request, ct);
+                var content = await response.Content.ReadAsStringAsync(ct);
+
+                using var doc = JsonDocument.Parse(content);
+
+                // Check for continuation token
+                resumeToken = doc.RootElement.TryGetProperty("resume", out var resumeElement)
+                    ? resumeElement.GetString()
+                    : null;
+
+                if (!doc.RootElement.TryGetProperty("children", out var children))
+                    break;
+
                 foreach (var child in children.EnumerateArray())
                 {
                     ct.ThrowIfCancellationRequested();
@@ -461,7 +482,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
 
                     await Task.Yield();
                 }
-            }
+            } while (!string.IsNullOrEmpty(resumeToken));
         }
 
         /// <summary>

@@ -34,7 +34,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USState
                 }
             }
 
-            if (!context.Attributes.TryGetValue("EncryptionImplemented", out var encryptObj) || encryptObj is not true)
+            // LOW-1565: Encryption check applies to write/store operations, not reads or audit operations.
+            var isWriteOrStoreOperation = string.IsNullOrEmpty(context.OperationType) ||
+                context.OperationType.Contains("write", StringComparison.OrdinalIgnoreCase) ||
+                context.OperationType.Contains("store", StringComparison.OrdinalIgnoreCase) ||
+                context.OperationType.Contains("transfer", StringComparison.OrdinalIgnoreCase) ||
+                context.OperationType.Contains("export", StringComparison.OrdinalIgnoreCase);
+            if (isWriteOrStoreOperation &&
+                (!context.Attributes.TryGetValue("EncryptionImplemented", out var encryptObj) || encryptObj is not true))
             {
                 violations.Add(new ComplianceViolation { Code = "NYSHIELD-003", Description = "Private information not encrypted", Severity = ViolationSeverity.High, Remediation = "Encrypt private information", RegulatoryReference = "NY GBL § 899-bb" });
             }

@@ -49,17 +49,22 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.WORM
                     RegulatoryReference = "FINRA Rule 4511(a)"
                 });
             }
-            else if (retention is int years && years < 3)
+            // LOW-1566: Accept int, long, and double from JSON deserializer so the check is not silently skipped.
+            else if (retention is int or long or double)
             {
-                violations.Add(new ComplianceViolation
+                var years = Convert.ToDouble(retention);
+                if (years < 3)
                 {
-                    Code = "FINRA-003",
-                    Description = $"Retention period {years} years is below FINRA minimum of 3 years",
-                    Severity = ViolationSeverity.Critical,
-                    AffectedResource = context.ResourceId,
-                    Remediation = "Increase retention period to meet FINRA requirements (3-6 years)",
-                    RegulatoryReference = "FINRA Rule 4511(a)"
-                });
+                    violations.Add(new ComplianceViolation
+                    {
+                        Code = "FINRA-003",
+                        Description = $"Retention period {years} years is below FINRA minimum of 3 years",
+                        Severity = ViolationSeverity.Critical,
+                        AffectedResource = context.ResourceId,
+                        Remediation = "Increase retention period to meet FINRA requirements (3-6 years)",
+                        RegulatoryReference = "FINRA Rule 4511(a)"
+                    });
+                }
             }
 
             // Check 3: Verify index and retrieval capability
@@ -160,27 +165,29 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.WORM
 
         private static List<string> GenerateRecommendations(List<ComplianceViolation> violations)
         {
+            // LOW-1567: Build HashSet<string> of violation codes once for O(1) lookups instead of O(N) .Any() per check.
+            var codes = new HashSet<string>(violations.Select(v => v.Code), StringComparer.Ordinal);
             var recommendations = new List<string>();
 
-            if (violations.Any(v => v.Code == "FINRA-001"))
+            if (codes.Contains("FINRA-001"))
                 recommendations.Add("Deploy FINRA-compliant WORM storage solution");
 
-            if (violations.Any(v => v.Code == "FINRA-002" || v.Code == "FINRA-003"))
+            if (codes.Contains("FINRA-002") || codes.Contains("FINRA-003"))
                 recommendations.Add("Implement retention policy: 3 years for most records, 6 years for account records");
 
-            if (violations.Any(v => v.Code == "FINRA-004"))
+            if (codes.Contains("FINRA-004"))
                 recommendations.Add("Build searchable index system with metadata tagging");
 
-            if (violations.Any(v => v.Code == "FINRA-005"))
+            if (codes.Contains("FINRA-005"))
                 recommendations.Add("Establish off-site backup at separate geographical location");
 
-            if (violations.Any(v => v.Code == "FINRA-006"))
+            if (codes.Contains("FINRA-006"))
                 recommendations.Add("Optimize retrieval system for prompt regulatory production");
 
-            if (violations.Any(v => v.Code == "FINRA-007"))
+            if (codes.Contains("FINRA-007"))
                 recommendations.Add("Implement comprehensive audit trail for all electronic record operations");
 
-            if (violations.Any(v => v.Code == "FINRA-008"))
+            if (codes.Contains("FINRA-008"))
                 recommendations.Add("Document and test business continuity plan for record systems");
 
             return recommendations;
