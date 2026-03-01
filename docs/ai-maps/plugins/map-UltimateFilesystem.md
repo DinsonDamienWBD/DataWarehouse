@@ -30,7 +30,7 @@ public sealed class UltimateFilesystemPlugin : DataWarehouse.SDK.Contracts.Hiera
     public override Task<Stream> RetrieveAsync(string key, CancellationToken ct = default);;
     public override Task DeleteAsync(string key, CancellationToken ct = default);;
     public override Task<bool> ExistsAsync(string key, CancellationToken ct = default);;
-    public override async IAsyncEnumerable<DataWarehouse.SDK.Contracts.Storage.StorageObjectMetadata> ListAsync(string? prefix, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default);
+    public override IAsyncEnumerable<DataWarehouse.SDK.Contracts.Storage.StorageObjectMetadata> ListAsync(string? prefix, CancellationToken ct = default);;
     public override Task<DataWarehouse.SDK.Contracts.Storage.StorageObjectMetadata> GetMetadataAsync(string key, CancellationToken ct = default);;
     public override Task<DataWarehouse.SDK.Contracts.Storage.StorageHealthInfo> GetHealthAsync(CancellationToken ct = default);;
     protected override void Dispose(bool disposing);
@@ -65,6 +65,7 @@ public sealed record BlockIoOptions
     public bool AsyncIo { get; init; }
     public int BufferSize { get; init; };
     public int Priority { get; init; };
+    public Scaling.IoPriority ToIoPriority();;
     public bool WriteThrough { get; init; }
     public bool ReadAhead { get; init; };
     public int MaxConcurrentOps { get; init; };
@@ -656,7 +657,7 @@ public sealed class AutoDetectStrategy : FilesystemStrategyBase
     public override string SemanticDescription;;
     public override string[] Tags;;
     public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);
-    public override Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
     public override Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
     public override async Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);
 }
@@ -672,7 +673,7 @@ public sealed class NtfsStrategy : FilesystemStrategyBase
     public override string SemanticDescription;;
     public override string[] Tags;;
     public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default);
-    public override Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
+    public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default);
     public override Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default);
     public override async Task<FilesystemMetadata> GetMetadataAsync(string path, CancellationToken ct = default);
 }
