@@ -81,7 +81,10 @@ public sealed class InMemoryGraphStrategy : LineageStrategyBase
 
             if (_upstreamLinks.TryGetValue(currentId, out var uplinks))
             {
-                foreach (var upId in uplinks)
+                // P2-2368: snapshot under lock — concurrent TrackAsync mutates the same HashSet
+                string[] uplinkSnapshot;
+                lock (uplinks) { uplinkSnapshot = [.. uplinks]; }
+                foreach (var upId in uplinkSnapshot)
                 {
                     queue.Enqueue((upId, depth + 1));
                     edges.Add(new LineageEdge
@@ -124,7 +127,10 @@ public sealed class InMemoryGraphStrategy : LineageStrategyBase
 
             if (_downstreamLinks.TryGetValue(currentId, out var downlinks))
             {
-                foreach (var downId in downlinks)
+                // P2-2368: snapshot under lock — concurrent TrackAsync mutates the same HashSet
+                string[] downlinkSnapshot;
+                lock (downlinks) { downlinkSnapshot = [.. downlinks]; }
+                foreach (var downId in downlinkSnapshot)
                 {
                     queue.Enqueue((downId, depth + 1));
                     edges.Add(new LineageEdge

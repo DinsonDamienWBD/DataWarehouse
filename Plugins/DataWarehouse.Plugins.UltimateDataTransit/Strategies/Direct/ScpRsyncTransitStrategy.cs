@@ -174,7 +174,8 @@ internal sealed class ScpRsyncTransitStrategy : DataTransitStrategyBase
                 remotePath = $"/tmp/{transferId}";
             }
 
-            await UploadViaScpAsync(request.Destination, remotePath, sourceData, cts.Token);
+            // P2-2679: upload the computed delta (or full source when no delta), not raw sourceData
+            await UploadViaScpAsync(request.Destination, remotePath, dataToTransfer, cts.Token);
 
             stopwatch.Stop();
 
