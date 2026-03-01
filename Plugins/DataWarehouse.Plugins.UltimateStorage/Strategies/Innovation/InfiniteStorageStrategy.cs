@@ -35,7 +35,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private readonly List<ProviderEndpoint> _providers = new();
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
         private readonly Dictionary<string, ProviderEndpoint> _providerById = new(); // O(1) lookup
+=======
+        // O(1) lookup by provider ID — updated in sync with _providers
+        private readonly Dictionary<string, ProviderEndpoint> _providerById = new();
+>>>>>>> Stashed changes
 =======
         // O(1) lookup by provider ID — updated in sync with _providers
         private readonly Dictionary<string, ProviderEndpoint> _providerById = new();
@@ -457,7 +462,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
             // Find providers using consistent hashing — O(1) lookup via _providerById
+=======
+            // Find providers using consistent hashing — O(log n) ring traversal, O(1) provider lookup
+>>>>>>> Stashed changes
 =======
             // Find providers using consistent hashing — O(log n) ring traversal, O(1) provider lookup
 >>>>>>> Stashed changes

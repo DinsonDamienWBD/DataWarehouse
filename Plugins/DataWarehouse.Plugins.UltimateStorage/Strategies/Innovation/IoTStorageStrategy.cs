@@ -204,6 +204,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             public List<TelemetrySample> Samples { get; set; } = new();
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+=======
+            /// <summary>Lock protecting Samples list from concurrent Add/Clear races.</summary>
+>>>>>>> Stashed changes
 =======
             /// <summary>Lock protecting Samples list from concurrent Add/Clear races.</summary>
 >>>>>>> Stashed changes

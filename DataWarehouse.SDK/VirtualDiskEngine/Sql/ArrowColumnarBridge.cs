@@ -283,11 +283,14 @@ public static class ArrowColumnarBridge
     {
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
         // Cat 13 (finding 911/912): MemoryMarshal.AsBytes gives a zero-copy view as Span<byte>,
         // but ReadOnlyMemory<byte> requires a byte[] backing store, so we must allocate and copy.
         // The previous comment "Zero-copy" was incorrect. If the caller can use ReadOnlySpan<byte>,
         // use MemoryMarshal.AsBytes(values.AsSpan()) directly to avoid this allocation.
 =======
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
         // Cat 13 (finding 911/912): MemoryMarshal.AsBytes returns a Span<byte> aliasing the original
@@ -296,6 +299,9 @@ public static class ArrowColumnarBridge
         // If the caller can accept a ReadOnlySpan<byte>, use MemoryMarshal.AsBytes(values) directly
         // to avoid this allocation.
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
