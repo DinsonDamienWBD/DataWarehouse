@@ -83,8 +83,10 @@ public sealed class BatteryLevelMonitoringStrategy : SustainabilityStrategyBase
 
             var status = new BatteryStatus { IsPresent = true };
 
-            if (File.Exists($"{batteryPath}/capacity"))
-                status.ChargePercent = int.Parse(File.ReadAllText($"{batteryPath}/capacity").Trim());
+            // Finding 4368: sysfs files can contain transient/corrupt data; use TryParse guards.
+            if (File.Exists($"{batteryPath}/capacity") &&
+                int.TryParse(File.ReadAllText($"{batteryPath}/capacity").Trim(), out var cap))
+                status.ChargePercent = cap;
             if (File.Exists($"{batteryPath}/status"))
             {
                 var state = File.ReadAllText($"{batteryPath}/status").Trim().ToLower();
@@ -92,13 +94,16 @@ public sealed class BatteryLevelMonitoringStrategy : SustainabilityStrategyBase
                 status.IsFull = state == "full";
                 status.IsDischarging = state == "discharging";
             }
-            if (File.Exists($"{batteryPath}/power_now"))
-                status.DischargingWatts = long.Parse(File.ReadAllText($"{batteryPath}/power_now").Trim()) / 1_000_000.0;
-            if (File.Exists($"{batteryPath}/energy_full"))
-                status.DesignCapacityWh = long.Parse(File.ReadAllText($"{batteryPath}/energy_full").Trim()) / 1_000_000.0;
-            if (File.Exists($"{batteryPath}/energy_full_design"))
+            if (File.Exists($"{batteryPath}/power_now") &&
+                long.TryParse(File.ReadAllText($"{batteryPath}/power_now").Trim(), out var powerNow))
+                status.DischargingWatts = powerNow / 1_000_000.0;
+            if (File.Exists($"{batteryPath}/energy_full") &&
+                long.TryParse(File.ReadAllText($"{batteryPath}/energy_full").Trim(), out var energyFull))
+                status.DesignCapacityWh = energyFull / 1_000_000.0;
+            if (File.Exists($"{batteryPath}/energy_full_design") &&
+                long.TryParse(File.ReadAllText($"{batteryPath}/energy_full_design").Trim(), out var designEnergy))
             {
-                var designCapacity = long.Parse(File.ReadAllText($"{batteryPath}/energy_full_design").Trim()) / 1_000_000.0;
+                var designCapacity = designEnergy / 1_000_000.0;
                 status.HealthPercent = designCapacity > 0 ? (status.DesignCapacityWh / designCapacity) * 100 : 100;
             }
 

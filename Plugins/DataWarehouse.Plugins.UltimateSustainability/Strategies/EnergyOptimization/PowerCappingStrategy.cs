@@ -248,8 +248,36 @@ public sealed class PowerCappingStrategy : SustainabilityStrategyBase
 
     private bool IsAmdApmAvailable()
     {
-        // Check for AMD APM support
-        return false;
+        // Finding 4452: detect AMD APM availability via /sys/class/powercap on Linux.
+        // AMD APM (Advanced Power Management) exposes its interface under the powercap
+        // subsystem with a "amd-energy" or "amd_energy" driver entry on supported hardware.
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            return false;
+
+        try
+        {
+            var powercapBase = "/sys/class/powercap";
+            if (!Directory.Exists(powercapBase))
+                return false;
+
+            foreach (var entry in Directory.EnumerateDirectories(powercapBase))
+            {
+                var name = Path.GetFileName(entry).ToLowerInvariant();
+                if (name.StartsWith("amd", StringComparison.Ordinal) ||
+                    name.Contains("amd-energy") ||
+                    name.Contains("amd_energy"))
+                {
+                    // Verify the constraint file is writable (APM control available)
+                    var constraintPath = Path.Combine(entry, "constraint_0_power_limit_uw");
+                    return File.Exists(constraintPath);
+                }
+            }
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private double? ReadRaplDomain(string domain)

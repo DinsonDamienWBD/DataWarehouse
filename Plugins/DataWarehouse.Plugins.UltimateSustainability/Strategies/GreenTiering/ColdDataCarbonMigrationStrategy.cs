@@ -592,11 +592,12 @@ public sealed class ColdDataCarbonMigrationStrategy : SustainabilityStrategyBase
             });
         }
 
-        // If significant portion of data is cold on high-carbon backends
-        var recentHistory = _migrationHistory.ToArray().TakeLast(100).ToList();
-        if (recentHistory.Count >= 50)
+        // Finding 4435: avoid double-materializing; take the last 100 records from
+        // a single snapshot (bounded at MaxHistoryEntries so this is at most 10K entries).
+        var recentHistory = _migrationHistory.ToArray().TakeLast(100).ToArray();
+        if (recentHistory.Length >= 50)
         {
-            var successRate = recentHistory.Count(r => r.Success) / (double)recentHistory.Count;
+            var successRate = recentHistory.Count(r => r.Success) / (double)recentHistory.Length;
             if (successRate < 0.8)
             {
                 recommendations.Add(new SustainabilityRecommendation

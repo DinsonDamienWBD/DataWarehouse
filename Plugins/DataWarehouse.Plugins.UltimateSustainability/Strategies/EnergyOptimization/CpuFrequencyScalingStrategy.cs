@@ -291,10 +291,37 @@ public sealed class CpuFrequencyScalingStrategy : SustainabilityStrategyBase
         }
     }
 
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
     private void DetectWindowsCpuCapabilities()
     {
-        // Windows detection would use WMI or registry
-        // Using typical values for now
+        // Finding 4457: read base/max/min frequencies from HKLM registry keys written by
+        // Windows power manager. Falls back to conservative processor-count heuristic when
+        // the keys are absent (e.g., VMs, containers without ACPI exposure).
+        try
+        {
+            using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                @"HARDWARE\DESCRIPTION\System\CentralProcessor\0");
+            if (key != null)
+            {
+                // "~MHz" holds the current/base frequency in MHz (DWORD)
+                var mhz = key.GetValue("~MHz");
+                if (mhz is int mhzInt && mhzInt > 0)
+                {
+                    _baseFrequencyMhz = mhzInt;
+                    // Max boost is typically ~40 % above base on modern CPUs
+                    _maxFrequencyMhz = _baseFrequencyMhz * 1.4;
+                    // Minimum idle frequency is typically ~30 % of base
+                    _minFrequencyMhz = _baseFrequencyMhz * 0.3;
+                    return;
+                }
+            }
+        }
+        catch
+        {
+            // Registry access failed (sandboxed process, container without registry, etc.)
+        }
+
+        // Heuristic fallback based on core count; better than a hard-coded constant
         _baseFrequencyMhz = Environment.ProcessorCount >= 8 ? 3200 : 2400;
         _maxFrequencyMhz = _baseFrequencyMhz * 1.4;
         _minFrequencyMhz = _baseFrequencyMhz * 0.3;

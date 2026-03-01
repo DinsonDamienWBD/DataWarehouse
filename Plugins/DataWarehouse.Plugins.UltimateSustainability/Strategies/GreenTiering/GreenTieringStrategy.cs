@@ -172,7 +172,9 @@ public sealed class GreenTieringStrategy : SustainabilityStrategyBase
     /// </summary>
     public IReadOnlyList<GreenMigrationBatch> GetPendingBatches()
     {
-        return _pendingBatches.ToArray().ToList().AsReadOnly();
+        // Finding 4566: ToArray() already materializes the ConcurrentQueue snapshot; ToList() then
+        // AsReadOnly() adds two unnecessary allocations. Single ToList().AsReadOnly() is sufficient.
+        return _pendingBatches.ToList().AsReadOnly();
     }
 
     /// <summary>

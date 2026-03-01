@@ -102,7 +102,9 @@ public sealed class ServerlessOptimizationStrategy : SustainabilityStrategyBase
                 Type = ServerlessRecommendationType.ReduceColdStarts,
                 Description = $"Cold start rate at {coldStartRate:F0}%. Consider provisioned concurrency or warming.",
                 Priority = 7,
-                EstimatedSavingsMs = executions.Where(e => e.WasColdStart).Average(e => e.DurationMs) * 0.5
+                // Finding 4456: guard against empty cold-start subset before Average().
+                EstimatedSavingsMs = executions.Where(e => e.WasColdStart) is { } cs && cs.Any()
+                    ? cs.Average(e => e.DurationMs) * 0.5 : 0
             });
         }
 

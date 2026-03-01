@@ -37,6 +37,11 @@ public sealed class ContainerDensityStrategy : SustainabilityStrategyBase
     /// <summary>Registers a Kubernetes node.</summary>
     public void RegisterNode(string nodeId, string name, int cpuMillicores, long memoryBytes)
     {
+        // Finding 4453: validate required parameters before mutating state.
+        ArgumentException.ThrowIfNullOrEmpty(nodeId);
+        ArgumentException.ThrowIfNullOrEmpty(name);
+        if (cpuMillicores <= 0) throw new ArgumentOutOfRangeException(nameof(cpuMillicores), "Must be > 0");
+        if (memoryBytes <= 0) throw new ArgumentOutOfRangeException(nameof(memoryBytes), "Must be > 0");
         lock (_lock)
         {
             _nodes[nodeId] = new K8sNode
@@ -74,6 +79,10 @@ public sealed class ContainerDensityStrategy : SustainabilityStrategyBase
     /// <summary>Registers a pod.</summary>
     public void RegisterPod(string podId, string name, string nodeId, int cpuRequest, int cpuLimit, long memoryRequest, long memoryLimit)
     {
+        // Finding 4453: validate required parameters.
+        ArgumentException.ThrowIfNullOrEmpty(podId);
+        ArgumentException.ThrowIfNullOrEmpty(name);
+        ArgumentException.ThrowIfNullOrEmpty(nodeId);
         lock (_lock)
         {
             _pods[podId] = new K8sPod

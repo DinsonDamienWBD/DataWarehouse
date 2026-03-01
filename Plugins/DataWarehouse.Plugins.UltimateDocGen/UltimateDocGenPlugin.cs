@@ -48,9 +48,49 @@ public sealed class DocGenResult
 
 public abstract class DocGenStrategyBase
 {
+    /// <summary>Maximum allowed length for OperationId to prevent embedding extremely long strings in output.</summary>
+    private const int MaxOperationIdLength = 256;
+
+    /// <summary>Maximum allowed length for SourceType.</summary>
+    private const int MaxSourceTypeLength = 512;
+
     public abstract DocGenCharacteristics Characteristics { get; }
     public string StrategyId => Characteristics.StrategyName.Replace(" ", "");
     public abstract Task<DocGenResult> GenerateAsync(DocGenRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Validates request fields that are embedded into generated output.
+    /// Cat 15 (finding 2909): OperationId and SourceType have unbounded length — a 1 MB OperationId
+    /// would be embedded verbatim into HTML/Markdown output.
+    /// </summary>
+    /// <exception cref="ArgumentException">Thrown when OperationId or SourceType exceeds allowed length.</exception>
+    protected static void ValidateRequest(DocGenRequest request)
+    {
+        if (request.OperationId != null && request.OperationId.Length > MaxOperationIdLength)
+            throw new ArgumentException(
+                $"OperationId exceeds maximum length of {MaxOperationIdLength} characters " +
+                $"(got {request.OperationId.Length}).", nameof(request));
+        if (request.SourceType != null && request.SourceType.Length > MaxSourceTypeLength)
+            throw new ArgumentException(
+                $"SourceType exceeds maximum length of {MaxSourceTypeLength} characters " +
+                $"(got {request.SourceType.Length}).", nameof(request));
+    }
+
+    /// <summary>
+    /// Extracts a source title hint from <see cref="DocGenRequest.Source"/>.
+    /// Cat 14 (finding 2908): strategies should use the Source object to influence output
+    /// when it contains a recognizable string/type name, rather than ignoring it entirely.
+    /// Returns null if Source is null or not a recognizable type.
+    /// </summary>
+    protected static string? ExtractSourceTitle(DocGenRequest request)
+    {
+        return request.Source switch
+        {
+            string s when !string.IsNullOrWhiteSpace(s) => s,
+            Type t => t.FullName ?? t.Name,
+            _ => request.Source?.GetType().Name
+        };
+    }
 
     protected string FormatAsMarkdown(string title, List<(string Name, string Type, string Description)> items)
     {
@@ -100,9 +140,13 @@ public sealed class OpenApiDocStrategy : DocGenStrategyBase
 
     public override Task<DocGenResult> GenerateAsync(DocGenRequest request, CancellationToken ct = default)
     {
+        ValidateRequest(request);
         var startTime = System.Diagnostics.Stopwatch.StartNew();
         var sourceType = request.SourceType ?? "api";
-        var title = request.Options.GetValueOrDefault("title")?.ToString() ?? "API Documentation";
+        // Cat 14 (finding 2908): use Source to derive a context-aware title when available.
+        var sourceHint = ExtractSourceTitle(request);
+        var title = request.Options.GetValueOrDefault("title")?.ToString()
+            ?? (sourceHint != null ? $"API Documentation — {sourceHint}" : "API Documentation");
         var version = request.Options.GetValueOrDefault("version")?.ToString() ?? "1.0.0";
         var basePath = request.Options.GetValueOrDefault("basePath")?.ToString() ?? "/api/v1";
 
