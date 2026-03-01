@@ -42,9 +42,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
         {
             var (host, port) = ParseHostPort(config.ConnectionString, 7474);
 
-            // Check bolt port (7687) via TCP
+            // Check bolt port — configurable, default 7687
+            var boltPort = config.Properties.TryGetValue("BoltPort", out var bp) && bp != null
+                && int.TryParse(bp.ToString(), out var bpInt) ? bpInt : 7687;
             _tcpClient = new TcpClient();
-            await _tcpClient.ConnectAsync(host, 7687, ct);
+            await _tcpClient.ConnectAsync(host, boltPort, ct);
 
             // Use HTTP REST API
             _httpClient = new HttpClient
