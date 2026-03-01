@@ -483,6 +483,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                 return new byte[] { cla, ins, p1, p2, 0x00 };
             }
 
+            // P2-3494: APDU Lc field is one byte — data payload must not exceed 255 bytes.
+            if (data.Length > 255)
+                throw new ArgumentException(
+                    $"APDU data payload too large: {data.Length} bytes exceeds the 255-byte APDU limit.", nameof(data));
+
             var apdu = new byte[5 + data.Length];
             apdu[0] = cla;
             apdu[1] = ins;

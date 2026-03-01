@@ -318,7 +318,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
 
             // If status returns successfully and doesn't show "encrypted" for our key files,
             // the repository is unlocked
-            return result.ExitCode == 0 && !result.Output?.Contains("encrypted:") == true;
+            // P2-3468: fix operator precedence — !nullable.Contains() evaluates to bool?, not bool.
+            // Null output from a successful exit code means no "encrypted:" lines: repository is unlocked.
+            return result.ExitCode == 0 && result.Output?.Contains("encrypted:") != true;
         }
 
         private async Task InitializeGitCryptAsync(CancellationToken cancellationToken)

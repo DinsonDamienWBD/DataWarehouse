@@ -228,12 +228,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                     siftedBits.Add((byte)(random[i] & matchMask));
                 }
 
-                _totalBitsGenerated += siftedBits.Count * 8;
+                // P2-3497: use Interlocked for 64-bit fields — non-atomic on 32-bit processes.
+                Interlocked.Add(ref _totalBitsGenerated, siftedBits.Count * 8);
 
                 // Simulate QBER (introduce small error rate)
                 var simulatedQber = 0.02 + (new Random().NextDouble() * 0.03); // 2-5% QBER
                 var errorBits = (int)(siftedBits.Count * 8 * simulatedQber);
-                _totalErrors += errorBits;
+                Interlocked.Add(ref _totalErrors, errorBits);
 
                 // Privacy amplification: hash sifted bits to final key length
                 var siftedArray = siftedBits.ToArray();

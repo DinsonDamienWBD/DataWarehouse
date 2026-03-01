@@ -28,6 +28,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
     public sealed class AzureKeyVaultStrategy : KeyStoreStrategyBase, IEnvelopeKeyStore
     {
         private readonly HttpClient _httpClient;
+        // P2-3444: serialize token refresh so concurrent callers don't all race to refresh.
+        private readonly System.Threading.SemaphoreSlim _tokenRefreshLock = new(1, 1);
         private AzureKeyVaultConfig _config = new();
         private string? _accessToken;
         private DateTime _tokenExpiry;
@@ -270,8 +272,18 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
         private async Task EnsureTokenAsync(CancellationToken cancellationToken = default)
         {
+            // Fast-path: token still valid — no lock needed for the read (double-checked locking).
             if (_accessToken != null && DateTime.UtcNow < _tokenExpiry.AddMinutes(-5))
                 return;
+
+            // P2-3444: serialize token refresh to prevent concurrent callers from all refreshing
+            // simultaneously when the token expires.
+            await _tokenRefreshLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                // Re-check inside the lock; another caller may have refreshed already.
+                if (_accessToken != null && DateTime.UtcNow < _tokenExpiry.AddMinutes(-5))
+                    return;
 
             var tokenUrl = $"https://login.microsoftonline.com/{_config.TenantId}/oauth2/v2.0/token";
             var content = new FormUrlEncodedContent(new Dictionary<string, string>
@@ -290,6 +302,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             _accessToken = doc.RootElement.GetProperty("access_token").GetString();
             var expiresIn = doc.RootElement.GetProperty("expires_in").GetInt32();
             _tokenExpiry = DateTime.UtcNow.AddSeconds(expiresIn);
+            }
+            finally
+            {
+                _tokenRefreshLock.Release();
+            }
         }
 
         private HttpRequestMessage CreateRequest(HttpMethod method, string path)
@@ -302,6 +319,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
         public override void Dispose()
         {
             _httpClient?.Dispose();
+            _tokenRefreshLock?.Dispose();
             base.Dispose();
         }
     }
