@@ -13035,6 +13035,7 @@ public sealed class ActiveLineageStrategy : IntelligenceStrategyBase
     public async Task<LineageTraversalResult> GetDownstreamLineageAsync(string assetId, int maxDepth = 10, CancellationToken ct = default);
     public async Task<ImpactAnalysisResult> AnalyzeImpactAsync(string assetId, string changeType, CancellationToken ct = default);
     public async Task<List<CausalRelationship>> InferCausalRelationshipsAsync(string assetId, CancellationToken ct = default);
+    protected override void Dispose(bool disposing);
 }
 ```
 ```csharp

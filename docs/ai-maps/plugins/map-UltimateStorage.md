@@ -7365,8 +7365,8 @@ public class TemporalOrganizationStrategy : UltimateStorageStrategyBase
     protected override async Task InitializeCoreAsync(CancellationToken ct);
     protected override async Task<StorageObjectMetadata> StoreAsyncCore(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct);
     protected override async Task<Stream> RetrieveAsyncCore(string key, CancellationToken ct);
-    protected override async Task DeleteAsyncCore(string key, CancellationToken ct);
-    protected override async Task<bool> ExistsAsyncCore(string key, CancellationToken ct);
+    protected override Task DeleteAsyncCore(string key, CancellationToken ct);
+    protected override Task<bool> ExistsAsyncCore(string key, CancellationToken ct);
     protected override async IAsyncEnumerable<StorageObjectMetadata> ListAsyncCore(string? prefix, [EnumeratorCancellation] CancellationToken ct);
     protected override async Task<StorageObjectMetadata> GetMetadataAsyncCore(string key, CancellationToken ct);
     protected override async Task<StorageHealthInfo> GetHealthAsyncCore(CancellationToken ct);
@@ -7450,6 +7450,7 @@ private class SemanticMetadata
     public string DetectedType { get; set; };
     public List<string> Tags { get; set; };
     public string Category { get; set; };
+    public string FilePath { get; set; };
 }
 ```
 
@@ -7867,6 +7868,7 @@ private class TimeSeriesBuffer
 }
     public string DeviceId { get; set; };
     public List<TelemetrySample> Samples { get; set; };
+    public readonly object SamplesLock = new();
 }
 ```
 ```csharp

@@ -22,6 +22,10 @@ public sealed class UltimateDatabaseProtocolPlugin : DataWarehouse.SDK.Contracts
 {
     get
     {
+        // LOW-2757: lazily compute and cache the capabilities list.
+        // Strategy enumeration is expensive; caching avoids repeated allocations per call.
+        if (_cachedCapabilities != null)
+            return _cachedCapabilities;
         var capabilities = new List<RegisteredCapability>
         {
             // Main plugin capability
@@ -55,7 +59,8 @@ public sealed class UltimateDatabaseProtocolPlugin : DataWarehouse.SDK.Contracts
             capabilities.Add(new() { CapabilityId = $"{Id}.{strategy.StrategyId.ToLowerInvariant().Replace(".", "-")}", DisplayName = strategy.StrategyName, Description = $"{strategy.StrategyName} wire protocol for {strategy.ProtocolInfo.ProtocolName}", Category = SDK.Contracts.CapabilityCategory.Connector, SubCategory = strategy.ProtocolInfo.Family.ToString(), PluginId = Id, PluginName = Name, PluginVersion = Version, Tags = [..tags] });
         }
 
-        return capabilities.AsReadOnly();
+        _cachedCapabilities = capabilities.AsReadOnly();
+        return _cachedCapabilities;
     }
 }
     public UltimateDatabaseProtocolPlugin();
@@ -1683,6 +1688,7 @@ public sealed class DuckDbProtocolStrategy : DatabaseProtocolStrategyBase
 public sealed class LevelDbProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
+    public override bool IsProductionReady;;
     public override string StrategyId;;
     public override string StrategyName;;
     public override ProtocolInfo ProtocolInfo;;
@@ -1722,6 +1728,7 @@ public sealed class RocksDbProtocolStrategy : DatabaseProtocolStrategyBase
 public sealed class BerkeleyDbProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
+    public override bool IsProductionReady;;
     public override string StrategyId;;
     public override string StrategyName;;
     public override ProtocolInfo ProtocolInfo;;
