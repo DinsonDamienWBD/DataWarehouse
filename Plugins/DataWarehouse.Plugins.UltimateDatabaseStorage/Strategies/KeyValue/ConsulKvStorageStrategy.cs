@@ -346,7 +346,8 @@ public sealed class ConsulKvStorageStrategy : DatabaseStorageStrategyBase
 
         public async Task ReleaseAsync(CancellationToken ct = default)
         {
-            await Task.Run(() => _lock.Release(), ct);
+            // LOW-2816: _lock.Release() is synchronous; no Task.Run wrapper needed
+            _lock.Release();
         }
 
         public async ValueTask DisposeAsync()

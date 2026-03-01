@@ -168,8 +168,11 @@ public sealed class ArangoDbStorageStrategy : DatabaseStorageStrategyBase
             $"/_db/{_database}/_api/document/{_collection}/{Uri.EscapeDataString(key)}",
             content, ct);
 
-        if (!response.IsSuccessStatusCode)
+        // LOW-2785: Only fall back to POST on 404 (document not found). Other errors (403, 5xx)
+        // should propagate — silently retrying a PUT on auth/server failure is incorrect.
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
+            content = new StringContent(JsonSerializer.Serialize(document), Encoding.UTF8, "application/json");
             response = await _httpClient.PostAsync(
                 $"/_db/{_database}/_api/document/{_collection}",
                 content, ct);

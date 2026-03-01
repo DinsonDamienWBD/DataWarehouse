@@ -280,7 +280,7 @@ public sealed class UltimateDataQualityPlugin : DataManagementPluginBase, IDispo
 
     #region Message Handlers
 
-    private Task HandleValidateAsync(PluginMessage message)
+    private async Task HandleValidateAsync(PluginMessage message)
     {
         if (!message.Payload.TryGetValue("strategyId", out var sidObj) || sidObj is not string strategyId)
         {
@@ -289,9 +289,27 @@ public sealed class UltimateDataQualityPlugin : DataManagementPluginBase, IDispo
 
         var strategy = GetStrategyOrThrow(strategyId);
         IncrementUsageStats(strategyId);
-        Interlocked.Increment(ref _totalRecordsProcessed);
 
-        // Accumulate issues from payload if caller reports them
+        // P2-2662: actually validate data if records are provided in the payload.
+        if (message.Payload.TryGetValue("records", out var recordsObj) && recordsObj != null)
+        {
+            var records = DeserializeRecords(recordsObj);
+            if (records.Count > 0)
+            {
+                Interlocked.Add(ref _totalRecordsProcessed, records.Count);
+                var result = await strategy.ValidateAsync(records, default).ConfigureAwait(false);
+                var issueCount = result.ValidationIssues?.Count ?? 0;
+                Interlocked.Add(ref _totalIssuesFound, issueCount);
+                message.Payload["success"] = result.IsValid;
+                message.Payload["issuesFound"] = issueCount;
+                message.Payload["validationIssues"] = result.ValidationIssues ?? new List<DataQualityIssue>();
+                message.Payload["strategyId"] = strategy.StrategyId;
+                message.Payload["strategyName"] = strategy.DisplayName;
+                return;
+            }
+        }
+
+        // Accumulate issues from payload if caller reports them (metadata-only path)
         if (message.Payload.TryGetValue("issueCount", out var ic) && ic is long issues)
             Interlocked.Add(ref _totalIssuesFound, issues);
 
@@ -305,7 +323,6 @@ public sealed class UltimateDataQualityPlugin : DataManagementPluginBase, IDispo
             ["supportsBatch"] = strategy.Capabilities.SupportsBatch,
             ["supportsStreaming"] = strategy.Capabilities.SupportsStreaming
         };
-        return Task.CompletedTask;
     }
 
     private Task HandleProfileAsync(PluginMessage message)

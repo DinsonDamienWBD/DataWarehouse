@@ -65,6 +65,7 @@ public sealed class DatabaseStorageScalingManager : IScalableSubsystem, IDisposa
     // ---- Metrics ----
     private long _streamingRetrievals;
     private long _paginatedQueries;
+    private long _streamingQueries;
     private long _healthChecksCompleted;
     private long _healthCheckFailures;
     private long _totalBytesStreamed;
@@ -135,6 +136,7 @@ public sealed class DatabaseStorageScalingManager : IScalableSubsystem, IDisposa
             ["streaming.retrievals"] = Interlocked.Read(ref _streamingRetrievals),
             ["streaming.totalBytesStreamed"] = Interlocked.Read(ref _totalBytesStreamed),
             ["query.paginatedQueries"] = Interlocked.Read(ref _paginatedQueries),
+            ["query.streamingQueries"] = Interlocked.Read(ref _streamingQueries),
             ["query.activeConcurrent"] = Interlocked.Read(ref _activeConcurrentQueries),
             ["cache.size"] = _queryResultCache.Count,
             ["cache.memoryBytes"] = _queryResultCache.EstimatedMemoryBytes,
@@ -340,7 +342,8 @@ public sealed class DatabaseStorageScalingManager : IScalableSubsystem, IDisposa
         var concurrent = Interlocked.Increment(ref _activeConcurrentQueries);
         try
         {
-            Interlocked.Increment(ref _paginatedQueries);
+            // LOW-2786: Track streaming queries separately; incrementing _paginatedQueries here is misleading
+            Interlocked.Increment(ref _streamingQueries);
 
             await foreach (var item in streamingQueryExecutor(ct).WithCancellation(ct).ConfigureAwait(false))
             {
