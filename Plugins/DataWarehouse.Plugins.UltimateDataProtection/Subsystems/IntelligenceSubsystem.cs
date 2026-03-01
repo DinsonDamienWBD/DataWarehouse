@@ -243,7 +243,8 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Subsystems
 
                 if (daysDiff > 0)
                 {
-                    var sizeDiff = recentBackups.Sum(b => b.StoredSize) / recentBackups.Count;
+                    // Actual storage growth = difference between total stored size at newest vs oldest point.
+                    var sizeDiff = newestRecent.StoredSize - oldestRecent.StoredSize;
                     dailyGrowthBytes = (long)(sizeDiff / daysDiff);
                     confidence = Math.Min(recentBackups.Count / 30.0, 1.0); // More backups = higher confidence
                 }

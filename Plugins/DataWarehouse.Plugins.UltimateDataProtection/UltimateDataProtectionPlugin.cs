@@ -584,11 +584,25 @@ namespace DataWarehouse.Plugins.UltimateDataProtection
 
         private Dictionary<string, object> RecommendStrategy(string scenario, Dictionary<string, object> context)
         {
+            // Validate and sanitize scenario input before embedding in any output string.
+            if (string.IsNullOrWhiteSpace(scenario) || scenario.Length > 200)
+            {
+                return new Dictionary<string, object>
+                {
+                    ["success"] = false,
+                    ["error"] = "Invalid scenario: must be a non-empty string of at most 200 characters."
+                };
+            }
+
+            // Strip non-alphanumeric chars (except hyphens/underscores) to prevent injection.
+            var sanitizedScenario = System.Text.RegularExpressions.Regex.Replace(
+                scenario, @"[^a-zA-Z0-9_\-]", "");
+
             // AI-driven strategy recommendation
             DataProtectionCategory? category = null;
             DataProtectionCapabilities required = DataProtectionCapabilities.None;
 
-            switch (scenario.ToLowerInvariant())
+            switch (sanitizedScenario.ToLowerInvariant())
             {
                 case "database":
                     category = DataProtectionCategory.FullBackup;
@@ -621,7 +635,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection
                 ["recommendedStrategy"] = strategy?.StrategyId ?? "streaming-full-backup",
                 ["strategyName"] = strategy?.StrategyName ?? "Streaming Full Backup",
                 ["category"] = strategy?.Category.ToString() ?? category?.ToString() ?? "FullBackup",
-                ["reasoning"] = $"Selected based on scenario '{scenario}' requirements"
+                ["reasoning"] = $"Selected based on scenario '{sanitizedScenario}' requirements"
             };
         }
 

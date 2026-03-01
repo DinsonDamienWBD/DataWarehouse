@@ -751,14 +751,26 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 
         /// <summary>
         /// Verifies a single blockchain anchor.
+        /// Checks that the anchor is marked confirmed, has a non-empty transaction hash, a positive block
+        /// number, and has not expired. A full production implementation would additionally query the
+        /// blockchain RPC endpoint to confirm on-chain transaction existence and confirmation count.
         /// </summary>
         private Task<bool> VerifyAnchorAsync(BlockchainAnchor anchor, CancellationToken ct)
         {
-            // In production, query the blockchain to verify:
-            // 1. Transaction exists
-            // 2. Transaction contains correct hash
-            // 3. Transaction has required confirmations
-            return Task.FromResult(anchor.Confirmed);
+            if (!anchor.Confirmed)
+                return Task.FromResult(false);
+
+            if (string.IsNullOrEmpty(anchor.TransactionHash))
+                return Task.FromResult(false);
+
+            if (anchor.BlockNumber <= 0)
+                return Task.FromResult(false);
+
+            // Reject anchors older than 10 years as potentially stale / network-forked.
+            if (anchor.AnchoredAt < DateTimeOffset.UtcNow.AddYears(-10))
+                return Task.FromResult(false);
+
+            return Task.FromResult(true);
         }
 
         #endregion

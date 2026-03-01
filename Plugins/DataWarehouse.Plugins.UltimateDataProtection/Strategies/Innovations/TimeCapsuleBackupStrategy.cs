@@ -343,7 +343,15 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                     var witnessValid = await VerifyTimeWitnessAsync(metadata.WitnessId, ct);
                     if (!witnessValid)
                     {
-                        // Warning only - continue with restore
+                        // Witness verification failed: surface as a warning in progress.
+                        progressCallback(new RestoreProgress
+                        {
+                            RestoreId = restoreId,
+                            Phase = "Verifying Time Witness",
+                            PercentComplete = 25,
+                            Warning = $"Time-witness '{metadata.WitnessId}' could not be verified. " +
+                                      "Restore will continue but temporal authenticity is unconfirmed."
+                        });
                     }
                 }
 

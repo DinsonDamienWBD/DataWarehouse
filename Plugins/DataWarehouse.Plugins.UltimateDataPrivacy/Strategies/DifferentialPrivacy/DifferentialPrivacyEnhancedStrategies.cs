@@ -394,6 +394,8 @@ public sealed class SyntheticDataGenerationStrategy : DataPrivacyStrategyBase
 /// </summary>
 public sealed class PiiDetectionStrategy : DataPrivacyStrategyBase
 {
+    // P2-2518: Pre-compile all Regex patterns at class init to avoid per-call allocation
+    // inside the nested loop over all patterns × all input rows.
     private static readonly Dictionary<string, PiiPattern[]> PiiPatterns = new()
     {
         ["email"] = new[] { new PiiPattern(@"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", 0.95, PiiType.Email) },
@@ -403,6 +405,18 @@ public sealed class PiiDetectionStrategy : DataPrivacyStrategyBase
         ["ip_address"] = new[] { new PiiPattern(@"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", 0.75, PiiType.IpAddress) },
         ["name"] = new[] { new PiiPattern(@"^[A-Z][a-z]+ [A-Z][a-z]+$", 0.60, PiiType.PersonName) }
     };
+
+    // Pre-compiled Regex per pattern, keyed by pattern string.
+    private static readonly Dictionary<string, System.Text.RegularExpressions.Regex> CompiledPatterns =
+        PiiPatterns.Values
+            .SelectMany(arr => arr)
+            .GroupBy(p => p.Pattern)
+            .ToDictionary(
+                g => g.Key,
+                g => new System.Text.RegularExpressions.Regex(
+                    g.Key,
+                    System.Text.RegularExpressions.RegexOptions.Compiled |
+                    System.Text.RegularExpressions.RegexOptions.CultureInvariant));
 
     public override string StrategyId => "pii-detection";
     public override string DisplayName => "PII Detection";
@@ -427,7 +441,7 @@ public sealed class PiiDetectionStrategy : DataPrivacyStrategyBase
         {
             foreach (var pattern in patterns)
             {
-                var regex = new System.Text.RegularExpressions.Regex(pattern.Pattern);
+                var regex = CompiledPatterns[pattern.Pattern];
                 var matches = regex.Matches(text);
 
                 foreach (System.Text.RegularExpressions.Match match in matches)

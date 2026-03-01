@@ -27,7 +27,17 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
     /// </summary>
     public sealed class AkeylessStrategy : KeyStoreStrategyBase, IEnvelopeKeyStore
     {
-        private readonly HttpClient _httpClient;
+        // P2-3573: Share a single HttpClient per process to enable connection pooling
+        // and proper DNS refresh via SocketsHttpHandler. Creating per-instance clients
+        // leads to socket exhaustion under load.
+        private static readonly HttpClient _httpClient = new(new SocketsHttpHandler
+        {
+            PooledConnectionLifetime = TimeSpan.FromMinutes(15),
+            PooledConnectionIdleTimeout = TimeSpan.FromMinutes(5)
+        })
+        {
+            Timeout = TimeSpan.FromSeconds(30)
+        };
         private AkeylessConfig _config = new();
         private string? _currentKeyId;
         private string? _accessToken;
@@ -66,11 +76,6 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
         public IReadOnlyList<string> SupportedWrappingAlgorithms => new[] { "AES-256-GCM" };
 
         public bool SupportsHsmKeyGeneration => true;
-
-        public AkeylessStrategy()
-        {
-            _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
-        }
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
         {
@@ -405,7 +410,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
 
         public override void Dispose()
         {
-            _httpClient?.Dispose();
+            // _httpClient is shared (static) — not disposed here to prevent breaking other callers.
             base.Dispose();
         }
     }

@@ -148,17 +148,17 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             {
                 ct.ThrowIfCancellationRequested();
                 // Measure actual source size.
-                if (!string.IsNullOrEmpty(source.SourcePath) && Directory.Exists(source.SourcePath))
+                if (!string.IsNullOrEmpty(source) && Directory.Exists(source))
                 {
-                    var di = new DirectoryInfo(source.SourcePath);
+                    var di = new DirectoryInfo(source);
                     var files = di.GetFiles("*", SearchOption.AllDirectories);
                     totalBytes += files.Sum(f => f.Length);
                     storedBytes += files.Sum(f => f.Length);
                     fileCount += files.Length;
                 }
-                else if (!string.IsNullOrEmpty(source.SourcePath) && File.Exists(source.SourcePath))
+                else if (!string.IsNullOrEmpty(source) && File.Exists(source))
                 {
-                    var fi = new FileInfo(source.SourcePath);
+                    var fi = new FileInfo(source);
                     totalBytes += fi.Length;
                     storedBytes += fi.Length;
                     fileCount += 1;
@@ -825,8 +825,26 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                 .Take(20);
             metadata.Keywords.AddRange(pathParts);
 
-            metadata.SizeBytes = 1024 * 1024 * 100;
-            metadata.FileCount = 500;
+            // Measure actual file sizes from the source paths.
+            long sizeBytes = 0;
+            long fileCount = 0;
+            foreach (var source in sources)
+            {
+                if (Directory.Exists(source))
+                {
+                    var di = new DirectoryInfo(source);
+                    var files = di.GetFiles("*", SearchOption.AllDirectories);
+                    sizeBytes += files.Sum(f => f.Length);
+                    fileCount += files.Length;
+                }
+                else if (File.Exists(source))
+                {
+                    sizeBytes += new FileInfo(source).Length;
+                    fileCount++;
+                }
+            }
+            metadata.SizeBytes = sizeBytes;
+            metadata.FileCount = fileCount;
 
             return Task.FromResult(metadata);
         }

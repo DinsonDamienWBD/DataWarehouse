@@ -105,16 +105,16 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                 // Measure actual source size instead of using hardcoded stub values.
                 long sourceBytes = 0;
                 long sourceFiles = 0;
-                if (!string.IsNullOrEmpty(source.SourcePath) && Directory.Exists(source.SourcePath))
+                if (!string.IsNullOrEmpty(source) && Directory.Exists(source))
                 {
-                    var di = new DirectoryInfo(source.SourcePath);
+                    var di = new DirectoryInfo(source);
                     var files = di.GetFiles("*", SearchOption.AllDirectories);
                     sourceFiles = files.Length;
                     sourceBytes = files.Sum(f => f.Length);
                 }
-                else if (!string.IsNullOrEmpty(source.SourcePath) && File.Exists(source.SourcePath))
+                else if (!string.IsNullOrEmpty(source) && File.Exists(source))
                 {
-                    sourceBytes = new FileInfo(source.SourcePath).Length;
+                    sourceBytes = new FileInfo(source).Length;
                     sourceFiles = 1;
                 }
 
@@ -775,7 +775,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
         {
             public string BackupId { get; set; } = string.Empty;
             public DateTimeOffset PreStagedAt { get; set; }
-            public DateTimeOffset ReadyAt { get; set; }
+            // Initialized to UtcNow so that stale-eviction based on `now - ReadyAt > threshold`
+            // does not immediately evict entries that were marked ready without an explicit timestamp.
+            public DateTimeOffset ReadyAt { get; set; } = DateTimeOffset.UtcNow;
             public long SizeBytes { get; set; }
             public long FileCount { get; set; }
             public bool IsReady { get; set; }

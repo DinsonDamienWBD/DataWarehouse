@@ -113,16 +113,16 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                 // Attempt to determine real size; fall back to 0 if unavailable.
                 long sourceBytes = 0;
                 long sourceFiles = 0;
-                if (!string.IsNullOrEmpty(source.SourcePath) && Directory.Exists(source.SourcePath))
+                if (!string.IsNullOrEmpty(source) && Directory.Exists(source))
                 {
-                    var info = new DirectoryInfo(source.SourcePath);
+                    var info = new DirectoryInfo(source);
                     var files = info.GetFiles("*", SearchOption.AllDirectories);
                     sourceFiles = files.Length;
                     sourceBytes = files.Sum(f => f.Length);
                 }
-                else if (!string.IsNullOrEmpty(source.SourcePath) && File.Exists(source.SourcePath))
+                else if (!string.IsNullOrEmpty(source) && File.Exists(source))
                 {
-                    sourceBytes = new FileInfo(source.SourcePath).Length;
+                    sourceBytes = new FileInfo(source).Length;
                     sourceFiles = 1;
                 }
 

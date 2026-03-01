@@ -14,6 +14,8 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Subsystems
         private readonly BoundedDictionary<string, BoundedDictionary<string, VersionInfo>> _versions = new BoundedDictionary<string, BoundedDictionary<string, VersionInfo>>(1000);
         private readonly BoundedDictionary<string, byte[]> _versionContent = new BoundedDictionary<string, byte[]>(1000);
         private readonly BoundedDictionary<string, HashSet<string>> _contentHashes = new BoundedDictionary<string, HashSet<string>>(1000);
+        // Reverse index: contentHash -> first versionId that stored that content (O(1) dedup lookup).
+        private readonly BoundedDictionary<string, string> _hashToVersionId = new BoundedDictionary<string, string>(1000);
         // P2-2640: Per-item atomic counters so concurrent CreateVersionAsync calls never
         // assign duplicate version numbers (Count+1 is not atomic across threads).
         private readonly System.Collections.Concurrent.ConcurrentDictionary<string, long> _versionCounters = new();
@@ -121,6 +123,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Subsystems
                 {
                     _versionContent[versionId] = contentArray;
                     itemHashes.Add(contentHash);
+                    // Update the reverse hash index for O(1) dedup lookup in GetVersionContentAsync.
+                    if (!string.IsNullOrEmpty(contentHash))
+                        _hashToVersionId.TryAdd(contentHash, versionId);
                 }
             }
 
@@ -254,15 +259,23 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Subsystems
 
             if (!string.IsNullOrEmpty(version.ContentHash))
             {
-                // Find any stored version with the same content hash
-                foreach (var (storedVersionId, storedContent) in _versionContent)
+                // O(1) reverse-index lookup: contentHash -> stored versionId.
+                if (_hashToVersionId.TryGetValue(version.ContentHash, out var storedVersionId)
+                    && _versionContent.TryGetValue(storedVersionId, out var indexedContent))
                 {
-                    // Validate that this stored content matches by checking across all items
+                    return Task.FromResult(indexedContent);
+                }
+
+                // Fallback O(n) scan for entries written before the reverse index existed.
+                foreach (var (svId, storedContent) in _versionContent)
+                {
                     foreach (var itemEntry in _versions.Values)
                     {
-                        if (itemEntry.TryGetValue(storedVersionId, out var storedVersion) &&
+                        if (itemEntry.TryGetValue(svId, out var storedVersion) &&
                             storedVersion.ContentHash == version.ContentHash)
                         {
+                            // Backfill the index so future lookups are O(1).
+                            _hashToVersionId.TryAdd(version.ContentHash, svId);
                             return Task.FromResult(storedContent);
                         }
                     }
