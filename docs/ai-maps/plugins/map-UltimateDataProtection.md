@@ -786,7 +786,7 @@ public sealed class BackupScalingManager : IScalableSubsystem, IDisposable
 }
     public BackupScalingManager(IPersistentBackingStore? backingStore = null, ScalingLimits? initialLimits = null, int diskCount = DefaultDiskCount, RetentionPolicy? retentionPolicy = null);
     public IReadOnlyDictionary<string, object> GetScalingMetrics();
-    public async Task ReconfigureLimitsAsync(ScalingLimits limits, CancellationToken ct = default);
+    public Task ReconfigureLimitsAsync(ScalingLimits limits, CancellationToken ct = default);
     public ScalingLimits CurrentLimits;;
     public BackpressureState CurrentBackpressureState;;
     public void ReportIoMetrics(double throughputBytesPerSec, double queueDepth, double ioUtilization);

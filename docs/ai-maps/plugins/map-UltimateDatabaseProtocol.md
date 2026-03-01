@@ -1250,7 +1250,7 @@ public sealed class ElasticsearchProtocolStrategy : DatabaseProtocolStrategyBase
     protected override Task<string> BeginTransactionCoreAsync(CancellationToken ct);
     protected override Task CommitTransactionCoreAsync(string transactionId, CancellationToken ct);
     protected override Task RollbackTransactionCoreAsync(string transactionId, CancellationToken ct);
-    protected override async Task SendDisconnectMessageAsync(CancellationToken ct);
+    protected override Task SendDisconnectMessageAsync(CancellationToken ct);
     protected override async Task<bool> PingCoreAsync(CancellationToken ct);
     protected override async Task CleanupConnectionAsync();
 }

@@ -188,7 +188,7 @@ public sealed class AvroStrategy : DataFormatStrategyBase
     public override Task<DataFormatResult> ParseAsync(Stream input, DataFormatContext context, CancellationToken ct = default);
     public override Task<DataFormatResult> SerializeAsync(object data, Stream output, DataFormatContext context, CancellationToken ct = default);
     protected override async Task<FormatSchema?> ExtractSchemaCoreAsync(Stream stream, CancellationToken ct);
-    protected override Task<FormatValidationResult> ValidateCoreAsync(Stream stream, FormatSchema? schema, CancellationToken ct);
+    protected override async Task<FormatValidationResult> ValidateCoreAsync(Stream stream, FormatSchema? schema, CancellationToken ct);
 }
 ```
 

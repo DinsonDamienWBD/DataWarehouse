@@ -40,8 +40,8 @@ public abstract class DataGovernanceStrategyBase : StrategyBase, IDataGovernance
     public abstract DataGovernanceCapabilities Capabilities { get; }
     public abstract string SemanticDescription { get; }
     public abstract string[] Tags { get; }
-    protected override async Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     public HealthStatus GetHealth();
     public async Task<HealthStatus> GetHealthAsync(CancellationToken ct = default);
     public IReadOnlyDictionary<string, long> GetCounters();;
@@ -964,6 +964,8 @@ public sealed class AutoArchiveOrchestrator : ConsciousnessStrategyBase
 ```csharp
 public sealed class ConsciousnessScoringEngine : ConsciousnessStrategyBase, IConsciousnessScorer
 {
+// P2-2274: IncrementCounter(string, long) is now provided by StrategyBase — uses AddOrUpdate
+// with the full amount instead of O(n) loop. Local override removed.
 }
     public override string StrategyId;;
     public override string DisplayName;;
