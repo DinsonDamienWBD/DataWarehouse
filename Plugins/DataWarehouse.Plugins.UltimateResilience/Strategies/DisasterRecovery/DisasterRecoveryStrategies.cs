@@ -296,7 +296,6 @@ public sealed class GeoReplicationFailoverStrategy : ResilienceStrategyBase
         catch (Exception ex)
         {
             IncrementCounter("dr.primary.failure");
-            RecordError("dr.primary.failure", ex.Message);
 
             bool shouldFailover;
             lock (_lock)
@@ -327,11 +326,10 @@ public sealed class GeoReplicationFailoverStrategy : ResilienceStrategyBase
                             }
                         };
                     }
-                    catch (Exception retryEx)
+                    catch (Exception)
                     {
-                        // Failover retry also failed — log and fall through to failure result
+                        // Failover retry also failed — fall through to failure result below
                         IncrementCounter("dr.failover.retry.failure");
-                        RecordError("dr.failover.retry.failure", retryEx.Message);
                     }
                 }
             }
