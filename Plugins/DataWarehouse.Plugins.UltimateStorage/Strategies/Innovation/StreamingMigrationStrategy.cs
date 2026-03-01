@@ -32,7 +32,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
     {
         private string _sourcePath = string.Empty;
         private string _targetPath = string.Empty;
-        private bool _migrationActive = false;
+        private volatile bool _migrationActive = false;
         private bool _enableDualWrite = true;
         private double _syncThreshold = 0.95;
         private readonly SemaphoreSlim _initLock = new(1, 1);

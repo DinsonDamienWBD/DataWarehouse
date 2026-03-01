@@ -480,11 +480,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
         private List<ReplicaLocation> SelectReplicaLocations(int count)
         {
-            return _replicaLocationsSnapshot
-                .Where(l => l.IsHealthy)
-                .OrderBy(_ => Guid.NewGuid()) // Random selection
-                .Take(count)
-                .ToList();
+            var healthy = _replicaLocationsSnapshot.Where(l => l.IsHealthy).ToList();
+            // Fisher-Yates shuffle via Random.Shared for uniform random selection.
+            for (int i = healthy.Count - 1; i > 0; i--)
+            {
+                int j = Random.Shared.Next(i + 1);
+                (healthy[i], healthy[j]) = (healthy[j], healthy[i]);
+            }
+            return healthy.Take(count).ToList();
         }
 
         private void MonitorReplicaHealth()

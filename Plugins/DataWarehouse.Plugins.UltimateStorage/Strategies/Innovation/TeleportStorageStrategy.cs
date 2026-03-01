@@ -97,7 +97,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             await data.CopyToAsync(ms, ct);
             var dataBytes = ms.ToArray();
 
-            var targetRegions = _regions.OrderBy(_ => Guid.NewGuid()).Take(_replicationRegions).ToList();
+            // Fisher-Yates shuffle for uniform random region selection.
+            var shuffled = _regions.ToList();
+            for (int i = shuffled.Count - 1; i > 0; i--)
+            {
+                int j = Random.Shared.Next(i + 1);
+                (shuffled[i], shuffled[j]) = (shuffled[j], shuffled[i]);
+            }
+            var targetRegions = shuffled.Take(_replicationRegions).ToList();
             var primaryRegion = targetRegions.First();
             var primaryPath = Path.Combine(primaryRegion.Path, key);
             var primaryDir = Path.GetDirectoryName(primaryPath);

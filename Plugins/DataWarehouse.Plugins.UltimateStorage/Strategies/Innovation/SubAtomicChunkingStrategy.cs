@@ -508,15 +508,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         /// Computes hash of a chunk for content-addressable storage using fast hashing.
         /// AD-11: Cryptographic hashing delegated to UltimateDataIntegrity via bus.
         /// </summary>
-        private string ComputeChunkHash(byte[] chunk)
+        private static string ComputeChunkHash(byte[] chunk)
         {
-            var hash = new HashCode();
-            hash.AddBytes(chunk);
-            var h1 = hash.ToHashCode();
-            var hash2 = new HashCode();
-            hash2.Add(h1);
-            hash2.Add(chunk.Length);
-            return $"{h1:x8}{hash2.ToHashCode():x8}";
+            // SHA-256 is collision-resistant for content-addressed storage.
+            // Process-randomized HashCode cannot be used as a content address —
+            // the same chunk would get a different address on each restart.
+            return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(chunk)).ToLowerInvariant();
         }
 
         #endregion

@@ -83,6 +83,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 _enableInlineMetadata = GetConfiguration("EnableInlineMetadata", true);
                 _enableBitPacking = GetConfiguration("EnableBitPacking", true);
 
+                // Validate BlockStorePath resolves within or alongside BasePath to prevent directory traversal.
+                var fullBlockStorePath = Path.GetFullPath(_blockStorePath);
+                var fullBasePath = Path.GetFullPath(basePath);
+                // Allow the store file itself to be in basePath or any subfolder of basePath.
+                if (!fullBlockStorePath.StartsWith(fullBasePath, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException($"BlockStorePath '{_blockStorePath}' resolves outside the base storage directory '{basePath}'.");
+                _blockStorePath = fullBlockStorePath;
+
                 Directory.CreateDirectory(Path.GetDirectoryName(_blockStorePath)!);
 
                 // Open or create block device
