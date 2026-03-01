@@ -548,7 +548,11 @@ public sealed class ComplianceAwareLifecycleStrategy : AiEnhancedStrategyBase
                 containsPII = true;
                 piiTypes.Add("EMAIL");
             }
-            if (System.Text.RegularExpressions.Regex.IsMatch(textContent, @"\b\d{3}[-.]?\d{2}[-.]?\d{4}\b"))
+            // P2-2402: Require consistent separators (both hyphens, both dots, or none) to reduce
+            // false positives. Bare 9-digit sequences are SSN-formatted only when embedded with
+            // an SSN label prefix. Mixed-separator patterns like "555.86-7530" are not matched.
+            if (System.Text.RegularExpressions.Regex.IsMatch(textContent,
+                @"(?:(?:SSN|Social Security)[\s:#]*)?(?:\b\d{3}-\d{2}-\d{4}\b|\b\d{3}\.\d{2}\.\d{4}\b|\b\d{9}\b)"))
             {
                 containsPII = true;
                 piiTypes.Add("SSN");

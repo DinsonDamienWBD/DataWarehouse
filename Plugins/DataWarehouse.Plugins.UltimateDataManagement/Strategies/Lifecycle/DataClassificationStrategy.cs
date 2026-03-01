@@ -199,8 +199,11 @@ public sealed class DataClassificationStrategy : LifecycleStrategyBase
         // Initialize default classification rules
         InitializeDefaultRules();
 
-        // Check ML availability (would connect to T90 in production)
-        _mlAvailable = false; // Fallback mode by default
+        // P2-2433: _mlAvailable defaults to false (rule-based classification only).
+        // Set to true at runtime when T90 UltimateIntelligence is available (injected via
+        // RegisterStrategy or EnableMlClassification configuration override).
+        // GetMlClassificationAsync will then route to "intelligence.classify.text" topic.
+        _mlAvailable = false;
 
         return Task.CompletedTask;
     }

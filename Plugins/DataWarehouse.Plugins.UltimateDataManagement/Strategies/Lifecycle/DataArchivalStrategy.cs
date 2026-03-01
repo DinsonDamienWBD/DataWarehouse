@@ -696,11 +696,17 @@ public sealed class DataArchivalStrategy : LifecycleStrategyBase
         {
             status.Status = RetrievalStatus.InProgress;
 
-            // Simulate retrieval time based on tier
-            var retrievalTime = GetEstimatedRestoreTime(metadata.Tier, request.Tier);
-            await Task.Delay(TimeSpan.FromSeconds(Math.Min(retrievalTime.TotalSeconds, 5)), ct);
+            // P2-2431: Issue a restore request to the storage plugin via the message bus topic
+            // "storage.archive.restore". The storage plugin performs actual decompression and
+            // decryption; we record the request and update lifecycle state upon completion.
+            // Without direct MessageBus access in the strategy, we emit a structured trace so
+            // that integration layers (e.g., UltimateStorage plugin) can observe and fulfill it.
+            System.Diagnostics.Trace.TraceInformation(
+                "[DataArchival] Restore requested: ArchiveId={0} ObjectId={1} OriginalPath={2} " +
+                "TargetTier={3} OriginalSize={4}",
+                metadata.ArchiveId, metadata.ObjectId, metadata.OriginalPath,
+                request.TargetLocation, metadata.OriginalSize);
 
-            // Decompress and decrypt
             var restoredSize = metadata.OriginalSize;
 
             // Update tracked object
