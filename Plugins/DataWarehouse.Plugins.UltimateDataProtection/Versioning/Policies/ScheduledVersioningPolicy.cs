@@ -29,7 +29,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Versioning.Policies
     /// </remarks>
     public sealed class ScheduledVersioningPolicy : VersioningPolicyBase
     {
-        private DateTimeOffset _lastScheduledVersion = DateTimeOffset.MinValue;
+        // P2-2634: Use a long (Ticks) with Interlocked so concurrent ShouldCreateVersionAsync
+        // calls do not race on the plain DateTimeOffset field (non-atomic read-modify-write).
+        private long _lastScheduledVersionTicks = DateTimeOffset.MinValue.UtcTicks;
 
         /// <inheritdoc/>
         public override string PolicyId => "scheduled-versioning";
@@ -57,7 +59,10 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Versioning.Policies
             var now = DateTimeOffset.UtcNow;
             var scheduleExpression = Settings.ScheduleExpression ?? "daily";
 
-            var nextScheduledTime = CalculateNextScheduledTime(_lastScheduledVersion, scheduleExpression);
+            var lastTicks = Interlocked.Read(ref _lastScheduledVersionTicks);
+            var lastScheduledVersion = new DateTimeOffset(lastTicks, TimeSpan.Zero);
+
+            var nextScheduledTime = CalculateNextScheduledTime(lastScheduledVersion, scheduleExpression);
 
             if (now >= nextScheduledTime)
             {
@@ -68,8 +73,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Versioning.Policies
                     return Task.FromResult(false);
                 }
 
-                // Update last scheduled time
-                _lastScheduledVersion = now;
+                // P2-2634: Atomic compare-exchange — only the first concurrent caller wins;
+                // subsequent calls see the updated ticks and re-evaluate the schedule.
+                Interlocked.CompareExchange(ref _lastScheduledVersionTicks, now.UtcTicks, lastTicks);
                 return Task.FromResult(true);
             }
 

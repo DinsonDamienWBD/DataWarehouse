@@ -379,10 +379,17 @@ internal sealed class DeltaDifferentialStrategy : DataTransitStrategyBase
         var literalStart = 0;
         var pos = 0;
 
+        // P2-2682: Use rolling Adler-32 to achieve O(1) per-byte hash updates instead of
+        // recomputing ComputeAdler32(windowSpan) (O(blockSize)) at every byte position.
+        // Seed the first window; subsequent positions use RollHash.
+        uint weakHash = sourceLength >= blockSize
+            ? _hashComputer.ComputeAdler32(sourceData.AsSpan(0, blockSize))
+            : 0;
+
         while (pos <= sourceLength - blockSize)
         {
+            // weakHash is already valid for the window at [pos, pos+blockSize).
             var windowSpan = sourceData.AsSpan(pos, blockSize);
-            var weakHash = _hashComputer.ComputeAdler32(windowSpan);
 
             if (weakHashLookup.TryGetValue(weakHash, out var candidates))
             {
@@ -423,10 +430,17 @@ internal sealed class DeltaDifferentialStrategy : DataTransitStrategyBase
 
                     pos += blockSize;
                     literalStart = pos;
+
+                    // Re-seed rolling hash for the new window position after the jump.
+                    if (pos <= sourceLength - blockSize)
+                        weakHash = _hashComputer.ComputeAdler32(sourceData.AsSpan(pos, blockSize));
                     continue;
                 }
             }
 
+            // Advance one byte: roll the hash O(1) using the outgoing and incoming bytes.
+            if (pos + blockSize < sourceLength)
+                weakHash = _hashComputer.RollHash(weakHash, sourceData[pos], sourceData[pos + blockSize], blockSize);
             pos++;
         }
 

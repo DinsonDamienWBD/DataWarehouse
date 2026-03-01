@@ -14,6 +14,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Subsystems
         private readonly BoundedDictionary<string, BoundedDictionary<string, VersionInfo>> _versions = new BoundedDictionary<string, BoundedDictionary<string, VersionInfo>>(1000);
         private readonly BoundedDictionary<string, byte[]> _versionContent = new BoundedDictionary<string, byte[]>(1000);
         private readonly BoundedDictionary<string, HashSet<string>> _contentHashes = new BoundedDictionary<string, HashSet<string>>(1000);
+        // P2-2640: Per-item atomic counters so concurrent CreateVersionAsync calls never
+        // assign duplicate version numbers (Count+1 is not atomic across threads).
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, long> _versionCounters = new();
         private readonly object _dedupLock = new();
         private IVersioningPolicy? _currentPolicy;
         private VersioningMode _currentMode = VersioningMode.Manual;
@@ -40,7 +43,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Subsystems
             ArgumentNullException.ThrowIfNull(metadata);
 
             var itemVersions = _versions.GetOrAdd(itemId, _ => new BoundedDictionary<string, VersionInfo>(1000));
-            var versionNumber = itemVersions.Count + 1;
+            // P2-2640: Increment an atomic per-item counter so concurrent calls never
+            // collide on the same version number (Count+1 is not thread-safe).
+            var versionNumber = _versionCounters.AddOrUpdate(itemId, 1L, (_, prev) => prev + 1);
             var versionId = $"{itemId}_v{versionNumber}_{Guid.NewGuid():N}";
 
             var versionInfo = new VersionInfo
