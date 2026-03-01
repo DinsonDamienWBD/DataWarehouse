@@ -11,9 +11,16 @@ namespace DataWarehouse.SDK.VirtualDiskEngine.Allocation;
 /// from 64 to 2048 bytes) and this bitmap tracks which slots are occupied.
 /// </summary>
 /// <remarks>
+/// <para>
 /// Sub-block packing eliminates internal fragmentation for small objects (config files,
 /// metadata records, tags) that don't fill a full block. The bitmap operates alongside
 /// the allocation group's primary block bitmap.
+/// </para>
+/// <para>
+/// <b>Thread safety:</b> This class is NOT thread-safe. The caller (e.g., <c>SubBlockPacker</c>)
+/// must hold its own lock before calling any method on this instance. Do not share a single
+/// <see cref="SubBlockBitmap"/> across threads without external synchronization (finding 766).
+/// </para>
 /// </remarks>
 [SdkCompatibility("6.0.0", Notes = "Phase 87: Sub-block slot bitmap for tail-merged shared blocks (VOPT-11)")]
 public sealed class SubBlockBitmap

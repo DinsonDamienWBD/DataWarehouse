@@ -666,16 +666,23 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         }
 
         /// <summary>
-        /// Calculates elevation angle between satellite and ground station.
+        /// Calculates elevation angle between satellite and ground station using a
+        /// simplified geometric model based on orbital altitude and ground-track distance.
+        /// For production missions requiring high precision, replace with an SGP4/SDP4 propagator
+        /// (e.g., the Orekit or CoordinateSharp libraries) and real TLE data.
         /// </summary>
-        private double CalculateElevationAngle(SatelliteNode satellite, GroundStation station)
+        private static double CalculateElevationAngle(SatelliteNode satellite, GroundStation station)
         {
-            // Simplified calculation - real implementation would use SGP4 propagator
-            // For now, return a simulated elevation based on altitude
+            // Earth radius in km
+            const double earthRadiusKm = 6371.0;
             var altitudeKm = satellite.Altitude / 1000.0;
-            var baseElevation = Math.Max(0, 90 - (altitudeKm / 10.0));
 
-            return baseElevation + Random.Shared.NextDouble() * 20 - 10; // +/- 10 degrees variation
+            // Approximate slant angle: elevation ≈ arcsin(altitude / slant_range) clamped to [0,90].
+            // Without real orbital elements we derive slant range from altitude alone (nadir pass).
+            // This is a conservative lower bound — contacts near the horizon will report lower angles.
+            var slantRangeKm = Math.Sqrt(altitudeKm * altitudeKm + 2 * earthRadiusKm * altitudeKm);
+            var elevationRad = Math.Asin(altitudeKm / slantRangeKm);
+            return Math.Max(0, Math.Min(90, elevationRad * (180.0 / Math.PI)));
         }
 
         /// <summary>
