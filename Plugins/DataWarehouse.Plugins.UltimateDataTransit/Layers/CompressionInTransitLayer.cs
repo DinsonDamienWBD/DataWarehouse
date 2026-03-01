@@ -113,15 +113,25 @@ internal sealed class CompressionInTransitLayer : IDataTransitStrategy
             ["compression-originalSize"] = originalSize.ToString()
         };
 
-        // Create modified request with compressed stream
-        var modifiedRequest = request with
+        // P2-2666: Wrap compressedStream in a try/finally so it is disposed even when
+        // _inner.TransferAsync throws (the caller never sees the stream; we own it here).
+        TransitResult result;
+        try
         {
-            DataStream = compressedStream,
-            SizeBytes = compressedStream.CanSeek ? compressedStream.Length : request.SizeBytes,
-            Metadata = metadata
-        };
+            // Create modified request with compressed stream
+            var modifiedRequest = request with
+            {
+                DataStream = compressedStream,
+                SizeBytes = compressedStream.CanSeek ? compressedStream.Length : request.SizeBytes,
+                Metadata = metadata
+            };
 
-        var result = await _inner.TransferAsync(modifiedRequest, progress, ct).ConfigureAwait(false);
+            result = await _inner.TransferAsync(modifiedRequest, progress, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            await compressedStream.DisposeAsync().ConfigureAwait(false);
+        }
 
         // Enrich result metadata with compression info
         var resultMetadata = new Dictionary<string, string>(result.Metadata)

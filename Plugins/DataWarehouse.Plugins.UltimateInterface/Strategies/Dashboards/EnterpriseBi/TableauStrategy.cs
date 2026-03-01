@@ -13,6 +13,8 @@ public sealed class TableauStrategy : DashboardStrategyBase
 {
     private string? _siteId;
     private string? _authToken;
+    // P2-3299: serialize sign-in to prevent concurrent callers from racing on _authToken/_siteId.
+    private readonly System.Threading.SemaphoreSlim _authLock = new(1, 1);
     private string _apiVersion = "3.21";
 
     /// <inheritdoc/>
@@ -475,9 +477,20 @@ public sealed class TableauStrategy : DashboardStrategyBase
 
     private async Task EnsureAuthenticatedAsync(CancellationToken cancellationToken)
     {
-        if (string.IsNullOrEmpty(_authToken))
+        // Fast-path: already authenticated.
+        if (!string.IsNullOrEmpty(_authToken)) return;
+
+        // P2-3299: serialize sign-in to prevent concurrent callers from double-signing-in
+        // and losing each other's _siteId assignment.
+        await _authLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            await SignInAsync(cancellationToken);
+            if (string.IsNullOrEmpty(_authToken))
+                await SignInAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _authLock.Release();
         }
     }
 

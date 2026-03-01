@@ -103,6 +103,8 @@ public sealed class RedashStrategy : DashboardStrategyBase
 public sealed class ApacheSupersetStrategy : DashboardStrategyBase
 {
     private string? _accessToken;
+    // P2-3300: serialize token fetch to prevent concurrent auth races on _accessToken.
+    private readonly System.Threading.SemaphoreSlim _authLock = new(1, 1);
 
     public override string StrategyId => "apache-superset";
     public override string StrategyName => "Apache Superset";
@@ -204,15 +206,27 @@ public sealed class ApacheSupersetStrategy : DashboardStrategyBase
 
     private async Task EnsureAuthenticatedAsync(CancellationToken ct)
     {
+        // Fast-path: already authenticated.
         if (!string.IsNullOrEmpty(_accessToken)) return;
-        if (Config?.AuthType != AuthenticationType.Basic || string.IsNullOrEmpty(Config.Username)) return;
 
-        var client = GetHttpClient();
-        var loginPayload = new { username = Config.Username, password = Config.Password, provider = "db" };
-        using var response = await client.PostAsync("/api/v1/security/login", CreateJsonContent(loginPayload), ct);
-        response.EnsureSuccessStatusCode();
-        var result = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
-        _accessToken = result.GetProperty("access_token").GetString();
+        // P2-3300: serialize login to prevent concurrent callers from racing on _accessToken.
+        await _authLock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            if (!string.IsNullOrEmpty(_accessToken)) return; // re-check inside lock
+            if (Config?.AuthType != AuthenticationType.Basic || string.IsNullOrEmpty(Config.Username)) return;
+
+            var client = GetHttpClient();
+            var loginPayload = new { username = Config.Username, password = Config.Password, provider = "db" };
+            using var response = await client.PostAsync("/api/v1/security/login", CreateJsonContent(loginPayload), ct);
+            response.EnsureSuccessStatusCode();
+            var result = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
+            _accessToken = result.GetProperty("access_token").GetString();
+        }
+        finally
+        {
+            _authLock.Release();
+        }
     }
 
     protected override Task ApplyAuthenticationAsync(HttpRequestMessage request, CancellationToken ct)

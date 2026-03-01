@@ -52,7 +52,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Subsystems
             {
                 VersionId = versionId,
                 ItemId = itemId,
-                VersionNumber = versionNumber,
+                VersionNumber = (int)versionNumber,
                 CreatedAt = DateTimeOffset.UtcNow,
                 Metadata = metadata,
                 SizeBytes = 0,

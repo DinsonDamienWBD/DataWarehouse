@@ -133,7 +133,8 @@ internal sealed class Http3TransitStrategy : DataTransitStrategyBase
                     getRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", request.Source.AuthToken);
                 }
 
-                var getResponse = await _httpClient.SendAsync(getRequest, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+                // P2-2683: dispose the HttpResponseMessage when done reading its content stream.
+                using var getResponse = await _httpClient.SendAsync(getRequest, HttpCompletionOption.ResponseHeadersRead, cts.Token);
                 getResponse.EnsureSuccessStatusCode();
                 dataStream = await getResponse.Content.ReadAsStreamAsync(cts.Token);
             }

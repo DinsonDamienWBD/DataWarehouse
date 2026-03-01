@@ -11,6 +11,8 @@ namespace DataWarehouse.Plugins.UltimateInterface.Dashboards.Strategies.OpenSour
 public sealed class MetabaseStrategy : DashboardStrategyBase
 {
     private string? _sessionToken;
+    // P2-3300: serialize sign-in to prevent concurrent auth races on _sessionToken.
+    private readonly System.Threading.SemaphoreSlim _authLock = new(1, 1);
 
     /// <inheritdoc/>
     public override string StrategyId => "metabase";
@@ -366,8 +368,14 @@ public sealed class MetabaseStrategy : DashboardStrategyBase
 
     private async Task EnsureAuthenticatedAsync(CancellationToken cancellationToken)
     {
-        if (!string.IsNullOrEmpty(_sessionToken))
-            return;
+        // Fast-path: already authenticated.
+        if (!string.IsNullOrEmpty(_sessionToken)) return;
+
+        // P2-3300: serialize sign-in to prevent concurrent callers from racing on _sessionToken.
+        await _authLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+        if (!string.IsNullOrEmpty(_sessionToken)) return; // re-check inside lock
 
         if (Config?.AuthType == AuthenticationType.Basic &&
             !string.IsNullOrEmpty(Config.Username) &&
@@ -393,6 +401,11 @@ public sealed class MetabaseStrategy : DashboardStrategyBase
         else if (Config?.AuthType == AuthenticationType.ApiKey && !string.IsNullOrEmpty(Config.ApiKey))
         {
             _sessionToken = Config.ApiKey;
+        }
+        }
+        finally
+        {
+            _authLock.Release();
         }
     }
 
