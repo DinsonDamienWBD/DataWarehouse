@@ -52,8 +52,13 @@ public sealed class PueTrackingStrategy : SustainabilityStrategyBase
     }
 
     /// <summary>Records a PUE reading manually.</summary>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="itLoadKw"/> is not positive.</exception>
     public void RecordPue(double itLoadKw, double totalPowerKw)
     {
+        // P2-4433: Guard against division by zero and nonsensical negative IT load.
+        if (itLoadKw <= 0)
+            throw new ArgumentOutOfRangeException(nameof(itLoadKw), itLoadKw, "IT load must be a positive value in kW.");
+
         var pue = totalPowerKw / itLoadKw;
         var reading = new PueReading
         {

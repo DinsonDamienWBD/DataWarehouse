@@ -374,12 +374,25 @@ public sealed class PolicyEnforcedConfigMode : IEncryptionConfigMode
             }
         }
 
-        // Check HSM requirement for Envelope mode
+        // P2-3425: Enforce HSM requirement for Envelope mode. Key store plugin IDs that
+        // indicate HSM backing must contain "Hsm", "Pkcs11", "CloudHsm", "Tpm", or "Kms".
+        // Operators configure only HSM-backed key store plugin IDs in AllowedKeyStores when
+        // RequireHsmBackedKek is true, so validation here checks the naming convention.
         if (policy.RequireHsmBackedKek && metadata.KeyMode == KeyManagementMode.Envelope)
         {
-            // This would typically check the key store capabilities
-            // For now, we trust that the key store plugin ID indicates HSM capability
-            // More sophisticated validation would involve querying the key store registry
+            var ksp = metadata.KeyStorePluginId ?? string.Empty;
+            bool isHsmBacked = ksp.Contains("Hsm", StringComparison.OrdinalIgnoreCase)
+                || ksp.Contains("Pkcs11", StringComparison.OrdinalIgnoreCase)
+                || ksp.Contains("CloudHsm", StringComparison.OrdinalIgnoreCase)
+                || ksp.Contains("Tpm", StringComparison.OrdinalIgnoreCase)
+                || ksp.Contains("Kms", StringComparison.OrdinalIgnoreCase);
+            if (!isHsmBacked)
+            {
+                return (false,
+                    $"Policy violation: Envelope mode requires an HSM-backed key store " +
+                    $"(RequireHsmBackedKek=true), but key store '{ksp}' does not appear to be HSM-backed. " +
+                    "Configure an HSM, PKCS#11, CloudHSM, TPM, or KMS key store.");
+            }
         }
 
         return (true, null);

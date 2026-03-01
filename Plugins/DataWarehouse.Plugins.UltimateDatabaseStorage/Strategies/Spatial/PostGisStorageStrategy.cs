@@ -47,7 +47,8 @@ public sealed class PostGisStorageStrategy : DatabaseStorageStrategyBase
 
     protected override async Task InitializeCoreAsync(CancellationToken ct)
     {
-        _tableName = GetConfiguration("TableName", "spatial_storage");
+        // P2-2844: Validate table name to prevent SQL injection via identifier interpolation.
+        _tableName = ValidatePgIdentifier(GetConfiguration("TableName", "spatial_storage"), "TableName");
 
         var connectionString = GetConnectionString();
         _dataSource = NpgsqlDataSource.Create(connectionString);
@@ -299,5 +300,20 @@ public sealed class PostGisStorageStrategy : DatabaseStorageStrategyBase
             await _dataSource.DisposeAsync();
         }
         await base.DisposeAsyncCore();
+    }
+
+    /// <summary>
+    /// Validates a PostgreSQL identifier (table name) to prevent SQL injection.
+    /// Only allows alphanumeric characters and underscores.
+    /// </summary>
+    private static string ValidatePgIdentifier(string name, string parameterName)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException($"PostgreSQL identifier '{parameterName}' must not be empty.", parameterName);
+        if (!System.Text.RegularExpressions.Regex.IsMatch(name, @"^[A-Za-z_][A-Za-z0-9_]{0,62}$"))
+            throw new ArgumentException(
+                $"PostgreSQL identifier '{parameterName}' contains invalid characters. Use only letters, digits, and underscores.",
+                parameterName);
+        return name;
     }
 }

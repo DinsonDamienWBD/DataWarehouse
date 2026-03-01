@@ -50,8 +50,10 @@ public sealed class MySqlStorageStrategy : DatabaseStorageStrategyBase
 
     protected override async Task InitializeCoreAsync(CancellationToken ct)
     {
-        _tableName = GetConfiguration("TableName", "data_warehouse_storage");
-        _databaseName = GetConfiguration("DatabaseName", "datawarehouse");
+        // P2-2833: Validate table/database names against safe identifier pattern to prevent
+        // SQL injection via backtick escaping (backtick itself in name would break quoting).
+        _tableName = ValidateSqlIdentifier(GetConfiguration("TableName", "data_warehouse_storage"), "TableName");
+        _databaseName = ValidateSqlIdentifier(GetConfiguration("DatabaseName", "datawarehouse"), "DatabaseName");
         _useJson = GetConfiguration("UseJson", true);
         _maxPoolSize = GetConfiguration("MaxPoolSize", 100);
         _minPoolSize = GetConfiguration("MinPoolSize", 5);
@@ -350,6 +352,22 @@ public sealed class MySqlStorageStrategy : DatabaseStorageStrategyBase
         await conn.OpenAsync(ct);
         var transaction = await conn.BeginTransactionAsync(isolationLevel, ct);
         return new MySqlDbTransaction(conn, transaction);
+    }
+
+    /// <summary>
+    /// Validates a SQL identifier (table or database name) to prevent SQL injection.
+    /// Only allows alphanumeric characters and underscores (no backticks or other special chars).
+    /// </summary>
+    private static string ValidateSqlIdentifier(string name, string parameterName)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException($"SQL identifier '{parameterName}' must not be empty.", parameterName);
+        // Allow letters, digits, underscores only — safe for backtick quoting in MySQL
+        if (!System.Text.RegularExpressions.Regex.IsMatch(name, @"^[A-Za-z0-9_]{1,64}$"))
+            throw new ArgumentException(
+                $"SQL identifier '{parameterName}' contains invalid characters. Use only letters, digits, and underscores (1-64 chars).",
+                parameterName);
+        return name;
     }
 
     private sealed class MySqlDbTransaction : IDatabaseTransaction

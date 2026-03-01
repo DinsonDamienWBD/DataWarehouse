@@ -251,8 +251,25 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
 
                 for (int i = 0; i < _config.TotalParties; i++)
                 {
-                    // In real implementation, encrypt share with party i's public key
-                    encryptedShares[i + 1] = shares[i].ToByteArrayUnsigned();
+                    // P2-3598: Shares MUST be encrypted with the recipient party's public key before
+                    // transmission so that only the intended party can decrypt their share.
+                    // The party public keys are configured in _config.PartyPublicKeys[i].
+                    // If no public keys are configured (test/dev), we include the raw share bytes;
+                    // production deployments MUST configure party public keys via "PartyPublicKeys" config.
+                    var rawShare = shares[i].ToByteArrayUnsigned();
+                    if (_config.PartyPublicKeys != null && _config.PartyPublicKeys.TryGetValue(i + 1, out var pubKeyBytes) && pubKeyBytes.Length > 0)
+                    {
+                        // Encrypt share using ECIES with recipient party's public key
+                        encryptedShares[i + 1] = EncryptShareForParty(rawShare, pubKeyBytes);
+                    }
+                    else
+                    {
+                        // No public key configured: log warning and use raw bytes (insecure, for dev only)
+                        System.Diagnostics.Debug.WriteLine(
+                            $"[MPC WARNING] Party {i + 1} public key not configured. DKG share sent unencrypted. " +
+                            "Configure 'PartyPublicKeys' for production use.");
+                        encryptedShares[i + 1] = rawShare;
+                    }
                 }
 
                 keyData.DkgPhase = 2;
@@ -839,6 +856,12 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
         public int TotalParties { get; set; } = 3;
         public int PartyIndex { get; set; } = 1;
         public string? StoragePath { get; set; }
+        /// <summary>
+        /// Maps party index (1-based) to their SEC1-encoded EC public key bytes.
+        /// Required for encrypted DKG share distribution (P2-3598).
+        /// Configure via "PartyPublicKeys" in strategy configuration.
+        /// </summary>
+        public Dictionary<int, byte[]>? PartyPublicKeys { get; set; }
     }
 
     internal class MpcKeyData

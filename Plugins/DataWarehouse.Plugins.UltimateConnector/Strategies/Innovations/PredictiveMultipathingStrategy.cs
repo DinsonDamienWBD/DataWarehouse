@@ -265,7 +265,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                     sw.Stop();
                     latencies[i] = sw.Elapsed.TotalMilliseconds;
 
-                    if (i == 0) result.IsReachable = response.IsSuccessStatusCode;
+                    // Finding 1951: Mark reachable if ANY probe succeeds, not just the first.
+                    if (response.IsSuccessStatusCode) result.IsReachable = true;
                 }
 
                 result.LatencyMs = latencies.Average();

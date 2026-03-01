@@ -267,8 +267,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                     var pidResult = ComputePid(state);
                     state.PidOutput = pidResult;
 
-                    // Apply PID output as window adjustment
-                    var newWindow = state.CurrentWindowKb + (int)(pidResult * 4);
+                    // Apply PID output as window adjustment.
+                    // Finding 1950: Positive error means ack-rate is below target — we should REDUCE
+                    // the window (slow down). Subtract pidResult so a positive controller output
+                    // decreases the window, matching the documented behaviour.
+                    var newWindow = state.CurrentWindowKb - (int)(pidResult * 4);
                     state.CurrentWindowKb = Math.Clamp(newWindow, state.MinWindowKb, state.MaxWindowKb);
                     state.TotalAdjustments++;
 

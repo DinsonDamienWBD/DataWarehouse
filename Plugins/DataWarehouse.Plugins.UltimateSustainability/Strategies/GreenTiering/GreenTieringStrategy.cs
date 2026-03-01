@@ -109,7 +109,8 @@ public sealed class GreenTieringStrategy : SustainabilityStrategyBase
     private readonly ConcurrentQueue<GreenMigrationBatch> _pendingBatches = new();
     private readonly BoundedDictionary<string, DateTimeOffset> _lastScanTimes = new BoundedDictionary<string, DateTimeOffset>(1000);
     private Timer? _scanTimer;
-    private volatile bool _scanning;
+    // 0 = not scanning, 1 = scanning. Use Interlocked to avoid TOCTOU race (P2-4431).
+    private int _scanning;
 
     // Energy cost of network transfer: ~0.0000006 kWh per MB (approximate for modern data centers)
     private const double NetworkEnergyKwhPerByte = 0.0000006 / (1024.0 * 1024.0);
@@ -486,9 +487,9 @@ public sealed class GreenTieringStrategy : SustainabilityStrategyBase
 
     private async Task RunScanCycleAsync()
     {
-        if (_scanning || MessageBus == null) return;
+        // P2-4431: Use Interlocked.CompareExchange so only one timer firing runs at a time.
+        if (MessageBus == null || Interlocked.CompareExchange(ref _scanning, 1, 0) != 0) return;
 
-        _scanning = true;
         try
         {
             var enabledTenants = _policyEngine.GetEnabledTenants();
@@ -556,7 +557,7 @@ public sealed class GreenTieringStrategy : SustainabilityStrategyBase
         }
         finally
         {
-            _scanning = false;
+            Interlocked.Exchange(ref _scanning, 0);
         }
     }
 

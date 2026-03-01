@@ -69,11 +69,12 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
             using var response = await httpClient.SendAsync(request, ct);
             response.EnsureSuccessStatusCode();
 
+            // Finding 1920: Do NOT store access key in ConnectionInfo — it is visible via health
+            // check serialization and logging. Keep credentials in private fields only.
             var connectionInfo = new Dictionary<string, object>
             {
                 ["protocol"] = "S3",
                 ["endpoint"] = endpoint,
-                ["accessKey"] = accessKey,
                 ["provider"] = "MinIO"
             };
 
