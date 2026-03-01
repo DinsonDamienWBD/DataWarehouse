@@ -19,7 +19,7 @@ public sealed class ConsistentHashShardingStrategy : ShardingStrategyBase
     private readonly BoundedDictionary<string, List<uint>> _shardToVirtualNodes = new BoundedDictionary<string, List<uint>>(1000);
     private readonly ReaderWriterLockSlim _ringLock = new();
     private readonly int _virtualNodesPerShard;
-    private readonly BoundedDictionary<string, string> _keyCache = new BoundedDictionary<string, string>(1000);
+    private BoundedDictionary<string, string> _keyCache;
     private readonly int _cacheMaxSize;
     private uint[]? _sortedRingKeys;
 
@@ -40,6 +40,8 @@ public sealed class ConsistentHashShardingStrategy : ShardingStrategyBase
 
         _virtualNodesPerShard = virtualNodesPerShard;
         _cacheMaxSize = cacheMaxSize;
+        // Align BoundedDictionary capacity with _cacheMaxSize so both controls are consistent.
+        _keyCache = new BoundedDictionary<string, string>(cacheMaxSize);
     }
 
     /// <inheritdoc/>

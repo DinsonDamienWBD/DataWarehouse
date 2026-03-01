@@ -272,13 +272,25 @@ public sealed class MemcachedStorageStrategy : DatabaseStorageStrategyBase
         await _indexLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            var indexResult = await _client!.GetAsync<string>(_indexKey);
-            var keys = indexResult.Success && !string.IsNullOrEmpty(indexResult.Value)
-                ? JsonSerializer.Deserialize<HashSet<string>>(indexResult.Value, JsonOptions) ?? new HashSet<string>()
-                : new HashSet<string>();
+            // P2-2811: Use cached index when still valid to avoid O(n) Memcached round-trip.
+            HashSet<string> keys;
+            if (_cachedIndex != null && DateTime.UtcNow < _cacheValidUntil)
+            {
+                keys = _cachedIndex;
+            }
+            else
+            {
+                var indexResult = await _client!.GetAsync<string>(_indexKey).ConfigureAwait(false);
+                keys = indexResult.Success && !string.IsNullOrEmpty(indexResult.Value)
+                    ? JsonSerializer.Deserialize<HashSet<string>>(indexResult.Value, JsonOptions) ?? new HashSet<string>()
+                    : new HashSet<string>();
+                _cachedIndex = keys;
+                _cacheValidUntil = DateTime.UtcNow.Add(_cacheValidFor);
+            }
+
             if (keys.Add(key))
             {
-                await _client.SetAsync(_indexKey, JsonSerializer.Serialize(keys, JsonOptions), (int)_defaultExpiration.TotalSeconds);
+                await _client!.SetAsync(_indexKey, JsonSerializer.Serialize(keys, JsonOptions), (int)_defaultExpiration.TotalSeconds).ConfigureAwait(false);
             }
         }
         finally
@@ -292,13 +304,24 @@ public sealed class MemcachedStorageStrategy : DatabaseStorageStrategyBase
         await _indexLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            var indexResult = await _client!.GetAsync<string>(_indexKey);
-            if (!indexResult.Success || string.IsNullOrEmpty(indexResult.Value)) return;
+            // P2-2811: Use cached index to avoid O(n) round-trip.
+            HashSet<string> keys;
+            if (_cachedIndex != null && DateTime.UtcNow < _cacheValidUntil)
+            {
+                keys = _cachedIndex;
+            }
+            else
+            {
+                var indexResult = await _client!.GetAsync<string>(_indexKey).ConfigureAwait(false);
+                if (!indexResult.Success || string.IsNullOrEmpty(indexResult.Value)) return;
+                keys = JsonSerializer.Deserialize<HashSet<string>>(indexResult.Value, JsonOptions) ?? new HashSet<string>();
+                _cachedIndex = keys;
+                _cacheValidUntil = DateTime.UtcNow.Add(_cacheValidFor);
+            }
 
-            var keys = JsonSerializer.Deserialize<HashSet<string>>(indexResult.Value, JsonOptions) ?? new HashSet<string>();
             if (keys.Remove(key))
             {
-                await _client.SetAsync(_indexKey, JsonSerializer.Serialize(keys, JsonOptions), (int)_defaultExpiration.TotalSeconds);
+                await _client!.SetAsync(_indexKey, JsonSerializer.Serialize(keys, JsonOptions), (int)_defaultExpiration.TotalSeconds).ConfigureAwait(false);
             }
         }
         finally

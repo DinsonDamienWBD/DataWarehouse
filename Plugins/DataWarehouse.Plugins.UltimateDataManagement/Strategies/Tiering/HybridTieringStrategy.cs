@@ -267,33 +267,42 @@ public sealed class HybridTieringStrategy : TieringStrategyBase
         var recommendations = new Dictionary<string, TierRecommendation>();
         var weightedVotes = new Dictionary<StorageTier, double>();
 
-        foreach (var (strategyId, registration) in _strategies)
+        // Run independent strategy evaluations in parallel to reduce wall-clock latency.
+        var eligibleStrategies = _strategies
+            .Where(kvp => kvp.Value.IsEnabled &&
+                          (string.IsNullOrEmpty(data.Classification) ||
+                           !kvp.Value.ExcludedClassifications.Contains(data.Classification)))
+            .ToList();
+
+        var tasks = eligibleStrategies.Select(async kvp =>
         {
-            if (!registration.IsEnabled)
-                continue;
-
-            if (!string.IsNullOrEmpty(data.Classification) &&
-                registration.ExcludedClassifications.Contains(data.Classification))
-                continue;
-
+            var (strategyId, registration) = kvp;
             try
             {
-                var recommendation = await registration.Strategy.EvaluateAsync(data, ct);
-                recommendations[strategyId] = recommendation;
-
-                // Accumulate weighted votes
-                var vote = recommendation.RecommendedTier;
-                var voteWeight = registration.Weight * recommendation.Confidence;
-
-                weightedVotes.TryGetValue(vote, out var existing);
-                weightedVotes[vote] = existing + voteWeight;
+                var recommendation = await registration.Strategy.EvaluateAsync(data, ct).ConfigureAwait(false);
+                return (strategyId, registration, recommendation, error: false);
             }
             catch
             {
-
-                // Strategy evaluation failed - skip
-                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+                System.Diagnostics.Debug.WriteLine($"[HybridTiering] Strategy '{strategyId}' evaluation failed - skipping.");
+                return (strategyId, registration, (TierRecommendation?)null, error: true);
             }
+        });
+
+        var results = await Task.WhenAll(tasks).ConfigureAwait(false);
+
+        foreach (var (strategyId, registration, recommendation, error) in results)
+        {
+            if (error || recommendation == null) continue;
+
+            recommendations[strategyId] = recommendation;
+
+            // Accumulate weighted votes
+            var vote = recommendation.RecommendedTier;
+            var voteWeight = registration.Weight * recommendation.Confidence;
+
+            weightedVotes.TryGetValue(vote, out var existing);
+            weightedVotes[vote] = existing + voteWeight;
         }
 
         if (recommendations.Count == 0)

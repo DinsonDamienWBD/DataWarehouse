@@ -33,13 +33,18 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
     public sealed class RansStrategy : CompressionStrategyBase
     {
         private static readonly byte[] Magic = { 0x52, 0x41, 0x4E, 0x53 }; // "RANS"
-        private const int TableLog = 11;
-        private const int TableSize = 1 << TableLog;
-        private const uint RansL = TableSize;
+        // Default table log when _precisionBits is not configured
+        private const int DefaultTableLog = 11;
         private const int MaxInputSize = 100 * 1024 * 1024; // 100MB limit
 
+        // Configurable rANS parameters; stored and used during compression
         private int _interleavedStreams = 1;
-        private int _precisionBits = 11;
+        private int _precisionBits = DefaultTableLog;
+
+        // Derived constants computed from configurable parameters
+        private int TableLog => _precisionBits;
+        private int TableSize => 1 << TableLog;
+        private uint RansL => (uint)TableSize;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="RansStrategy"/> class
