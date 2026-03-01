@@ -125,7 +125,7 @@ public class AwsEventBridgeConnectionStrategy : MessagingConnectionStrategyBase
     public AwsEventBridgeConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task PublishAsync(IConnectionHandle handle, string topic, byte[] message, Dictionary<string, string>? headers = null, CancellationToken ct = default);
     public override IAsyncEnumerable<byte[]> SubscribeAsync(IConnectionHandle handle, string topic, string? consumerGroup = null, CancellationToken ct = default);
@@ -146,7 +146,7 @@ public class AzureEventGridConnectionStrategy : MessagingConnectionStrategyBase
     public AzureEventGridConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task PublishAsync(IConnectionHandle handle, string topic, byte[] message, Dictionary<string, string>? headers = null, CancellationToken ct = default);
     public override IAsyncEnumerable<byte[]> SubscribeAsync(IConnectionHandle handle, string topic, string? consumerGroup = null, CancellationToken ct = default);
@@ -188,7 +188,7 @@ public class GooglePubSubConnectionStrategy : MessagingConnectionStrategyBase
     public GooglePubSubConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task PublishAsync(IConnectionHandle handle, string topic, byte[] message, Dictionary<string, string>? headers = null, CancellationToken ct = default);
     public override async IAsyncEnumerable<byte[]> SubscribeAsync(IConnectionHandle handle, string topic, string? consumerGroup = null, [EnumeratorCancellation] CancellationToken ct = default);
@@ -334,7 +334,7 @@ public class ZeroMqConnectionStrategy : MessagingConnectionStrategyBase
     public ZeroMqConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task PublishAsync(IConnectionHandle handle, string topic, byte[] message, Dictionary<string, string>? headers = null, CancellationToken ct = default);
     public override async IAsyncEnumerable<byte[]> SubscribeAsync(IConnectionHandle handle, string topic, string? consumerGroup = null, [EnumeratorCancellation] CancellationToken ct = default);
@@ -398,7 +398,7 @@ public class RedPandaConnectionStrategy : MessagingConnectionStrategyBase
     public RedPandaConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task PublishAsync(IConnectionHandle handle, string topic, byte[] message, Dictionary<string, string>? headers = null, CancellationToken ct = default);
     public override async IAsyncEnumerable<byte[]> SubscribeAsync(IConnectionHandle handle, string topic, string? consumerGroup = null, [EnumeratorCancellation] CancellationToken ct = default);
@@ -483,7 +483,7 @@ public class InfluxDbConnectionStrategy : DatabaseConnectionStrategyBase
     public InfluxDbConnectionStrategy(ILogger<InfluxDbConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
     public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
@@ -526,7 +526,7 @@ public class OpenSearchConnectionStrategy : DatabaseConnectionStrategyBase
     public OpenSearchConnectionStrategy(ILogger<OpenSearchConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
     public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
@@ -591,7 +591,7 @@ public class CouchbaseConnectionStrategy : DatabaseConnectionStrategyBase
     public CouchbaseConnectionStrategy(ILogger<CouchbaseConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
     public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
@@ -634,7 +634,7 @@ public class ArangoDbConnectionStrategy : DatabaseConnectionStrategyBase
     public ArangoDbConnectionStrategy(ILogger<ArangoDbConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
     public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
@@ -655,7 +655,7 @@ public class Neo4jConnectionStrategy : DatabaseConnectionStrategyBase
     public Neo4jConnectionStrategy(ILogger<Neo4jConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
     public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
@@ -1377,7 +1377,7 @@ public class AsanaConnectionStrategy : SaaSConnectionStrategyBase
     public AsanaConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -1398,7 +1398,7 @@ public class MondayConnectionStrategy : SaaSConnectionStrategyBase
     public MondayConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -1419,7 +1419,7 @@ public class FreshDeskConnectionStrategy : SaaSConnectionStrategyBase
     public FreshDeskConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -1440,7 +1440,7 @@ public class TwilioConnectionStrategy : SaaSConnectionStrategyBase
     public TwilioConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -1525,7 +1525,7 @@ public class WorkdayConnectionStrategy : SaaSConnectionStrategyBase
     public WorkdayConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -1546,7 +1546,7 @@ public class PipedriveConnectionStrategy : SaaSConnectionStrategyBase
     public PipedriveConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -1567,7 +1567,7 @@ public class SalesforceConnectionStrategy : SaaSConnectionStrategyBase
     public SalesforceConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -1625,7 +1625,7 @@ public class NetSuiteConnectionStrategy : SaaSConnectionStrategyBase
     public NetSuiteConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -1646,7 +1646,7 @@ public class GitHubConnectionStrategy : SaaSConnectionStrategyBase
     public GitHubConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -1734,7 +1734,7 @@ public class JiraConnectionStrategy : SaaSConnectionStrategyBase
     public JiraConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -1823,7 +1823,7 @@ public class SendGridConnectionStrategy : SaaSConnectionStrategyBase
     public SendGridConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -1885,7 +1885,7 @@ public class ZuoraConnectionStrategy : SaaSConnectionStrategyBase
     public ZuoraConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -1906,7 +1906,7 @@ public class IntercomConnectionStrategy : SaaSConnectionStrategyBase
     public IntercomConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -1927,7 +1927,7 @@ public class ServiceNowConnectionStrategy : SaaSConnectionStrategyBase
     public ServiceNowConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -1973,7 +1973,7 @@ public class SapConnectionStrategy : SaaSConnectionStrategyBase
     public SapConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -2019,7 +2019,7 @@ public class OracleFusionConnectionStrategy : SaaSConnectionStrategyBase
     public OracleFusionConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -2040,7 +2040,7 @@ public class StripeConnectionStrategy : SaaSConnectionStrategyBase
     public StripeConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -2087,7 +2087,7 @@ public class SuccessFactorsConnectionStrategy : SaaSConnectionStrategyBase
     public SuccessFactorsConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -2108,7 +2108,7 @@ public class SlackConnectionStrategy : SaaSConnectionStrategyBase
     public SlackConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -2177,7 +2177,7 @@ public class NotionConnectionStrategy : SaaSConnectionStrategyBase
     public NotionConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -2198,7 +2198,7 @@ public class AirtableConnectionStrategy : SaaSConnectionStrategyBase
     public AirtableConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -2219,7 +2219,7 @@ public class DocuSignConnectionStrategy : SaaSConnectionStrategyBase
     public DocuSignConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -2240,7 +2240,7 @@ public class ZendeskConnectionStrategy : SaaSConnectionStrategyBase
     public ZendeskConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -2261,7 +2261,7 @@ public class HubSpotConnectionStrategy : SaaSConnectionStrategyBase
     public HubSpotConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -2282,7 +2282,7 @@ public class ShopifyConnectionStrategy : SaaSConnectionStrategyBase
     public ShopifyConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -2303,7 +2303,7 @@ public class MicrosoftDynamicsConnectionStrategy : SaaSConnectionStrategyBase
     public MicrosoftDynamicsConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -3625,7 +3625,7 @@ public class VoltDbConnectionStrategy : DatabaseConnectionStrategyBase
     public VoltDbConnectionStrategy(ILogger<VoltDbConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
     public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
@@ -3646,7 +3646,7 @@ public class EventStoreDbConnectionStrategy : DatabaseConnectionStrategyBase
     public EventStoreDbConnectionStrategy(ILogger<EventStoreDbConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
     public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
@@ -3667,7 +3667,7 @@ public class FoundationDbConnectionStrategy : DatabaseConnectionStrategyBase
     public FoundationDbConnectionStrategy(ILogger<FoundationDbConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
     public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
@@ -3709,7 +3709,7 @@ public class ApacheIgniteConnectionStrategy : DatabaseConnectionStrategyBase
     public ApacheIgniteConnectionStrategy(ILogger<ApacheIgniteConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
     public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
@@ -3730,7 +3730,7 @@ public class ClickHouseConnectionStrategy : DatabaseConnectionStrategyBase
     public ClickHouseConnectionStrategy(ILogger<ClickHouseConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
     public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
@@ -3751,7 +3751,7 @@ public class ApacheDruidConnectionStrategy : DatabaseConnectionStrategyBase
     public ApacheDruidConnectionStrategy(ILogger<ApacheDruidConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
     public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
@@ -3772,7 +3772,7 @@ public class DuckDbConnectionStrategy : DatabaseConnectionStrategyBase
     public DuckDbConnectionStrategy(ILogger<DuckDbConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
     public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
@@ -3793,7 +3793,7 @@ public class HazelcastConnectionStrategy : DatabaseConnectionStrategyBase
     public HazelcastConnectionStrategy(ILogger<HazelcastConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
     public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
@@ -3814,7 +3814,7 @@ public class CrateDbConnectionStrategy : DatabaseConnectionStrategyBase
     public CrateDbConnectionStrategy(ILogger<CrateDbConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
     public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
@@ -3835,7 +3835,7 @@ public class FaunaDbConnectionStrategy : DatabaseConnectionStrategyBase
     public FaunaDbConnectionStrategy(ILogger<FaunaDbConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
     public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
@@ -3856,7 +3856,7 @@ public class NuoDbConnectionStrategy : DatabaseConnectionStrategyBase
     public NuoDbConnectionStrategy(ILogger<NuoDbConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
     public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
@@ -3877,7 +3877,7 @@ public class RethinkDbConnectionStrategy : DatabaseConnectionStrategyBase
     public RethinkDbConnectionStrategy(ILogger<RethinkDbConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
     public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
@@ -3898,7 +3898,7 @@ public class QuestDbConnectionStrategy : DatabaseConnectionStrategyBase
     public QuestDbConnectionStrategy(ILogger<QuestDbConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
     public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
@@ -3919,7 +3919,7 @@ public class SurrealDbConnectionStrategy : DatabaseConnectionStrategyBase
     public SurrealDbConnectionStrategy(ILogger<SurrealDbConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
     public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
@@ -3940,7 +3940,7 @@ public class TigerGraphConnectionStrategy : DatabaseConnectionStrategyBase
     public TigerGraphConnectionStrategy(ILogger<TigerGraphConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
     public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
@@ -3961,7 +3961,7 @@ public class ApachePinotConnectionStrategy : DatabaseConnectionStrategyBase
     public ApachePinotConnectionStrategy(ILogger<ApachePinotConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
     public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
@@ -3982,7 +3982,7 @@ public class SingleStoreConnectionStrategy : DatabaseConnectionStrategyBase
     public SingleStoreConnectionStrategy(ILogger<SingleStoreConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
     public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);
@@ -4155,7 +4155,7 @@ public class DremioConnectionStrategy : DatabaseConnectionStrategyBase
     public DremioConnectionStrategy(ILogger<DremioConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
     public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
@@ -4176,7 +4176,7 @@ public class RedshiftConnectionStrategy : DatabaseConnectionStrategyBase
     public RedshiftConnectionStrategy(ILogger<RedshiftConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
     public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
@@ -4197,7 +4197,7 @@ public class MotherDuckConnectionStrategy : DatabaseConnectionStrategyBase
     public MotherDuckConnectionStrategy(ILogger<MotherDuckConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
     public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
@@ -4218,7 +4218,7 @@ public class DatabricksConnectionStrategy : DatabaseConnectionStrategyBase
     public DatabricksConnectionStrategy(ILogger<DatabricksConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
     public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
@@ -4239,7 +4239,7 @@ public class SnowflakeConnectionStrategy : DatabaseConnectionStrategyBase
     public SnowflakeConnectionStrategy(ILogger<SnowflakeConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
     public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
@@ -4260,7 +4260,7 @@ public class BigQueryConnectionStrategy : DatabaseConnectionStrategyBase
     public BigQueryConnectionStrategy(ILogger<BigQueryConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
     public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
@@ -4281,7 +4281,7 @@ public class GoogleAlloyDbConnectionStrategy : DatabaseConnectionStrategyBase
     public GoogleAlloyDbConnectionStrategy(ILogger<GoogleAlloyDbConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
     public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
@@ -4302,7 +4302,7 @@ public class FireboltConnectionStrategy : DatabaseConnectionStrategyBase
     public FireboltConnectionStrategy(ILogger<FireboltConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
     public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
@@ -4323,7 +4323,7 @@ public class AzureSynapseConnectionStrategy : DatabaseConnectionStrategyBase
     public AzureSynapseConnectionStrategy(ILogger<AzureSynapseConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
     public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
@@ -4344,7 +4344,7 @@ public class StarburstConnectionStrategy : DatabaseConnectionStrategyBase
     public StarburstConnectionStrategy(ILogger<StarburstConnectionStrategy>? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
     public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default);;
@@ -6628,7 +6628,7 @@ public class MinioConnectionStrategy : SaaSConnectionStrategyBase
     public MinioConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -6649,7 +6649,7 @@ public class GcpDataflowConnectionStrategy : SaaSConnectionStrategyBase
     public GcpDataflowConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -6733,7 +6733,7 @@ public class AzureCosmosConnectionStrategy : SaaSConnectionStrategyBase
     public AzureCosmosConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -6754,7 +6754,7 @@ public class CloudflareR2ConnectionStrategy : SaaSConnectionStrategyBase
     public CloudflareR2ConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -6775,7 +6775,7 @@ public class AwsS3ConnectionStrategy : SaaSConnectionStrategyBase
     public AwsS3ConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);
@@ -6796,7 +6796,7 @@ public class GcpBigtableConnectionStrategy : SaaSConnectionStrategyBase
     public GcpBigtableConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -6838,7 +6838,7 @@ public class AzureBlobConnectionStrategy : SaaSConnectionStrategyBase
     public AzureBlobConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);
@@ -6911,7 +6911,7 @@ public class GcpFirestoreConnectionStrategy : SaaSConnectionStrategyBase
     public GcpFirestoreConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -6932,7 +6932,7 @@ public class WasabiConnectionStrategy : SaaSConnectionStrategyBase
     public WasabiConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -6953,7 +6953,7 @@ public class AzureDataLakeConnectionStrategy : SaaSConnectionStrategyBase
     public AzureDataLakeConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -6974,7 +6974,7 @@ public class BackblazeB2ConnectionStrategy : SaaSConnectionStrategyBase
     public BackblazeB2ConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -6995,7 +6995,7 @@ public class GcpStorageConnectionStrategy : SaaSConnectionStrategyBase
     public GcpStorageConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -7037,7 +7037,7 @@ public class OracleCloudConnectionStrategy : SaaSConnectionStrategyBase
     public OracleCloudConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -7058,7 +7058,7 @@ public class AzureFunctionsConnectionStrategy : SaaSConnectionStrategyBase
     public AzureFunctionsConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -7079,7 +7079,7 @@ public class DigitalOceanSpacesConnectionStrategy : SaaSConnectionStrategyBase
     public DigitalOceanSpacesConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
@@ -7121,7 +7121,7 @@ public class GcpSpannerConnectionStrategy : SaaSConnectionStrategyBase
     public GcpSpannerConnectionStrategy(ILogger? logger = null) : base(logger);
     protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
