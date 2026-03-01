@@ -505,7 +505,7 @@ public sealed class EnergyMeasurementService : IEnergyMeasurementService
     public async Task<CarbonEnergyMeasurement> MeasureOperationAsync(string operationId, string operationType, long dataSizeBytes, Func<Task> operation, string? tenantId = null, CancellationToken ct = default);
     public Task<double> GetWattsPerOperationAsync(string operationType, CancellationToken ct = default);
     public Task<IReadOnlyList<CarbonEnergyMeasurement>> GetMeasurementsAsync(DateTimeOffset from, DateTimeOffset to, string? tenantId = null, CancellationToken ct = default);
-    public async Task<double> GetCurrentPowerDrawWatts(CancellationToken ct = default);
+    public async Task<double> GetCurrentPowerDrawWattsAsync(CancellationToken ct = default);
     public async Task DisposeAsync();
 }
 ```
@@ -1605,7 +1605,14 @@ public sealed class DemandResponseStrategy : SustainabilityStrategyBase
             return _activeEvent;
     }
 }
-    public bool InDemandResponseEvent;;
+    public bool InDemandResponseEvent
+{
+    get
+    {
+        lock (_lock)
+            return _activeEvent != null;
+    }
+}
     protected override Task InitializeCoreAsync(CancellationToken ct);
     protected override Task DisposeCoreAsync();
     public async Task RespondToEventAsync(DemandResponseEvent drEvent, CancellationToken ct = default);
@@ -2602,7 +2609,7 @@ public sealed class MemoryOptimizationStrategy : SustainabilityStrategyBase
     get
     {
         lock (_lock)
-            return _compressedBytes > 0 ? (double)_usedMemoryBytes / _compressedBytes : 1;
+            return _managedBytesAfterGc > 0 && _managedBytesBeforeGc > 0 ? (double)_managedBytesBeforeGc / _managedBytesAfterGc : 1.0;
     }
 }
     public double TargetUsagePercent { get; set; };
