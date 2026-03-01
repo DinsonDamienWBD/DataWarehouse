@@ -240,10 +240,13 @@ public readonly struct Superblock
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
         // a corrupt superblock cannot propagate an extreme value into downstream allocations.
         if (blockSize < FormatConstants.MinBlockSize || blockSize > FormatConstants.MaxBlockSize ||
             (blockSize & (blockSize - 1)) != 0) // must be a power of two
 =======
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
 =======
@@ -263,6 +266,9 @@ public readonly struct Superblock
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
