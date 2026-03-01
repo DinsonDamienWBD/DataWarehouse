@@ -159,7 +159,11 @@ public sealed class ClockSiTransaction : IDisposable
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
     private int _disposed; // Cat 7 (finding 736): Interlocked guard for exactly-once Dispose
+=======
+    private int _disposed; // 0 = not disposed, 1 = disposed (Interlocked.Exchange guard)
+>>>>>>> Stashed changes
 =======
     private int _disposed; // 0 = not disposed, 1 = disposed (Interlocked.Exchange guard)
 >>>>>>> Stashed changes
@@ -491,7 +495,11 @@ public sealed class ClockSiTransaction : IDisposable
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
         // concurrent Dispose+Commit — the first caller wins, subsequent calls are safe no-ops.
+=======
+        // concurrent Dispose+Commit — the first caller wins, second call is a safe no-op.
+>>>>>>> Stashed changes
 =======
         // concurrent Dispose+Commit — the first caller wins, second call is a safe no-op.
 >>>>>>> Stashed changes
