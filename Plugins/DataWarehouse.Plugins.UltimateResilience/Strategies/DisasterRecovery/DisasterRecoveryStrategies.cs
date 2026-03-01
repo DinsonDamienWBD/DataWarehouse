@@ -326,10 +326,11 @@ public sealed class GeoReplicationFailoverStrategy : ResilienceStrategyBase
                             }
                         };
                     }
-                    catch (Exception)
+                    catch (Exception retryEx)
                     {
-                        // Failover retry also failed — fall through to failure result below
+                        // Failover retry also failed — log and fall through to failure result below
                         IncrementCounter("dr.failover.retry.failure");
+                        RecordFailure(retryEx);
                     }
                 }
             }

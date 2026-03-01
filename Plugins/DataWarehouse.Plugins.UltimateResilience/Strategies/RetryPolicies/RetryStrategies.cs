@@ -284,10 +284,8 @@ public sealed class FixedDelayRetryStrategy : ResilienceStrategyBase
                 lastException = ex;
                 RecordRetry();
 
-                if (attempts <= _maxRetries)
-                {
                     await Task.Delay(_delay, cancellationToken);
-                }
+
             }
         }
 
@@ -446,10 +444,8 @@ public sealed class RetryWithFallbackStrategy<TResult> : ResilienceStrategyBase
                 lastException = ex;
                 RecordRetry();
 
-                if (attempts <= _maxRetries)
-                {
                     await Task.Delay(_delay, cancellationToken);
-                }
+
             }
         }
 
@@ -560,11 +556,9 @@ public sealed class LinearBackoffRetryStrategy : ResilienceStrategyBase
                 lastException = ex;
                 RecordRetry();
 
-                if (attempts <= _maxRetries)
-                {
                     var delay = CalculateDelay(attempts);
                     await Task.Delay(delay, cancellationToken);
-                }
+
             }
         }
 
@@ -656,11 +650,9 @@ public sealed class DecorrelatedJitterRetryStrategy : ResilienceStrategyBase
                 lastException = ex;
                 RecordRetry();
 
-                if (attempts <= _maxRetries)
-                {
                     var delay = CalculateDecorrelatedDelay(ref previousDelay);
                     await Task.Delay(delay, cancellationToken);
-                }
+
             }
         }
 
