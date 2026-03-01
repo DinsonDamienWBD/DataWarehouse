@@ -52,8 +52,9 @@ public sealed class DruidStorageStrategy : DatabaseStorageStrategyBase
     protected override async Task InitializeCoreAsync(CancellationToken ct)
     {
         _dataSource = GetConfiguration("DataSource", "storage");
-        _routerUrl = GetConfiguration("RouterUrl", GetConnectionString());
-        _coordinatorUrl = GetConfiguration("CoordinatorUrl", _routerUrl);
+        // LOW-2788: Trim trailing slashes so that path concatenation never produces double-slashes
+        _routerUrl = GetConfiguration("RouterUrl", GetConnectionString()).TrimEnd('/');
+        _coordinatorUrl = GetConfiguration("CoordinatorUrl", _routerUrl).TrimEnd('/');
 
         _httpClient = new HttpClient
         {

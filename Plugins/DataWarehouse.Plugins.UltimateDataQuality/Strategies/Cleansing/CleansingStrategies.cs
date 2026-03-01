@@ -722,11 +722,16 @@ public sealed class SemanticCleansingStrategy : DataQualityStrategyBase
             if (valueLower == validLower)
                 return valid; // Exact match
 
+            // Early length filter: skip values that differ in length by more than the threshold.
+            if (Math.Abs(valueLower.Length - validLower.Length) > threshold)
+                continue;
+
             var distance = LevenshteinDistance(valueLower, validLower);
             if (distance <= threshold && distance < bestDistance)
             {
                 bestDistance = distance;
                 bestMatch = valid;
+                if (bestDistance == 1) break; // Can't do better than 1 edit
             }
         }
 

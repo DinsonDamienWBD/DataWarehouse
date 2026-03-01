@@ -607,13 +607,8 @@ public abstract class DataQualityStrategyBase : StrategyBase, IDataQualityStrate
     }
 
     /// <summary>Gets cached health status, refreshing every 60 seconds.</summary>
-    public bool IsHealthy()
-    {
-        var result = GetCachedHealthAsync(ct =>
-            Task.FromResult(new StrategyHealthCheckResult(IsInitialized)),
-            TimeSpan.FromSeconds(60)).GetAwaiter().GetResult();
-        return result.IsHealthy;
-    }
+    /// <remarks>Uses a pre-computed result to avoid sync-over-async deadlock.</remarks>
+    public bool IsHealthy() => IsInitialized;
 
     /// <summary>Gets all counter values.</summary>
     public IReadOnlyDictionary<string, long> GetCounters() => GetAllCounters();

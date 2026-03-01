@@ -23,6 +23,8 @@ public sealed class ElasticsearchStorageStrategy : DatabaseStorageStrategyBase
     private string _indexName = "datawarehouse-storage";
     private int _numberOfShards = 1;
     private int _numberOfReplicas = 1;
+    // LOW-2843: Refresh.True on every write is a 10x throughput hit. Configurable via "ImmediateRefresh" setting.
+    private bool _immediateRefresh = false;
 
     public override string StrategyId => "elasticsearch";
     public override string Name => "Elasticsearch Search Storage";
@@ -53,6 +55,7 @@ public sealed class ElasticsearchStorageStrategy : DatabaseStorageStrategyBase
         _indexName = GetConfiguration("IndexName", "datawarehouse-storage");
         _numberOfShards = GetConfiguration("NumberOfShards", 1);
         _numberOfReplicas = GetConfiguration("NumberOfReplicas", 1);
+        _immediateRefresh = GetConfiguration("ImmediateRefresh", false);
 
         var connectionString = GetConnectionString();
         var uri = new Uri(connectionString);
@@ -139,7 +142,7 @@ public sealed class ElasticsearchStorageStrategy : DatabaseStorageStrategyBase
         var response = await _client!.IndexAsync(document, i => i
             .Index(_indexName)
             .Id(key)
-            .Refresh(Refresh.True), ct);
+            .Refresh(_immediateRefresh ? Refresh.True : Refresh.False), ct);
 
         if (!response.IsValidResponse)
         {
@@ -177,7 +180,7 @@ public sealed class ElasticsearchStorageStrategy : DatabaseStorageStrategyBase
         var metadata = await GetMetadataCoreAsync(key, ct);
         var size = metadata.Size;
 
-        var response = await _client!.DeleteAsync<StorageDocument>(_indexName, key, d => d.Refresh(Refresh.True), ct);
+        var response = await _client!.DeleteAsync<StorageDocument>(_indexName, key, d => d.Refresh(_immediateRefresh ? Refresh.True : Refresh.False), ct);
 
         if (!response.IsValidResponse)
         {

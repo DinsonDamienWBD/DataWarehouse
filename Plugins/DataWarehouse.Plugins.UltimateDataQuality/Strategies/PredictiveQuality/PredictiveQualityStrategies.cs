@@ -925,14 +925,23 @@ internal sealed class RootCauseAnalyzerStrategy : DataQualityStrategyBase
             if (otherEvents.Count == 0)
                 continue;
 
+            // Sort otherEvents by timestamp once; use binary search for O(log m) per target event.
+            var sortedOtherTimes = otherEvents.Select(e => e.Timestamp).OrderBy(t => t).ToArray();
+            var windowMinutes = correlationWindow.TotalMinutes;
             int coOccurrenceCount = 0;
             foreach (var targetEvent in targetEvents)
             {
-                bool hasCoOccurrence = otherEvents.Any(other =>
-                    Math.Abs((other.Timestamp - targetEvent.Timestamp).TotalMinutes) <= correlationWindow.TotalMinutes);
-
-                if (hasCoOccurrence)
-                    coOccurrenceCount++;
+                var lo = targetEvent.Timestamp.AddMinutes(-windowMinutes);
+                var hi = targetEvent.Timestamp.AddMinutes(windowMinutes);
+                // Binary-search for first timestamp >= lo
+                int left = 0, right = sortedOtherTimes.Length;
+                while (left < right)
+                {
+                    int mid = (left + right) / 2;
+                    if (sortedOtherTimes[mid] < lo) left = mid + 1; else right = mid;
+                }
+                bool hasCoOccurrence = left < sortedOtherTimes.Length && sortedOtherTimes[left] <= hi;
+                if (hasCoOccurrence) coOccurrenceCount++;
             }
 
             double correlationScore = (double)coOccurrenceCount / targetEvents.Count;
