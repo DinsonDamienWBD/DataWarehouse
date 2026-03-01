@@ -350,32 +350,37 @@ public sealed class ProtocolCompressionManager : IDisposable
         var opts = options ?? _defaultOptions;
         var startTime = DateTime.UtcNow;
 
+        // P2-2711: avoid .Length on non-seekable streams; use counting wrappers instead.
+        await using var countingInput = new CountingStream(input);
+
         if (opts.Algorithm == CompressionAlgorithm.None)
         {
-            await input.CopyToAsync(output, opts.StreamingBufferSize, ct);
+            await countingInput.CopyToAsync(output, opts.StreamingBufferSize, ct);
+            var copied = countingInput.BytesRead;
             return new CompressionResult
             {
                 WasCompressed = false,
-                OriginalSize = (int)input.Length,
-                CompressedSize = (int)output.Length,
+                OriginalSize = (int)copied,
+                CompressedSize = (int)copied,
                 Algorithm = CompressionAlgorithm.None,
                 ElapsedMs = 0
             };
         }
 
         var provider = GetProvider(opts.Algorithm);
-        var originalLength = input.Length;
 
+        await using var countingOutput = new CountingStream(output);
         await using var compressionStream = provider.CreateCompressionStream(
-            output,
+            countingOutput,
             MapCompressionLevel(opts.Level),
             leaveOpen: true);
 
-        await input.CopyToAsync(compressionStream, opts.StreamingBufferSize, ct);
+        await countingInput.CopyToAsync(compressionStream, opts.StreamingBufferSize, ct);
         await compressionStream.FlushAsync(ct);
 
         var elapsedMs = (long)(DateTime.UtcNow - startTime).TotalMilliseconds;
-        var compressedLength = output.Length;
+        var originalLength = countingInput.BytesRead;
+        var compressedLength = countingOutput.BytesWritten;
 
         Interlocked.Add(ref _totalUncompressedBytes, originalLength);
         Interlocked.Add(ref _totalCompressedBytes, compressedLength);
@@ -803,5 +808,84 @@ public static class ProtocolCompressionExtensions
 
         // This would need proper integration with the protocol
         return stream;
+    }
+}
+
+/// <summary>
+/// A stream wrapper that counts bytes read and written without buffering.
+/// Used to obtain byte counts for non-seekable streams.
+/// </summary>
+internal sealed class CountingStream : Stream
+{
+    private readonly Stream _inner;
+    private long _bytesRead;
+    private long _bytesWritten;
+
+    public CountingStream(Stream inner) => _inner = inner;
+
+    public long BytesRead => _bytesRead;
+    public long BytesWritten => _bytesWritten;
+
+    public override bool CanRead => _inner.CanRead;
+    public override bool CanSeek => _inner.CanSeek;
+    public override bool CanWrite => _inner.CanWrite;
+    public override long Length => _inner.Length;
+    public override long Position { get => _inner.Position; set => _inner.Position = value; }
+
+    public override int Read(byte[] buffer, int offset, int count)
+    {
+        var n = _inner.Read(buffer, offset, count);
+        _bytesRead += n;
+        return n;
+    }
+
+    public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken ct)
+    {
+        var n = await _inner.ReadAsync(buffer, offset, count, ct);
+        _bytesRead += n;
+        return n;
+    }
+
+    public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken ct = default)
+    {
+        var n = await _inner.ReadAsync(buffer, ct);
+        _bytesRead += n;
+        return n;
+    }
+
+    public override void Write(byte[] buffer, int offset, int count)
+    {
+        _inner.Write(buffer, offset, count);
+        _bytesWritten += count;
+    }
+
+    public override async Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken ct)
+    {
+        await _inner.WriteAsync(buffer, offset, count, ct);
+        _bytesWritten += count;
+    }
+
+    public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken ct = default)
+    {
+        await _inner.WriteAsync(buffer, ct);
+        _bytesWritten += buffer.Length;
+    }
+
+    public override void Flush() => _inner.Flush();
+    public override Task FlushAsync(CancellationToken ct) => _inner.FlushAsync(ct);
+    public override long Seek(long offset, SeekOrigin origin) => _inner.Seek(offset, origin);
+    public override void SetLength(long value) => _inner.SetLength(value);
+
+    protected override void Dispose(bool disposing)
+    {
+        // Do NOT dispose the inner stream — we don't own it.
+        base.Dispose(disposing);
+    }
+
+    public override ValueTask DisposeAsync()
+    {
+        // Do NOT dispose the inner stream — we don't own it.
+        // Call base.DisposeAsync() to suppress finalizer (CA2215).
+        return base.DisposeAsync();
     }
 }

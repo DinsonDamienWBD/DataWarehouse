@@ -379,8 +379,20 @@ public sealed class Neo4jBoltProtocolStrategy : DatabaseProtocolStrategyBase
     {
         await SendMessageAsync(MsgRollback, new Dictionary<string, object>(), ct);
 
-        var (signature, metadata) = await ReadMessageAsync(ct);
-        _inTransaction = false;
+        var (signature, rollbackMeta) = await ReadMessageAsync(ct);
+        // P2-2708: only clear _inTransaction when rollback is confirmed. If the server
+        // returns a FAILURE response, the transaction may still be active on the server side.
+        if (signature == MsgSuccess)
+        {
+            _inTransaction = false;
+        }
+        else
+        {
+            // Rollback failed — transaction may still be active on the server.
+            // Throw so the caller does not reuse this connection silently.
+            var errMsg = rollbackMeta.TryGetValue("message", out var m) ? m?.ToString() : "Rollback rejected by server";
+            throw new InvalidOperationException($"[Neo4j] Rollback failed: {errMsg}. Connection must be discarded.");
+        }
     }
 
     /// <inheritdoc/>

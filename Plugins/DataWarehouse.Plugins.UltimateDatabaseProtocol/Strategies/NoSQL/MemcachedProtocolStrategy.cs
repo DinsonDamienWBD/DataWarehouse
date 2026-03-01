@@ -499,7 +499,9 @@ public sealed class MemcachedProtocolStrategy : DatabaseProtocolStrategyBase
                         return new QueryResult { Success = false, ErrorMessage = "TOUCH requires key and expiry" };
 
                     var key = parts[1];
-                    var expiry = uint.Parse(parts[2]);
+                    // P2-2715: use TryParse to avoid FormatException on non-numeric expiry values.
+                    if (!uint.TryParse(parts[2], out var expiry))
+                        return new QueryResult { Success = false, ErrorMessage = $"TOUCH: invalid expiry value '{parts[2]}'" };
 
                     var response = await SendBinaryCommandAsync(OpTouch, key, null, 0, expiry, ct);
 

@@ -506,7 +506,9 @@ public sealed class JdbcBridgeProtocolStrategy : DatabaseProtocolStrategyBase
             transactionId
         };
 
-        await _httpClient.PostAsJsonAsync("/api/jdbc", request, ct);
+        // P2-2712: EnsureSuccessStatusCode so HTTP errors are not silently treated as success.
+        var commitResponse = await _httpClient.PostAsJsonAsync("/api/jdbc", request, ct);
+        commitResponse.EnsureSuccessStatusCode();
     }
 
     /// <inheritdoc/>
@@ -522,7 +524,9 @@ public sealed class JdbcBridgeProtocolStrategy : DatabaseProtocolStrategyBase
             transactionId
         };
 
-        await _httpClient.PostAsJsonAsync("/api/jdbc", request, ct);
+        // P2-2712: EnsureSuccessStatusCode so HTTP errors are not silently treated as success.
+        var rollbackResponse = await _httpClient.PostAsJsonAsync("/api/jdbc", request, ct);
+        rollbackResponse.EnsureSuccessStatusCode();
     }
 
     /// <inheritdoc/>

@@ -314,8 +314,30 @@ public sealed class CassandraCqlProtocolStrategy : DatabaseProtocolStrategyBase
                 };
 
             case ResultPrepared:
-                // Parse and cache prepared statement
-                return new QueryResult { Success = true };
+            {
+                // P2-2713: Parse the prepared-statement ID and cache it for subsequent EXECUTE frames.
+                // CQL RESULT PREPARED layout: [short bytes id][metadata][result_metadata]
+                // [short bytes] = 2-byte big-endian length followed by N bytes.
+                if (offset + 2 > payload.Length)
+                    return new QueryResult { Success = false, ErrorMessage = "Malformed PREPARED response: truncated id length" };
+                var idLen = ReadInt16BE(payload, offset);
+                offset += 2;
+                if (idLen < 0 || offset + idLen > payload.Length)
+                    return new QueryResult { Success = false, ErrorMessage = "Malformed PREPARED response: id out of bounds" };
+                var preparedId = new byte[idLen];
+                Array.Copy(payload, offset, preparedId, 0, idLen);
+                var preparedKey = Convert.ToHexString(preparedId);
+                // Cache by hex key so EXECUTE frames can look up the binary ID.
+                lock (_preparedStatements)
+                {
+                    _preparedStatements[preparedKey] = (preparedId, Array.Empty<ColumnMetadata>());
+                }
+                return new QueryResult
+                {
+                    Success = true,
+                    Metadata = new Dictionary<string, object> { ["prepared_id"] = preparedKey }
+                };
+            }
 
             case ResultSchemaChange:
                 return new QueryResult { Success = true };
