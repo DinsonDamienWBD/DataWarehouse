@@ -996,7 +996,7 @@ internal static class LiabilityScanConstants
     internal static readonly Regex MedicationPattern = new(@"\b\w+(?:mab|nib|ide|ine|pril|sartan|statin|olol|azole|mycin|cillin|floxacin)\b", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5));
     internal static readonly Regex PatientIdPattern = new(@"\bPAT[\-_]?\d{6,10}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5));
     internal static readonly Regex DiagnosisKeywordPattern = new(@"\b(?:diagnosis|diagnosed|prognosis|symptom|condition|disorder|disease|syndrome|carcinoma|tumor|fracture|infection)\b", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5));
-    internal static readonly Regex CvvPattern = new(@"\b\d{3,4}\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
+    internal static readonly Regex CvvPattern = new(@"(?:cvv2?|cvc2?|security\s+code|card\s+verification)[^\d]{0,15}\b(\d{3,4})\b" + @"|\b(?!(?:19|20)\d{2}\b)\d{3,4}(?<!\d{5})\b", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5));
     internal static readonly Regex ExpiryDatePattern = new(@"\b(?:0[1-9]|1[0-2])[/\-]\d{2}\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
     internal static bool PassesLuhnCheck(string digits);
     internal static string ExtractText(byte[] data);

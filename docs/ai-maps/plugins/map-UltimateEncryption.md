@@ -92,6 +92,7 @@ private new sealed class DefaultSecurityContext : ISecurityContext
 public sealed class MigrationWorker : IDisposable
 {
 }
+    public string? LastFailureMessage;;
     public MigrationWorker(MigrationPlan plan, DoubleEncryptionService doubleEncryptionService, IMessageBus messageBus, MigrationOptions options);
     public Task StartAsync(CancellationToken ct = default);
     public async Task EnqueueBatchAsync(MigrationBatch batch, CancellationToken ct = default);
