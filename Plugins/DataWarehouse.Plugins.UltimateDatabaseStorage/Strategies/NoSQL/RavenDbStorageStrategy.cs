@@ -209,7 +209,8 @@ public sealed class RavenDbStorageStrategy : DatabaseStorageStrategyBase
                 .Where(d => d.Key.StartsWith(prefix))
                 .OrderBy(d => d.Key);
 
-        var enumerator = await session.Advanced.StreamAsync(query, ct);
+        // P2-2842: use await using to ensure the server-side cursor is always disposed.
+        await using var enumerator = await session.Advanced.StreamAsync(query, ct);
 
         while (await enumerator.MoveNextAsync())
         {

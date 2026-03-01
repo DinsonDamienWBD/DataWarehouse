@@ -287,7 +287,9 @@ public sealed class DynamoDbStorageStrategy : DatabaseStorageStrategyBase
 
         // Retrieve chunked data
         var chunkCount = int.Parse(item["ChunkCount"].N);
-        var totalSize = item.TryGetValue("TotalSize", out var sizeAttr) ? long.Parse(sizeAttr.N) : 0;
+        // P2-2837: metadata stores the key "Size" (not "TotalSize"); align field name to avoid
+        // always reading 0 for pre-allocation capacity.
+        var totalSize = item.TryGetValue("Size", out var sizeAttr) ? long.Parse(sizeAttr.N) : 0;
         var capacity = totalSize > 0 ? (int)Math.Min(totalSize, int.MaxValue) : 0;
         using var resultStream = new MemoryStream(capacity);
 

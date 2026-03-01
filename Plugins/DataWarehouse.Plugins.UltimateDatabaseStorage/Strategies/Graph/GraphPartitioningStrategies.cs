@@ -314,8 +314,10 @@ public sealed class RangePartitioningStrategy : GraphPartitioningStrategyBase
     {
         if (_rangeBoundaries.Count == 0)
         {
-            // Fall back to simple modulo if no boundaries set
-            return Math.Abs(StableHash.Compute(vertexId)) % PartitionCount;
+            // Fall back to simple modulo if no boundaries set.
+            // P2-2809: cast to uint before modulo to avoid negative result when hash == int.MinValue
+            // (Math.Abs(int.MinValue) overflows back to int.MinValue on checked arithmetic).
+            return (int)((uint)StableHash.Compute(vertexId) % (uint)PartitionCount);
         }
 
         // Binary search for the appropriate partition
@@ -492,10 +494,8 @@ public sealed class VertexCutPartitioningStrategy : GraphPartitioningStrategyBas
         // New vertex - assign to least loaded partition
         int partition = GetLeastLoadedEdgePartition();
 
-        _vertexReplicas.AddOrUpdate(
-            vertexId,
-            _ => new HashSet<int> { partition },
-            (_, set) => { set.Add(partition); return set; });
+        // P2-2808: delegate to AddVertexReplica which is protected by _balanceLock.
+        AddVertexReplica(vertexId, partition);
 
         return partition;
     }
@@ -531,10 +531,15 @@ public sealed class VertexCutPartitioningStrategy : GraphPartitioningStrategyBas
 
     private void AddVertexReplica(string vertexId, int partition)
     {
-        _vertexReplicas.AddOrUpdate(
-            vertexId,
-            _ => new HashSet<int> { partition },
-            (_, set) => { set.Add(partition); return set; });
+        // P2-2808: HashSet<int> is not thread-safe; serialise all mutations through _balanceLock
+        // so that concurrent edge assignments do not race inside the AddOrUpdate delegate.
+        lock (_balanceLock)
+        {
+            _vertexReplicas.AddOrUpdate(
+                vertexId,
+                _ => new HashSet<int> { partition },
+                (_, set) => { set.Add(partition); return set; });
+        }
     }
 
     private int GetLeastLoadedEdgePartition()
@@ -655,10 +660,13 @@ public sealed class CommunityPartitioningStrategy : GraphPartitioningStrategyBas
             }
         }
 
-        // Assign to new community
-        var newCommunity = Interlocked.Increment(ref _nextCommunityId);
-        _communityAssignments[vertexId] = newCommunity;
-        return MapCommunityToPartition(newCommunity);
+        // P2-2807: use GetOrAdd to atomically assign a community; Interlocked.Increment then
+        // dictionary write is TOCTOU — two concurrent callers could assign different communities
+        // to the same vertex. GetOrAdd ensures only one community ID is stored per vertex.
+        var assignedCommunity = _communityAssignments.GetOrAdd(
+            vertexId,
+            _ => Interlocked.Increment(ref _nextCommunityId));
+        return MapCommunityToPartition(assignedCommunity);
     }
 
     /// <inheritdoc/>

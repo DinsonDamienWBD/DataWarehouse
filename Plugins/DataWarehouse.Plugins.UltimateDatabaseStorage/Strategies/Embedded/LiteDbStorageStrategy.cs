@@ -288,9 +288,15 @@ public sealed class LiteDbStorageStrategy : DatabaseStorageStrategyBase
             var fileInfo = new FileInfo(tempPath);
             var size = fileInfo.Length;
 
-            // AD-11: Use file metadata for ETag (crypto hashing via UltimateDataIntegrity bus)
+            // P2-2778: HashCode.Combine is non-deterministic across process restarts (runtime seed).
+            // Use a deterministic SHA256 hash of the file content for the ETag.
             var tempFileInfo = new FileInfo(tempPath);
-            var etag = HashCode.Combine(tempFileInfo.Length, tempFileInfo.LastWriteTimeUtc.Ticks).ToString("x8");
+            string etag;
+            using (var hashStream = File.OpenRead(tempPath))
+            {
+                var hashBytes = System.Security.Cryptography.SHA256.HashData(hashStream);
+                etag = Convert.ToHexString(hashBytes)[..16]; // 64-bit prefix, 16 hex chars
+            }
 
             // Upload to FileStorage
             using (var fileStream = File.OpenRead(tempPath))

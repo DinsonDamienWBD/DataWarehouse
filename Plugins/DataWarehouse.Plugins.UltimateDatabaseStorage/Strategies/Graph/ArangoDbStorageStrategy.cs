@@ -462,14 +462,18 @@ public sealed class ArangoDbStorageStrategy : DatabaseStorageStrategyBase
 
         public async Task CommitAsync(CancellationToken ct = default)
         {
-            await _client.PutAsync(
+            // P2-2777: EnsureSuccessStatusCode so failed commits are not silently ignored.
+            var response = await _client.PutAsync(
                 $"/_db/{_database}/_api/transaction/{_transactionId}", null, ct);
+            response.EnsureSuccessStatusCode();
         }
 
         public async Task RollbackAsync(CancellationToken ct = default)
         {
-            await _client.DeleteAsync(
+            // P2-2777: EnsureSuccessStatusCode so failed rollbacks are not silently ignored.
+            var response = await _client.DeleteAsync(
                 $"/_db/{_database}/_api/transaction/{_transactionId}", ct);
+            response.EnsureSuccessStatusCode();
         }
 
         public ValueTask DisposeAsync()
