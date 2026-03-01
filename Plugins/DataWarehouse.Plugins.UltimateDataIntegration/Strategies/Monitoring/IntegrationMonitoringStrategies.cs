@@ -104,6 +104,10 @@ public sealed class PipelineHealthMonitoringStrategy : DataIntegrationStrategyBa
                     Message = GetAlertMessage(metrics, health.Config),
                     TriggeredAt = DateTime.UtcNow
                 });
+                // LOW-2341: evict oldest alerts beyond cap to prevent unbounded list growth.
+                const int MaxActiveAlerts = 1000;
+                while (health.ActiveAlerts.Count > MaxActiveAlerts)
+                    health.ActiveAlerts.RemoveAt(0);
             }
         }
 

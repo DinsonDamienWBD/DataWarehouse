@@ -846,8 +846,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         /// </summary>
         private static string ComputeChecksum(byte[] data, HashAlgorithmName algorithmName)
         {
-            using var ha = HashAlgorithm.Create(algorithmName.Name!)
-                ?? throw new ArgumentException($"Unsupported hash algorithm: {algorithmName.Name}", nameof(algorithmName));
+            // Use parameterless factory methods (SYSLIB0045: string-based Create is obsolete).
+            using HashAlgorithm ha = algorithmName == HashAlgorithmName.SHA256 ? SHA256.Create()
+                : algorithmName == HashAlgorithmName.SHA512 ? SHA512.Create()
+                : algorithmName == HashAlgorithmName.SHA1 ? SHA1.Create()
+                : algorithmName == HashAlgorithmName.MD5 ? MD5.Create()
+                : throw new ArgumentException($"Unsupported hash algorithm: {algorithmName.Name}", nameof(algorithmName));
             return Convert.ToHexString(ha.ComputeHash(data)).ToLowerInvariant();
         }
 

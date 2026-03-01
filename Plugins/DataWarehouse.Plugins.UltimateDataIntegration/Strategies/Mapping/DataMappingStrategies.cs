@@ -540,7 +540,13 @@ public sealed class HierarchicalMappingStrategy : DataIntegrationStrategyBase
                 next = new Dictionary<string, object>();
                 current[parts[i]] = next;
             }
-            current = (Dictionary<string, object>)next;
+            // LOW-2344: guard against InvalidCastException if path component is a non-dict value.
+            if (next is not Dictionary<string, object> nextDict)
+            {
+                nextDict = new Dictionary<string, object>();
+                current[parts[i]] = nextDict;
+            }
+            current = nextDict;
         }
 
         current[parts[^1]] = value!;

@@ -310,7 +310,15 @@ namespace DataWarehouse.Plugins.UltimateDataIntegration.Composition
                 }
 
                 var schemaId = payload["schemaId"]?.ToString() ?? "";
-                var changePercentage = Convert.ToDouble(payload["changePercentage"]);
+                // LOW-2305: use TryParse to avoid FormatException when payload value is a string.
+                if (!double.TryParse(payload["changePercentage"]?.ToString(),
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var changePercentage))
+                {
+                    _logger?.LogWarning("Invalid changePercentage value: {Value}", payload["changePercentage"]);
+                    return;
+                }
 
                 if (changePercentage < _config.ChangeThresholdPercent)
                 {

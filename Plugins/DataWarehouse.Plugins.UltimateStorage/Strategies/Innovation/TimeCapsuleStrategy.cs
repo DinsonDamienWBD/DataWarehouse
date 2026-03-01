@@ -225,11 +225,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 {
                     throw new ArgumentException(
                         $"Invalid UnlockTime value '{metadata["UnlockTime"]}'. Use ISO 8601 format (e.g. '2030-01-01T00:00:00Z').",
-                        "metadata");
+                        nameof(metadata));
                 }
                 unlockTime = unlockTime.ToUniversalTime();
                 if (unlockTime <= DateTime.UtcNow)
-                    throw new ArgumentException("UnlockTime must be in the future.", "metadata");
+                    throw new ArgumentException("UnlockTime must be in the future.", nameof(metadata));
             }
             else
             {
