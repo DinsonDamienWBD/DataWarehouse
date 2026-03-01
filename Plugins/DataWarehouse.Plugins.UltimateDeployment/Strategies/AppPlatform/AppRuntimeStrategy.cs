@@ -117,7 +117,17 @@ public sealed class AppRuntimeStrategy : DeploymentStrategyBase
         => Task.FromResult(new[] { new HealthCheckResult { InstanceId = deploymentId, IsHealthy = true, StatusCode = 200, ResponseTimeMs = 1 } });
 
     protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct)
-        => Task.FromResult(new DeploymentState { DeploymentId = deploymentId, Version = "1.0.0", Health = DeploymentHealth.Healthy });
+    {
+        // LOW-2871: Return Unknown state when the deployment is not tracked by this strategy.
+        // Version and Health are only knowable after a Deploy call has been recorded.
+        var hasConfig = _aiConfigs.ContainsKey(deploymentId);
+        return Task.FromResult(new DeploymentState
+        {
+            DeploymentId = deploymentId,
+            Version = "unknown",
+            Health = hasConfig ? DeploymentHealth.Healthy : DeploymentHealth.Unknown
+        });
+    }
 
     #endregion
 

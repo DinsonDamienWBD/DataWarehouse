@@ -37,7 +37,9 @@ public enum DeploymentType
     /// <summary>Hot reload without downtime.</summary>
     HotReload = 12,
     /// <summary>Rollback to previous version.</summary>
-    Rollback = 13
+    Rollback = 13,
+    /// <summary>Secret management and rotation deployment.</summary>
+    SecretManagement = 14
 }
 
 /// <summary>

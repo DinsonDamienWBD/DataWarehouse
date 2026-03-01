@@ -178,24 +178,19 @@ public sealed class UltimateDeploymentPlugin : InfrastructurePluginBase, IDispos
             return cachedState;
         }
 
-        // Try to find the strategy that owns this deployment
-        foreach (var strategy in _strategies.Values)
+        // P2-2894: Query all strategies in parallel instead of serially on cache miss
+        var strategyList = _strategies.Values.ToArray();
+        var tasks = strategyList.Select(async s =>
         {
-            try
-            {
-                var state = await strategy.GetStateAsync(deploymentId, ct);
-                if (state.Health != DeploymentHealth.Unknown)
-                {
-                    _activeDeployments[deploymentId] = state;
-                    return state;
-                }
-            }
-            catch
-            {
-
-                // Strategy doesn't know this deployment
-                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
-            }
+            try { return await s.GetStateAsync(deploymentId, ct); }
+            catch { return null; }
+        });
+        var results = await Task.WhenAll(tasks).ConfigureAwait(false);
+        var found = results.FirstOrDefault(r => r?.Health != DeploymentHealth.Unknown);
+        if (found != null)
+        {
+            _activeDeployments[deploymentId] = found;
+            return found;
         }
 
         return null;

@@ -125,15 +125,18 @@ public sealed class AppHostingStrategy : DeploymentStrategyBase
 
     protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct)
     {
+        // LOW-2870: Health is derived from active registration state. ResponseTimeMs is
+        // not measurable without a live HTTP call to the app's health endpoint; report 0
+        // to indicate "not measured" rather than a misleading 1ms constant.
         var results = _registrations.Values.Where(r => r.IsActive).Select(r => new HealthCheckResult
         {
             InstanceId = r.AppId,
             IsHealthy = true,
             StatusCode = 200,
-            ResponseTimeMs = 1
+            ResponseTimeMs = 0
         }).ToArray();
 
-        return Task.FromResult(results.Length > 0 ? results : new[] { new HealthCheckResult { InstanceId = deploymentId, IsHealthy = true, StatusCode = 200, ResponseTimeMs = 1 } });
+        return Task.FromResult(results.Length > 0 ? results : new[] { new HealthCheckResult { InstanceId = deploymentId, IsHealthy = true, StatusCode = 200, ResponseTimeMs = 0 } });
     }
 
     protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct)

@@ -16,7 +16,7 @@ public sealed class HashiCorpVaultStrategy : DeploymentStrategyBase
     public override DeploymentCharacteristics Characteristics => new()
     {
         StrategyName = "HashiCorp Vault",
-        DeploymentType = DeploymentType.FeatureFlag,
+        DeploymentType = DeploymentType.SecretManagement,
         SupportsZeroDowntime = true,
         SupportsInstantRollback = true,
         SupportsTrafficShifting = false,
@@ -196,7 +196,7 @@ public sealed class AwsSecretsManagerStrategy : DeploymentStrategyBase
     public override DeploymentCharacteristics Characteristics => new()
     {
         StrategyName = "AWS Secrets Manager",
-        DeploymentType = DeploymentType.FeatureFlag,
+        DeploymentType = DeploymentType.SecretManagement,
         SupportsZeroDowntime = true,
         SupportsInstantRollback = true,
         SupportsTrafficShifting = false,
@@ -294,7 +294,7 @@ public sealed class AzureKeyVaultStrategy : DeploymentStrategyBase
     public override DeploymentCharacteristics Characteristics => new()
     {
         StrategyName = "Azure Key Vault",
-        DeploymentType = DeploymentType.FeatureFlag,
+        DeploymentType = DeploymentType.SecretManagement,
         SupportsZeroDowntime = true,
         SupportsInstantRollback = true,
         SupportsTrafficShifting = false,
@@ -387,7 +387,7 @@ public sealed class GcpSecretManagerStrategy : DeploymentStrategyBase
     public override DeploymentCharacteristics Characteristics => new()
     {
         StrategyName = "GCP Secret Manager",
-        DeploymentType = DeploymentType.FeatureFlag,
+        DeploymentType = DeploymentType.SecretManagement,
         SupportsZeroDowntime = true,
         SupportsInstantRollback = true,
         SupportsTrafficShifting = false,
@@ -486,7 +486,7 @@ public sealed class KubernetesSecretsStrategy : DeploymentStrategyBase
     public override DeploymentCharacteristics Characteristics => new()
     {
         StrategyName = "Kubernetes Secrets",
-        DeploymentType = DeploymentType.FeatureFlag,
+        DeploymentType = DeploymentType.SecretManagement,
         SupportsZeroDowntime = true,
         SupportsInstantRollback = true,
         SupportsTrafficShifting = false,
@@ -582,7 +582,7 @@ public sealed class ExternalSecretsOperatorStrategy : DeploymentStrategyBase
     public override DeploymentCharacteristics Characteristics => new()
     {
         StrategyName = "External Secrets Operator",
-        DeploymentType = DeploymentType.FeatureFlag,
+        DeploymentType = DeploymentType.SecretManagement,
         SupportsZeroDowntime = true,
         SupportsInstantRollback = true,
         SupportsTrafficShifting = false,
@@ -686,7 +686,7 @@ public sealed class CyberArkConjurStrategy : DeploymentStrategyBase
     public override DeploymentCharacteristics Characteristics => new()
     {
         StrategyName = "CyberArk Conjur",
-        DeploymentType = DeploymentType.FeatureFlag,
+        DeploymentType = DeploymentType.SecretManagement,
         SupportsZeroDowntime = true,
         SupportsInstantRollback = true,
         SupportsTrafficShifting = false,

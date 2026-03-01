@@ -141,7 +141,15 @@ public sealed class TerraformEnvironmentStrategy : DeploymentStrategyBase
         => Task.FromResult(new DeploymentState { DeploymentId = deploymentId, Version = "unknown", Health = DeploymentHealth.Unknown });
 
     private static string GetWorkingDir(DeploymentConfig config)
-        => config.StrategyConfig.TryGetValue("workingDir", out var wd) && wd is string wds ? wds : "./terraform";
+    {
+        var raw = config.StrategyConfig.TryGetValue("workingDir", out var wd) && wd is string wds ? wds : "./terraform";
+        // P2-2904: Validate path to prevent directory traversal when real terraform execution is wired in.
+        var full = Path.GetFullPath(raw);
+        // Reject paths that resolve to filesystem roots (e.g. /etc, C:\Windows) as a basic guard.
+        if (full.Length <= 3 || full.Equals(Path.GetPathRoot(full), StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException($"workingDir '{raw}' resolves to a filesystem root, which is not permitted.");
+        return full;
+    }
 
     private static string GetWorkspace(DeploymentConfig config)
         => config.StrategyConfig.TryGetValue("workspace", out var ws) && ws is string wss ? wss : config.Environment;
