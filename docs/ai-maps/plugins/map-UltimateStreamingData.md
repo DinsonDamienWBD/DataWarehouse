@@ -1318,6 +1318,7 @@ public sealed class KafkaConsumerGroupManager
 {
 }
     public ConsumerGroupJoinResult JoinGroup(string groupId, string memberId, string? instanceId = null, IReadOnlyList<string>? subscribedTopics = null);
+    public void RegisterTopicPartitionCount(string topic, int partitionCount);
     public void LeaveGroup(string groupId, string memberId);
     public void Heartbeat(string groupId, string memberId);
     public ConsumerGroupInfo? GetGroupInfo(string groupId);
