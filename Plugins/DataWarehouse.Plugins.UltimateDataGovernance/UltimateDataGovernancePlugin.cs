@@ -42,6 +42,7 @@ public sealed class UltimateDataGovernancePlugin : DataManagementPluginBase, IDi
     private volatile bool _autoEnforcementEnabled = true;
     private long _totalOperations;
     private long _complianceChecks;
+    private long _policyViolations;
 
     /// <inheritdoc/>
     public override string Id => "com.datawarehouse.governance.ultimate";
@@ -216,7 +217,7 @@ public sealed class UltimateDataGovernancePlugin : DataManagementPluginBase, IDi
         metadata["DataOwnerships"] = _ownerships.Count;
         metadata["DataClassifications"] = _classifications.Count;
         metadata["TotalOperations"] = Interlocked.Read(ref _totalOperations);
-        metadata["PolicyViolations"] = 0L;
+        metadata["PolicyViolations"] = Interlocked.Read(ref _policyViolations);
         metadata["ComplianceChecks"] = Interlocked.Read(ref _complianceChecks);
         return metadata;
     }
@@ -456,6 +457,10 @@ public sealed class UltimateDataGovernancePlugin : DataManagementPluginBase, IDi
         }
         evaluatedRules++;
 
+        // Track violations in plugin-level counter (findings 2337/2338)
+        if (violations.Count > 0)
+            Interlocked.Add(ref _policyViolations, violations.Count);
+
         message.Payload["strategyName"] = strategy.DisplayName;
         message.Payload["strategyDescription"] = strategy.SemanticDescription;
         message.Payload["compliant"] = compliant;
@@ -510,7 +515,7 @@ public sealed class UltimateDataGovernancePlugin : DataManagementPluginBase, IDi
     private Task HandleStatsAsync(PluginMessage message)
     {
         message.Payload["totalOperations"] = Interlocked.Read(ref _totalOperations);
-        message.Payload["policyViolations"] = 0L;
+        message.Payload["policyViolations"] = Interlocked.Read(ref _policyViolations);
         message.Payload["complianceChecks"] = Interlocked.Read(ref _complianceChecks);
         message.Payload["registeredStrategies"] = _registry.Count;
         message.Payload["activePolicies"] = _policies.Count;
