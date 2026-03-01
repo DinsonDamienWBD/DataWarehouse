@@ -504,12 +504,14 @@ public sealed class RaidSnapshots
             .OrderByDescending(s => s.CreatedTime)
             .ToList();
 
-        // Remove by count
+        // Remove by count — P2-3653: check result and collect failures
+        var failures = new List<string>();
         if (schedule.RetentionCount.HasValue)
         {
             foreach (var old in snapshots.Skip(schedule.RetentionCount.Value))
             {
-                DeleteSnapshot(schedule.ArrayId, old.SnapshotId);
+                if (!DeleteSnapshot(schedule.ArrayId, old.SnapshotId))
+                    failures.Add(old.SnapshotId);
             }
         }
 
@@ -519,9 +521,14 @@ public sealed class RaidSnapshots
             var cutoff = DateTime.UtcNow.AddDays(-schedule.RetentionDays.Value);
             foreach (var old in snapshots.Where(s => s.CreatedTime < cutoff))
             {
-                DeleteSnapshot(schedule.ArrayId, old.SnapshotId);
+                if (!DeleteSnapshot(schedule.ArrayId, old.SnapshotId))
+                    failures.Add(old.SnapshotId);
             }
         }
+
+        if (failures.Count > 0)
+            System.Diagnostics.Debug.WriteLine(
+                $"[RaidSnapshots] Retention enforcement: {failures.Count} snapshot(s) could not be deleted for array {schedule.ArrayId}: {string.Join(", ", failures)}");
 
         await Task.CompletedTask;
     }

@@ -298,7 +298,7 @@ public sealed class WriteCoalescer
         {
             TotalWrites = _totalWrites,
             CoalescedWrites = _coalescedWrites,
-            CoalesceRatio = _totalWrites > 0 ? 1.0 - ((double)_batches.Count / _totalWrites) : 0,
+            CoalesceRatio = _totalWrites > 0 ? (double)_coalescedWrites / _totalWrites : 0, // P2-3655: ratio of writes that were actually coalesced
             PendingBatches = _batches.Count
         };
     }
@@ -474,10 +474,14 @@ public sealed class WriteBackCache
 
     private void EvictOldest()
     {
+        // P2-3654: prefer evicting clean entries; fall back to dirty entries if all dirty
         var oldest = _cache.Values
             .Where(e => !e.IsDirty)
             .OrderBy(e => e.LastAccess)
-            .FirstOrDefault();
+            .FirstOrDefault()
+            ?? _cache.Values
+               .OrderBy(e => e.LastAccess)
+               .FirstOrDefault();
 
         if (oldest != null)
         {
