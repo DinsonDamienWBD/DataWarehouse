@@ -261,11 +261,24 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             };
         }
 
-        protected override async Task<long?> GetAvailableCapacityAsyncCore(CancellationToken ct)
+        protected override Task<long?> GetAvailableCapacityAsyncCore(CancellationToken ct)
         {
             EnsureInitialized();
-            await Task.CompletedTask;
-            return long.MaxValue;
+            // Sum available free space across all healthy region paths.
+            long totalAvailable = 0;
+            foreach (var region in _regions.Where(r => r.IsHealthy))
+            {
+                try
+                {
+                    var root = Path.GetPathRoot(region.Path) ?? "C:\\";
+                    totalAvailable += new DriveInfo(root).AvailableFreeSpace;
+                }
+                catch
+                {
+                    // Ignore unavailable drives
+                }
+            }
+            return Task.FromResult<long?>(totalAvailable > 0 ? totalAvailable : null);
         }
 
         private class RegionEndpoint
