@@ -345,7 +345,7 @@ public sealed class S3ResponseWriter
 #endregion
 }
     public void WriteListBucketsResponse(HttpListenerResponse resp, S3ListBucketsResponse data);
-    public void WriteListObjectsResponse(HttpListenerResponse resp, S3ListObjectsResponse data, string bucketName);
+    public void WriteListObjectsResponse(HttpListenerResponse resp, S3ListObjectsResponse data, string bucketName, int maxKeys = 1000);
     public void WriteInitiateMultipartResponse(HttpListenerResponse resp, S3InitiateMultipartResponse data);
     public void WriteCompleteMultipartResponse(HttpListenerResponse resp, S3CompleteMultipartResponse data);
     public void WriteCopyObjectResponse(HttpListenerResponse resp, S3CopyObjectResponse data);
