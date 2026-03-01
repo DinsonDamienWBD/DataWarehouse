@@ -234,15 +234,14 @@ public sealed class DataWarehouseWriteFanOutOrchestrator : WriteFanOutOrchestrat
     {
         if (_initialized) return;
 
-        await base.StartAsync(ct);
-
         // Auto-register default destinations if none registered
         if (GetDestinations().Count == 0)
         {
             await RegisterDefaultDestinationsAsync();
         }
 
-        // Validate active strategy has required destinations
+        // Validate active strategy has required destinations BEFORE calling base.StartAsync
+        // to avoid leaving partially-started state on validation failure.
         var validation = _activeStrategy.ValidateDestinations(
             GetDestinations().Select(d => d.DestinationType));
 
@@ -252,6 +251,8 @@ public sealed class DataWarehouseWriteFanOutOrchestrator : WriteFanOutOrchestrat
                 $"Strategy '{_activeStrategy.StrategyId}' validation failed: " +
                 string.Join("; ", validation.Errors));
         }
+
+        await base.StartAsync(ct);
 
         _initialized = true;
     }

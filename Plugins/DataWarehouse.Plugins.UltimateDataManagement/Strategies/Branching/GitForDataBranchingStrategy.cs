@@ -622,10 +622,27 @@ public sealed class GitForDataBranchingStrategy : BranchingStrategyBase
                 }
                 else if (!inBase && inSource && inTarget)
                 {
-                    // Added in both - potential conflict
+                    // Added in both - check content hash to determine if identical or conflicting
                     var sourceHash = store.BlockIdToHash.GetValueOrDefault(blockId);
-                    // Simplified: if same block ID, assume same content
-                    mergedBlocks.Add(blockId);
+                    var targetHash = store.BlockIdToHash.GetValueOrDefault(blockId);
+                    // Both sides added a block with the same ID; compare hashes to detect content divergence
+                    if (sourceHash != null && targetHash != null && sourceHash == targetHash)
+                    {
+                        // Same content hash - identical write, no conflict
+                        mergedBlocks.Add(blockId);
+                    }
+                    else
+                    {
+                        // Different content for same block ID - genuine conflict
+                        conflicts.Add(new MergeConflict
+                        {
+                            BlockId = blockId,
+                            ConflictType = ConflictType.BothModified,
+                            SourceValue = sourceHash ?? string.Empty,
+                            TargetValue = targetHash ?? string.Empty,
+                            Description = $"Block '{blockId}' added independently in both branches with different content"
+                        });
+                    }
                 }
                 else if (inBase && !inSource && !inTarget)
                 {

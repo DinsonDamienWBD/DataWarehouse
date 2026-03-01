@@ -784,23 +784,28 @@ public sealed class DataMigrationStrategy : LifecycleStrategyBase
             o.StorageTier == job.SourceProvider ||
             o.StorageLocation == job.SourceLocation);
 
-        // Apply checkpoint for resumption
+        // P2-2460: Sort BEFORE applying the checkpoint filter so the stateful closure
+        // processes objects in deterministic order. Without pre-sorting the checkpoint
+        // may never be encountered (objects before it in insertion order would be included
+        // or excluded unpredictably), producing an empty or incorrect resume list.
+        var sorted = objects.OrderBy(o => o.ObjectId);
+
         if (!string.IsNullOrEmpty(checkpoint))
         {
             var checkpointFound = false;
-            objects = objects.Where(o =>
+            sorted = sorted.Where(o =>
             {
                 if (checkpointFound) return true;
                 if (o.ObjectId == checkpoint)
                 {
                     checkpointFound = true;
-                    return false; // Skip the checkpoint itself
+                    return false; // Skip the checkpoint itself, include everything after
                 }
-                return false;
-            });
+                return false; // Skip objects before the checkpoint
+            }).OrderBy(o => o.ObjectId);
         }
 
-        return objects.OrderBy(o => o.ObjectId).ToList();
+        return sorted.ToList();
     }
 
     private async Task<MigrationResult> MigrateWithRetryAsync(

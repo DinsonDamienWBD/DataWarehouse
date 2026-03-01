@@ -393,7 +393,7 @@ public sealed class StandardFanOutStrategy : FanOutStrategyBase
                 ["contentType"] = content.ContentType ?? "",
                 ["size"] = content.Size ?? 0,
                 ["summary"] = content.Summary ?? "",
-                ["ttlSeconds"] = (int)NonRequiredTimeout.TotalSeconds * 30 // 30x timeout as TTL
+                ["ttlSeconds"] = (int)Math.Min(NonRequiredTimeout.TotalSeconds * 30, int.MaxValue) // 30x timeout as TTL, clamped to avoid overflow
             },
             isRequired: _requiredDestinations.Contains(WriteDestinationType.Cache),
             ct);

@@ -395,6 +395,41 @@ namespace DataWarehouse.SDK.Connectors
             }
         }
 
+        /// <summary>
+        /// Parses a connection string of the form <c>host:port</c> or <c>[::1]:port</c> (IPv6)
+        /// into separate host and port components.
+        /// </summary>
+        /// <param name="connectionString">The raw connection string (e.g. "myhost:5432" or "[::1]:5432").</param>
+        /// <param name="defaultPort">Port to use when the connection string does not include one.</param>
+        /// <returns>A tuple of (host, port).</returns>
+        /// <remarks>
+        /// P2-2132: A naive <c>Split(':')</c> breaks for IPv6 addresses which contain colons.
+        /// This helper uses <see cref="Uri.TryCreate"/> with a dummy scheme to correctly extract
+        /// the host and port fields from both IPv4 and IPv6 connection strings.
+        /// </remarks>
+        protected static (string host, int port) ParseHostPort(string connectionString, int defaultPort)
+        {
+            // Try Uri-based parsing first (handles IPv6 "[::1]:port" and plain "host:port")
+            if (Uri.TryCreate("tcp://" + connectionString, UriKind.Absolute, out var uri)
+                && !string.IsNullOrEmpty(uri.Host)
+                && uri.Port > 0)
+            {
+                return (uri.Host, uri.Port);
+            }
+
+            // Fallback: simple split for bare "host:port" strings that Uri cannot handle
+            var colonIdx = connectionString.LastIndexOf(':');
+            if (colonIdx > 0
+                && int.TryParse(connectionString.AsSpan(colonIdx + 1), out var parsedPort)
+                && parsedPort > 0)
+            {
+                return (connectionString[..colonIdx], parsedPort);
+            }
+
+            // No port found — use entire string as host with the default port
+            return (connectionString, defaultPort);
+        }
+
         // ========================================
         // Intelligence Hooks for Derived Classes
         // ========================================

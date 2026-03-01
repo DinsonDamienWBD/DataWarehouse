@@ -465,11 +465,14 @@ public sealed class DataPurgingStrategy : LifecycleStrategyBase
             // Perform secure deletion
             var passes = await PerformSecureDeletionAsync(obj, purgeMethod, ct);
 
-            // Perform cascading deletions
+            // P2-2466: Capture cascade sizes BEFORE removal so BytesPurged can sum them.
+            // TryRemove from TrackedObjects happens here; querying after removal yields 0.
+            long cascadedBytes = 0;
             foreach (var cascadeId in cascadedObjects)
             {
                 if (TrackedObjects.TryRemove(cascadeId, out var cascadeObj))
                 {
+                    cascadedBytes += cascadeObj.Size;
                     await PerformSecureDeletionAsync(cascadeObj, purgeMethod, ct);
                     Interlocked.Add(ref _totalBytesPurged, cascadeObj.Size);
                 }
@@ -517,8 +520,7 @@ public sealed class DataPurgingStrategy : LifecycleStrategyBase
                 Success = true,
                 Method = purgeMethod,
                 PassesPerformed = passes,
-                BytesPurged = obj.Size + cascadedObjects.Sum(id =>
-                    TrackedObjects.TryGetValue(id, out var co) ? co.Size : 0),
+                BytesPurged = obj.Size + cascadedBytes,
                 Duration = sw.Elapsed,
                 Verified = verified,
                 CascadedObjects = cascadedObjects.Count > 0 ? cascadedObjects : null,

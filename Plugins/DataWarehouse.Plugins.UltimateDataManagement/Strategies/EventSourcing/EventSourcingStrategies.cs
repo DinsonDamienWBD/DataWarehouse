@@ -957,7 +957,15 @@ public sealed class EventReplayStrategy : DataManagementStrategyBase
         var sw = Stopwatch.StartNew();
         var replayed = 0;
 
-        foreach (var @event in events.Where(e => e.Timestamp <= targetTime).OrderBy(e => e.StreamPosition))
+        // P2-2439: Materialize once to avoid triple enumeration of the lazy IEnumerable.
+        // The original code called events.Where().OrderBy() for the loop and then
+        // events.Where().Max() for FinalPosition -- three separate enumerations total.
+        var filtered = events
+            .Where(e => e.Timestamp <= targetTime)
+            .OrderBy(e => e.StreamPosition)
+            .ToList();
+
+        foreach (var @event in filtered)
         {
             ct.ThrowIfCancellationRequested();
             await handler(@event);
@@ -968,7 +976,7 @@ public sealed class EventReplayStrategy : DataManagementStrategyBase
         {
             Success = true,
             EventsReplayed = replayed,
-            FinalPosition = events.Where(e => e.Timestamp <= targetTime).Max(e => (long?)e.StreamPosition) ?? 0,
+            FinalPosition = filtered.Count > 0 ? filtered[^1].StreamPosition : 0L,
             DurationMs = sw.Elapsed.TotalMilliseconds
         };
     }

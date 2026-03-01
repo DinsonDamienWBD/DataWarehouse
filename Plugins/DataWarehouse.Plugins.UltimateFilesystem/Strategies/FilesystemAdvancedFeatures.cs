@@ -18,8 +18,11 @@ namespace DataWarehouse.Plugins.UltimateFilesystem.Strategies;
 /// </summary>
 public sealed class ContentAddressableStorageLayer
 {
-    private readonly BoundedDictionary<string, CasBlock> _blockStore = new BoundedDictionary<string, CasBlock>(1000);
-    private readonly BoundedDictionary<string, CasReference> _referenceMap = new BoundedDictionary<string, CasReference>(1000);
+    // LOW-3028: Capacity raised to 100_000 to prevent premature eviction of referenced blocks.
+    // Use CollectGarbage() to explicitly reclaim zero-refcount blocks; BoundedDictionary eviction
+    // only occurs when this ceiling is reached, after which callers should invoke CollectGarbage first.
+    private readonly BoundedDictionary<string, CasBlock> _blockStore = new BoundedDictionary<string, CasBlock>(100_000);
+    private readonly BoundedDictionary<string, CasReference> _referenceMap = new BoundedDictionary<string, CasReference>(100_000);
     private readonly IMessageBus? _messageBus;
     private long _totalBlocks;
     private long _deduplicatedBytes;
