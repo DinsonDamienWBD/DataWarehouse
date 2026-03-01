@@ -22,10 +22,13 @@ namespace DataWarehouse.SDK.VirtualDiskEngine.Allocation;
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 /// <b>Thread safety:</b> This class is NOT thread-safe. The caller (e.g., <c>SubBlockPacker</c>)
 /// must hold its own lock before calling any method on this instance. Do not share a single
 /// <see cref="SubBlockBitmap"/> across threads without external synchronization (finding 766).
 =======
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
 =======
@@ -42,6 +45,9 @@ namespace DataWarehouse.SDK.VirtualDiskEngine.Allocation;
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
