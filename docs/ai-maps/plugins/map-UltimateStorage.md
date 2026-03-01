@@ -2468,6 +2468,7 @@ public class BitTorrentStrategy : UltimateStorageStrategyBase
     public async Task<TorrentStatistics?> GetTorrentStatisticsAsync(string key, CancellationToken ct = default);
     public async Task SetBandwidthLimitsAsync(string key, int? maxDownloadRateKBps, int? maxUploadRateKBps, CancellationToken ct = default);
     protected override int GetMaxKeyLength();;
+    protected override void ValidateKey(string key);
 }
 ```
 ```csharp
