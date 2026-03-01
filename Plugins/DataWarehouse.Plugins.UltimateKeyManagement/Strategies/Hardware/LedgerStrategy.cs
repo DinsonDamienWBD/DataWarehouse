@@ -243,7 +243,12 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
         {
             // Build derivation path
             // Format: m/44'/1234567'/keyIndex'/0/0
-            var keyIndex = Math.Abs(keyId.GetHashCode()) % 1000000;
+            // P2-3502: string.GetHashCode() is randomised per-process in .NET 6+.
+            // Use SHA-256 of the keyId bytes for a stable, deterministic BIP32 index
+            // that maps to the same key on every restart.
+            var keyIdHash = System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(keyId));
+            var keyIndex = (int)(BitConverter.ToUInt32(keyIdHash, 0) % 1000000);
             var derivationPath = $"{_config.DerivationPath.TrimEnd('/')}/{keyIndex}'/0/0";
 
             // Parse path to BIP32 format

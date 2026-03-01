@@ -604,8 +604,23 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
                 if (File.Exists(filePath))
                 {
                     var fileInfo = new FileInfo(filePath);
-                    var randomData = RandomNumberGenerator.GetBytes((int)Math.Min(fileInfo.Length, 1024 * 1024));
-                    File.WriteAllBytes(filePath, randomData);
+                    var fileLen = fileInfo.Length;
+                    // P2-3477: Overwrite the full file, not just the first 1MB.
+                    // Private keys >1MB (uncommon but valid) would partially survive a capped overwrite.
+                    using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Write, FileShare.None))
+                    {
+                        const int chunkSize = 64 * 1024;
+                        var chunk = new byte[chunkSize];
+                        long remaining = fileLen;
+                        while (remaining > 0)
+                        {
+                            int toWrite = (int)Math.Min(remaining, chunkSize);
+                            RandomNumberGenerator.Fill(chunk.AsSpan(0, toWrite));
+                            fs.Write(chunk, 0, toWrite);
+                            remaining -= toWrite;
+                        }
+                        fs.Flush(flushToDisk: true);
+                    }
                     File.Delete(filePath);
                 }
             }

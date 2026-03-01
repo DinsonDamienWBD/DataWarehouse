@@ -53,8 +53,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
         {
             if (string.IsNullOrEmpty(connectionString))
                 throw new ArgumentException("ConnectionString must not be null or empty.", nameof(connectionString));
-            var parts = connectionString.Split(':');
-            return (parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : defaultPort);
+            // P2-2132: delegate to base class ParseHostPortSafe which handles IPv6 bracket notation
+            return ParseHostPortSafe(connectionString, defaultPort);
         }
     }
 }

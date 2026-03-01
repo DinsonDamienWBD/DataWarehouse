@@ -18,10 +18,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ZFS
     public class RaidZ1Strategy : SdkRaidStrategyBase
     {
         private readonly int _defaultStripeWidth;
-        // P2-3680: Use BoundedDictionary (max 10,000 entries) to prevent unbounded growth.
-        // All access is under _checksumLock to prevent torn reads during resize.
-        private readonly BoundedDictionary<string, byte[]> _checksumCache = new(10_000);
-        private readonly object _checksumLock = new();
+        // P2-3680: BoundedDictionary (capacity 65_536) prevents unbounded growth; thread-safe via its internal lock.
+        private readonly BoundedDictionary<string, byte[]> _checksumCache = new(65_536);
 
         public RaidZ1Strategy(int stripeWidth = 4)
         {
@@ -446,10 +444,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ZFS
     public class RaidZ2Strategy : SdkRaidStrategyBase
     {
         private readonly int _defaultStripeWidth;
-        // P2-3680: Use BoundedDictionary (max 10,000 entries) to prevent unbounded growth.
-        // All access is under _checksumLock to prevent torn reads during resize.
-        private readonly BoundedDictionary<string, byte[]> _checksumCache = new(10_000);
-        private readonly object _checksumLock = new();
+        // P2-3680: BoundedDictionary (capacity 65_536) prevents unbounded growth; thread-safe via its internal lock.
+        private readonly BoundedDictionary<string, byte[]> _checksumCache = new(65_536);
 
         public RaidZ2Strategy(int stripeWidth = 6)
         {
@@ -831,10 +827,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ZFS
     public class RaidZ3Strategy : SdkRaidStrategyBase
     {
         private readonly int _defaultStripeWidth;
-        // P2-3680: Use BoundedDictionary (max 10,000 entries) to prevent unbounded growth.
-        // All access is under _checksumLock to prevent torn reads during resize.
-        private readonly BoundedDictionary<string, byte[]> _checksumCache = new(10_000);
-        private readonly object _checksumLock = new();
+        // P2-3680: BoundedDictionary (capacity 65_536) prevents unbounded growth; thread-safe via its internal lock.
+        private readonly BoundedDictionary<string, byte[]> _checksumCache = new(65_536);
 
         public RaidZ3Strategy(int stripeWidth = 8)
         {

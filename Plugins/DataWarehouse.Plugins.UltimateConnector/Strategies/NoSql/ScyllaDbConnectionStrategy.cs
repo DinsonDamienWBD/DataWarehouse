@@ -122,8 +122,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
 
         private (string host, int port) ParseHostPort(string connectionString, int defaultPort)
         {
-            var parts = connectionString.Split(':');
-            return (parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : defaultPort);
+            // P2-2132: delegate to base class ParseHostPortSafe which handles IPv6 bracket notation
+            return ParseHostPortSafe(connectionString, defaultPort);
         }
     }
 }

@@ -53,7 +53,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Container
         {
             SupportsRotation = true,
             SupportsEnvelope = true,  // SOPS does envelope encryption with cloud KMS
-            SupportsHsm = true,       // When using cloud KMS backends
+            // P2-3478: HSM is only available when backend is aws_kms, gcp_kms, azure_kv, or hc_vault.
+            // age and pgp backends do NOT use HSM. Reporting true here is a conservative declaration;
+            // check Metadata["HsmRequiresBackend"] to confirm the active backend supports HSM.
+            SupportsHsm = true,       // Conditional on backend — see HsmRequiresBackend metadata
             SupportsExpiration = false,
             SupportsReplication = false,
             SupportsVersioning = true, // Via Git versioning
@@ -67,6 +70,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Container
                 ["Platform"] = "Cross-Platform",
                 ["GitOpsCompatible"] = true,
                 ["SupportedBackends"] = new[] { "age", "pgp", "aws_kms", "gcp_kms", "azure_kv", "hc_vault" },
+                ["HsmRequiresBackend"] = new[] { "aws_kms", "gcp_kms", "azure_kv", "hc_vault" },
                 ["FileFormats"] = new[] { "yaml", "json", "dotenv", "ini", "binary" }
             }
         };

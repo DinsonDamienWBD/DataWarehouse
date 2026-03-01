@@ -233,6 +233,18 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
 
         protected override async Task SaveKeyToStorage(string keyId, byte[] keyData, ISecurityContext context)
         {
+            // P2-3505: Trezor derives keys via CipherKeyValue (BIP32 path + device entropy).
+            // The supplied keyData is NOT stored on the device — key material always lives in Trezor.
+            // Log a warning so callers understand that the provided keyData is intentionally discarded;
+            // the actual key is derived deterministically from keyId on each use.
+            if (keyData.Length > 0)
+            {
+                System.Diagnostics.Trace.TraceWarning(
+                    $"[TrezorStrategy] SaveKeyToStorage: provided keyData ({keyData.Length} bytes) for key '{keyId}' " +
+                    "is discarded. Trezor derives keys deterministically via CipherKeyValue; " +
+                    "the device is the only source of key material.");
+            }
+
             await _deviceLock.WaitAsync();
             try
             {

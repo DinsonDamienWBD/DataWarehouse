@@ -81,6 +81,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies
             }
             else
             {
+                // P2-3452: No MasterKey configured — random IKM will break decryption across restarts.
+                // Log a prominent warning so operators know persistent key derivation is unavailable.
+                System.Diagnostics.Trace.TraceWarning(
+                    "[AdvancedKeyOperations] 'MasterKey' configuration is missing. " +
+                    "A random IKM has been generated for this process lifetime only. " +
+                    "Keys derived in this session will NOT be decryptable after a restart. " +
+                    "Set 'MasterKey' (byte[]) in configuration for persistent key derivation.");
                 _masterIkm = new byte[32];
                 using var rng = RandomNumberGenerator.Create();
                 rng.GetBytes(_masterIkm);

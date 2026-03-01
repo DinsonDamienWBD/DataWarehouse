@@ -347,10 +347,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             else
             {
                 memoText = metadataJson[..28];
-                System.Diagnostics.Debug.WriteLine(
-                    $"[StellarAnchors] Memo truncated for key '{metadata.KeyId}': " +
-                    $"original {metadataJson.Length} bytes, stored first 28 bytes in memo. " +
-                    "Full metadata preserved in ManageData operation.");
+                // P2-3561: Use Trace.TraceWarning so truncation is visible in production logs.
+                System.Diagnostics.Trace.TraceWarning(
+                    $"[StellarAnchors] Memo for key '{metadata.KeyId}' truncated from " +
+                    $"{metadataJson.Length} to 28 bytes. Full metadata is preserved in ManageData operation.");
             }
             txBuilder.AddMemo(new MemoText(memoText));
 

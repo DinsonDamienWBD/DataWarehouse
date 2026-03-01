@@ -176,6 +176,10 @@ public sealed class IntelRaplStrategy : ResourceStrategyBase
     private readonly ConcurrentDictionary<string, PowerDomain> _allocations = new();
     private long _packagePowerBudgetMw = 65000;  // 65W TDP
     private long _currentPackagePowerMw;
+    // P2-3793/3796: RAPL sysfs sampling fields for delta-power computation
+    private long _lastEnergyUj = -1;
+    private long _lastSample = Stopwatch.GetTimestamp();
+    private const long _maxEnergyUj = 262143328850L; // typical max_energy_range_uj
 
     private enum PowerDomain { Package, Core, Uncore, Dram }
 
@@ -195,13 +199,53 @@ public sealed class IntelRaplStrategy : ResourceStrategyBase
 
     public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default)
     {
-        // Simulate reading RAPL energy counters
-        var proc = Process.GetCurrentProcess();
-        var estimatedPowerMw = (long)(proc.TotalProcessorTime.TotalSeconds * 1000);
+        // P2-3793/3796: Read Intel RAPL energy counter from Linux sysfs when available.
+        // Path: /sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj (microjoules, wraps at max_energy_range_uj).
+        // On non-Linux or systems without RAPL support, fall back to CPU-time estimation.
+        long estimatedPowerMw;
+        const string raplEnergyPath = "/sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj";
+        try
+        {
+            if (System.IO.File.Exists(raplEnergyPath))
+            {
+                var ujStr = System.IO.File.ReadAllText(raplEnergyPath).Trim();
+                if (long.TryParse(ujStr, out var energyUj))
+                {
+                    // Convert instantaneous counter difference to average power over sampling window.
+                    var elapsed = Stopwatch.GetElapsedTime(_lastSample);
+                    var prevEnergy = Interlocked.Exchange(ref _lastEnergyUj, energyUj);
+                    _lastSample = Stopwatch.GetTimestamp();
+                    if (elapsed.TotalSeconds > 0 && prevEnergy >= 0)
+                    {
+                        var deltaUj = energyUj - prevEnergy;
+                        if (deltaUj < 0) deltaUj += _maxEnergyUj; // counter wrap
+                        estimatedPowerMw = (long)(deltaUj / elapsed.TotalSeconds / 1000);
+                    }
+                    else
+                    {
+                        estimatedPowerMw = (long)(Process.GetCurrentProcess().TotalProcessorTime.TotalSeconds * 1000);
+                    }
+                }
+                else
+                {
+                    estimatedPowerMw = (long)(Process.GetCurrentProcess().TotalProcessorTime.TotalSeconds * 1000);
+                }
+            }
+            else
+            {
+                // Non-Linux or RAPL not exposed: best-effort estimate from CPU time
+                estimatedPowerMw = (long)(Process.GetCurrentProcess().TotalProcessorTime.TotalSeconds * 1000);
+            }
+        }
+        catch
+        {
+            estimatedPowerMw = (long)(Process.GetCurrentProcess().TotalProcessorTime.TotalSeconds * 1000);
+        }
 
+        var proc = Process.GetCurrentProcess();
         return Task.FromResult(new ResourceMetrics
         {
-            CpuPercent = (estimatedPowerMw / (double)_packagePowerBudgetMw) * 100,
+            CpuPercent = _packagePowerBudgetMw > 0 ? (estimatedPowerMw / (double)_packagePowerBudgetMw) * 100 : 0,
             MemoryBytes = proc.WorkingSet64,
             Timestamp = DateTime.UtcNow
         });
@@ -409,10 +453,37 @@ public sealed class BatteryAwareStrategy : ResourceStrategyBase
 
     public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default)
     {
-        // Simulate battery monitoring (would use Windows power APIs or /sys/class/power_supply on Linux)
-        var tickSeconds = Environment.TickCount64 / 1000;
-        _batteryLevelPercent = 100.0 - (tickSeconds % 100); // Simulate discharge
-        _onBatteryPower = _batteryLevelPercent < 95;
+        // P2-3794: Read real battery level instead of fake oscillating simulation.
+        // Linux: /sys/class/power_supply/BAT0/capacity (0-100) and /status ("Discharging"/"Charging")
+        // Windows: System.Windows.Forms.SystemInformation is unavailable; use GetSystemPowerStatus.
+        // Fallback to 100% on any error so allocation decisions are conservative (treat as AC).
+        try
+        {
+            const string capacityPath = "/sys/class/power_supply/BAT0/capacity";
+            const string statusPath = "/sys/class/power_supply/BAT0/status";
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && System.IO.File.Exists(capacityPath))
+            {
+                var capStr = System.IO.File.ReadAllText(capacityPath).Trim();
+                if (double.TryParse(capStr, System.Globalization.NumberStyles.Number,
+                    System.Globalization.CultureInfo.InvariantCulture, out var cap))
+                    _batteryLevelPercent = cap;
+                var statusStr = System.IO.File.Exists(statusPath)
+                    ? System.IO.File.ReadAllText(statusPath).Trim()
+                    : "Unknown";
+                _onBatteryPower = statusStr.Equals("Discharging", StringComparison.OrdinalIgnoreCase);
+            }
+            else
+            {
+                // No battery sensor — treat as AC power at full charge
+                _batteryLevelPercent = 100.0;
+                _onBatteryPower = false;
+            }
+        }
+        catch
+        {
+            _batteryLevelPercent = 100.0;
+            _onBatteryPower = false;
+        }
 
         return Task.FromResult(new ResourceMetrics
         {

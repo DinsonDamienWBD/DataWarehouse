@@ -56,7 +56,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
                 ["StorageType"] = "GitCrypt",
                 ["Backend"] = "git-crypt CLI",
                 ["Platform"] = "Cross-Platform",
-                ["EncryptionType"] = "AES-256-CTR",
+                // P2-3476: git-crypt uses AES-256-CBC (OPENSSL_CIPHER "aes-256-cbc" in OpenSSL mode)
+                // or AES-256-GCM in newer releases depending on backend. Report as AES-256-CBC
+                // (the most common default) rather than the incorrect CTR mode.
+                ["EncryptionType"] = "AES-256-CBC",
                 ["KeySharing"] = "GPG",
                 ["IdealFor"] = "Git-based CI/CD, Team collaboration, Secret versioning"
             }

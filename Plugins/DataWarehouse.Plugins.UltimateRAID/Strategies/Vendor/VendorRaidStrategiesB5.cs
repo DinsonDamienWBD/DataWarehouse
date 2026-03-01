@@ -31,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
     public sealed class StorageTekRaid7Strategy : SdkRaidStrategyBase
     {
         private readonly int _chunkSize;
-        private readonly ConcurrentQueue<WriteOperation> _writeCache;
+        private readonly BoundedDictionary<long, WriteOperation> _writeCache;
         private readonly int _cacheMaxSize;
         private readonly int _parityDriveCount;
         private long _cacheHits;
@@ -48,7 +48,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
             _chunkSize = chunkSize;
             _cacheMaxSize = cacheMaxSize;
             _parityDriveCount = parityDriveCount;
-            _writeCache = new ConcurrentQueue<WriteOperation>();
+            _writeCache = new BoundedDictionary<long, WriteOperation>(_cacheMaxSize > 0 ? _cacheMaxSize : 1000);
         }
 
         public override RaidLevel Level => RaidLevel.StorageTekRaid7;
@@ -108,16 +108,10 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
             };
 
             // Add to cache (async write-back)
-            _writeCache.Enqueue(writeOp);
+            _writeCache[offset] = writeOp;
 
-            // If cache is getting full, flush oldest entries.
-            // Use TryDequeue in a lock-free loop: the count check and dequeue are each individually
-            // safe on ConcurrentQueue.  Multiple concurrent flushers are fine because TryDequeue is
-            // idempotent — each operation is flushed exactly once.
-            while (_writeCache.Count > _cacheMaxSize && _writeCache.TryDequeue(out var oldOp))
-            {
-                await FlushWriteOperationAsync(oldOp, diskList, cancellationToken);
-            }
+            // BoundedDictionary auto-evicts LRU entries when capacity is exceeded.
+            // No manual flush loop needed — entries are evicted before next insertion.
 
             // Calculate multiple parity sets asynchronously
             var writeTasks = new List<Task>();
@@ -144,7 +138,6 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
             }
 
             await Task.WhenAll(writeTasks);
-            Interlocked.Increment(ref _cacheHits);
         }
 
         public override async Task<ReadOnlyMemory<byte>> ReadAsync(
@@ -285,32 +278,15 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
             }
         }
 
-        private async Task FlushWriteOperationAsync(WriteOperation op, List<DiskInfo> disks, CancellationToken ct)
-        {
-            // Flush cached write operation to the target disk(s) based on stripe info
-            var chunks = SplitIntoChunks(op.Data, _chunkSize);
-            var writeTasks = new List<Task>();
-            for (int i = 0; i < chunks.Count && i < op.StripeInfo.DataDisks.Length; i++)
-            {
-                var diskIndex = op.StripeInfo.DataDisks[i];
-                if (diskIndex < disks.Count)
-                    writeTasks.Add(WriteToDiskAsync(disks[diskIndex], chunks[i], op.Offset, ct));
-            }
-            await Task.WhenAll(writeTasks);
-        }
-
         private byte[]? GetFromCache(long offset, int length)
         {
-            // Check if data is in write cache
-            foreach (var op in _writeCache)
+            // LOW-3689: O(1) lookup by offset key instead of O(n) queue scan.
+            if (_writeCache.TryGetValue(offset, out var op) &&
+                op.Data.Length >= length)
             {
-                if (op.Offset <= offset && op.Offset + op.Data.Length >= offset + length)
-                {
-                    var startIndex = (int)(offset - op.Offset);
-                    var result = new byte[length];
-                    Array.Copy(op.Data, startIndex, result, 0, length);
-                    return result;
-                }
+                var result = new byte[length];
+                Array.Copy(op.Data, 0, result, 0, length);
+                return result;
             }
             return null;
         }

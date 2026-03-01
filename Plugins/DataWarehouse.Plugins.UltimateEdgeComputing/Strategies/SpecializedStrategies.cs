@@ -1027,21 +1027,62 @@ internal sealed class SmartCityEdgeStrategy : IEdgeComputingStrategy
         => Task.CompletedTask;
 
     /// <summary>
-    /// Optimizes traffic flow based on real-time data.
+    /// Optimizes traffic signal timings using Webster's formula.
+    /// Green time is allocated proportionally to vehicle demand on each axis.
+    /// Minimum green = 10 s, cycle length bounded to [60, 120] s.
     /// </summary>
     public async Task<TrafficOptimizationResult> OptimizeTrafficAsync(string intersectionId, TrafficData data, CancellationToken ct = default)
     {
-        await Task.Delay(10, ct);
+        await Task.Yield(); // allow cancellation check without artificial latency
+
+        // Demand on each axis (vehicles + scaled pedestrian pressure)
+        int nsTotal = data.VehicleCountNorth + data.VehicleCountSouth + data.PedestrianCount / 2;
+        int ewTotal = data.VehicleCountEast + data.VehicleCountWest + data.PedestrianCount / 2;
+        int totalDemand = nsTotal + ewTotal;
+
+        // Webster-style proportional green allocation
+        const int MinGreen = 10;
+        const int MaxCycle = 120;
+        const int Overhead = 8; // lost time per phase (yellow + all-red)
+
+        int nsGreen, ewGreen;
+        if (totalDemand <= 0)
+        {
+            // Equal split when no vehicles
+            nsGreen = ewGreen = (MaxCycle - 2 * Overhead) / 2;
+        }
+        else
+        {
+            int availableGreen = MaxCycle - 2 * Overhead;
+            nsGreen = Math.Max(MinGreen, (int)(availableGreen * (double)nsTotal / totalDemand));
+            ewGreen = Math.Max(MinGreen, availableGreen - nsGreen);
+
+            // Re-cap cycle to [60, 120]
+            int cycle = nsGreen + ewGreen + 2 * Overhead;
+            if (cycle > MaxCycle)
+            {
+                double scale = (double)(MaxCycle - 2 * Overhead) / (nsGreen + ewGreen);
+                nsGreen = Math.Max(MinGreen, (int)(nsGreen * scale));
+                ewGreen = Math.Max(MinGreen, (int)(ewGreen * scale));
+            }
+        }
+
+        // Estimated delay reduction vs. fixed-time 50/50 split (Akçelik approximation proxy)
+        double baseDelay = totalDemand > 0 ? 60.0 * totalDemand / (nsGreen + ewGreen + 2 * Overhead) : 0;
+        double optimisedDelay = totalDemand > 0
+            ? 60.0 * (nsTotal / (double)(nsGreen + Overhead) + ewTotal / (double)(ewGreen + Overhead))
+            : 0;
+        double delayReduction = Math.Max(0, baseDelay - optimisedDelay);
 
         return new TrafficOptimizationResult
         {
             IntersectionId = intersectionId,
             OptimizedSignalTimings = new Dictionary<string, int>
             {
-                ["north_south_green"] = 45,
-                ["east_west_green"] = 30
+                ["north_south_green"] = nsGreen,
+                ["east_west_green"] = ewGreen
             },
-            EstimatedDelayReduction = 15.5,
+            EstimatedDelayReduction = Math.Round(delayReduction, 1),
             ProcessedAt = DateTime.UtcNow
         };
     }
