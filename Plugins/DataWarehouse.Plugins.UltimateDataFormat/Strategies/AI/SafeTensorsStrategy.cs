@@ -107,6 +107,16 @@ public sealed class SafeTensorsStrategy : DataFormatStrategyBase
 
     public override async Task<DataFormatResult> ParseAsync(Stream input, DataFormatContext context, CancellationToken ct = default)
     {
+        // P2-2236: SafeTensors uses random-access seeks to read individual tensor data regions.
+        // Non-seekable streams (NetworkStream, GZipStream) would throw NotSupportedException at
+        // input.Position = ... below. Fail early with a clear diagnostic.
+        if (!input.CanSeek)
+        {
+            return DataFormatResult.Fail(
+                "SafeTensors format requires a seekable stream (file, MemoryStream, etc.). " +
+                "NetworkStream and GZipStream are not supported.");
+        }
+
         try
         {
             // Read header length

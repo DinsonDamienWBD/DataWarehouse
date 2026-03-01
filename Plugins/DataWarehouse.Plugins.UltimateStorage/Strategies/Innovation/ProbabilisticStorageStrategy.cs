@@ -635,7 +635,17 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             }
             else if (function.StartsWith("PERCENTILE"))
             {
-                var pct = double.Parse(ExtractFunctionArg(function)) / 100.0;
+                var rawArg = ExtractFunctionArg(function);
+                if (!double.TryParse(rawArg, System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out var pct))
+                {
+                    return new ProbabilisticQueryResult
+                    {
+                        Success = false,
+                        Error = $"Invalid percentile argument '{rawArg}': expected a numeric value between 0 and 100."
+                    };
+                }
+                pct /= 100.0;
                 var result = EstimateQuantile(structureName, pct);
                 Interlocked.Increment(ref _approximateQueriesServed);
                 return new ProbabilisticQueryResult

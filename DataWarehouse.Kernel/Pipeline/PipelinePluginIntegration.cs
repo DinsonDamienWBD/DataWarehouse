@@ -54,8 +54,16 @@ namespace DataWarehouse.Kernel.Pipeline
                 return null;
             }
 
-            // If a specific strategy is requested, we would need to configure it
-            // For now, return the plugin itself which can be configured via args
+            // Cat 15 (finding 962): StrategyName is passed through the cache key and is available
+            // as a pipeline execution arg so the plugin can select the correct strategy at runtime.
+            // If a StrategyName is specified, surface a diagnostic if it cannot be honoured.
+            if (!string.IsNullOrEmpty(stagePolicy.StrategyName))
+            {
+                context.LogInfo($"Encryption stage will use strategy '{stagePolicy.StrategyName}' " +
+                    $"via plugin '{encryptionPlugin.Id}'. " +
+                    "Ensure the plugin supports this strategy name via its SelectStrategyAsync method.");
+            }
+
             _resolvedStageCache[cacheKey] = encryptionPlugin;
             return encryptionPlugin;
         }

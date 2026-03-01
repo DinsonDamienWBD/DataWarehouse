@@ -417,11 +417,19 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         {
             EnsureInitialized();
 
-            var totalObjects = _objectTiers.Count;
-            var hotCount = _objectTiers.Values.Count(t => t == StorageTier.Hot);
-            var warmCount = _objectTiers.Values.Count(t => t == StorageTier.Warm);
-            var coldCount = _objectTiers.Values.Count(t => t == StorageTier.Cold);
-            var archiveCount = _objectTiers.Values.Count(t => t == StorageTier.Archive);
+            // Single pass over _objectTiers.Values to compute all four tier counts.
+            int hotCount = 0, warmCount = 0, coldCount = 0, archiveCount = 0;
+            foreach (var tier in _objectTiers.Values)
+            {
+                switch (tier)
+                {
+                    case StorageTier.Hot: hotCount++; break;
+                    case StorageTier.Warm: warmCount++; break;
+                    case StorageTier.Cold: coldCount++; break;
+                    case StorageTier.Archive: archiveCount++; break;
+                }
+            }
+            var totalObjects = hotCount + warmCount + coldCount + archiveCount;
 
             var message = $"Objects: {totalObjects} (Hot: {hotCount}, Warm: {warmCount}, Cold: {coldCount}, Archive: {archiveCount})";
 
@@ -570,7 +578,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             var currentTier = profile.CurrentTier;
             var optimalTier = DetermineOptimalTier(profile.AccessScore);
 
-            if (optimalTier < currentTier) // Lower enum value = higher tier
+            // StorageTier enum: Hot(0) < Warm(1) < Cold(2) < Archive(3).
+            // A smaller numeric value means a faster (hotter) tier, so optimalTier < currentTier
+            // means we want to promote to a faster tier.
+            if ((int)optimalTier < (int)currentTier) // Explicit cast documents the intent
             {
                 await MigrateObjectAsync(key, optimalTier, ct);
             }
@@ -681,7 +692,20 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         /// </summary>
         private string GetSafeFileName(string key)
         {
-            return string.Join("_", key.Split(Path.GetInvalidFileNameChars()));
+            // Replace invalid file-name characters and path separators to prevent path traversal.
+            // We also replace '..' sequences so keys like "../../etc/passwd" cannot escape the tier directory.
+            var sanitized = string.Join("_", key.Split(Path.GetInvalidFileNameChars()));
+            // Replace directory separators and parent-directory references.
+            sanitized = sanitized
+                .Replace('/', '_')
+                .Replace('\\', '_');
+            // Collapse any ".." that would survive the above (e.g. the ".." itself has no invalid chars).
+            while (sanitized.Contains(".."))
+                sanitized = sanitized.Replace("..", "__");
+            // Ensure the result is not empty or a reserved device name.
+            if (string.IsNullOrWhiteSpace(sanitized))
+                sanitized = "_empty_";
+            return sanitized;
         }
 
         /// <summary>

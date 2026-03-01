@@ -102,12 +102,51 @@ public sealed class ProtobufStrategy : DataFormatStrategyBase
 
     protected override Task<FormatValidationResult> ValidateCoreAsync(Stream stream, FormatSchema? schema, CancellationToken ct)
     {
-        // Stub: Validation requires schema
         if (schema == null)
         {
             return Task.FromResult(FormatValidationResult.Invalid(new ValidationError
             {
                 Message = "Protobuf validation requires schema definition"
+            }));
+        }
+
+        // P2-2240: Read at least one byte to confirm stream is non-empty and starts with a
+        // plausible protobuf varint (field tag). Protobuf encoding: first byte encodes
+        // field_number (bits 7-3) and wire_type (bits 2-0). Field 0 or wire_type 6/7 are invalid.
+        if (!stream.CanRead)
+        {
+            return Task.FromResult(FormatValidationResult.Invalid(new ValidationError
+            {
+                Message = "Protobuf stream is not readable"
+            }));
+        }
+
+        var firstByte = stream.ReadByte();
+        if (firstByte == -1)
+        {
+            return Task.FromResult(FormatValidationResult.Invalid(new ValidationError
+            {
+                Message = "Empty stream is not a valid Protobuf message"
+            }));
+        }
+
+        // Wire type is in the lower 3 bits. Values 0-5 are valid; 6 and 7 are reserved.
+        var wireType = firstByte & 0x07;
+        if (wireType == 6 || wireType == 7)
+        {
+            return Task.FromResult(FormatValidationResult.Invalid(new ValidationError
+            {
+                Message = $"Invalid Protobuf wire type {wireType} in first byte — not a valid Protobuf message"
+            }));
+        }
+
+        // Field number is in bits 7-3; field 0 is invalid in protobuf.
+        var fieldNumber = (firstByte >> 3) & 0x0F;
+        if (fieldNumber == 0 && (firstByte & 0x80) == 0)
+        {
+            return Task.FromResult(FormatValidationResult.Invalid(new ValidationError
+            {
+                Message = "Protobuf field number 0 is invalid"
             }));
         }
 

@@ -44,6 +44,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private readonly BoundedDictionary<DateTime, DailyCostMetrics> _costHistory = new BoundedDictionary<DateTime, DailyCostMetrics>(1000);
         private long _currentMonthSpendCents = 0; // stored as cents (decimal * 10000) for Interlocked atomicity
         private Timer? _costAnalysisTimer = null;
+        // Re-entry guard: prevents concurrent timer callbacks from running two migration cycles simultaneously.
+        private int _analysisRunning = 0;
 
         public override string StrategyId => "cost-predictive-storage";
         public override string Name => "Cost-Predictive Storage";
@@ -380,23 +382,33 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private void AnalyzeCostsAndOptimize()
         {
             if (!_enableCostOptimization)
-            {
                 return;
-            }
 
-            foreach (var kvp in _objects.Where(o => o.Value.CurrentTier == StorageTier.Hot))
+            // Prevent concurrent timer invocations from running two migration cycles at the same time.
+            if (Interlocked.CompareExchange(ref _analysisRunning, 1, 0) != 0)
+                return;
+
+            try
             {
-                var objectInfo = kvp.Value;
-                var daysSinceAccess = (DateTime.UtcNow - objectInfo.LastAccessed).TotalDays;
+                // Iterate all objects across tiers so that both Hot→Warm and Warm→Cold transitions are evaluated.
+                foreach (var kvp in _objects)
+                {
+                    var objectInfo = kvp.Value;
+                    var daysSinceAccess = (DateTime.UtcNow - objectInfo.LastAccessed).TotalDays;
 
-                if (daysSinceAccess > 30 && objectInfo.CurrentTier == StorageTier.Hot)
-                {
-                    _ = Task.Run(() => MigrateTierAsync(objectInfo.Key, StorageTier.Warm));
+                    if (daysSinceAccess > 30 && objectInfo.CurrentTier == StorageTier.Hot)
+                    {
+                        _ = Task.Run(() => MigrateTierAsync(objectInfo.Key, StorageTier.Warm));
+                    }
+                    else if (daysSinceAccess > 90 && objectInfo.CurrentTier == StorageTier.Warm)
+                    {
+                        _ = Task.Run(() => MigrateTierAsync(objectInfo.Key, StorageTier.Cold));
+                    }
                 }
-                else if (daysSinceAccess > 90 && objectInfo.CurrentTier == StorageTier.Warm)
-                {
-                    _ = Task.Run(() => MigrateTierAsync(objectInfo.Key, StorageTier.Cold));
-                }
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _analysisRunning, 0);
             }
         }
 

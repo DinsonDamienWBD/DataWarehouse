@@ -996,6 +996,28 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
 
         protected override int GetMaxKeyLength() => 512; // Reasonable limit for file names
 
+        /// <summary>
+        /// Validates the key and rejects path traversal sequences.
+        /// BitTorrentStrategy uses the key directly as a file name component, so
+        /// <c>../../</c> segments must be rejected before any path construction.
+        /// </summary>
+        protected override void ValidateKey(string key)
+        {
+            base.ValidateKey(key);
+
+            // Reject path traversal sequences regardless of separator style.
+            if (key.Contains("..") ||
+                key.Contains('/') ||
+                key.Contains('\\') ||
+                key.Contains(':'))
+            {
+                throw new ArgumentException(
+                    "Storage key must not contain path traversal sequences ('..', '/', '\\\\', ':'). " +
+                    "Use a simple file name or dot-separated namespace (e.g. 'myfile.dat', 'ns.key123').",
+                    nameof(key));
+            }
+        }
+
         #endregion
     }
 

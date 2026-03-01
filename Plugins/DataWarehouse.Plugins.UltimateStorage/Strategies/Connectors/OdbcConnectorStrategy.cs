@@ -577,7 +577,21 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                 throw new ArgumentException("No parameters provided for INSERT command");
             }
 
-            var columns = string.Join(", ", parameters.Keys);
+            // Validate column names to prevent SQL injection via caller-controlled parameter keys.
+            // Only allow identifiers composed of alphanumeric characters and underscores.
+            var invalidColumnPattern = new System.Text.RegularExpressions.Regex(@"[^A-Za-z0-9_]",
+                System.Text.RegularExpressions.RegexOptions.Compiled);
+            foreach (var columnName in parameters.Keys)
+            {
+                if (invalidColumnPattern.IsMatch(columnName))
+                    throw new ArgumentException(
+                        $"Column name '{columnName}' contains invalid characters. " +
+                        "Only alphanumeric characters and underscores are allowed.",
+                        nameof(parameters));
+            }
+
+            // Wrap column names in brackets for ODBC compatibility.
+            var columns = string.Join(", ", parameters.Keys.Select(k => $"[{k}]"));
             var values = string.Join(", ", parameters.Keys.Select(k => $"@{k}"));
 
             return $"INSERT INTO {tableName} ({columns}) VALUES ({values})";

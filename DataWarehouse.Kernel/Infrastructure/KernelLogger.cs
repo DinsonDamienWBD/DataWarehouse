@@ -493,7 +493,13 @@ namespace DataWarehouse.Kernel.Infrastructure
     public class KernelLoggerConfig
     {
         public LogLevel MinimumLevel { get; set; } = LogLevel.Information;
-        public bool EnableConsoleLogging { get; set; } = true;
+
+        /// <summary>
+        /// Enables console logging. Defaults to <c>false</c> — library code must not write to
+        /// <see cref="Console"/> in production service/container deployments (Cat 8, finding 951).
+        /// Set to <c>true</c> only for local development or CLI tools where a console is present.
+        /// </summary>
+        public bool EnableConsoleLogging { get; set; } = false;
         public bool BufferLogs { get; set; } = true;
         public string? LogFilePath { get; set; }
         public long MaxLogFileSize { get; set; } = 10 * 1024 * 1024;

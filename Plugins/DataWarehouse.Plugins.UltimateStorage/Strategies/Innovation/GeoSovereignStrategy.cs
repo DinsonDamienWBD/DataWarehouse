@@ -342,7 +342,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 Created = DateTime.UtcNow,
                 StoragePath = filePath,
                 HasExplicitConsent = metadata?.ContainsKey("ExplicitConsent") == true
-                    ? bool.Parse(metadata["ExplicitConsent"])
+                    ? (bool.TryParse(metadata["ExplicitConsent"], out var consent) && consent)
                     : !region.RequiresExplicitConsent,
                 DataClassification = metadata?.ContainsKey("DataClassification") == true
                     ? metadata["DataClassification"]
@@ -631,7 +631,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             if (region.RequiresExplicitConsent && _requireExplicitConsent)
             {
                 var hasConsent = metadata?.ContainsKey("ExplicitConsent") == true
-                    && bool.Parse(metadata["ExplicitConsent"]);
+                    && bool.TryParse(metadata["ExplicitConsent"], out var consentVal)
+                    && consentVal;
 
                 if (!hasConsent)
                 {
