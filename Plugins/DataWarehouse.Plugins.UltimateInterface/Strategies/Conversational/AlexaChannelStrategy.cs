@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -282,12 +283,59 @@ internal sealed class AlexaChannelStrategy : SdkInterface.InterfaceStrategyBase,
             }
         }
 
-        // In production, this would also:
-        // 1. Verify signature certificate chain from SignatureCertChainUrl header
-        // 2. Validate certificate is from Amazon
-        // 3. Verify signature using certificate public key
-        // For now, perform structural validation only
-        return request.Headers.ContainsKey("SignatureCertChainUrl") &&
-               request.Headers.ContainsKey("Signature");
+        // P2-3260: Verify Alexa request signature per Amazon's verification spec:
+        // https://developer.amazon.com/en-US/docs/alexa/custom-skills/host-a-custom-skill-as-a-web-service.html#verify-request-signature
+        if (!request.Headers.TryGetValue("SignatureCertChainUrl", out var certChainUrl) ||
+            !request.Headers.TryGetValue("Signature", out var signatureBase64))
+        {
+            return false;
+        }
+
+        // Validate certificate URL scheme and host (must be from Amazon CDN)
+        if (!Uri.TryCreate(certChainUrl, UriKind.Absolute, out var certUri) ||
+            !string.Equals(certUri.Scheme, "https", StringComparison.OrdinalIgnoreCase) ||
+            !certUri.Host.Equals("s3.amazonaws.com", StringComparison.OrdinalIgnoreCase) ||
+            !certUri.AbsolutePath.StartsWith("/echo.api/", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        try
+        {
+            // Fetch and verify certificate (synchronous for simplicity; production should cache)
+            using var http = new System.Net.Http.HttpClient();
+            var certBytes = http.GetByteArrayAsync(certChainUrl).GetAwaiter().GetResult();
+            var cert = System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadCertificate(certBytes);
+
+            // Verify certificate is current
+            var now = DateTime.UtcNow;
+            if (cert.NotBefore > now || cert.NotAfter < now)
+                return false;
+
+            // Verify Subject Alternative Name includes echo-api.amazon.com
+            foreach (var ext in cert.Extensions)
+            {
+                if (ext.Oid?.Value == "2.5.29.17") // Subject Alternative Name OID
+                {
+                    if (!ext.Format(false).Contains("echo-api.amazon.com", StringComparison.OrdinalIgnoreCase))
+                        return false;
+                    break;
+                }
+            }
+
+            // Verify signature of the raw request body using RSA public key from certificate
+            var signature = Convert.FromBase64String(signatureBase64);
+            using var rsa = cert.GetRSAPublicKey();
+            if (rsa == null) return false;
+
+            var bodyBytes = request.Body.ToArray();
+            return rsa.VerifyData(bodyBytes, signature,
+                System.Security.Cryptography.HashAlgorithmName.SHA1,
+                System.Security.Cryptography.RSASignaturePadding.Pkcs1);
+        }
+        catch
+        {
+            return false;
+        }
     }
 }

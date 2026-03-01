@@ -246,7 +246,8 @@ public sealed class HsmTimeLockProvider : TimeLockProviderPluginBase
                 break;
 
             case UnlockConditionType.MultiPartyApproval:
-                var requiredApprovals = condition.RequiredApprovals;
+                // LOW-1062: Enforce minimum of 2 approvals — value < 2 trivially bypasses multi-party gate.
+                var requiredApprovals = Math.Max(2, condition.RequiredApprovals);
                 var approvalCount = 0;
                 if (condition.Parameters.TryGetValue("ApproverIds", out var approverIdsObj))
                 {
@@ -620,23 +621,17 @@ public sealed class HsmTimeLockProvider : TimeLockProviderPluginBase
             }
         }
 
-        // Local fallback: compute hash of object ID bytes as a fingerprint
+        // Local fallback: compute hash of object ID bytes as a fingerprint.
+        // LOW-1065: Hash only objectId — including UtcNow made the hash non-reproducible.
         var objectBytes = objectId.ToByteArray();
-        var timestampBytes = BitConverter.GetBytes(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
-        var combinedBytes = new byte[objectBytes.Length + timestampBytes.Length];
-        Buffer.BlockCopy(objectBytes, 0, combinedBytes, 0, objectBytes.Length);
-        Buffer.BlockCopy(timestampBytes, 0, combinedBytes, objectBytes.Length, timestampBytes.Length);
 
         byte[] hashBytes;
         using (var sha256 = SHA256.Create())
         {
-            hashBytes = sha256.ComputeHash(combinedBytes);
+            hashBytes = sha256.ComputeHash(objectBytes);
         }
 
-        var result = Convert.ToHexString(hashBytes).ToLowerInvariant();
-        CryptographicOperations.ZeroMemory(combinedBytes);
-
-        return result;
+        return Convert.ToHexString(hashBytes).ToLowerInvariant();
     }
 
     /// <summary>

@@ -343,7 +343,9 @@ public sealed class BandwidthEstimationStrategy : EdgeIntegrationStrategyBase
             Timestamp = DateTimeOffset.UtcNow
         });
 
-        while (_samples.Count > _maxSamples)
+        // P2-3396: compute excess once; for-loop avoids infinite spin under concurrent enqueues.
+        int excess = _samples.Count - _maxSamples;
+        for (int i = 0; i < excess; i++)
             _samples.TryDequeue(out _);
 
         // EWMA (Exponential Weighted Moving Average) with alpha = 0.3.
@@ -808,10 +810,14 @@ internal sealed class SlidingWindow
         if (timestamp < OldestTimestamp) OldestTimestamp = timestamp;
         if (timestamp > NewestTimestamp) NewestTimestamp = timestamp;
 
-        // Evict old values
+        // Evict old values and keep OldestTimestamp current — P2-3401
         var cutoff = DateTimeOffset.UtcNow - _windowSize;
         while (_values.TryPeek(out var oldest) && oldest.Timestamp < cutoff)
+        {
             _values.TryDequeue(out _);
+        }
+        // Update OldestTimestamp to reflect the current oldest retained sample.
+        OldestTimestamp = _values.TryPeek(out var head) ? head.Timestamp : DateTimeOffset.MaxValue;
     }
 
     public double[] GetValues() => _values.Select(v => v.Value).ToArray();

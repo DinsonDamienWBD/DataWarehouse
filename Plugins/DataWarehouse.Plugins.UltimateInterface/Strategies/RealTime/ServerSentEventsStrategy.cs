@@ -168,12 +168,21 @@ internal sealed class ServerSentEventsStrategy : SdkInterface.InterfaceStrategyB
             sb.AppendLine();
         }
 
-        // Send sample event (in production, this would stream from actual data source)
-        eventId = Interlocked.Increment(ref _eventIdCounter);
-        sb.AppendLine($"event: {stream.Topic}");
-        sb.AppendLine($"data: {{\"message\":\"Event from topic {stream.Topic}\",\"timestamp\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}}}");
-        sb.AppendLine($"id: {eventId}");
-        sb.AppendLine();
+        // P2-3371/3377: Dequeue and emit real buffered events from the stream queue.
+        // Each queued event is already SSE-formatted by QueueEvent/PublishEventToStreams.
+        int flushed = 0;
+        while (stream.TryDequeueEvent(out var queued) && flushed < 50)
+        {
+            sb.Append(queued);
+            flushed++;
+        }
+
+        // If no real events were available, emit a heartbeat comment to keep the connection alive
+        if (flushed == 0)
+        {
+            sb.AppendLine(": heartbeat");
+            sb.AppendLine();
+        }
 
         stream.LastEventId = eventId;
 
@@ -250,6 +259,11 @@ internal sealed class ServerSentEventsStrategy : SdkInterface.InterfaceStrategyB
             return Filter.Contains('*')
                 ? eventType.StartsWith(Filter.Replace("*", ""), StringComparison.OrdinalIgnoreCase)
                 : eventType.Equals(Filter, StringComparison.OrdinalIgnoreCase);
+        }
+
+        public bool TryDequeueEvent(out string? sseMessage)
+        {
+            return _eventQueue.TryDequeue(out sseMessage);
         }
 
         public void QueueEvent(string sseMessage)

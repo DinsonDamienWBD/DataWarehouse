@@ -293,9 +293,11 @@ internal sealed class CmafStreamingStrategy : MediaStrategyBase
     private static string BuildFfmpegArguments(
         Resolution resolution, int bitrateKbps, TranscodeOptions options)
     {
-        var codec = options.VideoCodec ?? "libx264";
+        // LOW-1091: Sanitize codec names before interpolation into FFmpeg arguments to prevent
+        // argument injection when VideoCodec/AudioCodec are user-controlled.
+        var codec = SanitizeCodecName(options.VideoCodec ?? "libx264");
         var frameRate = options.FrameRate ?? 30.0;
-        var audioCodec = options.AudioCodec ?? "aac";
+        var audioCodec = SanitizeCodecName(options.AudioCodec ?? "aac");
 
         return $"-i pipe:0 -c:v {codec} -b:v {bitrateKbps}k " +
                $"-s {resolution.Width}x{resolution.Height} -r {frameRate:F2} " +
@@ -304,6 +306,17 @@ internal sealed class CmafStreamingStrategy : MediaStrategyBase
                $"-frag_duration {DefaultChunkDurationSeconds * 1_000_000} " +
                $"-min_frag_duration {DefaultChunkDurationSeconds * 1_000_000} " +
                $"-f mp4 pipe:1";
+    }
+
+    /// <summary>
+    /// Sanitizes a codec name to contain only alphanumeric characters, underscores, and hyphens.
+    /// Prevents FFmpeg argument injection when codec names are user-controlled.
+    /// </summary>
+    private static string SanitizeCodecName(string codec)
+    {
+        // Allow only alphanumeric, underscore, hyphen — reject any shell/argument special characters.
+        var sanitized = System.Text.RegularExpressions.Regex.Replace(codec, @"[^a-zA-Z0-9_\-]", string.Empty);
+        return sanitized.Length > 0 ? sanitized : "copy";
     }
 
     /// <summary>

@@ -358,7 +358,7 @@ public sealed class MySqlStorageStrategy : DatabaseStorageStrategyBase
     /// Validates a SQL identifier (table or database name) to prevent SQL injection.
     /// Only allows alphanumeric characters and underscores (no backticks or other special chars).
     /// </summary>
-    private static string ValidateSqlIdentifier(string name, string parameterName)
+    private new static string ValidateSqlIdentifier(string name, string parameterName)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException($"SQL identifier '{parameterName}' must not be empty.", parameterName);

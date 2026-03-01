@@ -329,9 +329,10 @@ internal sealed class HlsStreamingStrategy : MediaStrategyBase
     private static string BuildFfmpegArguments(
         Resolution resolution, int bitrateKbps, int segmentDuration, TranscodeOptions options)
     {
-        var codec = options.VideoCodec ?? "libx264";
+        // LOW-1091: Sanitize codec names before interpolation to prevent FFmpeg argument injection.
+        var codec = SanitizeCodecName(options.VideoCodec ?? "libx264");
         var frameRate = options.FrameRate ?? 30.0;
-        var audioCodec = options.AudioCodec ?? "aac";
+        var audioCodec = SanitizeCodecName(options.AudioCodec ?? "aac");
 
         return $"-i pipe:0 -c:v {codec} -b:v {bitrateKbps}k " +
                $"-s {resolution.Width}x{resolution.Height} -r {frameRate:F2} " +
@@ -339,6 +340,16 @@ internal sealed class HlsStreamingStrategy : MediaStrategyBase
                $"-f hls -hls_time {segmentDuration} -hls_playlist_type vod " +
                $"-hls_segment_filename segment_%04d.ts -hls_flags independent_segments " +
                $"pipe:1";
+    }
+
+    /// <summary>
+    /// Sanitizes a codec name to contain only alphanumeric characters, underscores, and hyphens.
+    /// Prevents FFmpeg argument injection when codec names are user-controlled.
+    /// </summary>
+    private static string SanitizeCodecName(string codec)
+    {
+        var sanitized = System.Text.RegularExpressions.Regex.Replace(codec, @"[^a-zA-Z0-9_\-]", string.Empty);
+        return sanitized.Length > 0 ? sanitized : "copy";
     }
 
     /// <summary>

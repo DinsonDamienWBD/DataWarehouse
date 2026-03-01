@@ -471,8 +471,10 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
                     credential.SignCount = counter;
                 }
 
-                // Update credential
-                credential.SignCount++;
+                // LOW-1239: Do NOT increment SignCount here — it was already set to the authenticator's
+                // counter value above. A redundant ++ would push the stored count ahead of the
+                // authenticator, causing the counter check (counter <= credential.SignCount) to reject
+                // the next valid authentication as a cloned-authenticator false-positive.
                 credential.LastUsedAt = DateTime.UtcNow;
                 _credentials[credentialId] = credential;
 

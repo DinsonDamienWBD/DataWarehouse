@@ -28,7 +28,9 @@ internal sealed class TwirpStrategy : SdkInterface.InterfaceStrategyBase, IPlugi
     public InterfaceCategory Category => InterfaceCategory.Rpc;
     public string[] Tags => ["twirp", "rpc", "protobuf", "json", "http"];
 
-    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.gRPC;
+    // P2-3367: Twirp is HTTP/1.1-based JSON/Protobuf RPC, NOT gRPC (which uses HTTP/2).
+    // Using Custom protocol tag since the SDK enum has no Twirp-specific value.
+    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.Custom;
 
     public override SdkInterface.InterfaceCapabilities Capabilities => new(
         SupportsStreaming: false, // Twirp is unary only

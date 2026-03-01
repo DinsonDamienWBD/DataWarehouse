@@ -512,9 +512,24 @@ public sealed class GeoShardingStrategy : ShardingStrategyBase
     /// <returns>The geographic region.</returns>
     public static GeoRegion GetRegionForCountry(string countryCode)
     {
-        return CountryToRegion.TryGetValue(countryCode, out var region)
-            ? region
-            : GeoRegion.NorthAmerica; // Default
+        if (CountryToRegion.TryGetValue(countryCode, out var region))
+            return region;
+
+        // P2-2491: Do NOT silently default unknown country codes to NorthAmerica.
+        // An unknown code could be an EU country not in the map, which would route GDPR-protected
+        // data to a non-compliant region. Throw so the caller can handle it explicitly.
+        throw new ArgumentException(
+            $"Unknown country code '{countryCode}'. Add a mapping to CountryToRegion or handle explicitly. " +
+            "Defaulting to NorthAmerica is not safe for GDPR compliance.");
+    }
+
+    /// <summary>
+    /// Gets the geographic region for a country code, returning a fallback region if unknown.
+    /// Use only when a fallback is explicitly acceptable (non-GDPR data).
+    /// </summary>
+    public static GeoRegion GetRegionForCountryOrDefault(string countryCode, GeoRegion defaultRegion)
+    {
+        return CountryToRegion.TryGetValue(countryCode, out var region) ? region : defaultRegion;
     }
 
     /// <summary>

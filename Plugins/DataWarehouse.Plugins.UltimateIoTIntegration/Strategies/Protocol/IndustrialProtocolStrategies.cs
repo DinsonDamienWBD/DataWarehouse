@@ -979,19 +979,17 @@ public class EnhancedModbusStrategy : ProtocolStrategyBase
     /// </summary>
     public byte[] BuildRtuFrame(int slaveId, byte functionCode, byte[] data)
     {
-        var frame = new byte[data.Length + 3]; // slave + fc + data + CRC(2)
+        // P2-3399: single allocation — slave(1) + fc(1) + data(N) + CRC(2) = N+4
+        var frame = new byte[data.Length + 4];
         frame[0] = (byte)slaveId;
         frame[1] = functionCode;
         Array.Copy(data, 0, frame, 2, data.Length);
 
-        // Append CRC-16/Modbus
+        // Compute CRC over slave + fc + data (all bytes except the last 2 CRC bytes)
         var crc = ComputeModbusCrc(frame, 0, frame.Length - 2);
-        // Note: frame doesn't have space for CRC - we need to resize
-        var fullFrame = new byte[frame.Length + 2];
-        Array.Copy(frame, fullFrame, frame.Length);
-        fullFrame[^2] = (byte)(crc & 0xFF);
-        fullFrame[^1] = (byte)(crc >> 8);
-        return fullFrame;
+        frame[^2] = (byte)(crc & 0xFF);
+        frame[^1] = (byte)(crc >> 8);
+        return frame;
     }
 
     /// <summary>

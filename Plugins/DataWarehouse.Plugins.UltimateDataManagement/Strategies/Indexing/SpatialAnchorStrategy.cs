@@ -92,6 +92,15 @@ public sealed class SpatialAnchorStrategy : IndexingStrategyBase, ISpatialAnchor
             throw new ArgumentException("Visual features are not valid.", nameof(visualFeatures));
         }
 
+        // P2-2440: Validate GPS coordinate ranges to prevent out-of-range values from silently
+        // being stored and causing downstream calculation errors.
+        if (gpsPosition.Latitude < -90.0 || gpsPosition.Latitude > 90.0)
+            throw new ArgumentOutOfRangeException(nameof(gpsPosition),
+                $"GPS latitude {gpsPosition.Latitude} is out of range [-90, 90].");
+        if (gpsPosition.Longitude < -180.0 || gpsPosition.Longitude > 180.0)
+            throw new ArgumentOutOfRangeException(nameof(gpsPosition),
+                $"GPS longitude {gpsPosition.Longitude} is out of range [-180, 180].");
+
         var anchorId = Guid.NewGuid().ToString();
         var now = DateTime.UtcNow;
 

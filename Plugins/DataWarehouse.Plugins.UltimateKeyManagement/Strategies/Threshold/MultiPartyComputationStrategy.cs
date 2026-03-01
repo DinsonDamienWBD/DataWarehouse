@@ -396,10 +396,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
                 // Compute partial signature: s_i = k + r * lambda_i * x_i (mod n)
                 // where r = R.x mod n, x_i is party's share
                 var r = R.Normalize().AffineXCoord.ToBigInteger().Mod(DomainParams.N);
+                // P2-3601: Message hash m MUST be included in the partial signature equation.
+                // Threshold ECDSA partial signature: s_i = k_i + r * m * lambda_i * x_i (mod n)
+                // where m = hash(message), x_i = party share, lambda_i = Lagrange coefficient.
                 var m = new BigInteger(1, messageHash);
 
                 var partialS = k.Add(
-                    r.Multiply(lambda).Multiply(keyData.MyShare).Mod(DomainParams.N)
+                    r.Multiply(m).Multiply(lambda).Multiply(keyData.MyShare).Mod(DomainParams.N)
                 ).Mod(DomainParams.N);
 
                 return new MpcPartialSignature
@@ -638,6 +641,45 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
         private ECPoint CalculatePublicKey(BigInteger privateKey)
         {
             return DomainParams.G.Multiply(privateKey);
+        }
+
+        /// <summary>
+        /// Encrypts a DKG share for transmission to a party using ECIES (AES-256-GCM).
+        /// The recipient's SEC1-encoded public key bytes are used for key agreement.
+        /// </summary>
+        private static byte[] EncryptShareForParty(byte[] shareBytes, byte[] recipientPublicKeyBytes)
+        {
+            // ECIES: generate ephemeral key pair, ECDH with recipient pubkey, AES-256-GCM encrypt
+            var recipientPoint = CurveParams.Curve.DecodePoint(recipientPublicKeyBytes);
+
+            // Generate ephemeral EC key pair
+            var ephemeralPriv = new Org.BouncyCastle.Math.BigInteger(1, System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+            ephemeralPriv = ephemeralPriv.Mod(CurveParams.N);
+            var ephemeralPub = CurveParams.G.Multiply(ephemeralPriv).Normalize();
+            var ephemeralPubBytes = ephemeralPub.GetEncoded(false);
+
+            // ECDH shared secret: recipientPubKey * ephemeralPriv
+            var sharedPoint = recipientPoint.Multiply(ephemeralPriv).Normalize();
+            var sharedSecret = sharedPoint.AffineXCoord.GetEncoded();
+
+            // Derive AES key and IV via SHA-256
+            var keyMaterial = System.Security.Cryptography.SHA256.HashData(sharedSecret);
+            var aesKey = keyMaterial[..16];
+            var iv = keyMaterial[16..];
+
+            // AES-256-GCM encrypt (use AesCcm as GCM substitute; or AesGcm if available)
+            var ciphertext = new byte[shareBytes.Length];
+            var tag = new byte[16];
+            using var aesGcm = new System.Security.Cryptography.AesGcm(
+                System.Security.Cryptography.SHA256.HashData(keyMaterial)[..32], 16);
+            aesGcm.Encrypt(iv[..12], shareBytes, ciphertext, tag);
+
+            // Output: ephemeralPubBytes || tag || ciphertext
+            var result = new byte[ephemeralPubBytes.Length + 16 + ciphertext.Length];
+            ephemeralPubBytes.CopyTo(result, 0);
+            tag.CopyTo(result, ephemeralPubBytes.Length);
+            ciphertext.CopyTo(result, ephemeralPubBytes.Length + 16);
+            return result;
         }
 
         private static byte[] SerializePoint(ECPoint point)
