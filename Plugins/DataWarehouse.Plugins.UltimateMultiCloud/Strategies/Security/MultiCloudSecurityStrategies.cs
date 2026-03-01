@@ -564,7 +564,13 @@ public sealed class CrossCloudThreatDetectionStrategy : MultiCloudStrategyBase
 
     private int GetRecentEventCount(string eventType, string sourceId)
     {
-        return _events.Count(e => e.EventType == eventType && e.SourceId == sourceId);
+        // P2-3620: Bound the scan to the last 60 seconds to avoid O(n) full-queue enumeration
+        // on every brute-force check. Events older than the window can never trigger a threshold.
+        var cutoff = DateTimeOffset.UtcNow.AddSeconds(-60);
+        return _events.Count(e =>
+            e.Timestamp >= cutoff &&
+            e.EventType == eventType &&
+            e.SourceId == sourceId);
     }
 
     protected override string? GetCurrentState() =>

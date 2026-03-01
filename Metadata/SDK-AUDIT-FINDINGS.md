@@ -4083,7 +4083,7 @@
 | 2532 | 15 | P2 | `UltimateDataProtection/Scheduler/BackupScheduler.cs:288` | `ParseCronNext` named as cron parser but ignores 3 of 5 fields. Contract lie. | [X]
 | 2533 | 9 | LOW | `UltimateDataProtection/DataProtectionStrategyBase.cs:319-322` | `ValidateRestoreTargetAsync` calls `Path.GetDirectoryName` without try-catch. ArgumentException on invalid path characters. | [X]
 | 2534 | 14 | LOW | `UltimateDataProtection/Catalog/BackupCatalog.cs:186-200` | `GetStatistics` calls `entries.Min`/`Max` without empty-list guard. InvalidOperationException on empty sequence. | [X]
-| 2535 | 14 | LOW | `UltimateDataProtection/Scaling/BackupScalingManager.cs:267-285` | `RegisterJobAsync` no null/empty validation on `sourcePath`. Incomplete metadata silently persisted. | [ ]
+| 2535 | 14 | LOW | `UltimateDataProtection/Scaling/BackupScalingManager.cs:267-285` | `RegisterJobAsync` no null/empty validation on `sourcePath`. Incomplete metadata silently persisted. | [X]
 
 **Clean files:** PrivacyComplianceStrategies.cs, PrivacyMetricsStrategies.cs, PrivacyPreservingAnalyticsStrategies.cs, PseudonymizationStrategies.cs, TokenizationStrategies.cs, DataProtectionConfiguration.cs, DataProtectionTopics.cs, IDataProtectionProvider.cs
 
@@ -4217,7 +4217,7 @@
 | 2630 | 2 | P1 | `UltimateDataProtection/Subsystems/VersioningSubsystem.cs:81-114` | Non-atomic read-modify-write on `_contentHashes` and `_versionContent`. Concurrent calls can both see isDuplicate=false, both store content, corrupt dedup state. | [X]
 | 2631 | 5 | P1 | `UltimateDataProtection/Subsystems/IntelligenceSubsystem.cs:56-59,326-329` | Two bare `catch` blocks in `RecommendStrategyAsync` and `GetAIStrategyRecommendationAsync` swallow all exceptions including OperationCanceledException. AI failures invisible. | [X]
 | 2632 | 1 | P2 | `UltimateDataProtection/Subsystems/VersioningSubsystem.cs:459-468` | `GetAvailablePoliciesAsync` returns only active policy. "In real implementation would return all registered" comment. Contract implies full catalog. | [X]
-| 2633 | 1 | P2 | `UltimateDataProtection/UltimateDataProtectionPlugin.cs:628-638` | `RecommendRecoveryPointAsync` returns hardcoded confidence=0.95, echoes back input backupId. No real analysis. | [ ]
+| 2633 | 1 | P2 | `UltimateDataProtection/UltimateDataProtectionPlugin.cs:628-638` | `RecommendRecoveryPointAsync` returns hardcoded confidence=0.95, echoes back input backupId. No real analysis. | [X]
 | 2634 | 2 | P2 | `UltimateDataProtection/Versioning/Policies/ScheduledVersioningPolicy.cs:32,72-73` | `_lastScheduledVersion` plain field read/written concurrently. Check-then-write not atomic. | [X]
 | 2635 | 5 | P2 | `UltimateDataProtection/UltimateDataProtectionPlugin.cs:657-671` | `DiscoverAndRegisterStrategies` bare `catch` silently skips broken strategies with no logging. | [X]
 | 2636 | 5 | P2 | `UltimateDataQuality/DataQualityStrategyBase.cs:706-715` | `AutoDiscover` two nested bare `catch` blocks — inner skips uninstantiable types, outer skips unscanned assemblies. Neither logs. | [X]
@@ -4226,10 +4226,10 @@
 | 2639 | 9 | P2 | `UltimateDataProtection/Subsystems/RestoreSubsystem.cs:148-155` | `GetProgressAsync` hardcodes PercentComplete=50. Callers always see 50% with "In Progress" phase. | [X]
 | 2640 | 10 | P2 | `UltimateDataProtection/Subsystems/VersioningSubsystem.cs:41-43` | Version number via `itemVersions.Count + 1`. After concurrent deletes/creates, numbers collide. Should use atomic counter. | [X]
 | 2641 | 13 | P2 | `UltimateDataQuality/Strategies/Cleansing/CleansingStrategies.cs:718-733` | `FindClosestMatch` O(n) over validValues with Levenshtein per entry. O(m×n) string lengths. Quadratic in hot path. | [ ]
-| 2642 | 12 | LOW | `UltimateDataProtection/Subsystems/IntelligenceSubsystem.cs:244` | Growth-rate calculation is average backup size ÷ days, not actual storage growth rate. `PredictedDailyGrowthBytes` systematically wrong. | [ ]
-| 2643 | 12 | LOW | `UltimateDataProtection/Subsystems/VersioningSubsystem.cs:233-243` | `GetVersionContentAsync` dedup lookup iterates all versions with nested SelectMany+Any. O(n). Should use reverse index. | [ ]
-| 2644 | 14 | LOW | `UltimateDataProtection/UltimateDataProtectionPlugin.cs:553-565` | `scenario` from msg.Payload embedded directly into reasoning string without length/content validation. | [ ]
-| 2645 | 15 | LOW | `UltimateDataProtection/Validation/BackupValidator.cs:27-88` | `ValidateAsync` with VerifyChecksums=true default calls stubs that always return valid. Contract lies about validation scope. | [ ]
+| 2642 | 12 | LOW | `UltimateDataProtection/Subsystems/IntelligenceSubsystem.cs:244` | Growth-rate calculation is average backup size ÷ days, not actual storage growth rate. `PredictedDailyGrowthBytes` systematically wrong. | [X]
+| 2643 | 12 | LOW | `UltimateDataProtection/Subsystems/VersioningSubsystem.cs:233-243` | `GetVersionContentAsync` dedup lookup iterates all versions with nested SelectMany+Any. O(n). Should use reverse index. | [X]
+| 2644 | 14 | LOW | `UltimateDataProtection/UltimateDataProtectionPlugin.cs:553-565` | `scenario` from msg.Payload embedded directly into reasoning string without length/content validation. | [X]
+| 2645 | 15 | LOW | `UltimateDataProtection/Validation/BackupValidator.cs:27-88` | `ValidateAsync` with VerifyChecksums=true default calls stubs that always return valid. Contract lies about validation scope. | [X]
 
 **Clean files:** IVersioningPolicy.cs, IVersioningSubsystem.cs, ContinuousVersioningPolicy.cs, EventVersioningPolicy.cs, IntelligentVersioningPolicy.cs, ManualVersioningPolicy.cs, BackupSubsystem.cs
 
