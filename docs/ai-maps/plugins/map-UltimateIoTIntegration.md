@@ -3005,6 +3005,13 @@ public class WhatIfSimulator
     public async Task<SimulationResult> SimulateAsync(string deviceId, Dictionary<string, object> parameterChanges, CancellationToken ct = default);
 }
 ```
+```csharp
+internal static class DeviceManagementHelper
+{
+}
+    internal static bool TryConvertToDouble(object value, out double result);
+}
+```
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/SensorFusion/WeightedAverageFusion.cs
 ```csharp

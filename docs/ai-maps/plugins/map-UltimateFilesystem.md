@@ -1489,6 +1489,7 @@ public sealed class BaremetalBootstrap
 public sealed class SmartMonitor
 {
 }
+    public long MaxUncorrectableErrors { get; set; };
     public SmartMonitor(ILogger? logger = null);
     public async Task<PhysicalDeviceHealth> ReadSmartAttributesAsync(string devicePath, BusType busType, CancellationToken ct = default);
 }
