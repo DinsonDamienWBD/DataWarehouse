@@ -378,7 +378,7 @@ public sealed class PbftStrategy : IRaftStrategy
     {
         ct.ThrowIfCancellationRequested();
 
-        var state = _groupStates.GetOrAdd(groupId, _ => new PbftGroupState(_totalNodes));
+        var state = _groupStates.GetOrAdd(groupId, _ => new PbftGroupState(_totalNodes, CheckpointInterval));
 
         lock (_lock)
         {
@@ -515,7 +515,7 @@ public sealed class PbftStrategy : IRaftStrategy
     /// <returns>The new view number.</returns>
     public int RequestViewChange(int groupId)
     {
-        var state = _groupStates.GetOrAdd(groupId, _ => new PbftGroupState(_totalNodes));
+        var state = _groupStates.GetOrAdd(groupId, _ => new PbftGroupState(_totalNodes, CheckpointInterval));
         lock (_lock)
         {
             TriggerViewChange(state);
@@ -713,9 +713,11 @@ public sealed class PbftStrategy : IRaftStrategy
         public List<PbftCheckpoint> Checkpoints { get; } = new();
         public List<PbftViewChange> ViewChangeHistory { get; } = new();
 
-        public PbftGroupState(int totalNodes)
+        // P2-2223: HighWatermark must be computed from checkpointInterval to allow proposals
+        // beyond seq 200 before the first checkpoint. Hardcoded 200 blocks large batches.
+        public PbftGroupState(int totalNodes, int checkpointInterval = 100)
         {
-            HighWatermark = 200;
+            HighWatermark = checkpointInterval * 2;
         }
     }
 }

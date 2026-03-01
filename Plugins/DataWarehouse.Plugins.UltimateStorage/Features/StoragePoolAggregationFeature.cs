@@ -222,12 +222,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 return null;
             }
 
-            // Get enabled backends
+            // Snapshot ConcurrentBag once to avoid multiple enumerations with inconsistent views
             var enabledBackends = pool.Backends
                 .Where(b => b.IsEnabled)
                 .ToList();
 
-            if (!enabledBackends.Any())
+            if (enabledBackends.Count == 0)
             {
                 return null;
             }
@@ -243,15 +243,18 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 return enabledBackends[index].StrategyId;
             }
 
-            // Select by priority first, then by weight
-            var byPriority = enabledBackends
-                .OrderByDescending(b => b.Priority)
-                .ToList();
+            // Select by priority first, then by weight (single pass over snapshot)
+            var maxPriority = int.MinValue;
+            foreach (var b in enabledBackends)
+            {
+                if (b.Priority > maxPriority) maxPriority = b.Priority;
+            }
 
-            var highestPriority = byPriority[0].Priority;
-            var topPriorityBackends = byPriority
-                .Where(b => b.Priority == highestPriority)
-                .ToList();
+            var topPriorityBackends = new List<PoolBackend>(enabledBackends.Count);
+            foreach (var b in enabledBackends)
+            {
+                if (b.Priority == maxPriority) topPriorityBackends.Add(b);
+            }
 
             // Weighted random selection among top priority backends
             var totalWeight = topPriorityBackends.Sum(b => b.Weight);
@@ -308,9 +311,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 throw new ArgumentException($"Pool '{poolId}' not found");
             }
 
-            var enabledBackends = pool.Backends
-                .Where(b => b.IsEnabled)
-                .ToList();
+            // Snapshot ConcurrentBag once to avoid multiple enumerations with inconsistent views
+            var enabledBackends = pool.Backends.Where(b => b.IsEnabled).ToList();
 
             long totalCapacity = 0;
             long usedCapacity = 0;
@@ -372,13 +374,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 throw new ArgumentException($"Pool '{poolId}' not found");
             }
 
-            var enabledBackends = pool.Backends.Where(b => b.IsEnabled).ToList();
+            // Snapshot ConcurrentBag once to avoid multiple enumerations
+            var allBackends = pool.Backends.ToList();
+            var enabledBackends = allBackends.Where(b => b.IsEnabled).ToList();
 
             return new PoolStatistics
             {
                 PoolId = poolId,
                 PoolName = pool.PoolName,
-                TotalBackends = pool.Backends.Count,
+                TotalBackends = allBackends.Count,
                 EnabledBackends = enabledBackends.Count,
                 TotalPlacements = enabledBackends.Sum(b => Interlocked.Read(ref b.PlacementCount)),
                 CreatedTime = pool.CreatedTime,

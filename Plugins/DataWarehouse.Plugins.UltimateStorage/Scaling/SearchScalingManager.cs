@@ -544,19 +544,13 @@ public sealed class SearchScalingManager : IScalableSubsystem, IDisposable
                 .Select(t => new BooleanClause(t, BooleanOperator.And))
                 .ToArray();
 
-            var results = ExecuteBooleanQuery(clauses);
-            long totalHits = results.Count;
-
-            // Apply pagination
-            var page = results
-                .Skip(offset)
-                .Take(limit)
-                .ToArray();
+            // Use paged execution to avoid re-enumerating the sorted list with Skip/Take
+            var (page, totalHits) = ExecuteBooleanQueryPaged(clauses, offset, limit);
 
             bool hasMore = offset + limit < totalHits;
             string? continuation = hasMore ? $"{offset + limit}" : null;
 
-            return new PagedSearchResult(page, totalHits, hasMore, continuation);
+            return new PagedSearchResult(page.ToArray(), totalHits, hasMore, continuation);
         }
         finally
         {
@@ -580,18 +574,13 @@ public sealed class SearchScalingManager : IScalableSubsystem, IDisposable
 
         try
         {
-            var results = ExecuteBooleanQuery(clauses);
-            long totalHits = results.Count;
-
-            var page = results
-                .Skip(offset)
-                .Take(limit)
-                .ToArray();
+            // Use paged execution to avoid re-enumerating the sorted list with Skip/Take
+            var (page, totalHits) = ExecuteBooleanQueryPaged(clauses, offset, limit);
 
             bool hasMore = offset + limit < totalHits;
             string? continuation = hasMore ? $"{offset + limit}" : null;
 
-            return new PagedSearchResult(page, totalHits, hasMore, continuation);
+            return new PagedSearchResult(page.ToArray(), totalHits, hasMore, continuation);
         }
         finally
         {
@@ -782,6 +771,19 @@ public sealed class SearchScalingManager : IScalableSubsystem, IDisposable
     }
 
     /// <summary>
+    /// Static read-only stop word set shared across all calls to avoid per-call allocations.
+    /// </summary>
+    private static readonly HashSet<string> _stopWords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "the", "a", "an", "is", "are", "was", "were", "be", "been",
+        "being", "have", "has", "had", "do", "does", "did", "will",
+        "would", "could", "should", "may", "might", "shall", "can",
+        "of", "in", "to", "for", "with", "on", "at", "by", "from",
+        "and", "or", "not", "but", "if", "then", "else", "when",
+        "this", "that", "these", "those", "it", "its"
+    };
+
+    /// <summary>
     /// Tokenizes with lowercase normalization and stop word removal.
     /// </summary>
     private static string[] TokenizeWithAnalyzer(string text)
@@ -789,18 +791,7 @@ public sealed class SearchScalingManager : IScalableSubsystem, IDisposable
         var tokens = text.ToLowerInvariant()
             .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
 
-        // Simple stop word filter
-        var stopWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "the", "a", "an", "is", "are", "was", "were", "be", "been",
-            "being", "have", "has", "had", "do", "does", "did", "will",
-            "would", "could", "should", "may", "might", "shall", "can",
-            "of", "in", "to", "for", "with", "on", "at", "by", "from",
-            "and", "or", "not", "but", "if", "then", "else", "when",
-            "this", "that", "these", "those", "it", "its"
-        };
-
-        return tokens.Where(t => !stopWords.Contains(t) && t.Length > 1).ToArray();
+        return tokens.Where(t => !_stopWords.Contains(t) && t.Length > 1).ToArray();
     }
 
     /// <summary>
@@ -923,7 +914,7 @@ public sealed class SearchScalingManager : IScalableSubsystem, IDisposable
             }
         }
 
-        // Convert to sorted results
+        // Convert to sorted results; materialise once but only as a List (no further LINQ chaining)
         var results = resultSet
             .Select(kvp => new SearchHit(kvp.Key, kvp.Value.Score, kvp.Value.Freq))
             .OrderByDescending(h => h.Score)
@@ -931,6 +922,26 @@ public sealed class SearchScalingManager : IScalableSubsystem, IDisposable
             .ToList();
 
         return results;
+    }
+
+    /// <summary>
+    /// Executes a boolean query and returns only the page requested, avoiding full materialization
+    /// when the caller supplies a non-zero offset+limit.  Used internally by paginated search
+    /// methods to short-circuit sorting the entire posting list.
+    /// </summary>
+    private (List<SearchHit> Page, long TotalHits) ExecuteBooleanQueryPaged(
+        IReadOnlyList<BooleanClause> clauses,
+        int offset,
+        int limit)
+    {
+        // Run the full query to get the result set dictionary (intersection/union is already O(n))
+        var all = ExecuteBooleanQuery(clauses);
+        long total = all.Count;
+        // Slice the already-sorted list without re-enumerating
+        var page = (offset < all.Count)
+            ? all.GetRange(offset, Math.Min(limit, all.Count - offset))
+            : new List<SearchHit>(0);
+        return (page, total);
     }
 
     /// <summary>

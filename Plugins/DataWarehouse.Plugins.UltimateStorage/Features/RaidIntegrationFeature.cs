@@ -29,6 +29,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         private readonly IMessageBus _messageBus;
         private readonly BoundedDictionary<string, RaidArray> _raidArrays = new BoundedDictionary<string, RaidArray>(1000);
         private readonly BoundedDictionary<string, string> _objectToArrayMapping = new BoundedDictionary<string, string>(1000); // object key -> array ID
+        private readonly object _failedBackendsLock = new();
         private bool _disposed;
         private IDisposable? _messageBusSubscription;
 
@@ -255,21 +256,31 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
             Interlocked.Increment(ref _totalBackendFailures);
 
-            array.FailedBackends.Add(backendId);
-            array.State = RaidArrayState.Degraded;
+            bool canTolerate;
+            int failedCount;
+            lock (_failedBackendsLock)
+            {
+                array.FailedBackends.Add(backendId);
+                array.State = RaidArrayState.Degraded;
+                canTolerate = CanTolerateFailures(array);
+                failedCount = array.FailedBackends.Count;
+                if (!canTolerate)
+                {
+                    array.State = RaidArrayState.Failed;
+                }
+            }
 
             // Notify RAID plugin about backend failure
             await NotifyRaidPluginAsync("backend.failed", new Dictionary<string, object>
             {
                 ["arrayId"] = arrayId,
                 ["backendId"] = backendId,
-                ["failedCount"] = array.FailedBackends.Count
+                ["failedCount"] = failedCount
             });
 
             // Check if array can tolerate more failures
-            if (!CanTolerateFailures(array))
+            if (!canTolerate)
             {
-                array.State = RaidArrayState.Failed;
                 await NotifyRaidPluginAsync("array.failed", new Dictionary<string, object>
                 {
                     ["arrayId"] = arrayId,
@@ -322,13 +333,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                     "Use RAID 1 or RAID 10 for supported rebuild operations.");
             }
 
-            // Replace failed backend with spare
-            if (array.FailedBackends.Any())
+            // Replace failed backend with spare (lock to prevent race with MarkBackendFailedAsync)
+            lock (_failedBackendsLock)
             {
-                var failedBackend = array.FailedBackends.First();
-                array.BackendIds.Remove(failedBackend);
-                array.BackendIds.Add(spareBackendId);
-                array.FailedBackends.Remove(failedBackend);
+                if (array.FailedBackends.Any())
+                {
+                    var failedBackend = array.FailedBackends.First();
+                    array.BackendIds.Remove(failedBackend);
+                    array.BackendIds.Add(spareBackendId);
+                    array.FailedBackends.Remove(failedBackend);
+                }
             }
 
             array.State = array.FailedBackends.Any() ? RaidArrayState.Degraded : RaidArrayState.Online;
@@ -484,8 +498,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
         private async Task<byte[]> ReadRaid1Async(RaidArray array, string objectKey, CancellationToken ct)
         {
+            // Snapshot failed-backends set under lock before iterating to avoid race with MarkBackendFailedAsync
+            HashSet<string> failedSnapshot;
+            lock (_failedBackendsLock)
+            {
+                failedSnapshot = new HashSet<string>(array.FailedBackends, StringComparer.Ordinal);
+            }
+
             // Try each backend until successful read
-            foreach (var backendId in array.BackendIds.Where(id => !array.FailedBackends.Contains(id)))
+            foreach (var backendId in array.BackendIds.Where(id => !failedSnapshot.Contains(id)))
             {
                 try
                 {
@@ -594,10 +615,46 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             }
         }
 
-        private async Task HandleRaidStatusMessageAsync(PluginMessage message)
+        private Task HandleRaidStatusMessageAsync(PluginMessage message)
         {
-            // Handle status updates from RAID plugin
-            await Task.CompletedTask;
+            // Process RAID status updates received from the RAID plugin via the message bus.
+            // Update the local array state to reflect the authoritative status from T91 RAID plugin.
+            if (message?.Type == null || message.Payload == null)
+                return Task.CompletedTask;
+
+            try
+            {
+                if (message.Type.EndsWith("backend.failed", StringComparison.OrdinalIgnoreCase) &&
+                    message.Payload.TryGetValue("arrayId", out var arrayIdObj) &&
+                    message.Payload.TryGetValue("backendId", out var backendIdObj) &&
+                    arrayIdObj is string arrayId &&
+                    backendIdObj is string backendId &&
+                    _raidArrays.TryGetValue(arrayId, out var array))
+                {
+                    lock (_failedBackendsLock)
+                    {
+                        array.FailedBackends.Add(backendId);
+                        array.State = CanTolerateFailures(array) ? RaidArrayState.Degraded : RaidArrayState.Failed;
+                    }
+                }
+                else if (message.Type.EndsWith("array.online", StringComparison.OrdinalIgnoreCase) &&
+                         message.Payload.TryGetValue("arrayId", out var onlineArrayIdObj) &&
+                         onlineArrayIdObj is string onlineArrayId &&
+                         _raidArrays.TryGetValue(onlineArrayId, out var onlineArray))
+                {
+                    lock (_failedBackendsLock)
+                    {
+                        onlineArray.FailedBackends.Clear();
+                        onlineArray.State = RaidArrayState.Online;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[RaidIntegrationFeature] HandleRaidStatusMessageAsync failed: {ex.GetType().Name}: {ex.Message}");
+            }
+
+            return Task.CompletedTask;
         }
 
         #endregion

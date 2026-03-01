@@ -51,11 +51,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         {
             _registry = registry ?? throw new ArgumentNullException(nameof(registry));
 
-            // Start background health check worker
+            // Start background health check worker.
+            // Delay the first run by 1 second to allow the constructor to finish
+            // and all fields to be initialized before the timer callback fires.
             _healthCheckTimer = new Timer(
                 callback: async _ => await RunHealthCheckCycleAsync(),
                 state: null,
-                dueTime: TimeSpan.Zero, // Run immediately
+                dueTime: TimeSpan.FromSeconds(1),
                 period: _healthCheckInterval);
         }
 
@@ -78,7 +80,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             set
             {
                 _healthCheckInterval = value;
-                _healthCheckTimer.Change(TimeSpan.Zero, value);
+                // Delay next execution by the new interval to avoid immediate fire-and-forget
+                _healthCheckTimer.Change(value, value);
             }
         }
 

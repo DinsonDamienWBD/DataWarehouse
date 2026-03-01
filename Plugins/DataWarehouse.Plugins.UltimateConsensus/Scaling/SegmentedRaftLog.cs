@@ -63,6 +63,11 @@ public sealed class SegmentedRaftLog : IRaftLogStore, IDisposable
     // Segment index: maps segment start index to segment metadata
     private readonly SortedList<long, SegmentInfo> _segments = new();
 
+    // P2-2221: ReaderWriterLockSlim protects _entries so read-only queries
+    // (Count, GetAsync, GetRangeAsync, GetFromAsync) do not race with
+    // AppendAsync / TruncateFromAsync which hold _logLock before mutating.
+    private readonly ReaderWriterLockSlim _entriesLock = new(LockRecursionPolicy.NoRecursion);
+
     // In-memory cache of all entries for fast random access
     private readonly List<RaftLogEntry> _entries = new();
 
@@ -130,7 +135,9 @@ public sealed class SegmentedRaftLog : IRaftLogStore, IDisposable
         get
         {
             EnsureInitialized();
-            return _entries.Count;
+            _entriesLock.EnterReadLock();
+            try { return _entries.Count; }
+            finally { _entriesLock.ExitReadLock(); }
         }
     }
 
@@ -138,57 +145,72 @@ public sealed class SegmentedRaftLog : IRaftLogStore, IDisposable
     public Task<long> GetLastIndexAsync()
     {
         EnsureInitialized();
-        return Task.FromResult(_entries.Count > 0 ? _entries[^1].Index : 0L);
+        _entriesLock.EnterReadLock();
+        try { return Task.FromResult(_entries.Count > 0 ? _entries[^1].Index : 0L); }
+        finally { _entriesLock.ExitReadLock(); }
     }
 
     /// <inheritdoc/>
     public Task<long> GetLastTermAsync()
     {
         EnsureInitialized();
-        return Task.FromResult(_entries.Count > 0 ? _entries[^1].Term : 0L);
+        _entriesLock.EnterReadLock();
+        try { return Task.FromResult(_entries.Count > 0 ? _entries[^1].Term : 0L); }
+        finally { _entriesLock.ExitReadLock(); }
     }
 
     /// <inheritdoc/>
     public Task<RaftLogEntry?> GetAsync(long index)
     {
         EnsureInitialized();
-
-        if (index <= 0 || index > _entries.Count)
-            return Task.FromResult<RaftLogEntry?>(null);
-
-        return Task.FromResult<RaftLogEntry?>(_entries[(int)index - 1]);
+        _entriesLock.EnterReadLock();
+        try
+        {
+            if (index <= 0 || index > _entries.Count)
+                return Task.FromResult<RaftLogEntry?>(null);
+            return Task.FromResult<RaftLogEntry?>(_entries[(int)index - 1]);
+        }
+        finally { _entriesLock.ExitReadLock(); }
     }
 
     /// <inheritdoc/>
     public Task<IReadOnlyList<RaftLogEntry>> GetRangeAsync(long fromIndex, long toIndex)
     {
         EnsureInitialized();
+        _entriesLock.EnterReadLock();
+        try
+        {
+            if (fromIndex > _entries.Count || fromIndex > toIndex)
+                return Task.FromResult<IReadOnlyList<RaftLogEntry>>(Array.Empty<RaftLogEntry>());
 
-        if (fromIndex > _entries.Count || fromIndex > toIndex)
-            return Task.FromResult<IReadOnlyList<RaftLogEntry>>(Array.Empty<RaftLogEntry>());
+            int start = (int)Math.Max(0, fromIndex - 1);
+            int end = (int)Math.Min(_entries.Count, toIndex);
+            int count = end - start;
 
-        int start = (int)Math.Max(0, fromIndex - 1);
-        int end = (int)Math.Min(_entries.Count, toIndex);
-        int count = end - start;
+            if (count <= 0)
+                return Task.FromResult<IReadOnlyList<RaftLogEntry>>(Array.Empty<RaftLogEntry>());
 
-        if (count <= 0)
-            return Task.FromResult<IReadOnlyList<RaftLogEntry>>(Array.Empty<RaftLogEntry>());
-
-        return Task.FromResult<IReadOnlyList<RaftLogEntry>>(
-            _entries.GetRange(start, count).AsReadOnly());
+            return Task.FromResult<IReadOnlyList<RaftLogEntry>>(
+                _entries.GetRange(start, count).AsReadOnly());
+        }
+        finally { _entriesLock.ExitReadLock(); }
     }
 
     /// <inheritdoc/>
     public Task<IReadOnlyList<RaftLogEntry>> GetFromAsync(long fromIndex)
     {
         EnsureInitialized();
+        _entriesLock.EnterReadLock();
+        try
+        {
+            if (fromIndex > _entries.Count)
+                return Task.FromResult<IReadOnlyList<RaftLogEntry>>(Array.Empty<RaftLogEntry>());
 
-        if (fromIndex > _entries.Count)
-            return Task.FromResult<IReadOnlyList<RaftLogEntry>>(Array.Empty<RaftLogEntry>());
-
-        int start = (int)Math.Max(0, fromIndex - 1);
-        return Task.FromResult<IReadOnlyList<RaftLogEntry>>(
-            _entries.GetRange(start, _entries.Count - start).AsReadOnly());
+            int start = (int)Math.Max(0, fromIndex - 1);
+            return Task.FromResult<IReadOnlyList<RaftLogEntry>>(
+                _entries.GetRange(start, _entries.Count - start).AsReadOnly());
+        }
+        finally { _entriesLock.ExitReadLock(); }
     }
 
     /// <inheritdoc/>
@@ -219,7 +241,10 @@ public sealed class SegmentedRaftLog : IRaftLogStore, IDisposable
             // Append to segment file with length-prefix binary format
             await AppendToSegmentAsync(entry, segmentStart).ConfigureAwait(false);
 
-            _entries.Add(entry);
+            // P2-2221: Acquire write lock before mutating _entries.
+            _entriesLock.EnterWriteLock();
+            try { _entries.Add(entry); }
+            finally { _entriesLock.ExitWriteLock(); }
 
             // Seal previous segment if current segment is new and previous is full
             if (_segments.Count > 1)
@@ -251,11 +276,17 @@ public sealed class SegmentedRaftLog : IRaftLogStore, IDisposable
         await _logLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            if (fromIndex <= 0 || fromIndex > _entries.Count)
-                return;
+            // P2-2221: Acquire write lock around _entries mutation.
+            _entriesLock.EnterWriteLock();
+            try
+            {
+                if (fromIndex <= 0 || fromIndex > _entries.Count)
+                    return;
 
-            int removeCount = _entries.Count - (int)fromIndex + 1;
-            _entries.RemoveRange((int)fromIndex - 1, removeCount);
+                int removeCount = _entries.Count - (int)fromIndex + 1;
+                _entries.RemoveRange((int)fromIndex - 1, removeCount);
+            }
+            finally { _entriesLock.ExitWriteLock(); }
 
             // Rewrite all affected segments
             await RewriteSegmentsAsync().ConfigureAwait(false);
@@ -319,16 +350,22 @@ public sealed class SegmentedRaftLog : IRaftLogStore, IDisposable
         await _logLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            if (upToIndex <= 0 || upToIndex > _entries.Count)
-                return;
-
-            _entries.RemoveRange(0, (int)upToIndex);
-
-            // Re-index remaining entries starting from 1
-            for (int i = 0; i < _entries.Count; i++)
+            // P2-2221: Write lock around _entries mutation.
+            _entriesLock.EnterWriteLock();
+            try
             {
-                _entries[i].Index = i + 1;
+                if (upToIndex <= 0 || upToIndex > _entries.Count)
+                    return;
+
+                _entries.RemoveRange(0, (int)upToIndex);
+
+                // Re-index remaining entries starting from 1 (still under write lock).
+                for (int i = 0; i < _entries.Count; i++)
+                {
+                    _entries[i].Index = i + 1;
+                }
             }
+            finally { _entriesLock.ExitWriteLock(); }
 
             await RewriteSegmentsAsync().ConfigureAwait(false);
             RefreshHotSegments();

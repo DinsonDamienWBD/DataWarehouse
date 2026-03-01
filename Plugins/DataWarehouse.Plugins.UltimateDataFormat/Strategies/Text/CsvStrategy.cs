@@ -143,6 +143,11 @@ public sealed class CsvStrategy : DataFormatStrategyBase
         var currentField = new System.Text.StringBuilder();
         bool inQuotes = false;
 
+        // P2-2248: Pre-compute delimiter char and length to avoid c.ToString() heap
+        // allocation per character in the hot loop (millions of allocs for large CSVs).
+        char delimChar = delimiter.Length > 0 ? delimiter[0] : ',';
+        bool isMultiCharDelim = delimiter.Length > 1;
+
         for (int i = 0; i < line.Length; i++)
         {
             char c = line[i];
@@ -160,10 +165,12 @@ public sealed class CsvStrategy : DataFormatStrategyBase
                     inQuotes = !inQuotes;
                 }
             }
-            else if (c.ToString() == delimiter && !inQuotes)
+            else if (!inQuotes && c == delimChar &&
+                     (!isMultiCharDelim || line.AsSpan(i).StartsWith(delimiter.AsSpan())))
             {
                 fields.Add(currentField.ToString());
                 currentField.Clear();
+                if (isMultiCharDelim) i += delimiter.Length - 1;
             }
             else
             {

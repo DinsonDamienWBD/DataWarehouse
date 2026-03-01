@@ -545,11 +545,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                         await strategy.DeleteAsync(key, ct);
                     }
                 }
-                catch
+                catch (Exception rollbackEx)
                 {
-
-                    // Ignore rollback failures
-                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+                    // Rollback failures are logged but not re-thrown; the original write failure
+                    // is the primary concern. Left-behind copies will be detected on next read.
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[MultiBackendFanOutFeature] Rollback failed for backend '{backendId}', key '{key}': {rollbackEx.GetType().Name}: {rollbackEx.Message}");
                 }
             });
 

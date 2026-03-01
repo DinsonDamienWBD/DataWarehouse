@@ -137,18 +137,18 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 var sourceMetadata = await sourceBackend.GetMetadataAsync(key, ct);
                 result.BytesTotal = sourceMetadata.Size;
 
-                // Stream data from source to target
-                using var sourceStream = await sourceBackend.RetrieveAsync(key, ct);
-
-                // If using streaming, wrap in progress tracking stream
-                Stream migrationStream = sourceStream;
-                if (options.TrackProgress)
-                {
-                    migrationStream = new ProgressTrackingStream(
+                // Stream data from source to target.
+                // When progress tracking is enabled, ProgressTrackingStream takes ownership
+                // of the sourceStream and will dispose it; we use a single outer using to
+                // ensure disposal in both branches without double-disposing the inner stream.
+                var sourceStream = await sourceBackend.RetrieveAsync(key, ct);
+                Stream migrationStream = options.TrackProgress
+                    ? new ProgressTrackingStream(
                         sourceStream,
                         sourceMetadata.Size,
-                        bytesRead => result.BytesMigrated = bytesRead);
-                }
+                        bytesRead => result.BytesMigrated = bytesRead)
+                    : sourceStream;
+                using var ownedMigrationStream = migrationStream;
 
                 // Convert readonly dictionary to mutable
                 var metadataDict = sourceMetadata.CustomMetadata != null
@@ -158,7 +158,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 // Write to target backend
                 var targetMetadata = await targetBackend.StoreAsync(
                     key,
-                    migrationStream,
+                    ownedMigrationStream,
                     metadataDict,
                     ct);
 
@@ -427,17 +427,21 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 Key = result.Key
             });
 
-            history.Migrations.Add(new MigrationHistoryEntry
+            // Migrations list is shared across concurrent MigrateAsync calls; lock required.
+            lock (history.Migrations)
             {
-                SourceBackend = result.SourceBackend,
-                TargetBackend = result.TargetBackend,
-                Timestamp = result.StartTime,
-                BytesMigrated = result.BytesMigrated,
-                Success = result.Success,
-                Duration = result.EndTime.HasValue
-                    ? result.EndTime.Value - result.StartTime
-                    : TimeSpan.Zero
-            });
+                history.Migrations.Add(new MigrationHistoryEntry
+                {
+                    SourceBackend = result.SourceBackend,
+                    TargetBackend = result.TargetBackend,
+                    Timestamp = result.StartTime,
+                    BytesMigrated = result.BytesMigrated,
+                    Success = result.Success,
+                    Duration = result.EndTime.HasValue
+                        ? result.EndTime.Value - result.StartTime
+                        : TimeSpan.Zero
+                });
+            }
         }
 
         #endregion

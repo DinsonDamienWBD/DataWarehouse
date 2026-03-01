@@ -419,11 +419,11 @@ namespace DataWarehouse.Plugins.UltimateStorage
                     var stream = await RetrieveAsync(key, ct);
                     results[key] = stream;
                 }
-                catch
+                catch (Exception ex)
                 {
-
-                    // Skip failed retrievals
-                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+                    // Log retrieval failure; key is skipped in the batch result
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[StorageStrategyBase] RetrieveBatchAsync: retrieval failed for key '{key}': {ex.GetType().Name}: {ex.Message}");
                 }
             }
 
@@ -454,11 +454,11 @@ namespace DataWarehouse.Plugins.UltimateStorage
                     await DeleteAsync(key, ct);
                     deletedCount++;
                 }
-                catch
+                catch (Exception ex)
                 {
-
-                    // Skip failed deletions
-                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+                    // Log deletion failure; key counted as failed in the batch result
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[StorageStrategyBase] DeleteBatchAsync: deletion failed for key '{key}': {ex.GetType().Name}: {ex.Message}");
                 }
             }
 

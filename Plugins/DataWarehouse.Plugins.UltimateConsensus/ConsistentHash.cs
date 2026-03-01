@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO.Hashing;
 using System.Text;
+using System.Threading;
 
 namespace DataWarehouse.Plugins.UltimateConsensus;
 
@@ -11,11 +12,14 @@ namespace DataWarehouse.Plugins.UltimateConsensus;
 /// with minimal rebalancing when groups are added/removed.
 /// </summary>
 /// <remarks>
-/// Thread-safe: read operations are lock-free; mutations use a lock.
+/// Thread-safe: concurrent Route() calls use a reader lock; AddNode/RemoveNode use a writer lock.
+/// P2-2208: Replaced exclusive lock with ReaderWriterLockSlim so read-heavy routing
+/// does not block other routing threads.
 /// </remarks>
-public sealed class ConsistentHash
+public sealed class ConsistentHash : IDisposable
 {
-    private readonly object _lock = new();
+    // P2-2208: ReaderWriterLockSlim allows concurrent Route() reads.
+    private readonly ReaderWriterLockSlim _lock = new(LockRecursionPolicy.NoRecursion);
     private readonly HashSet<int> _activeNodes = new();
     private int _bucketCount;
 
@@ -56,7 +60,8 @@ public sealed class ConsistentHash
     /// <exception cref="InvalidOperationException">Thrown when no active nodes exist.</exception>
     public int Route(string key)
     {
-        lock (_lock)
+        _lock.EnterReadLock();
+        try
         {
             if (_activeNodes.Count == 0)
                 throw new InvalidOperationException("No active nodes in the hash ring.");
@@ -64,6 +69,7 @@ public sealed class ConsistentHash
             var bucket = GetBucket(key, _bucketCount);
             return ResolveActiveBucket(bucket);
         }
+        finally { _lock.ExitReadLock(); }
     }
 
     /// <summary>
@@ -76,7 +82,8 @@ public sealed class ConsistentHash
     /// <exception cref="InvalidOperationException">Thrown when no active nodes exist.</exception>
     public int Route(byte[] data)
     {
-        lock (_lock)
+        _lock.EnterReadLock();
+        try
         {
             if (_activeNodes.Count == 0)
                 throw new InvalidOperationException("No active nodes in the hash ring.");
@@ -86,6 +93,7 @@ public sealed class ConsistentHash
             var bucket = JumpHash(hash, _bucketCount);
             return ResolveActiveBucket(bucket);
         }
+        finally { _lock.ExitReadLock(); }
     }
 
     /// <summary>
@@ -116,11 +124,13 @@ public sealed class ConsistentHash
     /// <param name="nodeId">Node/group ID to add.</param>
     public void AddNode(int nodeId)
     {
-        lock (_lock)
+        _lock.EnterWriteLock();
+        try
         {
             _activeNodes.Add(nodeId);
             _bucketCount = Math.Max(_bucketCount, nodeId + 1);
         }
+        finally { _lock.ExitWriteLock(); }
     }
 
     /// <summary>
@@ -131,10 +141,12 @@ public sealed class ConsistentHash
     /// <param name="nodeId">Node/group ID to remove.</param>
     public void RemoveNode(int nodeId)
     {
-        lock (_lock)
+        _lock.EnterWriteLock();
+        try
         {
             _activeNodes.Remove(nodeId);
         }
+        finally { _lock.ExitWriteLock(); }
     }
 
     /// <summary>
@@ -142,8 +154,16 @@ public sealed class ConsistentHash
     /// </summary>
     public int BucketCount
     {
-        get { lock (_lock) { return _bucketCount; } }
+        get
+        {
+            _lock.EnterReadLock();
+            try { return _bucketCount; }
+            finally { _lock.ExitReadLock(); }
+        }
     }
+
+    /// <inheritdoc/>
+    public void Dispose() => _lock.Dispose();
 
     /// <summary>
     /// Jump consistent hash algorithm.
