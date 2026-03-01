@@ -523,40 +523,36 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
         /// </summary>
         private Task<RestorePlan> LoadOrRegenerateRestorePlanAsync(string backupId, CancellationToken ct)
         {
-            // In production, this would load from backup metadata
+            // P2-2552: Check if a plan was previously generated and stored for this backup.
+            // Plans are keyed by restoreId in _orchestrations; search by the plan's PlanId
+            // which encodes the backupId as a prefix by convention.
+            foreach (var (_, state) in _orchestrations)
+            {
+                if (state.Plan != null && state.Plan.BackupId == backupId)
+                    return Task.FromResult(state.Plan);
+            }
+
+            // No stored plan; build a default restore plan from the backupId.
+            // The plan is a single phase that restores all sources associated with this backup.
             var plan = new RestorePlan
             {
                 PlanId = Guid.NewGuid().ToString("N"),
+                BackupId = backupId,
                 GeneratedAt = DateTimeOffset.UtcNow,
                 Phases = new List<RestorePhase>
                 {
                     new RestorePhase
                     {
                         PhaseNumber = 1,
-                        PhaseName = "Infrastructure",
+                        PhaseName = "Full Restore",
                         Components = new List<RestoreComponent>
                         {
                             new RestoreComponent
                             {
-                                ComponentId = "database",
+                                ComponentId = "primary",
                                 BackupReference = backupId,
                                 EstimatedRestoreTime = TimeSpan.FromMinutes(5),
                                 Priority = 100
-                            }
-                        }
-                    },
-                    new RestorePhase
-                    {
-                        PhaseNumber = 2,
-                        PhaseName = "Application",
-                        Components = new List<RestoreComponent>
-                        {
-                            new RestoreComponent
-                            {
-                                ComponentId = "api-server",
-                                BackupReference = backupId,
-                                EstimatedRestoreTime = TimeSpan.FromMinutes(2),
-                                Priority = 80
                             }
                         }
                     }
@@ -633,13 +629,26 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             {
                 ct.ThrowIfCancellationRequested();
 
+                // P2-2560: Actually probe each component's health endpoint using HTTP GET.
+                // A component with no HealthCheckEndpoint is treated as healthy (nothing to check).
                 var allHealthy = true;
                 foreach (var component in phase.Components)
                 {
-                    if (!string.IsNullOrEmpty(component.HealthCheckEndpoint))
+                    if (string.IsNullOrEmpty(component.HealthCheckEndpoint))
+                        continue;
+
+                    try
                     {
-                        // In production, would actually check health endpoint
-                        allHealthy = allHealthy && true;
+                        using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(3));
+                        using var linked = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(ct, cts.Token);
+                        using var httpClient = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+                        var response = await httpClient.GetAsync(component.HealthCheckEndpoint, linked.Token).ConfigureAwait(false);
+                        if (!response.IsSuccessStatusCode)
+                            allHealthy = false;
+                    }
+                    catch
+                    {
+                        allHealthy = false;
                     }
                 }
 
@@ -843,6 +852,8 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
         private sealed class RestorePlan
         {
             public string PlanId { get; set; } = string.Empty;
+            /// <summary>The backup ID this plan was created for.</summary>
+            public string BackupId { get; set; } = string.Empty;
             public DateTimeOffset GeneratedAt { get; set; }
             public List<RestorePhase> Phases { get; set; } = new();
         }

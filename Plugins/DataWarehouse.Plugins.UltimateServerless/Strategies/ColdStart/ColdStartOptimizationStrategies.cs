@@ -120,6 +120,9 @@ public sealed class ProvisionedConcurrencyStrategy : ServerlessStrategyBase
 /// </summary>
 public sealed class LambdaSnapStartStrategy : ServerlessStrategyBase
 {
+    private readonly BoundedDictionary<string, (string functionArn, Func<Task> hook)> _restoreHooks
+        = new BoundedDictionary<string, (string, Func<Task>)>(500);
+
     public override string StrategyId => "coldstart-snapstart";
     public override string DisplayName => "Lambda SnapStart";
     public override ServerlessCategory Category => ServerlessCategory.ColdStartOptimization;
@@ -163,11 +166,29 @@ public sealed class LambdaSnapStartStrategy : ServerlessStrategyBase
         });
     }
 
-    /// <summary>Registers a restore hook for state restoration.</summary>
+    /// <summary>Registers a restore hook for state restoration after SnapStart restore.</summary>
     public Task RegisterRestoreHookAsync(string functionArn, string hookName, Func<Task> hook, CancellationToken ct = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(functionArn);
+        ArgumentException.ThrowIfNullOrWhiteSpace(hookName);
+        ArgumentNullException.ThrowIfNull(hook);
+        _restoreHooks[hookName] = (functionArn, hook);
         RecordOperation("RegisterRestoreHook");
         return Task.CompletedTask;
+    }
+
+    /// <summary>Invokes all restore hooks registered for the given function ARN (called during restore simulation).</summary>
+    public async Task InvokeRestoreHooksAsync(string functionArn, CancellationToken ct = default)
+    {
+        foreach (var (name, (arn, hook)) in _restoreHooks)
+        {
+            if (arn == functionArn)
+            {
+                ct.ThrowIfCancellationRequested();
+                await hook().ConfigureAwait(false);
+            }
+        }
+        RecordOperation("InvokeRestoreHooks");
     }
 }
 

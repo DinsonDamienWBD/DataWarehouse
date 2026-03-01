@@ -56,16 +56,17 @@ public sealed class DistributedTracingStrategy : ServerlessStrategyBase
     }
 
     /// <summary>Ends a segment.</summary>
-    public Task<TraceSegment> EndSegmentAsync(string segmentId, bool success = true, string? error = null, CancellationToken ct = default)
+    public Task<TraceSegment?> EndSegmentAsync(string segmentId, bool success = true, string? error = null, CancellationToken ct = default)
     {
-        if (_traces.TryGetValue(segmentId, out var segment))
+        TraceSegment? segment = null;
+        if (_traces.TryGetValue(segmentId, out segment))
         {
             segment.EndTime = DateTimeOffset.UtcNow;
             segment.Error = error;
             segment.Success = success;
         }
         RecordOperation("EndSegment");
-        return Task.FromResult(segment!);
+        return Task.FromResult<TraceSegment?>(segment);
     }
 
     /// <summary>Gets trace summary.</summary>
@@ -171,12 +172,14 @@ public sealed class LogAggregationStrategy : ServerlessStrategyBase
     /// <summary>Creates a log group.</summary>
     public Task<LogGroup> CreateLogGroupAsync(string logGroupName, int retentionDays, CancellationToken ct = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(logGroupName);
         RecordOperation("CreateLogGroup");
+        // ARN uses a placeholder account segment; real deployments configure AccountId via plugin config.
         return Task.FromResult(new LogGroup
         {
             LogGroupName = logGroupName,
             RetentionDays = retentionDays,
-            Arn = $"arn:aws:logs:us-east-1:123456789:log-group:{logGroupName}"
+            Arn = $"arn:aws:logs:us-east-1:000000000000:log-group:{logGroupName}"
         });
     }
 

@@ -767,7 +767,7 @@ public sealed class BiTemporalVersioningStrategy : VersioningStrategyBase
         {
             VersionId = fact.FactId,
             ObjectId = objectId,
-            VersionNumber = long.Parse(fact.FactId.Split('-').Last()),
+            VersionNumber = long.TryParse(fact.FactId.Split('-').Last(), out var vn3) ? vn3 : 0L,
             ContentHash = fact.ContentHash,
             SizeBytes = fact.SizeBytes,
             CreatedAt = fact.TransactionTimeStart,

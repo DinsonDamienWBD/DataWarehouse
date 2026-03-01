@@ -98,11 +98,14 @@ public sealed class AwsLambdaFaaSStrategy : ServerlessStrategyBase
         if (!_functions.TryGetValue(functionName, out var function))
             throw new KeyNotFoundException($"Function {functionName} not found");
 
-        var version = (int.Parse(function.Version == "$LATEST" ? "0" : function.Version) + 1).ToString();
-        function.Version = version;
+        // Parse current version safely, treating non-numeric versions (e.g. "$LATEST") as version 0
+        var currentVersion = function.Version;
+        var numericVersion = int.TryParse(currentVersion, out var parsed) ? parsed : 0;
+        var newVersion = (numericVersion + 1).ToString();
+        function.Version = newVersion;
         RecordOperation("PublishVersion");
 
-        return Task.FromResult(version);
+        return Task.FromResult(newVersion);
     }
 
     /// <summary>Creates or updates an alias.</summary>

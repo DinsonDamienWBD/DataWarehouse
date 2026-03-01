@@ -405,6 +405,16 @@ public sealed class DruidStorageStrategy : DatabaseStorageStrategyBase
                     customMetadata = JsonSerializer.Deserialize<Dictionary<string, string>>(metadataJson, JsonOptions);
                 }
 
+                // P2-2783: Parse __time from the Druid event (ISO 8601 string) for Created/Modified.
+                // Falling back to UtcNow only when __time is absent or unparsable.
+                DateTime timestamp = DateTime.UtcNow;
+                var timeStr = evt.GetValueOrDefault("__time")?.ToString();
+                if (!string.IsNullOrEmpty(timeStr) &&
+                    DateTime.TryParse(timeStr, null, System.Globalization.DateTimeStyles.RoundtripKind, out var parsedTime))
+                {
+                    timestamp = parsedTime.ToUniversalTime();
+                }
+
                 yield return new StorageObjectMetadata
                 {
                     Key = key,
@@ -412,8 +422,8 @@ public sealed class DruidStorageStrategy : DatabaseStorageStrategyBase
                     ContentType = evt.GetValueOrDefault("content_type")?.ToString(),
                     ETag = evt.GetValueOrDefault("etag")?.ToString(),
                     CustomMetadata = customMetadata,
-                    Created = DateTime.UtcNow,
-                    Modified = DateTime.UtcNow,
+                    Created = timestamp,
+                    Modified = timestamp,
                     Tier = Tier
                 };
             }
@@ -460,6 +470,14 @@ public sealed class DruidStorageStrategy : DatabaseStorageStrategyBase
             customMetadata = JsonSerializer.Deserialize<Dictionary<string, string>>(metadataJson, JsonOptions);
         }
 
+        DateTime metaTimestamp = DateTime.UtcNow;
+        var metaTimeStr = evt.GetValueOrDefault("__time")?.ToString();
+        if (!string.IsNullOrEmpty(metaTimeStr) &&
+            DateTime.TryParse(metaTimeStr, null, System.Globalization.DateTimeStyles.RoundtripKind, out var parsedMetaTime))
+        {
+            metaTimestamp = parsedMetaTime.ToUniversalTime();
+        }
+
         return new StorageObjectMetadata
         {
             Key = key,
@@ -467,8 +485,8 @@ public sealed class DruidStorageStrategy : DatabaseStorageStrategyBase
             ContentType = evt.GetValueOrDefault("content_type")?.ToString(),
             ETag = evt.GetValueOrDefault("etag")?.ToString(),
             CustomMetadata = customMetadata,
-            Created = DateTime.UtcNow,
-            Modified = DateTime.UtcNow,
+            Created = metaTimestamp,
+            Modified = metaTimestamp,
             Tier = Tier
         };
     }

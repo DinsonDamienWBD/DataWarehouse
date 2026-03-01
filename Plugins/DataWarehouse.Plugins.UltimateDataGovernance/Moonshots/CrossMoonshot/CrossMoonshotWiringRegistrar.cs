@@ -25,7 +25,10 @@ public sealed class CrossMoonshotWiringRegistrar
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger _logger;
 
+    // LOW-2254: Use a lock to guard _registeredWirings against concurrent reads from GetActiveWirings
+    // while RegisterAllAsync / UnregisterAllAsync are mutating the list.
     private readonly List<WiringEntry> _registeredWirings = new();
+    private readonly object _wiringLock = new();
 
     /// <summary>
     /// Tracks a wiring instance with its metadata for lifecycle management.
@@ -149,9 +152,15 @@ public sealed class CrossMoonshotWiringRegistrar
     /// </summary>
     public async Task UnregisterAllAsync()
     {
-        var count = _registeredWirings.Count;
+        // Snapshot under lock to avoid iterating while RegisterAllAsync may add entries concurrently.
+        WiringEntry[] snapshot;
+        lock (_wiringLock)
+        {
+            snapshot = _registeredWirings.ToArray();
+            _registeredWirings.Clear();
+        }
 
-        foreach (var entry in _registeredWirings)
+        foreach (var entry in snapshot)
         {
             try
             {
@@ -163,8 +172,7 @@ public sealed class CrossMoonshotWiringRegistrar
             }
         }
 
-        _registeredWirings.Clear();
-        _logger.LogInformation("CrossMoonshotWiringRegistrar: unregistered {Count} cross-moonshot wirings", count);
+        _logger.LogInformation("CrossMoonshotWiringRegistrar: unregistered {Count} cross-moonshot wirings", snapshot.Length);
     }
 
     /// <summary>
@@ -173,7 +181,7 @@ public sealed class CrossMoonshotWiringRegistrar
     /// </summary>
     public IReadOnlyList<string> GetActiveWirings()
     {
-        return _registeredWirings.Select(e => e.Name).ToList().AsReadOnly();
+        lock (_wiringLock) { return _registeredWirings.Select(e => e.Name).ToList().AsReadOnly(); }
     }
 
     /// <summary>
@@ -201,7 +209,7 @@ public sealed class CrossMoonshotWiringRegistrar
             var (registerTask, unregisterFunc) = factory();
             await registerTask;
 
-            _registeredWirings.Add(new WiringEntry(name, first, second, unregisterFunc));
+            lock (_wiringLock) { _registeredWirings.Add(new WiringEntry(name, first, second, unregisterFunc)); }
             _logger.LogInformation("CrossMoonshotWiringRegistrar: registered {WiringName}", name);
         }
         catch (Exception ex)

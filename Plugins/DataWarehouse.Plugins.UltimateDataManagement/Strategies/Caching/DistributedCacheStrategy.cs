@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Caching;
@@ -363,6 +364,10 @@ public sealed class DistributedCacheStrategy : CachingStrategyBase
             await ExecuteMemcachedCommandAsync(command, ct);
         }
 
+        // Track size and entry count locally (distributed backends track internally)
+        Interlocked.Add(ref _trackedSize, value.Length);
+        Interlocked.Increment(ref _trackedEntryCount);
+
         // Track tags
         if (options.Tags != null && options.Tags.Length > 0)
         {
@@ -385,12 +390,16 @@ public sealed class DistributedCacheStrategy : CachingStrategyBase
         if (_config.Backend == DistributedCacheBackend.Redis)
         {
             var result = await ExecuteRedisCommandAsync($"DEL {fullKey}\r\n", ct);
-            return result != null && result.Contains(":1");
+            var removed = result != null && result.Contains(":1");
+            if (removed) { Interlocked.Decrement(ref _trackedEntryCount); }
+            return removed;
         }
         else if (_config.Backend == DistributedCacheBackend.Memcached)
         {
             var result = await ExecuteMemcachedCommandAsync($"delete {fullKey}\r\n", ct);
-            return result != null && result.Contains("DELETED");
+            var removed = result != null && result.Contains("DELETED");
+            if (removed) { Interlocked.Decrement(ref _trackedEntryCount); }
+            return removed;
         }
 
         return false;
@@ -467,6 +476,8 @@ public sealed class DistributedCacheStrategy : CachingStrategyBase
         }
 
         _tagIndex.Clear();
+        Interlocked.Exchange(ref _trackedSize, 0);
+        Interlocked.Exchange(ref _trackedEntryCount, 0);
     }
 
     private string GetFullKey(string key)

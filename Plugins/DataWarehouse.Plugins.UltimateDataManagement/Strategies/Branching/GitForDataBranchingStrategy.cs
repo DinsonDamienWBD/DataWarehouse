@@ -636,11 +636,11 @@ public sealed class GitForDataBranchingStrategy : BranchingStrategyBase
                         // Different content for same block ID - genuine conflict
                         conflicts.Add(new MergeConflict
                         {
+                            ConflictId = Guid.NewGuid().ToString(),
                             BlockId = blockId,
-                            ConflictType = ConflictType.BothModified,
-                            SourceValue = sourceHash ?? string.Empty,
-                            TargetValue = targetHash ?? string.Empty,
-                            Description = $"Block '{blockId}' added independently in both branches with different content"
+                            Type = ConflictType.ContentModification,
+                            SourceData = sourceHash != null ? System.Text.Encoding.UTF8.GetBytes(sourceHash) : null,
+                            TargetData = targetHash != null ? System.Text.Encoding.UTF8.GetBytes(targetHash) : null
                         });
                     }
                 }

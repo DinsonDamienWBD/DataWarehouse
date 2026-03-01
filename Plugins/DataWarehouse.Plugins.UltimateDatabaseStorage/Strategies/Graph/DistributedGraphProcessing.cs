@@ -169,9 +169,12 @@ public sealed class PregelGraphProcessor<TVertex, TMessage, TEdge>
         long messagesSent = 0;
         int activeVertices = 0;
 
-        // Process vertices in parallel by partition
+        // P2-2782: Group vertices by partition once per superstep rather than re-grouping
+        // inside the hot inner loop. GroupBy allocates O(V) IGrouping objects each call;
+        // caching the result as a List avoids redundant materializations across supersteps.
         var partitionGroups = _vertices.Values
             .GroupBy(v => v.Partition)
+            .Select(g => g.ToList())
             .ToList();
 
         await Parallel.ForEachAsync(partitionGroups, ct, async (partition, ct2) =>

@@ -34,14 +34,18 @@ public sealed class HttpTriggerStrategy : ServerlessStrategyBase
     /// <summary>Creates an HTTP trigger.</summary>
     public Task<HttpTriggerResult> CreateTriggerAsync(HttpTriggerConfig config, CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(config);
         _triggers[config.TriggerId] = config;
         RecordOperation("CreateTrigger");
 
+        // Use configured base URL or derive from API gateway configuration
+        var baseUrl = config.BaseUrl?.TrimEnd('/') ?? "https://<api-gateway-url>";
+        var path = config.Path?.TrimStart('/') ?? config.TriggerId;
         return Task.FromResult(new HttpTriggerResult
         {
             Success = true,
             TriggerId = config.TriggerId,
-            Endpoint = $"https://api.example.com/{config.Path}",
+            Endpoint = $"{baseUrl}/{path}",
             Methods = config.Methods
         });
     }
@@ -439,14 +443,16 @@ public sealed class WebhookTriggerStrategy : ServerlessStrategyBase
     /// <summary>Creates a webhook endpoint.</summary>
     public Task<WebhookResult> CreateWebhookAsync(WebhookConfig config, CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(config);
         RecordOperation("CreateWebhook");
         var secret = Guid.NewGuid().ToString("N");
         _webhookSecrets[config.WebhookId] = secret;
+        var baseUrl = config.BaseUrl?.TrimEnd('/') ?? "https://<webhook-endpoint-base-url>";
         return Task.FromResult(new WebhookResult
         {
             Success = true,
             WebhookId = config.WebhookId,
-            Endpoint = $"https://webhooks.example.com/{config.WebhookId}",
+            Endpoint = $"{baseUrl}/{config.WebhookId}",
             Secret = secret
         });
     }
@@ -614,6 +620,8 @@ public sealed record HttpTriggerConfig
     public IReadOnlyList<string> Methods { get; init; } = new[] { "GET", "POST" };
     public bool RequireAuth { get; init; }
     public bool EnableCors { get; init; } = true;
+    /// <summary>Optional base URL for the API gateway or function endpoint (e.g. "https://my-api.execute-api.us-east-1.amazonaws.com/prod").</summary>
+    public string? BaseUrl { get; init; }
 }
 
 public sealed record HttpTriggerResult { public bool Success { get; init; } public string? TriggerId { get; init; } public string? Endpoint { get; init; } public IReadOnlyList<string> Methods { get; init; } = Array.Empty<string>(); }
@@ -670,7 +678,7 @@ public sealed record StorageTriggerResult { public bool Success { get; init; } p
 public sealed record DatabaseTriggerConfig { public required string TriggerId { get; init; } public required string FunctionId { get; init; } public required string DatabaseType { get; init; } public required string TableName { get; init; } }
 public sealed record DatabaseTriggerResult { public bool Success { get; init; } public string? TriggerId { get; init; } public string? DatabaseType { get; init; } public string? TableName { get; init; } }
 
-public sealed record WebhookConfig { public required string WebhookId { get; init; } public required string FunctionId { get; init; } public string? SecretHeader { get; init; } }
+public sealed record WebhookConfig { public required string WebhookId { get; init; } public required string FunctionId { get; init; } public string? SecretHeader { get; init; } public string? BaseUrl { get; init; } }
 public sealed record WebhookResult { public bool Success { get; init; } public string? WebhookId { get; init; } public string? Endpoint { get; init; } public string? Secret { get; init; } }
 
 public sealed record IoTTriggerConfig { public required string TriggerId { get; init; } public required string FunctionId { get; init; } public required string TopicFilter { get; init; } }

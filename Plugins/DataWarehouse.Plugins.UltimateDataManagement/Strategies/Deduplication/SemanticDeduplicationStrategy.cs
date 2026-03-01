@@ -178,7 +178,8 @@ public sealed class SemanticDeduplicationStrategy : DeduplicationStrategyBase
 
             sw.Stop();
 
-            // Return as duplicate - storage saved through semantic grouping
+            // Return as duplicate - data is stored in semantic group but logically deduplicated;
+            // StoredSize = 0 aligns with the Duplicate factory contract so BytesSaved is calculated correctly.
             return new DeduplicationResult
             {
                 Success = true,
@@ -186,7 +187,7 @@ public sealed class SemanticDeduplicationStrategy : DeduplicationStrategyBase
                 Hash = hash,
                 ReferenceId = similarEntry.ObjectId,
                 OriginalSize = totalSize,
-                StoredSize = totalSize, // Still stored but grouped
+                StoredSize = 0,
                 Duration = sw.Elapsed
             };
         }

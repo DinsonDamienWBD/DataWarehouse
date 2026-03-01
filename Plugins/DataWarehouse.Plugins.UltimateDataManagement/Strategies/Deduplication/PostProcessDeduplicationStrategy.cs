@@ -155,9 +155,12 @@ public sealed class PostProcessDeduplicationStrategy : DeduplicationStrategyBase
         try
         {
             _isProcessing = true;
-            // ProcessBatchInternalAsync is synchronous (returns Task.FromResult);
-            // call it directly to avoid blocking a thread-pool thread.
-            ProcessBatchInternalAsync(CancellationToken.None).GetAwaiter().GetResult();
+            // P2-2415: ProcessBatchInternalAsync is synchronous (returns Task.FromResult).
+            // Use .GetAwaiter().GetResult() only because there is no SynchronizationContext
+            // on a timer callback thread. This is safe and avoids spawning another Task.
+            var t = ProcessBatchInternalAsync(CancellationToken.None);
+            // The task is already completed; GetResult() does NOT block.
+            _ = t.GetAwaiter().GetResult();
         }
         catch (Exception ex)
         {

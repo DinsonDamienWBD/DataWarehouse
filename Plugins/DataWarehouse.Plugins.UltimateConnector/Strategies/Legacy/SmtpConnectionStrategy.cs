@@ -33,8 +33,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            // P2-2132: Use ParseHostPort to correctly handle IPv6 addresses like [::1]:587
-            var (smtpDefaultHost, _) = ParseHostPort(config.ConnectionString ?? throw new ArgumentException("Connection string required"), 587);
+            // P2-2132: Use ParseHostPortSafe to correctly handle IPv6 addresses like [::1]:587
+            var (smtpDefaultHost, _) = ParseHostPortSafe(config.ConnectionString ?? throw new ArgumentException("Connection string required"), 587);
             _host = GetConfiguration<string>(config, "Host", smtpDefaultHost);
             if (string.IsNullOrWhiteSpace(_host)) throw new ArgumentException("SMTP host is required.");
             _port = GetConfiguration(config, "Port", 587);

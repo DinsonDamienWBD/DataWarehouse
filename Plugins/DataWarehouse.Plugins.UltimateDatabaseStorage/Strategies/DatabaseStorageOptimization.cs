@@ -502,10 +502,11 @@ public sealed class StorageCacheIntegration
         var expired = _cache.Where(kv => kv.Value.ExpiresAt.HasValue && kv.Value.ExpiresAt.Value < now).ToList();
         foreach (var kv in expired) _cache.TryRemove(kv.Key, out _);
 
-        // LRU eviction if still over capacity
+        // P2-2781: Use MinBy (O(n)) instead of OrderBy().FirstOrDefault() (O(n log n)) per
+        // eviction iteration. This avoids an O(n²) total cost when many entries need evicting.
         while (_cache.Count >= _maxEntries)
         {
-            var lru = _cache.OrderBy(kv => kv.Value.LastAccessed).FirstOrDefault();
+            var lru = _cache.MinBy(kv => kv.Value.LastAccessed);
             if (lru.Key != null) _cache.TryRemove(lru.Key, out _);
             else break;
         }

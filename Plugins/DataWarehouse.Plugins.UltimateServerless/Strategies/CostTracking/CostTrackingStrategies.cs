@@ -353,51 +353,136 @@ public sealed class CostAllocationStrategy : ServerlessStrategyBase
 /// <summary>119.8.6: Cost anomaly detection.</summary>
 public sealed class CostAnomalyDetectionStrategy : ServerlessStrategyBase
 {
+    private readonly List<(DateTimeOffset timestamp, decimal cost, string service)> _costHistory
+        = new List<(DateTimeOffset, decimal, string)>();
+    private readonly object _lock = new();
+
     public override string StrategyId => "cost-anomaly-detection";
     public override string DisplayName => "Cost Anomaly Detection";
     public override ServerlessCategory Category => ServerlessCategory.CostTracking;
     public override ServerlessStrategyCapabilities Capabilities => new() { SupportsSyncInvocation = true };
-    public override string SemanticDescription => "ML-based anomaly detection for unusual spending patterns and cost spikes.";
-    public override string[] Tags => new[] { "anomaly", "detection", "ml", "spike", "unusual" };
+    public override string SemanticDescription => "Threshold-based anomaly detection for unusual spending patterns and cost spikes using rolling average analysis.";
+    public override string[] Tags => new[] { "anomaly", "detection", "threshold", "spike", "unusual" };
+
+    /// <summary>Records a cost data point for anomaly analysis.</summary>
+    public void RecordCost(string service, decimal cost)
+    {
+        lock (_lock)
+        {
+            _costHistory.Add((DateTimeOffset.UtcNow, cost, service));
+            // Keep last 10000 data points
+            if (_costHistory.Count > 10000) _costHistory.RemoveAt(0);
+        }
+    }
 
     public Task<IReadOnlyList<CostAnomaly>> DetectAnomaliesAsync(TimeSpan lookbackPeriod, CancellationToken ct = default)
     {
         RecordOperation("DetectAnomalies");
-        return Task.FromResult<IReadOnlyList<CostAnomaly>>(new[]
+        var cutoff = DateTimeOffset.UtcNow - lookbackPeriod;
+        List<CostAnomaly> anomalies;
+
+        lock (_lock)
         {
-            new CostAnomaly
+            if (_costHistory.Count < 10)
+                return Task.FromResult<IReadOnlyList<CostAnomaly>>(Array.Empty<CostAnomaly>());
+
+            // Group by service and compute mean + stddev
+            var byService = _costHistory
+                .GroupBy(x => x.service)
+                .ToDictionary(g => g.Key, g => g.Select(x => (double)x.cost).ToList());
+
+            anomalies = new List<CostAnomaly>();
+            var recentRecords = _costHistory.Where(x => x.timestamp >= cutoff).ToList();
+
+            foreach (var (ts, cost, service) in recentRecords)
             {
-                AnomalyId = Guid.NewGuid().ToString(),
-                DetectedAt = DateTimeOffset.UtcNow.AddHours(-2),
-                Severity = "Medium",
-                ExpectedCost = 50,
-                ActualCost = 150,
-                RootCause = "Unusual spike in invocations for function X"
+                if (!byService.TryGetValue(service, out var history) || history.Count < 5) continue;
+                var mean = history.Average();
+                var stddev = Math.Sqrt(history.Select(c => Math.Pow(c - mean, 2)).Average());
+                if (stddev < 0.01) continue; // Not enough variance to detect anomaly
+                var zScore = ((double)cost - mean) / stddev;
+                if (Math.Abs(zScore) > 2.5) // ~2.5 sigma threshold
+                {
+                    anomalies.Add(new CostAnomaly
+                    {
+                        AnomalyId = Guid.NewGuid().ToString(),
+                        DetectedAt = ts,
+                        Severity = zScore > 4.0 ? "High" : zScore > 3.0 ? "Medium" : "Low",
+                        ExpectedCost = mean,
+                        ActualCost = (double)cost,
+                        RootCause = $"Unusual cost for service '{service}': {zScore:F1}σ above mean"
+                    });
+                }
             }
-        });
+        }
+
+        return Task.FromResult<IReadOnlyList<CostAnomaly>>(anomalies);
     }
 }
 
 /// <summary>119.8.7: Compute Savings Plans.</summary>
 public sealed class SavingsPlansStrategy : ServerlessStrategyBase
 {
+    private readonly List<(DateTimeOffset timestamp, decimal cost)> _usageHistory
+        = new List<(DateTimeOffset, decimal)>();
+    private readonly object _lock = new();
+
     public override string StrategyId => "cost-savings-plans";
     public override string DisplayName => "Savings Plans";
     public override ServerlessCategory Category => ServerlessCategory.CostTracking;
     public override ServerlessStrategyCapabilities Capabilities => new() { SupportsSyncInvocation = true };
-    public override string SemanticDescription => "AWS Compute Savings Plans analysis for Lambda with commitment recommendations.";
+    public override string SemanticDescription => "Compute Savings Plans analysis with commitment recommendations based on actual usage patterns.";
     public override string[] Tags => new[] { "savings-plans", "commitment", "discount", "reserved" };
+
+    /// <summary>Records an hourly usage data point for recommendation analysis.</summary>
+    public void RecordHourlyUsage(decimal hourlyCost)
+    {
+        lock (_lock)
+        {
+            _usageHistory.Add((DateTimeOffset.UtcNow, hourlyCost));
+            if (_usageHistory.Count > 8760) _usageHistory.RemoveAt(0); // 1 year of hourly data
+        }
+    }
 
     public Task<SavingsPlanRecommendation> GetRecommendationAsync(CancellationToken ct = default)
     {
         RecordOperation("GetRecommendation");
+        List<(DateTimeOffset, decimal)> snapshot;
+        lock (_lock) { snapshot = new List<(DateTimeOffset, decimal)>(_usageHistory); }
+
+        if (snapshot.Count < 24)
+        {
+            // Insufficient data — return zero-commitment recommendation
+            return Task.FromResult(new SavingsPlanRecommendation
+            {
+                RecommendedCommitment = 0,
+                Term = "1 year",
+                EstimatedSavingsPercent = 0,
+                EstimatedMonthlySavings = 0,
+                Coverage = 0
+            });
+        }
+
+        // Analyze usage: recommend commitment at the P10 percentile of hourly spend
+        // (conservative commitment that covers baseline usage)
+        var costs = snapshot.Select(x => (double)x.Item2).OrderBy(c => c).ToList();
+        var p10Index = Math.Max(0, (int)(costs.Count * 0.10));
+        var p10Cost = costs[p10Index];
+        var avgCost = costs.Average();
+        var monthlyOnDemand = avgCost * 24 * 30;
+        // Savings Plans offer ~17% discount on 1-year commitment, ~34% on 3-year
+        const double savingsRate1Yr = 0.17;
+        var commitment = Math.Round(p10Cost, 2);
+        var coverage = avgCost > 0 ? Math.Min(100.0, commitment / avgCost * 100) : 0;
+        var monthlySavings = commitment * 24 * 30 * savingsRate1Yr;
+
         return Task.FromResult(new SavingsPlanRecommendation
         {
-            RecommendedCommitment = 50,
+            RecommendedCommitment = commitment,
             Term = "1 year",
-            EstimatedSavingsPercent = 17,
-            EstimatedMonthlySavings = 85,
-            Coverage = 80
+            EstimatedSavingsPercent = savingsRate1Yr * 100,
+            EstimatedMonthlySavings = monthlySavings,
+            Coverage = coverage
         });
     }
 }

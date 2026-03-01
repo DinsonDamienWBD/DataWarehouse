@@ -453,13 +453,12 @@ public sealed class TenantShardingStrategy : ShardingStrategyBase
 
         try
         {
-            // Simulate migration progress
-            for (int i = 0; i <= 100; i += 10)
-            {
-                ct.ThrowIfCancellationRequested();
-                migration.ProgressPercent = i;
-                await Task.Delay(10, ct); // In real implementation, this would be actual data transfer
-            }
+            // P2-2485: Tenant sharding operates on an in-memory index; the actual
+            // "migration" is an atomic re-assignment of the shard pointer for the tenant.
+            // Progress tracking reflects the three logical phases: locking, moving, and
+            // updating the config -- no artificial delays are needed.
+            ct.ThrowIfCancellationRequested();
+            migration.ProgressPercent = 10;
 
             // Update tenant assignment
             _tenantLock.EnterWriteLock();
@@ -515,6 +514,7 @@ public sealed class TenantShardingStrategy : ShardingStrategyBase
             // Clear cache for this tenant
             ClearCacheForTenant(tenantId);
 
+            migration.ProgressPercent = 100;
             migration.State = TenantMigrationState.Completed;
             migration.CompletedAt = DateTime.UtcNow;
         }

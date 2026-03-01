@@ -432,39 +432,91 @@ public sealed class IntentBasedDataManagementStrategy : AiEnhancedStrategyBase
         {
             try
             {
-                // Try to parse JSON response - simplified for robustness
-                var lower = response.ToLowerInvariant();
-                var goalType = DataGoalType.Balanced;
-                double? targetValue = null;
-                string? targetUnit = null;
-                int priority = 50;
+                // Attempt structured JSON parse first
+                var jsonStart = response.IndexOf('{');
+                var jsonEnd = response.LastIndexOf('}');
+                if (jsonStart >= 0 && jsonEnd > jsonStart)
+                {
+                    var json = response[jsonStart..(jsonEnd + 1)];
+                    using var doc = System.Text.Json.JsonDocument.Parse(json);
+                    var root = doc.RootElement;
 
+                    var goalType = DataGoalType.Balanced;
+                    double? targetValue = null;
+                    string? targetUnit = null;
+                    int priority = 50;
+
+                    if (root.TryGetProperty("goal_type", out var gt))
+                    {
+                        var gtStr = gt.GetString() ?? "";
+                        goalType = gtStr.ToLowerInvariant() switch
+                        {
+                            "fastaccess" or "fast_access" => DataGoalType.FastAccess,
+                            "lowcost" or "low_cost" => DataGoalType.LowCost,
+                            "highdurability" or "high_durability" => DataGoalType.HighDurability,
+                            "geoavailability" or "geo_availability" => DataGoalType.GeoAvailability,
+                            "compliance" => DataGoalType.Compliance,
+                            "security" => DataGoalType.Security,
+                            _ => DataGoalType.Balanced
+                        };
+                    }
+
+                    if (root.TryGetProperty("target_value", out var tv) &&
+                        tv.ValueKind == System.Text.Json.JsonValueKind.Number)
+                    {
+                        targetValue = tv.GetDouble();
+                    }
+
+                    if (root.TryGetProperty("target_unit", out var tu) && tu.GetString() is { Length: > 0 } tuStr)
+                    {
+                        targetUnit = tuStr;
+                    }
+
+                    if (root.TryGetProperty("priority", out var p) &&
+                        p.ValueKind == System.Text.Json.JsonValueKind.Number)
+                    {
+                        priority = Math.Clamp(p.GetInt32(), 1, 100);
+                    }
+
+                    return new DataGoal
+                    {
+                        GoalId = Guid.NewGuid().ToString("N"),
+                        Type = goalType,
+                        Priority = priority,
+                        TargetValue = targetValue,
+                        TargetUnit = targetUnit,
+                        Description = description
+                    };
+                }
+
+                // Fallback: keyword scan on raw response
+                var lower = response.ToLowerInvariant();
+                var fallbackType = DataGoalType.Balanced;
                 if (lower.Contains("fastaccess") || lower.Contains("fast_access") || lower.Contains("\"fast"))
-                    goalType = DataGoalType.FastAccess;
+                    fallbackType = DataGoalType.FastAccess;
                 else if (lower.Contains("lowcost") || lower.Contains("low_cost") || lower.Contains("\"cost"))
-                    goalType = DataGoalType.LowCost;
+                    fallbackType = DataGoalType.LowCost;
                 else if (lower.Contains("highdurability") || lower.Contains("durability"))
-                    goalType = DataGoalType.HighDurability;
+                    fallbackType = DataGoalType.HighDurability;
                 else if (lower.Contains("geoavailability") || lower.Contains("geo") || lower.Contains("region"))
-                    goalType = DataGoalType.GeoAvailability;
+                    fallbackType = DataGoalType.GeoAvailability;
                 else if (lower.Contains("compliance"))
-                    goalType = DataGoalType.Compliance;
+                    fallbackType = DataGoalType.Compliance;
                 else if (lower.Contains("security"))
-                    goalType = DataGoalType.Security;
+                    fallbackType = DataGoalType.Security;
 
                 return new DataGoal
                 {
                     GoalId = Guid.NewGuid().ToString("N"),
-                    Type = goalType,
-                    Priority = priority,
-                    TargetValue = targetValue,
-                    TargetUnit = targetUnit,
+                    Type = fallbackType,
+                    Priority = 50,
+                    TargetValue = null,
+                    TargetUnit = null,
                     Description = description
                 };
             }
             catch
             {
-
                 // Parsing failed, return null to trigger fallback
                 System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }

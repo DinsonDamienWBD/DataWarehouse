@@ -15,7 +15,7 @@ namespace DataWarehouse.Plugins.UltimateDataGovernance.Strategies.IntelligentGov
 /// </summary>
 /// <param name="ObjectId">Unique identifier of the evaluated data object.</param>
 /// <param name="ShouldArchive">Whether the object should be archived.</param>
-/// <param name="TargetTier">Target storage tier: "cold", "archive", "glacier", or "deep_archive".</param>
+/// <param name="TargetTier">Target storage tier: "cold", "archive", or "deep_archive".</param>
 /// <param name="Reason">Human-readable explanation of the archive decision.</param>
 /// <param name="Score">The consciousness score that drove this decision.</param>
 /// <param name="DecidedAt">UTC timestamp when the decision was made.</param>
@@ -535,7 +535,9 @@ public sealed class TieredAutoArchiveStrategy : ConsciousnessStrategyBase
 /// </remarks>
 public sealed class AutoArchiveOrchestrator : ConsciousnessStrategyBase
 {
-    private static readonly string[] TierDepthOrder = { "hot", "warm", "cold", "archive", "glacier", "deep_archive" };
+    // LOW-2272: "glacier" removed — no strategy produces this tier name; "deep_archive" is the deepest.
+    // Updated ArchiveDecision param doc on line 18 to reflect actual tier names: cold/archive/deep_archive.
+    private static readonly string[] TierDepthOrder = { "hot", "warm", "cold", "archive", "deep_archive" };
 
     private readonly ThresholdAutoArchiveStrategy _thresholdStrategy = new();
     private readonly AgeBasedAutoArchiveStrategy _ageBasedStrategy = new();

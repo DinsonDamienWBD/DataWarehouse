@@ -765,16 +765,29 @@ public sealed class DataClassificationStrategy : LifecycleStrategyBase
 
     private string? GetContentForAnalysis(LifecycleDataObject data)
     {
-        // In production, this would fetch content from storage
-        // For now, return content from metadata if available
-        if (data.Metadata?.TryGetValue("content", out var content) == true)
+        // Attempt to retrieve analysable content from well-known metadata keys.
+        // Callers that have access to raw storage bytes should populate "content" or
+        // "preview" in the metadata dictionary before invoking classification.
+        if (data.Metadata?.TryGetValue("content", out var content) == true && content != null)
         {
-            return content?.ToString();
+            return content.ToString();
         }
 
-        if (data.Metadata?.TryGetValue("preview", out var preview) == true)
+        if (data.Metadata?.TryGetValue("preview", out var preview) == true && preview != null)
         {
-            return preview?.ToString();
+            return preview.ToString();
+        }
+
+        // Fall back to combining all string metadata values for keyword/PII scanning.
+        if (data.Metadata?.Count > 0)
+        {
+            var parts = data.Metadata
+                .Where(kv => kv.Value is string)
+                .Select(kv => kv.Value?.ToString())
+                .Where(v => !string.IsNullOrWhiteSpace(v));
+            var combined = string.Join(" ", parts);
+            if (!string.IsNullOrWhiteSpace(combined))
+                return combined;
         }
 
         return null;

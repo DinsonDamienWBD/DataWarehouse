@@ -680,8 +680,9 @@ public sealed class AutoPurgeOrchestrator : ConsciousnessStrategyBase
 
         if (toxicDecision.ShouldPurge && retentionDecision.ShouldPurge)
         {
-            // Both recommend purge -- take the more urgent one
-            selectedDecision = toxicDecision.Urgency <= retentionDecision.Urgency
+            // Both recommend purge -- take the more urgent one.
+            // LOW-2273: Use explicit UrgencyOrder lookup instead of enum ordinal comparison.
+            selectedDecision = UrgencyOrder(toxicDecision.Urgency) <= UrgencyOrder(retentionDecision.Urgency)
                 ? toxicDecision
                 : retentionDecision;
         }

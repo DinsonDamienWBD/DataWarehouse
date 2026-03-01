@@ -116,8 +116,9 @@ public sealed class MoonshotHealthAggregator
     {
         _logger.LogInformation("Starting periodic moonshot health checks for {ProbeCount} probes", _probes.Count);
 
-        // Initial full check
-        await CheckAllAsync(ct);
+        // LOW-2262: No initial full check here — _lastCheckTimes starts empty so all probes are
+        // "due" on the very first loop iteration, which will run them in parallel as designed.
+        // A pre-loop CheckAllAsync would double-run all probes before the periodic logic applies.
 
         while (!ct.IsCancellationRequested)
         {

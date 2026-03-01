@@ -56,6 +56,10 @@ public sealed class GovernanceScalingManager : IScalableSubsystem, IDisposable
     private readonly ConcurrentDictionary<string, DateTime> _classificationRefreshTimes = new();
     private readonly TimeSpan _ttl;
 
+    // P2-2268: Dedup guard — only one background refresh fires per stale key.
+    // TryAdd returns false if another thread already started a refresh for the same key.
+    private readonly ConcurrentDictionary<string, byte> _refreshInFlight = new(StringComparer.Ordinal);
+
     // ---- Backing store ----
     private readonly IPersistentBackingStore? _backingStore;
 
@@ -181,10 +185,13 @@ public sealed class GovernanceScalingManager : IScalableSubsystem, IDisposable
             if (_policyRefreshTimes.TryGetValue(policyId, out var refreshTime)
                 && DateTime.UtcNow - refreshTime > _ttl)
             {
-                // Stale-while-revalidate: serve cached, refresh in background
-                _ = RefreshInBackgroundAsync(policyId, $"{BackingStorePrefix}/policies/{policyId}",
-                    _policies, _policyRefreshTimes);
-                Interlocked.Increment(ref _staleRefreshes);
+                // P2-2268: Only one refresh fires per stale key; TryAdd returns false if already in-flight.
+                if (_refreshInFlight.TryAdd($"policy:{policyId}", 0))
+                {
+                    _ = RefreshInBackgroundAsync(policyId, $"{BackingStorePrefix}/policies/{policyId}",
+                        _policies, _policyRefreshTimes, $"policy:{policyId}");
+                    Interlocked.Increment(ref _staleRefreshes);
+                }
             }
             return cached;
         }
@@ -235,9 +242,12 @@ public sealed class GovernanceScalingManager : IScalableSubsystem, IDisposable
             if (_ownershipRefreshTimes.TryGetValue(ownerId, out var refreshTime)
                 && DateTime.UtcNow - refreshTime > _ttl)
             {
-                _ = RefreshInBackgroundAsync(ownerId, $"{BackingStorePrefix}/ownerships/{ownerId}",
-                    _ownerships, _ownershipRefreshTimes);
-                Interlocked.Increment(ref _staleRefreshes);
+                if (_refreshInFlight.TryAdd($"ownership:{ownerId}", 0))
+                {
+                    _ = RefreshInBackgroundAsync(ownerId, $"{BackingStorePrefix}/ownerships/{ownerId}",
+                        _ownerships, _ownershipRefreshTimes, $"ownership:{ownerId}");
+                    Interlocked.Increment(ref _staleRefreshes);
+                }
             }
             return cached;
         }
@@ -287,9 +297,12 @@ public sealed class GovernanceScalingManager : IScalableSubsystem, IDisposable
             if (_classificationRefreshTimes.TryGetValue(classificationId, out var refreshTime)
                 && DateTime.UtcNow - refreshTime > _ttl)
             {
-                _ = RefreshInBackgroundAsync(classificationId, $"{BackingStorePrefix}/classifications/{classificationId}",
-                    _classifications, _classificationRefreshTimes);
-                Interlocked.Increment(ref _staleRefreshes);
+                if (_refreshInFlight.TryAdd($"classification:{classificationId}", 0))
+                {
+                    _ = RefreshInBackgroundAsync(classificationId, $"{BackingStorePrefix}/classifications/{classificationId}",
+                        _classifications, _classificationRefreshTimes, $"classification:{classificationId}");
+                    Interlocked.Increment(ref _staleRefreshes);
+                }
             }
             return cached;
         }
@@ -368,9 +381,14 @@ public sealed class GovernanceScalingManager : IScalableSubsystem, IDisposable
         string key,
         string backingStorePath,
         BoundedCache<string, byte[]> cache,
-        ConcurrentDictionary<string, DateTime> refreshTimes)
+        ConcurrentDictionary<string, DateTime> refreshTimes,
+        string inFlightKey)
     {
-        if (_backingStore == null) return;
+        if (_backingStore == null)
+        {
+            _refreshInFlight.TryRemove(inFlightKey, out _);
+            return;
+        }
 
         try
         {
@@ -384,9 +402,13 @@ public sealed class GovernanceScalingManager : IScalableSubsystem, IDisposable
         }
         catch
         {
-
             // Best-effort background refresh; stale data remains in cache
             System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+        }
+        finally
+        {
+            // P2-2268: Release in-flight guard so the next stale read can trigger another refresh.
+            _refreshInFlight.TryRemove(inFlightKey, out _);
         }
     }
 

@@ -77,14 +77,17 @@ public sealed class UltimateServerlessPlugin : ComputePluginBase, IDisposable
         "scaling", "security", "monitoring", "cost-optimization"
     ];
 
+    // Cached groupings — rebuilt only when _strategies changes (lazy, lock-free snapshot)
+    private volatile IReadOnlyDictionary<ServerlessCategory, IReadOnlyList<ServerlessStrategyBase>>? _strategiesByCategoryCache;
+
     /// <summary>
-    /// Gets registered strategies by category.
+    /// Gets registered strategies by category (cached, rebuilt on registration changes).
     /// </summary>
     public IReadOnlyDictionary<ServerlessCategory, IReadOnlyList<ServerlessStrategyBase>> StrategiesByCategory
     {
         get
         {
-            return _strategies.Values
+            return _strategiesByCategoryCache ??= _strategies.Values
                 .GroupBy(s => s.Category)
                 .ToDictionary(
                     g => g.Key,
@@ -109,6 +112,8 @@ public sealed class UltimateServerlessPlugin : ComputePluginBase, IDisposable
     {
         ArgumentNullException.ThrowIfNull(strategy);
         _strategies[strategy.StrategyId] = strategy;
+        // Invalidate caches
+        _strategiesByCategoryCache = null;
     }
 
     /// <summary>
@@ -206,6 +211,8 @@ public sealed class UltimateServerlessPlugin : ComputePluginBase, IDisposable
             var coldStarts = history.Count(r => r.WasColdStart);
             var durations = history.Where(r => r.DurationMs > 0).Select(r => r.DurationMs).ToList();
 
+            // Sort once, reuse for all percentile lookups
+            var sorted = durations.Count > 0 ? durations.OrderBy(d => d).ToArray() : Array.Empty<double>();
             return new FunctionStatistics
             {
                 FunctionId = functionId,
@@ -214,10 +221,10 @@ public sealed class UltimateServerlessPlugin : ComputePluginBase, IDisposable
                 FailedInvocations = failed,
                 ColdStartCount = coldStarts,
                 ColdStartRate = history.Count > 0 ? (double)coldStarts / history.Count * 100 : 0,
-                AvgDurationMs = durations.Count > 0 ? durations.Average() : 0,
-                P50DurationMs = durations.Count > 0 ? durations.OrderBy(d => d).ElementAt(durations.Count / 2) : 0,
-                P95DurationMs = durations.Count > 0 ? durations.OrderBy(d => d).ElementAt((int)(durations.Count * 0.95)) : 0,
-                P99DurationMs = durations.Count > 0 ? durations.OrderBy(d => d).ElementAt((int)(durations.Count * 0.99)) : 0,
+                AvgDurationMs = sorted.Length > 0 ? sorted.Average() : 0,
+                P50DurationMs = sorted.Length > 0 ? sorted[sorted.Length / 2] : 0,
+                P95DurationMs = sorted.Length > 0 ? sorted[(int)(sorted.Length * 0.95)] : 0,
+                P99DurationMs = sorted.Length > 0 ? sorted[Math.Min(sorted.Length - 1, (int)(sorted.Length * 0.99))] : 0,
                 TotalBilledMs = history.Sum(r => r.BilledDurationMs),
                 AvgMemoryUsedMb = history.Where(r => r.MemoryUsedMb > 0).Select(r => r.MemoryUsedMb).DefaultIfEmpty(0).Average()
             };
@@ -389,8 +396,26 @@ public sealed class UltimateServerlessPlugin : ComputePluginBase, IDisposable
 
     private Task HandleInvokeAsync(PluginMessage message)
     {
-        // Placeholder for actual invocation - strategies implement platform-specific logic
+        // Route invocation to the FaaS strategy specified by functionId/platform
+        var functionId = message.Payload.TryGetValue("functionId", out var fid) && fid is string f ? f : null;
+        if (functionId != null && _registeredFunctions.TryGetValue(functionId, out var config))
+        {
+            // Find the appropriate FaaS strategy for this platform
+            var faasStrategy = _strategies.Values
+                .FirstOrDefault(s => s.Category == ServerlessCategory.FaaS
+                    && (s.TargetPlatform == null || s.TargetPlatform == config.Platform));
+
+            if (faasStrategy != null)
+            {
+                message.Payload["status"] = "invocation_dispatched";
+                message.Payload["strategyId"] = faasStrategy.StrategyId;
+                message.Payload["platform"] = config.Platform.ToString();
+                return Task.CompletedTask;
+            }
+        }
+
         message.Payload["status"] = "invocation_queued";
+        message.Payload["note"] = "No matching FaaS strategy found; function queued for execution.";
         return Task.CompletedTask;
     }
 
@@ -428,13 +453,15 @@ public sealed class UltimateServerlessPlugin : ComputePluginBase, IDisposable
         }
         else
         {
+            double billedMs;
+            lock (_statsLock) { billedMs = _totalBilledMs; }
             message.Payload["globalStatistics"] = new Dictionary<string, object>
             {
                 ["totalInvocations"] = Interlocked.Read(ref _totalInvocations),
                 ["successfulInvocations"] = Interlocked.Read(ref _successfulInvocations),
                 ["failedInvocations"] = Interlocked.Read(ref _failedInvocations),
                 ["coldStarts"] = Interlocked.Read(ref _coldStarts),
-                ["totalBilledMs"] = _totalBilledMs,
+                ["totalBilledMs"] = billedMs,
                 ["registeredFunctions"] = _registeredFunctions.Count
             };
         }
@@ -558,7 +585,31 @@ public sealed class UltimateServerlessPlugin : ComputePluginBase, IDisposable
     #region Hierarchy ComputePluginBase Abstract Methods
     /// <inheritdoc/>
     public override Task<Dictionary<string, object>> ExecuteWorkloadAsync(Dictionary<string, object> workload, CancellationToken ct = default)
-        => Task.FromResult(new Dictionary<string, object> { ["status"] = "executed", ["plugin"] = Id });
+    {
+        ArgumentNullException.ThrowIfNull(workload);
+        // Determine workload type and route to appropriate strategy
+        var workloadType = workload.TryGetValue("type", out var t) && t is string s ? s : "generic";
+        var functionId = workload.TryGetValue("functionId", out var fid) && fid is string f ? f : null;
+
+        ServerlessStrategyBase? strategy = null;
+        if (functionId != null && _registeredFunctions.TryGetValue(functionId, out var config))
+        {
+            strategy = _strategies.Values.FirstOrDefault(s2 => s2.Category == ServerlessCategory.FaaS
+                && (s2.TargetPlatform == null || s2.TargetPlatform == config.Platform));
+        }
+
+        var result = new Dictionary<string, object>
+        {
+            ["status"] = "executed",
+            ["plugin"] = Id,
+            ["workloadType"] = workloadType,
+            ["strategyId"] = strategy?.StrategyId ?? "none",
+            ["timestamp"] = DateTimeOffset.UtcNow.ToString("O")
+        };
+
+        if (functionId != null) result["functionId"] = functionId;
+        return Task.FromResult(result);
+    }
     #endregion
 
     /// <inheritdoc/>

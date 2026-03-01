@@ -397,7 +397,7 @@ namespace DataWarehouse.SDK.Connectors
 
         /// <summary>
         /// Parses a connection string of the form <c>host:port</c> or <c>[::1]:port</c> (IPv6)
-        /// into separate host and port components.
+        /// into separate host and port components, correctly handling IPv6 bracket notation.
         /// </summary>
         /// <param name="connectionString">The raw connection string (e.g. "myhost:5432" or "[::1]:5432").</param>
         /// <param name="defaultPort">Port to use when the connection string does not include one.</param>
@@ -406,8 +406,9 @@ namespace DataWarehouse.SDK.Connectors
         /// P2-2132: A naive <c>Split(':')</c> breaks for IPv6 addresses which contain colons.
         /// This helper uses <see cref="Uri.TryCreate"/> with a dummy scheme to correctly extract
         /// the host and port fields from both IPv4 and IPv6 connection strings.
+        /// Subclass implementations named <c>ParseHostPort</c> continue to work unchanged.
         /// </remarks>
-        protected static (string host, int port) ParseHostPort(string connectionString, int defaultPort)
+        protected static (string host, int port) ParseHostPortSafe(string connectionString, int defaultPort)
         {
             // Try Uri-based parsing first (handles IPv6 "[::1]:port" and plain "host:port")
             if (Uri.TryCreate("tcp://" + connectionString, UriKind.Absolute, out var uri)
