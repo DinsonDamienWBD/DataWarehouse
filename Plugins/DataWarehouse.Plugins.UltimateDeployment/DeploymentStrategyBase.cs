@@ -279,6 +279,7 @@ public abstract class DeploymentStrategyBase : IDeploymentStrategy
     private bool _initialized;
     private DateTime? _healthCacheExpiry;
     private bool? _cachedHealthy;
+    private readonly object _healthCacheLock = new();
 
     protected DeploymentStrategyBase()
     {
@@ -309,11 +310,14 @@ public abstract class DeploymentStrategyBase : IDeploymentStrategy
     /// <summary>Gets cached health status, refreshing every 60 seconds.</summary>
     public bool GetStrategyHealthy()
     {
-        if (_cachedHealthy.HasValue && _healthCacheExpiry.HasValue && DateTime.UtcNow < _healthCacheExpiry.Value)
+        lock (_healthCacheLock)
+        {
+            if (_cachedHealthy.HasValue && _healthCacheExpiry.HasValue && DateTime.UtcNow < _healthCacheExpiry.Value)
+                return _cachedHealthy.Value;
+            _cachedHealthy = _initialized && _activeDeployments.Values.All(d => d.Health != DeploymentHealth.Failed);
+            _healthCacheExpiry = DateTime.UtcNow.AddSeconds(60);
             return _cachedHealthy.Value;
-        _cachedHealthy = _initialized && _activeDeployments.Values.All(d => d.Health != DeploymentHealth.Failed);
-        _healthCacheExpiry = DateTime.UtcNow.AddSeconds(60);
-        return _cachedHealthy.Value;
+        }
     }
 
     /// <summary>Increments a named counter. Thread-safe.</summary>

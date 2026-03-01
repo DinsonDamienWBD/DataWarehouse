@@ -704,7 +704,7 @@ public sealed class SshDirectStrategy : DeploymentStrategyBase
 
         foreach (var host in hosts)
         {
-            state = state with { ProgressPercent = 20 + (60 * Array.IndexOf(hosts, host) / hosts.Length) };
+            state = state with { ProgressPercent = (int)(20 + (60.0 * Array.IndexOf(hosts, host) / hosts.Length)) };
 
             // Connect via SSH
             await SshConnectAsync(host, ct);

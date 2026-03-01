@@ -119,8 +119,14 @@ public sealed class BlueGreenStrategy : DeploymentStrategyBase
         // Switch traffic back to previous environment
         await SwitchTrafficAsync(activeEnv, standbyEnv, ct);
 
-        var environment = currentState.Metadata.TryGetValue("environment", out var env) ? env?.ToString() : "default";
-        _environmentPairs[environment!] = (standbyEnv, activeEnv);
+        // Derive the logical environment name from the active environment name by stripping
+        // the "-blue"/"-green" suffix that Deploy appended. Falls back to deployment ID.
+        var environment = activeEnv != null && activeEnv.EndsWith("-blue", StringComparison.Ordinal)
+            ? activeEnv[..^5]
+            : activeEnv != null && activeEnv.EndsWith("-green", StringComparison.Ordinal)
+                ? activeEnv[..^6]
+                : deploymentId;
+        _environmentPairs[environment!] = (standbyEnv!, activeEnv!);
 
         return currentState with
         {
@@ -131,8 +137,8 @@ public sealed class BlueGreenStrategy : DeploymentStrategyBase
             CompletedAt = DateTimeOffset.UtcNow,
             Metadata = new Dictionary<string, object>(currentState.Metadata)
             {
-                ["activeEnvironment"] = standbyEnv,
-                ["standbyEnvironment"] = activeEnv,
+                ["activeEnvironment"] = standbyEnv ?? string.Empty,
+                ["standbyEnvironment"] = activeEnv ?? string.Empty,
                 ["rolledBackAt"] = DateTimeOffset.UtcNow
             }
         };

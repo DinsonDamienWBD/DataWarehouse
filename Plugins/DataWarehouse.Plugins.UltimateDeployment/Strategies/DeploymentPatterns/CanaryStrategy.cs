@@ -74,8 +74,14 @@ public sealed class CanaryStrategy : DeploymentStrategyBase
         state = state with { ProgressPercent = 30 };
         await RouteTrafficAsync(state.DeploymentId, config.CanaryPercent, ct);
 
-        // Phase 4: Monitor and gradually increase traffic
-        var trafficSteps = new[] { config.CanaryPercent, 25, 50, 75, 100 };
+        // Phase 4: Monitor and gradually increase traffic.
+        // Build monotonically-increasing steps from canaryPercent to 100 — fixed steps
+        // that are <= canaryPercent would route traffic backwards (regression).
+        var baseSteps = new[] { 25, 50, 75, 100 };
+        var trafficSteps = baseSteps
+            .Where(s => s > config.CanaryPercent)
+            .Prepend(config.CanaryPercent)
+            .ToArray();
         var stepIndex = 0;
 
         foreach (var trafficPercent in trafficSteps.Skip(1))

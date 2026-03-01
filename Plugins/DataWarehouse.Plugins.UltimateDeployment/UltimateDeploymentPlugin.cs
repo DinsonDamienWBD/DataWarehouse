@@ -136,7 +136,16 @@ public sealed class UltimateDeploymentPlugin : InfrastructurePluginBase, IDispos
 
         try
         {
-            var state = await strategy.DeployAsync(config, ct);
+            var rawState = await strategy.DeployAsync(config, ct);
+
+            // Stamp the strategy name into metadata so that RollbackAsync, ScaleAsync,
+            // and HealthCheckAsync can look up the correct strategy without iterating all.
+            var state = rawState.Metadata.ContainsKey("strategy")
+                ? rawState
+                : rawState with
+                  {
+                      Metadata = new Dictionary<string, object>(rawState.Metadata) { ["strategy"] = strategyName }
+                  };
 
             if (state.Health == DeploymentHealth.Healthy)
             {

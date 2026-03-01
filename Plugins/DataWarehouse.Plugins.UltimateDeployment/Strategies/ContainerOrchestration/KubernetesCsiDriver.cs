@@ -117,8 +117,19 @@ public sealed class CsiControllerService
             throw new InvalidOperationException($"Volume '{request.Name}' already exists");
 
         var capacityBytes = request.CapacityBytes > 0 ? request.CapacityBytes : 1024L * 1024 * 1024; // Default 1GB
-        if (_usedCapacityBytes + capacityBytes > _totalCapacityBytes)
-            throw new InvalidOperationException("Insufficient capacity to create volume");
+
+        // Atomically reserve capacity: loop until CAS succeeds or capacity is exhausted.
+        // A plain check-then-Add is a TOCTOU race — two concurrent creates can both
+        // observe usedCapacity < totalCapacity and then both proceed, exceeding the limit.
+        long prev, updated;
+        do
+        {
+            prev = Interlocked.Read(ref _usedCapacityBytes);
+            if (prev + capacityBytes > _totalCapacityBytes)
+                throw new InvalidOperationException("Insufficient capacity to create volume");
+            updated = prev + capacityBytes;
+        }
+        while (Interlocked.CompareExchange(ref _usedCapacityBytes, updated, prev) != prev);
 
         var volumeId = $"vol-{Guid.NewGuid():N}"[..16];
         var volume = new CsiVolume
@@ -138,7 +149,6 @@ public sealed class CsiControllerService
         };
 
         _volumes[volumeId] = volume;
-        Interlocked.Add(ref _usedCapacityBytes, capacityBytes);
 
         return volume;
     }
@@ -164,11 +174,15 @@ public sealed class CsiControllerService
 
         var nodes = _publishedVolumes.GetOrAdd(volumeId, _ => new HashSet<string>());
 
-        // Check access mode constraints
-        if (volume.AccessMode == CsiAccessMode.SingleNodeWriter && nodes.Count > 0 && !nodes.Contains(nodeId))
-            throw new InvalidOperationException("Volume is SINGLE_NODE_WRITER and already published to another node");
-
-        lock (nodes) { nodes.Add(nodeId); }
+        // Lock first, then check — SingleNodeWriter guard must be inside the lock.
+        // Reading nodes.Count outside the lock then writing inside is a TOCTOU race:
+        // two concurrent publishes both see Count=0 and both succeed.
+        lock (nodes)
+        {
+            if (volume.AccessMode == CsiAccessMode.SingleNodeWriter && nodes.Count > 0 && !nodes.Contains(nodeId))
+                throw new InvalidOperationException("Volume is SINGLE_NODE_WRITER and already published to another node");
+            nodes.Add(nodeId);
+        }
 
         return new CsiPublishResult
         {
@@ -220,9 +234,10 @@ public sealed class CsiControllerService
     /// </summary>
     public CsiListVolumesResult ListVolumes(int maxEntries = 100, string? startingToken = null)
     {
+        var skip = startingToken != null && int.TryParse(startingToken, out var s) ? s : 0;
         var volumes = _volumes.Values
             .OrderBy(v => v.CreatedAt)
-            .Skip(startingToken != null && int.TryParse(startingToken, out var skip) ? skip : 0)
+            .Skip(skip)
             .Take(maxEntries)
             .ToList();
 
@@ -234,7 +249,9 @@ public sealed class CsiControllerService
                 PublishedNodeIds = _publishedVolumes.TryGetValue(v.VolumeId, out var nodes)
                     ? nodes.ToArray() : Array.Empty<string>()
             }).ToList(),
-            NextToken = volumes.Count == maxEntries ? (_volumes.Count).ToString() : null
+            // NextToken is the offset for the next page — skip + page size.
+            // Using _volumes.Count was wrong: it jumps past entries the caller never saw.
+            NextToken = volumes.Count == maxEntries ? (skip + maxEntries).ToString() : null
         };
     }
 
