@@ -361,6 +361,7 @@ public sealed class HybridAesKyberStrategy : EncryptionStrategyBase
     public HybridAesKyberStrategy();
     protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
     protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public (byte[] PublicKey, byte[] CompositePrivateKey) GenerateCompositeKeyPair();
 }
 ```
 ```csharp
@@ -373,6 +374,7 @@ public sealed class HybridChaChaKyberStrategy : EncryptionStrategyBase
     public HybridChaChaKyberStrategy();
     protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
     protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public (byte[] PublicKey, byte[] CompositePrivateKey) GenerateCompositeKeyPair();
 }
 ```
 ```csharp
@@ -385,6 +387,7 @@ public sealed class HybridX25519KyberStrategy : EncryptionStrategyBase
     public HybridX25519KyberStrategy();
     protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
     protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public (byte[] PublicKey, byte[] CompositePrivateKey) GenerateCompositeKeyPair();
 }
 ```
 
@@ -1527,6 +1530,8 @@ public sealed class OtpStrategy : EncryptionStrategyBase
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     public override string StrategyName;;
     public override CipherInfo CipherInfo;;
+    public byte[] GenerateKey(int plaintextLengthBytes);
+    public override byte[] GenerateKey();;
     protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
     protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
 }

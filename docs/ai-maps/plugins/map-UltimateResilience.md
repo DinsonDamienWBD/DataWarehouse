@@ -669,7 +669,7 @@ public sealed class ChaosMonkeyStrategy : ResilienceStrategyBase
     public bool Enabled { get => _enabled; set => _enabled = value; }
     public ChaosMonkeyStrategy AddStrategy(string name, ResilienceStrategyBase strategy, double weight);
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(Func<CancellationToken, Task<T>> operation, ResilienceContext? context, CancellationToken cancellationToken);
-    protected override string? GetCurrentState();;
+    protected override string? GetCurrentState();
 }
 ```
 ```csharp
