@@ -46,6 +46,12 @@ public class BackendAbstractionLayer : IStorageStrategy
     private DateTime _circuitOpenUntil = DateTime.MinValue;
     private readonly object _circuitLock = new();
 
+    // Metrics state (only populated when EnableMetrics is true)
+    private long _totalOperations;
+    private long _totalSuccesses;
+    private long _totalFailures;
+    private long _totalLatencyMs;
+
     /// <summary>
     /// Initializes a new instance of <see cref="BackendAbstractionLayer"/> wrapping the given strategy.
     /// </summary>
@@ -307,22 +313,54 @@ public class BackendAbstractionLayer : IStorageStrategy
     {
         CheckCircuitBreaker();
 
+        // Finding 4552: honour the EnableMetrics option — only track latency/counts when enabled.
+        var trackMetrics = _options.EnableMetrics;
+        var sw = trackMetrics ? System.Diagnostics.Stopwatch.StartNew() : null;
+
         try
         {
             var result = await ExecuteWithTimeoutAsync(operation, _options.OperationTimeout, ct);
             RecordSuccess();
+            if (trackMetrics)
+            {
+                sw!.Stop();
+                Interlocked.Increment(ref _totalOperations);
+                Interlocked.Increment(ref _totalSuccesses);
+                Interlocked.Add(ref _totalLatencyMs, sw.ElapsedMilliseconds);
+            }
             return result;
         }
         catch (OperationCanceledException)
         {
+            if (trackMetrics) Interlocked.Increment(ref _totalOperations);
             throw;
         }
         catch (Exception ex)
         {
             RecordFailure();
+            if (trackMetrics)
+            {
+                sw?.Stop();
+                Interlocked.Increment(ref _totalOperations);
+                Interlocked.Increment(ref _totalFailures);
+                if (sw != null) Interlocked.Add(ref _totalLatencyMs, sw.ElapsedMilliseconds);
+            }
             throw _normalizer.Normalize(ex, _backendId, operationName, key);
         }
     }
+
+    /// <summary>
+    /// Gets a metrics snapshot for this backend abstraction layer.
+    /// All values are zero when <see cref="BackendAbstractionOptions.EnableMetrics"/> is false.
+    /// </summary>
+    public BackendMetrics GetMetrics() => new(
+        TotalOperations: Interlocked.Read(ref _totalOperations),
+        TotalSuccesses: Interlocked.Read(ref _totalSuccesses),
+        TotalFailures: Interlocked.Read(ref _totalFailures),
+        AverageLatencyMs: _totalOperations > 0
+            ? Interlocked.Read(ref _totalLatencyMs) / (double)Interlocked.Read(ref _totalOperations)
+            : 0.0
+    );
 
     /// <summary>
     /// Wraps an operation with a timeout. If the operation does not complete within the specified
@@ -392,3 +430,17 @@ public record BackendAbstractionOptions
     /// </summary>
     public static BackendAbstractionOptions Default { get; } = new();
 }
+
+/// <summary>
+/// Snapshot of operation metrics collected by <see cref="BackendAbstractionLayer"/>.
+/// </summary>
+/// <param name="TotalOperations">Total number of operations attempted (including cancelled).</param>
+/// <param name="TotalSuccesses">Number of operations that completed successfully.</param>
+/// <param name="TotalFailures">Number of operations that failed with an exception.</param>
+/// <param name="AverageLatencyMs">Average operation latency in milliseconds, or 0 when no operations recorded.</param>
+public sealed record BackendMetrics(
+    long TotalOperations,
+    long TotalSuccesses,
+    long TotalFailures,
+    double AverageLatencyMs
+);
