@@ -207,6 +207,14 @@ public abstract class LineageStrategyBase : StrategyBase, ILineageStrategy
     protected readonly BoundedDictionary<string, LineageEdge> _edges = new BoundedDictionary<string, LineageEdge>(1000);
     protected readonly BoundedDictionary<string, List<ProvenanceRecord>> _provenance = new BoundedDictionary<string, List<ProvenanceRecord>>(1000);
 
+    // P2-2348/2349: Reverse indexes to avoid O(n) full-scan on every BFS step.
+    // _sourceIndex[src] = set of EdgeIds whose SourceNodeId == src  (downstream traversal)
+    // _targetIndex[tgt] = set of EdgeIds whose TargetNodeId == tgt  (upstream traversal)
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, System.Collections.Concurrent.ConcurrentDictionary<string, byte>>
+        _sourceIndex = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, System.Collections.Concurrent.ConcurrentDictionary<string, byte>>
+        _targetIndex = new();
+
     /// <inheritdoc/>
     public abstract override string StrategyId { get; }
     /// <inheritdoc/>
@@ -236,6 +244,8 @@ public abstract class LineageStrategyBase : StrategyBase, ILineageStrategy
         _nodes.Clear();
         _edges.Clear();
         _provenance.Clear();
+        _sourceIndex.Clear();
+        _targetIndex.Clear();
     }
 
     /// <summary>Explicit implementation for ILineageStrategy.DisposeAsync() (Task vs ValueTask).</summary>
@@ -277,10 +287,15 @@ public abstract class LineageStrategyBase : StrategyBase, ILineageStrategy
             var (current, depth) = queue.Dequeue();
             if (!visited.Add(current) || depth > maxDepth) continue;
             if (_nodes.TryGetValue(current, out var node)) resultNodes.Add(node);
-            foreach (var edge in _edges.Values.Where(e => e.TargetNodeId == current))
+            // P2-2348: use _targetIndex for O(1) lookup instead of full _edges scan.
+            if (_targetIndex.TryGetValue(current, out var incomingEdgeIds))
             {
-                resultEdges.Add(edge);
-                queue.Enqueue((edge.SourceNodeId, depth + 1));
+                foreach (var eid in incomingEdgeIds.Keys)
+                {
+                    if (!_edges.TryGetValue(eid, out var edge)) continue;
+                    resultEdges.Add(edge);
+                    queue.Enqueue((edge.SourceNodeId, depth + 1));
+                }
             }
         }
 
@@ -310,10 +325,15 @@ public abstract class LineageStrategyBase : StrategyBase, ILineageStrategy
             var (current, depth) = queue.Dequeue();
             if (!visited.Add(current) || depth > maxDepth) continue;
             if (_nodes.TryGetValue(current, out var node)) resultNodes.Add(node);
-            foreach (var edge in _edges.Values.Where(e => e.SourceNodeId == current))
+            // P2-2348: use _sourceIndex for O(1) lookup instead of full _edges scan.
+            if (_sourceIndex.TryGetValue(current, out var outgoingEdgeIds))
             {
-                resultEdges.Add(edge);
-                queue.Enqueue((edge.TargetNodeId, depth + 1));
+                foreach (var eid in outgoingEdgeIds.Keys)
+                {
+                    if (!_edges.TryGetValue(eid, out var edge)) continue;
+                    resultEdges.Add(edge);
+                    queue.Enqueue((edge.TargetNodeId, depth + 1));
+                }
             }
         }
 
@@ -332,19 +352,23 @@ public abstract class LineageStrategyBase : StrategyBase, ILineageStrategy
     public virtual Task<ImpactAnalysisResult> AnalyzeImpactAsync(string nodeId, string changeType, CancellationToken ct = default)
     {
         ThrowIfNotInitialized();
-        var directlyImpacted = _edges.Values
-            .Where(e => e.SourceNodeId == nodeId)
-            .Select(e => e.TargetNodeId)
-            .Distinct()
-            .ToList();
+        // P2-2349: use _sourceIndex for O(1) per-node lookup; keep directlyImpacted as HashSet for O(1) Contains.
+        var directlyImpacted = new HashSet<string>();
+        if (_sourceIndex.TryGetValue(nodeId, out var directEdgeIds))
+        {
+            foreach (var eid in directEdgeIds.Keys)
+                if (_edges.TryGetValue(eid, out var de)) directlyImpacted.Add(de.TargetNodeId);
+        }
 
         var indirectlyImpacted = new HashSet<string>();
         var queue = new Queue<string>(directlyImpacted);
         while (queue.Count > 0)
         {
             var current = queue.Dequeue();
-            foreach (var edge in _edges.Values.Where(e => e.SourceNodeId == current))
+            if (!_sourceIndex.TryGetValue(current, out var outEdgeIds)) continue;
+            foreach (var eid in outEdgeIds.Keys)
             {
+                if (!_edges.TryGetValue(eid, out var edge)) continue;
                 if (indirectlyImpacted.Add(edge.TargetNodeId) && !directlyImpacted.Contains(edge.TargetNodeId))
                     queue.Enqueue(edge.TargetNodeId);
             }
@@ -359,7 +383,7 @@ public abstract class LineageStrategyBase : StrategyBase, ILineageStrategy
         {
             SourceNodeId = nodeId,
             ChangeType = changeType,
-            DirectlyImpacted = directlyImpacted.AsReadOnly(),
+            DirectlyImpacted = directlyImpacted.ToList().AsReadOnly(),
             IndirectlyImpacted = indirectlyImpacted.ToList().AsReadOnly(),
             ImpactScore = Math.Min(score, 100)
         });
@@ -370,8 +394,14 @@ public abstract class LineageStrategyBase : StrategyBase, ILineageStrategy
 
     /// <summary>Adds a node to the lineage graph.</summary>
     protected void AddNode(LineageNode node) => _nodes[node.NodeId] = node;
-    /// <summary>Adds an edge to the lineage graph.</summary>
-    protected void AddEdge(LineageEdge edge) => _edges[edge.EdgeId] = edge;
+    /// <summary>Adds an edge to the lineage graph and updates reverse indexes.</summary>
+    protected void AddEdge(LineageEdge edge)
+    {
+        _edges[edge.EdgeId] = edge;
+        // P2-2348/2349: maintain source/target reverse indexes for O(1) lookup per node.
+        _sourceIndex.GetOrAdd(edge.SourceNodeId, _ => new()).TryAdd(edge.EdgeId, 0);
+        _targetIndex.GetOrAdd(edge.TargetNodeId, _ => new()).TryAdd(edge.EdgeId, 0);
+    }
 }
 
 /// <summary>
