@@ -211,7 +211,7 @@ internal sealed class ClaudeMcpStrategy : SdkInterface.InterfaceStrategyBase, IP
                 "analyze_data" => "intelligence.analyze",
                 _ => $"mcp.tool.{toolName}"
             };
-            await MessageBus!.SendAsync(new DataWarehouse.SDK.Contracts.PluginMessage
+            await MessageBus!.SendAsync(topic, new DataWarehouse.SDK.Utilities.PluginMessage
             {
                 Type = topic,
                 Payload = new System.Collections.Generic.Dictionary<string, object>
@@ -219,7 +219,7 @@ internal sealed class ClaudeMcpStrategy : SdkInterface.InterfaceStrategyBase, IP
                     ["toolName"] = toolName,
                     ["arguments"] = arguments.ValueKind != System.Text.Json.JsonValueKind.Undefined ? arguments.ToString() : "{}"
                 }
-            }, ct).ConfigureAwait(false);
+            }, cancellationToken).ConfigureAwait(false);
         }
 
         // Execute tool and return content

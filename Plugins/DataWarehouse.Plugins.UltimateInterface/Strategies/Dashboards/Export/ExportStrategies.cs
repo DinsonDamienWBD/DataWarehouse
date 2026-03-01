@@ -400,10 +400,25 @@ public sealed class ScheduledReportsStrategy : DashboardStrategyBase
         {
             ScheduleFrequency.Hourly => now.AddHours(1),
             ScheduleFrequency.Daily => now.Date.AddDays(1).Add(config.TimeOfDay),
-            ScheduleFrequency.Weekly => now.Date.AddDays((7 - (int)now.DayOfWeek + (int)config.DayOfWeek) % 7 + 7).Add(config.TimeOfDay),
+            // LOW-3310: If today is the target day and target time hasn't passed, run today.
+            // Otherwise advance to next occurrence of the target weekday.
+            ScheduleFrequency.Weekly => WeeklyNextRun(now, config),
             ScheduleFrequency.Monthly => new DateTimeOffset(now.Year, now.Month, 1, 0, 0, 0, now.Offset).AddMonths(1).AddDays(config.DayOfMonth - 1).Add(config.TimeOfDay),
             _ => now.AddDays(1)
         };
+    }
+
+    private static DateTimeOffset WeeklyNextRun(DateTimeOffset now, ScheduleConfig config)
+    {
+        var daysUntilTarget = ((int)config.DayOfWeek - (int)now.DayOfWeek + 7) % 7;
+        if (daysUntilTarget == 0 && now.TimeOfDay < config.TimeOfDay)
+        {
+            // Today is the target day and the time hasn't passed — run today
+            return now.Date.Add(config.TimeOfDay);
+        }
+        // Advance to next occurrence (at least 1 day out when daysUntilTarget == 0)
+        var daysToAdd = daysUntilTarget == 0 ? 7 : daysUntilTarget;
+        return now.Date.AddDays(daysToAdd).Add(config.TimeOfDay);
     }
 }
 

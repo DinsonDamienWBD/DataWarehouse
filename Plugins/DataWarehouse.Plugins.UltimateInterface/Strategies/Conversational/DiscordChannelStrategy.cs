@@ -168,11 +168,11 @@ internal sealed class DiscordChannelStrategy : SdkInterface.InterfaceStrategyBas
         // Route to NLP for intent parsing via message bus
         if (IsIntelligenceAvailable)
         {
-            await MessageBus!.SendAsync(new DataWarehouse.SDK.Contracts.PluginMessage
+            await MessageBus!.SendAsync("nlp.intent.parse", new DataWarehouse.SDK.Utilities.PluginMessage
             {
                 Type = "nlp.intent.parse",
-                Payload = new System.Collections.Generic.Dictionary<string, object> { ["query"] = query }
-            }, ct).ConfigureAwait(false);
+                Payload = new System.Collections.Generic.Dictionary<string, object> { ["command"] = commandName, ["options"] = options.ValueKind != System.Text.Json.JsonValueKind.Undefined ? options.ToString() : "{}" }
+            }, cancellationToken).ConfigureAwait(false);
         }
 
         // Build Discord embed response

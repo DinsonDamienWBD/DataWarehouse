@@ -252,11 +252,11 @@ paths:
         // Route to NLP for intent parsing via message bus
         if (IsIntelligenceAvailable)
         {
-            await MessageBus!.SendAsync(new DataWarehouse.SDK.Contracts.PluginMessage
+            await MessageBus!.SendAsync("nlp.intent.parse", new DataWarehouse.SDK.Utilities.PluginMessage
             {
                 Type = "nlp.intent.parse",
                 Payload = new System.Collections.Generic.Dictionary<string, object> { ["query"] = query }
-            }, ct).ConfigureAwait(false);
+            }, cancellationToken).ConfigureAwait(false);
         }
 
         // Build structured results response

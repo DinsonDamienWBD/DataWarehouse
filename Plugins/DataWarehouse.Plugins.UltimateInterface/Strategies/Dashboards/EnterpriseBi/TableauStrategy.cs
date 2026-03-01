@@ -284,10 +284,10 @@ public sealed class TableauStrategy : DashboardStrategyBase
                 ? ownerName.GetString()
                 : null,
             CreatedAt: wb.TryGetProperty("createdAt", out var created)
-                ? DateTimeOffset.Parse(created.GetString() ?? DateTimeOffset.UtcNow.ToString("O"))
+                ? DateTimeOffset.Parse(created.GetString() ?? DateTimeOffset.UtcNow.ToString("O"), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind)
                 : DateTimeOffset.UtcNow,
             UpdatedAt: wb.TryGetProperty("updatedAt", out var updated)
-                ? DateTimeOffset.Parse(updated.GetString() ?? DateTimeOffset.UtcNow.ToString("O"))
+                ? DateTimeOffset.Parse(updated.GetString() ?? DateTimeOffset.UtcNow.ToString("O"), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind)
                 : DateTimeOffset.UtcNow,
             Version: 1
         );
@@ -371,10 +371,10 @@ public sealed class TableauStrategy : DashboardStrategyBase
                         ? ownerName.GetString()
                         : null,
                     CreatedAt: wb.TryGetProperty("createdAt", out var created)
-                        ? DateTimeOffset.Parse(created.GetString() ?? DateTimeOffset.UtcNow.ToString("O"))
+                        ? DateTimeOffset.Parse(created.GetString() ?? DateTimeOffset.UtcNow.ToString("O"), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind)
                         : null,
                     UpdatedAt: wb.TryGetProperty("updatedAt", out var updated)
-                        ? DateTimeOffset.Parse(updated.GetString() ?? DateTimeOffset.UtcNow.ToString("O"))
+                        ? DateTimeOffset.Parse(updated.GetString() ?? DateTimeOffset.UtcNow.ToString("O"), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind)
                         : null,
                     Version: 1
                 ));
