@@ -120,7 +120,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             var request = CreateRequest(HttpMethod.Get, $"/v1/{_config.MountPath}/data/{safeKeyId}");
             // #3596: Pass CancellationToken through to HttpClient to allow cancellation.
             using var response = await _httpClient.SendAsync(request, CancellationToken.None);
-            response.EnsureSuccessStatusCode();
+            // P2-3600: Wrap EnsureSuccessStatusCode to provide key context in failure messages.
+            if (!response.IsSuccessStatusCode)
+                throw new InvalidOperationException(
+                    $"[VaultKeyStoreStrategy] Failed to load key '{safeKeyId}' from Vault: HTTP {(int)response.StatusCode} {response.StatusCode}.");
 
             var json = await response.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(json);
@@ -141,7 +144,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
             using var response = await _httpClient.SendAsync(request, CancellationToken.None); // #3596
-            response.EnsureSuccessStatusCode();
+            // P2-3600: Wrap EnsureSuccessStatusCode to provide key context in failure messages.
+            if (!response.IsSuccessStatusCode)
+                throw new InvalidOperationException(
+                    $"[VaultKeyStoreStrategy] Failed to save key '{safeKeyId}' to Vault: HTTP {(int)response.StatusCode} {response.StatusCode}.");
 
             _currentKeyId = safeKeyId;
         }

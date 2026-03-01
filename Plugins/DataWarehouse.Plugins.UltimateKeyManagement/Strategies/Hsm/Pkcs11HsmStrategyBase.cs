@@ -117,8 +117,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
             if (!File.Exists(_config.LibraryPath))
                 throw new InvalidOperationException($"PKCS#11 library not found at: {_config.LibraryPath}");
 
-            if (_config.SlotId.HasValue && _config.SlotId.Value < 0)
-                throw new ArgumentException($"SlotId must be >= 0, got {_config.SlotId.Value}");
+            // P2-3546: SlotId is ulong? — unsigned type can never be negative; the check was dead code.
+            // No validation needed beyond HasValue (ulong guarantees non-negative by definition).
 
             // Initialize PKCS#11 library
             await InitializePkcs11Async(cancellationToken);
@@ -233,7 +233,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
 
         protected override async Task<byte[]> LoadKeyFromStorage(string keyId, ISecurityContext context)
         {
-            await _sessionLock.WaitAsync();
+            // P2-3548: Base-class abstract signature has no CancellationToken; pass None to avoid indefinite block.
+            await _sessionLock.WaitAsync(CancellationToken.None);
             try
             {
                 EnsureSession();
@@ -285,7 +286,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
 
         private async Task SaveKeyToStorageInternal(string keyId, byte[] keyData, ISecurityContext context)
         {
-            await _sessionLock.WaitAsync();
+            // P2-3548: No CancellationToken in scope here; pass None.
+            await _sessionLock.WaitAsync(CancellationToken.None);
             try
             {
                 EnsureSession();
@@ -328,7 +330,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
         {
             ValidateSecurityContext(context);
 
-            await _sessionLock.WaitAsync();
+            // P2-3548: Interface has no CT; pass None. Consider upgrading IEnvelopeKeyStore to add CT in a future SDK version.
+            await _sessionLock.WaitAsync(CancellationToken.None);
             try
             {
                 EnsureSession();
@@ -393,7 +396,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
         {
             ValidateSecurityContext(context);
 
-            await _sessionLock.WaitAsync();
+            // P2-3548: Interface has no CT; pass None.
+            await _sessionLock.WaitAsync(CancellationToken.None);
             try
             {
                 EnsureSession();
@@ -587,7 +591,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
         /// </summary>
         public async Task<IObjectHandle> GenerateHsmKeyAsync(string keyLabel, bool extractable = false)
         {
-            await _sessionLock.WaitAsync();
+            // P2-3548: No CT in this public API; pass None.
+            await _sessionLock.WaitAsync(CancellationToken.None);
             try
             {
                 EnsureSession();

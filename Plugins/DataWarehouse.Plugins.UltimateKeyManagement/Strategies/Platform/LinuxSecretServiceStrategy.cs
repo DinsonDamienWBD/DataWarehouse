@@ -188,10 +188,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
 
             var keys = new List<string>();
 
+            // P2-3572: Use ArgumentList to prevent injection.
             // Use secret-tool search to find all keys with our application attribute
-            var args = $"search --all {AttributeApplication} {_config.ApplicationName} {AttributeKeyType} key";
+            var argList = new[] { "search", "--all", AttributeApplication, _config.ApplicationName, AttributeKeyType, "key" };
 
-            if (ExecuteSecretTool(args, out var output, out _))
+            if (ExecuteSecretTool(argList, out var output, out _))
             {
                 // Parse output to extract key IDs
                 // Output format: [/org/freedesktop/secrets/collection/login/xxx]
@@ -298,23 +299,18 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
 
         private void StoreSecret(string keyId, byte[] data, string label)
         {
-            // secret-tool store --label='label' attribute1 value1 attribute2 value2 ...
+            // P2-3572: Use ArgumentList (not Arguments string) to prevent shell metacharacter injection.
+            // secret-tool store --label=<label> attribute1 value1 attribute2 value2 ...
             // Password is read from stdin
-
-            var args = $"store --label=\"{label}\" " +
-                      $"{AttributeApplication} {_config.ApplicationName} " +
-                      $"{AttributeKeyId} {keyId} " +
-                      $"{AttributeKeyType} key";
-
+            var argList = new List<string> { "store", $"--label={label}" };
             if (!string.IsNullOrEmpty(_config.CollectionName) && _config.CollectionName != "default")
-            {
-                args = $"--collection={_config.CollectionName} " + args;
-            }
+                argList.Add($"--collection={_config.CollectionName}");
+            argList.AddRange(new[] { AttributeApplication, _config.ApplicationName, AttributeKeyId, keyId, AttributeKeyType, "key" });
 
             // Convert data to base64 for safe stdin transfer
             var base64Data = Convert.ToBase64String(data);
 
-            ExecuteSecretToolWithInput(args, base64Data, out var error);
+            ExecuteSecretToolWithInput(argList, base64Data, out var error);
 
             if (!string.IsNullOrEmpty(error))
             {
@@ -326,11 +322,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
         {
             data = null;
 
+            // P2-3572: Use ArgumentList to prevent injection.
             // secret-tool lookup attribute1 value1 attribute2 value2 ...
-            var args = $"lookup {AttributeApplication} {_config.ApplicationName} " +
-                      $"{AttributeKeyId} {keyId}";
+            var argList = new[] { "lookup", AttributeApplication, _config.ApplicationName, AttributeKeyId, keyId };
 
-            if (ExecuteSecretTool(args, out var output, out _))
+            if (ExecuteSecretTool(argList, out var output, out _))
             {
                 if (!string.IsNullOrEmpty(output))
                 {
@@ -352,25 +348,26 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
 
         private void DeleteSecret(string keyId)
         {
+            // P2-3572: Use ArgumentList to prevent injection.
             // secret-tool clear attribute1 value1 attribute2 value2 ...
-            var args = $"clear {AttributeApplication} {_config.ApplicationName} " +
-                      $"{AttributeKeyId} {keyId}";
-
-            ExecuteSecretTool(args, out _, out _);
+            var argList = new[] { "clear", AttributeApplication, _config.ApplicationName, AttributeKeyId, keyId };
+            ExecuteSecretTool(argList, out _, out _);
             // Ignore errors on delete (secret may not exist)
         }
 
-        private bool ExecuteSecretTool(string arguments, out string output, out string error)
+        private bool ExecuteSecretTool(IEnumerable<string> arguments, out string output, out string error)
         {
+            // P2-3572: Use ArgumentList instead of Arguments string to prevent shell metacharacter injection.
             var processInfo = new ProcessStartInfo
             {
                 FileName = "secret-tool",
-                Arguments = arguments,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
+            foreach (var arg in arguments)
+                processInfo.ArgumentList.Add(arg);
 
             // Ensure D-Bus session is available
             if (Environment.GetEnvironmentVariable("DBUS_SESSION_BUS_ADDRESS") == null)
@@ -394,18 +391,20 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
             return process.ExitCode == 0;
         }
 
-        private void ExecuteSecretToolWithInput(string arguments, string input, out string error)
+        private void ExecuteSecretToolWithInput(IEnumerable<string> arguments, string input, out string error)
         {
+            // P2-3572: Use ArgumentList to prevent shell metacharacter injection.
             var processInfo = new ProcessStartInfo
             {
                 FileName = "secret-tool",
-                Arguments = arguments,
                 RedirectStandardInput = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
+            foreach (var arg in arguments)
+                processInfo.ArgumentList.Add(arg);
 
             // Ensure D-Bus session is available
             if (Environment.GetEnvironmentVariable("DBUS_SESSION_BUS_ADDRESS") == null)

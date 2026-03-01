@@ -29,7 +29,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
     public sealed class HsmRotationStrategy : KeyStoreStrategyBase
     {
         private readonly BoundedDictionary<string, KeyVersion> _keyVersions = new BoundedDictionary<string, KeyVersion>(1000);
-        private readonly BoundedDictionary<string, List<RotationAuditEntry>> _auditTrail = new BoundedDictionary<string, List<RotationAuditEntry>>(1000);
+        // P2-3500: Use ConcurrentQueue so concurrent timer/rotate calls can add entries without
+        // the data-race present when List<T>.Add is called inside ConcurrentDictionary.AddOrUpdate.
+        private readonly BoundedDictionary<string, System.Collections.Concurrent.ConcurrentQueue<RotationAuditEntry>> _auditTrail
+            = new BoundedDictionary<string, System.Collections.Concurrent.ConcurrentQueue<RotationAuditEntry>>(1000);
         private readonly SemaphoreSlim _rotationLock = new(1, 1);
         private TimeSpan _rotationInterval = TimeSpan.FromDays(90);
         private TimeSpan _retentionPeriod = TimeSpan.FromDays(365);
@@ -226,7 +229,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
         public IReadOnlyList<RotationAuditEntry> GetAuditTrail(string keyId)
         {
             return _auditTrail.TryGetValue(keyId, out var trail)
-                ? trail.AsReadOnly()
+                ? trail.ToArray()
                 : Array.Empty<RotationAuditEntry>();
         }
 
@@ -391,8 +394,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
             };
 
             _auditTrail.AddOrUpdate(keyId,
-                _ => new List<RotationAuditEntry> { entry },
-                (_, list) => { list.Add(entry); return list; });
+                _ => { var q = new System.Collections.Concurrent.ConcurrentQueue<RotationAuditEntry>(); q.Enqueue(entry); return q; },
+                (_, queue) => { queue.Enqueue(entry); return queue; });
         }
 
         public override void Dispose()
