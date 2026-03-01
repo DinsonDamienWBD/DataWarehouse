@@ -81,14 +81,18 @@ public sealed class ThermalThrottlingStrategy : SustainabilityStrategyBase
             prevLevel = _currentLevel;
         }
 
-        var newLevel = temp switch
-        {
-            >= 100 => ThrottleLevel.Emergency,
-            >= 92  => ThrottleLevel.Heavy,
-            >= 85  => ThrottleLevel.Moderate,
-            >= 75  => ThrottleLevel.Light,
-            _      => ThrottleLevel.None
-        };
+        // Use the user-configurable threshold properties instead of literal constants.
+        ThrottleLevel newLevel;
+        if (temp >= EmergencyShutdownC)
+            newLevel = ThrottleLevel.Emergency;
+        else if (temp >= HeavyThrottleC)
+            newLevel = ThrottleLevel.Heavy;
+        else if (temp >= ModerateThrottleC)
+            newLevel = ThrottleLevel.Moderate;
+        else if (temp >= LightThrottleC)
+            newLevel = ThrottleLevel.Light;
+        else
+            newLevel = ThrottleLevel.None;
 
         if (newLevel != prevLevel)
         {

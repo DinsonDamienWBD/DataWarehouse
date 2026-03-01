@@ -446,27 +446,40 @@ public sealed class SpeculativeParallelStrategy : WorkflowStrategyBase
         };
 
         var completed = new BoundedDictionary<string, TaskResult>(1000);
-        var speculativeTasks = new BoundedDictionary<string, CancellationTokenSource>(1000);
+        // Track CancellationTokenSource instances so they can be disposed after use.
+        var speculativeCts = new List<CancellationTokenSource>();
 
-        foreach (var task in workflow.GetTopologicalOrder())
+        try
         {
-            if (task.Dependencies.All(d => completed.ContainsKey(d)))
+            var speculativeTasks = new BoundedDictionary<string, CancellationTokenSource>(1000);
+
+            foreach (var task in workflow.GetTopologicalOrder())
             {
-                var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                speculativeTasks[task.TaskId] = cts;
-
-                var result = await ExecuteTaskAsync(task, context, cts.Token);
-                context.TaskResults[task.TaskId] = result;
-                completed[task.TaskId] = result;
-
-                foreach (var spec in speculativeTasks.Where(kv =>
-                    kv.Key != task.TaskId && !completed.ContainsKey(kv.Key)))
+                if (task.Dependencies.All(d => completed.ContainsKey(d)))
                 {
-                    var specTask = workflow.Tasks.Find(t => t.TaskId == spec.Key);
-                    if (specTask?.Condition != null && !specTask.Condition(context))
-                        spec.Value.Cancel();
+                    var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    speculativeCts.Add(cts);
+                    speculativeTasks[task.TaskId] = cts;
+
+                    var result = await ExecuteTaskAsync(task, context, cts.Token);
+                    context.TaskResults[task.TaskId] = result;
+                    completed[task.TaskId] = result;
+
+                    foreach (var spec in speculativeTasks.Where(kv =>
+                        kv.Key != task.TaskId && !completed.ContainsKey(kv.Key)))
+                    {
+                        var specTask = workflow.Tasks.Find(t => t.TaskId == spec.Key);
+                        if (specTask?.Condition != null && !specTask.Condition(context))
+                            spec.Value.Cancel();
+                    }
                 }
             }
+        }
+        finally
+        {
+            // Dispose all CancellationTokenSource instances created during execution.
+            foreach (var cts in speculativeCts)
+                cts.Dispose();
         }
 
         return new WorkflowResult

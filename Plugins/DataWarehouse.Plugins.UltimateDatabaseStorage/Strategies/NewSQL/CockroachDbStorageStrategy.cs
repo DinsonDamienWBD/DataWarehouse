@@ -110,9 +110,17 @@ public sealed class CockroachDbStorageStrategy : DatabaseStorageStrategyBase
         await using var connection = await _dataSource!.OpenConnectionAsync(ct);
         await using var command = connection.CreateCommand();
 
+        // P2-2806: Use ON CONFLICT to preserve original created_at on update.
         command.CommandText = $@"
-            UPSERT INTO {_tableName} (key, data, size, content_type, etag, metadata, created_at, modified_at)
-            VALUES (@key, @data, @size, @contentType, @etag, @metadata::jsonb, @createdAt, @modifiedAt)";
+            INSERT INTO {_tableName} (key, data, size, content_type, etag, metadata, created_at, modified_at)
+            VALUES (@key, @data, @size, @contentType, @etag, @metadata::jsonb, @createdAt, @modifiedAt)
+            ON CONFLICT (key) DO UPDATE SET
+                data = EXCLUDED.data,
+                size = EXCLUDED.size,
+                content_type = EXCLUDED.content_type,
+                etag = EXCLUDED.etag,
+                metadata = EXCLUDED.metadata,
+                modified_at = EXCLUDED.modified_at";
 
         command.Parameters.AddWithValue("@key", key);
         command.Parameters.AddWithValue("@data", data);

@@ -257,9 +257,14 @@ public sealed class PipelineScalingManager : IScalableSubsystem, IDisposable
             isSpilled,
             dependsOnStages ?? Array.Empty<int>());
 
-        // GetOrAdd is atomic on BoundedDictionary (ConcurrentDictionary) — eliminates the TOCTOU
+        // Use TryGet then conditional Put under the downstream lock to eliminate the TOCTOU
         // between GetOrDefault and Put that allowed concurrent callers to orphan list objects.
-        var snapshots = _stateSnapshots.GetOrAdd(pipelineId, _ => new List<PipelineStageCapturedState>());
+        // BoundedCache does not expose GetOrAdd, so we lock the inner list as the guard.
+        if (!_stateSnapshots.TryGet(pipelineId, out var snapshots) || snapshots == null)
+        {
+            snapshots = new List<PipelineStageCapturedState>();
+            _stateSnapshots.Put(pipelineId, snapshots);
+        }
 
         // Insert at correct index position (pad if needed)
         lock (snapshots)

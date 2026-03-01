@@ -54,8 +54,8 @@ public sealed class CarbonAwareSchedulingStrategy : SustainabilityStrategyBase
         if (validRegions.Count == 0)
             return new CarbonSchedulingRecommendation { WorkloadId = workloadId, HasRecommendation = false };
 
-        var best = validRegions.First();
-        var worst = validRegions.Last();
+        var best = validRegions.First()!;
+        var worst = validRegions.Last()!;
         var estimatedEmissions = best.GCo2PerKwh * estimatedKwh;
         var worstEmissions = worst.GCo2PerKwh * estimatedKwh;
 
@@ -85,9 +85,9 @@ public sealed class CarbonAwareSchedulingStrategy : SustainabilityStrategyBase
             RegionRankings = validRegions.Select((r, i) => new RegionCarbonRanking
             {
                 Rank = i + 1,
-                Region = r.Region,
-                GCo2PerKwh = r.GCo2PerKwh,
-                EstimatedEmissionsGrams = r.GCo2PerKwh * estimatedKwh
+                Region = r!.Region,
+                GCo2PerKwh = r!.GCo2PerKwh,
+                EstimatedEmissionsGrams = r!.GCo2PerKwh * estimatedKwh
             }).ToList()
         };
     }

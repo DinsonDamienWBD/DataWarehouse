@@ -346,12 +346,25 @@ public sealed class MongoDbStorageStrategy : DatabaseStorageStrategyBase
         }
     }
 
+    // P2-2832: Dangerous MongoDB aggregation operators that can exfiltrate/overwrite data.
+    private static readonly HashSet<string> _blockedOperators = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "$out", "$merge", "$lookup", "$unionWith", "$graphLookup", "$function", "$accumulator"
+    };
+
     protected override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryCoreAsync(
         string query, IDictionary<string, object>? parameters, CancellationToken ct)
     {
-        // MongoDB uses aggregation pipeline instead of SQL
-        // Parse the query as a JSON aggregation pipeline
+        // MongoDB uses aggregation pipeline instead of SQL.
+        // P2-2832: Block dangerous pipeline operators before parsing to prevent NoSQL injection.
         var pipeline = BsonDocument.Parse(query);
+        foreach (var element in pipeline.Elements)
+        {
+            if (_blockedOperators.Contains(element.Name))
+                throw new InvalidOperationException(
+                    $"MongoDB aggregation operator '{element.Name}' is blocked for security reasons.");
+        }
+
         var cursor = await _collection!.AggregateAsync<BsonDocument>(new[] { pipeline }, cancellationToken: ct);
         var results = new List<Dictionary<string, object?>>();
 

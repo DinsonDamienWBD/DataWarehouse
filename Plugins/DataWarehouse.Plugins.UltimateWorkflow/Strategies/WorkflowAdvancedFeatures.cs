@@ -277,20 +277,23 @@ public sealed class ActivityHeartbeatManager
     /// <summary>Records a heartbeat for an activity.</summary>
     public void RecordHeartbeat(string activityId, object? details = null)
     {
+        // The AddOrUpdate update factory may be invoked multiple times by ConcurrentDictionary
+        // on contention. Mutating the existing object in-place inside the factory is not safe.
+        // Return a fresh instance each time instead.
         _heartbeats.AddOrUpdate(activityId,
-            new ActivityHeartbeat
+            _ => new ActivityHeartbeat
             {
                 ActivityId = activityId,
                 Details = details,
                 LastHeartbeat = DateTime.UtcNow,
                 HeartbeatCount = 1
             },
-            (_, existing) =>
+            (_, existing) => new ActivityHeartbeat
             {
-                existing.LastHeartbeat = DateTime.UtcNow;
-                existing.Details = details;
-                existing.HeartbeatCount++;
-                return existing;
+                ActivityId = activityId,
+                Details = details,
+                LastHeartbeat = DateTime.UtcNow,
+                HeartbeatCount = existing.HeartbeatCount + 1
             });
     }
 

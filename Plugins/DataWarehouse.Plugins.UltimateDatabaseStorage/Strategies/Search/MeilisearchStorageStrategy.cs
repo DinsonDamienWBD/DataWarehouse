@@ -178,14 +178,19 @@ public sealed class MeilisearchStorageStrategy : DatabaseStorageStrategyBase
         {
             ct.ThrowIfCancellationRequested();
 
+            // P2-2838: Restrict search to 'key' field and use MatchingStrategy.All so every
+            // prefix token must appear in the key field. Post-filter still applied below for
+            // exact ordinal prefix match to eliminate false positives from typo-tolerance.
             var searchParams = new SearchQuery
             {
                 Limit = PageSize,
                 Offset = offset,
-                AttributesToRetrieve = new[] { "key", "size", "contentType", "etag", "metadata", "createdAt", "modifiedAt" }
+                AttributesToRetrieve = new[] { "key", "size", "contentType", "etag", "metadata", "createdAt", "modifiedAt" },
+                AttributesToSearchOn = new[] { "key" },
+                MatchingStrategy = "all"
             };
 
-            var result = await _index!.SearchAsync<StorageDocument>(prefix ?? "", searchParams, ct);
+            var result = await _index!.SearchAsync<StorageDocument>(prefix ?? "*", searchParams, ct);
 
             if (result.Hits.Count == 0)
                 yield break;

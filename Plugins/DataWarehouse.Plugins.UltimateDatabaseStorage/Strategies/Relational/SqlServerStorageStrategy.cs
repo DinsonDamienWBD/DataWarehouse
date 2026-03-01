@@ -380,17 +380,12 @@ public sealed class SqlServerStorageStrategy : DatabaseStorageStrategyBase
             _transaction = transaction;
         }
 
+        // P2-2836: Use async commit/rollback variants to avoid blocking thread pool threads.
         public Task CommitAsync(CancellationToken ct = default)
-        {
-            _transaction.Commit();
-            return Task.CompletedTask;
-        }
+            => _transaction.CommitAsync(ct);
 
         public Task RollbackAsync(CancellationToken ct = default)
-        {
-            _transaction.Rollback();
-            return Task.CompletedTask;
-        }
+            => _transaction.RollbackAsync(ct);
 
         public ValueTask DisposeAsync()
         {

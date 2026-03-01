@@ -190,14 +190,20 @@ public sealed class TypesenseStorageStrategy : DatabaseStorageStrategyBase
         // Paginate using page + per_page to avoid the 250-hit limit.
         const int PageSize = 250;
         int page = 1;
-        var query = string.IsNullOrEmpty(prefix) ? "*" : $"key:{prefix}*";
+
+        // P2-2839: Use filter_by for structural prefix filtering instead of keyword search
+        // (which is typo-tolerant and unreliable for special characters).
+        // filter_by=key:=[prefix]* is a Typesense prefix match on the 'key' field.
+        var filterBy = string.IsNullOrEmpty(prefix)
+            ? string.Empty
+            : $"&filter_by=key:={Uri.EscapeDataString(prefix)}*";
 
         while (true)
         {
             ct.ThrowIfCancellationRequested();
 
             var response = await _httpClient!.GetAsync(
-                $"/collections/{_collectionName}/documents/search?q={Uri.EscapeDataString(query)}&query_by=key&per_page={PageSize}&page={page}&exclude_fields=data", ct);
+                $"/collections/{_collectionName}/documents/search?q=*&query_by=key&per_page={PageSize}&page={page}&exclude_fields=data{filterBy}", ct);
 
             if (!response.IsSuccessStatusCode)
                 yield break;
