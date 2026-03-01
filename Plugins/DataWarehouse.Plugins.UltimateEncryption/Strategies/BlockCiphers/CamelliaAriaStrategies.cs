@@ -404,7 +404,7 @@ public sealed class SeedStrategy : EncryptionStrategyBase
         }
 
         // Compute HMAC
-        var macKey = HKDF.DeriveKey(System.Security.Cryptography.HashAlgorithmName.SHA256, key, 32, salt: null, info: "hmac-key"u8);
+        var macKey = HKDF.DeriveKey(System.Security.Cryptography.HashAlgorithmName.SHA256, key, 32, salt: default, info: new byte[] { 0x68, 0x6d, 0x61, 0x63, 0x2d, 0x6b, 0x65, 0x79 });
         var dataToMac = new byte[iv.Length + ciphertext.Length];
         Buffer.BlockCopy(iv, 0, dataToMac, 0, iv.Length);
         Buffer.BlockCopy(ciphertext, 0, dataToMac, iv.Length, ciphertext.Length);
@@ -423,7 +423,7 @@ public sealed class SeedStrategy : EncryptionStrategyBase
         var (iv, encryptedData, tag) = SplitCiphertext(ciphertext);
 
         // Verify HMAC
-        var macKey = HKDF.DeriveKey(System.Security.Cryptography.HashAlgorithmName.SHA256, key, 32, salt: null, info: "hmac-key"u8);
+        var macKey = HKDF.DeriveKey(System.Security.Cryptography.HashAlgorithmName.SHA256, key, 32, salt: default, info: new byte[] { 0x68, 0x6d, 0x61, 0x63, 0x2d, 0x6b, 0x65, 0x79 });
         var dataToMac = new byte[iv.Length + encryptedData.Length];
         Buffer.BlockCopy(iv, 0, dataToMac, 0, iv.Length);
         Buffer.BlockCopy(encryptedData, 0, dataToMac, iv.Length, encryptedData.Length);
@@ -597,7 +597,7 @@ public sealed class MagmaStrategy : EncryptionStrategyBase
         }
 
         // Compute HMAC
-        var macKey = HKDF.DeriveKey(System.Security.Cryptography.HashAlgorithmName.SHA256, key, 32, salt: null, info: "hmac-key"u8);
+        var macKey = HKDF.DeriveKey(System.Security.Cryptography.HashAlgorithmName.SHA256, key, 32, salt: default, info: new byte[] { 0x68, 0x6d, 0x61, 0x63, 0x2d, 0x6b, 0x65, 0x79 });
         var dataToMac = new byte[nonce.Length + ciphertext.Length];
         Buffer.BlockCopy(nonce, 0, dataToMac, 0, nonce.Length);
         Buffer.BlockCopy(ciphertext, 0, dataToMac, nonce.Length, ciphertext.Length);
@@ -616,7 +616,7 @@ public sealed class MagmaStrategy : EncryptionStrategyBase
         var (nonce, encryptedData, tag) = SplitCiphertext(ciphertext);
 
         // Verify HMAC
-        var macKey = HKDF.DeriveKey(System.Security.Cryptography.HashAlgorithmName.SHA256, key, 32, salt: null, info: "hmac-key"u8);
+        var macKey = HKDF.DeriveKey(System.Security.Cryptography.HashAlgorithmName.SHA256, key, 32, salt: default, info: new byte[] { 0x68, 0x6d, 0x61, 0x63, 0x2d, 0x6b, 0x65, 0x79 });
         var dataToMac = new byte[nonce.Length + encryptedData.Length];
         Buffer.BlockCopy(nonce, 0, dataToMac, 0, nonce.Length);
         Buffer.BlockCopy(encryptedData, 0, dataToMac, nonce.Length, encryptedData.Length);

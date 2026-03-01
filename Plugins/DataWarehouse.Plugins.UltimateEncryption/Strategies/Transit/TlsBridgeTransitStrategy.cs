@@ -35,7 +35,7 @@ public sealed class TlsBridgeTransitStrategy : TransitEncryptionPluginBase
     public SslStream? TlsStream { get; set; }
 
     /// <inheritdoc/>
-    protected override async Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(
+    protected override Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(
         byte[] plaintext,
         CipherPreset preset,
         byte[] key,
@@ -78,11 +78,11 @@ public sealed class TlsBridgeTransitStrategy : TransitEncryptionPluginBase
         }
 
         // Return plaintext unchanged (TLS will encrypt during transmission)
-        return await Task.FromResult((plaintext, metadata));
+        return Task.FromResult((plaintext, metadata));
     }
 
     /// <inheritdoc/>
-    protected override async Task<byte[]> DecryptDataAsync(
+    protected override Task<byte[]> DecryptDataAsync(
         byte[] ciphertext,
         CipherPreset preset,
         byte[] key,
@@ -96,7 +96,7 @@ public sealed class TlsBridgeTransitStrategy : TransitEncryptionPluginBase
 
         // No application-layer decryption - data is already decrypted by TLS layer
         // Just pass through the data
-        return await Task.FromResult(ciphertext);
+        return Task.FromResult(ciphertext);
     }
 
     /// <inheritdoc/>
@@ -131,10 +131,11 @@ public sealed class TlsBridgeTransitStrategy : TransitEncryptionPluginBase
         {
             metadata["TlsVersion"] = TlsStream.SslProtocol.ToString();
             var decCipherSuite = TlsStream.NegotiatedCipherSuite;
+            var (cipherAlg, hashAlg, _) = ParseCipherSuiteComponents(decCipherSuite.ToString());
             metadata["CipherSuite"] = decCipherSuite.ToString();
-            metadata["CipherAlgorithm"] = decCipherSuite.ToString();
+            metadata["CipherAlgorithm"] = cipherAlg;
             metadata["CipherStrength"] = 256;
-            metadata["HashAlgorithm"] = decCipherSuite.ToString();
+            metadata["HashAlgorithm"] = hashAlg;
         }
 
         return new TransitEncryptionResult
@@ -226,13 +227,44 @@ public sealed class TlsBridgeTransitStrategy : TransitEncryptionPluginBase
             ["IsSigned"] = TlsStream.IsSigned,
             ["SslProtocol"] = TlsStream.SslProtocol.ToString(),
             ["NegotiatedCipherSuite"] = TlsStream.NegotiatedCipherSuite.ToString(),
-            ["CipherAlgorithm"] = TlsStream.NegotiatedCipherSuite.ToString(),
+            ["CipherAlgorithm"] = ParseCipherSuiteComponents(TlsStream.NegotiatedCipherSuite.ToString()).cipher,
             ["CipherStrength"] = 256,
-            ["HashAlgorithm"] = TlsStream.NegotiatedCipherSuite.ToString(),
+            ["HashAlgorithm"] = ParseCipherSuiteComponents(TlsStream.NegotiatedCipherSuite.ToString()).hash,
             ["HashStrength"] = 256,
-            ["KeyExchangeAlgorithm"] = TlsStream.NegotiatedCipherSuite.ToString(),
+            ["KeyExchangeAlgorithm"] = ParseCipherSuiteComponents(TlsStream.NegotiatedCipherSuite.ToString()).kex,
             ["KeyExchangeStrength"] = 256, // Derived from NegotiatedCipherSuite
             ["TransportContext"] = TlsStream.TransportContext != null
         };
+    }
+
+    /// <summary>
+    /// Parses a TLS cipher suite name (e.g. TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) into
+    /// its distinct cipher, hash, and key-exchange components so that metadata fields are
+    /// meaningful rather than duplicating the full suite name.
+    /// </summary>
+    private static (string cipher, string hash, string kex) ParseCipherSuiteComponents(string suiteName)
+    {
+        // TLS 1.3 suites: TLS_AES_256_GCM_SHA384 — no WITH separator
+        // TLS 1.2 suites: TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        var withIdx = suiteName.IndexOf("_WITH_", StringComparison.Ordinal);
+        if (withIdx < 0)
+        {
+            // TLS 1.3 format: derive cipher from suite name, no explicit kex
+            var lastUnderscore = suiteName.LastIndexOf('_');
+            var hash = lastUnderscore >= 0 ? suiteName[(lastUnderscore + 1)..] : suiteName;
+            var cipher = lastUnderscore >= 0 ? suiteName[4..lastUnderscore] : suiteName;
+            return (cipher, hash, "TLS1.3-Implicit");
+        }
+
+        // Pre-WITH = "TLS_KEX_AUTH", Post-WITH = "CIPHER_HASH"
+        var kexPart = suiteName[4..withIdx]; // strip leading "TLS_"
+        var cipherHashPart = suiteName[(withIdx + 6)..]; // skip "_WITH_"
+
+        // Hash is the last underscore-separated token
+        var chLastUnderscore = cipherHashPart.LastIndexOf('_');
+        var cipherComponent = chLastUnderscore >= 0 ? cipherHashPart[..chLastUnderscore] : cipherHashPart;
+        var hashComponent = chLastUnderscore >= 0 ? cipherHashPart[(chLastUnderscore + 1)..] : cipherHashPart;
+
+        return (cipherComponent, hashComponent, kexPart);
     }
 }

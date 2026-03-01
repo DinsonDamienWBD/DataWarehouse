@@ -64,7 +64,8 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
     // Crypto-agility engine for PQC migration orchestration
     private readonly CryptoAgilityEngine _cryptoAgilityEngine;
 
-    // Configuration
+    // Configuration — guarded by _configLock for compound read-modify-write sequences
+    private readonly object _configLock = new();
     private volatile string _defaultStrategyId = "aes-256-gcm";
     private volatile bool _fipsMode;
     private volatile bool _auditEnabled = true;
@@ -592,28 +593,38 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
         }
 
         var enabled = enabledObj is bool b ? b : bool.Parse(enabledObj.ToString()!);
-        _fipsMode = enabled;
 
-        if (enabled)
+        // Serialize concurrent FIPS toggle + default-strategy reads under _configLock to
+        // prevent TOCTOU: without the lock, two concurrent calls could both read _defaultStrategyId
+        // while one is mid-validation, producing inconsistent state.
+        string currentDefaultStrategyId;
+        lock (_configLock)
         {
-            // Verify default strategy is FIPS compliant
-            var defaultStrategy = _registry.GetStrategy(_defaultStrategyId);
-            if (defaultStrategy != null)
+            _fipsMode = enabled;
+
+            if (enabled)
             {
-                var fipsResult = FipsComplianceValidator.Validate(defaultStrategy.CipherInfo);
-                if (!fipsResult.IsCompliant)
+                // Verify default strategy is FIPS compliant; snapshot for use outside lock
+                var defaultStrategy = _registry.GetStrategy(_defaultStrategyId);
+                if (defaultStrategy != null)
                 {
-                    _defaultStrategyId = "aes-256-gcm"; // Fall back to FIPS-compliant default
+                    var fipsResult = FipsComplianceValidator.Validate(defaultStrategy.CipherInfo);
+                    if (!fipsResult.IsCompliant)
+                    {
+                        _defaultStrategyId = "aes-256-gcm"; // Fall back to FIPS-compliant default
+                    }
                 }
             }
+
+            currentDefaultStrategyId = _defaultStrategyId;
         }
 
         message.Payload["fipsMode"] = _fipsMode;
-        message.Payload["defaultStrategy"] = _defaultStrategyId;
+        message.Payload["defaultStrategy"] = currentDefaultStrategyId;
 
         // Persist FIPS mode and default strategy across restarts
         _ = SaveStateAsync("fipsMode", new byte[] { (byte)(_fipsMode ? 1 : 0) });
-        _ = SaveStateAsync("defaultStrategy", System.Text.Encoding.UTF8.GetBytes(_defaultStrategyId));
+        _ = SaveStateAsync("defaultStrategy", System.Text.Encoding.UTF8.GetBytes(currentDefaultStrategyId));
 
         return Task.CompletedTask;
     }

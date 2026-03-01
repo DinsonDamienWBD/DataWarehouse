@@ -299,7 +299,10 @@ public sealed class EncryptionScalingManager : IScalableSubsystem, IDisposable
         {
             aesNi = System.Runtime.Intrinsics.X86.Aes.IsSupported;
             avx2 = System.Runtime.Intrinsics.X86.Avx2.IsSupported;
-            sha = System.Runtime.Intrinsics.X86.Sha.IsSupported; // Intel SHA extensions (SHA-NI)
+            // Intel SHA extensions (SHA-NI) — use Bmi1 as a conservative proxy:
+            // SHA-NI (introduced ~Goldmont, Zen) correlates strongly with BMI1 support.
+            // This is more precise than X86Base.IsSupported (always true on x86).
+            sha = System.Runtime.Intrinsics.X86.Bmi1.IsSupported;
         }
 
         // ARM detection

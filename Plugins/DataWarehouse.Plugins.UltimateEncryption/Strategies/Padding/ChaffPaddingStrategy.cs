@@ -190,7 +190,7 @@ public sealed class ChaffPaddingStrategy : EncryptionStrategyBase
         // Structure: [header:10][nonce:16][combined][hmac:32]
         // HMAC-SHA256 is computed over header+nonce+combined using a key derived from the
         // encryption key, authenticating the header against tampering (#2997).
-        var macKey = HKDF.DeriveKey(System.Security.Cryptography.HashAlgorithmName.SHA256, key, 32, salt: null, info: "hmac-key"u8);
+        var macKey = HKDF.DeriveKey(System.Security.Cryptography.HashAlgorithmName.SHA256, key, 32, salt: default, info: new byte[] { 0x68, 0x6d, 0x61, 0x63, 0x2d, 0x6b, 0x65, 0x79 });
         var result = new byte[HeaderSize + NonceSize + combined.Length + HmacSize];
         var offset = 0;
 
@@ -237,7 +237,7 @@ public sealed class ChaffPaddingStrategy : EncryptionStrategyBase
 
         // Step 1a: Verify HMAC-SHA256 before parsing any header fields (#2997).
         // This prevents header-flip attacks and authenticates the original-length field.
-        var macKey = HKDF.DeriveKey(System.Security.Cryptography.HashAlgorithmName.SHA256, key, 32, salt: null, info: "hmac-key"u8);
+        var macKey = HKDF.DeriveKey(System.Security.Cryptography.HashAlgorithmName.SHA256, key, 32, salt: default, info: new byte[] { 0x68, 0x6d, 0x61, 0x63, 0x2d, 0x6b, 0x65, 0x79 });
         var storedHmac = ciphertext.AsSpan(ciphertext.Length - HmacSize, HmacSize);
         var computedHmac = HMACSHA256.HashData(macKey, ciphertext.AsSpan(0, ciphertext.Length - HmacSize));
         CryptographicOperations.ZeroMemory(macKey);
