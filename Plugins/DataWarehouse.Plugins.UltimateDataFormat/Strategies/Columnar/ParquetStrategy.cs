@@ -96,7 +96,8 @@ public sealed class ParquetStrategy : DataFormatStrategyBase
             var batches = new List<ColumnarBatch>();
             long totalRows = 0;
 
-            await foreach (var batch in ParquetCompatibleReader.ReadFromStream(input))
+            // P2-2239: Pass cancellation token so stream reading honours ct during large file reads.
+            await foreach (var batch in ParquetCompatibleReader.ReadFromStream(input).WithCancellation(ct))
             {
                 ct.ThrowIfCancellationRequested();
 

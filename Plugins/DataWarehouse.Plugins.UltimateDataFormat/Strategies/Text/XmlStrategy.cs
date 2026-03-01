@@ -67,9 +67,10 @@ public sealed class XmlStrategy : DataFormatStrategyBase
 
         try
         {
-            var startPosition = input.Position;
-            var doc = await Task.Run(() => XDocument.Load(input), ct);
-            var bytesProcessed = input.Position - startPosition;
+            var startPosition = input.CanSeek ? input.Position : 0L;
+            // P2-2249: Use XDocument.LoadAsync so cancellation is honoured during large XML loads.
+            var doc = await XDocument.LoadAsync(input, LoadOptions.None, ct);
+            var bytesProcessed = input.CanSeek ? input.Position - startPosition : 0L;
 
             return DataFormatResult.Ok(doc, bytesProcessed);
         }
@@ -92,11 +93,12 @@ public sealed class XmlStrategy : DataFormatStrategyBase
 
             if (data is XDocument doc)
             {
-                await Task.Run(() => doc.Save(output), ct);
+                // P2-2249: Use SaveAsync so cancellation is honoured during large XML writes.
+                await doc.SaveAsync(output, SaveOptions.None, ct);
             }
             else if (data is XElement element)
             {
-                await Task.Run(() => element.Save(output), ct);
+                await element.SaveAsync(output, SaveOptions.None, ct);
             }
             else
             {
@@ -119,7 +121,8 @@ public sealed class XmlStrategy : DataFormatStrategyBase
 
         try
         {
-            await Task.Run(() => XDocument.Load(stream), ct);
+            // P2-2249: Use LoadAsync so cancellation is honoured.
+            await XDocument.LoadAsync(stream, LoadOptions.None, ct);
             return FormatValidationResult.Valid;
         }
         catch (XmlException ex)

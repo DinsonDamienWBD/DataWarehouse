@@ -94,9 +94,11 @@ public sealed class VtkStrategy : DataFormatStrategyBase
     {
         try
         {
-            var buffer = new byte[Math.Min(4096, stream.Length)];
-            await stream.ReadExactlyAsync(buffer, 0, buffer.Length, ct);
-            var text = Encoding.ASCII.GetString(buffer);
+            // P2-2247: stream.Length throws NotSupportedException on non-seekable streams.
+            int bufSize = stream.CanSeek ? (int)Math.Min(4096, stream.Length) : 4096;
+            var buffer = new byte[bufSize];
+            int bytesRead = await stream.ReadAsync(buffer, 0, bufSize, ct);
+            var text = Encoding.ASCII.GetString(buffer, 0, bytesRead);
 
             var fields = new List<SchemaField>();
 
@@ -241,9 +243,11 @@ public sealed class VtkStrategy : DataFormatStrategyBase
     {
         try
         {
-            var buffer = new byte[Math.Min(2048, stream.Length)];
-            await stream.ReadExactlyAsync(buffer, 0, buffer.Length, ct);
-            var text = Encoding.ASCII.GetString(buffer);
+            // P2-2247: stream.Length throws NotSupportedException on non-seekable streams.
+            int bufSize2 = stream.CanSeek ? (int)Math.Min(2048, stream.Length) : 2048;
+            var buffer = new byte[bufSize2];
+            int bytesRead2 = await stream.ReadAsync(buffer, 0, bufSize2, ct);
+            var text = Encoding.ASCII.GetString(buffer, 0, bytesRead2);
 
             var errors = new List<ValidationError>();
 

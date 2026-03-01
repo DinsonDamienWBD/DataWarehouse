@@ -708,14 +708,6 @@ public sealed class OrcStrategy : DataFormatStrategyBase
             stripeInfos.Add((sOffset, sLength, sRowCount));
         }
 
-        // Read stripe data
-        var allColumns = new List<ColumnVector>(numColumns);
-        // Initialize column builders
-        for (int colIdx = 0; colIdx < numColumns; colIdx++)
-        {
-            allColumns.Add(null!); // Will be replaced per-stripe merge
-        }
-
         // For simplicity, read all stripes and merge into a single batch
         var batchColumns = new List<List<ColumnVector>>(numColumns);
         for (int c = 0; c < numColumns; c++)
@@ -724,6 +716,9 @@ public sealed class OrcStrategy : DataFormatStrategyBase
         int totalRows = 0;
         foreach (var (sOffset, sLength, sRowCount) in stripeInfos)
         {
+            // P2-2234: Guard against stripe offset > int.MaxValue (files >2 GB).
+            if (sOffset < 0 || sOffset > int.MaxValue || sOffset + sLength > fileBytes.Length)
+                throw new InvalidDataException($"ORC stripe offset {sOffset} is out of range for in-memory buffer (file size: {fileBytes.Length}).");
             using var stripeStream = new MemoryStream(fileBytes, (int)sOffset, sLength);
             using var stripeReader = new BinaryReader(stripeStream, Encoding.UTF8);
 
