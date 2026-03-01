@@ -898,17 +898,31 @@ public sealed class DataResidencyEnforcementStrategy : ComplianceStrategyBase
 
     private DataResidencyPolicy? GetApplicablePolicy(string? resourceId, string dataClassification)
     {
-        // Find policy by data classification
-        foreach (var policy in _policies.Values.Where(p => p.IsActive))
+        // P2-1536: deterministic selection — prefer policies with explicit classification lists
+        // (most specific) over wildcard policies; break ties by PolicyId for stable ordering.
+        DataResidencyPolicy? best = null;
+        int bestScore = -1;
+
+        foreach (var policy in _policies.Values)
         {
-            if (policy.ApplicableDataClassifications.Count == 0 ||
-                policy.ApplicableDataClassifications.Contains(dataClassification))
+            if (!policy.IsActive) continue;
+
+            bool matches = policy.ApplicableDataClassifications.Count == 0 ||
+                           policy.ApplicableDataClassifications.Contains(dataClassification);
+            if (!matches) continue;
+
+            // Higher score for explicit classification match (more specific wins)
+            int score = policy.ApplicableDataClassifications.Count > 0 ? 1 : 0;
+            if (score > bestScore ||
+                (score == bestScore && best != null &&
+                 string.Compare(policy.PolicyId, best.PolicyId, StringComparison.Ordinal) < 0))
             {
-                return policy;
+                best = policy;
+                bestScore = score;
             }
         }
 
-        return null;
+        return best;
     }
 
     private bool IsLocationAllowed(DataResidencyPolicy policy, string location)

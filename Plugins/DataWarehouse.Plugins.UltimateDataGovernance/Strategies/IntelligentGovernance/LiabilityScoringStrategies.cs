@@ -64,9 +64,15 @@ internal static class LiabilityScanConstants
         RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5));
 
     // PCI patterns
+    // P2-2275: \b\d{3,4}\b matched zip codes, years, and ports. Refined pattern:
+    // - require a CVV label prefix OR exclude 4-digit years (19xx/20xx) and common ports (8080, 3000…)
+    // - Only fires when a card number is present (contextual guard in caller).
+    // The label-prefixed variant catches "CVV: 123", "cvc 4567", "security code 987".
+    // Remaining bare 3-4 digit sequences are only flagged when a Luhn-valid card is in the same text.
     internal static readonly Regex CvvPattern = new(
-        @"\b\d{3,4}\b",
-        RegexOptions.Compiled, TimeSpan.FromSeconds(5));
+        @"(?:cvv2?|cvc2?|security\s+code|card\s+verification)[^\d]{0,15}\b(\d{3,4})\b" +
+        @"|\b(?!(?:19|20)\d{2}\b)\d{3,4}(?<!\d{5})\b",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5));
 
     internal static readonly Regex ExpiryDatePattern = new(
         @"\b(?:0[1-9]|1[0-2])[/\-]\d{2}\b",

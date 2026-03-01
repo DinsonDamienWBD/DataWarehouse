@@ -136,9 +136,12 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.WORM
                 });
             }
 
-            var isCompliant = violations.Count == 0;
-            var status = isCompliant ? ComplianceStatus.Compliant :
+            // P2-1562: Medium violations are advisory; only High+ violations fail compliance.
+            var isCompliant = !violations.Any(v =>
+                v.Severity == ViolationSeverity.Critical || v.Severity == ViolationSeverity.High);
+            var status = violations.Count == 0 ? ComplianceStatus.Compliant :
                         violations.Any(v => v.Severity == ViolationSeverity.Critical) ? ComplianceStatus.NonCompliant :
+                        !isCompliant ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult

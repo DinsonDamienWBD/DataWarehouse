@@ -268,10 +268,50 @@ public sealed class DbtStyleTransformationStrategy : DataIntegrationStrategyBase
         };
     }
 
-    private List<DbtModel> TopologicalSort(List<DbtModel> models)
+    /// <summary>
+    /// Kahn's algorithm topological sort — produces a valid DAG execution order.
+    /// P2-2298: replaced incorrect OrderBy(Dependencies.Count) which fails on diamond deps.
+    /// </summary>
+    private static List<DbtModel> TopologicalSort(List<DbtModel> models)
     {
-        // Simplified topological sort
-        return models.OrderBy(m => m.Dependencies.Count).ToList();
+        var byId = models.ToDictionary(m => m.ModelId);
+        // In-degree count
+        var inDegree = models.ToDictionary(m => m.ModelId, _ => 0);
+        var dependents = models.ToDictionary(m => m.ModelId, _ => new List<string>());
+
+        foreach (var model in models)
+        {
+            foreach (var dep in model.Dependencies)
+            {
+                if (!inDegree.ContainsKey(dep)) continue; // external/unknown dep — skip
+                inDegree[model.ModelId]++;
+                dependents[dep].Add(model.ModelId);
+            }
+        }
+
+        var queue = new Queue<string>(inDegree.Where(kvp => kvp.Value == 0).Select(kvp => kvp.Key));
+        var result = new List<DbtModel>(models.Count);
+
+        while (queue.Count > 0)
+        {
+            var id = queue.Dequeue();
+            if (byId.TryGetValue(id, out var m))
+                result.Add(m);
+            foreach (var dep in dependents[id])
+            {
+                if (--inDegree[dep] == 0)
+                    queue.Enqueue(dep);
+            }
+        }
+
+        // If cycle detected, append remaining nodes (best-effort)
+        foreach (var kvp in inDegree.Where(kvp => kvp.Value > 0))
+        {
+            if (byId.TryGetValue(kvp.Key, out var m))
+                result.Add(m);
+        }
+
+        return result;
     }
 
     private Task<DbtModelResult> ExecuteModelAsync(DbtModel model, CancellationToken ct)

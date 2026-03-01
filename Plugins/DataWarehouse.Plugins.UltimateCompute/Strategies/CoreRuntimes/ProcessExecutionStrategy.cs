@@ -165,14 +165,19 @@ internal sealed class ServerlessExecutionStrategy : ComputeRuntimeStrategyBase
     {
         // AWS Lambda invocation via CLI (aws lambda invoke)
         var functionName = task.EntryPoint ?? task.Metadata?["function_name"]?.ToString() ?? throw new ArgumentException("Lambda function name required");
+        // P2-1688: validate function name — Lambda names are [a-zA-Z0-9_-]{1,64} or ARNs.
+        // Reject names with spaces or shell metacharacters to prevent CLI injection.
+        if (functionName.IndexOfAny([' ', '\t', '\n', '\r', '"', '\'', '`', '$', '&', '|', ';', '<', '>']) >= 0)
+            throw new ArgumentException($"Lambda function name contains invalid characters: {functionName}");
 
-        // Write payload to a temp file and pass via --payload fileb:// to prevent shell injection.
+        // Write payload to a temp file and pass via --payload fileb:// to prevent shell injection
+        // and to handle large payloads or binary data that cannot be safely embedded in args.
         var payloadFile = Path.GetTempFileName();
         var outputFile = Path.GetTempFileName();
         try
         {
             await File.WriteAllBytesAsync(payloadFile, task.InputData.ToArray(), ct);
-            var args = $"lambda invoke --function-name {functionName} --payload fileb://\"{payloadFile}\" \"{outputFile}\"";
+            var args = $"lambda invoke --function-name \"{functionName}\" --payload fileb://\"{payloadFile}\" \"{outputFile}\"";
             var result = await RunProcessAsync("aws", args,
                 timeout: GetEffectiveTimeout(task),
                 cancellationToken: ct);

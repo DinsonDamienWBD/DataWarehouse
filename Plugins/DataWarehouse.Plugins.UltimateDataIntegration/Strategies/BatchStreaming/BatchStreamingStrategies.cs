@@ -14,6 +14,9 @@ public sealed class LambdaArchitectureStrategy : DataIntegrationStrategyBase
     private readonly BoundedDictionary<string, LambdaPipeline> _pipelines = new BoundedDictionary<string, LambdaPipeline>(1000);
     private readonly BoundedDictionary<string, BatchView> _batchViews = new BoundedDictionary<string, BatchView>(1000);
     private readonly BoundedDictionary<string, SpeedView> _speedViews = new BoundedDictionary<string, SpeedView>(1000);
+    // P2-2297: per-view locks guard mutations to mutable record properties under concurrency
+    private readonly BoundedDictionary<string, object> _batchViewLocks = new BoundedDictionary<string, object>(1000);
+    private readonly BoundedDictionary<string, object> _speedViewLocks = new BoundedDictionary<string, object>(1000);
 
     public override string StrategyId => "integration-lambda";
     public override string DisplayName => "Lambda Architecture";
@@ -57,6 +60,8 @@ public sealed class LambdaArchitectureStrategy : DataIntegrationStrategyBase
 
         _batchViews[pipelineId] = new BatchView { PipelineId = pipelineId };
         _speedViews[pipelineId] = new SpeedView { PipelineId = pipelineId };
+        _batchViewLocks[pipelineId] = new object();
+        _speedViewLocks[pipelineId] = new object();
 
         RecordOperation("CreateLambdaPipeline");
         return Task.FromResult(pipeline);
@@ -78,14 +83,20 @@ public sealed class LambdaArchitectureStrategy : DataIntegrationStrategyBase
 
         var startTime = DateTime.UtcNow;
 
-        // Process all data for accurate batch view
-        batchView.TotalRecords += records.Count;
-        batchView.LastUpdated = DateTime.UtcNow;
-
-        // Compute aggregations
-        foreach (var record in records)
+        // P2-2297: lock per-pipeline to guard mutable record property mutations
+        var batchLock = _batchViewLocks.TryGetValue(pipelineId, out var bl) ? bl : new object();
+        int snapshotVersion;
+        lock (batchLock)
         {
-            UpdateBatchAggregations(batchView, record);
+            batchView.TotalRecords += records.Count;
+            batchView.LastUpdated = DateTime.UtcNow;
+
+            // Compute aggregations
+            foreach (var record in records)
+            {
+                UpdateBatchAggregations(batchView, record);
+            }
+            snapshotVersion = batchView.Version;
         }
 
         RecordOperation("ProcessBatch");
@@ -95,7 +106,7 @@ public sealed class LambdaArchitectureStrategy : DataIntegrationStrategyBase
             PipelineId = pipelineId,
             RecordsProcessed = records.Count,
             ProcessingTime = DateTime.UtcNow - startTime,
-            ViewVersion = batchView.Version
+            ViewVersion = snapshotVersion
         };
     }
 
@@ -113,14 +124,19 @@ public sealed class LambdaArchitectureStrategy : DataIntegrationStrategyBase
         if (!_speedViews.TryGetValue(pipelineId, out var speedView))
             throw new InvalidOperationException($"Speed view not found for pipeline {pipelineId}");
 
+        // P2-2297: lock per-pipeline to guard mutable record property mutations
+        var speedLock = _speedViewLocks.TryGetValue(pipelineId, out var sl) ? sl : new object();
+
         await foreach (var evt in events.WithCancellation(ct))
         {
             var startTime = DateTime.UtcNow;
 
-            speedView.TotalEvents++;
-            speedView.LastUpdated = DateTime.UtcNow;
-
-            UpdateSpeedAggregations(speedView, evt);
+            lock (speedLock)
+            {
+                speedView.TotalEvents++;
+                speedView.LastUpdated = DateTime.UtcNow;
+                UpdateSpeedAggregations(speedView, evt);
+            }
 
             yield return new SpeedLayerResult
             {
