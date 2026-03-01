@@ -107,8 +107,9 @@ internal sealed class PipelinedExecutionStrategy : ComputeRuntimeStrategyBase
                 }, cancellationToken);
             }
 
-            await feeder;
-            await Task.WhenAll(stageTasks);
+            // P2-1724: await feeder and all stage tasks concurrently so a feeder failure does not
+            // leave stage tasks blocked on channel input indefinitely.
+            await Task.WhenAll([feeder, .. stageTasks]);
 
             // Collect final output
             var output = new StringBuilder();

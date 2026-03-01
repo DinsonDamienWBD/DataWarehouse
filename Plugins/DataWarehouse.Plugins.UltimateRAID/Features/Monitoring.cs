@@ -675,10 +675,15 @@ public sealed class AuditLogger
 
         _entries.Enqueue(entry);
 
-        // Trim old entries
-        while (_entries.Count > MaxEntries)
+        // Trim oldest entries when over capacity.  ConcurrentQueue.Count is a snapshot;
+        // concurrent trimmers may each attempt one dequeue — that is acceptable (ring-buffer
+        // approximation). The critical property is that no entry is lost without being
+        // replaced by a newer one; over-trimming by a few entries is preferable to an
+        // unbounded queue.
+        var excess = _entries.Count - MaxEntries;
+        for (int i = 0; i < excess; i++)
         {
-            _entries.TryDequeue(out _);
+            if (!_entries.TryDequeue(out _)) break;
         }
     }
 
@@ -809,6 +814,9 @@ public sealed class ComplianceReporter
 public sealed class IntegrityProof
 {
     private readonly BoundedDictionary<string, IntegrityRecord> _records = new BoundedDictionary<string, IntegrityRecord>(1000);
+    // Per-instance HMAC key — provides tamper-evidence against external forgers.
+    // For cross-process verification, persist and share this key securely.
+    private readonly byte[] _hmacKey = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
 
     public IntegrityRecord CreateProof(string arrayId, byte[] dataHash)
     {
@@ -863,9 +871,9 @@ public sealed class IntegrityProof
 
     private byte[] SignData(byte[] data)
     {
-        // Simulated signing
-        using var sha = System.Security.Cryptography.SHA256.Create();
-        return sha.ComputeHash(data);
+        // HMAC-SHA256 with per-instance key provides tamper-evidence.
+        // A bare SHA256 hash (no key) is not a signature — anyone can recompute it.
+        return System.Security.Cryptography.HMACSHA256.HashData(_hmacKey, data);
     }
 
     private bool VerifySignature(byte[] data, byte[] signature)

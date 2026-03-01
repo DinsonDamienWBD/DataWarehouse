@@ -440,11 +440,15 @@ public abstract class RaidStrategyBase : StrategyBase, IRaidStrategy
 
     /// <summary>
     /// Calculates average latency from samples.
+    /// Uses a manual fold to avoid ConcurrentQueue.Average() snapshot allocation on hot path.
     /// </summary>
     private static double CalculateAverageLatency(ConcurrentQueue<double> samples)
     {
         if (samples.IsEmpty) return 0;
-        return samples.Average();
+        double sum = 0;
+        int count = 0;
+        foreach (var s in samples) { sum += s; count++; }
+        return count == 0 ? 0 : sum / count;
     }
 
     #endregion

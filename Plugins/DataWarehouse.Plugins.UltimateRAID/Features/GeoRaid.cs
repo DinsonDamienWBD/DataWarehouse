@@ -131,8 +131,12 @@ public sealed class GeoRaid
             });
         }
 
-        allocation.EstimatedWriteLatencyMs = allocation.DataDiskAssignments.Max(d => d.EstimatedLatencyMs);
-        allocation.EstimatedReadLatencyMs = allocation.DataDiskAssignments.Min(d => d.EstimatedLatencyMs);
+        // Guard against empty DataDiskAssignments to avoid InvalidOperationException from LINQ Min/Max
+        if (allocation.DataDiskAssignments.Count > 0)
+        {
+            allocation.EstimatedWriteLatencyMs = allocation.DataDiskAssignments.Max(d => d.EstimatedLatencyMs);
+            allocation.EstimatedReadLatencyMs = allocation.DataDiskAssignments.Min(d => d.EstimatedLatencyMs);
+        }
 
         return allocation;
     }

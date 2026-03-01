@@ -199,10 +199,12 @@ internal abstract class WasmLanguageStrategyBase : ComputeRuntimeStrategyBase
         }
         catch (Exception ex)
         {
+            // P2-1757: CompilationSuccessful must be false when an exception occurred —
+            // wasmtime unavailable or compilation failure is not a successful compilation.
             return new WasmLanguageVerificationResult(
                 Language: LanguageInfo.Language,
                 ToolchainAvailable: false,
-                CompilationSuccessful: true,
+                CompilationSuccessful: false,
                 ExecutionSuccessful: false,
                 ActualOutput: null,
                 ExpectedOutput: ExpectedSampleOutput,

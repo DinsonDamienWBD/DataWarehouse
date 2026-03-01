@@ -264,6 +264,8 @@ public sealed class RaidLevelMigration
 
     private long CalculateTotalBlocks(List<DiskInfo> disks)
     {
+        if (disks.Count == 0)
+            throw new ArgumentException("Cannot calculate block count: disk list is empty.", nameof(disks));
         var minCapacity = disks.Min(d => d.Capacity);
         const int blockSize = 65536; // 64KB blocks
         return minCapacity / blockSize;

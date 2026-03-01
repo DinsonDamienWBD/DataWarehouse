@@ -356,6 +356,8 @@ public sealed class Raid50Strategy : SdkRaidStrategyBase
 
     public override StripeInfo CalculateStripe(long blockIndex, int diskCount)
     {
+        if (diskCount <= 0)
+            throw new ArgumentException("Disk count must be > 0.", nameof(diskCount));
         if (diskCount % _disksPerRaid5Group != 0)
             throw new ArgumentException($"Disk count must be a multiple of {_disksPerRaid5Group} for RAID 50");
 
@@ -678,6 +680,8 @@ public sealed class Raid60Strategy : SdkRaidStrategyBase
 
     public override StripeInfo CalculateStripe(long blockIndex, int diskCount)
     {
+        if (diskCount <= 0)
+            throw new ArgumentException("Disk count must be > 0.", nameof(diskCount));
         if (diskCount % _disksPerRaid6Group != 0)
             throw new ArgumentException($"Disk count must be a multiple of {_disksPerRaid6Group} for RAID 60");
 
