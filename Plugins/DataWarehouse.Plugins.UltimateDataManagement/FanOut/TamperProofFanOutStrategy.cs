@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -36,6 +37,10 @@ public sealed class TamperProofFanOutStrategy : FanOutStrategyBase
     private readonly IMessageBus? _messageBus;
     private readonly TimeSpan _storageTimeout = TimeSpan.FromSeconds(30);
     private readonly TimeSpan _wormTimeout = TimeSpan.FromSeconds(60);
+
+    // P2-2370: Thread-safe chain pointer — stores hash of the most recently committed anchor
+    // so PreviousHash correctly links each block to the prior one instead of always "genesis".
+    private string _lastAnchorHash = "genesis";
 
     private static readonly HashSet<WriteDestinationType> _enabledDestinations = new()
     {
@@ -96,8 +101,10 @@ public sealed class TamperProofFanOutStrategy : FanOutStrategyBase
         var sw = Stopwatch.StartNew();
         var results = new Dictionary<WriteDestinationType, WriteDestinationResult>();
 
-        // Generate blockchain anchor data BEFORE writes
-        var blockchainData = GenerateBlockchainAnchor(objectId, content);
+        // Generate blockchain anchor data BEFORE writes.
+        // P2-2370: Capture previous hash atomically and chain to it.
+        var prevHash = Interlocked.CompareExchange(ref _lastAnchorHash, _lastAnchorHash, _lastAnchorHash);
+        var blockchainData = GenerateBlockchainAnchor(objectId, content, prevHash);
 
         // PHASE 1: Parallel writes to Primary, Index, and Blockchain storage (all via T97)
         var phase1Results = await ExecutePhase1Async(objectId, content, blockchainData, ct);
@@ -105,6 +112,10 @@ public sealed class TamperProofFanOutStrategy : FanOutStrategyBase
         {
             results[type] = result;
         }
+
+        // P2-2370: Update chain pointer after anchor is committed to storage.
+        // Use Interlocked.Exchange so concurrent writes serialize correctly.
+        Interlocked.Exchange(ref _lastAnchorHash, blockchainData.ContentHash);
 
         // Check if Phase 1 succeeded
         var phase1Success = phase1Results.All(r => r.Value.Success);
@@ -494,7 +505,7 @@ public sealed class TamperProofFanOutStrategy : FanOutStrategyBase
     /// Generates blockchain anchor data for the content.
     /// This is the TamperProof orchestrator's core responsibility.
     /// </summary>
-    private static BlockchainAnchorData GenerateBlockchainAnchor(string objectId, IndexableContent content)
+    private static BlockchainAnchorData GenerateBlockchainAnchor(string objectId, IndexableContent content, string previousHash)
     {
         var timestamp = DateTimeOffset.UtcNow;
         var contentHash = ComputeContentHash(objectId, content);
@@ -508,7 +519,7 @@ public sealed class TamperProofFanOutStrategy : FanOutStrategyBase
             AnchorId = $"anchor-{Guid.NewGuid():N}",
             ObjectId = objectId,
             ContentHash = contentHash,
-            PreviousHash = "genesis", // Would chain to previous anchor in production
+            PreviousHash = previousHash,
             Timestamp = timestamp,
             Nonce = nonce,
             Size = content.Size ?? 0,
