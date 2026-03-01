@@ -164,6 +164,7 @@ public class MigrationJob
     public void RecordFailed(string key, string error);
     public void RecordSkipped();
     public void SetTotal(long objects, long bytes);
+    public void IncrementTotal(long objects, long bytes);
 }
 ```
 
@@ -313,7 +314,8 @@ public sealed class S3HttpServer : IS3CompatibleServer
 {
 #endregion
 }
-    public S3HttpServer(IStorageFabric fabric);
+    public S3HttpServer(IStorageFabric fabric) : this(fabric, null);
+    public S3HttpServer(IStorageFabric fabric, S3BucketManager? bucketManager);
     public bool IsRunning;;
     public string? ListenUrl { get; private set; }
     public async Task StartAsync(S3ServerOptions options, CancellationToken ct = default);

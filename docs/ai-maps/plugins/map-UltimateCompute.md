@@ -406,6 +406,8 @@ internal abstract class WasmLanguageStrategyBase : ComputeRuntimeStrategyBase
     protected virtual string ExpectedSampleOutput;;
     public override async Task InitializeAsync(CancellationToken cancellationToken = default);
     public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
+    protected virtual string[] GetToolchainBinaryNames();;
+    protected string? FindMissingToolchain();
     public async Task<WasmLanguageVerificationResult> VerifyLanguageAsync(CancellationToken cancellationToken = default);
 }
 ```
@@ -1263,6 +1265,7 @@ internal sealed class GrainWasmLanguageStrategy : WasmLanguageStrategyBase
 {
 }
     public override string StrategyId;;
+    protected override string[] GetToolchainBinaryNames();;
     public override string StrategyName;;
     public override WasmLanguageInfo LanguageInfo;;
     protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
@@ -1275,6 +1278,7 @@ internal sealed class KotlinWasmLanguageStrategy : WasmLanguageStrategyBase
 {
 }
     public override string StrategyId;;
+    protected override string[] GetToolchainBinaryNames();;
     public override string StrategyName;;
     public override WasmLanguageInfo LanguageInfo;;
     protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
@@ -1287,6 +1291,7 @@ internal sealed class OCamlWasmLanguageStrategy : WasmLanguageStrategyBase
 {
 }
     public override string StrategyId;;
+    protected override string[] GetToolchainBinaryNames();;
     public override string StrategyName;;
     public override WasmLanguageInfo LanguageInfo;;
     protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
@@ -1299,6 +1304,7 @@ internal sealed class JavaWasmLanguageStrategy : WasmLanguageStrategyBase
 {
 }
     public override string StrategyId;;
+    protected override string[] GetToolchainBinaryNames();;
     public override string StrategyName;;
     public override WasmLanguageInfo LanguageInfo;;
     protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
@@ -1311,6 +1317,7 @@ internal sealed class MoonBitWasmLanguageStrategy : WasmLanguageStrategyBase
 {
 }
     public override string StrategyId;;
+    protected override string[] GetToolchainBinaryNames();;
     public override string StrategyName;;
     public override WasmLanguageInfo LanguageInfo;;
     protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
@@ -1323,6 +1330,7 @@ internal sealed class SwiftWasmLanguageStrategy : WasmLanguageStrategyBase
 {
 }
     public override string StrategyId;;
+    protected override string[] GetToolchainBinaryNames();;
     public override string StrategyName;;
     public override WasmLanguageInfo LanguageInfo;;
     protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
@@ -1335,6 +1343,7 @@ internal sealed class TypeScriptWasmLanguageStrategy : WasmLanguageStrategyBase
 {
 }
     public override string StrategyId;;
+    protected override string[] GetToolchainBinaryNames();;
     public override string StrategyName;;
     public override WasmLanguageInfo LanguageInfo;;
     protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
@@ -1347,6 +1356,7 @@ internal sealed class RubyWasmLanguageStrategy : WasmLanguageStrategyBase
 {
 }
     public override string StrategyId;;
+    protected override string[] GetToolchainBinaryNames();;
     public override string StrategyName;;
     public override WasmLanguageInfo LanguageInfo;;
     protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
@@ -1359,6 +1369,7 @@ internal sealed class HaskellWasmLanguageStrategy : WasmLanguageStrategyBase
 {
 }
     public override string StrategyId;;
+    protected override string[] GetToolchainBinaryNames();;
     public override string StrategyName;;
     public override WasmLanguageInfo LanguageInfo;;
     protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
@@ -1371,6 +1382,7 @@ internal sealed class PythonWasmLanguageStrategy : WasmLanguageStrategyBase
 {
 }
     public override string StrategyId;;
+    protected override string[] GetToolchainBinaryNames();;
     public override string StrategyName;;
     public override WasmLanguageInfo LanguageInfo;;
     protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
@@ -1383,6 +1395,7 @@ internal sealed class DartWasmLanguageStrategy : WasmLanguageStrategyBase
 {
 }
     public override string StrategyId;;
+    protected override string[] GetToolchainBinaryNames();;
     public override string StrategyName;;
     public override WasmLanguageInfo LanguageInfo;;
     protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
@@ -1395,6 +1408,7 @@ internal sealed class PhpWasmLanguageStrategy : WasmLanguageStrategyBase
 {
 }
     public override string StrategyId;;
+    protected override string[] GetToolchainBinaryNames();;
     public override string StrategyName;;
     public override WasmLanguageInfo LanguageInfo;;
     protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
@@ -1407,6 +1421,7 @@ internal sealed class JavaScriptWasmLanguageStrategy : WasmLanguageStrategyBase
 {
 }
     public override string StrategyId;;
+    protected override string[] GetToolchainBinaryNames();;
     public override string StrategyName;;
     public override WasmLanguageInfo LanguageInfo;;
     protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
@@ -1419,6 +1434,7 @@ internal sealed class LuaWasmLanguageStrategy : WasmLanguageStrategyBase
 {
 }
     public override string StrategyId;;
+    protected override string[] GetToolchainBinaryNames();;
     public override string StrategyName;;
     public override WasmLanguageInfo LanguageInfo;;
     protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
@@ -1515,6 +1531,7 @@ internal sealed class ScalaWasmLanguageStrategy : WasmLanguageStrategyBase
 {
 }
     public override string StrategyId;;
+    protected override string[] GetToolchainBinaryNames();;
     public override string StrategyName;;
     public override WasmLanguageInfo LanguageInfo;;
     protected override ReadOnlySpan<byte> GetSampleWasmBytes();;
