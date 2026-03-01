@@ -111,26 +111,27 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
         /// </summary>
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
-            var startTime = DateTimeOffset.UtcNow;
+            // P2-1904: Use Stopwatch for latency — DateTimeOffset subtraction is susceptible to NTP clock adjustments.
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             try
             {
                 var httpClient = handle.GetConnection<HttpClient>();
-                var start = DateTimeOffset.UtcNow;
                 using var response = await httpClient.GetAsync("/minio/health/live", ct);
-                var latency = DateTimeOffset.UtcNow - start;
+                sw.Stop();
 
                 return new ConnectionHealth(
                     IsHealthy: response.IsSuccessStatusCode,
                     StatusMessage: response.IsSuccessStatusCode ? "MinIO server healthy" : $"MinIO server returned {response.StatusCode}",
-                    Latency: latency,
+                    Latency: sw.Elapsed,
                     CheckedAt: DateTimeOffset.UtcNow);
             }
             catch (Exception ex)
             {
+                sw.Stop();
                 return new ConnectionHealth(
                     IsHealthy: false,
                     StatusMessage: $"MinIO health check failed: {ex.Message}",
-                    Latency: DateTimeOffset.UtcNow - startTime,
+                    Latency: sw.Elapsed,
                     CheckedAt: DateTimeOffset.UtcNow);
             }
         }

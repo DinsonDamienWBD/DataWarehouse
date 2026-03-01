@@ -42,18 +42,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
         /// <inheritdoc/>
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':');
-            var host = parts[0];
-            int port;
-            if (parts.Length > 1)
-            {
-                if (!int.TryParse(parts[1], out port) || port < 1 || port > 65535)
-                    throw new ArgumentException($"Invalid port '{parts[1]}' in SFTP connection string. Expected a number between 1 and 65535.", nameof(config));
-            }
-            else
-            {
-                port = 22;
-            }
+            // P2-2132: Use IPv6-safe host/port parser (handles [::1]:22 bracket notation).
+            var (host, port) = ParseHostPort(
+                config.ConnectionString ?? throw new ArgumentException("Connection string required"),
+                22, "SFTP");
 
             var client = new TcpClient();
             await client.ConnectAsync(host, port, ct);
@@ -106,6 +98,36 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
                 StatusMessage: isHealthy ? "SFTP server connected" : "SFTP server disconnected",
                 Latency: TimeSpan.Zero,
                 CheckedAt: DateTimeOffset.UtcNow);
+        }
+        // P2-2132: IPv6-safe host/port parser. Handles "[::1]:port", "host:port", and "host" forms.
+        private static (string host, int port) ParseHostPort(string cs, int defaultPort, string protocol)
+        {
+            cs = cs.Trim();
+            if (cs.StartsWith('['))
+            {
+                // IPv6 bracket notation: [addr]:port or [addr]
+                var closeBracket = cs.IndexOf(']');
+                if (closeBracket < 0)
+                    throw new ArgumentException($"Malformed IPv6 address in {protocol} connection string: missing ']'.", nameof(cs));
+                var ipv6Host = cs.Substring(1, closeBracket - 1);
+                if (closeBracket + 1 < cs.Length && cs[closeBracket + 1] == ':')
+                {
+                    var portStr = cs.Substring(closeBracket + 2);
+                    if (!int.TryParse(portStr, out var p6) || p6 < 1 || p6 > 65535)
+                        throw new ArgumentException($"Invalid port '{portStr}' in {protocol} connection string.", nameof(cs));
+                    return (ipv6Host, p6);
+                }
+                return (ipv6Host, defaultPort);
+            }
+            var colonIdx = cs.IndexOf(':');
+            if (colonIdx >= 0)
+            {
+                var portPart = cs.Substring(colonIdx + 1);
+                if (!int.TryParse(portPart, out var p) || p < 1 || p > 65535)
+                    throw new ArgumentException($"Invalid port '{portPart}' in {protocol} connection string. Expected a number between 1 and 65535.", nameof(cs));
+                return (cs.Substring(0, colonIdx), p);
+            }
+            return (cs, defaultPort);
         }
     }
 }

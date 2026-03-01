@@ -110,7 +110,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
         /// </summary>
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
-            var startTime = DateTimeOffset.UtcNow;
+            // P2-1904: Use Stopwatch for latency — DateTimeOffset subtraction is susceptible
+            // to NTP/clock adjustments which can yield negative or wildly inaccurate latency.
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             try
             {
                 var httpClient = handle.GetConnection<HttpClient>();
@@ -118,7 +120,6 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
                     ? volName.ToString()
                     : null;
 
-                var start = DateTimeOffset.UtcNow;
                 HttpResponseMessage response;
 
                 // If a specific volume is configured, check its status
@@ -132,22 +133,22 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
                     response = await httpClient.GetAsync("/v1/volumes", ct);
                 }
 
-                var latency = DateTimeOffset.UtcNow - start;
-
+                sw.Stop();
                 return new ConnectionHealth(
                     IsHealthy: response.IsSuccessStatusCode,
                     StatusMessage: response.IsSuccessStatusCode
                         ? "GlusterFS cluster healthy"
                         : $"GlusterFS returned {response.StatusCode}",
-                    Latency: latency,
+                    Latency: sw.Elapsed,
                     CheckedAt: DateTimeOffset.UtcNow);
             }
             catch (Exception ex)
             {
+                sw.Stop();
                 return new ConnectionHealth(
                     IsHealthy: false,
                     StatusMessage: $"GlusterFS health check failed: {ex.Message}",
-                    Latency: DateTimeOffset.UtcNow - startTime,
+                    Latency: sw.Elapsed,
                     CheckedAt: DateTimeOffset.UtcNow);
             }
         }
