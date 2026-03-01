@@ -5545,6 +5545,7 @@ public class MpcConfig
     public int TotalParties { get; set; };
     public int PartyIndex { get; set; };
     public string? StoragePath { get; set; }
+    public Dictionary<int, byte[]>? PartyPublicKeys { get; set; }
 }
 ```
 ```csharp

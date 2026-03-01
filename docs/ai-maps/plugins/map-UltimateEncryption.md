@@ -319,7 +319,7 @@ public sealed class EncryptionScalingManager : IScalableSubsystem, IDisposable
     public EncryptionScalingManager(ILogger logger, ScalingLimits? limits = null, TimeSpan? probeInterval = null);
     public HardwareCryptoCapabilities CurrentCapabilities;;
     public BoundedCache<string, int> AlgorithmConcurrencyLimits;;
-    public BoundedCache<string, byte[]> KeyDerivationCache;;
+    internal BoundedCache<string, byte[]> KeyDerivationCache;;
     public HardwareCryptoCapabilities ReprobeHardware();
     public int GetAlgorithmParallelism(string algorithmName);
     public void SetAlgorithmParallelism(string algorithmName, int maxConcurrent);
@@ -897,6 +897,7 @@ public sealed class IdeaStrategy : EncryptionStrategyBase
     public override string StrategyName;;
     protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
     protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override byte[] GenerateKey();;
 }
 ```
 ```csharp
@@ -908,6 +909,7 @@ public sealed class Cast5Strategy : EncryptionStrategyBase
     public override string StrategyName;;
     protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
     protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override byte[] GenerateKey();;
 }
 ```
 ```csharp
@@ -919,6 +921,7 @@ public sealed class Cast6Strategy : EncryptionStrategyBase
     public override string StrategyName;;
     protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
     protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override byte[] GenerateKey();;
 }
 ```
 ```csharp
@@ -930,6 +933,7 @@ public sealed class Rc5Strategy : EncryptionStrategyBase
     public override string StrategyName;;
     protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
     protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override byte[] GenerateKey();;
 }
 ```
 ```csharp
@@ -1432,6 +1436,7 @@ public sealed class ChaCha20TransitStrategy : TransitEncryptionPluginBase
     protected override Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
     protected override Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
     public override async Task<TransitEncryptionResult> EncryptStreamForTransitAsync(System.IO.Stream plaintextStream, System.IO.Stream ciphertextStream, TransitEncryptionOptions options, ISecurityContext context, CancellationToken cancellationToken = default);
+    public override async Task<TransitDecryptionResult> DecryptStreamFromTransitAsync(System.IO.Stream ciphertextStream, System.IO.Stream plaintextStream, ISecurityContext context, CancellationToken cancellationToken = default);
 }
 ```
 
@@ -1487,6 +1492,7 @@ public sealed class Aes128GcmTransitStrategy : TransitEncryptionPluginBase
     protected override Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
     protected override Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
     public override async Task<TransitEncryptionResult> EncryptStreamForTransitAsync(System.IO.Stream plaintextStream, System.IO.Stream ciphertextStream, TransitEncryptionOptions options, ISecurityContext context, CancellationToken cancellationToken = default);
+    public override async Task<TransitDecryptionResult> DecryptStreamFromTransitAsync(System.IO.Stream ciphertextStream, System.IO.Stream plaintextStream, ISecurityContext context, CancellationToken cancellationToken = default);
 }
 ```
 
@@ -1501,6 +1507,7 @@ public sealed class AesGcmTransitStrategy : TransitEncryptionPluginBase
     protected override Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
     protected override Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
     public override async Task<TransitEncryptionResult> EncryptStreamForTransitAsync(System.IO.Stream plaintextStream, System.IO.Stream ciphertextStream, TransitEncryptionOptions options, ISecurityContext context, CancellationToken cancellationToken = default);
+    public override async Task<TransitDecryptionResult> DecryptStreamFromTransitAsync(System.IO.Stream ciphertextStream, System.IO.Stream plaintextStream, ISecurityContext context, CancellationToken cancellationToken = default);
 }
 ```
 
