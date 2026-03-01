@@ -5125,6 +5125,7 @@ public sealed class LegalHoldStrategy : RetentionStrategyBase
 public sealed class LegalHold
 {
 }
+    internal readonly object ListLock = new();
     public required string HoldId { get; init; }
     public required string MatterName { get; init; }
     public string? Description { get; init; }

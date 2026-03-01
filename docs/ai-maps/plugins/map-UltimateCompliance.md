@@ -552,7 +552,16 @@ public sealed class TamperProofAuditLog
     public string ComputeMerkleRoot(int startIndex = 0, int count = -1);
     public AuditEntry? GetEntry(string entryId);
     public IReadOnlyList<AuditEntry> GetEntriesInRange(DateTime startTime, DateTime endTime);
-    public int EntryCount;;
+    public int EntryCount
+{
+    get
+    {
+        lock (_lock)
+        {
+            return _entries.Count;
+        }
+    }
+}
 }
 ```
 ```csharp
@@ -1211,6 +1220,7 @@ public sealed class Iso27017Strategy : ComplianceStrategyBase
 public sealed class Iso27701Strategy : ComplianceStrategyBase
 {
 }
+    public int DataMinimizationFieldThreshold { get; set; };
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Framework;;
@@ -1957,6 +1967,7 @@ public sealed class ItarStrategy : ComplianceStrategyBase
     public override string StrategyName;;
     public override string Framework;;
     protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
 }
