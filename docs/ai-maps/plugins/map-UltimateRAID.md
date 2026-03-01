@@ -930,7 +930,7 @@ public sealed class MigrationRegistry
 {
 }
     public void AddEntry(string pluginId, LegacyPluginInfo info);
-    public IReadOnlyList<MigrationEntry> GetEntries();;
+    public IReadOnlyList<MigrationEntry> GetEntries();
     public void UpdateStatus(string pluginId, string status);
     public void SetOption(string pluginId, string key, object value);
 }
