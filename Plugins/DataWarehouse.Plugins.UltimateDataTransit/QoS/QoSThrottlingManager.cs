@@ -299,6 +299,8 @@ internal sealed class TokenBucket : IDisposable
         while (!ct.IsCancellationRequested)
         {
             await _refillLock.WaitAsync(ct);
+            // P2-2658: track release state explicitly to avoid the TOCTOU race on CurrentCount
+            bool released = false;
             try
             {
                 RefillTokens();
@@ -317,7 +319,8 @@ internal sealed class TokenBucket : IDisposable
 
                 if (waitMs <= 0) waitMs = 1;
 
-                // Release lock before waiting
+                // Release lock before waiting to allow refill to proceed
+                released = true;
                 _refillLock.Release();
 
                 await Task.Delay(waitMs, ct);
@@ -327,12 +330,9 @@ internal sealed class TokenBucket : IDisposable
             }
             finally
             {
-                // Only release if still held (not released in the wait path above)
-                if (_refillLock.CurrentCount == 0)
-                {
-                    try { _refillLock.Release(); }
-                    catch (SemaphoreFullException) { /* Already released */ }
-                }
+                // Only release if we have not already explicitly released above
+                if (!released)
+                    _refillLock.Release();
             }
         }
 
