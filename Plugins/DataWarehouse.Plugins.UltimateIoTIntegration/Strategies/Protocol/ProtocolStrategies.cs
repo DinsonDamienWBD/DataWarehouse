@@ -215,15 +215,16 @@ public class CoApProtocolStrategy : ProtocolStrategyBase
         // Token
         packet.AddRange(token);
 
-        // Options: Uri-Path (delta = 11)
+        // Options: Uri-Path (option number = 11). RFC 7252 §3.1 extended encoding.
+        // P2-3397: use proper delta encoding; delta > 12 or length > 12 require extended bytes.
         var pathSegments = resourcePath.Trim('/').Split('/');
+        int prevOptionNumber = 0;
         foreach (var segment in pathSegments)
         {
             var segmentBytes = Encoding.UTF8.GetBytes(segment);
-            // Option delta = 11 (Uri-Path), length in lower nibble
-            byte optionHeader = (byte)((11 << 4) | (segmentBytes.Length & 0x0F));
-            packet.Add(optionHeader);
-            packet.AddRange(segmentBytes);
+            int delta = 11 - prevOptionNumber;
+            prevOptionNumber = 11;
+            AppendCoapOption(packet, delta, segmentBytes);
         }
 
         // Payload marker and payload
@@ -234,6 +235,58 @@ public class CoApProtocolStrategy : ProtocolStrategyBase
         }
 
         return packet.ToArray();
+    }
+
+    /// <summary>
+    /// Appends a CoAP option to the packet list using RFC 7252 §3.1 extended encoding.
+    /// Handles delta and length values up to 65535 using 1-byte or 2-byte extended fields.
+    /// </summary>
+    private static void AppendCoapOption(List<byte> packet, int delta, byte[] value)
+    {
+        int length = value.Length;
+
+        // Encode delta nibble (0-12 direct, 13 = 1-byte ext, 14 = 2-byte ext)
+        byte deltaNibble;
+        byte[]? deltaExt = null;
+        if (delta <= 12)
+        {
+            deltaNibble = (byte)delta;
+        }
+        else if (delta <= 268) // 13 + 255
+        {
+            deltaNibble = 13;
+            deltaExt = new[] { (byte)(delta - 13) };
+        }
+        else
+        {
+            deltaNibble = 14;
+            int v = delta - 269;
+            deltaExt = new[] { (byte)(v >> 8), (byte)(v & 0xFF) };
+        }
+
+        // Encode length nibble
+        byte lengthNibble;
+        byte[]? lengthExt = null;
+        if (length <= 12)
+        {
+            lengthNibble = (byte)length;
+        }
+        else if (length <= 268)
+        {
+            lengthNibble = 13;
+            lengthExt = new[] { (byte)(length - 13) };
+        }
+        else
+        {
+            lengthNibble = 14;
+            int v = length - 269;
+            lengthExt = new[] { (byte)(v >> 8), (byte)(v & 0xFF) };
+        }
+
+        packet.Add((byte)((deltaNibble << 4) | lengthNibble));
+        if (deltaExt != null) packet.AddRange(deltaExt);
+        if (lengthExt != null) packet.AddRange(lengthExt);
+        packet.AddRange(value);
     }
 }
 

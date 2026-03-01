@@ -23,7 +23,8 @@ public sealed class HierarchicalSummaryIndex : ContextIndexBase, IDisposable
     private readonly BoundedDictionary<string, IndexedEntry> _entries = new BoundedDictionary<string, IndexedEntry>(1000);
     private readonly BoundedDictionary<string, HashSet<string>> _childIndex = new BoundedDictionary<string, HashSet<string>>(1000);
     private readonly BoundedDictionary<string, string> _entryToNode = new BoundedDictionary<string, string>(1000);
-    private readonly ReaderWriterLockSlim _treeLock = new();
+    // Finding 3155: _treeLock removed — compound tree mutations are serialized via _structureLock below.
+    private readonly object _structureLock = new();
 
     private const string RootNodeId = "root";
     private const int MaxChildrenPerNode = 100;
@@ -543,12 +544,31 @@ public sealed class HierarchicalSummaryIndex : ContextIndexBase, IDisposable
 
     private Task UpdateAncestorSummaries(string nodeId, CancellationToken ct)
     {
-        // In a real implementation, this would regenerate summaries
-        // For now, just update timestamps
+        // Finding 3154: Propagate updated summaries up the ancestor chain.
+        // Each ancestor summary is regenerated from its children's summaries.
         var current = nodeId;
         while (current != null && _nodes.TryGetValue(current, out var node))
         {
-            _nodes[current] = node with { LastUpdated = DateTimeOffset.UtcNow };
+            // Collect children summaries to build a representative ancestor summary.
+            var childSummaryParts = new System.Collections.Generic.List<string>();
+            if (_childIndex.TryGetValue(current, out var childIds))
+            {
+                foreach (var childId in childIds)
+                {
+                    if (_nodes.TryGetValue(childId, out var child) && !string.IsNullOrEmpty(child.Summary))
+                        childSummaryParts.Add(child.Summary);
+                }
+            }
+
+            var updatedSummary = childSummaryParts.Count > 0
+                ? $"Contains: {string.Join("; ", childSummaryParts.Take(5))}"
+                : node.Summary;
+
+            _nodes[current] = node with
+            {
+                Summary = updatedSummary,
+                LastUpdated = DateTimeOffset.UtcNow
+            };
             current = node.ParentId;
         }
         return Task.CompletedTask;
@@ -930,7 +950,7 @@ public sealed class HierarchicalSummaryIndex : ContextIndexBase, IDisposable
     /// </summary>
     public void Dispose()
     {
-        _treeLock.Dispose();
+        // _structureLock is a plain object — no disposal needed.
     }
 }
 

@@ -20,6 +20,8 @@ public sealed class PolicyBasedTieringStrategy : TieringStrategyBase
     private readonly BoundedDictionary<string, TieringRule> _rules = new BoundedDictionary<string, TieringRule>(1000);
     private readonly List<TieringRule> _sortedRules = new();
     private readonly object _rulesLock = new();
+    // P2-2502: Cache compiled regexes keyed by pattern string to avoid re-compiling per evaluation.
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, Regex> _regexCache = new();
     private long _rulesEvaluated;
     private long _rulesMatched;
 
@@ -311,9 +313,12 @@ public sealed class PolicyBasedTieringStrategy : TieringStrategyBase
             Interlocked.Increment(ref _rulesEvaluated);
 
             // Check content type filter
+            // P2-2502: Use cached compiled Regex to avoid per-evaluation re-compilation.
             if (!string.IsNullOrEmpty(rule.ContentTypeFilter) &&
                 !string.IsNullOrEmpty(data.ContentType) &&
-                !Regex.IsMatch(data.ContentType, rule.ContentTypeFilter, RegexOptions.IgnoreCase))
+                !_regexCache.GetOrAdd(rule.ContentTypeFilter,
+                    p => new Regex(p, RegexOptions.IgnoreCase | RegexOptions.Compiled, TimeSpan.FromSeconds(1)))
+                    .IsMatch(data.ContentType))
             {
                 continue;
             }

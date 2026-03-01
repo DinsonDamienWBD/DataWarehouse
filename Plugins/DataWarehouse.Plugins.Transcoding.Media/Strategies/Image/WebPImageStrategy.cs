@@ -201,24 +201,32 @@ internal sealed class WebPImageStrategy : MediaStrategyBase
         Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken)
     {
         var sourceBytes = await ReadStreamFullyAsync(videoStream, cancellationToken).ConfigureAwait(false);
+        // LOW-1094: Dispose outputStream on exception to avoid buffer being held until GC.
         var outputStream = new MemoryStream(1024 * 1024);
+        try
+        {
+            using var writer = new BinaryWriter(outputStream, Encoding.UTF8, leaveOpen: true);
 
-        using var writer = new BinaryWriter(outputStream, Encoding.UTF8, leaveOpen: true);
+            writer.Write(RiffHeader);
+            writer.Write(0); // Size placeholder
+            writer.Write(WebPIdentifier);
 
-        writer.Write(RiffHeader);
-        writer.Write(0); // Size placeholder
-        writer.Write(WebPIdentifier);
+            WriteVp8Chunk(writer, sourceBytes, width, height, quality: 70);
 
-        WriteVp8Chunk(writer, sourceBytes, width, height, quality: 70);
+            var totalSize = (int)outputStream.Position - 8;
+            outputStream.Position = 4;
+            writer.Write(totalSize);
+            outputStream.Position = outputStream.Length;
 
-        var totalSize = (int)outputStream.Position - 8;
-        outputStream.Position = 4;
-        writer.Write(totalSize);
-        outputStream.Position = outputStream.Length;
-
-        await writer.BaseStream.FlushAsync(cancellationToken).ConfigureAwait(false);
-        outputStream.Position = 0;
-        return outputStream;
+            await writer.BaseStream.FlushAsync(cancellationToken).ConfigureAwait(false);
+            outputStream.Position = 0;
+            return outputStream;
+        }
+        catch
+        {
+            outputStream.Dispose();
+            throw;
+        }
     }
 
     /// <inheritdoc/>

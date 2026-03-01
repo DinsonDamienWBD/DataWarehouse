@@ -131,7 +131,9 @@ internal sealed class MockServerStrategy : SdkInterface.InterfaceStrategyBase, I
             var path = root.GetProperty("path").GetString() ?? throw new InvalidOperationException("Path is required");
             var statusCode = root.TryGetProperty("statusCode", out var statusElement) ? statusElement.GetInt32() : 200;
             var responseBody = root.TryGetProperty("responseBody", out var bodyElement) ? bodyElement.GetString() : "{}";
-            var delayMs = root.TryGetProperty("delayMs", out var delayElement) ? delayElement.GetInt32() : 0;
+            // P2-3303: Cap delay at 30 seconds to prevent Int32.MaxValue (~25-day) hangs.
+            var rawDelayMs = root.TryGetProperty("delayMs", out var delayElement) ? delayElement.GetInt32() : 0;
+            var delayMs = Math.Clamp(rawDelayMs, 0, 30_000);
 
             var mockResponse = new MockResponse
             {

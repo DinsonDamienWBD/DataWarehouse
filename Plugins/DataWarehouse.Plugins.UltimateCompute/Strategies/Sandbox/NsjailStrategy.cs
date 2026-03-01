@@ -40,7 +40,11 @@ internal sealed class NsjailStrategy : ComputeRuntimeStrategyBase
                 await File.WriteAllBytesAsync(codePath, task.Code.ToArray(), cancellationToken);
 
                 var maxMem = GetMaxMemoryBytes(task, 256 * 1024 * 1024);
-                var timeoutSec = (int)GetEffectiveTimeout(task).TotalSeconds;
+                // P2-1733: Clamp timeout to at least 1 second (nsjail rejects time_limit: 0),
+                // and cap at 86400 seconds (1 day) to prevent absurdly large values from
+                // integer overflow or misconfiguration.
+                var rawTimeoutSec = GetEffectiveTimeout(task).TotalSeconds;
+                var timeoutSec = (int)Math.Clamp(rawTimeoutSec, 1.0, 86400.0);
 
                 // Generate nsjail protobuf text config
                 var config = new StringBuilder();

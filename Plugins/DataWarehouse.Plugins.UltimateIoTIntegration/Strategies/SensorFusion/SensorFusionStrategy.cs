@@ -10,7 +10,9 @@ namespace DataWarehouse.Plugins.UltimateIoTIntegration.Strategies.SensorFusion;
 /// </summary>
 public sealed class SensorFusionStrategy : IoTStrategyBase
 {
-    private SensorFusionEngine? _engine;
+    // LOW-3426: use Lazy<T> for thread-safe single initialization; prevents concurrent first-callers
+    // creating separate engines and discarding Kalman state.
+    private Lazy<SensorFusionEngine> _engine = new(() => new SensorFusionEngine(), System.Threading.LazyThreadSafetyMode.ExecutionAndPublication);
 
     /// <inheritdoc/>
     public override string StrategyId => "sensor-fusion";
@@ -33,7 +35,9 @@ public sealed class SensorFusionStrategy : IoTStrategyBase
     /// <param name="config">Fusion pipeline configuration.</param>
     public void Initialize(FusionPipelineConfig? config = null)
     {
-        _engine = new SensorFusionEngine(config);
+        // LOW-3426: replace lazy with new Lazy<> using the caller-supplied config.
+        _engine = new Lazy<SensorFusionEngine>(() => new SensorFusionEngine(config),
+            System.Threading.LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
     /// <summary>
@@ -44,13 +48,7 @@ public sealed class SensorFusionStrategy : IoTStrategyBase
     /// <returns>Fused sensor reading.</returns>
     public async Task<FusedReading> ProcessSensorDataAsync(SensorReading[] readings, CancellationToken ct = default)
     {
-        if (_engine == null)
-        {
-            // Initialize with default config if not already initialized
-            Initialize();
-        }
-
-        return await _engine!.ProcessAsync(readings, ct);
+        return await _engine.Value.ProcessAsync(readings, ct);
     }
 
     /// <summary>
@@ -59,11 +57,6 @@ public sealed class SensorFusionStrategy : IoTStrategyBase
     /// <returns>The underlying sensor fusion engine.</returns>
     public SensorFusionEngine GetEngine()
     {
-        if (_engine == null)
-        {
-            Initialize();
-        }
-
-        return _engine!;
+        return _engine.Value;
     }
 }

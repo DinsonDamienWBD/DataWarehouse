@@ -223,13 +223,19 @@ public class Dnp3ProtocolStrategy : ProtocolStrategyBase
 /// <summary>
 /// DNP3 function codes.
 /// </summary>
+/// <remarks>
+/// LOW-3402: DNP3 protocol spec assigns fc=0x03 to both DirectOperate and SBO-Select.
+/// Context is determined by the object variation (Group 12 Var 1 CROB), not the function code.
+/// Remove the ambiguous <c>SelectBeforeOperate</c> alias; callers that need SBO use DirectOperate
+/// and set the appropriate CROB control code (TCC field) in the application object.
+/// </remarks>
 public enum Dnp3FunctionCode : byte
 {
     Read = 0x01,
     Write = 0x02,
+    /// <summary>Function code 0x03. Used for both Direct Operate and SBO-Select per DNP3 spec.</summary>
     DirectOperate = 0x03,
     DirectOperateNoAck = 0x04,
-    SelectBeforeOperate = 0x03, // Select uses same code, context-dependent
     FreezeAndClear = 0x07,
     ImmediateFreeze = 0x08,
     Response = 0x81,

@@ -78,56 +78,58 @@ public sealed class VotingFusion
         _faultySensors.Clear();
     }
 
+    // P2-3420: track a running average per group to avoid O(N) recompute per (reading,group) pair in IsSimilar.
     private List<List<SensorReading>> GroupSimilarReadings(
         SensorReading[] readings,
         int valueDim,
         double tolerancePercent)
     {
         var groups = new List<List<SensorReading>>();
+        var groupAverages = new List<double[]>(); // running average per group
 
         foreach (var reading in readings)
         {
-            // Find a group that this reading belongs to
-            List<SensorReading>? matchingGroup = null;
+            int matchingIndex = -1;
 
-            foreach (var group in groups)
+            for (int g = 0; g < groups.Count; g++)
             {
-                // Check if reading is similar to group average
-                if (IsSimilar(reading, group, valueDim, tolerancePercent))
+                if (IsSimilarToAverage(reading, groupAverages[g], valueDim, tolerancePercent))
                 {
-                    matchingGroup = group;
+                    matchingIndex = g;
                     break;
                 }
             }
 
-            if (matchingGroup != null)
+            if (matchingIndex >= 0)
             {
-                matchingGroup.Add(reading);
+                var group = groups[matchingIndex];
+                group.Add(reading);
+                // Update running average: newAvg = (oldAvg * (n-1) + newValue) / n
+                int n = group.Count;
+                var avg = groupAverages[matchingIndex];
+                for (int dim = 0; dim < valueDim; dim++)
+                    avg[dim] = (avg[dim] * (n - 1) + reading.Value[dim]) / n;
             }
             else
             {
-                // Create new group
                 groups.Add(new List<SensorReading> { reading });
+                var initAvg = new double[valueDim];
+                for (int dim = 0; dim < valueDim; dim++)
+                    initAvg[dim] = reading.Value[dim];
+                groupAverages.Add(initAvg);
             }
         }
 
         return groups;
     }
 
-    private bool IsSimilar(
+    private static bool IsSimilarToAverage(
         SensorReading reading,
-        List<SensorReading> group,
+        double[] groupAverage,
         int valueDim,
         double tolerancePercent)
     {
-        // Compute group average
-        var groupAverage = new double[valueDim];
-        for (int dim = 0; dim < valueDim; dim++)
-        {
-            groupAverage[dim] = group.Average(r => r.Value[dim]);
-        }
-
-        // Check if reading is within tolerance of group average
+        // Check if reading is within tolerance of pre-computed group average
         for (int dim = 0; dim < valueDim; dim++)
         {
             double reference = Math.Abs(groupAverage[dim]);

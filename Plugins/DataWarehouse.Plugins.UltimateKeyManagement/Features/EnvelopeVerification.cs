@@ -136,9 +136,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
                 return strategy.Capabilities.SupportsEnvelope;
             }
 
-            // Fall back to interface check
-            return VerifyInterfaceImplementation(keyStore).HasWrapKey &&
-                   VerifyInterfaceImplementation(keyStore).HasUnwrapKey;
+            // P2-3443: Call VerifyInterfaceImplementation only once to avoid double reflection cost.
+            var caps = VerifyInterfaceImplementation(keyStore);
+            return caps.HasWrapKey && caps.HasUnwrapKey;
         }
 
         /// <summary>

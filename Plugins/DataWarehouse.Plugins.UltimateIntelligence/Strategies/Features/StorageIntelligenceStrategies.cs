@@ -619,9 +619,14 @@ Return JSON:
     public void RecordAccess(string objectId, TierAccessEvent accessEvent)
     {
         var history = _accessHistories.GetOrAdd(objectId, _ => new AccessHistory { ObjectId = objectId });
-        history.TotalAccesses++;
-        history.LastAccess = accessEvent.Timestamp;
-        history.UpdatedAt = DateTime.UtcNow;
+        // Finding 3127: Lock on the individual history object to prevent torn writes
+        // when concurrent callers update TotalAccesses and LastAccess.
+        lock (history)
+        {
+            history.TotalAccesses++;
+            history.LastAccess = accessEvent.Timestamp;
+            history.UpdatedAt = DateTime.UtcNow;
+        }
     }
 
     private double CalculateAccessScore(List<TierAccessEvent> history, double decayFactor)

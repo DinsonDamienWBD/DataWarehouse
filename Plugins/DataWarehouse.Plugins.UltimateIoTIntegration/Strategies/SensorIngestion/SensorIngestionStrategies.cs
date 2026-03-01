@@ -339,13 +339,16 @@ public class TimeSeriesIngestionStrategy : SensorIngestionStrategyBase
             {
                 if (subscription.DeviceId == null || kvp.Key == subscription.DeviceId)
                 {
+                    // P2-3423: take snapshot under lock; yield outside lock (C# disallows yield-in-lock).
+                    List<TelemetryMessage> snapshot;
                     lock (kvp.Value)
                     {
-                        foreach (var message in kvp.Value.Values.Where(m => m.Timestamp > lastSeen))
-                        {
-                            lastSeen = message.Timestamp;
-                            yield return message;
-                        }
+                        snapshot = kvp.Value.Values.Where(m => m.Timestamp > lastSeen).ToList();
+                    }
+                    foreach (var message in snapshot)
+                    {
+                        lastSeen = message.Timestamp;
+                        yield return message;
                     }
                 }
             }
@@ -371,7 +374,7 @@ public class AggregatingIngestionStrategy : SensorIngestionStrategyBase
         var windowKey = $"{message.DeviceId}:{message.Timestamp:yyyy-MM-dd-HH-mm}";
         var window = _windows.GetOrAdd(windowKey, _ => new AggregationWindow());
 
-        window.Count++;
+        Interlocked.Increment(ref window.Count); // LOW-3429: atomic increment
         foreach (var kvp in message.Data)
         {
             if (kvp.Value is double value)

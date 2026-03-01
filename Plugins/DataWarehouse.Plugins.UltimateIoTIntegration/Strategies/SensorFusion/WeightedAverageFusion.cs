@@ -78,26 +78,26 @@ public sealed class WeightedAverageFusion
     {
         var filtered = new List<SensorReading>();
 
+        // P2-3419: compute mean/stddev once per dimension; reuse for both variance tracking and filtering.
+        var means = new double[valueDim];
+        var stdDevs = new double[valueDim];
+
         for (int dim = 0; dim < valueDim; dim++)
         {
-            // Compute mean and standard deviation for this dimension
             double mean = readings.Average(r => r.Value[dim]);
             double variance = readings.Average(r => Math.Pow(r.Value[dim] - mean, 2));
-            double stdDev = Math.Sqrt(variance);
+            means[dim] = mean;
+            stdDevs[dim] = Math.Sqrt(variance);
 
             // Track variance for adaptive weighting
             foreach (var reading in readings)
             {
                 if (!_recentVariances.ContainsKey(reading.SensorId))
-                {
                     _recentVariances[reading.SensorId] = new List<double>();
-                }
 
                 _recentVariances[reading.SensorId].Add(variance);
                 if (_recentVariances[reading.SensorId].Count > 10)
-                {
                     _recentVariances[reading.SensorId].RemoveAt(0);
-                }
             }
         }
 
@@ -108,12 +108,8 @@ public sealed class WeightedAverageFusion
 
             for (int dim = 0; dim < valueDim; dim++)
             {
-                double mean = readings.Average(r => r.Value[dim]);
-                double variance = readings.Average(r => Math.Pow(r.Value[dim] - mean, 2));
-                double stdDev = Math.Sqrt(variance);
-
-                double deviation = Math.Abs(reading.Value[dim] - mean);
-                if (deviation > 3.0 * stdDev && stdDev > 1e-10)
+                double deviation = Math.Abs(reading.Value[dim] - means[dim]);
+                if (deviation > 3.0 * stdDevs[dim] && stdDevs[dim] > 1e-10)
                 {
                     isOutlier = true;
                     break;
@@ -121,9 +117,7 @@ public sealed class WeightedAverageFusion
             }
 
             if (!isOutlier)
-            {
                 filtered.Add(reading);
-            }
         }
 
         return filtered.ToArray();

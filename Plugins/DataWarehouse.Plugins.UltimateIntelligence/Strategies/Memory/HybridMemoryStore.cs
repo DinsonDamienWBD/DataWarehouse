@@ -20,6 +20,8 @@ public sealed class HybridMemoryStore : IPersistentMemoryStore
     private readonly ConcurrentQueue<PendingWrite> _writeQueue = new();
     private readonly SemaphoreSlim _migrationLock = new(1, 1);
     private readonly SemaphoreSlim _flushLock = new(1, 1);
+    // Finding 3146: Serialize atomic three-way updates to _hotCache/_accessTimes/_accessCounts.
+    private readonly object _cacheLock = new();
     private readonly Timer _migrationTimer;
     private readonly Timer _flushTimer;
 
@@ -65,10 +67,14 @@ public sealed class HybridMemoryStore : IPersistentMemoryStore
     {
         ct.ThrowIfCancellationRequested();
 
-        // Always store in hot cache first for fast subsequent access
-        _hotCache[entry.EntryId] = entry;
-        _accessTimes[entry.EntryId] = DateTimeOffset.UtcNow;
-        _accessCounts[entry.EntryId] = 1;
+        // Always store in hot cache first for fast subsequent access.
+        // Finding 3146: Serialize the three-way update so no eviction can observe a partial state.
+        lock (_cacheLock)
+        {
+            _hotCache[entry.EntryId] = entry;
+            _accessTimes[entry.EntryId] = DateTimeOffset.UtcNow;
+            _accessCounts[entry.EntryId] = 1;
+        }
 
         // Queue for async persistence
         var pendingWrite = new PendingWrite

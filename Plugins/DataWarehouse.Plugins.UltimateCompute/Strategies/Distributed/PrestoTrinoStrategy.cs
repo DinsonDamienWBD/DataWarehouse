@@ -68,7 +68,16 @@ internal sealed class PrestoTrinoStrategy : ComputeRuntimeStrategyBase
                 if (task.Metadata?.TryGetValue("session_properties", out var sp) == true && sp is Dictionary<string, object> spDict)
                 {
                     foreach (var (key, value) in spDict)
-                        args.Append($" --session {key}={value}");
+                    {
+                        // P2-1692: Validate key/value identifiers to prevent shell argument injection.
+                        // Session property keys must be alphanumeric+dot+underscore; values must not contain spaces/quotes/semicolons.
+                        if (!System.Text.RegularExpressions.Regex.IsMatch(key, @"^[A-Za-z0-9_\.]+$"))
+                            throw new ArgumentException($"Invalid session property key '{key}': must match [A-Za-z0-9_.]+");
+                        var valStr = value?.ToString() ?? string.Empty;
+                        if (valStr.AsSpan().IndexOfAny(System.Buffers.SearchValues.Create(" \"';`\n\r")) >= 0)
+                            throw new ArgumentException($"Session property value for '{key}' contains unsafe characters.");
+                        args.Append($" --session {key}={valStr}");
+                    }
                 }
 
                 var timeout = GetEffectiveTimeout(task, TimeSpan.FromMinutes(30));

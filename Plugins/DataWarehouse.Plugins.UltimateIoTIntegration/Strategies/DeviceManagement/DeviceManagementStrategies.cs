@@ -39,8 +39,9 @@ public class DeviceRegistryStrategy : DeviceManagementStrategyBase
     public override Task<DeviceRegistration> RegisterDeviceAsync(DeviceRegistrationRequest request, CancellationToken ct = default)
     {
         var deviceId = string.IsNullOrEmpty(request.DeviceId) ? Guid.NewGuid().ToString() : request.DeviceId;
-        var primaryKey = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
-        var secondaryKey = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
+        // LOW-3403: use cryptographically random 32-byte keys instead of GUID.ToByteArray()
+        var primaryKey = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        var secondaryKey = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
 
         var device = new DeviceInfo
         {

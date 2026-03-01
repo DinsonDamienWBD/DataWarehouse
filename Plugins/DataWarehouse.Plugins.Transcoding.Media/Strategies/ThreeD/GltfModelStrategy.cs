@@ -254,6 +254,9 @@ internal sealed class GltfModelStrategy : MediaStrategyBase
 
         // Skip JSON chunk
         int jsonChunkLength = BitConverter.ToInt32(data, 12);
+        // LOW-1093: Guard against negative/corrupt chunk length — negative value causes binOffset < 20
+        // which bypasses the bounds check below and reads from an invalid offset.
+        if (jsonChunkLength < 0) return Array.Empty<byte>();
         int binOffset = 20 + jsonChunkLength;
 
         // Align to 4 bytes
