@@ -59,6 +59,9 @@ public sealed class BackupScalingManager : IScalableSubsystem, IDisposable
     private int _currentConcurrentJobs;
 
     // ---- I/O capacity monitoring (EMA) ----
+    // P2-2527: Lock protects non-atomic double read-modify-write operations on EMA fields
+    // and _currentConcurrentJobs accessed from both the timer callback and callers.
+    private readonly object _emaLock = new();
     private double _emaThroughput;
     private double _emaQueueDepth;
     private double _emaIoUtilization;
@@ -176,9 +179,10 @@ public sealed class BackupScalingManager : IScalableSubsystem, IDisposable
             ["backup.chainsTracked"] = Interlocked.Read(ref _chainsTracked),
             ["backup.totalBytesBackedUp"] = Interlocked.Read(ref _totalBytesBackedUp),
             ["backup.activeJobs"] = _activeJobs.Count,
-            ["io.emaThroughput"] = _emaThroughput,
-            ["io.emaQueueDepth"] = _emaQueueDepth,
-            ["io.emaUtilization"] = _emaIoUtilization,
+            // P2-2527: read EMA snapshot under lock to avoid torn reads on non-atomic doubles.
+            ["io.emaThroughput"] = GetEmaSnapshot().throughput,
+            ["io.emaQueueDepth"] = GetEmaSnapshot().queueDepth,
+            ["io.emaUtilization"] = GetEmaSnapshot().utilization,
             ["io.diskCount"] = _diskCount,
             ["retention.maxCount"] = _retentionPolicy.MaxCount,
             ["retention.maxAgeDays"] = _retentionPolicy.MaxAgeDays,
@@ -228,18 +232,21 @@ public sealed class BackupScalingManager : IScalableSubsystem, IDisposable
     /// <param name="ioUtilization">Current I/O utilization as a fraction (0.0 to 1.0).</param>
     public void ReportIoMetrics(double throughputBytesPerSec, double queueDepth, double ioUtilization)
     {
-        // Apply EMA smoothing
-        _emaThroughput = _emaThroughput == 0
-            ? throughputBytesPerSec
-            : EmaAlpha * throughputBytesPerSec + (1 - EmaAlpha) * _emaThroughput;
+        // P2-2527: Lock protects non-atomic double read-modify-write operations.
+        lock (_emaLock)
+        {
+            _emaThroughput = _emaThroughput == 0
+                ? throughputBytesPerSec
+                : EmaAlpha * throughputBytesPerSec + (1 - EmaAlpha) * _emaThroughput;
 
-        _emaQueueDepth = _emaQueueDepth == 0
-            ? queueDepth
-            : EmaAlpha * queueDepth + (1 - EmaAlpha) * _emaQueueDepth;
+            _emaQueueDepth = _emaQueueDepth == 0
+                ? queueDepth
+                : EmaAlpha * queueDepth + (1 - EmaAlpha) * _emaQueueDepth;
 
-        _emaIoUtilization = EmaAlpha * ioUtilization + (1 - EmaAlpha) * _emaIoUtilization;
+            _emaIoUtilization = EmaAlpha * ioUtilization + (1 - EmaAlpha) * _emaIoUtilization;
 
-        RecalculateDynamicConcurrency();
+            RecalculateDynamicConcurrency();
+        }
     }
 
     /// <summary>
@@ -437,6 +444,17 @@ public sealed class BackupScalingManager : IScalableSubsystem, IDisposable
         {
             // I/O is overutilized -- decrease concurrent jobs
             _currentConcurrentJobs = Math.Max(_currentConcurrentJobs - 1, DefaultMinConcurrentJobs);
+        }
+    }
+
+    /// <summary>
+    /// Returns a consistent snapshot of EMA metrics under _emaLock to avoid torn reads.
+    /// </summary>
+    private (double throughput, double queueDepth, double utilization) GetEmaSnapshot()
+    {
+        lock (_emaLock)
+        {
+            return (_emaThroughput, _emaQueueDepth, _emaIoUtilization);
         }
     }
 
