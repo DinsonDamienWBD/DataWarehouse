@@ -8,7 +8,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-// Use explicit alias to avoid ambiguity with DataWarehouse.SDK.Contracts.SnapshotManager
+// Explicit aliases to avoid ambiguity with DataWarehouse.SDK.Contracts.SnapshotManager.
 using VdeSnapshotManager = DataWarehouse.SDK.VirtualDiskEngine.CopyOnWrite.SnapshotManager;
 using VdeSnapshot = DataWarehouse.SDK.VirtualDiskEngine.CopyOnWrite.Snapshot;
 
@@ -100,7 +100,7 @@ public readonly struct TemporalVersion
 /// </list>
 /// </para>
 /// <para>
-/// Epoch index is stored in ascending order by <see cref="EpochEntry.Epoch"/>. Binary search
+/// The epoch index is stored sorted ascending by <see cref="EpochEntry.Epoch"/>. Binary search
 /// finds the largest epoch &lt;= the requested timestamp in O(log N) where N = snapshot count.
 /// </para>
 /// </remarks>
@@ -152,13 +152,14 @@ public sealed class TemporalPointQueryEngine
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Scans the Snapshot Table region via <see cref="SnapshotManager"/> and builds a
+    /// Scans the Snapshot Table region via <see cref="VdeSnapshotManager"/> and builds a
     /// sorted epoch index.  Must be called once before issuing temporal queries.
     /// </summary>
     /// <param name="ct">Cancellation token.</param>
     public async Task BuildEpochIndexAsync(CancellationToken ct = default)
     {
-        IReadOnlyList<VdeSnapshot> snapshots = await _snapshotManager.ListSnapshotsAsync(ct).ConfigureAwait(false);
+        IReadOnlyList<VdeSnapshot> snapshots =
+            await _snapshotManager.ListSnapshotsAsync(ct).ConfigureAwait(false);
 
         var index = new List<EpochEntry>(snapshots.Count);
 
@@ -169,8 +170,8 @@ public sealed class TemporalPointQueryEngine
             {
                 SnapshotId = snap.SnapshotId,
                 Epoch = epochNs,
-                // Generation number is stored as an extended attribute on the root inode of
-                // the snapshot when the snapshot was taken.  Fall back to zero if absent.
+                // Generation number is stored as an extended attribute on the root inode
+                // of the snapshot when the snapshot was taken.  Fall back to 0 if absent.
                 GenerationNumber = await ReadSnapshotGenerationAsync(snap, ct).ConfigureAwait(false)
             });
         }
@@ -221,7 +222,7 @@ public sealed class TemporalPointQueryEngine
 
         if (idx < 0)
         {
-            // Requested time is before the oldest snapshot — inode did not exist.
+            // Requested time is before the oldest snapshot — inode did not exist yet.
             return new TemporalQueryResult
             {
                 InodeNumber = inodeNumber,
@@ -331,7 +332,7 @@ public sealed class TemporalPointQueryEngine
 
         var versions = new List<TemporalVersion>();
 
-        // Collect all epoch entries within the requested range.
+        // Find the first epoch index entry >= fromEpoch.
         int lo = BisectCeiling(_epochIndex, fromEpoch);
         if (lo < 0)
             lo = 0;
@@ -452,11 +453,9 @@ public sealed class TemporalPointQueryEngine
     }
 
     /// <summary>
-    /// Reads extent pointers from an inode, filtered to those whose generation number
-    /// is &lt;= <paramref name="generationNumber"/> to honour point-in-time semantics.
-    /// For the current (non-versioned) inode table the method returns all direct block
-    /// pointers as synthetic single-block extents; future integration with the MVCC
-    /// version store will provide generation-granular extent lists.
+    /// Reads extent pointers from an inode at a given generation.
+    /// Returns all direct, indirect, and double-indirect block pointers as synthetic
+    /// single-block extents ordered by logical offset.
     /// </summary>
     private async Task<IReadOnlyList<InodeExtent>> ResolveExtentsAtGenerationAsync(
         Inode inode,
@@ -478,7 +477,7 @@ public sealed class TemporalPointQueryEngine
             logicalOffset += _blockSize;
         }
 
-        // Traverse indirect block pointer if present.
+        // Traverse indirect block pointer if present; returns the advanced logical offset.
         if (inode.IndirectBlockPointer > 0)
         {
             logicalOffset = await AppendIndirectExtentsAsync(
@@ -488,7 +487,7 @@ public sealed class TemporalPointQueryEngine
         // Traverse double indirect block pointer if present.
         if (inode.DoubleIndirectPointer > 0)
         {
-            logicalOffset = await AppendDoubleIndirectExtentsAsync(
+            await AppendDoubleIndirectExtentsAsync(
                 inode.DoubleIndirectPointer, logicalOffset, extents, ct).ConfigureAwait(false);
         }
 
@@ -498,7 +497,7 @@ public sealed class TemporalPointQueryEngine
     /// <summary>
     /// Appends single-block extents from one level of indirection.
     /// Each 8-byte slot in <paramref name="indirectBlockPointer"/> is a pointer to a data block.
-    /// Returns the updated logical offset after processing all pointers in the indirect block.
+    /// Returns the next logical offset after all pointers have been processed.
     /// </summary>
     private async Task<long> AppendIndirectExtentsAsync(
         long indirectBlockPointer,
@@ -531,9 +530,8 @@ public sealed class TemporalPointQueryEngine
 
     /// <summary>
     /// Appends single-block extents from two levels of indirection.
-    /// Returns the updated logical offset after traversing all indirect blocks.
     /// </summary>
-    private async Task<long> AppendDoubleIndirectExtentsAsync(
+    private async Task AppendDoubleIndirectExtentsAsync(
         long doubleIndirectPointer,
         long logicalOffset,
         List<InodeExtent> extents,
@@ -560,8 +558,6 @@ public sealed class TemporalPointQueryEngine
         {
             ArrayPool<byte>.Shared.Return(outerBuffer);
         }
-
-        return logicalOffset;
     }
 
     /// <summary>
@@ -599,7 +595,9 @@ public sealed class TemporalPointQueryEngine
     /// </summary>
     private async Task<VdeSnapshot?> FindSnapshotByIdAsync(long snapshotId, CancellationToken ct)
     {
-        IReadOnlyList<VdeSnapshot> snapshots = await _snapshotManager.ListSnapshotsAsync(ct).ConfigureAwait(false);
+        IReadOnlyList<VdeSnapshot> snapshots =
+            await _snapshotManager.ListSnapshotsAsync(ct).ConfigureAwait(false);
+
         foreach (VdeSnapshot s in snapshots)
         {
             if (s.SnapshotId == snapshotId)
