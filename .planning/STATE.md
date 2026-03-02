@@ -267,6 +267,8 @@
 - [Phase 91.5-vde-v2.1-format-completion]: QoSPolicyRecord.PolicyVaultTypeTag = 0x0003 compile-time const for Policy Vault type discrimination
 - [Phase 91.5-87-55]: HMACSHA256 used as BCL stand-in for HMAC-BLAKE3 in EmergencyRecoveryBlock
 - [Phase 91.5-87-55]: RecoveryFooter uses SUPB tag (not new tag) so recovery tools identify it as superblock copy
+- [Phase 91.5]: Windows IOCP block device uses RandomAccess API internally for managed safety with IOCP performance
+- [Phase 91.5]: IoRing raw handle cached via DangerousAddRef lifecycle to satisfy S3869 analyzer
 
 ## Performance Metrics
 
@@ -480,4 +482,4 @@
 
 ## Last Session
 - **Timestamp:** 2026-03-02T00:30:00Z
-- **Stopped At:** Completed 91.5-87-55-PLAN.md
+- **Stopped At:** Completed 91.5-87-57-PLAN.md
