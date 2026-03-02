@@ -275,6 +275,7 @@
 - [Phase 91.5]: VOPT-66: Three named preamble composition profiles with 4KiB-aligned layout engine
 - [Phase 91.5]: SHA-256 as BLAKE3 fallback for preamble integrity verification
 - [Phase 91.5]: 87-63: Used UnmanagedFunctionPointer delegates with GCHandle pinning for FUSE callback lifecycle; sync adapter calls via GetAwaiter().GetResult() safe under fuse_session_loop_mt thread pool
+- [Phase 91.5]: Handler registry dispatch: per-module IModuleFieldHandler with zero-fill safe defaults for unregistered modules
 
 ## Performance Metrics
 
@@ -487,7 +488,8 @@
 | Phase 91.5-vde-v2.1-format-completion P87-55 | 7 | 2 tasks | 6 files |
 | Phase 91.5 P87-47 | 247s | 1 tasks | 2 files |
 | Phase 91.5 P49 | 229s | 1 tasks | 2 files |
+| Phase 91.5 P87-67 | 3min | 2 tasks | 3 files |
 
 ## Last Session
 - **Timestamp:** 2026-03-02T00:30:00Z
-- **Stopped At:** Completed 91.5-87-63-PLAN.md
+- **Stopped At:** Completed 91.5-87-67-PLAN.md
