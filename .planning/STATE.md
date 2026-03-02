@@ -259,6 +259,7 @@
 - [Phase 91.5-vde-v2.1-format-completion]: 87-43: ITpmProvider interface injected for hardware-independent TPM abstraction in ProofOfPhysicalCustody
 - [Phase 91.5-vde-v2.1-format-completion]: 87-44: EMA alpha=0.001 gives ~1000-sample memory for adaptive entropy baseline without losing ransomware sensitivity
 - [Phase 91.5-vde-v2.1-format-completion]: 87-44: ReadOnlySpan<byte> EvaluateAndForkAsync split into sync wrapper + async core to resolve CS4012
+- [Phase 91.5-vde-v2.1-format-completion]: Float64 metrics stored via BitConverter.DoubleToInt64Bits in int64 value slot; IsFloat64Metric guides callers
 
 ## Performance Metrics
 
@@ -466,7 +467,8 @@
 | Phase 91.5-vde-v2.1-format-completion P87-41 | 4 | 1 tasks | 2 files |
 | Phase 91.5-vde-v2.1-format-completion P87-43 | 7 | 1 tasks | 2 files |
 | Phase 91.5-vde-v2.1-format-completion P87-44 | 3 | 1 tasks | 3 files |
+| Phase 91.5-vde-v2.1-format-completion P87-51 | 8 | 1 tasks | 2 files |
 
 ## Last Session
 - **Timestamp:** 2026-03-02T00:30:00Z
-- **Stopped At:** Completed 91.5-vde-v2.1-format-completion-87-44-PLAN.md
+- **Stopped At:** Completed 91.5-87-51-PLAN.md
