@@ -1,10 +1,10 @@
 # Execution State
 
 ## Current Position
-- **Phase:** 91-compound-block-device-raid
-- **Plan:** 5/5
-- **Status:** COMPLETE
-- **Last Completed:** 91-05-PLAN.md
+- **Phase:** 91.5-vde-v2.1-format-completion
+- **Plan:** 1/7
+- **Status:** IN_PROGRESS
+- **Last Completed:** 87-27-PLAN.md
 
 ## Progress
 - Phase 66: COMPLETE (8/8 plans, 269/269 tests, integration gate PASS)
@@ -232,6 +232,7 @@
 - [Phase 91.5]: MetaslabAllocator morph levels 0-3: flat bitmap/sharded groups/metaslab tree/hierarchical; LazyBitmap loading via EnsureBitmapLoadedAsync; 32-byte directory entry per metaslab
 - [Phase 91.5-vde-v2.1-format-completion]: FROST hot-path verifier uses structural Schnorr checks (non-zero R/s, Ed25519 high-bit, non-trivial challenge); production key-management layer supplies combined public key for full EC verification
 - [Phase 91.5-vde-v2.1-format-completion]: QuorumDegradePolicy: Reject throws QuorumVerificationException, AcceptUnsigned writes without seal, QueueForSealing provisions write and enqueues for later sealing via ProcessSealingQueueAsync
+- [Phase 91.5 87-27]: DeletionProof uses SHA-256 as BLAKE3 BCL fallback; proof hash 16 bytes (matches ExtentPointer.ExpectedHash); WAL marker encoding packs op type into upper 32 bits of TargetBlockNumber
 
 ## Performance Metrics
 
@@ -425,7 +426,8 @@
 | Phase 91.5 P87-19 | 5min | 1 tasks | 3 files |
 | Phase 91.5 P87-18 | 6min | 2 tasks | 3 files |
 | Phase 91.5-vde-v2.1-format-completion P87-28 | 4 | 1 tasks | 2 files |
+| Phase 91.5 P87-27 | 15min | 1 tasks | 4 files |
 
 ## Last Session
-- **Timestamp:** 2026-02-24T01:35:00Z
-- **Stopped At:** Completed 91.5-vde-v2.1-format-completion-87-28-PLAN.md
+- **Timestamp:** 2026-03-02T00:15:00Z
+- **Stopped At:** Completed 91.5-vde-v2.1-format-completion-87-27-PLAN.md
