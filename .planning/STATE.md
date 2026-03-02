@@ -221,6 +221,7 @@
 - [Phase 91.5]: SuperblockV2.ModuleManifest stays uint for on-disk compat; registry methods accept ulong (uint widens implicitly)
 - [Phase 91.5]: MaxSecurity profile manifest stays 0x0007_FFFF (bits 0-18); v2.1 modules opt-in via custom profiles
 - [Phase 91.5]: DeltaExtentModule layout [MaxDeltaDepth:2][CurrentDepth:2][CompactionPolicy:4] = 8B at inode offset 0x1F2 (byte 498); NeedsCompaction only for Eager policy
+- [Phase 91.5]: CPSH PredicateFlags serialized as single byte at offset 12 with 3 reserved bytes; inline byte[] always 32B zeroed; CreateExternal clears InlinePredicate flag
 
 ## Performance Metrics
 
@@ -406,7 +407,8 @@
 | Phase 91.5 P87-22 | 3min | 1 tasks | 2 files |
 | Phase 91.5 P87-65 | 23min | 2 tasks | 9 files |
 | Phase 91.5 P87-23 | 3min | 1 tasks | 2 files |
+| Phase 91.5 P87-24 | 5min | 1 tasks | 2 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-24T01:35:00Z
-- **Stopped At:** Completed 91.5-87-23-PLAN.md
+- **Stopped At:** Completed 91.5-87-24-PLAN.md
