@@ -224,6 +224,8 @@
 - [Phase 91.5]: CPSH PredicateFlags serialized as single byte at offset 12 with 3 reserved bytes; inline byte[] always 32B zeroed; CreateExternal clears InlinePredicate flag
 - [Phase 91.5]: RaidTopologyScheme enum values 0-4 match extent flag bits 9-11 directly; ExtentRaidTopology exposes both uint and typed ExtentFlags overloads; DeviceMap is byte[] (not fixed array) to keep readonly struct usable; SpatioTemporalModule XML cref errors pre-existed and auto-fixed
 - [Phase 91.5]: STEX: SpatioTemporalModule 6B at inode 0x1FA (bit 24); SpatioTemporalExtent 64B; MaxDirectExtents=3; Geohash interleaved lon/lat bits; Hilbert rotate/reflect algorithm zero-alloc
+- [Phase 91.5]: MarkDirty is the ONLY method on write hot path — O(1) ConcurrentQueue.Enqueue, no locks, no tree traversal
+- [Phase 91.5]: SHA-256 as BLAKE3 BCL fallback with TODO comment at hash site; last-write-wins dedup per batch epoch via Dictionary
 
 ## Performance Metrics
 
@@ -412,7 +414,8 @@
 | Phase 91.5 P87-24 | 5min | 1 tasks | 2 files |
 | Phase 91.5 P87-25 | 4min | 1 tasks | 2 files |
 | Phase 91.5 P87-26 | 3min | 1 tasks | 2 files |
+| Phase 91.5 P87-17 | 4min | 1 tasks | 2 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-24T01:35:00Z
-- **Stopped At:** Completed 91.5-87-26-PLAN.md
+- **Stopped At:** Completed 91.5-87-17-PLAN.md
