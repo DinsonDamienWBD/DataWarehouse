@@ -2,9 +2,9 @@
 
 ## Current Position
 - **Phase:** 91.5-vde-v2.1-format-completion
-- **Plan:** 2/7
+- **Plan:** 4/7
 - **Status:** IN_PROGRESS
-- **Last Completed:** 87-30-PLAN.md
+- **Last Completed:** 87-33-PLAN.md
 
 ## Progress
 - Phase 66: COMPLETE (8/8 plans, 269/269 tests, integration gate PASS)
@@ -240,6 +240,8 @@
 - [Phase 91.5-87-29]: Dead-block ratio = 1 - FreeBlockCount/BlockCount for vacuum candidate detection
 - [Phase 91.5-vde-v2.1-format-completion]: 87-32: OldestActiveEpoch persisted to block 0 with EGLD magic; UniversalBlockTrailer.GenerationNumber used as per-block epoch tag for TRLR scan
 - [Phase 91.5-vde-v2.1-format-completion]: InstantCloneEngine: re-uses ExtentAwareCowManager for ref counting; NullWal satisfies IWriteAheadLog requirement without external WAL dependency
+- [Phase 91.5-vde-v2.1-format-completion]: Converted async ref params to return-value pattern (Task<long>) to comply with CS1988 in TemporalPointQueryEngine
+- [Phase 91.5-vde-v2.1-format-completion]: HeatDrivenTieringAllocator: AllocateWithHeatHint falls back to primary IBlockAllocator when no shard group registered for tier
 
 ## Performance Metrics
 
@@ -439,4 +441,4 @@
 
 ## Last Session
 - **Timestamp:** 2026-03-02T00:15:00Z
-- **Stopped At:** Completed 91.5-vde-v2.1-format-completion/87-31-PLAN.md
+- **Stopped At:** Completed 91.5-87-33-PLAN.md
