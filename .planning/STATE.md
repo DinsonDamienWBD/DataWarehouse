@@ -242,6 +242,7 @@
 - [Phase 91.5-vde-v2.1-format-completion]: InstantCloneEngine: re-uses ExtentAwareCowManager for ref counting; NullWal satisfies IWriteAheadLog requirement without external WAL dependency
 - [Phase 91.5-vde-v2.1-format-completion]: Converted async ref params to return-value pattern (Task<long>) to comply with CS1988 in TemporalPointQueryEngine
 - [Phase 91.5-vde-v2.1-format-completion]: HeatDrivenTieringAllocator: AllocateWithHeatHint falls back to primary IBlockAllocator when no shard group registered for tier
+- [Phase 91.5-87-34]: Epoch index uses ulong UTC nanoseconds for O(log N) BisectFloor binary search; async ref params replaced with return-value passing pattern
 
 ## Performance Metrics
 
@@ -438,7 +439,8 @@
 | Phase 91.5 P87-27 | 15min | 1 tasks | 4 files |
 | Phase 91.5-vde-v2.1-format-completion P87-29 | 255 | 1 tasks | 3 files |
 | Phase 91.5-vde-v2.1-format-completion P87-31 | 12 | 1 tasks | 2 files |
+| Phase 91.5-vde-v2.1-format-completion P87-34 | 7 | 1 tasks | 2 files |
 
 ## Last Session
 - **Timestamp:** 2026-03-02T00:15:00Z
-- **Stopped At:** Completed 91.5-87-33-PLAN.md
+- **Stopped At:** Completed 91.5-87-34-PLAN.md (TemporalPointQueryEngine)
