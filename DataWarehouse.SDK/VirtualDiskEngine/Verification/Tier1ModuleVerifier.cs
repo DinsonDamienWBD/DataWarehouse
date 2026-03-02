@@ -97,7 +97,7 @@ public static class Tier1ModuleVerifier
             if (fieldBytes > 0)
             {
                 // Verify the module appears in the inode layout for a manifest that includes it
-                uint testManifest = 1u << (int)module.Id;
+                ulong testManifest = 1UL << (int)module.Id;
                 int totalInodeBytes = ModuleRegistry.CalculateTotalInodeFieldBytes(testManifest);
                 inodeVerified = totalInodeBytes >= fieldBytes;
 

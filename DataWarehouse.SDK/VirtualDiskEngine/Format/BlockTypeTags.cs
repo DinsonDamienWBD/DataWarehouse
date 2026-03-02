@@ -132,6 +132,20 @@ public static class BlockTypeTags
     /// <summary>Zone map index ("ZMAP").</summary>
     public const uint ZMAP = 0x5A4D4150;
 
+    // ── v2.1 Module Extensions (VOPT-87) ────────────────────────────────
+
+    /// <summary>WAL Subscriber Cursors ("WALS") — WalSubscribers module (bit 21).</summary>
+    public const uint WALS = 0x57414C53;
+
+    /// <summary>ZNS Zone Map ("ZNSM") — ZnsZoneMap module (bit 23).</summary>
+    public const uint ZNSM = 0x5A4E534D;
+
+    /// <summary>Online Operations Journal ("OPJR") — OnlineOps module (bit 28).</summary>
+    public const uint OPJR = 0x4F504A52;
+
+    /// <summary>Trailer block ("TRLR") — format trailer sentinel.</summary>
+    public const uint TRLR = 0x54524C52;
+
     // ── Lookup Set ─────────────────────────────────────────────────────
 
     private static readonly FrozenSet<uint> KnownTags = new HashSet<uint>
@@ -139,7 +153,7 @@ public static class BlockTypeTags
         SUPB, RMAP, POLV, ENCR, BMAP, INOD, TAGI, MWAL, MTRK, BTRE,
         SNAP, REPL, RAID, COMP, INTE, STRE, XREF, WORM, CODE, DWAL,
         DATA, FREE, CMVT, ALOG, CMAL, CLOG, DICT, ANON, MLOG, ERCV, EXTN,
-        COLR, ZMAP, EXMD, IANT
+        COLR, ZMAP, EXMD, IANT, WALS, ZNSM, OPJR, TRLR
     }.ToFrozenSet();
 
     /// <summary>

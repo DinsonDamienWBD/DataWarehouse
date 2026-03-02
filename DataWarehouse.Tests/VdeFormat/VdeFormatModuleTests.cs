@@ -75,17 +75,17 @@ public class VdeFormatModuleTests
     }
 
     [Fact]
-    public void ModuleRegistry_AllModules_Has19Entries()
+    public void ModuleRegistry_AllModules_Has39Entries()
     {
-        Assert.Equal(19, ModuleRegistry.AllModules.Count);
+        Assert.Equal(39, ModuleRegistry.AllModules.Count);
     }
 
     [Fact]
-    public void ModuleRegistry_GetActiveModules_AllBitsSet_Returns19()
+    public void ModuleRegistry_GetActiveModules_AllBitsSet_Returns39()
     {
-        uint allModules = 0x0007_FFFF;
+        ulong allModules = 0x0000_007F_FFFF_FFFFuL; // bits 0-38
         var active = ModuleRegistry.GetActiveModules(allModules);
-        Assert.Equal(19, active.Count);
+        Assert.Equal(39, active.Count);
     }
 
     [Fact]
@@ -100,8 +100,8 @@ public class VdeFormatModuleTests
     [Fact]
     public void ModuleManifestField_SerializeDeserialize_RoundTrip()
     {
-        var original = new ModuleManifestField(0x0007_FFFF);
-        var buffer = new byte[4];
+        var original = new ModuleManifestField(0x0000_007F_FFFF_FFFFuL); // all 39 modules
+        var buffer = new byte[8]; // 8 bytes for ulong
         ModuleManifestField.Serialize(original, buffer);
         var deserialized = ModuleManifestField.Deserialize(buffer);
         Assert.Equal(original.Value, deserialized.Value);
@@ -131,14 +131,14 @@ public class VdeFormatModuleTests
     {
         var manifest = ModuleManifestField.AllModules.WithoutModule(ModuleId.AuditLog);
         Assert.False(manifest.IsModuleActive(ModuleId.AuditLog));
-        Assert.Equal(18, manifest.ActiveModuleCount);
+        Assert.Equal(38, manifest.ActiveModuleCount); // 39 - 1 = 38
     }
 
     [Fact]
-    public void ModuleManifestField_AllModules_Has19BitsSet()
+    public void ModuleManifestField_AllModules_Has39BitsSet()
     {
-        Assert.Equal(0x0007_FFFFu, ModuleManifestField.AllModules.Value);
-        Assert.Equal(19, ModuleManifestField.AllModules.ActiveModuleCount);
+        Assert.Equal(0x0000_007F_FFFF_FFFFuL, ModuleManifestField.AllModules.Value);
+        Assert.Equal(39, ModuleManifestField.AllModules.ActiveModuleCount);
     }
 
     // ── 3. VdeCreationProfile Factory Tests (7 profiles) ──────────────────
@@ -782,9 +782,9 @@ public class VdeFormatModuleTests
     }
 
     [Fact]
-    public void FormatConstants_DefinedModules_Is19()
+    public void FormatConstants_DefinedModules_Is39()
     {
-        Assert.Equal(19, FormatConstants.DefinedModules);
+        Assert.Equal(39, FormatConstants.DefinedModules);
     }
 
     [Fact]
@@ -792,7 +792,7 @@ public class VdeFormatModuleTests
     {
         var profile = VdeCreationProfile.Standard(1024);
         var manifest = profile.GetManifest();
-        Assert.Equal(0x0000_1C01u, manifest.Value);
+        Assert.Equal(0x0000_1C01uL, manifest.Value); // ulong comparison
         Assert.Equal(4, manifest.ActiveModuleCount);
     }
 

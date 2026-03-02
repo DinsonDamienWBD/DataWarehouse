@@ -5,10 +5,10 @@ using DataWarehouse.SDK.Contracts;
 namespace DataWarehouse.SDK.VirtualDiskEngine.Format;
 
 /// <summary>
-/// Identifies a composable VDE module by its bit position in the 32-bit module manifest.
-/// Bits 0-18 are defined in the current specification; bits 19-31 are reserved for future use.
+/// Identifies a composable VDE module by its bit position in the 64-bit module manifest.
+/// Bits 0-38 are defined in the v2.1 specification; bits 39-63 are reserved for future use.
 /// </summary>
-[SdkCompatibility("6.0.0", Notes = "Phase 71: VDE v2.0 module identifiers (VDE2-04)")]
+[SdkCompatibility("6.0.0", Notes = "Phase 91.5: VDE v2.1 module identifiers expanded to 39 entries (VOPT-87)")]
 public enum ModuleId : byte
 {
     /// <summary>Security module (policy vault, encryption header). Bit 0.</summary>
@@ -309,19 +309,19 @@ public static class ModuleRegistry
     public static VdeModule GetModule(ModuleId id) => Modules[id];
 
     /// <summary>
-    /// All 19 defined modules, ordered by bit position.
+    /// All 39 defined modules, ordered by bit position.
     /// </summary>
     public static IReadOnlyList<VdeModule> AllModules => AllModulesArray;
 
     /// <summary>
-    /// Returns the modules that are active in the given 32-bit manifest.
+    /// Returns the modules that are active in the given 64-bit manifest.
     /// </summary>
-    /// <param name="manifest">The 32-bit module manifest value.</param>
+    /// <param name="manifest">The 64-bit module manifest value.</param>
     /// <returns>List of active modules.</returns>
-    public static IReadOnlyList<VdeModule> GetActiveModules(uint manifest)
+    public static IReadOnlyList<VdeModule> GetActiveModules(ulong manifest)
     {
         var result = new List<VdeModule>(BitOperations.PopCount(manifest));
-        uint bits = manifest;
+        ulong bits = manifest;
         while (bits != 0)
         {
             int bit = BitOperations.TrailingZeroCount(bits);
@@ -337,12 +337,12 @@ public static class ModuleRegistry
     /// <summary>
     /// Calculates the total inode extension bytes for all active modules in the manifest.
     /// </summary>
-    /// <param name="manifest">The 32-bit module manifest value.</param>
+    /// <param name="manifest">The 64-bit module manifest value.</param>
     /// <returns>Sum of <see cref="VdeModule.InodeFieldBytes"/> for active modules.</returns>
-    public static int CalculateTotalInodeFieldBytes(uint manifest)
+    public static int CalculateTotalInodeFieldBytes(ulong manifest)
     {
         int total = 0;
-        uint bits = manifest;
+        ulong bits = manifest;
         while (bits != 0)
         {
             int bit = BitOperations.TrailingZeroCount(bits);
@@ -358,12 +358,12 @@ public static class ModuleRegistry
     /// <summary>
     /// Returns the union of all block type tags required by the active modules in the manifest.
     /// </summary>
-    /// <param name="manifest">The 32-bit module manifest value.</param>
+    /// <param name="manifest">The 64-bit module manifest value.</param>
     /// <returns>Distinct set of block type tags.</returns>
-    public static IReadOnlyList<uint> GetRequiredBlockTypeTags(uint manifest)
+    public static IReadOnlyList<uint> GetRequiredBlockTypeTags(ulong manifest)
     {
         var tags = new HashSet<uint>();
-        uint bits = manifest;
+        ulong bits = manifest;
         while (bits != 0)
         {
             int bit = BitOperations.TrailingZeroCount(bits);
@@ -382,12 +382,12 @@ public static class ModuleRegistry
     /// <summary>
     /// Returns the union of all region names required by the active modules in the manifest.
     /// </summary>
-    /// <param name="manifest">The 32-bit module manifest value.</param>
+    /// <param name="manifest">The 64-bit module manifest value.</param>
     /// <returns>Distinct set of region names.</returns>
-    public static IReadOnlyList<string> GetRequiredRegions(uint manifest)
+    public static IReadOnlyList<string> GetRequiredRegions(ulong manifest)
     {
         var regions = new HashSet<string>(StringComparer.Ordinal);
-        uint bits = manifest;
+        ulong bits = manifest;
         while (bits != 0)
         {
             int bit = BitOperations.TrailingZeroCount(bits);
@@ -406,9 +406,9 @@ public static class ModuleRegistry
     /// <summary>
     /// Checks whether a specific module is active in the given manifest.
     /// </summary>
-    /// <param name="manifest">The 32-bit module manifest value.</param>
+    /// <param name="manifest">The 64-bit module manifest value.</param>
     /// <param name="module">The module to check.</param>
     /// <returns>True if the module's bit is set in the manifest.</returns>
-    public static bool IsModuleActive(uint manifest, ModuleId module)
-        => (manifest & (1u << (int)module)) != 0;
+    public static bool IsModuleActive(ulong manifest, ModuleId module)
+        => (manifest & (1UL << (int)module)) != 0;
 }
