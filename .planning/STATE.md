@@ -271,6 +271,7 @@
 - [Phase 91.5]: IoRing raw handle cached via DangerousAddRef lifecycle to satisfy S3869 analyzer
 - [Phase 91.5-87-59]: Used LibraryImport source generator for SPDK P/Invoke with GCHandle-based TCS callback propagation and cooperative polling
 - [Phase 91.5]: Monolithic kernel (CONFIG_MODULES=n) for preamble — reduces attack surface and simplifies boot
+- [Phase 91.5]: GCHandle-pinned completion flags for async P/Invoke polling in SPDK block device
 
 ## Performance Metrics
 
@@ -485,4 +486,4 @@
 
 ## Last Session
 - **Timestamp:** 2026-03-02T00:30:00Z
-- **Stopped At:** Completed 91.5-87-47-PLAN.md
+- **Stopped At:** Completed 91.5-87-46-PLAN.md
