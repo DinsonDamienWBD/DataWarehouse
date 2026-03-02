@@ -251,6 +251,8 @@
 - [Phase 91.5-vde-v2.1-format-completion]: VOPT-43: TRLR stride computed from blockSize at runtime (RecordsPerTrlrBlock+1) to support non-4096B geometries
 - [Phase 91.5-vde-v2.1-format-completion]: ForensicNecromancyRecovery Phase 3 validates UniversalBlockTrailer.Verify() before accepting metadata blocks to prevent false positives
 - [Phase 91.5-vde-v2.1-format-completion]: 87-39: Approximate LRU (ConcurrentQueue) for lock-free extent integrity cache eviction; CacheEntry as readonly struct; TTL supplements generation tracking
+- [Phase 91.5-87-42]: XxHash64 for deterministic group assignment (0-99): inode + seed + experiment name, consistent with StableHash.cs conventions
+- [Phase 91.5-87-42]: Volume ModuleManifest as safety gate: per-inode activation only allowed for modules present at volume level
 
 ## Performance Metrics
 
@@ -454,7 +456,8 @@
 | Phase 91.5 P87-38 | 15min | 1 tasks | 1 files |
 | Phase 91.5-vde-v2.1-format-completion P87-40 | 3 | 1 tasks | 3 files |
 | Phase 91.5-vde-v2.1-format-completion P87-39 | 6 | 1 tasks | 2 files |
+| Phase 91.5-vde-v2.1-format-completion P87-42 | 3 | 1 tasks | 3 files |
 
 ## Last Session
 - **Timestamp:** 2026-03-02T00:30:00Z
-- **Stopped At:** Completed 91.5-vde-v2.1-format-completion 87-39-PLAN.md
+- **Stopped At:** Completed 91.5-87-42-PLAN.md
