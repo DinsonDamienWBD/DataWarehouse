@@ -230,6 +230,8 @@
 - [Phase 91.5]: Barrier AfterImage packs shard LSNs as [ShardId:2][Lsn:6] per entry (8 bytes each); TryUnpackShardLsns validates count and index alignment
 - [Phase 91.5]: EpochTracker wraps MvccGarbageCollector; OldestActiveEpoch returns CurrentGlobalEpoch when no readers active; WORM check via InodeFlags byte 9 in version payload; physical materialization delegated to VDE layer
 - [Phase 91.5]: MetaslabAllocator morph levels 0-3: flat bitmap/sharded groups/metaslab tree/hierarchical; LazyBitmap loading via EnsureBitmapLoadedAsync; 32-byte directory entry per metaslab
+- [Phase 91.5-vde-v2.1-format-completion]: FROST hot-path verifier uses structural Schnorr checks (non-zero R/s, Ed25519 high-bit, non-trivial challenge); production key-management layer supplies combined public key for full EC verification
+- [Phase 91.5-vde-v2.1-format-completion]: QuorumDegradePolicy: Reject throws QuorumVerificationException, AcceptUnsigned writes without seal, QueueForSealing provisions write and enqueues for later sealing via ProcessSealingQueueAsync
 
 ## Performance Metrics
 
@@ -422,7 +424,8 @@
 | Phase 91.5 P87-16 | 6min | 2 tasks | 3 files |
 | Phase 91.5 P87-19 | 5min | 1 tasks | 3 files |
 | Phase 91.5 P87-18 | 6min | 2 tasks | 3 files |
+| Phase 91.5-vde-v2.1-format-completion P87-28 | 4 | 1 tasks | 2 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-24T01:35:00Z
-- **Stopped At:** Completed 91.5-87-18-PLAN.md
+- **Stopped At:** Completed 91.5-vde-v2.1-format-completion-87-28-PLAN.md
