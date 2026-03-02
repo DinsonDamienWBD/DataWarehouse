@@ -228,6 +228,7 @@
 - [Phase 91.5]: SHA-256 as BLAKE3 BCL fallback with TODO comment at hash site; last-write-wins dedup per batch epoch via Dictionary
 - [Phase 91.5]: ConcurrentDictionary thread-ring indexing for ShardedWriteAheadLog thread affinity (avoids S2696, consistent with Phase 86-12)
 - [Phase 91.5]: Barrier AfterImage packs shard LSNs as [ShardId:2][Lsn:6] per entry (8 bytes each); TryUnpackShardLsns validates count and index alignment
+- [Phase 91.5]: EpochTracker wraps MvccGarbageCollector; OldestActiveEpoch returns CurrentGlobalEpoch when no readers active; WORM check via InodeFlags byte 9 in version payload; physical materialization delegated to VDE layer
 
 ## Performance Metrics
 
@@ -418,7 +419,8 @@
 | Phase 91.5 P87-26 | 3min | 1 tasks | 2 files |
 | Phase 91.5 P87-17 | 4min | 1 tasks | 2 files |
 | Phase 91.5 P87-16 | 6min | 2 tasks | 3 files |
+| Phase 91.5 P87-19 | 5min | 1 tasks | 3 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-24T01:35:00Z
-- **Stopped At:** Completed 91.5-87-16-PLAN.md
+- **Stopped At:** Completed 91.5-87-19-PLAN.md
