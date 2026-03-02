@@ -179,12 +179,14 @@ public class VdeFormatModuleTests
     }
 
     [Fact]
-    public void Profile_MaxSecurity_HasAll19Modules()
+    public void Profile_MaxSecurity_HasAll19ModuleConfigs()
     {
+        // MaxSecurity manifest activates the original 19 modules (bits 0-18).
+        // New v2.1 modules (bits 19-38) are opt-in via custom profiles.
         var profile = VdeCreationProfile.MaxSecurity(1024);
-        Assert.Equal(0x0007_FFFFu, profile.ModuleManifest);
+        Assert.Equal(0x0007_FFFFu, profile.ModuleManifest); // bits 0-18
         Assert.Equal(0x04, profile.TamperResponseLevel);
-        Assert.Equal(19, profile.ModuleConfigLevels.Count);
+        Assert.Equal(19, profile.ModuleConfigLevels.Count); // 19 active modules
         foreach (var (_, level) in profile.ModuleConfigLevels)
         {
             Assert.Equal(0xF, level);
@@ -631,7 +633,8 @@ public class VdeFormatModuleTests
     [Fact]
     public void VdeCreator_CalculateLayout_MinimalProfile_HasCoreRegions()
     {
-        var profile = VdeCreationProfile.Minimal(1024);
+        // Use 4096 blocks to ensure data blocks remain after metadata (inode table min=1024 blocks)
+        var profile = VdeCreationProfile.Minimal(4096);
         var layout = VdeCreator.CalculateLayout(profile);
         Assert.True(layout.Regions.ContainsKey("PrimarySuperblock"));
         Assert.True(layout.Regions.ContainsKey("MirrorSuperblock"));

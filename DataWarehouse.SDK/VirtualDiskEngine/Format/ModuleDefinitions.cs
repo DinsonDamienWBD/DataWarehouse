@@ -67,6 +67,68 @@ public enum ModuleId : byte
 
     /// <summary>Audit log module (audit log region). Bit 18.</summary>
     AuditLog = 18,
+
+    // ── v2.1 Modules (bits 19-38, Phase 91.5 VOPT-87) ──────────────────
+
+    /// <summary>Compute Pushdown module — Smart Extents WASM pushdown (CPSH). Bit 19.</summary>
+    ComputePushdown = 19,
+
+    /// <summary>Ephemeral Key module — Cryptographic ephemerality (EKEY). Bit 20.</summary>
+    EphemeralKey = 20,
+
+    /// <summary>WAL Subscribers module — WAL streaming pub/sub (WALS). Bit 21.</summary>
+    WalSubscribers = 21,
+
+    /// <summary>Delta Extents module — Sub-block delta extents (DELT). Bit 22.</summary>
+    DeltaExtents = 22,
+
+    /// <summary>ZNS Zone Map module — Epoch-to-ZNS zone mapping (ZNSM). Bit 23.</summary>
+    ZnsZoneMap = 23,
+
+    /// <summary>Spatio-Temporal module — 4D spatiotemporal extents (STEX). Bit 24.</summary>
+    SpatioTemporal = 24,
+
+    /// <summary>Semantic Dedup module — Latent-space dedup, v7.0 reserve (SDUP). Bit 25.</summary>
+    SemanticDedup = 25,
+
+    /// <summary>ZKP Compliance module — zk-SNARK compliance, v7.0 reserve (ZKPA). Bit 26.</summary>
+    ZkpCompliance = 26,
+
+    /// <summary>Storage Policy module — Per-inode storage hints (SPOL). Bit 27.</summary>
+    StoragePolicy = 27,
+
+    /// <summary>Online Ops module — Online operations journal (OPJR). Bit 28.</summary>
+    OnlineOps = 28,
+
+    /// <summary>Disaster Recovery module — Failover state machine (DREC). Bit 29.</summary>
+    DisasterRecovery = 29,
+
+    /// <summary>GDPR Tombstone module — Provable erasure (TOMB). Bit 30.</summary>
+    GdprTombstone = 30,
+
+    /// <summary>Semantic Wear Level module — TTL-aware block placement (SWLV). Bit 31.</summary>
+    SemanticWearLevel = 31,
+
+    /// <summary>Quorum Seal module — FROST threshold signatures (QSIG). Bit 32.</summary>
+    QuorumSeal = 32,
+
+    /// <summary>Stego Watermark module — Traitor tracing, v7.0 reserve (STEG). Bit 33.</summary>
+    StegoWatermark = 33,
+
+    /// <summary>Quality of Service module — Per-inode QoS class (QOS). Bit 34.</summary>
+    QualityOfService = 34,
+
+    /// <summary>Vector Quantize module — Vector quantization (VECQ). Bit 35.</summary>
+    VectorQuantize = 35,
+
+    /// <summary>Ancestry Chaining module — Cryptographic ancestry (ANCR). Bit 36.</summary>
+    AncestryChaining = 36,
+
+    /// <summary>Capability Macaroon module — Macaroon capabilities (MACR). Bit 37.</summary>
+    CapabilityMacaroon = 37,
+
+    /// <summary>WORM Time Lock module — Time-locked WORM (WLCK). Bit 38.</summary>
+    WormTimeLock = 38,
 }
 
 /// <summary>
@@ -286,6 +348,189 @@ public static class ModuleRegistry
             Abbreviation = "ALOG",
             BlockTypeTags = new[] { Format.BlockTypeTags.ALOG },
             RegionNames = new[] { "AuditLogRegion" },
+            InodeFieldBytes = 0,
+        },
+
+        // ── v2.1 Modules (bits 19-38, VOPT-87) ──────────────────────────
+
+        [ModuleId.ComputePushdown] = new VdeModule
+        {
+            Id = ModuleId.ComputePushdown,
+            Name = "ComputePushdown",
+            Abbreviation = "CPSH",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 48,
+        },
+        [ModuleId.EphemeralKey] = new VdeModule
+        {
+            Id = ModuleId.EphemeralKey,
+            Name = "EphemeralKey",
+            Abbreviation = "EKEY",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 32,
+        },
+        [ModuleId.WalSubscribers] = new VdeModule
+        {
+            Id = ModuleId.WalSubscribers,
+            Name = "WalSubscribers",
+            Abbreviation = "WALS",
+            BlockTypeTags = new[] { Format.BlockTypeTags.WALS },
+            RegionNames = new[] { "WalSubscriberCursorTable" },
+            InodeFieldBytes = 0,
+        },
+        [ModuleId.DeltaExtents] = new VdeModule
+        {
+            Id = ModuleId.DeltaExtents,
+            Name = "DeltaExtents",
+            Abbreviation = "DELT",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 8,
+        },
+        [ModuleId.ZnsZoneMap] = new VdeModule
+        {
+            Id = ModuleId.ZnsZoneMap,
+            Name = "ZnsZoneMap",
+            Abbreviation = "ZNSM",
+            BlockTypeTags = new[] { Format.BlockTypeTags.ZNSM },
+            RegionNames = new[] { "ZnsZoneMapRegion" },
+            InodeFieldBytes = 0,
+        },
+        [ModuleId.SpatioTemporal] = new VdeModule
+        {
+            Id = ModuleId.SpatioTemporal,
+            Name = "SpatioTemporal",
+            Abbreviation = "STEX",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 6,
+        },
+        [ModuleId.SemanticDedup] = new VdeModule
+        {
+            Id = ModuleId.SemanticDedup,
+            Name = "SemanticDedup",
+            Abbreviation = "SDUP",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 266,
+        },
+        [ModuleId.ZkpCompliance] = new VdeModule
+        {
+            Id = ModuleId.ZkpCompliance,
+            Name = "ZkpCompliance",
+            Abbreviation = "ZKPA",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 322,
+        },
+        [ModuleId.StoragePolicy] = new VdeModule
+        {
+            Id = ModuleId.StoragePolicy,
+            Name = "StoragePolicy",
+            Abbreviation = "SPOL",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 2,
+        },
+        [ModuleId.OnlineOps] = new VdeModule
+        {
+            Id = ModuleId.OnlineOps,
+            Name = "OnlineOps",
+            Abbreviation = "OPJR",
+            BlockTypeTags = new[] { Format.BlockTypeTags.OPJR },
+            RegionNames = new[] { "OnlineOpsJournal" },
+            InodeFieldBytes = 0,
+        },
+        [ModuleId.DisasterRecovery] = new VdeModule
+        {
+            Id = ModuleId.DisasterRecovery,
+            Name = "DisasterRecovery",
+            Abbreviation = "DREC",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 0,
+        },
+        [ModuleId.GdprTombstone] = new VdeModule
+        {
+            Id = ModuleId.GdprTombstone,
+            Name = "GdprTombstone",
+            Abbreviation = "TOMB",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 0,
+        },
+        [ModuleId.SemanticWearLevel] = new VdeModule
+        {
+            Id = ModuleId.SemanticWearLevel,
+            Name = "SemanticWearLevel",
+            Abbreviation = "SWLV",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 2,
+        },
+        [ModuleId.QuorumSeal] = new VdeModule
+        {
+            Id = ModuleId.QuorumSeal,
+            Name = "QuorumSeal",
+            Abbreviation = "QSIG",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 79,
+        },
+        [ModuleId.StegoWatermark] = new VdeModule
+        {
+            Id = ModuleId.StegoWatermark,
+            Name = "StegoWatermark",
+            Abbreviation = "STEG",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 8,
+        },
+        [ModuleId.QualityOfService] = new VdeModule
+        {
+            Id = ModuleId.QualityOfService,
+            Name = "QualityOfService",
+            Abbreviation = "QOS",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 4,
+        },
+        [ModuleId.VectorQuantize] = new VdeModule
+        {
+            Id = ModuleId.VectorQuantize,
+            Name = "VectorQuantize",
+            Abbreviation = "VECQ",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 0,
+        },
+        [ModuleId.AncestryChaining] = new VdeModule
+        {
+            Id = ModuleId.AncestryChaining,
+            Name = "AncestryChaining",
+            Abbreviation = "ANCR",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 0,
+        },
+        [ModuleId.CapabilityMacaroon] = new VdeModule
+        {
+            Id = ModuleId.CapabilityMacaroon,
+            Name = "CapabilityMacaroon",
+            Abbreviation = "MACR",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 0,
+        },
+        [ModuleId.WormTimeLock] = new VdeModule
+        {
+            Id = ModuleId.WormTimeLock,
+            Name = "WormTimeLock",
+            Abbreviation = "WLCK",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
             InodeFieldBytes = 0,
         },
     }.ToFrozenDictionary();
