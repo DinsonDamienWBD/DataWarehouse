@@ -140,6 +140,7 @@
 - Phase 83: COMPLETE (5/5 plans, 201+280+35 integration tests for policy/cascade/performance/VDE format)
 - Phase 84: COMPLETE (6/6 plans, topology+VDE composer+GUI+shell registration+CLI fixes+51 integration tests)
 - Phase 85: COMPLETE (8/8 plans, lakehouse transaction log + time-travel engine)
+- Phase 91: COMPLETE (5/5 plans, 8/8 verified, CompoundBlockDevice + device-level RAID 0/1/5/6/10 + erasure coding + hot spare + dual RAID integration tests)
 - [Phase 83-01]: 201 new Policy tests (70 contract + 61 persistence + 70 edge case); 490 total Policy tests passing; all 5 CascadeStrategy, 5 PolicyLevel, 6 OperationalProfilePreset values covered; all 5 persistence backends round-trip verified
 - [Phase 83-02]: 280 per-feature multi-level tests; 7 feature categories x 5 levels x 5 cascades; 94-feature classification table verified; bloom filter + skip optimizer + deployment tier tested; MostRestrictive picks lowest intensity (most restrictive)
 - [Phase 83-04]: 35 performance benchmarks: resolution <10ms, fast-path <5ms, bloom filter <100us, cache <0.5ms, 100 parallel resolves no deadlock, three-tier ordering verified (avg Tier3 < Tier2 < Tier1)
