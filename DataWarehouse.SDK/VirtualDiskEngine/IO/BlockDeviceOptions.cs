@@ -41,6 +41,16 @@ public sealed class BlockDeviceOptions
     /// Registered buffers avoid per-operation page pinning overhead in io_uring and IoRing.
     /// </summary>
     public int RegisteredBufferCount { get; set; } = 256;
+
+    /// <summary>
+    /// Gets or sets whether to allow opening raw partitions that do not contain a DWVD signature.
+    /// When <c>false</c> (default), <see cref="RawPartitionBlockDevice"/> throws
+    /// <see cref="System.InvalidOperationException"/> if the DWVD magic bytes are not found
+    /// at the expected superblock location. Set to <c>true</c> to bypass this safety check.
+    /// <strong>WARNING:</strong> Setting this to <c>true</c> on a non-DWVD partition risks
+    /// irreversible data destruction.
+    /// </summary>
+    public bool AllowNonDwvd { get; set; }
 }
 
 /// <summary>
