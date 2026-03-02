@@ -31,6 +31,12 @@ public enum IncompatibleFeatureFlags : uint
 
     /// <summary>Consensus log (Raft/Paxos) is active for distributed coordination.</summary>
     ConsensusLogActive = 1 << 5,
+
+    /// <summary>
+    /// Bootable preamble region is present before Block 0.
+    /// Engines that do not recognize this bit MUST refuse to open the VDE.
+    /// </summary>
+    HasPreamble = 1 << 8,
 }
 
 /// <summary>
