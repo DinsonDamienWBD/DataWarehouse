@@ -270,6 +270,7 @@
 - [Phase 91.5]: Windows IOCP block device uses RandomAccess API internally for managed safety with IOCP performance
 - [Phase 91.5]: IoRing raw handle cached via DangerousAddRef lifecycle to satisfy S3869 analyzer
 - [Phase 91.5-87-59]: Used LibraryImport source generator for SPDK P/Invoke with GCHandle-based TCS callback propagation and cooperative polling
+- [Phase 91.5]: Monolithic kernel (CONFIG_MODULES=n) for preamble — reduces attack surface and simplifies boot
 
 ## Performance Metrics
 
@@ -480,7 +481,8 @@
 | Phase 91.5-vde-v2.1-format-completion P87-51 | 8 | 1 tasks | 2 files |
 | Phase 91.5-vde-v2.1-format-completion P87-52 | 3 | 1 tasks | 4 files |
 | Phase 91.5-vde-v2.1-format-completion P87-55 | 7 | 2 tasks | 6 files |
+| Phase 91.5 P87-47 | 247s | 1 tasks | 2 files |
 
 ## Last Session
 - **Timestamp:** 2026-03-02T00:30:00Z
-- **Stopped At:** Completed 91.5-87-59-PLAN.md
+- **Stopped At:** Completed 91.5-87-47-PLAN.md
