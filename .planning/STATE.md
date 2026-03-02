@@ -235,6 +235,7 @@
 - [Phase 91.5 87-27]: DeletionProof uses SHA-256 as BLAKE3 BCL fallback; proof hash 16 bytes (matches ExtentPointer.ExpectedHash); WAL marker encoding packs op type into upper 32 bits of TargetBlockNumber
 - [Phase 91.5-87-29]: Round-robin within temperature band; fallback Hot→Warm→Cold→Frozen when band exhausted
 - [Phase 91.5-87-29]: Dead-block ratio = 1 - FreeBlockCount/BlockCount for vacuum candidate detection
+- [Phase 91.5-vde-v2.1-format-completion]: 87-32: OldestActiveEpoch persisted to block 0 with EGLD magic; UniversalBlockTrailer.GenerationNumber used as per-block epoch tag for TRLR scan
 
 ## Performance Metrics
 
@@ -433,4 +434,4 @@
 
 ## Last Session
 - **Timestamp:** 2026-03-02T00:15:00Z
-- **Stopped At:** Completed 91.5-87-29-PLAN.md (SemanticWearLevelingAllocator VOPT-41)
+- **Stopped At:** Completed 91.5-87-32-PLAN.md
