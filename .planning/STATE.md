@@ -233,6 +233,8 @@
 - [Phase 91.5-vde-v2.1-format-completion]: FROST hot-path verifier uses structural Schnorr checks (non-zero R/s, Ed25519 high-bit, non-trivial challenge); production key-management layer supplies combined public key for full EC verification
 - [Phase 91.5-vde-v2.1-format-completion]: QuorumDegradePolicy: Reject throws QuorumVerificationException, AcceptUnsigned writes without seal, QueueForSealing provisions write and enqueues for later sealing via ProcessSealingQueueAsync
 - [Phase 91.5 87-27]: DeletionProof uses SHA-256 as BLAKE3 BCL fallback; proof hash 16 bytes (matches ExtentPointer.ExpectedHash); WAL marker encoding packs op type into upper 32 bits of TargetBlockNumber
+- [Phase 91.5-87-29]: Round-robin within temperature band; fallback Hot→Warm→Cold→Frozen when band exhausted
+- [Phase 91.5-87-29]: Dead-block ratio = 1 - FreeBlockCount/BlockCount for vacuum candidate detection
 
 ## Performance Metrics
 
@@ -427,7 +429,8 @@
 | Phase 91.5 P87-18 | 6min | 2 tasks | 3 files |
 | Phase 91.5-vde-v2.1-format-completion P87-28 | 4 | 1 tasks | 2 files |
 | Phase 91.5 P87-27 | 15min | 1 tasks | 4 files |
+| Phase 91.5-vde-v2.1-format-completion P87-29 | 255 | 1 tasks | 3 files |
 
 ## Last Session
 - **Timestamp:** 2026-03-02T00:15:00Z
-- **Stopped At:** Completed 91.5-vde-v2.1-format-completion-87-27-PLAN.md
+- **Stopped At:** Completed 91.5-87-29-PLAN.md (SemanticWearLevelingAllocator VOPT-41)
