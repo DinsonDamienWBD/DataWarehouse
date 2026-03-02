@@ -222,6 +222,7 @@
 - [Phase 91.5]: MaxSecurity profile manifest stays 0x0007_FFFF (bits 0-18); v2.1 modules opt-in via custom profiles
 - [Phase 91.5]: DeltaExtentModule layout [MaxDeltaDepth:2][CurrentDepth:2][CompactionPolicy:4] = 8B at inode offset 0x1F2 (byte 498); NeedsCompaction only for Eager policy
 - [Phase 91.5]: CPSH PredicateFlags serialized as single byte at offset 12 with 3 reserved bytes; inline byte[] always 32B zeroed; CreateExternal clears InlinePredicate flag
+- [Phase 91.5]: RaidTopologyScheme enum values 0-4 match extent flag bits 9-11 directly; ExtentRaidTopology exposes both uint and typed ExtentFlags overloads; DeviceMap is byte[] (not fixed array) to keep readonly struct usable; SpatioTemporalModule XML cref errors pre-existed and auto-fixed
 
 ## Performance Metrics
 
@@ -408,7 +409,9 @@
 | Phase 91.5 P87-65 | 23min | 2 tasks | 9 files |
 | Phase 91.5 P87-23 | 3min | 1 tasks | 2 files |
 | Phase 91.5 P87-24 | 5min | 1 tasks | 2 files |
+| Phase 91.5 P87-25 | 4min | 1 tasks | 2 files |
+| Phase 91.5 P87-26 | 3min | 1 tasks | 2 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-24T01:35:00Z
-- **Stopped At:** Completed 91.5-87-24-PLAN.md
+- **Stopped At:** Completed 91.5-87-25-PLAN.md
