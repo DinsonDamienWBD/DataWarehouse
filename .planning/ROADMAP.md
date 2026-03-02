@@ -1951,7 +1951,7 @@ Plans:
   8. 128-bit block addressing compiles and is forward-compatible (VDE v2.0 format reserves address space; activation requires config flag)
   9. ML pipeline stores feature data in VDE Intelligence Cache region; model versioning tracks lineage
   10. Delta Lake/Iceberg transaction logs stored natively in VDE; time-travel queries use VDE snapshot mechanism
-**Plans**: 8 plans
+**Plans**: 4 plans
 
 Plans:
 - [ ] 85-01-PLAN.md -- VDE-native block export: zero-copy I/O path for SMB/NFS/iSCSI/FC/NVMe-oF strategies, direct VDE region reads, bypass plugin layer on hot path
@@ -2430,17 +2430,13 @@ Plans:
   7. Transparent namespace: user operations (Store/Retrieve/Delete/List) work identically regardless of single-VDE or federated deployment
   8. Federation layer adds 0% overhead for single-VDE deployment (router stays null until multi-VDE activated by admin)
   9. Cross-shard List/Search operations fan out and merge results correctly with pagination
-**Plans**: 8 plans
+**Plans**: 4 plans
 
 Plans:
 - [ ] 92-01-PLAN.md -- VdeFederationRouter: namespace resolution, routing table, path-embedded routing algorithm, warm-cache fast path
 - [ ] 92-02-PLAN.md -- ShardCatalog Level 0-1: Root Catalog VDE (Raft-replicated 5x), Domain Catalog VDEs, catalog entry format, catalog VDE creation
-- [ ] 92-03-PLAN.md -- ShardCatalog Level 2-3: Index Shard VDEs (B-Tree + bloom filter), Data Shard VDEs (VDE 2.0A instances), shard addressing scheme
-- [ ] 92-04-PLAN.md -- Transparent namespace: Store/Retrieve/Delete/List/Search routed through federation, single-VDE passthrough (zero overhead)
-- [ ] 92-05-PLAN.md -- Cross-shard operations: fan-out List, merge-sort Search, distributed Delete, cross-shard metadata aggregation, pagination
-- [ ] 92-06-PLAN.md -- Bloom filter integration: per-index-shard bloom filters, negative lookup rejection, false-positive handling, filter persistence in shard metadata
-- [ ] 92-07-PLAN.md -- Recursive composition (VDE 2.0B+): super-federation that treats VDE 2.0B instances as routing targets, yottabyte→brontobyte scale
-- [ ] 92-08-PLAN.md -- Federation integration tests: single-VDE vs federated behavior parity, warm/cold path latency, routing correctness, namespace transparency
+- [ ] 92-03-PLAN.md -- ShardCatalog Level 2-3: Index Shard VDEs (B-Tree + bloom filter), Data Shard descriptors, ShardCatalogResolver wiring 4-level hierarchy
+- [ ] 92-04-PLAN.md -- Transparent namespace: FederatedVirtualDiskEngine facade, cross-shard fan-out merger, single-VDE passthrough (zero overhead)
 
 #### Phase 93: VDE 2.0B Shard Lifecycle
 **Goal**: Shards are living entities — they split when full, merge when underutilized, migrate between storage tiers based on access patterns, and rebalance across nodes. The placement policy engine decides where each shard lives (NVMe/SSD/HDD/tape, which datacenter, how many replicas).
