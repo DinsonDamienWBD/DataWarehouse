@@ -255,6 +255,8 @@
 - [Phase 91.5-87-42]: Volume ModuleManifest as safety gate: per-inode activation only allowed for modules present at volume level
 - [Phase 91.5-87-41]: Portable VDE exports always carry a fresh VolumeUuid — never share UUID with source
 - [Phase 91.5-87-41]: Block address remap table built during layout-planning; indirect extents not exported (inline only)
+- [Phase 91.5-vde-v2.1-format-completion]: 87-43: SHA-256 used as BCL substitute for BLAKE3 in custody proof nonce and HMAC computation
+- [Phase 91.5-vde-v2.1-format-completion]: 87-43: ITpmProvider interface injected for hardware-independent TPM abstraction in ProofOfPhysicalCustody
 
 ## Performance Metrics
 
@@ -460,7 +462,8 @@
 | Phase 91.5-vde-v2.1-format-completion P87-39 | 6 | 1 tasks | 2 files |
 | Phase 91.5-vde-v2.1-format-completion P87-42 | 3 | 1 tasks | 3 files |
 | Phase 91.5-vde-v2.1-format-completion P87-41 | 4 | 1 tasks | 2 files |
+| Phase 91.5-vde-v2.1-format-completion P87-43 | 7 | 1 tasks | 2 files |
 
 ## Last Session
 - **Timestamp:** 2026-03-02T00:30:00Z
-- **Stopped At:** Completed 91.5-87-41-PLAN.md
+- **Stopped At:** Completed 91.5-vde-v2.1-format-completion-87-43-PLAN.md
