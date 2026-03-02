@@ -2,9 +2,9 @@
 
 ## Current Position
 - **Phase:** 91.5-vde-v2.1-format-completion
-- **Plan:** 6/7
+- **Plan:** 7/7
 - **Status:** IN_PROGRESS
-- **Last Completed:** 87-37-PLAN.md
+- **Last Completed:** 87-38-PLAN.md
 
 ## Progress
 - Phase 66: COMPLETE (8/8 plans, 269/269 tests, integration gate PASS)
@@ -246,6 +246,8 @@
 - [Phase 91.5-vde-v2.1-format-completion]: VOPT-54: InlineTagPredicateScanner uses AVX2 Vector256 for batch hash matching; TagPredicate is sealed record for ReadOnlyMemory<byte> Value; AND predicate semantics
 - [Phase 91.5-vde-v2.1-format-completion]: VOPT-45: Compact tag presence uses nsHash||nameHash != 0; TRLR stride every 256th block; tag overflow via ExtendedAttributeBlock != 0
 - [Phase 91.5-87-37]: Wilson score interval over normal approximation for rare-event corruption rate estimation (accurate for proportions << 1%)
+- [Phase 91.5-87-38]: InodeExtent has no ExpectedHash field; VerifyExtentAsync accepts optional byte[]? expectedHash (callers with SpatioTemporalExtent supply it)
+- [Phase 91.5-87-38]: BLAKE3 = SHA-256 BCL fallback; 3-level chain pinpoints corruption at Block/Extent/File level via FirstFailureLevel for targeted repair
 
 ## Performance Metrics
 
@@ -446,7 +448,8 @@
 | Phase 91.5-vde-v2.1-format-completion P87-36 | 3 | 1 tasks | 2 files |
 | Phase 91.5-vde-v2.1-format-completion P87-35 | 10 | 1 tasks | 2 files |
 | Phase 91.5 P87-37 | 3min | 1 tasks | 3 files |
+| Phase 91.5 P87-38 | 15min | 1 tasks | 1 files |
 
 ## Last Session
-- **Timestamp:** 2026-03-02T00:15:00Z
-- **Stopped At:** Completed 91.5-87-37-PLAN.md (ProbabilisticCorruptionRadar)
+- **Timestamp:** 2026-03-02T00:30:00Z
+- **Stopped At:** Completed 91.5-87-38-PLAN.md (CrossExtentIntegrityChain)
