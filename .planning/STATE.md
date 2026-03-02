@@ -2,9 +2,9 @@
 
 ## Current Position
 - **Phase:** 91.5-vde-v2.1-format-completion
-- **Plan:** 1/7
+- **Plan:** 2/7
 - **Status:** IN_PROGRESS
-- **Last Completed:** 87-27-PLAN.md
+- **Last Completed:** 87-30-PLAN.md
 
 ## Progress
 - Phase 66: COMPLETE (8/8 plans, 269/269 tests, integration gate PASS)
@@ -26,6 +26,9 @@
 - Phase 82: COMPLETE (3/3 plans, audit + merge + verification; 53->52 plugins; 3,036 strategies; 0 errors 0 warnings)
 
 ## Decisions
+- [87-30]: ContentAddressableDedup uses per-pass in-memory refcount map; blocks freed via IBlockAllocator.FreeExtent after verification (avoids WAL overhead during scan)
+- [87-30]: Hash128 co-located in ContentAddressableDedup.cs (sole consumer) to avoid single-use type namespace sprawl
+- [87-30]: GetExtentHash returns zero for InodeExtent (no embedded hash in 24-byte layout); real dedup targets SpatioTemporalExtent.ExpectedHash
 - Assembly scanning (DiscoverAndRegister) dominant registration pattern - 46/47 plugins
 - Two complementary configuration systems: base ConfigurationItem<T> (89 items) and Moonshot MoonshotOverridePolicy (3-level enum) serve different layers
 - All 10 moonshot features at 100% configuration coverage with explicit override policies
