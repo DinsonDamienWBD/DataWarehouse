@@ -253,6 +253,8 @@
 - [Phase 91.5-vde-v2.1-format-completion]: 87-39: Approximate LRU (ConcurrentQueue) for lock-free extent integrity cache eviction; CacheEntry as readonly struct; TTL supplements generation tracking
 - [Phase 91.5-87-42]: XxHash64 for deterministic group assignment (0-99): inode + seed + experiment name, consistent with StableHash.cs conventions
 - [Phase 91.5-87-42]: Volume ModuleManifest as safety gate: per-inode activation only allowed for modules present at volume level
+- [Phase 91.5-87-41]: Portable VDE exports always carry a fresh VolumeUuid — never share UUID with source
+- [Phase 91.5-87-41]: Block address remap table built during layout-planning; indirect extents not exported (inline only)
 
 ## Performance Metrics
 
@@ -457,7 +459,8 @@
 | Phase 91.5-vde-v2.1-format-completion P87-40 | 3 | 1 tasks | 3 files |
 | Phase 91.5-vde-v2.1-format-completion P87-39 | 6 | 1 tasks | 2 files |
 | Phase 91.5-vde-v2.1-format-completion P87-42 | 3 | 1 tasks | 3 files |
+| Phase 91.5-vde-v2.1-format-completion P87-41 | 4 | 1 tasks | 2 files |
 
 ## Last Session
 - **Timestamp:** 2026-03-02T00:30:00Z
-- **Stopped At:** Completed 91.5-87-42-PLAN.md
+- **Stopped At:** Completed 91.5-87-41-PLAN.md
