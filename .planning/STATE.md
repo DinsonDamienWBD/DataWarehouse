@@ -215,6 +215,7 @@
 - [Phase 91]: Self-contained tests in plugin (no xUnit) via (bool, string) tuples + RunAllTestsAsync for programmatic execution
 - [Phase 91]: xUnit companion in DataWarehouse.Tests provides CI-runnable coverage; InMemoryPhysicalBlockDevice uses ConcurrentDictionary sparse storage; SetOnline(bool) mirrors real device API
 - [Phase 91.5]: EKEY module: Guid.TryWriteBytes for Span serialization; KeyRingSlot is fast-path hint with ID-based fallback; IVolatileKeyRing docs enumerate anti-patterns (no KMS, no disk, no logging)
+- [Phase 91.5]: ZnsZoneAllocator uses internal Dictionary-based O(1) epoch/zone index decoupled from ZnsZoneMapRegion for allocation performance; region is persistence-only
 
 ## Performance Metrics
 
@@ -396,7 +397,8 @@
 | Phase 91 P01 | 5min | 2 tasks | 3 files |
 | Phase 91 P05 | 15 | 2 tasks | 4 files |
 | Phase 91.5 P87-20 | 3min | 1 tasks | 3 files |
+| Phase 91.5 P87-21 | 4min | 1 tasks | 2 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-24T01:35:00Z
-- **Stopped At:** Completed 91.5-87-20-PLAN.md
+- **Stopped At:** Completed 91.5-87-21-PLAN.md
