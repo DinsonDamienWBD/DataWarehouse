@@ -236,6 +236,7 @@
 - [Phase 91.5-87-29]: Round-robin within temperature band; fallback Hot→Warm→Cold→Frozen when band exhausted
 - [Phase 91.5-87-29]: Dead-block ratio = 1 - FreeBlockCount/BlockCount for vacuum candidate detection
 - [Phase 91.5-vde-v2.1-format-completion]: 87-32: OldestActiveEpoch persisted to block 0 with EGLD magic; UniversalBlockTrailer.GenerationNumber used as per-block epoch tag for TRLR scan
+- [Phase 91.5-vde-v2.1-format-completion]: InstantCloneEngine: re-uses ExtentAwareCowManager for ref counting; NullWal satisfies IWriteAheadLog requirement without external WAL dependency
 
 ## Performance Metrics
 
@@ -431,7 +432,8 @@
 | Phase 91.5-vde-v2.1-format-completion P87-28 | 4 | 1 tasks | 2 files |
 | Phase 91.5 P87-27 | 15min | 1 tasks | 4 files |
 | Phase 91.5-vde-v2.1-format-completion P87-29 | 255 | 1 tasks | 3 files |
+| Phase 91.5-vde-v2.1-format-completion P87-31 | 12 | 1 tasks | 2 files |
 
 ## Last Session
 - **Timestamp:** 2026-03-02T00:15:00Z
-- **Stopped At:** Completed 91.5-87-32-PLAN.md
+- **Stopped At:** Completed 91.5-vde-v2.1-format-completion/87-31-PLAN.md
