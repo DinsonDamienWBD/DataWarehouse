@@ -223,6 +223,7 @@
 - [Phase 91.5]: DeltaExtentModule layout [MaxDeltaDepth:2][CurrentDepth:2][CompactionPolicy:4] = 8B at inode offset 0x1F2 (byte 498); NeedsCompaction only for Eager policy
 - [Phase 91.5]: CPSH PredicateFlags serialized as single byte at offset 12 with 3 reserved bytes; inline byte[] always 32B zeroed; CreateExternal clears InlinePredicate flag
 - [Phase 91.5]: RaidTopologyScheme enum values 0-4 match extent flag bits 9-11 directly; ExtentRaidTopology exposes both uint and typed ExtentFlags overloads; DeviceMap is byte[] (not fixed array) to keep readonly struct usable; SpatioTemporalModule XML cref errors pre-existed and auto-fixed
+- [Phase 91.5]: STEX: SpatioTemporalModule 6B at inode 0x1FA (bit 24); SpatioTemporalExtent 64B; MaxDirectExtents=3; Geohash interleaved lon/lat bits; Hilbert rotate/reflect algorithm zero-alloc
 
 ## Performance Metrics
 
@@ -414,4 +415,4 @@
 
 ## Last Session
 - **Timestamp:** 2026-02-24T01:35:00Z
-- **Stopped At:** Completed 91.5-87-25-PLAN.md
+- **Stopped At:** Completed 91.5-87-26-PLAN.md
