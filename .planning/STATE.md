@@ -248,6 +248,8 @@
 - [Phase 91.5-87-37]: Wilson score interval over normal approximation for rare-event corruption rate estimation (accurate for proportions << 1%)
 - [Phase 91.5-87-38]: InodeExtent has no ExpectedHash field; VerifyExtentAsync accepts optional byte[]? expectedHash (callers with SpatioTemporalExtent supply it)
 - [Phase 91.5-87-38]: BLAKE3 = SHA-256 BCL fallback; 3-level chain pinpoints corruption at Block/Extent/File level via FirstFailureLevel for targeted repair
+- [Phase 91.5-vde-v2.1-format-completion]: VOPT-43: TRLR stride computed from blockSize at runtime (RecordsPerTrlrBlock+1) to support non-4096B geometries
+- [Phase 91.5-vde-v2.1-format-completion]: ForensicNecromancyRecovery Phase 3 validates UniversalBlockTrailer.Verify() before accepting metadata blocks to prevent false positives
 
 ## Performance Metrics
 
@@ -449,7 +451,8 @@
 | Phase 91.5-vde-v2.1-format-completion P87-35 | 10 | 1 tasks | 2 files |
 | Phase 91.5 P87-37 | 3min | 1 tasks | 3 files |
 | Phase 91.5 P87-38 | 15min | 1 tasks | 1 files |
+| Phase 91.5-vde-v2.1-format-completion P87-40 | 3 | 1 tasks | 3 files |
 
 ## Last Session
 - **Timestamp:** 2026-03-02T00:30:00Z
-- **Stopped At:** Completed 91.5-87-38-PLAN.md (CrossExtentIntegrityChain)
+- **Stopped At:** Completed 91.5-vde-v2.1-format-completion 87-40-PLAN.md
