@@ -265,6 +265,8 @@
 - [Phase 91.5-vde-v2.1-format-completion]: Float64 metrics stored via BitConverter.DoubleToInt64Bits in int64 value slot; IsFloat64Metric guides callers
 - [Phase 91.5-vde-v2.1-format-completion]: NvmeQoSPriority (2-bit extent bits 6-7) is distinct from QoSClass (3-bit inode); Policy Vault updates never require extent flag rewrites
 - [Phase 91.5-vde-v2.1-format-completion]: QoSPolicyRecord.PolicyVaultTypeTag = 0x0003 compile-time const for Policy Vault type discrimination
+- [Phase 91.5-87-55]: HMACSHA256 used as BCL stand-in for HMAC-BLAKE3 in EmergencyRecoveryBlock
+- [Phase 91.5-87-55]: RecoveryFooter uses SUPB tag (not new tag) so recovery tools identify it as superblock copy
 
 ## Performance Metrics
 
@@ -474,7 +476,8 @@
 | Phase 91.5-vde-v2.1-format-completion P87-44 | 3 | 1 tasks | 3 files |
 | Phase 91.5-vde-v2.1-format-completion P87-51 | 8 | 1 tasks | 2 files |
 | Phase 91.5-vde-v2.1-format-completion P87-52 | 3 | 1 tasks | 4 files |
+| Phase 91.5-vde-v2.1-format-completion P87-55 | 7 | 2 tasks | 6 files |
 
 ## Last Session
 - **Timestamp:** 2026-03-02T00:30:00Z
-- **Stopped At:** Completed 87-52-PLAN.md (format-native QoS structures VOPT-71-73)
+- **Stopped At:** Completed 91.5-87-55-PLAN.md
