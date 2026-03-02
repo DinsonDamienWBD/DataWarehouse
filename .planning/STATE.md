@@ -257,6 +257,8 @@
 - [Phase 91.5-87-41]: Block address remap table built during layout-planning; indirect extents not exported (inline only)
 - [Phase 91.5-vde-v2.1-format-completion]: 87-43: SHA-256 used as BCL substitute for BLAKE3 in custody proof nonce and HMAC computation
 - [Phase 91.5-vde-v2.1-format-completion]: 87-43: ITpmProvider interface injected for hardware-independent TPM abstraction in ProofOfPhysicalCustody
+- [Phase 91.5-vde-v2.1-format-completion]: 87-44: EMA alpha=0.001 gives ~1000-sample memory for adaptive entropy baseline without losing ransomware sensitivity
+- [Phase 91.5-vde-v2.1-format-completion]: 87-44: ReadOnlySpan<byte> EvaluateAndForkAsync split into sync wrapper + async core to resolve CS4012
 
 ## Performance Metrics
 
@@ -463,7 +465,8 @@
 | Phase 91.5-vde-v2.1-format-completion P87-42 | 3 | 1 tasks | 3 files |
 | Phase 91.5-vde-v2.1-format-completion P87-41 | 4 | 1 tasks | 2 files |
 | Phase 91.5-vde-v2.1-format-completion P87-43 | 7 | 1 tasks | 2 files |
+| Phase 91.5-vde-v2.1-format-completion P87-44 | 3 | 1 tasks | 3 files |
 
 ## Last Session
 - **Timestamp:** 2026-03-02T00:30:00Z
-- **Stopped At:** Completed 91.5-vde-v2.1-format-completion-87-43-PLAN.md
+- **Stopped At:** Completed 91.5-vde-v2.1-format-completion-87-44-PLAN.md
