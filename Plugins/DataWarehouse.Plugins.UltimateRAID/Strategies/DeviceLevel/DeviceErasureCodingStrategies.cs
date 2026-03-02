@@ -293,7 +293,7 @@ public sealed class DeviceReedSolomonStrategy : RaidStrategyBase, IDeviceErasure
                 var allChunks = EncodeStripeToChunks(decoded, blockSize);
 
                 // Write the failed device's chunk to the replacement
-                if (failedDeviceIndex < allChunks.Length && allChunks[failedDeviceIndex] != null)
+                if (failedDeviceIndex < allChunks.Length && allChunks[failedDeviceIndex].Length > 0)
                 {
                     await replacement.WriteBlockAsync(s, allChunks[failedDeviceIndex], ct)
                         .ConfigureAwait(false);
@@ -721,6 +721,12 @@ public sealed class DeviceFountainCodeStrategy : RaidStrategyBase, IDeviceErasur
 
     /// <inheritdoc/>
     public override double StorageEfficiency => _dataDevices / (double)_totalEncodedBlocks;
+
+    /// <inheritdoc/>
+    public override double ReadPerformanceMultiplier => _dataDevices * 0.8;
+
+    /// <inheritdoc/>
+    public override double WritePerformanceMultiplier => _dataDevices * 0.5;
 
     /// <summary>
     /// Gets the erasure coding scheme (always <see cref="ErasureCodingScheme.FountainCode"/>).

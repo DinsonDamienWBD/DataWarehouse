@@ -11,7 +11,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.DeviceLevel;
 /// Shared base for all device-level RAID strategies. Provides common validation,
 /// compound device construction, and health inspection logic.
 /// </summary>
-internal abstract class DeviceLevelRaidStrategyBase : IDeviceRaidStrategy
+public abstract class DeviceLevelRaidStrategyBase : IDeviceRaidStrategy
 {
     /// <inheritdoc />
     public abstract DeviceLayoutType Layout { get; }
