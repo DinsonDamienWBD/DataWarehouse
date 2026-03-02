@@ -115,6 +115,9 @@ public static class BlockTypeTags
     /// <summary>Emergency Recovery ("ERCV").</summary>
     public const uint ERCV = 0x45524356;
 
+    /// <summary>Recovery Control ("RCVR") — always at block 14, never encrypted (AD-67).</summary>
+    public const uint RCVR = 0x52435652;
+
     /// <summary>Extent tree node ("EXTN").</summary>
     public const uint EXTN = 0x4558544E;
 
@@ -153,7 +156,7 @@ public static class BlockTypeTags
         SUPB, RMAP, POLV, ENCR, BMAP, INOD, TAGI, MWAL, MTRK, BTRE,
         SNAP, REPL, RAID, COMP, INTE, STRE, XREF, WORM, CODE, DWAL,
         DATA, FREE, CMVT, ALOG, CMAL, CLOG, DICT, ANON, MLOG, ERCV, EXTN,
-        COLR, ZMAP, EXMD, IANT, WALS, ZNSM, OPJR, TRLR
+        COLR, ZMAP, EXMD, IANT, WALS, ZNSM, OPJR, TRLR, RCVR
     }.ToFrozenSet();
 
     /// <summary>
