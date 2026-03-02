@@ -244,6 +244,7 @@
 - [Phase 91.5-vde-v2.1-format-completion]: HeatDrivenTieringAllocator: AllocateWithHeatHint falls back to primary IBlockAllocator when no shard group registered for tier
 - [Phase 91.5-87-34]: Epoch index uses ulong UTC nanoseconds for O(log N) BisectFloor binary search; async ref params replaced with return-value passing pattern
 - [Phase 91.5-vde-v2.1-format-completion]: VOPT-54: InlineTagPredicateScanner uses AVX2 Vector256 for batch hash matching; TagPredicate is sealed record for ReadOnlyMemory<byte> Value; AND predicate semantics
+- [Phase 91.5-vde-v2.1-format-completion]: VOPT-45: Compact tag presence uses nsHash||nameHash != 0; TRLR stride every 256th block; tag overflow via ExtendedAttributeBlock != 0
 
 ## Performance Metrics
 
@@ -442,7 +443,8 @@
 | Phase 91.5-vde-v2.1-format-completion P87-31 | 12 | 1 tasks | 2 files |
 | Phase 91.5-vde-v2.1-format-completion P87-34 | 7 | 1 tasks | 2 files |
 | Phase 91.5-vde-v2.1-format-completion P87-36 | 3 | 1 tasks | 2 files |
+| Phase 91.5-vde-v2.1-format-completion P87-35 | 10 | 1 tasks | 2 files |
 
 ## Last Session
 - **Timestamp:** 2026-03-02T00:15:00Z
-- **Stopped At:** Completed 91.5-87-36-PLAN.md
+- **Stopped At:** Completed 91.5-87-35-PLAN.md (ColdAnalyticsScanner)
