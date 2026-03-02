@@ -210,6 +210,7 @@
 - [Phase 90]: SupportedOSPlatform attribute for Windows-only ProcessorAffinity; NVMe namespace grouping under NvmeSubsystem node; BoundedDictionary(500) NUMA cache
 - [Phase 90-06]: Three device strategies (discovery/health/pool) wrap all Phase 90 classes; 10 device.* message bus topics on UltimateFilesystemPlugin; StorageTier using alias for namespace disambiguation
 - [Phase 90-05]: Fixed 256-byte journal entries with CRC32 integrity; circular buffer (128 entries, 32KB) on reserved sectors; intent/commit/rollback lifecycle; StorageTier using alias for namespace disambiguation; BoundedDictionary(100) for rebuild state; proactive rebuild for Failing devices
+- [Phase 91]: Single SemaphoreSlim for parity write serialization; left-symmetric rotating parity for RAID 5/6
 
 ## Performance Metrics
 
@@ -388,7 +389,8 @@
 | Phase 90 P05 | 5min | 2 tasks | 3 files |
 
 | Phase 90 P06 | 5min | 2 tasks | 4 files |
+| Phase 91 P01 | 5min | 2 tasks | 3 files |
 
 ## Last Session
 - **Timestamp:** 2026-02-24T01:35:00Z
-- **Stopped At:** Completed 90-06-PLAN.md (Phase 90 COMPLETE)
+- **Stopped At:** Completed 91-01-PLAN.md
