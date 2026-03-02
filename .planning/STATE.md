@@ -273,6 +273,7 @@
 - [Phase 91.5]: Monolithic kernel (CONFIG_MODULES=n) for preamble — reduces attack surface and simplifies boot
 - [Phase 91.5]: GCHandle-pinned completion flags for async P/Invoke polling in SPDK block device
 - [Phase 91.5]: VOPT-66: Three named preamble composition profiles with 4KiB-aligned layout engine
+- [Phase 91.5]: SHA-256 as BLAKE3 fallback for preamble integrity verification
 
 ## Performance Metrics
 
@@ -488,4 +489,4 @@
 
 ## Last Session
 - **Timestamp:** 2026-03-02T00:30:00Z
-- **Stopped At:** Completed 91.5-87-49-PLAN.md
+- **Stopped At:** Completed 91.5-87-50-PLAN.md
