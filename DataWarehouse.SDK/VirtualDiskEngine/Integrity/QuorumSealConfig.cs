@@ -23,7 +23,7 @@ public enum QuorumScheme : byte
 public enum QuorumDegradePolicy : byte
 {
     /// <summary>
-    /// Reject the write entirely and throw an <see cref="InvalidOperationException"/>.
+    /// Reject the write entirely and throw <see cref="QuorumVerificationException"/>.
     /// Provides maximum security at the cost of availability.
     /// </summary>
     Reject = 0,

@@ -580,16 +580,17 @@ public sealed class QuorumSealedWritePath
         // Compute challenge: e = SHA-512(R || PK_placeholder || message)
         // Without PK we use the signer-bitmap as a deterministic placeholder — sufficient
         // to detect replayed or syntactically invalid seals.
-        Span<byte> challengeInput = stackalloc byte[32 + 4 + message.Length];
-        R.CopyTo(challengeInput.Slice(0, 32));
-        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(challengeInput.Slice(32, 4), seal.SignerBitmap);
-        message.CopyTo(challengeInput.Slice(36));
+        // Use heap allocation to avoid CA2014 (variable-length stackalloc).
+        byte[] challengeInput = new byte[32 + 4 + message.Length];
+        R.CopyTo(challengeInput.AsSpan(0, 32));
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(challengeInput.AsSpan(32, 4), seal.SignerBitmap);
+        message.CopyTo(challengeInput.AsSpan(36));
 
-        Span<byte> challengeHash = stackalloc byte[64]; // SHA-512
+        byte[] challengeHash = new byte[64]; // SHA-512
         SHA512.HashData(challengeInput, challengeHash);
 
         // Challenge must not be trivially zero.
-        return !IsAllZero(challengeHash.Slice(0, 32));
+        return !IsAllZero(challengeHash.AsSpan(0, 32));
     }
 
     /// <summary>
@@ -626,15 +627,16 @@ public sealed class QuorumSealedWritePath
             return false;
 
         // Challenge hash with bitmap placeholder (same rationale as Ed25519 verifier).
-        Span<byte> challengeInput = stackalloc byte[32 + 4 + message.Length];
-        R.CopyTo(challengeInput.Slice(0, 32));
-        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(challengeInput.Slice(32, 4), seal.SignerBitmap);
-        message.CopyTo(challengeInput.Slice(36));
+        // Use heap allocation to avoid CA2014 (variable-length stackalloc).
+        byte[] challengeInput = new byte[32 + 4 + message.Length];
+        R.CopyTo(challengeInput.AsSpan(0, 32));
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(challengeInput.AsSpan(32, 4), seal.SignerBitmap);
+        message.CopyTo(challengeInput.AsSpan(36));
 
-        Span<byte> challengeHash = stackalloc byte[64];
+        byte[] challengeHash = new byte[64];
         SHA512.HashData(challengeInput, challengeHash);
 
-        return !IsAllZero(challengeHash.Slice(0, 32));
+        return !IsAllZero(challengeHash.AsSpan(0, 32));
     }
 
     // ── Bit-manipulation utilities ───────────────────────────────────────────────
