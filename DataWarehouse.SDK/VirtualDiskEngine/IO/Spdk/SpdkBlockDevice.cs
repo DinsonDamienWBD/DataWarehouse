@@ -203,13 +203,20 @@ public sealed class SpdkBlockDevice : IDirectBlockDevice
             using var dmaBuffer = _dmaAllocator.Allocate(BlockSize, AlignmentRequirement);
             var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-            unsafe
+            var pinned = dmaBuffer.Memory.Pin();
+            try
             {
-                using var pinned = dmaBuffer.Memory.Pin();
-                void* payload = pinned.Pointer;
+                unsafe
+                {
+                    void* payload = pinned.Pointer;
+                    SubmitReadCommand(_namespace, _qpair, payload, (ulong)blockNumber, 1, tcs);
+                }
 
-                SubmitReadCommand(_namespace, _qpair, payload, (ulong)blockNumber, 1, tcs);
                 await PollForCompletion(_qpair, tcs, ct);
+            }
+            finally
+            {
+                pinned.Dispose();
             }
 
             // Copy from DMA buffer to caller's buffer
@@ -246,13 +253,20 @@ public sealed class SpdkBlockDevice : IDirectBlockDevice
 
             var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-            unsafe
+            var pinned = dmaBuffer.Memory.Pin();
+            try
             {
-                using var pinned = dmaBuffer.Memory.Pin();
-                void* payload = pinned.Pointer;
+                unsafe
+                {
+                    void* payload = pinned.Pointer;
+                    SubmitWriteCommand(_namespace, _qpair, payload, (ulong)blockNumber, 1, tcs);
+                }
 
-                SubmitWriteCommand(_namespace, _qpair, payload, (ulong)blockNumber, 1, tcs);
                 await PollForCompletion(_qpair, tcs, ct);
+            }
+            finally
+            {
+                pinned.Dispose();
             }
         }
         finally
@@ -519,11 +533,9 @@ public sealed class SpdkBlockDevice : IDirectBlockDevice
         ReadOnlySpan<byte> appName = "DataWarehouse.VDE"u8;
         unsafe
         {
-            fixed (byte* namePtr = opts.Name)
-            {
-                appName.CopyTo(new Span<byte>(namePtr, Math.Min(appName.Length, 255)));
-                namePtr[Math.Min(appName.Length, 255)] = 0; // Null-terminate
-            }
+            byte* namePtr = opts.Name;
+            appName.CopyTo(new Span<byte>(namePtr, Math.Min(appName.Length, 255)));
+            namePtr[Math.Min(appName.Length, 255)] = 0; // Null-terminate
         }
 
         // Use default shared memory group (no isolation)
@@ -540,12 +552,10 @@ public sealed class SpdkBlockDevice : IDirectBlockDevice
 
         // Copy PCI address into the transport ID
         byte[] addrBytes = Encoding.ASCII.GetBytes(pciAddress);
-        fixed (byte* traddrPtr = trid.Traddr)
-        {
-            int copyLen = Math.Min(addrBytes.Length, 255);
-            Marshal.Copy(addrBytes, 0, (IntPtr)traddrPtr, copyLen);
-            traddrPtr[copyLen] = 0; // Null-terminate
-        }
+        byte* traddrPtr = trid.Traddr;
+        int copyLen = Math.Min(addrBytes.Length, 255);
+        Marshal.Copy(addrBytes, 0, (IntPtr)traddrPtr, copyLen);
+        traddrPtr[copyLen] = 0; // Null-terminate
 
         IntPtr attachedController = IntPtr.Zero;
 

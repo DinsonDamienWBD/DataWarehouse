@@ -13,7 +13,7 @@ namespace DataWarehouse.SDK.VirtualDiskEngine.Preamble;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Each buffer is aligned to <paramref name="blockSize"/> and sized to hold exactly one
+/// Each buffer is aligned to the configured block size and sized to hold exactly one
 /// block. When the pool is exhausted, <see cref="Rent"/> transparently allocates a new
 /// DMA buffer (pool growth), ensuring the I/O path never blocks on allocation.
 /// </para>
