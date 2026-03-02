@@ -250,6 +250,7 @@
 - [Phase 91.5-87-38]: BLAKE3 = SHA-256 BCL fallback; 3-level chain pinpoints corruption at Block/Extent/File level via FirstFailureLevel for targeted repair
 - [Phase 91.5-vde-v2.1-format-completion]: VOPT-43: TRLR stride computed from blockSize at runtime (RecordsPerTrlrBlock+1) to support non-4096B geometries
 - [Phase 91.5-vde-v2.1-format-completion]: ForensicNecromancyRecovery Phase 3 validates UniversalBlockTrailer.Verify() before accepting metadata blocks to prevent false positives
+- [Phase 91.5-vde-v2.1-format-completion]: 87-39: Approximate LRU (ConcurrentQueue) for lock-free extent integrity cache eviction; CacheEntry as readonly struct; TTL supplements generation tracking
 
 ## Performance Metrics
 
@@ -452,7 +453,8 @@
 | Phase 91.5 P87-37 | 3min | 1 tasks | 3 files |
 | Phase 91.5 P87-38 | 15min | 1 tasks | 1 files |
 | Phase 91.5-vde-v2.1-format-completion P87-40 | 3 | 1 tasks | 3 files |
+| Phase 91.5-vde-v2.1-format-completion P87-39 | 6 | 1 tasks | 2 files |
 
 ## Last Session
 - **Timestamp:** 2026-03-02T00:30:00Z
-- **Stopped At:** Completed 91.5-vde-v2.1-format-completion 87-40-PLAN.md
+- **Stopped At:** Completed 91.5-vde-v2.1-format-completion 87-39-PLAN.md
