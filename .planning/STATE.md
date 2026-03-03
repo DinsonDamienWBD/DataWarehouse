@@ -286,6 +286,8 @@
 - [Phase 92]: SDK tests use local InMemoryBlockDevice for plugin isolation
 - [Phase 93]: Rack-aware selection uses round-robin across rack groups for balanced distribution
 - [Phase 93]: Cost ceiling enforcement: policy.MaxCostPerGbMonth * shardSizeGb vs placement total
+- [Phase 93]: Lower shard survives merge, upper absorbed and decommissioned
+- [Phase 93]: Batch merges sequential to serialize index catalog updates
 
 ## Performance Metrics
 
@@ -504,7 +506,8 @@
 | Phase 92 P07 | 4min | 2 tasks | 2 files |
 | Phase 92 P08 | 5min | 2 tasks | 2 files |
 | Phase 93 P01 | 4min | 2 tasks | 5 files |
+| Phase 93 P03 | 4min | 2 tasks | 2 files |
 
 ## Last Session
 - **Timestamp:** 2026-03-02T00:30:00Z
-- **Stopped At:** Completed 93-01-PLAN.md
+- **Stopped At:** Completed 93-03-PLAN.md
