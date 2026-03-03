@@ -5,6 +5,7 @@ using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
+using DataWarehouse.Plugins.UltimateDataManagement.Delegation;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement;
 
@@ -39,6 +40,7 @@ public sealed class UltimateDataManagementPlugin : DataManagementPluginBase, IDi
     private readonly DataManagementStrategyRegistry _registry;
     private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private readonly BoundedDictionary<string, DataManagementPolicy> _policies = new BoundedDictionary<string, DataManagementPolicy>(1000);
+    private readonly MessageBusDelegationHelper _catalogDelegation;
     private bool _disposed;
 
     // Configuration
@@ -110,6 +112,7 @@ public sealed class UltimateDataManagementPlugin : DataManagementPluginBase, IDi
     public UltimateDataManagementPlugin()
     {
         _registry = new DataManagementStrategyRegistry();
+        _catalogDelegation = new MessageBusDelegationHelper(Name, () => MessageBus, "catalog");
 
         // Auto-discover and register strategies
         DiscoverAndRegisterStrategies();
@@ -580,6 +583,20 @@ public sealed class UltimateDataManagementPlugin : DataManagementPluginBase, IDi
         var usageByStrategy = new Dictionary<string, long>(_usageStats);
         message.Payload["usageByStrategy"] = usageByStrategy;
 
+        // Circuit breaker delegation health stats
+        var catalogStats = _catalogDelegation.GetStatistics();
+        message.Payload["delegationHealth"] = new Dictionary<string, object>
+        {
+            ["catalog"] = new Dictionary<string, object>
+            {
+                ["circuitState"] = catalogStats.CurrentState.ToString(),
+                ["totalRequests"] = catalogStats.TotalRequests,
+                ["successfulRequests"] = catalogStats.SuccessfulRequests,
+                ["failedRequests"] = catalogStats.FailedRequests,
+                ["rejectedRequests"] = catalogStats.RejectedRequests
+            }
+        };
+
         return Task.CompletedTask;
     }
 
@@ -826,6 +843,7 @@ public sealed class UltimateDataManagementPlugin : DataManagementPluginBase, IDi
         {
             if (_disposed) return;
             _disposed = true;
+            _catalogDelegation.Dispose();
             _usageStats.Clear();
             _policies.Clear();
         }

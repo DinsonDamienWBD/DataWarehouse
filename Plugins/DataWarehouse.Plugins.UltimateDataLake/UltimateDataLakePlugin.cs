@@ -6,6 +6,7 @@ using DataWarehouse.SDK.Contracts.DataLake;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
+using DataWarehouse.Plugins.UltimateDataLake.Delegation;
 
 namespace DataWarehouse.Plugins.UltimateDataLake;
 
@@ -38,6 +39,8 @@ public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposab
     private readonly StrategyRegistry<IDataLakeStrategy> _registry;
     private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private readonly BoundedDictionary<string, DataLakeAccessPolicy> _policies = new BoundedDictionary<string, DataLakeAccessPolicy>(1000);
+    private readonly MessageBusDelegationHelper _lineageDelegation;
+    private readonly MessageBusDelegationHelper _catalogDelegation;
     private bool _disposed;
 
     private volatile bool _auditEnabled = true;
@@ -78,6 +81,8 @@ public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposab
     public UltimateDataLakePlugin()
     {
         _registry = new StrategyRegistry<IDataLakeStrategy>(s => s.StrategyId);
+        _lineageDelegation = new MessageBusDelegationHelper(Name, () => MessageBus, "lineage");
+        _catalogDelegation = new MessageBusDelegationHelper(Name, () => MessageBus, "catalog");
         DiscoverAndRegisterStrategies();
     }
 
@@ -256,277 +261,283 @@ public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposab
     {
         var action = message.Payload.TryGetValue("action", out var actObj) && actObj is string act ? act : "list";
 
-        if (MessageBus == null)
+        switch (action.ToLowerInvariant())
         {
-            message.Payload["success"] = false;
-            message.Payload["error"] = "Catalog service unavailable: message bus not configured";
-            return;
+            case "add":
+                var registerMsg = new PluginMessage
+                {
+                    Type = "catalog.register",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["action"] = "add",
+                        ["id"] = GetRequiredString(message.Payload, "id"),
+                        ["name"] = GetRequiredString(message.Payload, "name"),
+                        ["location"] = GetRequiredString(message.Payload, "location"),
+                        ["format"] = message.Payload.TryGetValue("format", out var fmtObj) && fmtObj is string fmt ? fmt : "parquet",
+                        ["zone"] = message.Payload.TryGetValue("zone", out var zObj) && zObj is string z ? z : "Raw"
+                    }
+                };
+                var addResponse = await _catalogDelegation.DelegateAsync("catalog.register", registerMsg);
+                if (addResponse.Success)
+                {
+                    message.Payload["entry"] = addResponse.Payload ?? new Dictionary<string, object>
+                    {
+                        ["id"] = registerMsg.Payload["id"],
+                        ["name"] = registerMsg.Payload["name"],
+                        ["location"] = registerMsg.Payload["location"]
+                    };
+                    message.Payload["success"] = true;
+                    if (addResponse.ErrorCode == "DELEGATION_FALLBACK")
+                        message.Payload["_delegationFallback"] = true;
+                }
+                else
+                {
+                    message.Payload["success"] = false;
+                    message.Payload["error"] = addResponse.ErrorMessage ?? "Failed to register catalog entry";
+                    if (addResponse.ErrorCode == "DELEGATION_UNAVAILABLE")
+                        message.Payload["_delegationUnavailable"] = true;
+                }
+                return;
+
+            case "get":
+                var getMsg = new PluginMessage
+                {
+                    Type = "catalog.search",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["action"] = "get",
+                        ["id"] = GetRequiredString(message.Payload, "id")
+                    }
+                };
+                var getResponse = await _catalogDelegation.DelegateAsync("catalog.search", getMsg);
+                if (getResponse.Success)
+                {
+                    message.Payload["entry"] = getResponse.Payload ?? "null";
+                    message.Payload["success"] = true;
+                    if (getResponse.ErrorCode == "DELEGATION_FALLBACK")
+                        message.Payload["_delegationFallback"] = true;
+                }
+                else
+                {
+                    message.Payload["success"] = false;
+                    message.Payload["error"] = getResponse.ErrorMessage ?? "Failed to get catalog entry";
+                    if (getResponse.ErrorCode == "DELEGATION_UNAVAILABLE")
+                        message.Payload["_delegationUnavailable"] = true;
+                }
+                return;
+
+            case "list":
+                var listMsg = new PluginMessage
+                {
+                    Type = "catalog.search",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["action"] = "list"
+                    }
+                };
+                var listResponse = await _catalogDelegation.DelegateAsync("catalog.search", listMsg);
+                if (listResponse.Success)
+                {
+                    message.Payload["entries"] = listResponse.Payload ?? Array.Empty<object>();
+                    message.Payload["success"] = true;
+                    if (listResponse.ErrorCode == "DELEGATION_FALLBACK")
+                        message.Payload["_delegationFallback"] = true;
+                }
+                else
+                {
+                    message.Payload["success"] = false;
+                    message.Payload["error"] = listResponse.ErrorMessage ?? "Failed to list catalog entries";
+                    if (listResponse.ErrorCode == "DELEGATION_UNAVAILABLE")
+                        message.Payload["_delegationUnavailable"] = true;
+                }
+                return;
+
+            case "remove":
+                var removeMsg = new PluginMessage
+                {
+                    Type = "catalog.register",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["action"] = "remove",
+                        ["id"] = GetRequiredString(message.Payload, "id")
+                    }
+                };
+                var removeResponse = await _catalogDelegation.DelegateAsync("catalog.register", removeMsg);
+                if (removeResponse.Success)
+                {
+                    message.Payload["success"] = true;
+                    if (removeResponse.ErrorCode == "DELEGATION_FALLBACK")
+                        message.Payload["_delegationFallback"] = true;
+                }
+                else
+                {
+                    message.Payload["success"] = false;
+                    message.Payload["error"] = removeResponse.ErrorMessage ?? "Failed to remove catalog entry";
+                    if (removeResponse.ErrorCode == "DELEGATION_UNAVAILABLE")
+                        message.Payload["_delegationUnavailable"] = true;
+                }
+                return;
         }
 
-        try
-        {
-            switch (action.ToLowerInvariant())
-            {
-                case "add":
-                    var registerMsg = new PluginMessage
-                    {
-                        Type = "catalog.register",
-                        Payload = new Dictionary<string, object>
-                        {
-                            ["action"] = "add",
-                            ["id"] = GetRequiredString(message.Payload, "id"),
-                            ["name"] = GetRequiredString(message.Payload, "name"),
-                            ["location"] = GetRequiredString(message.Payload, "location"),
-                            ["format"] = message.Payload.TryGetValue("format", out var fmtObj) && fmtObj is string fmt ? fmt : "parquet",
-                            ["zone"] = message.Payload.TryGetValue("zone", out var zObj) && zObj is string z ? z : "Raw"
-                        }
-                    };
-                    var addResponse = await MessageBus.SendAsync("catalog.register", registerMsg);
-                    if (addResponse.Success)
-                    {
-                        message.Payload["entry"] = addResponse.Payload ?? new Dictionary<string, object>
-                        {
-                            ["id"] = registerMsg.Payload["id"],
-                            ["name"] = registerMsg.Payload["name"],
-                            ["location"] = registerMsg.Payload["location"]
-                        };
-                        message.Payload["success"] = true;
-                    }
-                    else
-                    {
-                        message.Payload["success"] = false;
-                        message.Payload["error"] = addResponse.ErrorMessage ?? "Failed to register catalog entry";
-                    }
-                    return;
-
-                case "get":
-                    var getMsg = new PluginMessage
-                    {
-                        Type = "catalog.search",
-                        Payload = new Dictionary<string, object>
-                        {
-                            ["action"] = "get",
-                            ["id"] = GetRequiredString(message.Payload, "id")
-                        }
-                    };
-                    var getResponse = await MessageBus.SendAsync("catalog.search", getMsg);
-                    if (getResponse.Success)
-                    {
-                        message.Payload["entry"] = getResponse.Payload ?? "null";
-                        message.Payload["success"] = true;
-                    }
-                    else
-                    {
-                        message.Payload["success"] = false;
-                        message.Payload["error"] = getResponse.ErrorMessage ?? "Failed to get catalog entry";
-                    }
-                    return;
-
-                case "list":
-                    var listMsg = new PluginMessage
-                    {
-                        Type = "catalog.search",
-                        Payload = new Dictionary<string, object>
-                        {
-                            ["action"] = "list"
-                        }
-                    };
-                    var listResponse = await MessageBus.SendAsync("catalog.search", listMsg);
-                    if (listResponse.Success)
-                    {
-                        message.Payload["entries"] = listResponse.Payload ?? Array.Empty<object>();
-                        message.Payload["success"] = true;
-                    }
-                    else
-                    {
-                        message.Payload["success"] = false;
-                        message.Payload["error"] = listResponse.ErrorMessage ?? "Failed to list catalog entries";
-                    }
-                    return;
-
-                case "remove":
-                    var removeMsg = new PluginMessage
-                    {
-                        Type = "catalog.register",
-                        Payload = new Dictionary<string, object>
-                        {
-                            ["action"] = "remove",
-                            ["id"] = GetRequiredString(message.Payload, "id")
-                        }
-                    };
-                    var removeResponse = await MessageBus.SendAsync("catalog.register", removeMsg);
-                    if (removeResponse.Success)
-                    {
-                        message.Payload["success"] = true;
-                    }
-                    else
-                    {
-                        message.Payload["success"] = false;
-                        message.Payload["error"] = removeResponse.ErrorMessage ?? "Failed to remove catalog entry";
-                    }
-                    return;
-            }
-
-            message.Payload["success"] = true;
-        }
-        catch (Exception ex)
-        {
-            message.Payload["success"] = false;
-            message.Payload["error"] = $"Catalog service unavailable: {ex.Message}";
-        }
+        message.Payload["success"] = true;
     }
 
     private async Task HandleLineageAsync(PluginMessage message)
     {
         var action = message.Payload.TryGetValue("action", out var actObj) && actObj is string act ? act : "list";
 
-        if (MessageBus == null)
+        switch (action.ToLowerInvariant())
         {
-            message.Payload["success"] = false;
-            message.Payload["error"] = "Lineage service unavailable: message bus not configured";
-            return;
+            case "add":
+                var sourceId = GetRequiredString(message.Payload, "sourceId");
+                var targetId = GetRequiredString(message.Payload, "targetId");
+                var transformationType = message.Payload.TryGetValue("type", out var tObj) && tObj is string t ? t : "transform";
+
+                // Track lineage event (best-effort, do not fail if this one fails)
+                var trackMsg = new PluginMessage
+                {
+                    Type = "lineage.track",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["dataObjectId"] = targetId,
+                        ["operation"] = transformationType,
+                        ["actor"] = "datalake",
+                        ["sourceId"] = sourceId,
+                        ["targetId"] = targetId
+                    }
+                };
+                await _lineageDelegation.DelegateAsync("lineage.track", trackMsg);
+
+                // Also add edge for graph traversal
+                var edgeMsg = new PluginMessage
+                {
+                    Type = "lineage.add-edge",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["sourceNodeId"] = sourceId,
+                        ["targetNodeId"] = targetId,
+                        ["edgeType"] = transformationType
+                    }
+                };
+                var addResponse = await _lineageDelegation.DelegateAsync("lineage.add-edge", edgeMsg);
+                if (addResponse.Success)
+                {
+                    message.Payload["record"] = addResponse.Payload ?? new Dictionary<string, object>
+                    {
+                        ["sourceId"] = sourceId,
+                        ["targetId"] = targetId,
+                        ["transformationType"] = transformationType
+                    };
+                    message.Payload["success"] = true;
+                    if (addResponse.ErrorCode == "DELEGATION_FALLBACK")
+                        message.Payload["_delegationFallback"] = true;
+                }
+                else
+                {
+                    message.Payload["success"] = false;
+                    message.Payload["error"] = addResponse.ErrorMessage ?? "Failed to add lineage record";
+                    if (addResponse.ErrorCode == "DELEGATION_UNAVAILABLE")
+                        message.Payload["_delegationUnavailable"] = true;
+                }
+                return;
+
+            case "get":
+                var nodeId = GetRequiredString(message.Payload, "id");
+                var getMsg = new PluginMessage
+                {
+                    Type = "lineage.get-node",
+                    Payload = new Dictionary<string, object> { ["nodeId"] = nodeId }
+                };
+                var getResponse = await _lineageDelegation.DelegateAsync("lineage.get-node", getMsg);
+                if (getResponse.Success)
+                {
+                    message.Payload["record"] = getResponse.Payload ?? "null";
+                    message.Payload["success"] = true;
+                    if (getResponse.ErrorCode == "DELEGATION_FALLBACK")
+                        message.Payload["_delegationFallback"] = true;
+                }
+                else
+                {
+                    message.Payload["success"] = false;
+                    message.Payload["error"] = getResponse.ErrorMessage ?? "Failed to get lineage record";
+                    if (getResponse.ErrorCode == "DELEGATION_UNAVAILABLE")
+                        message.Payload["_delegationUnavailable"] = true;
+                }
+                return;
+
+            case "upstream":
+                var upTargetId = GetRequiredString(message.Payload, "targetId");
+                var upMsg = new PluginMessage
+                {
+                    Type = "lineage.upstream",
+                    Payload = new Dictionary<string, object> { ["nodeId"] = upTargetId }
+                };
+                var upResponse = await _lineageDelegation.DelegateAsync("lineage.upstream", upMsg);
+                if (upResponse.Success)
+                {
+                    message.Payload["records"] = upResponse.Payload ?? Array.Empty<object>();
+                    message.Payload["success"] = true;
+                    if (upResponse.ErrorCode == "DELEGATION_FALLBACK")
+                        message.Payload["_delegationFallback"] = true;
+                }
+                else
+                {
+                    message.Payload["success"] = false;
+                    message.Payload["error"] = upResponse.ErrorMessage ?? "Failed to query upstream lineage";
+                    if (upResponse.ErrorCode == "DELEGATION_UNAVAILABLE")
+                        message.Payload["_delegationUnavailable"] = true;
+                }
+                return;
+
+            case "downstream":
+                var downSourceId = GetRequiredString(message.Payload, "sourceId");
+                var downMsg = new PluginMessage
+                {
+                    Type = "lineage.downstream",
+                    Payload = new Dictionary<string, object> { ["nodeId"] = downSourceId }
+                };
+                var downResponse = await _lineageDelegation.DelegateAsync("lineage.downstream", downMsg);
+                if (downResponse.Success)
+                {
+                    message.Payload["records"] = downResponse.Payload ?? Array.Empty<object>();
+                    message.Payload["success"] = true;
+                    if (downResponse.ErrorCode == "DELEGATION_FALLBACK")
+                        message.Payload["_delegationFallback"] = true;
+                }
+                else
+                {
+                    message.Payload["success"] = false;
+                    message.Payload["error"] = downResponse.ErrorMessage ?? "Failed to query downstream lineage";
+                    if (downResponse.ErrorCode == "DELEGATION_UNAVAILABLE")
+                        message.Payload["_delegationUnavailable"] = true;
+                }
+                return;
+
+            case "list":
+                var listMsg = new PluginMessage
+                {
+                    Type = "lineage.search",
+                    Payload = new Dictionary<string, object> { ["query"] = "*" }
+                };
+                var listResponse = await _lineageDelegation.DelegateAsync("lineage.search", listMsg);
+                if (listResponse.Success)
+                {
+                    message.Payload["records"] = listResponse.Payload ?? Array.Empty<object>();
+                    message.Payload["success"] = true;
+                    if (listResponse.ErrorCode == "DELEGATION_FALLBACK")
+                        message.Payload["_delegationFallback"] = true;
+                }
+                else
+                {
+                    message.Payload["success"] = false;
+                    message.Payload["error"] = listResponse.ErrorMessage ?? "Failed to list lineage records";
+                    if (listResponse.ErrorCode == "DELEGATION_UNAVAILABLE")
+                        message.Payload["_delegationUnavailable"] = true;
+                }
+                return;
         }
 
-        try
-        {
-            switch (action.ToLowerInvariant())
-            {
-                case "add":
-                    var sourceId = GetRequiredString(message.Payload, "sourceId");
-                    var targetId = GetRequiredString(message.Payload, "targetId");
-                    var transformationType = message.Payload.TryGetValue("type", out var tObj) && tObj is string t ? t : "transform";
-
-                    // Track lineage event
-                    var trackMsg = new PluginMessage
-                    {
-                        Type = "lineage.track",
-                        Payload = new Dictionary<string, object>
-                        {
-                            ["dataObjectId"] = targetId,
-                            ["operation"] = transformationType,
-                            ["actor"] = "datalake",
-                            ["sourceId"] = sourceId,
-                            ["targetId"] = targetId
-                        }
-                    };
-                    await MessageBus.SendAsync("lineage.track", trackMsg);
-
-                    // Also add edge for graph traversal
-                    var edgeMsg = new PluginMessage
-                    {
-                        Type = "lineage.add-edge",
-                        Payload = new Dictionary<string, object>
-                        {
-                            ["sourceNodeId"] = sourceId,
-                            ["targetNodeId"] = targetId,
-                            ["edgeType"] = transformationType
-                        }
-                    };
-                    var addResponse = await MessageBus.SendAsync("lineage.add-edge", edgeMsg);
-                    if (addResponse.Success)
-                    {
-                        message.Payload["record"] = addResponse.Payload ?? new Dictionary<string, object>
-                        {
-                            ["sourceId"] = sourceId,
-                            ["targetId"] = targetId,
-                            ["transformationType"] = transformationType
-                        };
-                        message.Payload["success"] = true;
-                    }
-                    else
-                    {
-                        message.Payload["success"] = false;
-                        message.Payload["error"] = addResponse.ErrorMessage ?? "Failed to add lineage record";
-                    }
-                    return;
-
-                case "get":
-                    var nodeId = GetRequiredString(message.Payload, "id");
-                    var getMsg = new PluginMessage
-                    {
-                        Type = "lineage.get-node",
-                        Payload = new Dictionary<string, object> { ["nodeId"] = nodeId }
-                    };
-                    var getResponse = await MessageBus.SendAsync("lineage.get-node", getMsg);
-                    if (getResponse.Success)
-                    {
-                        message.Payload["record"] = getResponse.Payload ?? "null";
-                        message.Payload["success"] = true;
-                    }
-                    else
-                    {
-                        message.Payload["success"] = false;
-                        message.Payload["error"] = getResponse.ErrorMessage ?? "Failed to get lineage record";
-                    }
-                    return;
-
-                case "upstream":
-                    var upTargetId = GetRequiredString(message.Payload, "targetId");
-                    var upMsg = new PluginMessage
-                    {
-                        Type = "lineage.upstream",
-                        Payload = new Dictionary<string, object> { ["nodeId"] = upTargetId }
-                    };
-                    var upResponse = await MessageBus.SendAsync("lineage.upstream", upMsg);
-                    if (upResponse.Success)
-                    {
-                        message.Payload["records"] = upResponse.Payload ?? Array.Empty<object>();
-                        message.Payload["success"] = true;
-                    }
-                    else
-                    {
-                        message.Payload["success"] = false;
-                        message.Payload["error"] = upResponse.ErrorMessage ?? "Failed to query upstream lineage";
-                    }
-                    return;
-
-                case "downstream":
-                    var downSourceId = GetRequiredString(message.Payload, "sourceId");
-                    var downMsg = new PluginMessage
-                    {
-                        Type = "lineage.downstream",
-                        Payload = new Dictionary<string, object> { ["nodeId"] = downSourceId }
-                    };
-                    var downResponse = await MessageBus.SendAsync("lineage.downstream", downMsg);
-                    if (downResponse.Success)
-                    {
-                        message.Payload["records"] = downResponse.Payload ?? Array.Empty<object>();
-                        message.Payload["success"] = true;
-                    }
-                    else
-                    {
-                        message.Payload["success"] = false;
-                        message.Payload["error"] = downResponse.ErrorMessage ?? "Failed to query downstream lineage";
-                    }
-                    return;
-
-                case "list":
-                    var listMsg = new PluginMessage
-                    {
-                        Type = "lineage.search",
-                        Payload = new Dictionary<string, object> { ["query"] = "*" }
-                    };
-                    var listResponse = await MessageBus.SendAsync("lineage.search", listMsg);
-                    if (listResponse.Success)
-                    {
-                        message.Payload["records"] = listResponse.Payload ?? Array.Empty<object>();
-                        message.Payload["success"] = true;
-                    }
-                    else
-                    {
-                        message.Payload["success"] = false;
-                        message.Payload["error"] = listResponse.ErrorMessage ?? "Failed to list lineage records";
-                    }
-                    return;
-            }
-
-            message.Payload["success"] = true;
-        }
-        catch (Exception ex)
-        {
-            message.Payload["success"] = false;
-            message.Payload["error"] = $"Lineage service unavailable: {ex.Message}";
-        }
+        message.Payload["success"] = true;
     }
 
     private Task HandlePromoteAsync(PluginMessage message)
@@ -615,6 +626,30 @@ public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposab
         message.Payload["registeredStrategies"] = _registry.Count;
         message.Payload["accessPolicies"] = _policies.Count;
         message.Payload["usageByStrategy"] = new Dictionary<string, long>(_usageStats);
+
+        // Circuit breaker delegation health stats
+        var lineageStats = _lineageDelegation.GetStatistics();
+        var catalogStats = _catalogDelegation.GetStatistics();
+        message.Payload["delegationHealth"] = new Dictionary<string, object>
+        {
+            ["lineage"] = new Dictionary<string, object>
+            {
+                ["circuitState"] = lineageStats.CurrentState.ToString(),
+                ["totalRequests"] = lineageStats.TotalRequests,
+                ["successfulRequests"] = lineageStats.SuccessfulRequests,
+                ["failedRequests"] = lineageStats.FailedRequests,
+                ["rejectedRequests"] = lineageStats.RejectedRequests
+            },
+            ["catalog"] = new Dictionary<string, object>
+            {
+                ["circuitState"] = catalogStats.CurrentState.ToString(),
+                ["totalRequests"] = catalogStats.TotalRequests,
+                ["successfulRequests"] = catalogStats.SuccessfulRequests,
+                ["failedRequests"] = catalogStats.FailedRequests,
+                ["rejectedRequests"] = catalogStats.RejectedRequests
+            }
+        };
+
         return Task.CompletedTask;
     }
 
@@ -695,6 +730,8 @@ public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposab
         {
             if (_disposed) return;
             _disposed = true;
+            _lineageDelegation.Dispose();
+            _catalogDelegation.Dispose();
             _usageStats.Clear();
             _policies.Clear();
         }
