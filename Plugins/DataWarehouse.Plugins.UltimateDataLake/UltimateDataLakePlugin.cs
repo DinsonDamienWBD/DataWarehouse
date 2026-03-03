@@ -37,7 +37,6 @@ public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposab
 {
     private readonly StrategyRegistry<IDataLakeStrategy> _registry;
     private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
-    private readonly BoundedDictionary<string, DataCatalogEntry> _catalog = new BoundedDictionary<string, DataCatalogEntry>(1000);
     private readonly BoundedDictionary<string, DataLakeAccessPolicy> _policies = new BoundedDictionary<string, DataLakeAccessPolicy>(1000);
     private bool _disposed;
 
@@ -209,7 +208,6 @@ public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposab
     {
         var metadata = base.GetMetadata();
         metadata["TotalStrategies"] = _registry.Count;
-        metadata["CatalogEntries"] = _catalog.Count;
         metadata["AccessPolicies"] = _policies.Count;
         metadata["TotalOperations"] = Interlocked.Read(ref _totalOperations);
         metadata["TotalBytesProcessed"] = 0L;
@@ -254,43 +252,128 @@ public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposab
         return Task.CompletedTask;
     }
 
-    private Task HandleCatalogAsync(PluginMessage message)
+    private async Task HandleCatalogAsync(PluginMessage message)
     {
         var action = message.Payload.TryGetValue("action", out var actObj) && actObj is string act ? act : "list";
 
-        switch (action.ToLowerInvariant())
+        if (MessageBus == null)
         {
-            case "add":
-                var entry = new DataCatalogEntry
-                {
-                    Id = GetRequiredString(message.Payload, "id"),
-                    Name = GetRequiredString(message.Payload, "name"),
-                    Location = GetRequiredString(message.Payload, "location"),
-                    Format = message.Payload.TryGetValue("format", out var fmtObj) && fmtObj is string fmt ? fmt : "parquet",
-                    Zone = Enum.TryParse<DataLakeZone>(
-                        message.Payload.TryGetValue("zone", out var zObj) && zObj is string z ? z : "Raw", true, out var zone)
-                        ? zone : DataLakeZone.Raw,
-                    CreatedAt = DateTimeOffset.UtcNow,
-                    ModifiedAt = DateTimeOffset.UtcNow
-                };
-                _catalog[entry.Id] = entry;
-                message.Payload["entry"] = entry;
-                break;
-            case "get":
-                var id = GetRequiredString(message.Payload, "id");
-                message.Payload["entry"] = _catalog.TryGetValue(id, out var e) ? (object)e : (object)"null";
-                break;
-            case "list":
-                message.Payload["entries"] = _catalog.Values.ToList();
-                break;
-            case "remove":
-                var removeId = GetRequiredString(message.Payload, "id");
-                _catalog.TryRemove(removeId, out _);
-                break;
+            message.Payload["success"] = false;
+            message.Payload["error"] = "Catalog service unavailable: message bus not configured";
+            return;
         }
 
-        message.Payload["success"] = true;
-        return Task.CompletedTask;
+        try
+        {
+            switch (action.ToLowerInvariant())
+            {
+                case "add":
+                    var registerMsg = new PluginMessage
+                    {
+                        Type = "catalog.register",
+                        Payload = new Dictionary<string, object>
+                        {
+                            ["action"] = "add",
+                            ["id"] = GetRequiredString(message.Payload, "id"),
+                            ["name"] = GetRequiredString(message.Payload, "name"),
+                            ["location"] = GetRequiredString(message.Payload, "location"),
+                            ["format"] = message.Payload.TryGetValue("format", out var fmtObj) && fmtObj is string fmt ? fmt : "parquet",
+                            ["zone"] = message.Payload.TryGetValue("zone", out var zObj) && zObj is string z ? z : "Raw"
+                        }
+                    };
+                    var addResponse = await MessageBus.SendAsync("catalog.register", registerMsg);
+                    if (addResponse.Success)
+                    {
+                        message.Payload["entry"] = addResponse.Payload ?? new Dictionary<string, object>
+                        {
+                            ["id"] = registerMsg.Payload["id"],
+                            ["name"] = registerMsg.Payload["name"],
+                            ["location"] = registerMsg.Payload["location"]
+                        };
+                        message.Payload["success"] = true;
+                    }
+                    else
+                    {
+                        message.Payload["success"] = false;
+                        message.Payload["error"] = addResponse.ErrorMessage ?? "Failed to register catalog entry";
+                    }
+                    return;
+
+                case "get":
+                    var getMsg = new PluginMessage
+                    {
+                        Type = "catalog.search",
+                        Payload = new Dictionary<string, object>
+                        {
+                            ["action"] = "get",
+                            ["id"] = GetRequiredString(message.Payload, "id")
+                        }
+                    };
+                    var getResponse = await MessageBus.SendAsync("catalog.search", getMsg);
+                    if (getResponse.Success)
+                    {
+                        message.Payload["entry"] = getResponse.Payload ?? "null";
+                        message.Payload["success"] = true;
+                    }
+                    else
+                    {
+                        message.Payload["success"] = false;
+                        message.Payload["error"] = getResponse.ErrorMessage ?? "Failed to get catalog entry";
+                    }
+                    return;
+
+                case "list":
+                    var listMsg = new PluginMessage
+                    {
+                        Type = "catalog.search",
+                        Payload = new Dictionary<string, object>
+                        {
+                            ["action"] = "list"
+                        }
+                    };
+                    var listResponse = await MessageBus.SendAsync("catalog.search", listMsg);
+                    if (listResponse.Success)
+                    {
+                        message.Payload["entries"] = listResponse.Payload ?? Array.Empty<object>();
+                        message.Payload["success"] = true;
+                    }
+                    else
+                    {
+                        message.Payload["success"] = false;
+                        message.Payload["error"] = listResponse.ErrorMessage ?? "Failed to list catalog entries";
+                    }
+                    return;
+
+                case "remove":
+                    var removeMsg = new PluginMessage
+                    {
+                        Type = "catalog.register",
+                        Payload = new Dictionary<string, object>
+                        {
+                            ["action"] = "remove",
+                            ["id"] = GetRequiredString(message.Payload, "id")
+                        }
+                    };
+                    var removeResponse = await MessageBus.SendAsync("catalog.register", removeMsg);
+                    if (removeResponse.Success)
+                    {
+                        message.Payload["success"] = true;
+                    }
+                    else
+                    {
+                        message.Payload["success"] = false;
+                        message.Payload["error"] = removeResponse.ErrorMessage ?? "Failed to remove catalog entry";
+                    }
+                    return;
+            }
+
+            message.Payload["success"] = true;
+        }
+        catch (Exception ex)
+        {
+            message.Payload["success"] = false;
+            message.Payload["error"] = $"Catalog service unavailable: {ex.Message}";
+        }
     }
 
     private async Task HandleLineageAsync(PluginMessage message)
@@ -530,7 +613,6 @@ public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposab
         message.Payload["totalOperations"] = Interlocked.Read(ref _totalOperations);
         message.Payload["totalBytesProcessed"] = 0L;
         message.Payload["registeredStrategies"] = _registry.Count;
-        message.Payload["catalogEntries"] = _catalog.Count;
         message.Payload["accessPolicies"] = _policies.Count;
         message.Payload["usageByStrategy"] = new Dictionary<string, long>(_usageStats);
         return Task.CompletedTask;
@@ -576,22 +658,6 @@ public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposab
     /// <inheritdoc/>
     protected override async Task OnStartCoreAsync(CancellationToken ct)
     {
-        // Restore persisted catalog entries
-        var catalogData = await LoadStateAsync("catalog", ct);
-        if (catalogData != null && catalogData.Length > 0)
-        {
-            try
-            {
-                var entries = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, DataCatalogEntry>>(catalogData);
-                if (entries != null)
-                {
-                    foreach (var kvp in entries)
-                        _catalog[kvp.Key] = kvp.Value;
-                }
-            }
-            catch { /* Graceful degradation -- start with empty catalog */ }
-        }
-
         // Restore persisted access policies
         var policyData = await LoadStateAsync("policies", ct);
         if (policyData != null && policyData.Length > 0)
@@ -612,15 +678,6 @@ public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposab
     /// <inheritdoc/>
     protected override async Task OnStopCoreAsync()
     {
-        // Persist catalog entries
-        try
-        {
-            var catalogDict = new Dictionary<string, DataCatalogEntry>(_catalog);
-            var catalogBytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(catalogDict);
-            await SaveStateAsync("catalog", catalogBytes);
-        }
-        catch { /* Best-effort persistence */ }
-
         // Persist access policies
         try
         {
@@ -639,7 +696,6 @@ public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposab
             if (_disposed) return;
             _disposed = true;
             _usageStats.Clear();
-            _catalog.Clear();
             _policies.Clear();
         }
         base.Dispose(disposing);
