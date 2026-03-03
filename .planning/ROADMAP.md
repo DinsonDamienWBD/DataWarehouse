@@ -2496,14 +2496,11 @@ Plans:
   6. Transparent namespace verification: user operations identical at all 3 scales (same API, same behavior, same results)
   7. Policy cascade through federation: VDE-level policy at federation root cascades correctly to all shard VDEs
   8. Bare-metal bootstrap: DW starts on raw devices without OS storage stack, initializes pools, creates VDEs, serves requests
-**Plans**: 5 plans
+**Plans**: 3 plans
 
 Plans:
 - [ ] 95-01-PLAN.md -- Single-VDE E2E test: raw device → pool → CompoundBlockDevice → VDE → CRUD operations, device failure injection, SMART health verification
 - [ ] 95-02-PLAN.md -- Multi-VDE E2E test: multiple VDEs, device-level RAID across pools, data-level RAID within VDE, cross-VDE operations via UniversalFabric
-- [ ] 95-03-PLAN.md -- Federated E2E test: 100+ shard VDEs, hierarchical catalog, fan-out List/Search, shard split/merge under load, namespace transparency
-- [ ] 95-04-PLAN.md -- Dual RAID + zero-overhead verification: simultaneous device + data failure, recovery correctness, single-VDE performance baseline comparison
-- [ ] 95-05-PLAN.md -- Bare-metal bootstrap + policy cascade: OS-free initialization, pool creation, VDE creation, federation activation, policy propagation through hierarchy
 
 ### Progress
 
