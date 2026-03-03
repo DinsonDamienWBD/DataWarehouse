@@ -85,14 +85,31 @@ See `.planning/MILESTONES.md` for full accomplishment list.
 - ✓ Production audit: 4,656 findings all fixed, plugin consolidation to 52 — v6.0
 - ✓ E2E testing: 34 tests covering raw devices to federation at GB/TB/PB scales — v6.0
 
-### Active (next milestone)
+### Active (v7.0)
 
-- [ ] (To be defined in next milestone)
+- [ ] Fix all 4,444 remaining audit findings (1,751 P1 + 1,863 P2 + 830 LOW) — sequential top-to-bottom
+- [ ] Contract test generation for all 3,036 strategies against their base class contracts
+- [ ] Integration path tests — message bus, pipeline, VDE decorator chain, federation
+- [ ] Companion project tests — CLI, GUI, Dashboard, Launcher, Shared
+- [ ] Negative/adversarial tests and fuzz harnesses
+- [ ] Performance baselines with regression gates (real DW benchmarks, not generic .NET)
+- [ ] Cross-cutting hostile runtime analysis — thread safety, CancellationToken, config validation, memory leaks
+- [ ] Fix all findings from hostile analysis
+
+### Active (v7.1)
+
+- [ ] CLI sync to v6.0 architecture (missing: PolicyEngine, Federation, Authority, Shards, DeviceRAID, AIAdvisor)
+- [ ] GUI sync to v6.0 architecture (missing: PolicyEngine, AuthorityChain, ShardLifecycle, AIAdvisor)
+- [ ] Dashboard sync to v6.0 architecture (missing: Policy, Federation, Authority, Shards, RAID, AI, VDE controllers)
+- [ ] Launcher sync to v6.0 architecture (federation-aware topology, policy-based startup, CRDT sync)
+- [ ] Shared library alignment with current SDK contracts
 
 ### Out of Scope
 
-- v7.0 reserved features: SDUP (Semantic Dedup), ZKPA (zk-SNARK Compliance), Ghost Enclaves
+- v8.0+ reserved features: SDUP (Semantic Dedup), ZKPA (zk-SNARK Compliance), Ghost Enclaves
 - New plugins beyond what exists in current 52-plugin set
+- New SDK features or architectural changes (v7.0 is hardening only)
+- UI/UX redesign (v7.1 syncs existing architecture, not new design)
 
 ## Constraints
 
@@ -130,9 +147,23 @@ See `.planning/MILESTONES.md` for full accomplishment list.
 
 See `.planning/MILESTONES.md` for full history.
 
-## Next Milestone
+## Current Milestone: v7.0 Production Hardening, Full Test Coverage & Hostile Analysis
 
-To be defined. Run `/gsd:new-milestone` to start next milestone planning.
+**Goal:** Fix every known audit finding, build comprehensive test coverage (~50,000+ tests), perform hostile runtime analysis, and fix all findings — achieving true production readiness with zero known issues.
+
+**Target features:**
+- Sequential top-to-bottom fix of all 4,444 audit findings with explicit disposition ledger
+- Auto-generated contract tests for 3,036 strategies (base class contract compliance)
+- Integration tests for message bus, pipeline, VDE chain, federation
+- Companion project test coverage (CLI, GUI, Dashboard, Launcher, Shared — currently 0%)
+- Adversarial/fuzz testing (corrupt data, resource exhaustion, concurrency stress)
+- Real DataWarehouse performance benchmarks replacing generic .NET benchmarks
+- Cross-cutting hostile analysis: thread safety, CancellationToken, config validation, memory leaks, deadlocks
+- All hostile analysis findings fixed with failing-test-first methodology
+
+**Key reference:**
+- Audit findings: `Metadata/SDK-AUDIT-FINDINGS.md` (6,900 lines, 4,647 findings, 203 P0 fixed)
+- Fix tracking: `Metadata/audit-fix-ledger-*.md` (created during execution)
 
 **Design documents (from v6.0):**
 - `.planning/v6.0-DESIGN-DISCUSSION.md` — 41 architectural decisions
@@ -140,4 +171,4 @@ To be defined. Run `/gsd:new-milestone` to start next milestone planning.
 - `.planning/ADAPTIVE-SCALING-ANALYSIS.md` — 97 features x 6 scale levels
 
 ---
-*Last updated: 2026-03-03 after v6.0 milestone*
+*Last updated: 2026-03-03 after v7.0 milestone start*
