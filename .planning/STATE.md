@@ -284,6 +284,8 @@
 - [Phase 92]: Longest-prefix match via SortedList reverse iteration for super-federation routing
 - [Phase 92]: IFederationNode polymorphic tree for recursive VDE 2.0B+ composition
 - [Phase 92]: SDK tests use local InMemoryBlockDevice for plugin isolation
+- [Phase 93]: Rack-aware selection uses round-robin across rack groups for balanced distribution
+- [Phase 93]: Cost ceiling enforcement: policy.MaxCostPerGbMonth * shardSizeGb vs placement total
 
 ## Performance Metrics
 
@@ -501,7 +503,8 @@
 | Phase 92 P05 | 4min | 2 tasks | 3 files |
 | Phase 92 P07 | 4min | 2 tasks | 2 files |
 | Phase 92 P08 | 5min | 2 tasks | 2 files |
+| Phase 93 P01 | 4min | 2 tasks | 5 files |
 
 ## Last Session
 - **Timestamp:** 2026-03-02T00:30:00Z
-- **Stopped At:** Completed 92-08-PLAN.md
+- **Stopped At:** Completed 93-01-PLAN.md
