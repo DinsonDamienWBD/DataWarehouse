@@ -38,7 +38,6 @@ public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposab
     private readonly StrategyRegistry<IDataLakeStrategy> _registry;
     private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private readonly BoundedDictionary<string, DataCatalogEntry> _catalog = new BoundedDictionary<string, DataCatalogEntry>(1000);
-    private readonly BoundedDictionary<string, DataLineageRecord> _lineage = new BoundedDictionary<string, DataLineageRecord>(1000);
     private readonly BoundedDictionary<string, DataLakeAccessPolicy> _policies = new BoundedDictionary<string, DataLakeAccessPolicy>(1000);
     private bool _disposed;
 
@@ -211,7 +210,6 @@ public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposab
         var metadata = base.GetMetadata();
         metadata["TotalStrategies"] = _registry.Count;
         metadata["CatalogEntries"] = _catalog.Count;
-        metadata["LineageRecords"] = _lineage.Count;
         metadata["AccessPolicies"] = _policies.Count;
         metadata["TotalOperations"] = Interlocked.Read(ref _totalOperations);
         metadata["TotalBytesProcessed"] = 0L;
@@ -295,43 +293,157 @@ public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposab
         return Task.CompletedTask;
     }
 
-    private Task HandleLineageAsync(PluginMessage message)
+    private async Task HandleLineageAsync(PluginMessage message)
     {
         var action = message.Payload.TryGetValue("action", out var actObj) && actObj is string act ? act : "list";
 
-        switch (action.ToLowerInvariant())
+        if (MessageBus == null)
         {
-            case "add":
-                var record = new DataLineageRecord
-                {
-                    Id = Guid.NewGuid().ToString("N"),
-                    SourceId = GetRequiredString(message.Payload, "sourceId"),
-                    TargetId = GetRequiredString(message.Payload, "targetId"),
-                    TransformationType = message.Payload.TryGetValue("type", out var tObj) && tObj is string t ? t : "transform",
-                    Timestamp = DateTimeOffset.UtcNow
-                };
-                _lineage[record.Id] = record;
-                message.Payload["record"] = record;
-                break;
-            case "get":
-                var linId = GetRequiredString(message.Payload, "id");
-                message.Payload["record"] = _lineage.TryGetValue(linId, out var r) ? (object)r : (object)"null";
-                break;
-            case "upstream":
-                var targetId = GetRequiredString(message.Payload, "targetId");
-                message.Payload["records"] = _lineage.Values.Where(l => l.TargetId == targetId).ToList();
-                break;
-            case "downstream":
-                var sourceId = GetRequiredString(message.Payload, "sourceId");
-                message.Payload["records"] = _lineage.Values.Where(l => l.SourceId == sourceId).ToList();
-                break;
-            case "list":
-                message.Payload["records"] = _lineage.Values.ToList();
-                break;
+            message.Payload["success"] = false;
+            message.Payload["error"] = "Lineage service unavailable: message bus not configured";
+            return;
         }
 
-        message.Payload["success"] = true;
-        return Task.CompletedTask;
+        try
+        {
+            switch (action.ToLowerInvariant())
+            {
+                case "add":
+                    var sourceId = GetRequiredString(message.Payload, "sourceId");
+                    var targetId = GetRequiredString(message.Payload, "targetId");
+                    var transformationType = message.Payload.TryGetValue("type", out var tObj) && tObj is string t ? t : "transform";
+
+                    // Track lineage event
+                    var trackMsg = new PluginMessage
+                    {
+                        Type = "lineage.track",
+                        Payload = new Dictionary<string, object>
+                        {
+                            ["dataObjectId"] = targetId,
+                            ["operation"] = transformationType,
+                            ["actor"] = "datalake",
+                            ["sourceId"] = sourceId,
+                            ["targetId"] = targetId
+                        }
+                    };
+                    await MessageBus.SendAsync("lineage.track", trackMsg);
+
+                    // Also add edge for graph traversal
+                    var edgeMsg = new PluginMessage
+                    {
+                        Type = "lineage.add-edge",
+                        Payload = new Dictionary<string, object>
+                        {
+                            ["sourceNodeId"] = sourceId,
+                            ["targetNodeId"] = targetId,
+                            ["edgeType"] = transformationType
+                        }
+                    };
+                    var addResponse = await MessageBus.SendAsync("lineage.add-edge", edgeMsg);
+                    if (addResponse.Success)
+                    {
+                        message.Payload["record"] = addResponse.Payload ?? new Dictionary<string, object>
+                        {
+                            ["sourceId"] = sourceId,
+                            ["targetId"] = targetId,
+                            ["transformationType"] = transformationType
+                        };
+                        message.Payload["success"] = true;
+                    }
+                    else
+                    {
+                        message.Payload["success"] = false;
+                        message.Payload["error"] = addResponse.ErrorMessage ?? "Failed to add lineage record";
+                    }
+                    return;
+
+                case "get":
+                    var nodeId = GetRequiredString(message.Payload, "id");
+                    var getMsg = new PluginMessage
+                    {
+                        Type = "lineage.get-node",
+                        Payload = new Dictionary<string, object> { ["nodeId"] = nodeId }
+                    };
+                    var getResponse = await MessageBus.SendAsync("lineage.get-node", getMsg);
+                    if (getResponse.Success)
+                    {
+                        message.Payload["record"] = getResponse.Payload ?? "null";
+                        message.Payload["success"] = true;
+                    }
+                    else
+                    {
+                        message.Payload["success"] = false;
+                        message.Payload["error"] = getResponse.ErrorMessage ?? "Failed to get lineage record";
+                    }
+                    return;
+
+                case "upstream":
+                    var upTargetId = GetRequiredString(message.Payload, "targetId");
+                    var upMsg = new PluginMessage
+                    {
+                        Type = "lineage.upstream",
+                        Payload = new Dictionary<string, object> { ["nodeId"] = upTargetId }
+                    };
+                    var upResponse = await MessageBus.SendAsync("lineage.upstream", upMsg);
+                    if (upResponse.Success)
+                    {
+                        message.Payload["records"] = upResponse.Payload ?? Array.Empty<object>();
+                        message.Payload["success"] = true;
+                    }
+                    else
+                    {
+                        message.Payload["success"] = false;
+                        message.Payload["error"] = upResponse.ErrorMessage ?? "Failed to query upstream lineage";
+                    }
+                    return;
+
+                case "downstream":
+                    var downSourceId = GetRequiredString(message.Payload, "sourceId");
+                    var downMsg = new PluginMessage
+                    {
+                        Type = "lineage.downstream",
+                        Payload = new Dictionary<string, object> { ["nodeId"] = downSourceId }
+                    };
+                    var downResponse = await MessageBus.SendAsync("lineage.downstream", downMsg);
+                    if (downResponse.Success)
+                    {
+                        message.Payload["records"] = downResponse.Payload ?? Array.Empty<object>();
+                        message.Payload["success"] = true;
+                    }
+                    else
+                    {
+                        message.Payload["success"] = false;
+                        message.Payload["error"] = downResponse.ErrorMessage ?? "Failed to query downstream lineage";
+                    }
+                    return;
+
+                case "list":
+                    var listMsg = new PluginMessage
+                    {
+                        Type = "lineage.search",
+                        Payload = new Dictionary<string, object> { ["query"] = "*" }
+                    };
+                    var listResponse = await MessageBus.SendAsync("lineage.search", listMsg);
+                    if (listResponse.Success)
+                    {
+                        message.Payload["records"] = listResponse.Payload ?? Array.Empty<object>();
+                        message.Payload["success"] = true;
+                    }
+                    else
+                    {
+                        message.Payload["success"] = false;
+                        message.Payload["error"] = listResponse.ErrorMessage ?? "Failed to list lineage records";
+                    }
+                    return;
+            }
+
+            message.Payload["success"] = true;
+        }
+        catch (Exception ex)
+        {
+            message.Payload["success"] = false;
+            message.Payload["error"] = $"Lineage service unavailable: {ex.Message}";
+        }
     }
 
     private Task HandlePromoteAsync(PluginMessage message)
@@ -419,7 +531,6 @@ public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposab
         message.Payload["totalBytesProcessed"] = 0L;
         message.Payload["registeredStrategies"] = _registry.Count;
         message.Payload["catalogEntries"] = _catalog.Count;
-        message.Payload["lineageRecords"] = _lineage.Count;
         message.Payload["accessPolicies"] = _policies.Count;
         message.Payload["usageByStrategy"] = new Dictionary<string, long>(_usageStats);
         return Task.CompletedTask;
@@ -481,22 +592,6 @@ public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposab
             catch { /* Graceful degradation -- start with empty catalog */ }
         }
 
-        // Restore persisted lineage records
-        var lineageData = await LoadStateAsync("lineage", ct);
-        if (lineageData != null && lineageData.Length > 0)
-        {
-            try
-            {
-                var records = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, DataLineageRecord>>(lineageData);
-                if (records != null)
-                {
-                    foreach (var kvp in records)
-                        _lineage[kvp.Key] = kvp.Value;
-                }
-            }
-            catch { /* Graceful degradation -- start with empty lineage */ }
-        }
-
         // Restore persisted access policies
         var policyData = await LoadStateAsync("policies", ct);
         if (policyData != null && policyData.Length > 0)
@@ -526,15 +621,6 @@ public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposab
         }
         catch { /* Best-effort persistence */ }
 
-        // Persist lineage records
-        try
-        {
-            var lineageDict = new Dictionary<string, DataLineageRecord>(_lineage);
-            var lineageBytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(lineageDict);
-            await SaveStateAsync("lineage", lineageBytes);
-        }
-        catch { /* Best-effort persistence */ }
-
         // Persist access policies
         try
         {
@@ -554,7 +640,6 @@ public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposab
             _disposed = true;
             _usageStats.Clear();
             _catalog.Clear();
-            _lineage.Clear();
             _policies.Clear();
         }
         base.Dispose(disposing);
