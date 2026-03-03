@@ -2598,3 +2598,167 @@ Plans:
 - [ ] 65.4-08-PLAN.md -- Migrate Pattern B inline + Pattern C inline class plugins (9 plugins)
 - [ ] 65.4-09-PLAN.md -- Hybrid-migrate UNIQUE plugins (Replication, Compute, StorageProcessing, SemanticSync)
 - [ ] 65.4-10-PLAN.md -- Full solution build verification and cleanup
+
+
+---
+
+## Milestone: v7.0 Production Hardening, Full Test Coverage & Hostile Analysis
+
+> 9 phases (96-104) | 43 requirements across 5 categories (AFIX:8, TEST:21, PERF:3, HOST:8, GATE:5) | Approach: fix audit findings top-to-bottom, generate contract tests for all 3,036 strategies, build integration/companion/adversarial test suites, establish performance baselines, perform hostile runtime analysis, fix all findings, gate on zero known issues
+
+**Milestone Goal:** Fix every known audit finding (4,444 remaining), build comprehensive test coverage (~50,000+ tests), perform hostile runtime analysis across the entire codebase, and fix all findings -- achieving true production readiness with zero known issues, zero unfixed findings, and regression-gated performance baselines.
+
+**Ordering Rationale:** Audit fixes first (Phases 96-97) because they address known code quality issues that would generate false positives in subsequent testing. Contract tests next (Phase 98) because they establish baseline correctness for all 3,036 strategies. Integration tests (Phase 99) exercise cross-cutting paths that depend on correct individual strategies. Companion tests (Phase 100) are independent of strategy correctness but benefit from stable integration paths. Adversarial tests (Phase 101) push boundaries beyond normal operation. Performance baselines (Phase 102) require a stable, correct codebase to produce meaningful numbers. Hostile analysis (Phase 103) is a separate investigative pass that generates findings. Fix pass (Phase 104) resolves all hostile findings and gates the milestone.
+
+**Key references:**
+- Audit findings: `Metadata/SDK-AUDIT-FINDINGS.md` (6,900 lines, 4,647 findings, 203 P0 fixed in v6.0)
+- Fix tracking: `Metadata/audit-fix-ledger-sdk.md`, `Metadata/audit-fix-ledger-kernel.md`, `Metadata/audit-fix-ledger-plugins.md`
+- Hostile findings: `Metadata/hostile-analysis-findings.md`
+
+### Dependency Graph
+
+```
+Phase 96 (SDK Audit Fixes)
+    +---> Phase 97 (Kernel & Plugin Audit Fixes) -- depends on SDK fixes
+              +---> Phase 98 (Contract Tests) -- depends on clean audit codebase
+              |         +---> Phase 99 (Integration Tests) -- depends on contract correctness
+              |         +---> Phase 100 (Companion Tests) -- independent after audit fixes
+              +---> Phase 101 (Adversarial & Fuzz Tests) -- depends on clean audit codebase
+              +---> Phase 102 (Performance Baselines) -- depends on stable codebase
+    Phase 99 + 100 + 101 + 102 ---> Phase 103 (Hostile Analysis) -- depends on full test coverage
+                                        +---> Phase 104 (Fix Hostile + Final Gate) -- depends on Phase 103
+```
+
+### Phases
+
+- [ ] **Phase 96: Sequential Audit Fix Pass -- SDK** - Fix/resolve all 939 SDK audit findings with explicit disposition ledger
+- [ ] **Phase 97: Sequential Audit Fix Pass -- Kernel & Plugins** - Fix/resolve all 3,702 Kernel + Plugin audit findings with explicit disposition ledgers
+- [ ] **Phase 98: Contract Test Generation** - Auto-generate contract tests for all 3,036 strategies and 23 plugin base classes
+- [ ] **Phase 99: Integration Path Tests** - Message bus, pipeline, VDE chain, federation, and policy engine integration tests
+- [ ] **Phase 100: Companion Project Tests** - CLI, Dashboard, GUI, Launcher, and Shared test coverage from 0% to comprehensive
+- [ ] **Phase 101: Negative & Adversarial Tests + Fuzz Harnesses** - Boundary, corruption, exhaustion, concurrency, fuzz, and security regression tests
+- [ ] **Phase 102: Performance Baselines with Regression Gates** - Real DW benchmarks replacing generic .NET benchmarks with CI regression gates
+- [ ] **Phase 103: Cross-Cutting Hostile Analysis** - Thread safety, CancellationToken, config validation, error paths, memory leaks, deadlocks
+- [ ] **Phase 104: Fix All Hostile Analysis Findings + Final Gate** - Fix every hostile finding, verify entire suite green, gate milestone
+
+### Phase Details
+
+### Phase 96: Sequential Audit Fix Pass -- SDK
+**Goal**: Every SDK audit finding has an explicit disposition -- either fixed or provably resolved by a prior fix
+**Depends on**: Nothing (first phase of v7.0)
+**Requirements**: AFIX-01, AFIX-02, AFIX-03
+**Success Criteria** (what must be TRUE):
+  1. All 939 SDK findings in `Metadata/SDK-AUDIT-FINDINGS.md` lines 9-1665 have an explicit disposition (FIXED, RESOLVED-BY with reference, or WONT-FIX with approved justification)
+  2. `Metadata/audit-fix-ledger-sdk.md` exists and tracks every finding with its disposition, grouped by audit chunk
+  3. Solution builds with 0 errors and 0 warnings after all SDK fixes
+  4. Existing test suite still passes (zero regressions from fixes)
+**Plans**: TBD
+
+### Phase 97: Sequential Audit Fix Pass -- Kernel & Plugins
+**Goal**: Every Kernel and Plugin audit finding has an explicit disposition -- the entire audit backlog is cleared
+**Depends on**: Phase 96
+**Requirements**: AFIX-04, AFIX-05, AFIX-06, AFIX-07, AFIX-08
+**Success Criteria** (what must be TRUE):
+  1. All 27 Kernel findings and all 3,675 Plugin findings have explicit dispositions
+  2. `Metadata/audit-fix-ledger-kernel.md` and `Metadata/audit-fix-ledger-plugins.md` exist with complete tracking
+  3. Processing was strictly sequential top-to-bottom through the audit file (no severity-based reordering)
+  4. Solution builds with 0 errors and 0 warnings after all Kernel + Plugin fixes
+  5. Existing test suite still passes (zero regressions)
+**Plans**: TBD
+
+### Phase 98: Contract Test Generation
+**Goal**: Every strategy and plugin base class has auto-generated contract tests verifying compliance with its base class contract
+**Depends on**: Phase 97
+**Requirements**: TEST-01, TEST-02, TEST-03, TEST-04
+**Success Criteria** (what must be TRUE):
+  1. `DataWarehouse.Tests/Contracts/` contains generated tests for all 3,036 strategy subclasses verifying constructor, lifecycle, dispose, and required properties
+  2. All 23 plugin base classes have contract tests verifying lifecycle, dispose, capability registration, and message bus subscription patterns
+  3. All 14 domain strategy bases have domain-specific contract tests (e.g., CompressionStrategy round-trip, EncryptionStrategy encrypt/decrypt symmetry)
+  4. All generated contract tests pass with 0 failures
+**Plans**: TBD
+
+### Phase 99: Integration Path Tests
+**Goal**: All major cross-cutting integration paths have test coverage proving they work end-to-end
+**Depends on**: Phase 98
+**Requirements**: TEST-05, TEST-06, TEST-07, TEST-08, TEST-09, TEST-10
+**Success Criteria** (what must be TRUE):
+  1. Message bus pub/sub tests cover all known cross-plugin communication paths extracted from plugin map headers
+  2. Pipeline orchestration round-trip tests verify compress-encrypt-store-retrieve-decrypt-decompress
+  3. VDE decorator chain tests verify each decorator in isolation and the full Cache-Integrity-Compression-Dedup-Encryption-WAL-RAID-File chain
+  4. VDE mount pipeline tests verify SuperblockV2 feature bits produce the correct decorator chain
+  5. Federation router tests verify hierarchical shard catalog, zero-overhead passthrough, and cross-VDE queries
+**Plans**: TBD
+
+### Phase 100: Companion Project Tests
+**Goal**: CLI, Dashboard, GUI, Launcher, and Shared projects go from 0% test coverage to comprehensive coverage
+**Depends on**: Phase 97
+**Requirements**: TEST-11, TEST-12, TEST-13, TEST-14, TEST-15
+**Success Criteria** (what must be TRUE):
+  1. Every CLI command class has test coverage for argument parsing, kernel interaction, and output formatting
+  2. Every Dashboard controller, service, and SignalR hub method has test coverage
+  3. GUI service layer (DashboardFramework, NavigationService, ThemeManager, etc.) has test coverage
+  4. Launcher adapter pattern, plugin profile loading, host lifecycle, and HTTP server have test coverage
+  5. All 53 Shared .cs files (InstanceManager, MessageBridge, etc.) have test coverage
+**Plans**: TBD
+
+### Phase 101: Negative & Adversarial Tests + Fuzz Harnesses
+**Goal**: The codebase handles hostile inputs, corrupt data, resource exhaustion, and concurrency stress gracefully
+**Depends on**: Phase 97
+**Requirements**: TEST-16, TEST-17, TEST-18, TEST-19, TEST-20, TEST-21
+**Success Criteria** (what must be TRUE):
+  1. Null/empty/boundary input tests exist for every public SDK method
+  2. Corrupt data injection tests verify graceful handling of malformed VDE superblocks, truncated payloads, and invalid RAID parity
+  3. Resource exhaustion tests verify behavior under OOM, disk full, network timeout, and CancellationToken fire
+  4. Concurrency stress tests verify parallel strategy execution, concurrent pipeline runs, and race condition safety
+  5. Fuzz harnesses exist for config deserialization, VDE format parsing, compression round-trip, encryption key derivation, and message bus parsing
+**Plans**: TBD
+
+### Phase 102: Performance Baselines with Regression Gates
+**Goal**: Real DataWarehouse-specific benchmarks exist with stored baselines and CI regression gates
+**Depends on**: Phase 97
+**Requirements**: PERF-01, PERF-02, PERF-03
+**Success Criteria** (what must be TRUE):
+  1. `DataWarehouse.Benchmarks/` contains real DW benchmarks (VDE throughput, pipeline latency, strategy selection, plugin load, RAID rebuild, encryption, federation routing, message bus, index ops)
+  2. Baseline results stored in `artifacts/benchmarks/baseline.json`
+  3. CI gate defined: any benchmark regressing >10% fails the build
+**Plans**: TBD
+
+### Phase 103: Cross-Cutting Hostile Analysis
+**Goal**: Systematic hostile runtime analysis identifies every thread safety, cancellation, config validation, error path, memory leak, and deadlock issue across the codebase
+**Depends on**: Phase 99, Phase 100, Phase 101, Phase 102
+**Requirements**: HOST-01, HOST-02, HOST-03, HOST-04, HOST-05, HOST-06, HOST-08
+**Success Criteria** (what must be TRUE):
+  1. Thread safety audit of every ConcurrentDictionary, lock, Interlocked, volatile is complete with concurrent test harnesses verifying each
+  2. CancellationToken propagation is traced from top-level APIs to async leaves -- dropped tokens identified
+  3. Adversarial config values tested against every configurable option -- rejection or safe handling verified
+  4. Failures injected at every external boundary -- graceful degradation confirmed, no silent corruption
+  5. Long-running test harness with memory snapshots confirms no unbounded growth (memory leak detection)
+**Plans**: TBD
+
+### Phase 104: Fix All Hostile Analysis Findings + Final Gate
+**Goal**: Every hostile analysis finding is fixed via failing-test-first methodology, and the entire test suite is green with zero known issues
+**Depends on**: Phase 103
+**Requirements**: HOST-07, GATE-01, GATE-02, GATE-03, GATE-04, GATE-05
+**Success Criteria** (what must be TRUE):
+  1. Every hostile analysis finding has a corresponding failing test that was written first, then the fix made the test pass
+  2. Entire test suite green: 0 failures across all test categories (contract, integration, companion, adversarial, hostile, E2E)
+  3. Build: 0 errors, 0 warnings
+  4. All benchmarks within established baselines (no >10% regressions)
+  5. Zero unfixed findings across both audit (4,444) and hostile analysis ledgers
+**Plans**: TBD
+
+### v7.0 Progress
+
+**Execution Order:** 96 -> 97 -> 98 -> 99 (+ 100, 101, 102 parallel after 97) -> 103 -> 104
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 96. SDK Audit Fixes | 0/TBD | Not started | - |
+| 97. Kernel & Plugin Audit Fixes | 0/TBD | Not started | - |
+| 98. Contract Test Generation | 0/TBD | Not started | - |
+| 99. Integration Path Tests | 0/TBD | Not started | - |
+| 100. Companion Project Tests | 0/TBD | Not started | - |
+| 101. Adversarial & Fuzz Tests | 0/TBD | Not started | - |
+| 102. Performance Baselines | 0/TBD | Not started | - |
+| 103. Hostile Analysis | 0/TBD | Not started | - |
+| 104. Fix Hostile + Final Gate | 0/TBD | Not started | - |
