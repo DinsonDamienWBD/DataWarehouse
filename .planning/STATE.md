@@ -2,9 +2,9 @@
 
 ## Current Position
 - **Phase:** 95-e2e-testing
-- **Plan:** 1/5
+- **Plan:** 4/5
 - **Status:** IN PROGRESS
-- **Last Completed:** 95-01-PLAN.md
+- **Last Completed:** 95-04-PLAN.md
 
 ## Progress
 - Phase 66: COMPLETE (8/8 plans, 269/269 tests, integration gate PASS)
@@ -26,6 +26,8 @@
 - Phase 82: COMPLETE (3/3 plans, audit + merge + verification; 53->52 plugins; 3,036 strategies; 0 errors 0 warnings)
 
 ## Decisions
+- [95-04]: XorRebuildStrategy as internal IDeviceRaidStrategy test double for hot spare rebuild E2E (SDK cannot reference plugins)
+- [95-04]: RAID 6 dual-failure test validates readable block count (XOR-only, not full Reed-Solomon)
 - [94-04]: MessageBusDelegationHelper uses Func<IMessageBus?> accessor pattern since MessageBus is protected on PluginBase
 - [94-04]: BoundedCache TTL mode (5-min, 500 entries) for delegation fallback to prevent stale cached data
 - [94-04]: 2-second delegation timeout via linked CancellationTokenSource for bounded blocking
