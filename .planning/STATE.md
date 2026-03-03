@@ -2,9 +2,9 @@
 
 ## Current Position
 - **Phase:** 95-e2e-testing
-- **Plan:** 3/5
-- **Status:** IN PROGRESS
-- **Last Completed:** 95-03-PLAN.md
+- **Plan:** 5/5
+- **Status:** COMPLETE
+- **Last Completed:** 95-05-PLAN.md
 
 ## Progress
 - Phase 66: COMPLETE (8/8 plans, 269/269 tests, integration gate PASS)
@@ -28,6 +28,8 @@
 ## Decisions
 - [95-04]: XorRebuildStrategy as internal IDeviceRaidStrategy test double for hot spare rebuild E2E (SDK cannot reference plugins)
 - [95-04]: RAID 6 dual-failure test validates readable block count (XOR-only, not full Reed-Solomon)
+- [95-05]: Policy cascade test uses CascadeStrategies static methods directly instead of full PolicyResolutionEngine (avoids IPolicyStore/IPolicyPersistence setup)
+- [95-05]: Federation test uses CreateSingleVde factory for lightweight single-VDE passthrough validation
 - [94-04]: MessageBusDelegationHelper uses Func<IMessageBus?> accessor pattern since MessageBus is protected on PluginBase
 - [94-04]: BoundedCache TTL mode (5-min, 500 entries) for delegation fallback to prevent stale cached data
 - [94-04]: 2-second delegation timeout via linked CancellationTokenSource for bounded blocking
@@ -155,6 +157,7 @@
 - Phase 92: IN PROGRESS (1/8 plans, federation router + path hashing + routing table + warm cache)
 - Phase 93: COMPLETE (6/6 plans, placement policy + split/merge + migration + 2PC/saga + lifecycle integration tests)
 - Phase 94: COMPLETE (5/5 plans, data plugin consolidation: lineage/catalog delegation, circuit breakers, verification)
+- Phase 95: COMPLETE (5/5 plans, E2E tests: VDE lifecycle, decorator chain, federation, dual RAID, bare-metal bootstrap)
 - [Phase 83-01]: 201 new Policy tests (70 contract + 61 persistence + 70 edge case); 490 total Policy tests passing; all 5 CascadeStrategy, 5 PolicyLevel, 6 OperationalProfilePreset values covered; all 5 persistence backends round-trip verified
 - [Phase 83-02]: 280 per-feature multi-level tests; 7 feature categories x 5 levels x 5 cascades; 94-feature classification table verified; bloom filter + skip optimizer + deployment tier tested; MostRestrictive picks lowest intensity (most restrictive)
 - [Phase 83-04]: 35 performance benchmarks: resolution <10ms, fast-path <5ms, bloom filter <100us, cache <0.5ms, 100 parallel resolves no deadlock, three-tier ordering verified (avg Tier3 < Tier2 < Tier1)
