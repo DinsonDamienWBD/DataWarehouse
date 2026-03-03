@@ -34,7 +34,6 @@ public sealed class UltimateDataCatalogPlugin : DataManagementPluginBase, IDispo
     private readonly StrategyRegistry<IDataCatalogStrategy> _registry;
     private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private readonly BoundedDictionary<string, CatalogAsset> _assets = new BoundedDictionary<string, CatalogAsset>(1000);
-    private readonly BoundedDictionary<string, CatalogRelationship> _relationships = new BoundedDictionary<string, CatalogRelationship>(1000);
     private readonly BoundedDictionary<string, BusinessTerm> _glossary = new BoundedDictionary<string, BusinessTerm>(1000);
     private bool _disposed;
 
@@ -211,7 +210,6 @@ public sealed class UltimateDataCatalogPlugin : DataManagementPluginBase, IDispo
         var metadata = base.GetMetadata();
         metadata["TotalStrategies"] = _registry.Count;
         metadata["CatalogAssets"] = _assets.Count;
-        metadata["CatalogRelationships"] = _relationships.Count;
         metadata["GlossaryTerms"] = _glossary.Count;
         metadata["TotalOperations"] = Interlocked.Read(ref _totalOperations);
         metadata["SearchQueries"] = Interlocked.Read(ref _searchQueries);
@@ -314,40 +312,122 @@ public sealed class UltimateDataCatalogPlugin : DataManagementPluginBase, IDispo
         return Task.CompletedTask;
     }
 
-    private Task HandleLineageAsync(PluginMessage message)
+    private async Task HandleLineageAsync(PluginMessage message)
     {
         var action = message.Payload.TryGetValue("action", out var actObj) && actObj is string act ? act : "list";
+        Interlocked.Increment(ref _totalOperations);
 
-        switch (action.ToLowerInvariant())
+        if (MessageBus == null)
         {
-            case "add":
-                var rel = new CatalogRelationship
-                {
-                    Id = Guid.NewGuid().ToString("N"),
-                    SourceId = GetRequiredString(message.Payload, "sourceId"),
-                    TargetId = GetRequiredString(message.Payload, "targetId"),
-                    Type = message.Payload.TryGetValue("type", out var tObj) && tObj is string t ? t : "derives_from",
-                    CreatedAt = DateTimeOffset.UtcNow
-                };
-                _relationships[rel.Id] = rel;
-                message.Payload["relationship"] = rel;
-                break;
-            case "upstream":
-                var targetId = GetRequiredString(message.Payload, "targetId");
-                message.Payload["relationships"] = _relationships.Values.Where(r => r.TargetId == targetId).ToList();
-                break;
-            case "downstream":
-                var sourceId = GetRequiredString(message.Payload, "sourceId");
-                message.Payload["relationships"] = _relationships.Values.Where(r => r.SourceId == sourceId).ToList();
-                break;
-            case "list":
-                message.Payload["relationships"] = _relationships.Values.ToList();
-                break;
+            message.Payload["success"] = false;
+            message.Payload["error"] = "Lineage service unavailable: message bus not configured";
+            return;
         }
 
-        Interlocked.Increment(ref _totalOperations);
-        message.Payload["success"] = true;
-        return Task.CompletedTask;
+        try
+        {
+            switch (action.ToLowerInvariant())
+            {
+                case "add":
+                    var sourceId = GetRequiredString(message.Payload, "sourceId");
+                    var targetId = GetRequiredString(message.Payload, "targetId");
+                    var edgeType = message.Payload.TryGetValue("type", out var tObj) && tObj is string t ? t : "derives_from";
+
+                    var addMsg = new PluginMessage
+                    {
+                        Type = "lineage.add-edge",
+                        Payload = new Dictionary<string, object>
+                        {
+                            ["sourceNodeId"] = sourceId,
+                            ["targetNodeId"] = targetId,
+                            ["edgeType"] = edgeType
+                        }
+                    };
+                    var addResponse = await MessageBus.SendAsync("lineage.add-edge", addMsg);
+                    if (addResponse.Success)
+                    {
+                        message.Payload["relationship"] = addResponse.Payload ?? new Dictionary<string, object>
+                        {
+                            ["sourceId"] = sourceId,
+                            ["targetId"] = targetId,
+                            ["type"] = edgeType
+                        };
+                        message.Payload["success"] = true;
+                    }
+                    else
+                    {
+                        message.Payload["success"] = false;
+                        message.Payload["error"] = addResponse.ErrorMessage ?? "Failed to add lineage edge";
+                    }
+                    return;
+
+                case "upstream":
+                    var upTargetId = GetRequiredString(message.Payload, "targetId");
+                    var upMsg = new PluginMessage
+                    {
+                        Type = "lineage.upstream",
+                        Payload = new Dictionary<string, object> { ["nodeId"] = upTargetId }
+                    };
+                    var upResponse = await MessageBus.SendAsync("lineage.upstream", upMsg);
+                    if (upResponse.Success)
+                    {
+                        message.Payload["relationships"] = upResponse.Payload ?? Array.Empty<object>();
+                        message.Payload["success"] = true;
+                    }
+                    else
+                    {
+                        message.Payload["success"] = false;
+                        message.Payload["error"] = upResponse.ErrorMessage ?? "Failed to query upstream lineage";
+                    }
+                    return;
+
+                case "downstream":
+                    var downSourceId = GetRequiredString(message.Payload, "sourceId");
+                    var downMsg = new PluginMessage
+                    {
+                        Type = "lineage.downstream",
+                        Payload = new Dictionary<string, object> { ["nodeId"] = downSourceId }
+                    };
+                    var downResponse = await MessageBus.SendAsync("lineage.downstream", downMsg);
+                    if (downResponse.Success)
+                    {
+                        message.Payload["relationships"] = downResponse.Payload ?? Array.Empty<object>();
+                        message.Payload["success"] = true;
+                    }
+                    else
+                    {
+                        message.Payload["success"] = false;
+                        message.Payload["error"] = downResponse.ErrorMessage ?? "Failed to query downstream lineage";
+                    }
+                    return;
+
+                case "list":
+                    var listMsg = new PluginMessage
+                    {
+                        Type = "lineage.search",
+                        Payload = new Dictionary<string, object> { ["query"] = "*" }
+                    };
+                    var listResponse = await MessageBus.SendAsync("lineage.search", listMsg);
+                    if (listResponse.Success)
+                    {
+                        message.Payload["relationships"] = listResponse.Payload ?? Array.Empty<object>();
+                        message.Payload["success"] = true;
+                    }
+                    else
+                    {
+                        message.Payload["success"] = false;
+                        message.Payload["error"] = listResponse.ErrorMessage ?? "Failed to list lineage relationships";
+                    }
+                    return;
+            }
+
+            message.Payload["success"] = true;
+        }
+        catch (Exception ex)
+        {
+            message.Payload["success"] = false;
+            message.Payload["error"] = $"Lineage service unavailable: {ex.Message}";
+        }
     }
 
     private async Task HandleDocumentAsync(PluginMessage message)
@@ -466,7 +546,6 @@ public sealed class UltimateDataCatalogPlugin : DataManagementPluginBase, IDispo
         message.Payload["apiCalls"] = Interlocked.Read(ref _apiCalls);
         message.Payload["registeredStrategies"] = _registry.Count;
         message.Payload["catalogAssets"] = _assets.Count;
-        message.Payload["catalogRelationships"] = _relationships.Count;
         message.Payload["glossaryTerms"] = _glossary.Count;
         message.Payload["usageByStrategy"] = new Dictionary<string, long>(_usageStats);
         return Task.CompletedTask;
@@ -525,19 +604,6 @@ public sealed class UltimateDataCatalogPlugin : DataManagementPluginBase, IDispo
             catch { /* corrupted state — start fresh */ }
         }
 
-        var relData = await LoadStateAsync("relationships", ct);
-        if (relData != null)
-        {
-            try
-            {
-                var entries = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, CatalogRelationship>>(relData);
-                if (entries != null)
-                    foreach (var kvp in entries)
-                        _relationships[kvp.Key] = kvp.Value;
-            }
-            catch { /* corrupted state — start fresh */ }
-        }
-
         var glossData = await LoadStateAsync("glossary", ct);
         if (glossData != null)
         {
@@ -559,10 +625,6 @@ public sealed class UltimateDataCatalogPlugin : DataManagementPluginBase, IDispo
             new Dictionary<string, CatalogAsset>(_assets));
         await SaveStateAsync("assets", assetBytes, ct);
 
-        var relBytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
-            new Dictionary<string, CatalogRelationship>(_relationships));
-        await SaveStateAsync("relationships", relBytes, ct);
-
         var glossBytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
             new Dictionary<string, BusinessTerm>(_glossary));
         await SaveStateAsync("glossary", glossBytes, ct);
@@ -577,7 +639,6 @@ public sealed class UltimateDataCatalogPlugin : DataManagementPluginBase, IDispo
             _disposed = true;
             _usageStats.Clear();
             _assets.Clear();
-            _relationships.Clear();
             _glossary.Clear();
         }
         base.Dispose(disposing);
