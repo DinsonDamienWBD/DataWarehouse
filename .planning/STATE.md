@@ -2,9 +2,9 @@
 
 ## Current Position
 - **Phase:** 94-data-plugin-consolidation
-- **Plan:** 3/5
+- **Plan:** 4/5
 - **Status:** IN PROGRESS
-- **Last Completed:** 94-03-PLAN.md
+- **Last Completed:** 94-04-PLAN.md
 
 ## Progress
 - Phase 66: COMPLETE (8/8 plans, 269/269 tests, integration gate PASS)
@@ -26,6 +26,9 @@
 - Phase 82: COMPLETE (3/3 plans, audit + merge + verification; 53->52 plugins; 3,036 strategies; 0 errors 0 warnings)
 
 ## Decisions
+- [94-04]: MessageBusDelegationHelper uses Func<IMessageBus?> accessor pattern since MessageBus is protected on PluginBase
+- [94-04]: BoundedCache TTL mode (5-min, 500 entries) for delegation fallback to prevent stale cached data
+- [94-04]: 2-second delegation timeout via linked CancellationTokenSource for bounded blocking
 - [87-53]: OPJR BeginResize immediately transitions Queued->InProgress so crash between OPJR write and Superblock write is detectable on recovery
 - [87-53]: OperationEntry uses readonly struct for zero-allocation serialisation; 32-byte OperationPayload stores operation-specific parameters (e.g. newTotalBlocks LE at offset 0)
 - [87-53]: CheckpointIntervalBlocks=4096 per VOPT-75 spec — 16 MiB max re-work after crash at 4 KiB block size
