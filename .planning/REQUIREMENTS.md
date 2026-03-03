@@ -825,6 +825,17 @@ Requirements for production hardening milestone. Each maps to roadmap phases 96-
 - [ ] **AFIX-07**: Build compiles with 0 errors, 0 warnings after all Kernel + Plugin fixes
 - [ ] **AFIX-08**: Processing is strictly sequential top-to-bottom through the audit file — no reordering by severity
 
+### Pillar Verification (PILR)
+
+- [ ] **PILR-01**: Every plugin (52 total) is policy-aware — PolicyContext is accessible, cascade resolution produces effective policy at every level (Block/Chunk/Object/Container/VDE), and no plugin operates in a "dumb" one-size-fits-all mode
+- [ ] **PILR-02**: Every feature-specific strategy verifies it respects the resolved effective policy — intensity levels, cascade rules, and AI autonomy settings are honored, not ignored
+- [ ] **PILR-03**: AI advisors (5 total) correctly influence policy at all autonomy levels (ManualOnly through AutoSilent) and overhead throttling prevents runaway AI cost
+- [ ] **PILR-04**: VDE structures morph correctly across scale transitions — tiny (KB) → small (MB) → medium (GB) → large (TB) → massive (PB) → yottabyte (YB) → federation (multi-VDE) and back down
+- [ ] **PILR-05**: All golden-path VDE structures (superblock, allocation groups, inodes, extent trees, WAL, ARC cache, MVCC, SQL engine, tag index, defrag, dedup, heat tiering) function correctly at each scale level without errors
+- [ ] **PILR-06**: All SMA (Scale-Morphing Architecture) structures (morph levels 1-7, Bw-Tree, HNSW, Masstree, ALEX, Hilbert, Clock-SI, metaslab allocator) transition smoothly between scale thresholds
+- [ ] **PILR-07**: Scale-down path verified — a VDE that grew to TB+ scale and then shrank back operates correctly with compacted/merged structures (no orphan allocations, no dead morph levels)
+- [ ] **PILR-08**: Federation scale-up/scale-down verified — adding/removing VDEs from federation maintains shard catalog integrity, routing correctness, and zero-overhead single-VDE passthrough when federation dissolves back to single VDE
+
 ### Contract Tests (TEST)
 
 - [ ] **TEST-01**: Every strategy subclass (3,036 total) has a generated test verifying base class contract compliance (constructor, lifecycle, dispose, required properties)
@@ -942,6 +953,14 @@ Deferred to separate milestone. Tracked but not in current roadmap.
 | AFIX-06 | Phase 97 | Pending |
 | AFIX-07 | Phase 97 | Pending |
 | AFIX-08 | Phase 97 | Pending |
+| PILR-01 | Phase 96+97 | Pending |
+| PILR-02 | Phase 96+97 | Pending |
+| PILR-03 | Phase 96+97 | Pending |
+| PILR-04 | Phase 99 | Pending |
+| PILR-05 | Phase 99 | Pending |
+| PILR-06 | Phase 99 | Pending |
+| PILR-07 | Phase 99 | Pending |
+| PILR-08 | Phase 99 | Pending |
 | TEST-01 | Phase 98 | Pending |
 | TEST-02 | Phase 98 | Pending |
 | TEST-03 | Phase 98 | Pending |
@@ -981,8 +1000,8 @@ Deferred to separate milestone. Tracked but not in current roadmap.
 | GATE-05 | Phase 104 | Pending |
 
 **Coverage:**
-- v7.0 requirements: 43 total (AFIX:8, TEST:21, PERF:3, HOST:8, GATE:5)
-- Mapped to phases: 43
+- v7.0 requirements: 51 total (AFIX:8, PILR:8, TEST:21, PERF:3, HOST:8, GATE:5)
+- Mapped to phases: 51
 - Unmapped: 0
 
 ---

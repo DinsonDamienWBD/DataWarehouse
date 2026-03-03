@@ -2646,24 +2646,27 @@ Phase 96 (SDK Audit Fixes)
 ### Phase 96: Sequential Audit Fix Pass -- SDK
 **Goal**: Every SDK audit finding has an explicit disposition -- either fixed or provably resolved by a prior fix
 **Depends on**: Nothing (first phase of v7.0)
-**Requirements**: AFIX-01, AFIX-02, AFIX-03
+**Requirements**: AFIX-01, AFIX-02, AFIX-03, PILR-01 (partial), PILR-02 (partial), PILR-03 (partial)
 **Success Criteria** (what must be TRUE):
   1. All 939 SDK findings in `Metadata/SDK-AUDIT-FINDINGS.md` lines 9-1665 have an explicit disposition (FIXED, RESOLVED-BY with reference, or WONT-FIX with approved justification)
   2. `Metadata/audit-fix-ledger-sdk.md` exists and tracks every finding with its disposition, grouped by audit chunk
   3. Solution builds with 0 errors and 0 warnings after all SDK fixes
   4. Existing test suite still passes (zero regressions from fixes)
+  5. SDK PolicyEngine contracts verified: PolicyContext accessible from every plugin base, cascade resolution produces effective policy at all 5 levels, AI autonomy levels respected
 **Plans**: TBD
 
 ### Phase 97: Sequential Audit Fix Pass -- Kernel & Plugins
 **Goal**: Every Kernel and Plugin audit finding has an explicit disposition -- the entire audit backlog is cleared
 **Depends on**: Phase 96
-**Requirements**: AFIX-04, AFIX-05, AFIX-06, AFIX-07, AFIX-08
+**Requirements**: AFIX-04, AFIX-05, AFIX-06, AFIX-07, AFIX-08, PILR-01 (complete), PILR-02 (complete), PILR-03 (complete)
 **Success Criteria** (what must be TRUE):
   1. All 27 Kernel findings and all 3,675 Plugin findings have explicit dispositions
   2. `Metadata/audit-fix-ledger-kernel.md` and `Metadata/audit-fix-ledger-plugins.md` exist with complete tracking
   3. Processing was strictly sequential top-to-bottom through the audit file (no severity-based reordering)
   4. Solution builds with 0 errors and 0 warnings after all Kernel + Plugin fixes
   5. Existing test suite still passes (zero regressions)
+  6. All 52 plugins verified policy-aware: PolicyContext accessible, cascade resolution works at every level, no plugin operates in "dumb" one-size-fits-all mode
+  7. All 5 AI advisors verified: correct behavior at all autonomy levels, overhead throttling prevents runaway cost
 **Plans**: TBD
 
 ### Phase 98: Contract Test Generation
@@ -2680,13 +2683,18 @@ Phase 96 (SDK Audit Fixes)
 ### Phase 99: Integration Path Tests
 **Goal**: All major cross-cutting integration paths have test coverage proving they work end-to-end
 **Depends on**: Phase 98
-**Requirements**: TEST-05, TEST-06, TEST-07, TEST-08, TEST-09, TEST-10
+**Requirements**: TEST-05, TEST-06, TEST-07, TEST-08, TEST-09, TEST-10, PILR-04, PILR-05, PILR-06, PILR-07, PILR-08
 **Success Criteria** (what must be TRUE):
   1. Message bus pub/sub tests cover all known cross-plugin communication paths extracted from plugin map headers
   2. Pipeline orchestration round-trip tests verify compress-encrypt-store-retrieve-decrypt-decompress
   3. VDE decorator chain tests verify each decorator in isolation and the full Cache-Integrity-Compression-Dedup-Encryption-WAL-RAID-File chain
   4. VDE mount pipeline tests verify SuperblockV2 feature bits produce the correct decorator chain
   5. Federation router tests verify hierarchical shard catalog, zero-overhead passthrough, and cross-VDE queries
+  6. VDE scale-morphing tests: structures morph correctly across KB→MB→GB→TB→PB→YB→Federation and back down
+  7. All golden-path VDE structures (superblock, allocation groups, inodes, extent trees, WAL, ARC cache, MVCC, SQL engine, tag index, defrag, dedup, heat tiering) verified at each scale level
+  8. All SMA structures (morph levels 1-7, Bw-Tree, HNSW, Masstree, ALEX, Hilbert, Clock-SI, metaslab allocator) transition smoothly between scale thresholds
+  9. Scale-down verified: VDE that grew to TB+ and shrank back operates correctly (no orphan allocations, no dead morph levels)
+  10. Federation scale-up/scale-down: adding/removing VDEs maintains shard catalog integrity and zero-overhead passthrough when dissolving to single VDE
 **Plans**: TBD
 
 ### Phase 100: Companion Project Tests
