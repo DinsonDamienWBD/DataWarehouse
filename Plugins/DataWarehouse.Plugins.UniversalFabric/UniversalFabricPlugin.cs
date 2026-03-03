@@ -20,10 +20,19 @@ using StorageTier = DataWarehouse.SDK.Contracts.Storage.StorageTier;
 namespace DataWarehouse.Plugins.UniversalFabric;
 
 /// <summary>
-/// Core Universal Storage Fabric plugin that makes all storage backends accessible
-/// through dw:// addressing. Implements <see cref="IStorageFabric"/> to provide
-/// a unified facade for Store/Retrieve/Delete/Copy/Move operations across any
-/// registered backend via address routing.
+/// Universal Fabric Plugin — physical storage I/O routing layer.
+/// Routes Store/Retrieve/Delete/Copy/Move operations to registered backend storage
+/// strategies via placement rules, address routing, and capability matching.
+/// Provides S3-compatible HTTP server, live migration, and fabric health monitoring.
+/// Implements <see cref="IStorageFabric"/> to provide a unified facade across any
+/// registered backend via <c>dw://</c> addressing.
+/// <para>
+/// DISTINCTION (Phase 94): This plugin handles <b>physical storage I/O routing</b>.
+/// It is NOT the same as UltimateDataFabric (now merged into UltimateDataManagement),
+/// which provides <b>logical data virtualization</b> (unified views across heterogeneous
+/// data sources). UniversalFabric routes bytes to storage backends; UltimateDataFabric
+/// provides virtual unified data access.
+/// </para>
 /// </summary>
 /// <remarks>
 /// <para>
