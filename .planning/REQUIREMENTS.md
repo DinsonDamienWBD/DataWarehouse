@@ -1,7 +1,13 @@
-# Requirements: DataWarehouse v6.0
+# Requirements: DataWarehouse
 
-**Defined:** 2026-02-20
-**Core Value:** Every feature has a multi-level, cascade-aware, AI-tunable policy with format-native VDE integration — no feature is "dumb" or "one-size-fits-all."
+**Defined:** 2026-02-20 (v6.0), 2026-03-03 (v7.0)
+**Core Value:** Every feature production-ready — no stubs, no simulations, no known issues
+
+## v6.0 Requirements (SHIPPED)
+
+> v6.0 requirements below are historical. See v7.0 section for active work.
+
+**Original Core Value:** Every feature has a multi-level, cascade-aware, AI-tunable policy with format-native VDE integration — no feature is "dumb" or "one-size-fits-all."
 
 ## v6.0 Requirements
 
@@ -800,5 +806,185 @@ Requirements for v6.0 Intelligent Policy Engine & Composable VDE. Each maps to r
 - Unmapped: 0
 
 ---
-*Requirements defined: 2026-02-20*
-*Last updated: 2026-02-22 after VDE 2.0B Federation, Device-Level RAID, and Hardware-to-Storage Flow*
+
+## v7.0 Requirements
+
+Requirements for production hardening milestone. Each maps to roadmap phases 96-104.
+
+### Audit Fix — SDK (AFIX)
+
+- [ ] **AFIX-01**: All 939 SDK audit findings (348 P1, 415 P2, 160 LOW) are resolved — each finding either fixed or explicitly marked as resolved by a prior fix with reference
+- [ ] **AFIX-02**: Audit fix ledger `Metadata/audit-fix-ledger-sdk.md` tracks every finding's disposition (FIXED, RESOLVED-BY, or WON'T-FIX with approved justification)
+- [ ] **AFIX-03**: Build compiles with 0 errors, 0 warnings after all SDK fixes
+
+### Audit Fix — Kernel & Plugins (AFIX)
+
+- [ ] **AFIX-04**: All 27 Kernel audit findings (12 P1, 5 P2, 7 LOW) are resolved with explicit disposition
+- [ ] **AFIX-05**: All 3,675 Plugin audit findings (1,391 P1, 1,443 P2, 663 LOW) are resolved with explicit disposition
+- [ ] **AFIX-06**: Audit fix ledgers `Metadata/audit-fix-ledger-kernel.md` and `Metadata/audit-fix-ledger-plugins.md` track every finding
+- [ ] **AFIX-07**: Build compiles with 0 errors, 0 warnings after all Kernel + Plugin fixes
+- [ ] **AFIX-08**: Processing is strictly sequential top-to-bottom through the audit file — no reordering by severity
+
+### Contract Tests (TEST)
+
+- [ ] **TEST-01**: Every strategy subclass (3,036 total) has a generated test verifying base class contract compliance (constructor, lifecycle, dispose, required properties)
+- [ ] **TEST-02**: Every plugin base class (23 total) has contract tests verifying lifecycle, dispose, capability registration, message bus subscription patterns
+- [ ] **TEST-03**: Domain-specific contract tests exist for each of the 14 domain strategy bases (e.g., CompressionStrategy round-trip, EncryptionStrategy encrypt/decrypt symmetry)
+- [ ] **TEST-04**: All generated contract tests pass with 0 failures
+
+### Integration Tests (TEST)
+
+- [ ] **TEST-05**: Message bus pub/sub tests cover all known cross-plugin communication paths (extracted from plugin map headers)
+- [ ] **TEST-06**: Pipeline orchestration round-trip tests verify compress-encrypt-store-retrieve-decrypt-decompress
+- [ ] **TEST-07**: VDE decorator chain tests verify each decorator in isolation and full chain
+- [ ] **TEST-08**: VDE mount pipeline tests verify SuperblockV2 feature bits produce correct decorator chain
+- [ ] **TEST-09**: Federation router tests verify hierarchical shard catalog, zero-overhead passthrough, cross-VDE queries
+- [ ] **TEST-10**: Policy engine tests verify cascade resolution, compliance scoring, AI advisor integration
+
+### Companion Tests (TEST)
+
+- [ ] **TEST-11**: Every CLI command class has test coverage (argument parsing, kernel interaction, output formatting)
+- [ ] **TEST-12**: Every Dashboard controller, service, and SignalR hub method has test coverage
+- [ ] **TEST-13**: GUI service layer (DashboardFramework, NavigationService, ThemeManager, etc.) has test coverage
+- [ ] **TEST-14**: Launcher adapter pattern, plugin profile loading, host lifecycle, and HTTP server have test coverage
+- [ ] **TEST-15**: All 53 Shared .cs files (InstanceManager, MessageBridge, etc.) have test coverage
+
+### Adversarial & Fuzz Tests (TEST)
+
+- [ ] **TEST-16**: Null/empty/boundary input tests exist for every public SDK method
+- [ ] **TEST-17**: Corrupt data injection tests verify graceful handling of malformed VDE superblocks, truncated payloads, invalid RAID parity
+- [ ] **TEST-18**: Resource exhaustion tests verify behavior under OOM, disk full, network timeout, CancellationToken fire
+- [ ] **TEST-19**: Concurrency stress tests verify parallel strategy execution, concurrent pipeline runs, race conditions
+- [ ] **TEST-20**: Fuzz harnesses exist for config deserialization, VDE format parsing, compression round-trip, encryption key derivation, message bus parsing
+- [ ] **TEST-21**: Automated security regression tests cover STRIDE/OWASP pentest plan scenarios
+
+### Performance Baselines (PERF)
+
+- [ ] **PERF-01**: Real DataWarehouse benchmarks replace generic .NET benchmarks (VDE throughput, pipeline latency, strategy selection, plugin load, RAID rebuild, encryption, federation routing, message bus, index ops)
+- [ ] **PERF-02**: Baseline results stored as JSON artifacts (`artifacts/benchmarks/baseline.json`)
+- [ ] **PERF-03**: CI gate defined: any benchmark regressing >10% fails the build
+
+### Hostile Analysis (HOST)
+
+- [ ] **HOST-01**: Thread safety audit of every ConcurrentDictionary, lock, Interlocked, volatile — verified with concurrent test harnesses
+- [ ] **HOST-02**: CancellationToken propagation trace from top-level APIs to async leaves — dropped tokens identified and fixed
+- [ ] **HOST-03**: Configuration validation: adversarial config values to every configurable option — rejection or safe handling verified
+- [ ] **HOST-04**: Error path completeness: failures injected at every external boundary — graceful degradation, no silent corruption
+- [ ] **HOST-05**: Memory leak detection via long-running test harness with memory snapshots — no unbounded growth
+- [ ] **HOST-06**: Deadlock detection: concurrent lifecycle operations across plugin combinations
+- [ ] **HOST-07**: Every hostile finding becomes a failing test first, then gets fixed
+- [ ] **HOST-08**: All findings documented in `Metadata/hostile-analysis-findings.md`
+
+### Final Gate (GATE)
+
+- [ ] **GATE-01**: Entire test suite green (0 failures across all test categories)
+- [ ] **GATE-02**: Build: 0 errors, 0 warnings
+- [ ] **GATE-03**: All benchmarks within established baselines (no >10% regressions)
+- [ ] **GATE-04**: Zero unfixed audit findings (all 4,444 have explicit disposition)
+- [ ] **GATE-05**: Zero unfixed hostile analysis findings
+
+## v7.1 Requirements (Next Milestone — Companion Sync)
+
+Deferred to separate milestone. Tracked but not in current roadmap.
+
+### CLI Sync
+
+- **CSYNC-01**: CLI has commands for PolicyEngine, Federation, Authority, Shards, DeviceRAID, AIAdvisor, CRDT, DualLevel
+- **CSYNC-02**: CLI migrated from static classes to DI-driven command handlers
+- **CSYNC-03**: CLI integrates with Kernel capability registry for dynamic command discovery
+- **CSYNC-04**: InteractiveMode/NLP updated for v3.0-v6.0 concepts
+
+### GUI Sync
+
+- **GSYNC-01**: GUI has pages for PolicyEngine, AuthorityChain, ShardLifecycle, AIAdvisor, DeviceRAID
+- **GSYNC-02**: Inline Razor logic extracted to testable service classes
+- **GSYNC-03**: DI service layer matches full plugin capability set
+
+### Dashboard Sync
+
+- **DSYNC-01**: Dashboard has controllers for Policy, Federation, Authority, Shards, RAID, AI, Compliance, Performance, VDE
+- **DSYNC-02**: Real-time SignalR channels for federation status, RAID health, shard migration progress
+- **DSYNC-03**: Full REST API parity with CLI capabilities
+
+### Launcher Sync
+
+- **LSYNC-01**: Federation-aware deployment topology
+- **LSYNC-02**: Policy-based startup configuration
+- **LSYNC-03**: Health check endpoints for all subsystems
+- **LSYNC-04**: Graceful shutdown with CRDT sync
+
+### Shared Alignment
+
+- **SHRD-01**: All 53 .cs files verified against current SDK contracts
+- **SHRD-02**: Stale types superseded by SDK removed
+- **SHRD-03**: InstanceManager and MessageBridge work with federation topology
+
+## Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| SDUP (Semantic Dedup) | v8.0+ reserved — requires latent-space ML pipeline |
+| ZKPA (zk-SNARK Compliance) | v8.0+ reserved — requires zk-SNARK proving system |
+| Ghost Enclaves | v8.0+ reserved |
+| New plugins beyond 52 | Hardening milestone — stabilize what exists |
+| New SDK features/architecture | v7.0 is strictly hardening, no new capabilities |
+| UI/UX redesign | v7.1 syncs existing architecture, not new design |
+
+## v7.0 Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| AFIX-01 | Phase 96 | Pending |
+| AFIX-02 | Phase 96 | Pending |
+| AFIX-03 | Phase 96 | Pending |
+| AFIX-04 | Phase 97 | Pending |
+| AFIX-05 | Phase 97 | Pending |
+| AFIX-06 | Phase 97 | Pending |
+| AFIX-07 | Phase 97 | Pending |
+| AFIX-08 | Phase 97 | Pending |
+| TEST-01 | Phase 98 | Pending |
+| TEST-02 | Phase 98 | Pending |
+| TEST-03 | Phase 98 | Pending |
+| TEST-04 | Phase 98 | Pending |
+| TEST-05 | Phase 99 | Pending |
+| TEST-06 | Phase 99 | Pending |
+| TEST-07 | Phase 99 | Pending |
+| TEST-08 | Phase 99 | Pending |
+| TEST-09 | Phase 99 | Pending |
+| TEST-10 | Phase 99 | Pending |
+| TEST-11 | Phase 100 | Pending |
+| TEST-12 | Phase 100 | Pending |
+| TEST-13 | Phase 100 | Pending |
+| TEST-14 | Phase 100 | Pending |
+| TEST-15 | Phase 100 | Pending |
+| TEST-16 | Phase 101 | Pending |
+| TEST-17 | Phase 101 | Pending |
+| TEST-18 | Phase 101 | Pending |
+| TEST-19 | Phase 101 | Pending |
+| TEST-20 | Phase 101 | Pending |
+| TEST-21 | Phase 101 | Pending |
+| PERF-01 | Phase 102 | Pending |
+| PERF-02 | Phase 102 | Pending |
+| PERF-03 | Phase 102 | Pending |
+| HOST-01 | Phase 103 | Pending |
+| HOST-02 | Phase 103 | Pending |
+| HOST-03 | Phase 103 | Pending |
+| HOST-04 | Phase 103 | Pending |
+| HOST-05 | Phase 103 | Pending |
+| HOST-06 | Phase 103 | Pending |
+| HOST-07 | Phase 104 | Pending |
+| HOST-08 | Phase 103 | Pending |
+| GATE-01 | Phase 104 | Pending |
+| GATE-02 | Phase 104 | Pending |
+| GATE-03 | Phase 104 | Pending |
+| GATE-04 | Phase 104 | Pending |
+| GATE-05 | Phase 104 | Pending |
+
+**Coverage:**
+- v7.0 requirements: 43 total (AFIX:8, TEST:21, PERF:3, HOST:8, GATE:5)
+- Mapped to phases: 43
+- Unmapped: 0
+
+---
+*Requirements defined: 2026-02-20 (v6.0), 2026-03-03 (v7.0)*
+*Last updated: 2026-03-03 after v7.0 milestone definition*
