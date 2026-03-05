@@ -58,6 +58,13 @@ public sealed class InfluxDbStorageStrategy : DatabaseStorageStrategyBase
         _measurement = GetConfiguration("Measurement", "storage");
         _token = GetConfiguration<string?>("Token", null);
 
+        // Validate config-supplied identifiers to prevent Flux query injection.
+        // Bucket, organization, and measurement are embedded directly in Flux string
+        // literals; they must not contain characters that break the query.
+        ValidateFluxIdentifier(_bucket, "Bucket");
+        ValidateFluxIdentifier(_organization, "Organization");
+        ValidateFluxIdentifier(_measurement, "Measurement");
+
         var connectionString = GetConnectionString();
 
         if (string.IsNullOrEmpty(_token))
@@ -318,9 +325,32 @@ public sealed class InfluxDbStorageStrategy : DatabaseStorageStrategyBase
         }
     }
 
+    private static void ValidateFluxIdentifier(string value, string paramName)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            throw new ArgumentException($"InfluxDB {paramName} must not be empty.", paramName);
+
+        // Reject characters that could break embedded Flux string literals or queries.
+        foreach (char c in value)
+        {
+            if (c == '"' || c == '\\' || c == '\n' || c == '\r' || c == '\0')
+                throw new ArgumentException(
+                    $"InfluxDB {paramName} contains illegal character '{c}'. " +
+                    "Bucket, organization, and measurement names must not contain " +
+                    "double-quotes, backslashes, or control characters.", paramName);
+        }
+    }
+
     private static string EscapeFluxString(string value)
     {
-        return value.Replace("\\", "\\\\").Replace("\"", "\\\"");
+        // Escape backslash first, then double-quote, closing parenthesis (breaks Flux
+        // function calls), and newline/carriage-return characters (break the query).
+        return value
+            .Replace("\\", "\\\\")
+            .Replace("\"", "\\\"")
+            .Replace(")", "\\)")
+            .Replace("\n", "\\n")
+            .Replace("\r", "\\r");
     }
 
     protected override async ValueTask DisposeAsyncCore()

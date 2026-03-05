@@ -281,11 +281,21 @@ public sealed class BTreeNode
             BlockNumber = blockNumber
         };
 
+        // Validate KeyCount against node capacity before using it for array access
+        if (header.KeyCount > node.MaxKeys)
+            throw new InvalidDataException(
+                $"Corrupt B-Tree node at block {blockNumber}: KeyCount={header.KeyCount} exceeds MaxKeys={node.MaxKeys}.");
+
         // Read key lengths
         var keyLengths = new ushort[header.KeyCount];
         for (int i = 0; i < header.KeyCount; i++)
         {
+            if (offset + 2 > buffer.Length)
+                throw new InvalidDataException($"Corrupt B-Tree node at block {blockNumber}: buffer overrun reading key length {i}.");
             keyLengths[i] = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(offset, 2));
+            if (keyLengths[i] > MaxKeySize)
+                throw new InvalidDataException(
+                    $"Corrupt B-Tree node at block {blockNumber}: key length {keyLengths[i]} at index {i} exceeds MaxKeySize={MaxKeySize}.");
             offset += 2;
         }
 
@@ -294,6 +304,8 @@ public sealed class BTreeNode
         {
             if (keyLengths[i] > 0)
             {
+                if (offset + keyLengths[i] > buffer.Length)
+                    throw new InvalidDataException($"Corrupt B-Tree node at block {blockNumber}: buffer overrun reading key {i} (length={keyLengths[i]}).");
                 node.Keys[i] = buffer.Slice(offset, keyLengths[i]).ToArray();
                 offset += keyLengths[i];
             }

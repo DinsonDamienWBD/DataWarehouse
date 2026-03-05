@@ -31,7 +31,9 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.Discovery
         private readonly string _address;
         private readonly int _port;
         private readonly MdnsConfiguration _config;
-        private readonly List<DiscoveredService> _discoveredServices = new();
+        // LOW-434: Dictionary keyed by NodeId for O(1) membership check; sorted-set for O(log n) eviction.
+        private readonly Dictionary<string, DiscoveredService> _discoveredServices = new(StringComparer.Ordinal);
+        private readonly SortedSet<(DateTimeOffset DiscoveredAt, string NodeId)> _discoveredOrder = new();
         private readonly object _servicesLock = new();
 
         private UdpClient? _announceClient;
@@ -161,9 +163,15 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.Discovery
             _listenCts?.Cancel();
 
             if (_announceTask != null)
-                await _announceTask.ConfigureAwait(false);
+            {
+                try { await _announceTask.ConfigureAwait(false); }
+                catch (OperationCanceledException) { /* expected on stop */ }
+            }
             if (_listenTask != null)
-                await _listenTask.ConfigureAwait(false);
+            {
+                try { await _listenTask.ConfigureAwait(false); }
+                catch (OperationCanceledException) { /* expected on stop */ }
+            }
 
             _announceClient?.Dispose();
             _listenClient?.Dispose();
@@ -176,7 +184,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.Discovery
         {
             lock (_servicesLock)
             {
-                return _discoveredServices.ToList().AsReadOnly();
+                return _discoveredServices.Values.ToList().AsReadOnly();
             }
         }
 
@@ -296,6 +304,11 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.Discovery
                 var anCount = BinaryPrimitives.ReverseEndianness(reader.ReadUInt16());
                 var nsCount = reader.ReadUInt16();
                 var arCount = BinaryPrimitives.ReverseEndianness(reader.ReadUInt16());
+
+                // Sanity-check counts to reject malformed/crafted packets
+                const int MaxDnsRecords = 512;
+                if (qdCount > MaxDnsRecords || anCount > MaxDnsRecords || arCount > MaxDnsRecords)
+                    return;
 
                 // Skip question section
                 for (int i = 0; i < qdCount; i++)
@@ -441,15 +454,19 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.Discovery
             bool isNew = false;
             lock (_servicesLock)
             {
-                if (!_discoveredServices.Any(s => s.NodeId == service.NodeId))
+                // LOW-434: O(1) membership check via dictionary key lookup instead of O(n) Any()
+                if (!_discoveredServices.ContainsKey(service.NodeId))
                 {
-                    // Enforce max entries (MEM-03)
-                    while (_discoveredServices.Count >= _config.MaxDiscoveredServices)
+                    // Enforce max entries (MEM-03): O(log n) eviction via sorted-set
+                    while (_discoveredServices.Count >= _config.MaxDiscoveredServices && _discoveredOrder.Count > 0)
                     {
-                        var oldest = _discoveredServices.OrderBy(s => s.DiscoveredAt).First();
-                        _discoveredServices.Remove(oldest);
-                        Console.WriteLine($"[MdnsServiceDiscovery] Audit: Service lost (evicted) -- nodeId={oldest.NodeId}");
-                        OnServiceLost?.Invoke(oldest.NodeId);
+                        var oldestEntry = _discoveredOrder.Min;
+                        _discoveredOrder.Remove(oldestEntry);
+                        if (_discoveredServices.Remove(oldestEntry.NodeId, out var evicted))
+                        {
+                            Console.WriteLine($"[MdnsServiceDiscovery] Audit: Service lost (evicted) -- nodeId={evicted.NodeId}");
+                            OnServiceLost?.Invoke(evicted.NodeId);
+                        }
                     }
 
                     // DIST-06: Mark as unverified when RequireClusterVerification is enabled
@@ -462,7 +479,8 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.Discovery
                         Console.WriteLine($"[MdnsServiceDiscovery] WARNING: RequireClusterVerification is disabled -- node {service.NodeId} auto-trusted");
                     }
 
-                    _discoveredServices.Add(serviceToAdd);
+                    _discoveredServices[serviceToAdd.NodeId] = serviceToAdd;
+                    _discoveredOrder.Add((serviceToAdd.DiscoveredAt, serviceToAdd.NodeId));
                     isNew = true;
 
                     // DIST-06: Audit trail for join events
@@ -485,10 +503,9 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.Discovery
         {
             lock (_servicesLock)
             {
-                var index = _discoveredServices.FindIndex(s => s.NodeId == nodeId);
-                if (index >= 0)
+                if (_discoveredServices.TryGetValue(nodeId, out var existing))
                 {
-                    _discoveredServices[index] = _discoveredServices[index] with { Verified = true };
+                    _discoveredServices[nodeId] = existing with { Verified = true };
                     Console.WriteLine($"[MdnsServiceDiscovery] Audit: Service verified -- nodeId={nodeId}");
                     return true;
                 }
@@ -510,8 +527,8 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.Discovery
         /// </summary>
         public void Dispose()
         {
-            // Call async dispose and block (safer than GetAwaiter().GetResult())
-            DisposeAsync().AsTask().Wait();
+            // Avoid deadlock under SynchronizationContext by offloading to thread pool
+            Task.Run(async () => await DisposeAsync().ConfigureAwait(false)).GetAwaiter().GetResult();
         }
     }
 

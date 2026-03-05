@@ -316,19 +316,26 @@ namespace DataWarehouse.Plugins.UltimateDataProtection
                     aggregate.LastRestoreTime = stats.LastRestoreTime;
             }
 
-            // Calculate weighted averages for throughput
+            // P2-2529: Snapshot GetStatistics() once per strategy to avoid double-calls inside
+            // Where+Average chains (each call may have side effects or be expensive).
             if (aggregate.SuccessfulBackups > 0)
             {
-                aggregate.AverageBackupThroughput = _strategies.Values
-                    .Where(s => s.GetStatistics().SuccessfulBackups > 0)
-                    .Average(s => s.GetStatistics().AverageBackupThroughput);
+                var backupStats = _strategies.Values
+                    .Select(s => s.GetStatistics())
+                    .Where(s => s.SuccessfulBackups > 0)
+                    .ToList();
+                if (backupStats.Count > 0)
+                    aggregate.AverageBackupThroughput = backupStats.Average(s => s.AverageBackupThroughput);
             }
 
             if (aggregate.SuccessfulRestores > 0)
             {
-                aggregate.AverageRestoreThroughput = _strategies.Values
-                    .Where(s => s.GetStatistics().SuccessfulRestores > 0)
-                    .Average(s => s.GetStatistics().AverageRestoreThroughput);
+                var restoreStats = _strategies.Values
+                    .Select(s => s.GetStatistics())
+                    .Where(s => s.SuccessfulRestores > 0)
+                    .ToList();
+                if (restoreStats.Count > 0)
+                    aggregate.AverageRestoreThroughput = restoreStats.Average(s => s.AverageRestoreThroughput);
             }
 
             return aggregate;

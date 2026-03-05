@@ -278,13 +278,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Migration
             };
 
             // Migrate HashiCorp Vault configuration
+            // P2-3446: Sensitive values (Token, ClientSecret, SecretAccessKey) are intentionally
+            // NOT written to the migrated config file. After migration, supply these via
+            // environment variables: DW_VAULT_TOKEN, DW_AZURE_CLIENT_SECRET, DW_AWS_SECRET_ACCESS_KEY.
             if (legacyConfig.HashiCorpVault != null)
             {
                 config.StrategyConfigurations["DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManagement.VaultKeyStoreStrategy"] =
                     new Dictionary<string, object>
                     {
                         ["Address"] = legacyConfig.HashiCorpVault.Address ?? "",
-                        ["Token"] = legacyConfig.HashiCorpVault.Token ?? "",
+                        // Token must be supplied via DW_VAULT_TOKEN environment variable — not stored in config.
                         ["MountPath"] = legacyConfig.HashiCorpVault.MountPath ?? "secret",
                         ["DefaultKeyName"] = legacyConfig.HashiCorpVault.DefaultKeyName ?? "datawarehouse-master"
                     };
@@ -299,7 +302,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Migration
                         ["VaultUrl"] = legacyConfig.AzureKeyVault.VaultUrl ?? "",
                         ["TenantId"] = legacyConfig.AzureKeyVault.TenantId ?? "",
                         ["ClientId"] = legacyConfig.AzureKeyVault.ClientId ?? "",
-                        ["ClientSecret"] = legacyConfig.AzureKeyVault.ClientSecret ?? "",
+                        // ClientSecret must be supplied via DW_AZURE_CLIENT_SECRET environment variable — not stored in config.
                         ["DefaultKeyName"] = legacyConfig.AzureKeyVault.DefaultKeyName ?? "datawarehouse-master"
                     };
             }
@@ -312,7 +315,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Migration
                     {
                         ["Region"] = legacyConfig.AwsKms.Region ?? "us-east-1",
                         ["AccessKeyId"] = legacyConfig.AwsKms.AccessKeyId ?? "",
-                        ["SecretAccessKey"] = legacyConfig.AwsKms.SecretAccessKey ?? "",
+                        // SecretAccessKey must be supplied via DW_AWS_SECRET_ACCESS_KEY environment variable — not stored in config.
                         ["DefaultKeyId"] = legacyConfig.AwsKms.DefaultKeyId ?? ""
                     };
             }

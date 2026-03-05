@@ -18,7 +18,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("zero_trust_compliance.check");
+            IncrementCounter("zero_trust_compliance.check");
             var violations = new List<ComplianceViolation>();
 
             // Check 1: Verify continuous authentication
@@ -156,14 +156,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("zero_trust_compliance.initialized");
+            IncrementCounter("zero_trust_compliance.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("zero_trust_compliance.shutdown");
+            IncrementCounter("zero_trust_compliance.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

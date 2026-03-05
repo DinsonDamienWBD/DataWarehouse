@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System.Threading;
+using System.Threading.Tasks;
 
 namespace DataWarehouse.SDK.Contracts
 {
@@ -14,6 +15,6 @@ namespace DataWarehouse.SDK.Contracts
         /// <param name="blobId">The ID of the corrupted manifest/blob.</param>
         /// <param name="replicaId">The specific replica node/ID to restore from (optional).</param>
         /// <returns>True if restoration was successful.</returns>
-        Task<bool> RestoreAsync(string blobId, string? replicaId);
+        Task<bool> RestoreAsync(string blobId, string? replicaId, CancellationToken ct = default);
     }
 }

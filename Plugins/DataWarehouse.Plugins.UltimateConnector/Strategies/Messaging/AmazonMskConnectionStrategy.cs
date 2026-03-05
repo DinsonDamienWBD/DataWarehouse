@@ -24,13 +24,13 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
             var brokers = config.ConnectionString.Split(',');
             var parts = brokers[0].Split(':');
             var host = parts[0];
-            var port = parts.Length > 1 ? int.Parse(parts[1]) : 9092;
+            var port = parts.Length > 1 && int.TryParse(parts[1], out var p9092) ? p9092 : 9092;
             var tcpClient = new TcpClient();
             await tcpClient.ConnectAsync(host, port, ct);
             return new DefaultConnectionHandle(tcpClient, new Dictionary<string, object> { ["Brokers"] = config.ConnectionString, ["Host"] = host, ["Port"] = port });
         }
-        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { try { return handle.GetConnection<TcpClient>()?.Connected ?? false; } catch { return false; } }
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<TcpClient>()?.Close(); await Task.CompletedTask; }
+        protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { try { return Task.FromResult(handle.GetConnection<TcpClient>()?.Connected ?? false); } catch { return Task.FromResult(false); } }
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<TcpClient>()?.Close(); return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, isHealthy ? "Amazon MSK is connected" : "Amazon MSK is disconnected", sw.Elapsed, DateTimeOffset.UtcNow); }
 
         public override async Task PublishAsync(IConnectionHandle handle, string topic, byte[] message, Dictionary<string, string>? headers = null, CancellationToken ct = default)
@@ -70,6 +70,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
             if (client == null || !client.Connected)
                 throw new InvalidOperationException("Amazon MSK connection is not established");
             var stream = client.GetStream();
+            var retryCount = 0;
             while (!ct.IsCancellationRequested && client.Connected)
             {
                 using var ms = new System.IO.MemoryStream();
@@ -98,14 +99,17 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
                 var read = await stream.ReadAsync(respLengthBuf, 0, 4, ct);
                 if (read < 4) break;
                 var respLength = System.Net.IPAddress.NetworkToHostOrder(BitConverter.ToInt32(respLengthBuf, 0));
+                bool hadData = false;
                 if (respLength > 0 && respLength < 10 * 1024 * 1024)
                 {
                     var respBuf = new byte[respLength];
                     var totalRead = 0;
                     while (totalRead < respLength) { var chunk = await stream.ReadAsync(respBuf, totalRead, respLength - totalRead, ct); if (chunk == 0) break; totalRead += chunk; }
-                    if (totalRead > 8) yield return respBuf;
+                    if (totalRead > 8) { yield return respBuf; hadData = true; }
                 }
-                await Task.Delay(100, ct);
+                // Finding 2021: Adaptive back-off — yield quickly when messages present, back off when idle.
+                if (!hadData) await Task.Delay(Math.Min(100 * (1 << Math.Min(retryCount++, 4)), 1000), ct);
+                else retryCount = 0;
             }
         }
 

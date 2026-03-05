@@ -18,12 +18,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("self_healing_compliance.check");
+            IncrementCounter("self_healing_compliance.check");
             var violations = new List<ComplianceViolation>();
 
-            // Check 1: Verify auto-remediation capability
-            if (!context.Attributes.TryGetValue("AutoRemediationEnabled", out var autoRemediation) ||
-                !(autoRemediation is bool enabled && enabled))
+            // Check 1: Verify auto-remediation capability (single lookup; result reused in check 3)
+            bool autoRemediationEnabled = context.Attributes.TryGetValue("AutoRemediationEnabled", out var autoRemediationObj) &&
+                                          autoRemediationObj is bool autoRemBool && autoRemBool;
+
+            if (!autoRemediationEnabled)
             {
                 violations.Add(new ComplianceViolation
                 {
@@ -51,9 +53,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
                 });
             }
 
-            // Check 3: Verify rollback capability
-            if (context.Attributes.TryGetValue("AutoRemediationEnabled", out var ar) &&
-                ar is bool autoRem && autoRem)
+            // Check 3: Verify rollback capability (reuse autoRemediationEnabled from check 1)
+            if (autoRemediationEnabled)
             {
                 if (!context.Attributes.ContainsKey("RollbackSupported") ||
                     !context.Attributes.ContainsKey("BackupBeforeRemediation"))
@@ -117,12 +118,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
             });
         }
 
-        private T GetConfigValue<T>(string key, T defaultValue)
-        {
-            if (Configuration.TryGetValue(key, out var value) && value is T typedValue)
-                return typedValue;
-            return defaultValue;
-        }
+        // LOW-1459: GetConfigValue<T> is now on ComplianceStrategyBase — removed duplicate.
 
         private static List<string> GenerateRecommendations(List<ComplianceViolation> violations)
         {
@@ -146,14 +142,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("self_healing_compliance.initialized");
+            IncrementCounter("self_healing_compliance.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("self_healing_compliance.shutdown");
+            IncrementCounter("self_healing_compliance.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

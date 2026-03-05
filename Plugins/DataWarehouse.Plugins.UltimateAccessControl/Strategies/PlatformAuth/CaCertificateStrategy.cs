@@ -49,24 +49,13 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PlatformAuth
             IncrementCounter("ca.certificate.shutdown");
             return base.ShutdownAsyncCore(cancellationToken);
         }
-protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
             IncrementCounter("ca.certificate.evaluate");
-            await Task.Yield();
-
-            var hasValidIdentity = context.SubjectId.Length > 0;
-
-            return new AccessDecision
-            {
-                IsGranted = hasValidIdentity,
-                Reason = hasValidIdentity ? "CA Certificate Strategy verified" : "Authentication failed",
-                ApplicablePolicies = new[] { "ca-certificate-policy" },
-                Metadata = new Dictionary<string, object>
-                {
-                    ["auth_type"] = "certificate",
-                    ["strategy_type"] = "PlatformAuth"
-                }
-            };
+            throw new NotSupportedException(
+                "Requires X509 chain validation using System.Security.Cryptography.X509Certificates.X509Chain " +
+                "with configured trust anchors, CRL/OCSP checking, and subject DN verification. " +
+                "Granting access for any non-empty SubjectId is not a valid implementation.");
         }
     }
 }

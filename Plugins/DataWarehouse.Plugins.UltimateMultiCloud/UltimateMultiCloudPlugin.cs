@@ -403,7 +403,9 @@ public sealed class UltimateMultiCloudPlugin : InfrastructurePluginBase, IDispos
     private Task HandleFailoverAsync(PluginMessage message)
     {
         Interlocked.Increment(ref _failoverCount);
-        Interlocked.Increment(ref _failedOperations);
+        // Cat 15 (finding 3627): a successful failover is NOT a failed operation.
+        // _failedOperations tracks errors; failover is a resilience event.
+        // Only mark as failed if the failover itself encounters an error (checked below).
 
         var fromProvider = message.Payload.TryGetValue("from", out var f) && f is string from ? from : null;
         var toProvider = message.Payload.TryGetValue("to", out var t) && t is string to ? to : null;

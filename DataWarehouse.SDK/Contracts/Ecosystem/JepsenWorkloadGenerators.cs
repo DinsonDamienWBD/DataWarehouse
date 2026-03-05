@@ -83,6 +83,10 @@ public sealed class RegisterWorkload : IWorkloadGenerator
             var startTime = DateTimeOffset.UtcNow;
             var roll = random.NextDouble();
             OperationHistoryEntry entry;
+            // Track the actual operation type for accurate error recording
+            var actualOpType = roll < ReadProbability ? OperationType.Read
+                : roll < ReadProbability + CasProbability ? OperationType.Cas
+                : OperationType.Write;
 
             try
             {
@@ -158,7 +162,7 @@ public sealed class RegisterWorkload : IWorkloadGenerator
                     SequenceId = JepsenTestHarness.NextSequenceId(),
                     NodeId = node.NodeId,
                     ClientId = clientName,
-                    Type = OperationType.Read,
+                    Type = actualOpType,
                     Key = key,
                     StartTime = startTime,
                     EndTime = DateTimeOffset.UtcNow,
@@ -172,7 +176,7 @@ public sealed class RegisterWorkload : IWorkloadGenerator
                     SequenceId = JepsenTestHarness.NextSequenceId(),
                     NodeId = node.NodeId,
                     ClientId = clientName,
-                    Type = OperationType.Read,
+                    Type = actualOpType,
                     Key = key,
                     StartTime = startTime,
                     EndTime = DateTimeOffset.UtcNow,
@@ -192,27 +196,27 @@ public sealed class RegisterWorkload : IWorkloadGenerator
 
     private static Task<string?> ExecuteReadAsync(JepsenNode node, string key, CancellationToken ct)
     {
-        // Execute SQL: SELECT value FROM jepsen_test WHERE key = '{key}'
-        // via PostgreSQL wire protocol connection to node
         _ = node; _ = key; _ = ct;
-        return Task.FromResult<string?>(null);
+        throw new PlatformNotSupportedException(
+            "Jepsen test harness requires external Jepsen framework and live database nodes. " +
+            "Configure JepsenEndpoint in options.");
     }
 
     private static Task ExecuteWriteAsync(JepsenNode node, string key, string value, CancellationToken ct)
     {
-        // Execute SQL: INSERT INTO jepsen_test (key, value) VALUES ('{key}', '{value}')
-        //   ON CONFLICT (key) DO UPDATE SET value = '{value}'
         _ = node; _ = key; _ = value; _ = ct;
-        return Task.CompletedTask;
+        throw new PlatformNotSupportedException(
+            "Jepsen test harness requires external Jepsen framework and live database nodes. " +
+            "Configure JepsenEndpoint in options.");
     }
 
     private static Task<bool> ExecuteCasAsync(
         JepsenNode node, string key, string? expected, string newValue, CancellationToken ct)
     {
-        // Execute SQL: UPDATE jepsen_test SET value = '{newValue}' WHERE key = '{key}' AND value = '{expected}'
-        // Returns true if rowcount = 1
         _ = node; _ = key; _ = expected; _ = newValue; _ = ct;
-        return Task.FromResult(true);
+        throw new PlatformNotSupportedException(
+            "Jepsen test harness requires external Jepsen framework and live database nodes. " +
+            "Configure JepsenEndpoint in options.");
     }
 
     private static JepsenNode? SelectRandomHealthyNode(JepsenCluster cluster, Random random)
@@ -264,10 +268,12 @@ public sealed class SetWorkload : IWorkloadGenerator
 
             var startTime = DateTimeOffset.UtcNow;
             OperationHistoryEntry entry;
+            var readRoll = random.NextDouble();
+            var actualOpType = readRoll < ReadProbability ? OperationType.Read : OperationType.Append;
 
             try
             {
-                if (random.NextDouble() < ReadProbability)
+                if (readRoll < ReadProbability)
                 {
                     // Read the entire set
                     var setContents = await ExecuteSetReadAsync(node, key, ct).ConfigureAwait(false);
@@ -313,7 +319,7 @@ public sealed class SetWorkload : IWorkloadGenerator
                     SequenceId = JepsenTestHarness.NextSequenceId(),
                     NodeId = node.NodeId,
                     ClientId = clientName,
-                    Type = OperationType.Read,
+                    Type = actualOpType,
                     Key = key,
                     StartTime = startTime,
                     EndTime = DateTimeOffset.UtcNow,
@@ -327,7 +333,7 @@ public sealed class SetWorkload : IWorkloadGenerator
                     SequenceId = JepsenTestHarness.NextSequenceId(),
                     NodeId = node.NodeId,
                     ClientId = clientName,
-                    Type = OperationType.Read,
+                    Type = actualOpType,
                     Key = key,
                     StartTime = startTime,
                     EndTime = DateTimeOffset.UtcNow,
@@ -347,17 +353,18 @@ public sealed class SetWorkload : IWorkloadGenerator
 
     private static Task<string?> ExecuteSetReadAsync(JepsenNode node, string key, CancellationToken ct)
     {
-        // Execute SQL: SELECT element FROM jepsen_set WHERE key = '{key}' ORDER BY element
-        // Returns comma-separated elements
         _ = node; _ = key; _ = ct;
-        return Task.FromResult<string?>(null);
+        throw new PlatformNotSupportedException(
+            "Jepsen test harness requires external Jepsen framework and live database nodes. " +
+            "Configure JepsenEndpoint in options.");
     }
 
     private static Task ExecuteSetAddAsync(JepsenNode node, string key, string element, CancellationToken ct)
     {
-        // Execute SQL: INSERT INTO jepsen_set (key, element) VALUES ('{key}', '{element}')
         _ = node; _ = key; _ = element; _ = ct;
-        return Task.CompletedTask;
+        throw new PlatformNotSupportedException(
+            "Jepsen test harness requires external Jepsen framework and live database nodes. " +
+            "Configure JepsenEndpoint in options.");
     }
 
     private static JepsenNode? SelectRandomHealthyNode(JepsenCluster cluster, Random random)
@@ -409,10 +416,12 @@ public sealed class ListAppendWorkload : IWorkloadGenerator
 
             var startTime = DateTimeOffset.UtcNow;
             OperationHistoryEntry entry;
+            var readRoll = random.NextDouble();
+            var actualOpType = readRoll < ReadProbability ? OperationType.Read : OperationType.Append;
 
             try
             {
-                if (random.NextDouble() < ReadProbability)
+                if (readRoll < ReadProbability)
                 {
                     // Read the entire list
                     var listContents = await ExecuteListReadAsync(node, key, ct).ConfigureAwait(false);
@@ -458,7 +467,7 @@ public sealed class ListAppendWorkload : IWorkloadGenerator
                     SequenceId = JepsenTestHarness.NextSequenceId(),
                     NodeId = node.NodeId,
                     ClientId = clientName,
-                    Type = OperationType.Read,
+                    Type = actualOpType,
                     Key = key,
                     StartTime = startTime,
                     EndTime = DateTimeOffset.UtcNow,
@@ -472,7 +481,7 @@ public sealed class ListAppendWorkload : IWorkloadGenerator
                     SequenceId = JepsenTestHarness.NextSequenceId(),
                     NodeId = node.NodeId,
                     ClientId = clientName,
-                    Type = OperationType.Read,
+                    Type = actualOpType,
                     Key = key,
                     StartTime = startTime,
                     EndTime = DateTimeOffset.UtcNow,
@@ -492,18 +501,18 @@ public sealed class ListAppendWorkload : IWorkloadGenerator
 
     private static Task<string?> ExecuteListReadAsync(JepsenNode node, string key, CancellationToken ct)
     {
-        // Execute SQL: SELECT element FROM jepsen_list WHERE key = '{key}' ORDER BY position ASC
-        // Returns comma-separated list of elements in order
         _ = node; _ = key; _ = ct;
-        return Task.FromResult<string?>(null);
+        throw new PlatformNotSupportedException(
+            "Jepsen test harness requires external Jepsen framework and live database nodes. " +
+            "Configure JepsenEndpoint in options.");
     }
 
     private static Task ExecuteListAppendAsync(JepsenNode node, string key, string element, CancellationToken ct)
     {
-        // Execute SQL: INSERT INTO jepsen_list (key, position, element)
-        //   VALUES ('{key}', (SELECT COALESCE(MAX(position), 0) + 1 FROM jepsen_list WHERE key = '{key}'), '{element}')
         _ = node; _ = key; _ = element; _ = ct;
-        return Task.CompletedTask;
+        throw new PlatformNotSupportedException(
+            "Jepsen test harness requires external Jepsen framework and live database nodes. " +
+            "Configure JepsenEndpoint in options.");
     }
 
     private static JepsenNode? SelectRandomHealthyNode(JepsenCluster cluster, Random random)
@@ -649,22 +658,19 @@ public sealed class BankWorkload : IWorkloadGenerator
 
     private static Task<long> ExecuteReadTotalAsync(JepsenNode node, int accountCount, CancellationToken ct)
     {
-        // Execute SQL: SELECT SUM(balance) FROM jepsen_bank
-        // Returns total balance across all accounts
         _ = node; _ = accountCount; _ = ct;
-        return Task.FromResult(0L);
+        throw new PlatformNotSupportedException(
+            "Jepsen test harness requires external Jepsen framework and live database nodes. " +
+            "Configure JepsenEndpoint in options.");
     }
 
     private static Task ExecuteTransferAsync(
         JepsenNode node, int from, int to, int amount, CancellationToken ct)
     {
-        // Execute SQL in a transaction:
-        //   BEGIN;
-        //   UPDATE jepsen_bank SET balance = balance - {amount} WHERE account = {from} AND balance >= {amount};
-        //   UPDATE jepsen_bank SET balance = balance + {amount} WHERE account = {to};
-        //   COMMIT;
         _ = node; _ = from; _ = to; _ = amount; _ = ct;
-        return Task.CompletedTask;
+        throw new PlatformNotSupportedException(
+            "Jepsen test harness requires external Jepsen framework and live database nodes. " +
+            "Configure JepsenEndpoint in options.");
     }
 
     private static JepsenNode? SelectRandomHealthyNode(JepsenCluster cluster, Random random)

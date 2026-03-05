@@ -19,9 +19,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
     /// </summary>
     public class ServiceNowConnectionStrategy : SaaSConnectionStrategyBase
     {
-        private string _instanceName = "";
-        private string _username = "";
-        private string _password = "";
+        private volatile string _instanceName = "";
+        private volatile string _username = "";
+        private volatile string _password = "";
 
         public override string StrategyId => "servicenow";
         public override string DisplayName => "ServiceNow";
@@ -34,7 +34,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            _instanceName = GetConfiguration<string>(config, "Instance", "dev12345");
+            _instanceName = GetConfiguration<string>(config, "Instance", ""); if (string.IsNullOrEmpty(_instanceName) || _instanceName == "dev12345") throw new ArgumentException("ServiceNow instance name is required");
             _username = GetConfiguration<string>(config, "Username", "");
             _password = GetConfiguration<string>(config, "Password", "");
 
@@ -66,16 +66,13 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             {
                 var response = await handle.GetConnection<HttpClient>()
                     .GetAsync("/api/now/table/sys_user?sysparm_limit=1", ct);
-                return response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable;
+                return response.IsSuccessStatusCode;
             }
             catch { return false; }
         }
 
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
-        {
-            handle.GetConnection<HttpClient>()?.Dispose();
-            await Task.CompletedTask;
-        }
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) {
+            handle.GetConnection<HttpClient>()?.Dispose(); return Task.CompletedTask; }
 
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
@@ -88,8 +85,16 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
         }
 
         protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(
-            IConnectionHandle handle, CancellationToken ct = default) =>
-            Task.FromResult((Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow.AddHours(24)));
+            IConnectionHandle handle, CancellationToken ct = default)
+        {
+            // ServiceNow uses HTTP Basic auth. Return encoded Basic credential as the token.
+            if (!string.IsNullOrEmpty(_username))
+            {
+                var encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_username}:{_password}"));
+                return Task.FromResult((encoded, DateTimeOffset.UtcNow.AddHours(24)));
+            }
+            return Task.FromResult((string.Empty, DateTimeOffset.UtcNow));
+        }
 
         protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(
             IConnectionHandle handle, string currentToken, CancellationToken ct = default) =>
@@ -113,7 +118,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                 queryParams.Add($"sysparm_fields={string.Join(",", fields)}");
 
             var url = $"/api/now/table/{tableName}?{string.Join("&", queryParams)}";
-            var response = await client.GetAsync(url, ct);
+            using var response = await client.GetAsync(url, ct);
+            response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
@@ -157,7 +163,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             var json = JsonSerializer.Serialize(fields);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await client.PostAsync($"/api/now/table/{tableName}", content, ct);
+            using var response = await client.PostAsync($"/api/now/table/{tableName}", content, ct);
+            response.EnsureSuccessStatusCode();
             var responseJson = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
@@ -183,7 +190,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                 Content = new StringContent(json, Encoding.UTF8, "application/json")
             };
 
-            var response = await client.SendAsync(request, ct);
+            using var response = await client.SendAsync(request, ct);
             return new ServiceNowRecordResult
             {
                 Success = response.IsSuccessStatusCode,

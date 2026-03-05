@@ -134,17 +134,28 @@ internal sealed class BackpressureHandling : IDisposable
         _config = config ?? new BackpressureConfig();
         _messageBus = messageBus;
 
-        _rateAdjustmentTimer = new Timer(
-            AdjustRates,
-            null,
-            _config.RateAdjustmentInterval,
-            _config.RateAdjustmentInterval);
-
+        // Create both timers before starting either so a constructor failure after
+        // the first timer is created cannot leak the first timer.
+        _rateAdjustmentTimer = new Timer(AdjustRates, null, Timeout.Infinite, Timeout.Infinite);
         _metricsTimer = new Timer(
-            async _ => await ReportMetricsAsync(CancellationToken.None),
+            _ =>
+            {
+                try
+                {
+                    _ = ReportMetricsAsync(CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[BackpressureHandling] Metrics timer callback failed: {ex.Message}");
+                }
+            },
             null,
-            _config.MetricsInterval,
-            _config.MetricsInterval);
+            Timeout.Infinite,
+            Timeout.Infinite);
+
+        // Start both timers only after both are successfully constructed.
+        _rateAdjustmentTimer.Change(_config.RateAdjustmentInterval, _config.RateAdjustmentInterval);
+        _metricsTimer.Change(_config.MetricsInterval, _config.MetricsInterval);
     }
 
     /// <summary>Gets the total events accepted globally.</summary>
@@ -164,7 +175,7 @@ internal sealed class BackpressureHandling : IDisposable
     /// <returns>The channel identifier.</returns>
     public string CreateChannel(string channelId, BackpressureConfig? config = null)
     {
-        ArgumentNullException.ThrowIfNull(channelId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(channelId, nameof(channelId));
 
         var channelConfig = config ?? _config;
         var options = new BoundedChannelOptions(channelConfig.BufferCapacity)
@@ -412,9 +423,11 @@ internal sealed class BackpressureHandling : IDisposable
             {
                 await _messageBus.PublishAsync("streaming.backpressure.status", message, ct);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Non-critical metrics reporting
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
     }

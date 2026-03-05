@@ -6,6 +6,7 @@ using DataWarehouse.SDK.VirtualDiskEngine.CopyOnWrite;
 using DataWarehouse.SDK.VirtualDiskEngine.Index;
 using DataWarehouse.SDK.VirtualDiskEngine.Integrity;
 using DataWarehouse.SDK.VirtualDiskEngine.Concurrency;
+using System.Linq;
 using DataWarehouse.SDK.VirtualDiskEngine.Journal;
 using DataWarehouse.SDK.VirtualDiskEngine.Metadata;
 using System;
@@ -30,8 +31,9 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
     private readonly VdeOptions _options;
     private readonly StripedWriteLock _stripedLock = new(64);
     private readonly SemaphoreSlim _checkpointLock = new(1, 1);
-    private bool _disposed;
-    private bool _initialized;
+    private readonly SemaphoreSlim _initLock = new(1, 1);
+    private volatile bool _disposed;
+    private volatile bool _initialized;
 
     // Subsystems (initialized in InitializeAsync)
     private ContainerFile? _container;
@@ -70,6 +72,15 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
         {
             return;
         }
+
+        await _initLock.WaitAsync(ct);
+        try
+        {
+            // Double-check after acquiring lock
+            if (_initialized)
+            {
+                return;
+            }
 
         // Step 1: Create or open the container file
         bool containerExists = File.Exists(_options.ContainerPath);
@@ -152,8 +163,9 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
             _options.BlockSize);
 
         // Step 8: Initialize CoW engine (separate B-Tree for ref counts)
-        // Create a separate B-Tree for reference counting
-        var refCountBTreeRoot = _container.Layout.DataStartBlock; // Note: should be allocated from metadata region when metadata allocator is available
+        // Allocate a dedicated block for the ref-count B-Tree root from the block allocator
+        // to avoid colliding with data blocks
+        var refCountBTreeRoot = _allocator.AllocateBlock(ct);
         var refCountBTree = new BTree(
             _container.BlockDevice,
             _allocator,
@@ -184,6 +196,11 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
         _spaceReclaimer = new SpaceReclaimer(_cowEngine, _allocator);
 
         _initialized = true;
+        }
+        finally
+        {
+            _initLock.Release();
+        }
     }
 
     #region Store/Retrieve/Delete Operations
@@ -203,6 +220,12 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
         ThrowIfNotInitialized();
 
         ArgumentNullException.ThrowIfNull(key);
+        if (key.Length == 0)
+            throw new ArgumentException("Key cannot be empty.", nameof(key));
+        if (key.Length > 4096)
+            throw new ArgumentException("Key exceeds maximum length of 4096 bytes.", nameof(key));
+        if (key.Contains('\0'))
+            throw new ArgumentException("Key must not contain null bytes.", nameof(key));
         ArgumentNullException.ThrowIfNull(data);
 
         await using var writeRegion = await _stripedLock.AcquireAsync(key, ct);
@@ -261,6 +284,9 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
             // Update inode with block pointers
             if (blockPointers.Count > Inode.DirectBlockCount)
             {
+                // Free all allocated blocks before throwing to prevent leaks
+                foreach (var blk in blockPointers)
+                    _allocator!.FreeBlock(blk);
                 throw new NotSupportedException($"Files exceeding direct block limit require indirect block support. Current limit: {Inode.DirectBlockCount} blocks ({Inode.DirectBlockCount * _options.BlockSize} bytes).");
             }
 
@@ -500,7 +526,9 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
             Inode? inode = await _inodeTable!.GetInodeAsync(inodeNumber, ct);
             if (inode == null)
             {
-                continue; // Skip if inode is missing
+                // Index inconsistency: key in B-Tree but inode missing — log for operator visibility
+                System.Diagnostics.Trace.TraceWarning($"[VirtualDiskEngine] Index inconsistency: key '{key}' references missing inode {inodeNumber}. Skipping.");
+                continue;
             }
 
             yield return new StorageObjectMetadata
@@ -629,12 +657,15 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
             TotalBlocks = totalBlocks,
             FreeBlocks = freeBlocks,
             UsedBlocks = usedBlocks,
-            TotalInodes = 65536, // Fixed for now; InodeTable should expose this
+            TotalInodes = _container != null && _container.Layout.InodeTableBlockCount > 0
+                ? _container.Layout.InodeTableBlockCount * (_options.BlockSize / 256)
+                : 65536,
             AllocatedInodes = _inodeTable!.AllocatedInodeCount,
             WalUtilizationPercent = walUtilization,
             ChecksumErrorCount = checksumErrorCount,
             SnapshotCount = snapshots.Count,
             HealthStatus = healthStatus,
+            BlockSize = _options.BlockSize,
             GeneratedAtUtc = DateTimeOffset.UtcNow
         };
     }
@@ -651,7 +682,7 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
         ThrowIfNotInitialized();
 
         var scanResult = await _corruptionDetector!.ScanAllBlocksAsync(progress, ct);
-        return scanResult.Events.Select(e => e.BlockNumber).ToList();
+        return (scanResult.Events ?? Enumerable.Empty<CorruptionEvent>()).Select(e => e.BlockNumber).ToList();
     }
 
     #endregion
@@ -696,7 +727,21 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
             return;
         }
 
-        _disposed = true;
+        // Acquire init lock to ensure no concurrent initialization/operations
+        await _initLock.WaitAsync();
+        try
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+        }
+        finally
+        {
+            _initLock.Release();
+        }
 
         // Orderly shutdown: checkpoint, flush, dispose subsystems in reverse order
         try
@@ -719,6 +764,7 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
 
         await _stripedLock.DisposeAsync();
         _checkpointLock.Dispose();
+        _initLock.Dispose();
     }
 
     #endregion

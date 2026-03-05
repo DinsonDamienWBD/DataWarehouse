@@ -17,6 +17,12 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transit
     {
         private const int MaxInputSize = 100 * 1024 * 1024; // 100 MB
 
+        // 1-byte algorithm ID written as a framing header so DecompressCore can select the right strategy.
+        private const byte AlgoIdSnappy = 0;
+        private const byte AlgoIdLz4    = 1;
+        private const byte AlgoIdBrotli = 2;
+        private const byte AlgoIdZstd   = 3;
+
         private readonly ICompressionStrategy _zstdStrategy;
         private readonly ICompressionStrategy _lz4Strategy;
         private readonly ICompressionStrategy _brotliStrategy;
@@ -122,8 +128,13 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transit
 
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for Adaptive-Transit");
-            var strategy = SelectStrategy(input);
-            return strategy.Compress(input);
+            var (strategy, algoId) = SelectStrategyWithId(input);
+            var compressed = strategy.Compress(input);
+            // Prepend 1-byte algorithm ID so DecompressCore can route to the same strategy.
+            var result = new byte[1 + compressed.Length];
+            result[0] = algoId;
+            Buffer.BlockCopy(compressed, 0, result, 1, compressed.Length);
+            return result;
         }
 
         /// <inheritdoc/>
@@ -136,22 +147,47 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transit
 
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for Adaptive-Transit");
-            // Detect which algorithm was used (would need header in real implementation)
-            // For now, default to Zstd as it's most common
-            return _zstdStrategy.Decompress(input);
+            if (input.Length < 2)
+                throw new InvalidDataException("Adaptive-Transit compressed data is too short (missing algorithm header).");
+            // Read the 1-byte algorithm ID written by CompressCore.
+            byte algoId = input[0];
+            var payload = new byte[input.Length - 1];
+            Buffer.BlockCopy(input, 1, payload, 0, payload.Length);
+            return algoId switch
+            {
+                AlgoIdSnappy => _snappyStrategy.Decompress(payload),
+                AlgoIdLz4    => _lz4Strategy.Decompress(payload),
+                AlgoIdBrotli => _brotliStrategy.Decompress(payload),
+                _            => _zstdStrategy.Decompress(payload)
+            };
         }
 
         /// <inheritdoc/>
         protected override async Task<byte[]> CompressAsyncCore(byte[] input, CancellationToken cancellationToken)
         {
-            var strategy = SelectStrategy(input);
-            return await strategy.CompressAsync(input, cancellationToken).ConfigureAwait(false);
+            var (strategy, algoId) = SelectStrategyWithId(input);
+            var compressed = await strategy.CompressAsync(input, cancellationToken).ConfigureAwait(false);
+            var result = new byte[1 + compressed.Length];
+            result[0] = algoId;
+            Buffer.BlockCopy(compressed, 0, result, 1, compressed.Length);
+            return result;
         }
 
         /// <inheritdoc/>
         protected override async Task<byte[]> DecompressAsyncCore(byte[] input, CancellationToken cancellationToken)
         {
-            return await _zstdStrategy.DecompressAsync(input, cancellationToken).ConfigureAwait(false);
+            if (input == null || input.Length < 2)
+                return input ?? Array.Empty<byte>();
+            byte algoId = input[0];
+            var payload = new byte[input.Length - 1];
+            Buffer.BlockCopy(input, 1, payload, 0, payload.Length);
+            return algoId switch
+            {
+                AlgoIdSnappy => await _snappyStrategy.DecompressAsync(payload, cancellationToken).ConfigureAwait(false),
+                AlgoIdLz4    => await _lz4Strategy.DecompressAsync(payload, cancellationToken).ConfigureAwait(false),
+                AlgoIdBrotli => await _brotliStrategy.DecompressAsync(payload, cancellationToken).ConfigureAwait(false),
+                _            => await _zstdStrategy.DecompressAsync(payload, cancellationToken).ConfigureAwait(false)
+            };
         }
 
         /// <inheritdoc/>
@@ -165,6 +201,19 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transit
         protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen)
         {
             return _zstdStrategy.CreateDecompressionStream(input, leaveOpen);
+        }
+
+        /// <summary>
+        /// Selects the optimal compression strategy and its framing algorithm ID.
+        /// </summary>
+        private (ICompressionStrategy strategy, byte algoId) SelectStrategyWithId(byte[] input)
+        {
+            var strategy = SelectStrategy(input);
+            byte algoId = strategy == _snappyStrategy ? AlgoIdSnappy
+                        : strategy == _lz4Strategy    ? AlgoIdLz4
+                        : strategy == _brotliStrategy  ? AlgoIdBrotli
+                        : AlgoIdZstd;
+            return (strategy, algoId);
         }
 
         /// <summary>

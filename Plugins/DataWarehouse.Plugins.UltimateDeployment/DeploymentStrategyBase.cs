@@ -37,7 +37,9 @@ public enum DeploymentType
     /// <summary>Hot reload without downtime.</summary>
     HotReload = 12,
     /// <summary>Rollback to previous version.</summary>
-    Rollback = 13
+    Rollback = 13,
+    /// <summary>Secret management and rotation deployment.</summary>
+    SecretManagement = 14
 }
 
 /// <summary>
@@ -269,7 +271,8 @@ public interface IDeploymentStrategy
 /// Abstract base class for deployment strategy implementations.
 /// Provides common functionality including health checks, statistics tracking, and rollback triggers.
 /// </summary>
-public abstract class DeploymentStrategyBase : IDeploymentStrategy
+// P2-2861: Implement IDisposable to dispose the per-instance HttpClient and release sockets.
+public abstract class DeploymentStrategyBase : IDeploymentStrategy, IDisposable
 {
     private readonly DeploymentStatistics _statistics = new();
     private readonly object _statsLock = new();
@@ -279,10 +282,21 @@ public abstract class DeploymentStrategyBase : IDeploymentStrategy
     private bool _initialized;
     private DateTime? _healthCacheExpiry;
     private bool? _cachedHealthy;
+    private readonly object _healthCacheLock = new();
+    private bool _disposed;
 
     protected DeploymentStrategyBase()
     {
         _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+    }
+
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        _httpClient.Dispose();
+        GC.SuppressFinalize(this);
     }
 
     /// <summary>Gets whether this strategy has been initialized.</summary>
@@ -309,11 +323,14 @@ public abstract class DeploymentStrategyBase : IDeploymentStrategy
     /// <summary>Gets cached health status, refreshing every 60 seconds.</summary>
     public bool GetStrategyHealthy()
     {
-        if (_cachedHealthy.HasValue && _healthCacheExpiry.HasValue && DateTime.UtcNow < _healthCacheExpiry.Value)
+        lock (_healthCacheLock)
+        {
+            if (_cachedHealthy.HasValue && _healthCacheExpiry.HasValue && DateTime.UtcNow < _healthCacheExpiry.Value)
+                return _cachedHealthy.Value;
+            _cachedHealthy = _initialized && _activeDeployments.Values.All(d => d.Health != DeploymentHealth.Failed);
+            _healthCacheExpiry = DateTime.UtcNow.AddSeconds(60);
             return _cachedHealthy.Value;
-        _cachedHealthy = _initialized && _activeDeployments.Values.All(d => d.Health != DeploymentHealth.Failed);
-        _healthCacheExpiry = DateTime.UtcNow.AddSeconds(60);
-        return _cachedHealthy.Value;
+        }
     }
 
     /// <summary>Increments a named counter. Thread-safe.</summary>
@@ -393,7 +410,9 @@ public abstract class DeploymentStrategyBase : IDeploymentStrategy
                 }
                 catch
                 {
+
                     // Rollback also failed, return failed state
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
 

@@ -35,69 +35,17 @@ internal sealed class OnStorageZstdStrategy : StorageProcessingStrategyBase
     };
 
     /// <inheritdoc/>
-    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default)
+    public override Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default)
     {
-        ValidateQuery(query);
-        var sw = Stopwatch.StartNew();
-        var sourcePath = query.Source;
-        var level = GetCompressionLevel(query);
-        var mode = GetMode(query);
-
-        if (mode == "decompress")
-        {
-            return await DecompressAsync(sourcePath, sw, ct);
-        }
-
-        // Default: compress
-        if (!File.Exists(sourcePath))
-        {
-            return CreateErrorResult("Source file not found", sourcePath, sw);
-        }
-
-        var originalSize = new FileInfo(sourcePath).Length;
-        var outputPath = sourcePath + ".zst";
-
-        // Use ZLibStream for compression (Zstd-compatible framing via .NET built-in)
-        await using (var input = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, true))
-        await using (var output = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
-        {
-            var compressionLevel = level <= 7 ? CompressionLevel.Fastest :
-                                   level <= 15 ? CompressionLevel.Optimal : CompressionLevel.SmallestSize;
-
-            await using var compressor = new ZLibStream(output, compressionLevel, leaveOpen: true);
-            var buffer = new byte[81920];
-            int bytesRead;
-            while ((bytesRead = await input.ReadAsync(buffer, ct)) > 0)
-            {
-                await compressor.WriteAsync(buffer.AsMemory(0, bytesRead), ct);
-            }
-        }
-
-        var compressedSize = new FileInfo(outputPath).Length;
-        var ratio = originalSize > 0 ? (double)compressedSize / originalSize : 1.0;
-        sw.Stop();
-
-        return new ProcessingResult
-        {
-            Data = new Dictionary<string, object?>
-            {
-                ["sourcePath"] = sourcePath,
-                ["outputPath"] = outputPath,
-                ["originalSize"] = originalSize,
-                ["compressedSize"] = compressedSize,
-                ["compressionRatio"] = Math.Round(ratio, 4),
-                ["spaceSavings"] = Math.Round((1.0 - ratio) * 100.0, 2),
-                ["compressionLevel"] = level,
-                ["algorithm"] = "zstd"
-            },
-            Metadata = new ProcessingMetadata
-            {
-                RowsProcessed = 1,
-                RowsReturned = 1,
-                BytesProcessed = originalSize,
-                ProcessingTimeMs = sw.Elapsed.TotalMilliseconds
-            }
-        };
+        // Zstandard compression is not available in .NET BCL. A production implementation
+        // requires a native Zstd library (e.g. ZstdSharp or ZstdNet NuGet package).
+        // Previous implementation silently used ZLibStream and wrote .zst extension files
+        // containing zlib-format data, which all standard Zstd decoders (4-byte magic 0xFD2FB528)
+        // will reject immediately.
+        throw new NotSupportedException(
+            "Zstandard (Zstd) compression requires a native Zstd library (e.g. ZstdSharp or ZstdNet). " +
+            "Add the package reference and implement using ZstdCompressStream/ZstdDecompressStream. " +
+            "The previous implementation produced invalid .zst files (zlib data, not Zstd format).");
     }
 
     /// <inheritdoc/>

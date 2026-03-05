@@ -78,7 +78,7 @@ public sealed class IamRoleStrategy : ServerlessStrategyBase
 /// </summary>
 public sealed class SecretsManagementStrategy : ServerlessStrategyBase
 {
-    private readonly BoundedDictionary<string, SecretEntry> _secrets = new BoundedDictionary<string, SecretEntry>(1000);
+    private readonly BoundedDictionary<string, (SecretEntry entry, string value)> _secrets = new BoundedDictionary<string, (SecretEntry, string)>(1000);
 
     public override string StrategyId => "security-secrets";
     public override string DisplayName => "Secrets Management";
@@ -96,18 +96,24 @@ public sealed class SecretsManagementStrategy : ServerlessStrategyBase
     public Task<SecretValue> GetSecretAsync(string secretId, string? version = null, CancellationToken ct = default)
     {
         RecordOperation("GetSecret");
-        return Task.FromResult(new SecretValue
+        if (_secrets.TryGetValue(secretId, out var stored))
         {
-            SecretId = secretId,
-            Version = version ?? "AWSCURRENT",
-            Value = "***REDACTED***",
-            RetrievedAt = DateTimeOffset.UtcNow
-        });
+            return Task.FromResult(new SecretValue
+            {
+                SecretId = secretId,
+                Version = stored.entry.VersionId,
+                Value = stored.value,
+                RetrievedAt = DateTimeOffset.UtcNow
+            });
+        }
+        throw new KeyNotFoundException($"Secret '{secretId}' not found. Use PutSecretAsync to store a secret first.");
     }
 
     /// <summary>Creates or updates a secret.</summary>
     public Task<SecretEntry> PutSecretAsync(string secretId, string value, Dictionary<string, string>? tags = null, CancellationToken ct = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(secretId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(value);
         var entry = new SecretEntry
         {
             SecretId = secretId,
@@ -115,7 +121,7 @@ public sealed class SecretsManagementStrategy : ServerlessStrategyBase
             CreatedAt = DateTimeOffset.UtcNow,
             RotationEnabled = false
         };
-        _secrets[secretId] = entry;
+        _secrets[secretId] = (entry, value);
         RecordOperation("PutSecret");
         return Task.FromResult(entry);
     }
@@ -123,10 +129,10 @@ public sealed class SecretsManagementStrategy : ServerlessStrategyBase
     /// <summary>Configures automatic rotation.</summary>
     public Task ConfigureRotationAsync(string secretId, int rotationDays, string rotationLambdaArn, CancellationToken ct = default)
     {
-        if (_secrets.TryGetValue(secretId, out var entry))
+        if (_secrets.TryGetValue(secretId, out var stored))
         {
-            entry.RotationEnabled = true;
-            entry.RotationDays = rotationDays;
+            stored.entry.RotationEnabled = true;
+            stored.entry.RotationDays = rotationDays;
         }
         RecordOperation("ConfigureRotation");
         return Task.CompletedTask;
@@ -257,8 +263,10 @@ public sealed class CodeSigningStrategy : ServerlessStrategyBase
 
     public Task<SigningProfile> CreateSigningProfileAsync(string profileName, string platformId, CancellationToken ct = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(profileName);
         RecordOperation("CreateSigningProfile");
-        return Task.FromResult(new SigningProfile { ProfileName = profileName, ProfileVersionArn = $"arn:aws:signer:us-east-1:123456789:signing-profile/{profileName}" });
+        // ARN uses a placeholder account segment; real deployments should configure AccountId via plugin config.
+        return Task.FromResult(new SigningProfile { ProfileName = profileName, ProfileVersionArn = $"arn:aws:signer:us-east-1:000000000000:signing-profile/{profileName}" });
     }
 }
 

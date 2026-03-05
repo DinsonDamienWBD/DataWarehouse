@@ -26,7 +26,15 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
     /// </summary>
     public sealed class AwsKmsStrategy : KeyStoreStrategyBase, IEnvelopeKeyStore
     {
-        private readonly HttpClient _httpClient;
+        // P2-3450: Shared static HttpClient to prevent socket exhaustion
+        private static readonly HttpClient _httpClient = new(new SocketsHttpHandler
+        {
+            PooledConnectionLifetime = TimeSpan.FromMinutes(15),
+            PooledConnectionIdleTimeout = TimeSpan.FromMinutes(5)
+        })
+        {
+            Timeout = TimeSpan.FromSeconds(30)
+        };
         private AwsKmsConfig _config = new();
         private string? _currentKeyId;
 
@@ -67,7 +75,6 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
         public AwsKmsStrategy()
         {
-            _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
         }
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
@@ -105,7 +112,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             try
             {
                 var request = CreateSignedRequest("DescribeKey", new { KeyId = _config.DefaultKeyId });
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -124,11 +131,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 KeySpec = "AES_256"
             });
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             var plaintext = doc.RootElement.GetProperty("Plaintext").GetString();
             return Convert.FromBase64String(plaintext!);
         }
@@ -143,11 +150,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 KeySpec = "SYMMETRIC_DEFAULT"
             });
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             var kmsKeyId = doc.RootElement.GetProperty("KeyMetadata").GetProperty("KeyId").GetString();
 
             _currentKeyId = kmsKeyId ?? keyId;
@@ -163,11 +170,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 Plaintext = Convert.ToBase64String(dataKey)
             });
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             var ciphertext = doc.RootElement.GetProperty("CiphertextBlob").GetString();
             return Convert.FromBase64String(ciphertext!);
         }
@@ -182,11 +189,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 CiphertextBlob = Convert.ToBase64String(wrappedKey)
             });
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             var plaintext = doc.RootElement.GetProperty("Plaintext").GetString();
             return Convert.FromBase64String(plaintext!);
         }
@@ -196,13 +203,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             ValidateSecurityContext(context);
 
             var request = CreateSignedRequest("ListKeys", new { });
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
                 return Array.Empty<string>();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
 
             if (doc.RootElement.TryGetProperty("Keys", out var keys))
             {
@@ -232,7 +239,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 PendingWindowInDays = 7 // Minimum is 7 days
             });
 
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
         }
 
@@ -243,13 +250,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             try
             {
                 var request = CreateSignedRequest("DescribeKey", new { KeyId = keyId });
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                     return null;
 
                 var json = await response.Content.ReadAsStringAsync(cancellationToken);
-                var doc = JsonDocument.Parse(json);
+                using var doc = JsonDocument.Parse(json);
                 var keyMetadata = doc.RootElement.GetProperty("KeyMetadata");
 
                 var createdAt = keyMetadata.TryGetProperty("CreationDate", out var created)
@@ -332,7 +339,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
         public override void Dispose()
         {
-            _httpClient?.Dispose();
+            // _httpClient is shared (static) — not disposed here to prevent breaking other callers.
             base.Dispose();
         }
     }

@@ -108,7 +108,8 @@ public sealed class AutomaticCloudFailoverStrategy : MultiCloudStrategyBase
 public sealed class ActiveActiveCloudStrategy : MultiCloudStrategyBase
 {
     private readonly BoundedDictionary<string, ProviderWeight> _weights = new BoundedDictionary<string, ProviderWeight>(1000);
-    private readonly Random _random = new();
+    // Cat 2 (finding 3629): Random.Shared is thread-safe (.NET 6+); instance Random is not.
+    private readonly Random _random = Random.Shared;
 
     public override string StrategyId => "failover-active-active";
     public override string StrategyName => "Active-Active Multi-Cloud";

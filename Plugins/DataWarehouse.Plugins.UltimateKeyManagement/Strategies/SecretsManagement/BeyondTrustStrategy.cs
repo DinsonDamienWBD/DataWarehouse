@@ -25,6 +25,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
     {
         private readonly HttpClient _httpClient;
         private BeyondTrustConfig _config = new();
+        // P2-3580: Track the most recently loaded key so GetCurrentKeyIdAsync is meaningful.
+        private string? _currentKeyId;
 
         public override KeyStoreCapabilities Capabilities => new()
         {
@@ -85,7 +87,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
 
         public override Task<string> GetCurrentKeyIdAsync()
         {
-            return Task.FromResult("default");
+            // P2-3580: Return the most recently loaded keyId rather than a hardcoded "default".
+            // Falls back to "default" only when no key has been loaded in this session.
+            return Task.FromResult(_currentKeyId ?? "default");
         }
 
         public override async Task<bool> HealthCheckAsync(CancellationToken cancellationToken = default)
@@ -94,7 +98,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             {
                 var request = new HttpRequestMessage(HttpMethod.Get, $"{_config.BaseUrl}/BeyondTrust/api/public/v3/ManagedAccounts");
                 request.Headers.Add("Authorization", $"PS-Auth key={_config.ApiKey}");
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -124,14 +128,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             var request = CreateRequest(HttpMethod.Post, "/BeyondTrust/api/public/v3/Requests");
             request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
 
             // Extract credential from response
             var credential = doc.RootElement.GetProperty("Credentials")[0].GetProperty("Password").GetString();
+            // P2-3580: Track the most recently loaded key for GetCurrentKeyIdAsync.
+            _currentKeyId = keyId;
             return Encoding.UTF8.GetBytes(credential!);
         }
 
@@ -149,13 +155,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             ValidateSecurityContext(context);
 
             var request = CreateRequest(HttpMethod.Get, "/BeyondTrust/api/public/v3/ManagedAccounts");
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
                 return Array.Empty<string>();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
 
             var accounts = new List<string>();
             foreach (var account in doc.RootElement.EnumerateArray())
@@ -190,13 +196,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             try
             {
                 var request = CreateRequest(HttpMethod.Get, $"/BeyondTrust/api/public/v3/ManagedAccounts/{keyId}");
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                     return null;
 
                 var json = await response.Content.ReadAsStringAsync(cancellationToken);
-                var doc = JsonDocument.Parse(json);
+                using var doc = JsonDocument.Parse(json);
 
                 var accountName = doc.RootElement.GetProperty("AccountName").GetString() ?? keyId;
                 var systemName = doc.RootElement.TryGetProperty("SystemName", out var sn) ? sn.GetString() : null;
@@ -227,7 +233,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             {
                 var request = new HttpRequestMessage(HttpMethod.Get, $"{_config.BaseUrl}/BeyondTrust/api/public/v3/ManagedAccounts");
                 request.Headers.Add("Authorization", $"PS-Auth key={_config.ApiKey}");
-                var response = await _httpClient.SendAsync(request);
+                using var response = await _httpClient.SendAsync(request);
                 return response.IsSuccessStatusCode;
             }
             catch

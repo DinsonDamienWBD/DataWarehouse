@@ -16,7 +16,8 @@ namespace DataWarehouse.Plugins.UniversalObservability.Strategies.Health;
 /// </remarks>
 public sealed class IcingaStrategy : ObservabilityStrategyBase
 {
-    private readonly HttpClient _httpClient;
+    // Not readonly: rebuilt by Configure() to apply the correct SSL verification policy.
+    private HttpClient _httpClient;
     private string _apiUrl = "https://localhost:5665";
     private string _username = "root";
     private string _password = "";
@@ -39,18 +40,15 @@ public sealed class IcingaStrategy : ObservabilityStrategyBase
         SupportsAlerting: true,
         SupportedExporters: new[] { "Icinga", "Graphite", "InfluxDB" }))
     {
-        var handler = new HttpClientHandler();
-        // SECURITY: TLS certificate validation is enabled by default.
-        // Only bypass when explicitly configured to false.
-        if (!_verifySsl)
-        {
-            handler.ServerCertificateCustomValidationCallback = (_, _, _, _) => true;
-        }
-        _httpClient = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(30) };
+        // Build a default client (SSL verification enabled, no auth yet).
+        // The actual handler is rebuilt in Configure() once verifySsl and credentials are known.
+        _httpClient = new HttpClient(new HttpClientHandler()) { Timeout = TimeSpan.FromSeconds(30) };
     }
 
     /// <summary>
     /// Configures the Icinga API connection.
+    /// Creates a new <see cref="HttpClient"/> with the correct SSL verification policy
+    /// so the policy takes effect rather than being dead code in the constructor.
     /// </summary>
     /// <param name="apiUrl">Icinga API URL.</param>
     /// <param name="username">API username.</param>
@@ -62,6 +60,17 @@ public sealed class IcingaStrategy : ObservabilityStrategyBase
         _username = username;
         _password = password;
         _verifySsl = verifySsl;
+
+        // Dispose the old client and rebuild with the correct SSL policy.
+        _httpClient.Dispose();
+        var handler = new HttpClientHandler();
+        // SECURITY: TLS certificate validation is enabled by default.
+        // Only bypass when explicitly configured to false.
+        if (!_verifySsl)
+        {
+            handler.ServerCertificateCustomValidationCallback = (_, _, _, _) => true;
+        }
+        _httpClient = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(30) };
 
         var credentials = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{username}:{password}"));
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", credentials);
@@ -80,10 +89,13 @@ public sealed class IcingaStrategy : ObservabilityStrategyBase
 
             var perfData = $"{SanitizeName(metric.Name)}={metric.Value}";
 
+            // P2-4612: Use EscapeFilterStringValue to prevent filter injection via metric names
+            // containing double-quotes, backticks, or backslashes.
+            var escapedName = EscapeFilterStringValue(SanitizeName(metric.Name));
             var checkResult = new
             {
                 type = "Service",
-                filter = $"service.name==\"{SanitizeName(metric.Name)}\" && host.name==\"datawarehouse\"",
+                filter = $"service.name==\"{escapedName}\" && host.name==\"datawarehouse\"",
                 exit_status = exitStatus,
                 plugin_output = pluginOutput,
                 performance_data = new[] { perfData },
@@ -124,7 +136,7 @@ public sealed class IcingaStrategy : ObservabilityStrategyBase
         var checkResult = new
         {
             type = "Service",
-            filter = $"service.name==\"{serviceName}\" && host.name==\"datawarehouse\"",
+            filter = $"service.name==\"{EscapeFilterStringValue(serviceName)}\" && host.name==\"datawarehouse\"",
             exit_status = exitStatus,
             plugin_output = pluginOutput,
             performance_data = performanceData ?? Array.Empty<string>(),
@@ -142,12 +154,14 @@ public sealed class IcingaStrategy : ObservabilityStrategyBase
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             var url = $"{_apiUrl}/v1/actions/process-check-result";
 
-            var response = await _httpClient.PostAsync(url, content, ct);
+            using var response = await _httpClient.PostAsync(url, content, ct);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Icinga API unavailable
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -167,13 +181,27 @@ public sealed class IcingaStrategy : ObservabilityStrategyBase
         return name.Replace(" ", "_").Replace("-", "_").Replace(".", "_").ToLowerInvariant();
     }
 
+    /// <summary>
+    /// Sanitizes a value for safe embedding in an Icinga filter expression string literal.
+    /// Escapes backslash, double-quote, backtick, and newlines to prevent filter injection.
+    /// </summary>
+    private static string EscapeFilterStringValue(string value)
+    {
+        return value
+            .Replace("\\", "\\\\")   // backslash must come first
+            .Replace("\"", "\\\"")   // double-quote: literal " in Icinga DSL string
+            .Replace("`", "\\`")     // backtick: Icinga DSL template literal delimiter
+            .Replace("\r", "")
+            .Replace("\n", "");
+    }
+
     /// <inheritdoc/>
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken cancellationToken)
     {
         try
         {
             // Query Icinga status
-            var response = await _httpClient.GetAsync($"{_apiUrl}/v1/status", cancellationToken);
+            using var response = await _httpClient.GetAsync($"{_apiUrl}/v1/status", cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {
@@ -218,21 +246,16 @@ public sealed class IcingaStrategy : ObservabilityStrategyBase
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("icinga.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     protected override void Dispose(bool disposing)
     {
+                _password = string.Empty;
         if (disposing)
         {
             _httpClient.Dispose();

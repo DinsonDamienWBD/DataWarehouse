@@ -38,6 +38,7 @@ public static class DeploymentProfileFactory
     /// <returns>Deployment profile with environment-specific optimizations.</returns>
     public static DeploymentProfile CreateProfile(DeploymentContext context)
     {
+        ArgumentNullException.ThrowIfNull(context);
         return context.Environment switch
         {
             DeploymentEnvironment.HostedVm => new DeploymentProfile

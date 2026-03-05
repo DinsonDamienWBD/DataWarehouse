@@ -447,6 +447,7 @@ public static class TerraformProviderSpecification
         sb.AppendLine();
         sb.AppendLine("\t\"github.com/hashicorp/terraform-plugin-sdk/v2/diag\"");
         sb.AppendLine("\t\"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema\"");
+        sb.AppendLine("\t\"github.com/hashicorp/terraform-plugin-sdk/v2/plugin\"");
         sb.AppendLine("\tdw \"github.com/datawarehouse/datawarehouse-go\"");
         sb.AppendLine(")");
         sb.AppendLine();
@@ -524,6 +525,7 @@ public static class TerraformProviderSpecification
         sb.AppendLine();
         sb.AppendLine("\t\"github.com/hashicorp/terraform-plugin-sdk/v2/diag\"");
         sb.AppendLine("\t\"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema\"");
+        sb.AppendLine("\t\"github.com/hashicorp/terraform-plugin-sdk/v2/plugin\"");
         sb.AppendLine("\tdw \"github.com/datawarehouse/datawarehouse-go\"");
         sb.AppendLine(")");
         sb.AppendLine();
@@ -587,6 +589,7 @@ public static class TerraformProviderSpecification
         sb.AppendLine();
         sb.AppendLine("\t\"github.com/hashicorp/terraform-plugin-sdk/v2/diag\"");
         sb.AppendLine("\t\"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema\"");
+        sb.AppendLine("\t\"github.com/hashicorp/terraform-plugin-sdk/v2/plugin\"");
         sb.AppendLine("\tdw \"github.com/datawarehouse/datawarehouse-go\"");
         sb.AppendLine(")");
         sb.AppendLine();

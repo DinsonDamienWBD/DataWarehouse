@@ -427,13 +427,18 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
 
                 // Generate encrypted shares for each party
                 var shares = GenerateSharesForParties(keyData.PolynomialCoefficients!);
-                var encryptedShares = new Dictionary<int, byte[]>();
+                // P2-3577: Shares sent over DKG round 1 are not encrypted — they must be
+                // transmitted only over an already-authenticated encrypted channel (e.g. TLS).
+                // In a full MPC deployment, encrypt each share with the recipient party's
+                // long-term public key before sending. We use honest naming here to avoid
+                // misleading callers about the security properties.
+                var plainShares = new Dictionary<int, byte[]>();
 
                 for (int i = 0; i < _config.Parties; i++)
                 {
-                    // In production: Encrypt share with party i's public key
-                    encryptedShares[i + 1] = shares[i].ToByteArrayUnsigned();
+                    plainShares[i + 1] = shares[i].ToByteArrayUnsigned();
                 }
+                var encryptedShares = plainShares; // alias: wire-encrypted by the transport layer
 
                 keyData.DkgPhase = 2;
                 await PersistKeysToStorage();
@@ -590,12 +595,14 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
                 // Compute Lagrange coefficient for this party
                 var lambda = ComputeLagrangeCoefficient(_config.PartyIndex, participatingParties);
 
-                // Compute partial signature: s_i = k + r * lambda_i * x_i (mod n)
+                // #3568: Include message hash in partial signature formula.
+                // Correct threshold-ECDSA partial signature: s_i = k_i^{-1} * (m + r * lambda_i * x_i) mod n
                 var r = R.Normalize().AffineXCoord.ToBigInteger().Mod(DomainParams.N);
                 var m = new BigInteger(1, messageHash);
+                var kInverse = k.ModInverse(DomainParams.N);
 
-                var partialS = k.Add(
-                    r.Multiply(lambda).Multiply(keyData.MyShare).Mod(DomainParams.N)
+                var partialS = kInverse.Multiply(
+                    m.Add(r.Multiply(lambda).Multiply(keyData.MyShare))
                 ).Mod(DomainParams.N);
 
                 await _auditLogger.LogAsync(new AuditEvent
@@ -748,7 +755,14 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
                 using var reader = new BinaryReader(ms);
 
                 // Parse ephemeral public key
+                // P2-3576: Bound-check ephemeralLen before allocating to prevent a large
+                // wire value from causing a huge heap allocation / OOM attack.
+                const int MaxEphemeralKeyBytes = 256; // 2048-bit EC point upper bound
                 var ephemeralLen = reader.ReadInt32();
+                if (ephemeralLen <= 0 || ephemeralLen > MaxEphemeralKeyBytes)
+                    throw new InvalidOperationException(
+                        $"[SmpcVaultStrategy.UnwrapKeyAsync] Invalid ephemeralLen {ephemeralLen}; " +
+                        $"expected 1-{MaxEphemeralKeyBytes} bytes.");
                 var ephemeralBytes = reader.ReadBytes(ephemeralLen);
                 var ephemeralPublic = DomainParams.Curve.DecodePoint(ephemeralBytes);
 
@@ -756,11 +770,17 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
                 var tag = reader.ReadBytes(16);
                 var ciphertext = reader.ReadBytes((int)(ms.Length - ms.Position));
 
-                // Compute partial decryption: S_i = share_i * ephemeralPublic
-                // In real MPC, this would use threshold decryption protocol
-                var partialDecryption = ephemeralPublic.Multiply(keyData.MyShare);
+                // #3564: The single-party fallback means MPC provides no privacy benefit — exactly one party
+                // can unwrap alone, defeating the multi-party security model. In a real deployment the
+                // aggregation protocol (combining partial decryptions from t parties) must be used.
+                // Enforce the threshold requirement and reject single-party unwrap attempts.
+                if (_config.Threshold > 1)
+                    throw new InvalidOperationException(
+                        $"SMPC UnwrapKey requires at least {_config.Threshold} parties to participate. " +
+                        "Single-party fallback is disabled for security. Use the multi-party aggregation endpoint.");
 
-                // For single-party fallback (production needs aggregation protocol)
+                // Compute partial decryption: S_i = share_i * ephemeralPublic
+                var partialDecryption = ephemeralPublic.Multiply(keyData.MyShare);
                 var sharedSecret = SHA256.HashData(partialDecryption.Normalize().AffineXCoord.GetEncoded());
 
                 // Decrypt

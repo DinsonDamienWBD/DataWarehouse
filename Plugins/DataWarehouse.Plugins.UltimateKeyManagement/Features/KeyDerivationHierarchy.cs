@@ -212,8 +212,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
                 // Build info with full path for HKDF
                 var info = BuildHkdfInfo(childPurpose, derivationPath, context);
 
-                // Use child purpose as salt if not provided
-                var hkdfSalt = salt ?? Encoding.UTF8.GetBytes($"dw-kdf-{childPurpose}-child");
+                // #3441: Use the caller-supplied salt when provided; fall back to deterministic default.
+                var hkdfSalt = (salt != null && salt.Length > 0)
+                    ? salt
+                    : Encoding.UTF8.GetBytes($"dw-kdf-{childPurpose}-child");
 
                 // Derive key using HKDF from master (ensures reproducibility)
                 // In practice, we derive from the full path from master

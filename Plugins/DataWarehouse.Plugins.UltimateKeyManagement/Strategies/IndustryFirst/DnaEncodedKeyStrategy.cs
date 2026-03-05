@@ -140,11 +140,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             {
                 case DnaSynthesisProvider.TwistBioscience:
                     client.BaseAddress = new Uri("https://api.twistbioscience.com/v1/");
+                    client.DefaultRequestHeaders.Remove("Authorization");
                     client.DefaultRequestHeaders.Add("Authorization", $"Bearer {_config.SynthesisApiKey}");
                     break;
 
                 case DnaSynthesisProvider.Idt:
                     client.BaseAddress = new Uri("https://www.idtdna.com/api/v1/");
+                    client.DefaultRequestHeaders.Remove("X-API-KEY");
                     client.DefaultRequestHeaders.Add("X-API-KEY", _config.SynthesisApiKey);
                     break;
             }
@@ -163,11 +165,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             {
                 case DnaSequencingProvider.Illumina:
                     client.BaseAddress = new Uri("https://api.illumina.com/v1/");
+                    client.DefaultRequestHeaders.Remove("Authorization");
                     client.DefaultRequestHeaders.Add("Authorization", $"Bearer {_config.SequencingApiKey}");
                     break;
 
                 case DnaSequencingProvider.OxfordNanopore:
                     client.BaseAddress = new Uri("https://api.nanoporetech.com/v1/");
+                    client.DefaultRequestHeaders.Remove("X-API-Key");
                     client.DefaultRequestHeaders.Add("X-API-Key", _config.SequencingApiKey);
                     break;
             }
@@ -285,26 +289,20 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
         /// </summary>
         public string EncodeBinaryToDna(byte[] data)
         {
+            // #3526: The previous implementation rotated bases to avoid homopolymer runs but never
+            // stored a rotation marker, making decoding lossy and broken.
+            // Fix: use a reversible encoding — each 2-bit pair maps directly to a base with no
+            // silent mutation. DNA synthesis hardware handles homopolymer runs at the oligo level.
+            // The decoder can now faithfully recover the original bytes.
             var dna = new StringBuilder(data.Length * 4); // 4 bases per byte
-            char lastBase = '\0';
 
             foreach (var b in data)
             {
-                // Encode each byte as 4 DNA bases (2 bits each)
+                // Encode each byte as 4 DNA bases (2 bits each), MSB first.
                 for (int i = 6; i >= 0; i -= 2)
                 {
                     var twoBits = (byte)((b >> i) & 0b11);
-                    var baseChar = BinaryToDna[twoBits];
-
-                    // Avoid homopolymer runs by rotating if same as last base
-                    if (baseChar == lastBase)
-                    {
-                        baseChar = RotateBase(baseChar);
-                        // Store rotation marker in next encoding
-                    }
-
-                    dna.Append(baseChar);
-                    lastBase = baseChar;
+                    dna.Append(BinaryToDna[twoBits]);
                 }
             }
 
@@ -487,12 +485,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
 
         private byte[] RsDecode(byte[] codeword, int[] gfExp, int[] gfLog)
         {
-            // Simplified decoding - in production would use Berlekamp-Massey algorithm
-            // For now, return data portion (error correction would be applied here)
-            var dataLength = codeword.Length - RsParitySymbols;
-            var data = new byte[dataLength];
-            Array.Copy(codeword, data, dataLength);
-            return data;
+            // #3509: Reed-Solomon decoding requires a proper RS decoder (e.g., Berlekamp-Massey).
+            // Simply returning the data portion without error correction is a stub.
+            throw new NotSupportedException(
+                "Reed-Solomon decoding requires native RS library. " +
+                "Configure via DnaOptions.ReedSolomonProvider.");
         }
 
         private char RotateBase(char baseChar)
@@ -809,8 +806,25 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
 
                 if (stored != null)
                 {
+                    // #3510: Decrypt stored keys on load using machine-derived key.
+                    var encryptionKey = DeriveDnaStorageKey();
                     foreach (var kvp in stored)
                     {
+                        byte[]? decodedKey = null;
+                        if (!string.IsNullOrEmpty(kvp.Value.DecodedKey))
+                        {
+                            try
+                            {
+                                decodedKey = kvp.Value.DecodedKey.StartsWith("enc1:", StringComparison.Ordinal)
+                                    ? DecryptKeyFromStorage(kvp.Value.DecodedKey, encryptionKey)
+                                    : null; // Reject plaintext base64 keys - they are not accepted
+                            }
+                            catch
+                            {
+                                decodedKey = null; // Key will need to be re-derived from DNA
+                            }
+                        }
+
                         _keyStore[kvp.Key] = new DnaKeyEntry
                         {
                             KeyId = kvp.Value.KeyId,
@@ -822,9 +836,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
                             DnaSampleId = kvp.Value.DnaSampleId,
                             CreatedAt = kvp.Value.CreatedAt,
                             CreatedBy = kvp.Value.CreatedBy,
-                            DecodedKey = string.IsNullOrEmpty(kvp.Value.DecodedKey)
-                                ? null
-                                : Convert.FromBase64String(kvp.Value.DecodedKey),
+                            DecodedKey = decodedKey,
                             SequenceLength = kvp.Value.SequenceLength,
                             RedundantCopies = kvp.Value.RedundantCopies
                         };
@@ -838,7 +850,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             }
             catch
             {
+
                 // Ignore load errors
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
@@ -850,6 +864,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             {
                 Directory.CreateDirectory(dir);
             }
+
+            // #3510: Encrypt DecodedKey with machine-derived key before persisting.
+            // Raw key bytes must never be written to disk in plaintext.
+            var encryptionKey = DeriveDnaStorageKey();
 
             var toStore = _keyStore.ToDictionary(
                 kvp => kvp.Key,
@@ -865,7 +883,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
                     CreatedAt = kvp.Value.CreatedAt,
                     CreatedBy = kvp.Value.CreatedBy,
                     DecodedKey = kvp.Value.DecodedKey != null
-                        ? Convert.ToBase64String(kvp.Value.DecodedKey)
+                        ? EncryptKeyForStorage(kvp.Value.DecodedKey, encryptionKey)
                         : "",
                     SequenceLength = kvp.Value.SequenceLength,
                     RedundantCopies = kvp.Value.RedundantCopies
@@ -873,6 +891,53 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
 
             var json = JsonSerializer.Serialize(toStore, new JsonSerializerOptions { WriteIndented = true });
             await File.WriteAllTextAsync(path, json);
+        }
+
+        // #3510: Machine-derived encryption key for protecting stored DNA key material.
+        private byte[] DeriveDnaStorageKey()
+        {
+            var entropy = string.Join("|", Environment.MachineName, Environment.UserName,
+                "DataWarehouse.DnaKeyStorage.v1");
+            return HKDF.DeriveKey(
+                HashAlgorithmName.SHA256,
+                Encoding.UTF8.GetBytes(entropy),
+                32,
+                salt: null,
+                info: Encoding.UTF8.GetBytes("DnaEncodedKey.StorageEncryption"));
+        }
+
+        private static string EncryptKeyForStorage(byte[] keyBytes, byte[] encryptionKey)
+        {
+            var nonce = new byte[12];
+            RandomNumberGenerator.Fill(nonce);
+            var tag = new byte[16];
+            var ciphertext = new byte[keyBytes.Length];
+            using var aes = new AesGcm(encryptionKey, 16);
+            aes.Encrypt(nonce, keyBytes, ciphertext, tag);
+            // Format: "enc1:" + base64(nonce + tag + ciphertext)
+            var combined = new byte[nonce.Length + tag.Length + ciphertext.Length];
+            Buffer.BlockCopy(nonce, 0, combined, 0, nonce.Length);
+            Buffer.BlockCopy(tag, 0, combined, nonce.Length, tag.Length);
+            Buffer.BlockCopy(ciphertext, 0, combined, nonce.Length + tag.Length, ciphertext.Length);
+            return "enc1:" + Convert.ToBase64String(combined);
+        }
+
+        private byte[] DecryptKeyFromStorage(string stored, byte[] encryptionKey)
+        {
+            if (!stored.StartsWith("enc1:", StringComparison.Ordinal))
+                throw new CryptographicException("DNA key storage format unrecognized. Plaintext keys are no longer accepted.");
+
+            var combined = Convert.FromBase64String(stored[5..]);
+            if (combined.Length < 28)
+                throw new CryptographicException("DNA key storage entry is too short.");
+
+            var nonce = combined.AsSpan(0, 12).ToArray();
+            var tag = combined.AsSpan(12, 16).ToArray();
+            var ciphertext = combined.AsSpan(28).ToArray();
+            var plaintext = new byte[ciphertext.Length];
+            using var aes = new AesGcm(encryptionKey, 16);
+            aes.Decrypt(nonce, ciphertext, tag, plaintext);
+            return plaintext;
         }
 
         public override void Dispose()

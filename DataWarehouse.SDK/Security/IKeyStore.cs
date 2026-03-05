@@ -160,6 +160,9 @@ namespace DataWarehouse.SDK.Security
         /// </remarks>
         async Task<NativeKeyHandle> GetKeyNativeAsync(string keyId, ISecurityContext context, CancellationToken ct = default)
         {
+            // Cat 15 (finding 586): GetKeyAsync does not accept a CancellationToken (legacy interface signature).
+            // ct is checked here before the call to avoid dispatching when already cancelled.
+            ct.ThrowIfCancellationRequested();
             var keyBytes = await GetKeyAsync(keyId, context).ConfigureAwait(false);
             try
             {
@@ -173,10 +176,12 @@ namespace DataWarehouse.SDK.Security
 
         /// <summary>
         /// Synchronously retrieves a key by ID.
-        /// LEGACY: Prefer GetKeyAsync for new implementations.
+        /// LEGACY: Use GetKeyAsync instead. This sync method forces sync-over-async
+        /// in cloud KMS implementations.
         /// </summary>
         /// <param name="keyId">The key identifier.</param>
         /// <returns>The key bytes.</returns>
+        [Obsolete("Use GetKeyAsync instead. Sync method forces sync-over-async in cloud KMS implementations.")]
         byte[] GetKey(string keyId);
 
         /// <summary>

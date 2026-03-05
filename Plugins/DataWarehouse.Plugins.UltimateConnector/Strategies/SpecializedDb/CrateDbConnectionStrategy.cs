@@ -20,15 +20,29 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
         public CrateDbConnectionStrategy(ILogger<CrateDbConnectionStrategy>? logger = null) : base(logger) { }
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var (host, port) = ParseHostPort(config.ConnectionString, 4200);
-            _httpClient = new HttpClient { BaseAddress = new Uri($"http://{host}:{port}"), Timeout = config.Timeout };
-            var response = await _httpClient.PostAsync("/_sql", new StringContent("{\"stmt\":\"SELECT 1\"}", System.Text.Encoding.UTF8, "application/json"), ct);
+            var useSsl = GetConfiguration<bool>(config, "UseSsl", false);
+            var scheme = useSsl ? "https" : "http";
+            var (host, port) = ParseHostPort(config.ConnectionString, useSsl ? 4201 : 4200);
+            _httpClient = new HttpClient { BaseAddress = new Uri($"{scheme}://{host}:{port}"), Timeout = config.Timeout };
+            if (!string.IsNullOrEmpty(config.AuthCredential))
+            {
+                var creds = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{config.AuthSecondary ?? "crate"}:{config.AuthCredential}"));
+                _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", creds);
+            }
+            using var response = await _httpClient.PostAsync("/_sql", new StringContent("{\"stmt\":\"SELECT 1\"}", System.Text.Encoding.UTF8, "application/json"), ct);
             response.EnsureSuccessStatusCode();
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object> { ["host"] = host, ["port"] = port });
         }
-        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { if (_httpClient == null) return false; try { var response = await _httpClient.PostAsync("/_sql", new StringContent("{\"stmt\":\"SELECT 1\"}", System.Text.Encoding.UTF8, "application/json"), ct); return response.IsSuccessStatusCode; } catch { return false; } }
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { _httpClient?.Dispose(); _httpClient = null; await Task.CompletedTask; }
-        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var isHealthy = await TestCoreAsync(handle, ct); return new ConnectionHealth(isHealthy, isHealthy ? "CrateDB healthy" : "CrateDB unhealthy", TimeSpan.FromMilliseconds(6), DateTimeOffset.UtcNow); }
+        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { if (_httpClient == null) return false; try { using var response = await _httpClient.PostAsync("/_sql", new StringContent("{\"stmt\":\"SELECT 1\"}", System.Text.Encoding.UTF8, "application/json"), ct); return response.IsSuccessStatusCode; } catch { return false; } }
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { _httpClient?.Dispose(); _httpClient = null; return Task.CompletedTask; }
+        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        {
+            // P2-2180: Measure actual latency with Stopwatch instead of hardcoded value.
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var isHealthy = await TestCoreAsync(handle, ct);
+            sw.Stop();
+            return new ConnectionHealth(isHealthy, isHealthy ? "CrateDB healthy" : "CrateDB unhealthy", sw.Elapsed, DateTimeOffset.UtcNow);
+        }
         public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
             if (_httpClient == null) return new List<Dictionary<string, object?>>();
@@ -36,7 +50,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             {
                 var requestBody = System.Text.Json.JsonSerializer.Serialize(new { stmt = query });
                 var content = new StringContent(requestBody, System.Text.Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync("/_sql", content, ct);
+                using var response = await _httpClient.PostAsync("/_sql", content, ct);
                 if (!response.IsSuccessStatusCode) return new List<Dictionary<string, object?>>();
                 var json = await response.Content.ReadAsStringAsync(ct);
                 using var doc = System.Text.Json.JsonDocument.Parse(json);
@@ -68,7 +82,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             {
                 var requestBody = System.Text.Json.JsonSerializer.Serialize(new { stmt = command });
                 var content = new StringContent(requestBody, System.Text.Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync("/_sql", content, ct);
+                using var response = await _httpClient.PostAsync("/_sql", content, ct);
                 if (!response.IsSuccessStatusCode) return 0;
                 var json = await response.Content.ReadAsStringAsync(ct);
                 using var doc = System.Text.Json.JsonDocument.Parse(json);
@@ -83,7 +97,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             {
                 var requestBody = System.Text.Json.JsonSerializer.Serialize(new { stmt = "SELECT table_schema, table_name, column_name, data_type FROM information_schema.columns" });
                 var content = new StringContent(requestBody, System.Text.Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync("/_sql", content, ct);
+                using var response = await _httpClient.PostAsync("/_sql", content, ct);
                 if (!response.IsSuccessStatusCode) return new List<DataSchema>();
                 var json = await response.Content.ReadAsStringAsync(ct);
                 using var doc = System.Text.Json.JsonDocument.Parse(json);
@@ -105,6 +119,15 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             }
             catch { return new List<DataSchema>(); /* Schema query failed - return empty */ }
         }
-        private (string host, int port) ParseHostPort(string connectionString, int defaultPort) { var clean = connectionString.Replace("http://", "").Split('/')[0]; var parts = clean.Split(':'); return (parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : defaultPort); }
+        private (string host, int port) ParseHostPort(string connectionString, int defaultPort)
+        {
+            // P2-2132: Use Uri parsing to correctly handle IPv6 addresses like http://[::1]:8123/
+            var uriString = connectionString.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                            connectionString.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+                ? connectionString : "http://" + connectionString;
+            if (Uri.TryCreate(uriString, UriKind.Absolute, out var uri) && !string.IsNullOrEmpty(uri.Host) && uri.Port > 0)
+                return (uri.Host, uri.Port);
+            return ParseHostPortSafe(connectionString, defaultPort);
+        }
     }
 }

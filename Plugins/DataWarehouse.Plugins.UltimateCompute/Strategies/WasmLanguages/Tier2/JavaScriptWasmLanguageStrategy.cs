@@ -31,6 +31,9 @@ internal sealed class JavaScriptWasmLanguageStrategy : WasmLanguageStrategyBase
     public override string StrategyId => "compute.wasm.lang.javascript";
 
     /// <inheritdoc/>
+    protected override string[] GetToolchainBinaryNames() => new[] { "javy" };
+
+    /// <inheritdoc/>
     public override string StrategyName => "JavaScript WASM Language";
 
     /// <inheritdoc/>

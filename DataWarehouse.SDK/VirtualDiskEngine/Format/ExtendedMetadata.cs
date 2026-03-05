@@ -346,13 +346,32 @@ public readonly struct ExtendedMetadata : IEquatable<ExtendedMetadata>
     // ── Equality ────────────────────────────────────────────────────────
 
     /// <inheritdoc />
-    public bool Equals(ExtendedMetadata other) => Namespace == other.Namespace;
+    public bool Equals(ExtendedMetadata other) =>
+        Namespace == other.Namespace &&
+        DottedVersionVector.AsSpan().SequenceEqual(other.DottedVersionVector) &&
+        SovereigntyZoneConfig.AsSpan().SequenceEqual(other.SovereigntyZoneConfig) &&
+        RaidLayoutSummary.AsSpan().SequenceEqual(other.RaidLayoutSummary) &&
+        StreamingConfig.AsSpan().SequenceEqual(other.StreamingConfig) &&
+        FabricNamespaceRoot.AsSpan().SequenceEqual(other.FabricNamespaceRoot) &&
+        TierPolicyDigest.AsSpan().SequenceEqual(other.TierPolicyDigest) &&
+        AiMetadataSummary.AsSpan().SequenceEqual(other.AiMetadataSummary) &&
+        BillingMeterSnapshot.AsSpan().SequenceEqual(other.BillingMeterSnapshot);
 
     /// <inheritdoc />
     public override bool Equals(object? obj) => obj is ExtendedMetadata other && Equals(other);
 
     /// <inheritdoc />
-    public override int GetHashCode() => Namespace.GetHashCode();
+    public override int GetHashCode()
+    {
+        var hc = new HashCode();
+        hc.Add(Namespace);
+        // Include a representative sample from each byte array for hash stability
+        foreach (var b in DottedVersionVector.AsSpan(0, Math.Min(8, DottedVersionVector.Length)))
+            hc.Add(b);
+        foreach (var b in SovereigntyZoneConfig.AsSpan(0, Math.Min(8, SovereigntyZoneConfig.Length)))
+            hc.Add(b);
+        return hc.ToHashCode();
+    }
 
     /// <summary>Equality operator.</summary>
     public static bool operator ==(ExtendedMetadata left, ExtendedMetadata right) => left.Equals(right);

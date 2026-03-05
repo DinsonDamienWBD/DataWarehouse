@@ -87,23 +87,26 @@ protected override async Task<AccessDecision> EvaluateAccessCoreAsync(
 
                 // Validate TOTP code with time window
                 var currentTimeStep = GetCurrentTimeStep(userData.Period);
-                var isValid = ValidateTotp(code, userData.SecretKey, currentTimeStep, userData.Period, userData.Algorithm);
+                var isValid = ValidateTotp(code, userData.SecretKey, currentTimeStep, userData.Period, userData.Algorithm, userData.Digits);
 
                 if (isValid)
                 {
-                    // Replay protection: ensure time step not reused
-                    if (_lastUsedTimeSteps.TryGetValue(context.SubjectId, out var lastStep) && lastStep == currentTimeStep)
+                    // Atomic replay protection: check-and-set under lock to prevent TOCTOU race
+                    lock (_lastUsedTimeSteps)
                     {
-                        return new AccessDecision
+                        if (_lastUsedTimeSteps.TryGetValue(context.SubjectId, out var lastStep) && lastStep == currentTimeStep)
                         {
-                            IsGranted = false,
-                            Reason = "TOTP code already used (replay attack detected)",
-                            ApplicablePolicies = new[] { "totp-replay-protection" }
-                        };
-                    }
+                            return new AccessDecision
+                            {
+                                IsGranted = false,
+                                Reason = "TOTP code already used (replay attack detected)",
+                                ApplicablePolicies = new[] { "totp-replay-protection" }
+                            };
+                        }
 
-                    // Store current time step
-                    _lastUsedTimeSteps[context.SubjectId] = currentTimeStep;
+                        // Store current time step
+                        _lastUsedTimeSteps[context.SubjectId] = currentTimeStep;
+                    }
 
                     return new AccessDecision
                     {
@@ -189,13 +192,13 @@ protected override async Task<AccessDecision> EvaluateAccessCoreAsync(
         /// <summary>
         /// Validates TOTP code with time window for clock skew tolerance.
         /// </summary>
-        private bool ValidateTotp(string code, byte[] secretKey, long currentTimeStep, int period, HashAlgorithmName algorithm)
+        private bool ValidateTotp(string code, byte[] secretKey, long currentTimeStep, int period, HashAlgorithmName algorithm, int digits = DefaultDigits)
         {
             // Try current time step and ±window for clock skew
             for (int i = -TimeStepWindow; i <= TimeStepWindow; i++)
             {
                 var testTimeStep = currentTimeStep + i;
-                var expectedCode = GenerateTotpCode(secretKey, testTimeStep, DefaultDigits, algorithm);
+                var expectedCode = GenerateTotpCode(secretKey, testTimeStep, digits, algorithm);
 
                 if (ConstantTimeEquals(code, expectedCode))
                 {

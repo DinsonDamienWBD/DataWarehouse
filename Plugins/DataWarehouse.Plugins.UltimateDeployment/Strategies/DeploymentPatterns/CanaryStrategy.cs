@@ -6,7 +6,7 @@ namespace DataWarehouse.Plugins.UltimateDeployment.Strategies.DeploymentPatterns
 /// </summary>
 public sealed class CanaryStrategy : DeploymentStrategyBase
 {
-    private readonly Dictionary<string, CanaryState> _canaryStates = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, CanaryState> _canaryStates = new();
 
     public override DeploymentCharacteristics Characteristics { get; } = new()
     {
@@ -74,8 +74,14 @@ public sealed class CanaryStrategy : DeploymentStrategyBase
         state = state with { ProgressPercent = 30 };
         await RouteTrafficAsync(state.DeploymentId, config.CanaryPercent, ct);
 
-        // Phase 4: Monitor and gradually increase traffic
-        var trafficSteps = new[] { config.CanaryPercent, 25, 50, 75, 100 };
+        // Phase 4: Monitor and gradually increase traffic.
+        // Build monotonically-increasing steps from canaryPercent to 100 — fixed steps
+        // that are <= canaryPercent would route traffic backwards (regression).
+        var baseSteps = new[] { 25, 50, 75, 100 };
+        var trafficSteps = baseSteps
+            .Where(s => s > config.CanaryPercent)
+            .Prepend(config.CanaryPercent)
+            .ToArray();
         var stepIndex = 0;
 
         foreach (var trafficPercent in trafficSteps.Skip(1))
@@ -125,7 +131,7 @@ public sealed class CanaryStrategy : DeploymentStrategyBase
 
         // Phase 5: Complete - scale up remaining instances
         await ScaleToFullAsync(config, ct);
-        _canaryStates.Remove(state.DeploymentId);
+        _canaryStates.TryRemove(state.DeploymentId, out _);
 
         return state with
         {
@@ -149,14 +155,14 @@ public sealed class CanaryStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
-        IncrementCounter("canary.deploy");
+        IncrementCounter("canary.rollback");
         // Route all traffic back to stable version
         await RouteTrafficAsync(deploymentId, 0, ct);
 
         // Remove canary instances
         await RemoveCanaryInstancesAsync(deploymentId, ct);
 
-        _canaryStates.Remove(deploymentId);
+        _canaryStates.TryRemove(deploymentId, out _);
 
         return currentState with
         {
@@ -340,11 +346,12 @@ public sealed class CanaryStrategy : DeploymentStrategyBase
                     ["RequestedAt"] = DateTime.UtcNow
                 }
             };
-            await MessageBus.SendAsync("metrics.collect.canary", message, ct);
+            var response = await MessageBus.SendAsync("metrics.collect.canary", message, ct);
 
-            // Extract metrics from response
-            var errorRate = message.Payload.TryGetValue("ErrorRate", out var er) ? Convert.ToDouble(er) : 0.005;
-            var latencyP95 = message.Payload.TryGetValue("LatencyP95", out var l95) ? Convert.ToDouble(l95) : 20.0;
+            // Extract metrics from response payload
+            var payload = response?.Payload as Dictionary<string, object>;
+            var errorRate = payload?.TryGetValue("ErrorRate", out var er) == true ? Convert.ToDouble(er) : 0.005;
+            var latencyP95 = payload?.TryGetValue("LatencyP95", out var l95) == true ? Convert.ToDouble(l95) : 20.0;
 
             return (errorRate, latencyP95);
         }

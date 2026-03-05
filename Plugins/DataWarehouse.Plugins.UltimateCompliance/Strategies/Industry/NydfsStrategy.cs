@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Industry
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("nydfs.check");
+            IncrementCounter("nydfs.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -45,7 +45,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Industry
                 });
             }
 
-            if (!context.Attributes.TryGetValue("MultiFactor Authentication", out var mfaObj) || mfaObj is not true)
+            // Key uses camelCase without space to avoid false-positive violations when callers use "MultiFactorAuthentication"
+            if (!context.Attributes.TryGetValue("MultiFactorAuthentication", out var mfaObj) || mfaObj is not true)
             {
                 violations.Add(new ComplianceViolation
                 {
@@ -83,9 +84,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Industry
 
             recommendations.Add("Submit annual certification of compliance to NY DFS");
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -101,14 +103,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Industry
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("nydfs.initialized");
+            IncrementCounter("nydfs.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("nydfs.shutdown");
+            IncrementCounter("nydfs.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

@@ -609,13 +609,26 @@ public sealed class RealTimeMonitoringStrategy : DataQualityStrategyBase
                 severity = AlertSeverity.Error;
                 message = $"Metric '{metric.Name}' ({metric.Value:F2}) exceeds maximum threshold ({threshold.MaxValue:F2})";
             }
-            else if (threshold.MinValue.HasValue)
+            else if (threshold.MaxValue.HasValue)
             {
-                var warningLevel = threshold.MinValue.Value / threshold.WarningThreshold;
-                if (metric.Value < warningLevel)
+                // P2-2661: warn when value approaches max from below (within warningThreshold % of max)
+                var maxWarningLevel = threshold.MaxValue.Value * threshold.WarningThreshold;
+                if (metric.Value >= maxWarningLevel)
                 {
                     severity = AlertSeverity.Warning;
-                    message = $"Metric '{metric.Name}' ({metric.Value:F2}) is approaching minimum threshold";
+                    message = $"Metric '{metric.Name}' ({metric.Value:F2}) is approaching maximum threshold ({threshold.MaxValue:F2})";
+                }
+            }
+            else if (threshold.MinValue.HasValue)
+            {
+                // P2-2661: warn when value is within (1-warningThreshold)% above the minimum.
+                // Formula: warn when value < minValue * (2 - warningThreshold).
+                // For WT=0.9 and min=100 → warn when value < 110, i.e. [100, 110).
+                var minWarningLevel = threshold.MinValue.Value * (2.0 - threshold.WarningThreshold);
+                if (metric.Value < minWarningLevel)
+                {
+                    severity = AlertSeverity.Warning;
+                    message = $"Metric '{metric.Name}' ({metric.Value:F2}) is approaching minimum threshold ({threshold.MinValue:F2})";
                 }
             }
 

@@ -106,7 +106,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             await data.CopyToAsync(ms, ct);
             var dataBytes = ms.ToArray();
 
-            var originFilePath = Path.Combine(_originPath, key);
+            var originFilePath = GetSafeOriginPath(key);
             var originDir = Path.GetDirectoryName(originFilePath);
             if (!string.IsNullOrEmpty(originDir))
             {
@@ -168,7 +168,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 return new MemoryStream(originCached.Data);
             }
 
-            var originFilePath = Path.Combine(_originPath, key);
+            var originFilePath = GetSafeOriginPath(key);
             if (!File.Exists(originFilePath))
             {
                 throw new FileNotFoundException($"Object with key '{key}' not found", key);
@@ -204,7 +204,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         {
             EnsureInitialized();
 
-            var originFilePath = Path.Combine(_originPath, key);
+            var originFilePath = GetSafeOriginPath(key);
             if (File.Exists(originFilePath))
             {
                 File.Delete(originFilePath);
@@ -216,18 +216,23 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             await Task.CompletedTask;
         }
 
-        protected override async Task<bool> ExistsAsyncCore(string key, CancellationToken ct)
+        protected override Task<bool> ExistsAsyncCore(string key, CancellationToken ct)
         {
             EnsureInitialized();
 
+            // Check origin in-memory cache
             if (_originCache.ContainsKey(key))
+                return Task.FromResult(true);
+
+            // Check all edge caches — objects may exist in an edge node even after origin eviction.
+            foreach (var edgeCache in _edgeCaches.Values)
             {
-                return true;
+                if (edgeCache.ContainsKey(key))
+                    return Task.FromResult(true);
             }
 
-            var originFilePath = Path.Combine(_originPath, key);
-            await Task.CompletedTask;
-            return File.Exists(originFilePath);
+            var originFilePath = GetSafeOriginPath(key);
+            return Task.FromResult(File.Exists(originFilePath));
         }
 
         protected override async IAsyncEnumerable<StorageObjectMetadata> ListAsyncCore(string? prefix, [EnumeratorCancellation] CancellationToken ct)
@@ -264,7 +269,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         {
             EnsureInitialized();
 
-            var originFilePath = Path.Combine(_originPath, key);
+            var originFilePath = GetSafeOriginPath(key);
             if (!File.Exists(originFilePath))
             {
                 throw new FileNotFoundException($"Object with key '{key}' not found", key);
@@ -318,6 +323,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             {
                 edgeCache.TryRemove(key, out _);
             }
+        }
+
+        /// <summary>Resolves and validates a key against the origin path to prevent path traversal.</summary>
+        private string GetSafeOriginPath(string key)
+        {
+            var fullPath = Path.GetFullPath(Path.Combine(_originPath, key));
+            if (!fullPath.StartsWith(_originPath, StringComparison.OrdinalIgnoreCase))
+                throw new UnauthorizedAccessException($"Key '{key}' resolves outside origin storage path.");
+            return fullPath;
         }
 
         private class EdgeTier

@@ -20,8 +20,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
     public sealed class OidcStrategy : AccessControlStrategyBase
     {
         private readonly HttpClient _httpClient;
-        private readonly Dictionary<string, CachedDiscovery> _discoveryCache = new();
-        private readonly Dictionary<string, CachedJwks> _jwksCache = new();
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, CachedDiscovery> _discoveryCache = new();
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, CachedJwks> _jwksCache = new();
 
         private string? _issuer;
         private string? _clientId;
@@ -56,7 +56,16 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
             if (configuration.TryGetValue("ClientSecret", out var secret) && secret is string secretStr)
                 _clientSecret = secretStr;
             if (configuration.TryGetValue("ValidateSignature", out var validate) && validate is bool validateBool)
+            {
                 _validateSignature = validateBool;
+                if (!validateBool)
+                {
+                    // Log security warning when signature validation is disabled
+                    System.Diagnostics.Debug.WriteLine(
+                        "[SECURITY WARNING] OIDC JWT signature validation is DISABLED. " +
+                        "This allows forged tokens to be accepted. Only disable in development environments.");
+                }
+            }
 
             return base.InitializeAsync(configuration, cancellationToken);
         }
@@ -132,7 +141,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
                 return cached.Discovery;
 
             var discoveryUrl = _issuer.TrimEnd('/') + "/.well-known/openid-configuration";
-            var response = await _httpClient.GetAsync(discoveryUrl, cancellationToken);
+            using var response = await _httpClient.GetAsync(discoveryUrl, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -274,7 +283,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
             if (_jwksCache.TryGetValue(jwksUri, out var cached) && cached.ExpiresAt > DateTime.UtcNow)
                 return cached.Jwks;
 
-            var response = await _httpClient.GetAsync(jwksUri, cancellationToken);
+            using var response = await _httpClient.GetAsync(jwksUri, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);

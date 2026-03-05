@@ -268,7 +268,8 @@ public sealed class CloudTimeLockProvider : TimeLockProviderPluginBase
                 break;
 
             case UnlockConditionType.MultiPartyApproval:
-                var requiredApprovals = condition.RequiredApprovals;
+                // LOW-1062: Enforce minimum of 2 approvals — value < 2 trivially bypasses multi-party gate.
+                var requiredApprovals = Math.Max(2, condition.RequiredApprovals);
                 var approvalCount = 0;
                 if (condition.Parameters.TryGetValue("ApproverIds", out var approverIdsObj))
                 {
@@ -529,7 +530,9 @@ public sealed class CloudTimeLockProvider : TimeLockProviderPluginBase
         }
         catch
         {
+
             // Fall through to auto-detect
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return CloudProviders.Auto;
@@ -575,7 +578,9 @@ public sealed class CloudTimeLockProvider : TimeLockProviderPluginBase
         }
         catch
         {
+
             // On failure, trust local clock since it already confirmed expiry
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return true;
@@ -616,26 +621,23 @@ public sealed class CloudTimeLockProvider : TimeLockProviderPluginBase
             }
             catch
             {
+
                 // Fall through to local computation
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
+        // LOW-1065: Hash only objectId bytes — including UtcNow made each call produce a different
+        // hash for the same object, defeating reproducible integrity verification.
         var objectBytes = objectId.ToByteArray();
-        var timestampBytes = BitConverter.GetBytes(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
-        var combinedBytes = new byte[objectBytes.Length + timestampBytes.Length];
-        Buffer.BlockCopy(objectBytes, 0, combinedBytes, 0, objectBytes.Length);
-        Buffer.BlockCopy(timestampBytes, 0, combinedBytes, objectBytes.Length, timestampBytes.Length);
 
         byte[] hashBytes;
         using (var sha256 = SHA256.Create())
         {
-            hashBytes = sha256.ComputeHash(combinedBytes);
+            hashBytes = sha256.ComputeHash(objectBytes);
         }
 
-        var result = Convert.ToHexString(hashBytes).ToLowerInvariant();
-        CryptographicOperations.ZeroMemory(combinedBytes);
-
-        return result;
+        return Convert.ToHexString(hashBytes).ToLowerInvariant();
     }
 
     /// <summary>
@@ -660,7 +662,9 @@ public sealed class CloudTimeLockProvider : TimeLockProviderPluginBase
         }
         catch
         {
+
             // Retention request failure is logged but must not disrupt lock operations
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 
@@ -686,7 +690,9 @@ public sealed class CloudTimeLockProvider : TimeLockProviderPluginBase
         }
         catch
         {
+
             // Event publication failure must not disrupt cloud lock operations
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 }

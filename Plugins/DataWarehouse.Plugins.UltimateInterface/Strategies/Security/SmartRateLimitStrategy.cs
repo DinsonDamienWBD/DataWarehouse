@@ -40,6 +40,7 @@ internal sealed class SmartRateLimitStrategy : SdkInterface.InterfaceStrategyBas
     public string[] Tags => new[] { "rate-limiting", "throttling", "abuse-detection", "429", "security" };
 
     // SDK contract properties
+    public override bool IsProductionReady => false;
     public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.REST;
     public override SdkInterface.InterfaceCapabilities Capabilities => new SdkInterface.InterfaceCapabilities(
         SupportsStreaming: false,
@@ -141,9 +142,21 @@ internal sealed class SmartRateLimitStrategy : SdkInterface.InterfaceStrategyBas
             // Clean up old timestamps (sliding window)
             CleanupOldTimestamps(clientData, now);
 
-            // Count requests in the last minute and hour
-            var requestsLastMinute = clientData.RequestTimestamps.Count(ts => ts >= now.AddMinutes(-1));
-            var requestsLastHour = clientData.RequestTimestamps.Count(ts => ts >= now.AddHours(-1));
+            // P2-3365: Avoid two O(n) Count(predicate) passes. Since timestamps are
+            // inserted in monotonically increasing order, iterate once from the head to
+            // count both windows simultaneously.
+            int requestsLastMinute = 0, requestsLastHour = 0;
+            var minuteThreshold = now.AddMinutes(-1);
+            var hourThreshold = now.AddHours(-1);
+            foreach (var ts in clientData.RequestTimestamps)
+            {
+                if (ts >= hourThreshold)
+                {
+                    requestsLastHour++;
+                    if (ts >= minuteThreshold)
+                        requestsLastMinute++;
+                }
+            }
 
             // Check rate limits
             if (requestsLastMinute >= tierConfig.RequestsPerMinute)

@@ -210,6 +210,7 @@ public class VirtualDiskTests
     {
         var report = new VdeHealthReport
         {
+            BlockSize = 4096,
             TotalBlocks = 1000,
             FreeBlocks = 250,
             UsedBlocks = 750,
@@ -230,6 +231,7 @@ public class VirtualDiskTests
     {
         var report = new VdeHealthReport
         {
+            BlockSize = 4096,
             TotalBlocks = 0,
             FreeBlocks = 0,
             UsedBlocks = 0,
@@ -294,6 +296,7 @@ public class VirtualDiskTests
     {
         var report = new VdeHealthReport
         {
+            BlockSize = 4096,
             TotalBlocks = 1000,
             FreeBlocks = 500,
             UsedBlocks = 500,

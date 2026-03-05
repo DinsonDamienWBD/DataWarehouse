@@ -79,14 +79,16 @@ internal sealed class CarbonAwareComputeStrategy : ComputeRuntimeStrategyBase
             {
                 var deferralStart = DateTime.UtcNow;
                 var deferralDeadline = deferralStart.Add(maxDeferral);
+                int retryCount = 0;
 
                 while (currentIntensity > intensityThreshold && DateTime.UtcNow < deferralDeadline)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     deferred = true;
 
-                    // Wait and re-check (exponential backoff: 30s, 60s, 120s, up to 300s)
-                    var waitTime = TimeSpan.FromSeconds(Math.Min(300, 30 * Math.Pow(2, deferralTime.TotalMinutes / 5)));
+                    // Exponential backoff: 30s, 60s, 120s, 240s, up to 300s max.
+                    var waitTime = TimeSpan.FromSeconds(Math.Min(300, 30 * Math.Pow(2, retryCount)));
+                    retryCount++;
                     await Task.Delay(waitTime, cancellationToken);
 
                     currentIntensity = await QueryCarbonIntensityAsync(region, cancellationToken);
@@ -172,7 +174,7 @@ internal sealed class CarbonAwareComputeStrategy : ComputeRuntimeStrategyBase
 
             if (result.ExitCode == 0 && !string.IsNullOrWhiteSpace(result.StandardOutput))
             {
-                var json = JsonDocument.Parse(result.StandardOutput);
+                using var json = JsonDocument.Parse(result.StandardOutput);
                 if (json.RootElement.TryGetProperty("data", out var data) &&
                     data.ValueKind == JsonValueKind.Array)
                 {
@@ -189,7 +191,9 @@ internal sealed class CarbonAwareComputeStrategy : ComputeRuntimeStrategyBase
         }
         catch
         {
+
             // API unavailable, use cached or default
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         // Return cached value or default

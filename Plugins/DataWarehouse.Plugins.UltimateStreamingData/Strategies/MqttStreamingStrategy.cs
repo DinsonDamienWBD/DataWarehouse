@@ -49,7 +49,14 @@ namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies
     {
         private readonly IMqttClient _mqttClient;
         private readonly MqttConnectionSettings _connectionSettings;
-        private readonly ConcurrentQueue<MqttMessage> _incomingMessages = new();
+        private readonly System.Threading.Channels.Channel<MqttMessage> _incomingMessages =
+            System.Threading.Channels.Channel.CreateBounded<MqttMessage>(
+                new System.Threading.Channels.BoundedChannelOptions(10_000)
+                {
+                    FullMode = System.Threading.Channels.BoundedChannelFullMode.DropOldest,
+                    SingleReader = false,
+                    SingleWriter = false
+                });
         private readonly List<string> _subscribedTopics = new();
         private readonly object _topicsLock = new();
         private bool _disposed;
@@ -64,10 +71,10 @@ namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies
             _connectionSettings = connectionSettings ?? throw new ArgumentNullException(nameof(connectionSettings));
             _mqttClient = new SDK.Edge.Protocols.MqttClient();
 
-            // Wire up message reception
+            // Wire up message reception — write to the bounded channel; excess drops oldest.
             _mqttClient.OnMessageReceived += (sender, args) =>
             {
-                _incomingMessages.Enqueue(args.Message);
+                _incomingMessages.Writer.TryWrite(args.Message);
             };
         }
 
@@ -166,29 +173,18 @@ namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies
                 _subscribedTopics.Add(streamName);
             }
 
-            // Consume messages from queue
-            while (!ct.IsCancellationRequested)
+            // Consume messages via channel reader — no spin-loop, pure push-based async.
+            await foreach (var mqttMsg in _incomingMessages.Reader.ReadAllAsync(ct).ConfigureAwait(false))
             {
-                if (_incomingMessages.TryDequeue(out var mqttMsg))
+                yield return new StreamMessage
                 {
-                    // Map MqttMessage to StreamMessage
-                    var streamMsg = new StreamMessage
-                    {
-                        MessageId = Guid.NewGuid().ToString(),
-                        Key = mqttMsg.Topic,
-                        Data = mqttMsg.Payload,
-                        Headers = mqttMsg.UserProperties,
-                        Timestamp = DateTime.UtcNow,
-                        ContentType = "application/octet-stream"
-                    };
-
-                    yield return streamMsg;
-                }
-                else
-                {
-                    // Wait for messages
-                    await Task.Delay(10, ct);
-                }
+                    MessageId = Guid.NewGuid().ToString(),
+                    Key = mqttMsg.Topic,
+                    Data = mqttMsg.Payload,
+                    Headers = mqttMsg.UserProperties,
+                    Timestamp = DateTime.UtcNow,
+                    ContentType = "application/octet-stream"
+                };
             }
         }
 
@@ -218,12 +214,20 @@ namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies
         }
 
         /// <inheritdoc/>
+        /// <remarks>
+        /// Finding 4370: MQTT brokers do not expose a topic-existence API. MQTT topics are created
+        /// implicitly on first publish/subscribe and cannot be queried without subscribing.
+        /// This method returns <see langword="true"/> when this client is subscribed to
+        /// <paramref name="streamName"/>, which is the closest proxy available in the MQTT protocol.
+        /// Callers that need broker-level discovery must use MQTT v5 topic aliases or a
+        /// broker-specific management API.
+        /// </remarks>
         public override Task<bool> StreamExistsAsync(string streamName, CancellationToken ct = default)
         {
             ValidateStreamName(streamName);
 
-            // MQTT topics exist implicitly (no explicit creation required)
-            // Return true if we're subscribed to it
+            // MQTT topics exist implicitly — no broker-side existence query is possible via the protocol.
+            // Return true if this client is currently subscribed to the topic.
             lock (_topicsLock)
             {
                 return Task.FromResult(_subscribedTopics.Contains(streamName));
@@ -301,8 +305,17 @@ namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies
 
             if (disposing)
             {
-                // Don't call async dispose from sync Dispose
-                // User must call DisposeAsync() for proper cleanup
+                // Finding 4354: release _mqttClient on the synchronous dispose path.
+                // Prefer IDisposable if the concrete implementation supports it; otherwise
+                // block on the async dispose to avoid leaking the underlying socket/resource.
+                if (_mqttClient is IDisposable syncClient)
+                {
+                    syncClient.Dispose();
+                }
+                else if (_mqttClient != null)
+                {
+                    _mqttClient.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                }
             }
 
             _disposed = true;

@@ -9,17 +9,18 @@ namespace DataWarehouse.Plugins.UniversalObservability.Strategies.SyntheticMonit
 /// SSL certificate monitoring service for synthetic monitoring strategies.
 /// Tracks certificate expiration, chain validity, and protocol compliance.
 /// </summary>
-public sealed class SslCertificateMonitorService
+public sealed class SslCertificateMonitorService : IDisposable
 {
     private readonly BoundedDictionary<string, SslCertificateInfo> _certificateCache = new BoundedDictionary<string, SslCertificateInfo>(1000);
     private readonly BoundedDictionary<string, List<SslAlert>> _alerts = new BoundedDictionary<string, List<SslAlert>>(1000);
+    private readonly HttpClientHandler _handler;
     private readonly HttpClient _httpClient;
     private readonly int _expirationWarningDays;
 
     public SslCertificateMonitorService(int expirationWarningDays = 30)
     {
         _expirationWarningDays = expirationWarningDays;
-        var handler = new HttpClientHandler
+        _handler = new HttpClientHandler
         {
             ServerCertificateCustomValidationCallback = (message, cert, chain, errors) =>
             {
@@ -27,10 +28,22 @@ public sealed class SslCertificateMonitorService
                 {
                     CacheCertificateInfo(message.RequestUri.Host, cert, chain, errors);
                 }
-                return true; // We monitor; we don't block
+                // P2-4679: Intentional for SSL monitoring — the service MUST connect to
+                // inspect certificate data (expiry, chain, SANs) regardless of trust errors.
+                // All error details are captured in CacheCertificateInfo above; callers receive
+                // full SslErrors in the returned SslCertificateInfo. This class should ONLY be
+                // used for monitoring endpoints, never for authenticating data connections.
+                return true;
             }
         };
-        _httpClient = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(15) };
+        _httpClient = new HttpClient(_handler) { Timeout = TimeSpan.FromSeconds(15) };
+    }
+
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        _httpClient.Dispose();
+        _handler.Dispose();
     }
 
     /// <summary>
@@ -44,9 +57,11 @@ public sealed class SslCertificateMonitorService
                 ? host : $"https://{host}";
             await _httpClient.GetAsync(uri, ct);
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Connection may fail but we still get the cert
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
 
         return _certificateCache.TryGetValue(host, out var info) ? info : new SslCertificateInfo

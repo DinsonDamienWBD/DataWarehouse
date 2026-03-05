@@ -99,8 +99,12 @@ public sealed record CompliancePassport
     /// </summary>
     /// <param name="regulationId">The regulation identifier to check (e.g., "GDPR", "HIPAA").</param>
     /// <returns><c>true</c> if any entry in this passport references the specified regulation.</returns>
-    public bool CoversRegulation(string regulationId) =>
-        Entries.Any(e => string.Equals(e.RegulationId, regulationId, StringComparison.OrdinalIgnoreCase));
+    public bool CoversRegulation(string regulationId)
+    {
+        if (string.IsNullOrEmpty(regulationId))
+            return false;
+        return Entries.Any(e => string.Equals(e.RegulationId, regulationId, StringComparison.OrdinalIgnoreCase));
+    }
 }
 
 /// <summary>

@@ -147,6 +147,9 @@ public sealed class ConcurrencyLimitsStrategy : ServerlessStrategyBase
 /// </summary>
 public sealed class TargetTrackingStrategy : ServerlessStrategyBase
 {
+    private readonly BoundedDictionary<string, List<ScalingActivity>> _activityHistory
+        = new BoundedDictionary<string, List<ScalingActivity>>(500);
+
     public override string StrategyId => "scaling-target-tracking";
     public override string DisplayName => "Target Tracking";
     public override ServerlessCategory Category => ServerlessCategory.Scaling;
@@ -174,21 +177,31 @@ public sealed class TargetTrackingStrategy : ServerlessStrategyBase
         });
     }
 
-    /// <summary>Gets scaling activities.</summary>
+    /// <summary>Records a scaling activity for a policy (called by platform integration).</summary>
+    public void RecordActivity(ScalingActivity activity)
+    {
+        ArgumentNullException.ThrowIfNull(activity);
+        var list = _activityHistory.GetOrAdd(activity.PolicyName, _ => new List<ScalingActivity>());
+        lock (list)
+        {
+            list.Add(activity);
+            if (list.Count > 1000) list.RemoveAt(0);
+        }
+    }
+
+    /// <summary>Gets scaling activities from the recorded history.</summary>
     public Task<IReadOnlyList<ScalingActivity>> GetActivitiesAsync(string policyName, int limit = 10, CancellationToken ct = default)
     {
         RecordOperation("GetActivities");
-        var activities = Enumerable.Range(0, limit)
-            .Select(i => new ScalingActivity
+        if (_activityHistory.TryGetValue(policyName, out var history))
+        {
+            lock (history)
             {
-                ActivityId = Guid.NewGuid().ToString(),
-                PolicyName = policyName,
-                StartTime = DateTimeOffset.UtcNow.AddMinutes(-Random.Shared.Next(1, 60)),
-                StatusCode = "Successful",
-                Description = $"Scaled from {Random.Shared.Next(1, 5)} to {Random.Shared.Next(5, 10)} instances"
-            })
-            .ToList();
-        return Task.FromResult<IReadOnlyList<ScalingActivity>>(activities);
+                var result = history.AsEnumerable().Reverse().Take(limit).ToList();
+                return Task.FromResult<IReadOnlyList<ScalingActivity>>(result);
+            }
+        }
+        return Task.FromResult<IReadOnlyList<ScalingActivity>>(Array.Empty<ScalingActivity>());
     }
 }
 

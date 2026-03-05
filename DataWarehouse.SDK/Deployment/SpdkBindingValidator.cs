@@ -259,12 +259,67 @@ public sealed class SpdkBindingValidator
     }
 
     [SupportedOSPlatform("windows")]
-    private Task<(bool isMounted, string? mountPoint, bool isSystemDevice)> CheckWindowsMountStatusAsync(
+    private async Task<(bool isMounted, string? mountPoint, bool isSystemDevice)> CheckWindowsMountStatusAsync(
         string devicePath, CancellationToken ct)
     {
-        // Windows detection would use WMI Win32_DiskDrive/Win32_DiskPartition/Win32_LogicalDisk
-        // For simplicity, assume mounted for safety (conservative)
-        return Task.FromResult<(bool isMounted, string? mountPoint, bool isSystemDevice)>((true, "unknown", true));
+        // Use PowerShell to query Win32_LogicalDisk for volumes backed by this physical device.
+        // This avoids a WMI COM interop dependency in the SDK (finding P2-269).
+        try
+        {
+            // Normalise \\.\ prefix so we can compare with Win32_DiskDrive.DeviceID
+            var normDevice = devicePath.Replace("\\\\?\\", "\\\\.\\", StringComparison.OrdinalIgnoreCase);
+            if (!normDevice.StartsWith("\\\\.\\", StringComparison.Ordinal))
+                normDevice = "\\\\.\\" + normDevice.TrimStart('\\');
+
+            var script =
+                $"$dd = Get-WmiObject Win32_DiskDrive | Where-Object {{ $_.DeviceID -eq '{normDevice}' }}; " +
+                "if (!$dd) { exit 2 }; " +
+                "$parts = Get-WmiObject -Query (\"ASSOCIATORS OF {Win32_DiskDrive.DeviceID='\" + $dd.DeviceID + \"'} WHERE AssocClass = Win32_DiskDriveToDiskPartition\"); " +
+                "foreach ($p in $parts) { " +
+                "  $vols = Get-WmiObject -Query (\"ASSOCIATORS OF {Win32_DiskPartition.DeviceID='\" + $p.DeviceID + \"'} WHERE AssocClass = Win32_LogicalDiskToPartition\"); " +
+                "  foreach ($v in $vols) { " +
+                "    $sys = ($v.DriveType -eq 3 -and ($v.DeviceID -eq $env:SystemDrive)); " +
+                "    Write-Output (\"$($v.DeviceID)|$sys\") " +
+                "  } " +
+                "}";
+
+            var psi = new System.Diagnostics.ProcessStartInfo("powershell.exe",
+                $"-NoProfile -NonInteractive -Command \"{script}\"")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var proc = System.Diagnostics.Process.Start(psi);
+            if (proc != null)
+            {
+                var output = await proc.StandardOutput.ReadToEndAsync(ct).ConfigureAwait(false);
+                await proc.WaitForExitAsync(ct).ConfigureAwait(false);
+
+                if (proc.ExitCode == 2)
+                    return (false, null, false); // Device not found in WMI
+
+                var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                if (lines.Length == 0)
+                    return (false, null, false); // No volumes mapped to this device
+
+                // Return the first volume's mount point and system flag
+                var parts = lines[0].Trim().Split('|');
+                var mp = parts.Length > 0 ? parts[0].Trim() : null;
+                var isSystem = parts.Length > 1 &&
+                    bool.TryParse(parts[1].Trim(), out var s) && s;
+                return (true, mp, isSystem || IsSystemMountPoint(mp ?? ""));
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "CheckWindowsMountStatusAsync: PowerShell WMI query failed for {Device}, assuming mounted for safety", devicePath);
+        }
+
+        // Conservative fallback: assume mounted for safety
+        return (true, "unknown", true);
     }
 
     private bool IsSystemMountPoint(string mountPoint)

@@ -42,8 +42,17 @@ internal sealed class PipelinedExecutionStrategy : ComputeRuntimeStrategyBase
             if (stages.Length == 0) stages = [codeStr];
 
             var bufferSize = 100;
-            if (task.Metadata?.TryGetValue("buffer_size", out var bs) == true && bs is int bsi)
-                bufferSize = bsi;
+            if (task.Metadata?.TryGetValue("buffer_size", out var bs) == true && bs != null)
+            {
+                // Metadata values from JSON deserialization arrive as JsonElement or long.
+                bufferSize = bs switch
+                {
+                    int i => i,
+                    long l => (int)Math.Clamp(l, 1, 10_000),
+                    System.Text.Json.JsonElement je when je.TryGetInt32(out var jei) => jei,
+                    _ => bufferSize
+                };
+            }
 
             // Create bounded channels between stages
             var channels = new Channel<string>[stages.Length + 1];
@@ -53,12 +62,18 @@ internal sealed class PipelinedExecutionStrategy : ComputeRuntimeStrategyBase
                     FullMode = BoundedChannelFullMode.Wait
                 });
 
-            // Feed input into first channel
+            // Feed input into first channel — complete in finally to prevent deadlock on failure.
             var feeder = Task.Run(async () =>
             {
-                foreach (var line in lines)
-                    await channels[0].Writer.WriteAsync(line, cancellationToken);
-                channels[0].Writer.Complete();
+                try
+                {
+                    foreach (var line in lines)
+                        await channels[0].Writer.WriteAsync(line, cancellationToken);
+                }
+                finally
+                {
+                    channels[0].Writer.Complete();
+                }
             }, cancellationToken);
 
             // Create pipeline stages
@@ -73,6 +88,7 @@ internal sealed class PipelinedExecutionStrategy : ComputeRuntimeStrategyBase
                 stageTasks[stageIdx] = Task.Run(async () =>
                 {
                     var codePath = Path.GetTempFileName() + ".sh";
+                    Exception? stageException = null;
                     try
                     {
                         await File.WriteAllTextAsync(codePath, stageCode, cancellationToken);
@@ -86,16 +102,23 @@ internal sealed class PipelinedExecutionStrategy : ComputeRuntimeStrategyBase
                                 await outputChannel.Writer.WriteAsync(outLine, cancellationToken);
                         }
                     }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        stageException = ex;
+                        throw;
+                    }
                     finally
                     {
-                        outputChannel.Writer.Complete();
+                        // Propagate exception into the channel so downstream stages unblock instead of hanging.
+                        outputChannel.Writer.Complete(stageException);
                         try { File.Delete(codePath); } catch { /* Best-effort cleanup */ }
                     }
                 }, cancellationToken);
             }
 
-            await feeder;
-            await Task.WhenAll(stageTasks);
+            // P2-1724: await feeder and all stage tasks concurrently so a feeder failure does not
+            // leave stage tasks blocked on channel input indefinitely.
+            await Task.WhenAll([feeder, .. stageTasks]);
 
             // Collect final output
             var output = new StringBuilder();

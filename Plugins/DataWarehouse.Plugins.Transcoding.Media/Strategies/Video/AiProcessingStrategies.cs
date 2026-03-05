@@ -48,6 +48,11 @@ internal sealed class OnnxInferenceStrategy : MediaStrategyBase
     public override string StrategyId => "onnx-inference";
     public override string Name => "ONNX Runtime AI Inference Pipeline";
 
+    // Finding 1096: RunInferenceAsync, UpscaleAsync, DetectObjectsAsync, DetectFacesAsync,
+    // TranscribeAsync all return zeroed/empty results — ONNX Runtime not referenced.
+    // Not production-ready until Microsoft.ML.OnnxRuntime is integrated.
+    public override bool IsProductionReady => false;
+
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
         IncrementCounter("onnx.inference.init");
@@ -209,6 +214,8 @@ internal sealed class AiUpscalingStrategy : MediaStrategyBase
 
     public override string StrategyId => "ai-upscaling";
     public override string Name => "AI Super-Resolution Upscaling";
+    // Finding 1096: UpscaleAsync returns zero-filled output. Requires ONNX Runtime / GPU library.
+    public override bool IsProductionReady => false;
 
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
@@ -321,6 +328,8 @@ internal sealed class ObjectDetectionStrategy : MediaStrategyBase
 
     public override string StrategyId => "object-detection";
     public override string Name => "AI Object Detection (YOLO/ONNX)";
+    // Finding 1096: DetectObjectsAsync returns empty detection list. Requires ONNX Runtime.
+    public override bool IsProductionReady => false;
 
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
@@ -481,6 +490,8 @@ internal sealed class FaceDetectionStrategy : MediaStrategyBase
 
     public override string StrategyId => "face-detection";
     public override string Name => "AI Face Detection (RetinaFace/MTCNN)";
+    // Finding 1096: DetectFacesAsync returns empty detection list. Requires ONNX Runtime.
+    public override bool IsProductionReady => false;
 
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
@@ -581,6 +592,8 @@ internal sealed class SpeechToTextStrategy : MediaStrategyBase
 
     public override string StrategyId => "speech-to-text";
     public override string Name => "AI Speech-to-Text (Whisper/ONNX)";
+    // Finding 1096: TranscribeAsync returns empty transcript string. Requires ONNX Runtime.
+    public override bool IsProductionReady => false;
 
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {

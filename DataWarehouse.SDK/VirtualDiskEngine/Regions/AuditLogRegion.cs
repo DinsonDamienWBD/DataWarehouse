@@ -93,6 +93,10 @@ public readonly record struct AuditLogEntry
         var targetId = new Guid(buffer.Slice(offset + 34, 16));
         byte[] prevHash = buffer.Slice(offset + 50, HashSize).ToArray();
         int detailsLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(offset + 82));
+        if (detailsLen < 0 || detailsLen > MaxDetailsLength)
+            throw new InvalidDataException($"AuditLogEntry detailsLen {detailsLen} exceeds maximum {MaxDetailsLength}.");
+        if (offset + FixedSize + detailsLen > buffer.Length)
+            throw new InvalidDataException($"AuditLogEntry details at offset {offset} extends beyond buffer (need {FixedSize + detailsLen}, have {buffer.Length - offset}).");
         byte[] details = detailsLen > 0
             ? buffer.Slice(offset + FixedSize, detailsLen).ToArray()
             : Array.Empty<byte>();
@@ -134,6 +138,7 @@ public sealed class AuditLogRegion
     /// <summary>Size of the fixed header: [EntryCount:8][NextSequenceNumber:8] = 16 bytes.</summary>
     private const int HeaderFieldsSize = 16;
 
+    private readonly object _entriesLock = new();
     private readonly List<AuditLogEntry> _entries = new();
 
     /// <summary>Monotonic generation number for torn-write detection.</summary>
@@ -162,31 +167,34 @@ public sealed class AuditLogRegion
                 $"Details must not exceed {AuditLogEntry.MaxDetailsLength} bytes. Got {details.Length}.",
                 nameof(details));
 
-        byte[] previousHash;
-        if (_entries.Count == 0)
+        lock (_entriesLock)
         {
-            previousHash = new byte[AuditLogEntry.HashSize]; // all-zero for first entry
-        }
-        else
-        {
-            var lastEntry = _entries[_entries.Count - 1];
-            previousHash = ComputeEntryHash(lastEntry);
-        }
+            byte[] previousHash;
+            if (_entries.Count == 0)
+            {
+                previousHash = new byte[AuditLogEntry.HashSize]; // all-zero for first entry
+            }
+            else
+            {
+                var lastEntry = _entries[_entries.Count - 1];
+                previousHash = ComputeEntryHash(lastEntry);
+            }
 
-        var entry = new AuditLogEntry
-        {
-            SequenceNumber = NextSequenceNumber,
-            TimestampUtcTicks = DateTime.UtcNow.Ticks,
-            ActorId = actorId,
-            EventType = eventType,
-            TargetObjectId = targetObjectId,
-            PreviousEntryHash = previousHash,
-            Details = details ?? Array.Empty<byte>()
-        };
+            var entry = new AuditLogEntry
+            {
+                SequenceNumber = NextSequenceNumber,
+                TimestampUtcTicks = DateTime.UtcNow.Ticks,
+                ActorId = actorId,
+                EventType = eventType,
+                TargetObjectId = targetObjectId,
+                PreviousEntryHash = previousHash,
+                Details = details ?? Array.Empty<byte>()
+            };
 
-        _entries.Add(entry);
-        NextSequenceNumber++;
-        return entry;
+            _entries.Add(entry);
+            NextSequenceNumber++;
+            return entry;
+        }
     }
 
     /// <summary>

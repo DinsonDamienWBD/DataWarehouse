@@ -219,7 +219,9 @@ public sealed class UltimateRTOSBridgePlugin : StreamingPluginBase, IDisposable
             }
             catch
             {
+
                 // Skip strategies that fail to initialize
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
     }

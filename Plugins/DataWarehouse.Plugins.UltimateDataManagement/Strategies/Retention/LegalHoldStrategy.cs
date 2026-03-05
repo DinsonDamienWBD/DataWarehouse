@@ -114,13 +114,13 @@ public sealed class LegalHoldStrategy : RetentionStrategyBase
         foreach (var objectId in objectIds)
         {
             var holds = _objectHolds.GetOrAdd(objectId, _ => new HashSet<string>());
-            lock (holds)
+            bool added;
+            lock (holds) { added = holds.Add(holdId); }
+            if (added)
             {
-                if (holds.Add(holdId))
-                {
-                    hold.HeldObjects.Add(objectId);
-                    count++;
-                }
+                // P2-1538: Lock on hold.ListLock to protect HeldObjects from concurrent modification.
+                lock (hold.ListLock) { hold.HeldObjects.Add(objectId); }
+                count++;
             }
         }
 
@@ -146,13 +146,13 @@ public sealed class LegalHoldStrategy : RetentionStrategyBase
         }
 
         var holds = _custodianHolds.GetOrAdd(custodianId, _ => new HashSet<string>());
-        lock (holds)
+        bool added;
+        lock (holds) { added = holds.Add(holdId); }
+        if (added)
         {
-            if (holds.Add(holdId))
-            {
-                hold.Custodians.Add(custodianId);
-                LogHoldAction(holdId, HoldAction.CustodianAdded, appliedBy, $"Custodian '{custodianId}' added to hold");
-            }
+            // P2-1538: Lock on hold.ListLock to protect Custodians from concurrent modification.
+            lock (hold.ListLock) { hold.Custodians.Add(custodianId); }
+            LogHoldAction(holdId, HoldAction.CustodianAdded, appliedBy, $"Custodian '{custodianId}' added to hold");
         }
     }
 
@@ -369,6 +369,9 @@ public sealed class LegalHoldStrategy : RetentionStrategyBase
 /// </summary>
 public sealed class LegalHold
 {
+    // P2-1538: Lock object protecting concurrent modifications to HeldObjects and Custodians lists.
+    internal readonly object ListLock = new();
+
     /// <summary>
     /// Unique hold identifier.
     /// </summary>

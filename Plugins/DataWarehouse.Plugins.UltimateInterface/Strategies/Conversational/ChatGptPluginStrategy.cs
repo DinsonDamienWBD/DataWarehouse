@@ -30,6 +30,24 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Conversational;
 /// </remarks>
 internal sealed class ChatGptPluginStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
+    private volatile string? _verificationToken;
+
+    /// <summary>
+    /// Configures the OpenAI verification token for ChatGPT plugin registration.
+    /// Must be called before serving the plugin manifest. The token is provided by OpenAI
+    /// during the plugin registration process.
+    /// </summary>
+    /// <param name="verificationToken">The OpenAI verification token (non-empty).</param>
+    /// <exception cref="ArgumentException">Thrown when verificationToken is null or empty.</exception>
+    public void ConfigureVerificationToken(string verificationToken)
+    {
+        if (string.IsNullOrWhiteSpace(verificationToken))
+            throw new ArgumentException("ChatGPT verification token must not be null or empty.", nameof(verificationToken));
+        if (verificationToken == "chatgpt-plugin-token-placeholder")
+            throw new ArgumentException("ChatGPT verification token must not be a placeholder value.", nameof(verificationToken));
+        _verificationToken = verificationToken;
+    }
+
     // IPluginInterfaceStrategy metadata
     public override string StrategyId => "chatgpt-plugin";
     public string DisplayName => "ChatGPT Plugin";
@@ -38,6 +56,7 @@ internal sealed class ChatGptPluginStrategy : SdkInterface.InterfaceStrategyBase
     public string[] Tags => new[] { "chatgpt", "openai", "ai", "plugin", "conversational", "natural-language" };
 
     // SDK contract properties
+    public override bool IsProductionReady => false;
     public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.REST;
     public override SdkInterface.InterfaceCapabilities Capabilities => new SdkInterface.InterfaceCapabilities(
         SupportsStreaming: false,
@@ -94,6 +113,10 @@ internal sealed class ChatGptPluginStrategy : SdkInterface.InterfaceStrategyBase
     /// </summary>
     private SdkInterface.InterfaceResponse ServePluginManifest()
     {
+        var token = _verificationToken
+            ?? throw new InvalidOperationException(
+                "ChatGPT verification token not configured. Call ConfigureVerificationToken() before serving the manifest.");
+
         var manifest = new
         {
             schema_version = "v1",
@@ -107,7 +130,7 @@ internal sealed class ChatGptPluginStrategy : SdkInterface.InterfaceStrategyBase
                 authorization_type = "bearer",
                 verification_tokens = new
                 {
-                    openai = "chatgpt-plugin-token-placeholder"
+                    openai = token
                 }
             },
             api = new
@@ -229,7 +252,11 @@ paths:
         // Route to NLP for intent parsing via message bus
         if (IsIntelligenceAvailable)
         {
-            // In production, this would send to "nlp.intent.parse" topic
+            await MessageBus!.SendAsync("nlp.intent.parse", new DataWarehouse.SDK.Utilities.PluginMessage
+            {
+                Type = "nlp.intent.parse",
+                Payload = new System.Collections.Generic.Dictionary<string, object> { ["query"] = query }
+            }, cancellationToken).ConfigureAwait(false);
         }
 
         // Build structured results response

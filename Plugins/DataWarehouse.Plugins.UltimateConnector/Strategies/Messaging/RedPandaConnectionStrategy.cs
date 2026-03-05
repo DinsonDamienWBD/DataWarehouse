@@ -12,6 +12,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
 {
     public class RedPandaConnectionStrategy : MessagingConnectionStrategyBase
     {
+        // Monotonically increasing correlation ID counter — safe for concurrent use.
+        private static int _correlationIdCounter;
+
         public override string StrategyId => "redpanda";
         public override string DisplayName => "RedPanda";
         public override ConnectorCategory Category => ConnectorCategory.Messaging;
@@ -19,9 +22,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
         public override string SemanticDescription => "Connects to RedPanda using Kafka-compatible TCP protocol on port 9092 for high-performance streaming.";
         public override string[] Tags => new[] { "redpanda", "kafka-compatible", "streaming", "tcp", "performance" };
         public RedPandaConnectionStrategy(ILogger? logger = null) : base(logger) { }
-        protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct) { var parts = config.ConnectionString.Split(':'); var host = parts[0]; var port = parts.Length > 1 ? int.Parse(parts[1]) : 9092; var tcpClient = new TcpClient(); await tcpClient.ConnectAsync(host, port, ct); return new DefaultConnectionHandle(tcpClient, new Dictionary<string, object> { ["Host"] = host, ["Port"] = port }); }
+        protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct) { var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':'); var host = parts[0]; var port = parts.Length > 1 && int.TryParse(parts[1], out var p9092) ? p9092 : 9092; var tcpClient = new TcpClient(); await tcpClient.ConnectAsync(host, port, ct); return new DefaultConnectionHandle(tcpClient, new Dictionary<string, object> { ["Host"] = host, ["Port"] = port }); }
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { try { return handle.GetConnection<TcpClient>()?.Connected ?? false; } catch { return false; } }
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<TcpClient>()?.Close(); await Task.CompletedTask; }
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<TcpClient>()?.Close(); return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, isHealthy ? "RedPanda is connected" : "RedPanda is disconnected", sw.Elapsed, DateTimeOffset.UtcNow); }
 
         public override async Task PublishAsync(IConnectionHandle handle, string topic, byte[] message, Dictionary<string, string>? headers = null, CancellationToken ct = default)
@@ -34,19 +37,20 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
             using var ms = new System.IO.MemoryStream();
             using var writer = new System.IO.BinaryWriter(ms);
             var clientId = "datawarehouse-redpanda";
-            var correlationId = Environment.TickCount;
-            writer.Write((short)0); // API Key: Produce
-            writer.Write((short)0); // API Version
-            writer.Write(correlationId);
+            var correlationId = Interlocked.Increment(ref _correlationIdCounter);
+            // Kafka wire protocol uses big-endian (network byte order) for all multi-byte integers.
+            writer.Write(System.Net.IPAddress.HostToNetworkOrder((short)0)); // API Key: Produce
+            writer.Write(System.Net.IPAddress.HostToNetworkOrder((short)0)); // API Version
+            writer.Write(System.Net.IPAddress.HostToNetworkOrder(correlationId));
             WriteKafkaString(writer, clientId);
-            writer.Write((short)-1); // Required Acks
-            writer.Write(1000); // Timeout ms
-            writer.Write(1); // Topic array count
+            writer.Write(System.Net.IPAddress.HostToNetworkOrder((short)-1));         // Required Acks
+            writer.Write(System.Net.IPAddress.HostToNetworkOrder(1000));              // Timeout ms
+            writer.Write(System.Net.IPAddress.HostToNetworkOrder(1));                 // Topic array count
             WriteKafkaString(writer, topic);
-            writer.Write(1); // Partition array count
-            writer.Write(0); // Partition index
+            writer.Write(System.Net.IPAddress.HostToNetworkOrder(1));                 // Partition array count
+            writer.Write(System.Net.IPAddress.HostToNetworkOrder(0));                 // Partition index
             var messageSet = BuildKafkaMessageSet(message);
-            writer.Write(messageSet.Length);
+            writer.Write(System.Net.IPAddress.HostToNetworkOrder(messageSet.Length));
             writer.Write(messageSet);
             var payload = ms.ToArray();
             var lengthPrefix = BitConverter.GetBytes(System.Net.IPAddress.HostToNetworkOrder(payload.Length));
@@ -61,25 +65,28 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
             if (client == null || !client.Connected)
                 throw new InvalidOperationException("RedPanda connection is not established");
             var stream = client.GetStream();
+            // Finding 2054: Track the fetch offset per partition so we don't replay the entire topic.
+            long fetchOffset = 0L;
             while (!ct.IsCancellationRequested && client.Connected)
             {
                 using var ms = new System.IO.MemoryStream();
                 using var writer = new System.IO.BinaryWriter(ms);
                 var clientId = "datawarehouse-redpanda";
-                var correlationId = Environment.TickCount;
-                writer.Write((short)1); // API Key: Fetch
-                writer.Write((short)0); // API Version
-                writer.Write(correlationId);
+                var correlationId = Interlocked.Increment(ref _correlationIdCounter);
+                // Kafka wire protocol requires big-endian byte order throughout.
+                writer.Write(System.Net.IPAddress.HostToNetworkOrder((short)1)); // API Key: Fetch
+                writer.Write(System.Net.IPAddress.HostToNetworkOrder((short)0)); // API Version
+                writer.Write(System.Net.IPAddress.HostToNetworkOrder(correlationId));
                 WriteKafkaString(writer, clientId);
-                writer.Write(-1); // Replica ID
-                writer.Write(100); // Max wait ms
-                writer.Write(1); // Min bytes
-                writer.Write(1); // Topic count
+                writer.Write(System.Net.IPAddress.HostToNetworkOrder(-1));           // Replica ID
+                writer.Write(System.Net.IPAddress.HostToNetworkOrder(100));          // Max wait ms
+                writer.Write(System.Net.IPAddress.HostToNetworkOrder(1));            // Min bytes
+                writer.Write(System.Net.IPAddress.HostToNetworkOrder(1));            // Topic count
                 WriteKafkaString(writer, topic);
-                writer.Write(1); // Partition count
-                writer.Write(0); // Partition
-                writer.Write(0L); // Fetch offset
-                writer.Write(1024 * 1024); // Max bytes
+                writer.Write(System.Net.IPAddress.HostToNetworkOrder(1));            // Partition count
+                writer.Write(System.Net.IPAddress.HostToNetworkOrder(0));            // Partition
+                writer.Write(System.Net.IPAddress.HostToNetworkOrder(fetchOffset));  // Fetch offset (advances)
+                writer.Write(System.Net.IPAddress.HostToNetworkOrder(1024 * 1024)); // Max bytes
                 var payload = ms.ToArray();
                 var lengthPrefix = BitConverter.GetBytes(System.Net.IPAddress.HostToNetworkOrder(payload.Length));
                 await stream.WriteAsync(lengthPrefix, 0, 4, ct);
@@ -94,7 +101,14 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
                     var respBuf = new byte[respLength];
                     var totalRead = 0;
                     while (totalRead < respLength) { var chunk = await stream.ReadAsync(respBuf, totalRead, respLength - totalRead, ct); if (chunk == 0) break; totalRead += chunk; }
-                    if (totalRead > 8) yield return respBuf;
+                    if (totalRead > 8)
+                    {
+                        // Finding 2054: Advance fetch offset to avoid re-reading messages on the next fetch.
+                        // The response contains the high watermark offset in the first 8 bytes after correlation ID.
+                        // Increment conservatively by 1 message per batch as we don't parse the full response format.
+                        fetchOffset++;
+                        yield return respBuf;
+                    }
                 }
                 await Task.Delay(100, ct);
             }

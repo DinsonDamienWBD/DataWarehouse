@@ -25,9 +25,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
         public ApachePulsarConnectionStrategy(ILogger? logger = null) : base(logger) { }
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var parts = config.ConnectionString.Split(':');
-            var host = parts[0];
-            var port = parts.Length > 1 ? int.Parse(parts[1]) : 6650;
+            // P2-2132: Use ParseHostPortSafe to correctly handle IPv6 addresses like [::1]:6650
+            var (host, port) = ParseHostPortSafe(config.ConnectionString ?? throw new ArgumentException("Connection string required"), 6650);
             var tcpClient = new TcpClient();
             await tcpClient.ConnectAsync(host, port, ct);
             var stream = tcpClient.GetStream();
@@ -37,8 +36,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
             await stream.FlushAsync(ct);
             return new DefaultConnectionHandle(tcpClient, new Dictionary<string, object> { ["Host"] = host, ["Port"] = port });
         }
-        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { try { return handle.GetConnection<TcpClient>()?.Connected ?? false; } catch { return false; } }
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<TcpClient>()?.Close(); await Task.CompletedTask; }
+        protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { try { return Task.FromResult(handle.GetConnection<TcpClient>()?.Connected ?? false); } catch { return Task.FromResult(false); } }
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<TcpClient>()?.Close(); return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, isHealthy ? "Pulsar is connected" : "Pulsar is disconnected", sw.Elapsed, DateTimeOffset.UtcNow); }
 
         public override async Task PublishAsync(IConnectionHandle handle, string topic, byte[] message, Dictionary<string, string>? headers = null, CancellationToken ct = default)

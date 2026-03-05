@@ -234,7 +234,8 @@ namespace DataWarehouse.SDK.Utilities
 
         /// <summary>
         /// Attempts to get the value associated with the specified key.
-        /// Promotes the entry to most-recently-used on success.
+        /// Promotes the entry to most-recently-used on success (write lock required for LRU update).
+        /// Use <see cref="TryPeek"/> for read-only access without LRU promotion.
         /// </summary>
         /// <param name="key">The key to look up.</param>
         /// <param name="value">When this method returns, contains the associated value if found.</param>
@@ -254,6 +255,30 @@ namespace DataWarehouse.SDK.Utilities
                 return false;
             }
             finally { _lock.ExitWriteLock(); }
+        }
+
+        /// <summary>
+        /// Reads the value associated with the specified key WITHOUT updating LRU order.
+        /// Uses a read lock so concurrent peeks can proceed in parallel.
+        /// Use this when LRU promotion is not desired (e.g., read-only scanning or metrics).
+        /// </summary>
+        /// <param name="key">The key to look up.</param>
+        /// <param name="value">When this method returns, contains the associated value if found.</param>
+        /// <returns><c>true</c> if the key was found; otherwise <c>false</c>.</returns>
+        public bool TryPeek(TKey key, out TValue value)
+        {
+            _lock.EnterReadLock();
+            try
+            {
+                if (_map.TryGetValue(key, out var node))
+                {
+                    value = node.Value.Value;
+                    return true;
+                }
+                value = default!;
+                return false;
+            }
+            finally { _lock.ExitReadLock(); }
         }
 
         /// <summary>
@@ -533,6 +558,10 @@ namespace DataWarehouse.SDK.Utilities
         {
             if (!PersistenceEnabled) return;
 
+            // Clear the flag BEFORE the save so that any mutation during SaveAsync
+            // will re-set it to true (preventing lost-persist data race).
+            _pendingPersist = false;
+
             Dictionary<string, string> snapshot;
             _lock.EnterReadLock();
             try
@@ -550,7 +579,6 @@ namespace DataWarehouse.SDK.Utilities
             var json = JsonSerializer.Serialize(snapshot);
             var bytes = Encoding.UTF8.GetBytes(json);
             await _stateStore!.SaveAsync(_pluginId!, _stateKey!, bytes, ct).ConfigureAwait(false);
-            _pendingPersist = false;
         }
 
         /// <summary>
@@ -694,13 +722,11 @@ namespace DataWarehouse.SDK.Utilities
             _debounceTimer?.Dispose();
             _debounceTimer = null;
 
-            // Flush pending persist synchronously on dispose — Dispose() is synchronous.
-            // Task.Run avoids deadlocks on synchronization-context-bound threads.
-            // Prefer DisposeAsync() for callers that can await.
+            // Best-effort flush — do NOT block (sync-over-async deadlocks threadpool-starved callers).
+            // Prefer DisposeAsync() for guaranteed flush. Dispose() is a fire-and-forget fallback.
             if (_pendingPersist && PersistenceEnabled)
             {
-                try { Task.Run(() => PersistAsync()).ConfigureAwait(false).GetAwaiter().GetResult(); }
-                catch { /* Best-effort */ }
+                _ = Task.Run(() => PersistAsync());
             }
 
             _lock.Dispose();

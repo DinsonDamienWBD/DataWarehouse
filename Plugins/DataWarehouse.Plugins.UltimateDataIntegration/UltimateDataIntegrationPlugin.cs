@@ -144,7 +144,9 @@ public sealed class UltimateDataIntegrationPlugin : OrchestrationPluginBase, IDi
             }
             catch
             {
+
                 // Skip strategies that fail to instantiate
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
     }
@@ -326,6 +328,9 @@ public abstract class DataIntegrationStrategyBase : StrategyBase, IDataIntegrati
     protected void RecordOperation(string operationName)
     {
         Interlocked.Increment(ref _totalWrites);
+        // P2-2352: record named operation counts for observability.
+        // operationName is now used to tag operation-level metrics.
+        System.Diagnostics.Trace.TraceInformation("[DataIntegration] Operation: {0}", operationName);
     }
 
     protected void RecordFailure()

@@ -84,6 +84,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
 
             var policy = GetConfiguration<string>(config, "sovereignty_policy", "unrestricted");
             var lookingGlassUrl = GetConfiguration<string>(config, "bgp_looking_glass_url", "https://stat.ripe.net/data/bgp-state/data.json");
+            // Validate URL to prevent SSRF attacks
+            if (Uri.TryCreate(lookingGlassUrl, UriKind.Absolute, out var bgpUri))
+            { if (bgpUri.Host == "169.254.169.254" || bgpUri.Host == "metadata.google.internal" || bgpUri.Host == "localhost" || bgpUri.Host == "127.0.0.1") throw new ArgumentException("BGP looking glass URL points to a blocked internal endpoint (SSRF protection)"); }
+            else throw new ArgumentException($"Invalid BGP looking glass URL: {lookingGlassUrl}");
             var enforcePolicy = GetConfiguration<bool>(config, "enforce_policy", true);
             var targetIp = GetConfiguration<string>(config, "target_ip", ExtractHostFromEndpoint(targetEndpoint));
 
@@ -114,7 +118,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
 
             httpClient.BaseAddress = new Uri(targetEndpoint);
 
-            var response = await httpClient.GetAsync("/", ct);
+            using var response = await httpClient.GetAsync("/", ct);
             response.EnsureSuccessStatusCode();
 
             var info = new Dictionary<string, object>
@@ -136,7 +140,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             var client = handle.GetConnection<HttpClient>();
-            var response = await client.GetAsync("/", ct);
+            using var response = await client.GetAsync("/", ct);
             return response.IsSuccessStatusCode;
         }
 
@@ -183,7 +187,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
 
             try
             {
-                var response = await client.GetAsync(requestUrl, ct);
+                using var response = await client.GetAsync(requestUrl, ct);
                 if (!response.IsSuccessStatusCode)
                     return new BgpPathAnalysis([], []);
 
@@ -209,9 +213,12 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                     }
                 }
 
-                foreach (var asn in asPath)
+                // P2-1944: Resolve ASN countries in parallel instead of sequentially to
+                // avoid O(N) latency when the AS path contains many hops.
+                var countryResults = await Task.WhenAll(
+                    asPath.Select(asn => ResolveAsnCountryAsync(client, asn, ct)));
+                foreach (var country in countryResults)
                 {
-                    var country = await ResolveAsnCountryAsync(client, asn, ct);
                     if (!string.IsNullOrEmpty(country) && !transitCountries.Contains(country))
                         transitCountries.Add(country);
                 }
@@ -233,17 +240,35 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             try
             {
                 var url = $"https://stat.ripe.net/data/as-overview/data.json?resource=AS{asn.TrimStart('A', 'S', 'a', 's')}";
-                var response = await client.GetAsync(url, ct);
+                using var response = await client.GetAsync(url, ct);
                 if (!response.IsSuccessStatusCode) return string.Empty;
 
                 var json = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
-                if (json.TryGetProperty("data", out var data) &&
-                    data.TryGetProperty("resource", out _) &&
-                    data.TryGetProperty("holder", out var holder))
+                // Finding 1940: Read the explicit "country" field rather than the first 2 chars
+                // of the "holder" name string, which is an organisation name not a country code.
+                if (json.TryGetProperty("data", out var data))
                 {
-                    var holderStr = holder.GetString() ?? string.Empty;
-                    if (holderStr.Length >= 2)
-                        return holderStr[..2].ToUpperInvariant();
+                    if (data.TryGetProperty("country", out var countryProp))
+                    {
+                        var countryStr = countryProp.GetString() ?? string.Empty;
+                        if (countryStr.Length == 2)
+                            return countryStr.ToUpperInvariant();
+                    }
+                    // Fallback: try "rir" → derive region (best-effort only)
+                    if (data.TryGetProperty("rir", out var rirProp))
+                    {
+                        var rir = rirProp.GetString()?.ToUpperInvariant() ?? string.Empty;
+                        // Map well-known RIR regions as a coarse fallback
+                        return rir switch
+                        {
+                            "ARIN" => "US",
+                            "RIPE NCC" => "EU",
+                            "APNIC" => "AP",
+                            "LACNIC" => "LA",
+                            "AFRINIC" => "AF",
+                            _ => string.Empty
+                        };
+                    }
                 }
             }
             catch { /* Country resolution is best-effort */ }

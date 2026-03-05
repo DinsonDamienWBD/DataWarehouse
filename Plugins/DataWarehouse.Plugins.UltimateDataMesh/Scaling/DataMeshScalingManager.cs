@@ -340,13 +340,6 @@ public sealed class DataMeshScalingManager : IScalableSubsystem, IDisposable
                 long remoteTimestamp = tsObj is long ts ? ts : 0;
                 var compositeKey = $"{entityType}:{entityId}";
 
-                // Last-writer-wins: only apply if remote timestamp is newer
-                if (_entityTimestamps.TryGetValue(compositeKey, out long localTimestamp) &&
-                    localTimestamp >= remoteTimestamp)
-                {
-                    return; // Local is newer or equal, skip
-                }
-
                 byte[] data;
                 try
                 {
@@ -357,18 +350,33 @@ public sealed class DataMeshScalingManager : IScalableSubsystem, IDisposable
                     return; // Invalid data, skip
                 }
 
-                // Apply the remote update
-                var cache = entityType switch
-                {
-                    "domain" => _domains,
-                    "product" => _products,
-                    _ => null
-                };
+                // Atomically apply last-writer-wins: update only if remote is newer.
+                // AddOrUpdate factory runs under ConcurrentDictionary's internal lock,
+                // guaranteeing the timestamp check and write are atomic per key.
+                bool applied = false;
+                _entityTimestamps.AddOrUpdate(
+                    compositeKey,
+                    _ => { applied = true; return remoteTimestamp; },
+                    (_, localTs) =>
+                    {
+                        if (localTs < remoteTimestamp)
+                        {
+                            applied = true;
+                            return remoteTimestamp;
+                        }
+                        return localTs; // local is newer, no update
+                    });
 
-                if (cache != null)
+                if (applied)
                 {
-                    cache.Put(entityId, data);
-                    _entityTimestamps[compositeKey] = remoteTimestamp;
+                    var cache = entityType switch
+                    {
+                        "domain" => _domains,
+                        "product" => _products,
+                        _ => null
+                    };
+
+                    cache?.Put(entityId, data);
                     Interlocked.Increment(ref _federationConflictsResolved);
                 }
             }

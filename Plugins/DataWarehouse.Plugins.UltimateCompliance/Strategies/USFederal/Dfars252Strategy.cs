@@ -24,7 +24,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("dfars252.check");
+            IncrementCounter("dfars252.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -33,9 +33,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
             CheckCloudRequirements(context, violations, recommendations);
             CheckSubcontractorFlow(context, violations, recommendations);
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -50,7 +51,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckNist800171Compliance(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.DataClassification.Equals("cui", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("cui", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("Nist800171Implemented", out var nistObj) || nistObj is not true)
                 {
@@ -95,10 +96,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckCyberIncidentReporting(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.OperationType.Equals("security-incident", StringComparison.OrdinalIgnoreCase) ||
-                context.OperationType.Equals("cyber-incident", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("security-incident", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(context.OperationType, "cyber-incident", StringComparison.OrdinalIgnoreCase))
             {
-                if (context.DataClassification.Equals("cui", StringComparison.OrdinalIgnoreCase))
+                if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("cui", StringComparison.OrdinalIgnoreCase))
                 {
                     if (!context.Attributes.TryGetValue("IncidentReportedWithin72Hours", out var reportedObj) || reportedObj is not true)
                     {
@@ -139,7 +140,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
         {
             if (context.Attributes.TryGetValue("CloudStorage", out var cloudObj) && cloudObj is true)
             {
-                if (context.DataClassification.Equals("cui", StringComparison.OrdinalIgnoreCase))
+                if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("cui", StringComparison.OrdinalIgnoreCase))
                 {
                     if (!context.Attributes.TryGetValue("FedRampModerate", out var fedrampObj) || fedrampObj is not true)
                     {
@@ -190,14 +191,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("dfars252.initialized");
+            IncrementCounter("dfars252.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("dfars252.shutdown");
+            IncrementCounter("dfars252.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

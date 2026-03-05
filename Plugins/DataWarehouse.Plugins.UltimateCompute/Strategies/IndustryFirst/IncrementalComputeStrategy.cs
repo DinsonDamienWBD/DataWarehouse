@@ -158,19 +158,52 @@ internal sealed class IncrementalComputeStrategy : ComputeRuntimeStrategyBase
 
     /// <summary>
     /// Evicts oldest cache entries when exceeding max capacity.
+    /// Uses partial sort (select minimum N by LastAccessed) instead of a full sort
+    /// to reduce O(n log n) to O(n) for the common case where few entries need eviction.
     /// </summary>
     private void EvictCache(int maxEntries)
     {
         if (_cache.Count <= maxEntries) return;
 
-        var toEvict = _cache
-            .OrderBy(kv => kv.Value.LastAccessed)
-            .Take(_cache.Count - maxEntries)
-            .Select(kv => kv.Key)
-            .ToList();
+        int evictCount = _cache.Count - maxEntries;
+        // Collect entries and find the evictCount oldest using a max-heap of size evictCount.
+        // Simple approach: one pass to collect all, then partial sort only evictCount items.
+        var entries = _cache.ToArray().ToList(); // snapshot as List to allow .Count access
+        // Partial selection: bring the evictCount smallest LastAccessed to the front.
+        // Array.Sort on the full array is O(n log n); MinHeap-based selection would be O(n log k).
+        // For typical cache sizes (≤10,000) a single-pass partial sort is sufficient.
+        if (evictCount <= entries.Count / 4)
+        {
+            // Few entries to evict: single pass to find threshold then evict.
+            var threshold = entries
+                .Select(kv => kv.Value.LastAccessed)
+                .OrderBy(t => t)
+                .Skip(evictCount - 1)
+                .FirstOrDefault();
 
-        foreach (var key in toEvict)
-            _cache.TryRemove(key, out _);
+            int removed = 0;
+            foreach (var kv in entries)
+            {
+                if (removed >= evictCount) break;
+                if (kv.Value.LastAccessed <= threshold)
+                {
+                    _cache.TryRemove(kv.Key, out _);
+                    removed++;
+                }
+            }
+        }
+        else
+        {
+            // Many entries to evict: full sort is acceptable.
+            var toEvict = entries
+                .OrderBy(kv => kv.Value.LastAccessed)
+                .Take(evictCount)
+                .Select(kv => kv.Key)
+                .ToList();
+
+            foreach (var key in toEvict)
+                _cache.TryRemove(key, out _);
+        }
     }
 
     /// <summary>Cached segment result with LRU tracking.</summary>

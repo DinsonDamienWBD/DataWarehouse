@@ -163,18 +163,22 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 throw new ArgumentException($"Backend '{backendId}' not found in registry");
             }
 
-            if (pool.Backends.Any(b => b.StrategyId == backendId))
+            // Protect check-then-add with a per-pool lock to prevent TOCTOU duplicates.
+            lock (pool.MembershipLock)
             {
-                throw new InvalidOperationException($"Backend '{backendId}' already in pool '{poolId}'");
-            }
+                if (pool.Backends.Any(b => b.StrategyId == backendId))
+                {
+                    throw new InvalidOperationException($"Backend '{backendId}' already in pool '{poolId}'");
+                }
 
-            pool.Backends.Add(new PoolBackend
-            {
-                StrategyId = backendId,
-                Weight = weight,
-                Priority = priority,
-                IsEnabled = true
-            });
+                pool.Backends.Add(new PoolBackend
+                {
+                    StrategyId = backendId,
+                    Weight = weight,
+                    Priority = priority,
+                    IsEnabled = true
+                });
+            }
         }
 
         /// <summary>
@@ -222,12 +226,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 return null;
             }
 
-            // Get enabled backends
+            // Snapshot ConcurrentBag once to avoid multiple enumerations with inconsistent views
             var enabledBackends = pool.Backends
                 .Where(b => b.IsEnabled)
                 .ToList();
 
-            if (!enabledBackends.Any())
+            if (enabledBackends.Count == 0)
             {
                 return null;
             }
@@ -243,15 +247,18 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 return enabledBackends[index].StrategyId;
             }
 
-            // Select by priority first, then by weight
-            var byPriority = enabledBackends
-                .OrderByDescending(b => b.Priority)
-                .ToList();
+            // Select by priority first, then by weight (single pass over snapshot)
+            var maxPriority = int.MinValue;
+            foreach (var b in enabledBackends)
+            {
+                if (b.Priority > maxPriority) maxPriority = b.Priority;
+            }
 
-            var highestPriority = byPriority[0].Priority;
-            var topPriorityBackends = byPriority
-                .Where(b => b.Priority == highestPriority)
-                .ToList();
+            var topPriorityBackends = new List<PoolBackend>(enabledBackends.Count);
+            foreach (var b in enabledBackends)
+            {
+                if (b.Priority == maxPriority) topPriorityBackends.Add(b);
+            }
 
             // Weighted random selection among top priority backends
             var totalWeight = topPriorityBackends.Sum(b => b.Weight);
@@ -291,6 +298,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         /// <param name="poolId">Pool identifier.</param>
         /// <returns>Pool capacity information.</returns>
         public PoolCapacityInfo GetPoolCapacity(string poolId)
+            => GetPoolCapacityAsync(poolId, CancellationToken.None).GetAwaiter().GetResult();
+
+        /// <summary>
+        /// Gets aggregate capacity information for a pool by querying actual backend capacity.
+        /// </summary>
+        /// <param name="poolId">Pool identifier.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Pool capacity information with real capacity values from each backend.</returns>
+        public async Task<PoolCapacityInfo> GetPoolCapacityAsync(string poolId, CancellationToken ct)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -299,14 +315,42 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 throw new ArgumentException($"Pool '{poolId}' not found");
             }
 
-            var enabledBackends = pool.Backends
-                .Where(b => b.IsEnabled)
-                .ToList();
+            // Snapshot ConcurrentBag once to avoid multiple enumerations with inconsistent views
+            var enabledBackends = pool.Backends.Where(b => b.IsEnabled).ToList();
 
-            // Aggregate capacity from all backends
-            // Note: This is a simplified implementation. Real implementation would query actual backend capacity.
-            var totalCapacity = enabledBackends.Count * pool.Policy.EstimatedBackendCapacityBytes;
-            var usedCapacity = enabledBackends.Sum(b => Interlocked.Read(ref b.StoredBytes));
+            long totalCapacity = 0;
+            long usedCapacity = 0;
+
+            foreach (var backend in enabledBackends)
+            {
+                var strategy = _registry.Get(backend.StrategyId);
+                if (strategy != null)
+                {
+                    // Query real available capacity from backend
+                    var available = await strategy.GetAvailableCapacityAsync(ct).ConfigureAwait(false);
+                    var storedBytes = Interlocked.Read(ref backend.StoredBytes);
+
+                    if (available.HasValue)
+                    {
+                        // Real capacity: used + available = total
+                        totalCapacity += storedBytes + available.Value;
+                        usedCapacity += storedBytes;
+                    }
+                    else
+                    {
+                        // Backend did not report capacity; use policy estimate
+                        totalCapacity += pool.Policy.EstimatedBackendCapacityBytes;
+                        usedCapacity += storedBytes;
+                    }
+                }
+                else
+                {
+                    // Strategy not registered; fall back to estimate
+                    totalCapacity += pool.Policy.EstimatedBackendCapacityBytes;
+                    usedCapacity += Interlocked.Read(ref backend.StoredBytes);
+                }
+            }
+
             var availableCapacity = totalCapacity - usedCapacity;
 
             return new PoolCapacityInfo
@@ -334,13 +378,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 throw new ArgumentException($"Pool '{poolId}' not found");
             }
 
-            var enabledBackends = pool.Backends.Where(b => b.IsEnabled).ToList();
+            // Snapshot ConcurrentBag once to avoid multiple enumerations
+            var allBackends = pool.Backends.ToList();
+            var enabledBackends = allBackends.Where(b => b.IsEnabled).ToList();
 
             return new PoolStatistics
             {
                 PoolId = poolId,
                 PoolName = pool.PoolName,
-                TotalBackends = pool.Backends.Count,
+                TotalBackends = allBackends.Count,
                 EnabledBackends = enabledBackends.Count,
                 TotalPlacements = enabledBackends.Sum(b => Interlocked.Read(ref b.PlacementCount)),
                 CreatedTime = pool.CreatedTime,
@@ -445,6 +491,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
         /// <summary>Human-readable pool name.</summary>
         public string PoolName { get; init; } = string.Empty;
+
+        /// <summary>Lock protecting check-then-add membership operations to prevent duplicate backends.</summary>
+        internal readonly object MembershipLock = new();
 
         /// <summary>Backends in this pool.</summary>
         public ConcurrentBag<PoolBackend> Backends { get; init; } = new();

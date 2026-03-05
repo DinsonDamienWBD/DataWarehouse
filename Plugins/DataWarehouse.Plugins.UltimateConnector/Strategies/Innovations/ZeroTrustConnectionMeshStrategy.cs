@@ -137,10 +137,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             client.DefaultRequestHeaders.Add("X-ZT-Session-Token", sessionToken);
 
             var connectionId = $"zt-{Guid.NewGuid():N}";
+            // Finding 1974: Do NOT store session_token in ConnectionInfo — it is a sensitive credential
+            // that would be exposed via health check serialization and logging. Store only non-sensitive metadata.
             var info = new Dictionary<string, object>
             {
                 ["endpoint"] = endpoint,
-                ["session_token"] = sessionToken,
                 ["trust_score"] = trustScore,
                 ["scopes"] = requiredScopes,
                 ["device_id"] = devicePosture["device_id"]!,
@@ -148,6 +149,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 ["last_auth_at"] = DateTimeOffset.UtcNow,
                 ["connected_at"] = DateTimeOffset.UtcNow,
                 ["auth_events"] = new List<string> { $"initial_auth:{DateTimeOffset.UtcNow:O}" }
+                // session_token intentionally omitted — held as Bearer header on HttpClient only
             };
 
             var handle = new DefaultConnectionHandle(client, info, connectionId);
@@ -162,7 +164,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
         {
             var client = handle.GetConnection<HttpClient>();
 
-            var response = await client.GetAsync("/api/v1/zt/verify-session", ct);
+            using var response = await client.GetAsync("/api/v1/zt/verify-session", ct);
             if (!response.IsSuccessStatusCode) return false;
 
             var result = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
@@ -192,7 +194,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             var sw = Stopwatch.StartNew();
             var client = handle.GetConnection<HttpClient>();
 
-            var response = await client.GetAsync("/api/v1/zt/session-health", ct);
+            using var response = await client.GetAsync("/api/v1/zt/session-health", ct);
             sw.Stop();
 
             if (!response.IsSuccessStatusCode)
@@ -231,7 +233,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             var sslOptions = new SslClientAuthenticationOptions
             {
                 RemoteCertificateValidationCallback = (sender, cert, chain, errors) =>
-                    errors == SslPolicyErrors.None
+                    errors == SslPolicyErrors.None && chain?.ChainElements.Count > 0
             };
 
             if (!string.IsNullOrEmpty(certPath))
@@ -253,7 +255,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
         {
             return new Dictionary<string, string>
             {
-                ["device_id"] = Environment.MachineName + "-" + Environment.UserName,
+                ["device_id"] = Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(Environment.MachineName + "-" + Environment.UserName))),
                 ["os_version"] = Environment.OSVersion.ToString(),
                 ["runtime_version"] = Environment.Version.ToString(),
                 ["process_id"] = Environment.ProcessId.ToString(),
@@ -271,7 +273,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             {
                 try
                 {
-                    var response = await client.PostAsync("/api/v1/zt/reauthenticate", null);
+                    using var response = await client.PostAsync("/api/v1/zt/reauthenticate", null);
                     if (response.IsSuccessStatusCode)
                     {
                         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -285,7 +287,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 }
                 catch
                 {
+
                     // Re-auth failure is logged by the base class health monitoring
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }, null, TimeSpan.FromSeconds(intervalSec), TimeSpan.FromSeconds(intervalSec));
 

@@ -289,14 +289,16 @@ public sealed class PerformanceTieringStrategy : TieringStrategyBase
 
             if (targetTier < data.CurrentTier)
             {
-                // Reset violations after promotion
+                // Capture count before reset so the log message is accurate.
+                int violationCount;
                 lock (metrics)
                 {
+                    violationCount = metrics.SlaViolations;
                     metrics.SlaViolations = 0;
                 }
 
                 return Task.FromResult(Promote(data, targetTier,
-                    $"SLA violations ({metrics.SlaViolations}) exceeded threshold. " +
+                    $"SLA violations ({violationCount}) exceeded threshold. " +
                     $"Required latency: {requirements.MaxLatencyMs}ms, current tier latency: " +
                     $"{_config.TierLatencyMs.GetValueOrDefault(data.CurrentTier, 10)}ms",
                     0.95, 1.0));

@@ -38,6 +38,7 @@ internal sealed class InteractivePlaygroundStrategy : SdkInterface.InterfaceStra
     public string[] Tags => new[] { "playground", "testing", "developer-experience", "web-ui", "interactive" };
 
     // SDK contract properties
+    public override bool IsProductionReady => false;
     public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.REST;
     public override SdkInterface.InterfaceCapabilities Capabilities => new SdkInterface.InterfaceCapabilities(
         SupportsStreaming: false,

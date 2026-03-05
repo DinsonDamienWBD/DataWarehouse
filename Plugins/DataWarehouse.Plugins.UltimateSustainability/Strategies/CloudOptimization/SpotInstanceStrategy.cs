@@ -46,6 +46,10 @@ public sealed class SpotInstanceStrategy : SustainabilityStrategyBase
         string region,
         string provider = "AWS")
     {
+        // Finding 4454: validate inputs before constructing the instance.
+        ArgumentException.ThrowIfNullOrEmpty(instanceType);
+        ArgumentException.ThrowIfNullOrEmpty(region);
+        if (maxBidUsd <= 0) throw new ArgumentOutOfRangeException(nameof(maxBidUsd), "Max bid must be > 0");
         var instance = new SpotInstance
         {
             InstanceId = Guid.NewGuid().ToString("N"),

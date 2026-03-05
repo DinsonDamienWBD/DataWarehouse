@@ -77,6 +77,10 @@ internal sealed class KtxTextureStrategy : MediaStrategyBase
     /// <inheritdoc/>
     public override string Name => "KTX GPU Texture";
 
+    // Finding 1072: WriteKtx2Header writes DFD/KVD/SGD offset and length fields as zero —
+    // KTX2-conformant loaders will fail to locate sections. Requires libktx. Not production-ready.
+    public override bool IsProductionReady => false;
+
     /// <summary>Production hardening: initialization with counter tracking.</summary>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken) { IncrementCounter("ktx.init"); return base.InitializeAsyncCore(cancellationToken); }
     /// <summary>Production hardening: graceful shutdown.</summary>

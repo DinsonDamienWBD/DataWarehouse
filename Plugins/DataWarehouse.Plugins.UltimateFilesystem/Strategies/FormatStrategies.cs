@@ -179,7 +179,7 @@ public sealed class F2FsStrategy : FilesystemStrategyBase
             if (!File.Exists("/proc/mounts"))
                 return Task.FromResult<FilesystemMetadata?>(null);
 
-            var mounts = File.ReadAllLines("/proc/mounts");
+            var mounts = File.ReadLines("/proc/mounts");
             var normalizedPath = Path.GetFullPath(path);
 
             foreach (var line in mounts)
@@ -266,7 +266,7 @@ public sealed class Ext3Strategy : FilesystemStrategyBase
             if (!File.Exists("/proc/mounts"))
                 return Task.FromResult<FilesystemMetadata?>(null);
 
-            var mounts = File.ReadAllLines("/proc/mounts");
+            var mounts = File.ReadLines("/proc/mounts");
             var normalizedPath = Path.GetFullPath(path);
 
             foreach (var line in mounts)
@@ -353,7 +353,7 @@ public sealed class Ext2Strategy : FilesystemStrategyBase
             if (!File.Exists("/proc/mounts"))
                 return Task.FromResult<FilesystemMetadata?>(null);
 
-            var mounts = File.ReadAllLines("/proc/mounts");
+            var mounts = File.ReadLines("/proc/mounts");
             var normalizedPath = Path.GetFullPath(path);
 
             foreach (var line in mounts)
@@ -505,8 +505,26 @@ public sealed class Hammer2Strategy : FilesystemStrategyBase
 
     public override Task<FilesystemMetadata?> DetectAsync(string path, CancellationToken ct = default)
     {
-        // HAMMER2 is DragonFly BSD specific
-        if (!RuntimeInformation.IsOSPlatform(OSPlatform.FreeBSD))
+        // HAMMER2 is DragonFly BSD specific — NOT FreeBSD (finding 3025).
+        // .NET does not expose a DragonFly BSD OSPlatform constant. Detect via /proc/version
+        // content or /kern/ostype sysctl string. If neither confirms DragonFly BSD, return null.
+        var isDragonFly = false;
+        try
+        {
+            if (System.IO.File.Exists("/kern/ostype"))
+            {
+                var ostype = System.IO.File.ReadAllText("/kern/ostype").Trim();
+                isDragonFly = ostype.Contains("DragonFly", StringComparison.OrdinalIgnoreCase);
+            }
+            else if (System.IO.File.Exists("/proc/version"))
+            {
+                var version = System.IO.File.ReadAllText("/proc/version");
+                isDragonFly = version.Contains("DragonFly", StringComparison.OrdinalIgnoreCase);
+            }
+        }
+        catch { /* Best-effort detection */ }
+
+        if (!isDragonFly)
             return Task.FromResult<FilesystemMetadata?>(null);
 
         return Task.FromResult<FilesystemMetadata?>(new FilesystemMetadata
@@ -573,7 +591,7 @@ public sealed class Ocfs2Strategy : FilesystemStrategyBase
             if (!File.Exists("/proc/mounts"))
                 return Task.FromResult<FilesystemMetadata?>(null);
 
-            var mounts = File.ReadAllLines("/proc/mounts");
+            var mounts = File.ReadLines("/proc/mounts");
             var normalizedPath = Path.GetFullPath(path);
 
             foreach (var line in mounts)
@@ -660,7 +678,7 @@ public sealed class TmpfsStrategy : FilesystemStrategyBase
             if (!File.Exists("/proc/mounts"))
                 return Task.FromResult<FilesystemMetadata?>(null);
 
-            var mounts = File.ReadAllLines("/proc/mounts");
+            var mounts = File.ReadLines("/proc/mounts");
             var normalizedPath = Path.GetFullPath(path);
 
             foreach (var line in mounts)

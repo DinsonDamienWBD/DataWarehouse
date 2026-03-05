@@ -136,15 +136,15 @@ public sealed class DataClassificationStrategy : LifecycleStrategyBase
     // Common PII patterns
     private static readonly Dictionary<string, Regex> PiiPatterns = new()
     {
-        ["SSN"] = new Regex(@"\b\d{3}-\d{2}-\d{4}\b", RegexOptions.Compiled),
-        ["CreditCard"] = new Regex(@"\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})\b", RegexOptions.Compiled),
-        ["Email"] = new Regex(@"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", RegexOptions.Compiled),
-        ["Phone"] = new Regex(@"\b(?:\+?1[-.\s]?)?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}\b", RegexOptions.Compiled),
-        ["IPAddress"] = new Regex(@"\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b", RegexOptions.Compiled),
-        ["DateOfBirth"] = new Regex(@"\b(?:DOB|Date of Birth|Birth ?Date)[:\s]*\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase),
-        ["MedicalRecordNumber"] = new Regex(@"\b(?:MRN|Medical Record)[:\s#]*[A-Z0-9]{6,12}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase),
-        ["DriversLicense"] = new Regex(@"\b(?:DL|Driver'?s? ?License)[:\s#]*[A-Z0-9]{5,15}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase),
-        ["Passport"] = new Regex(@"\b(?:Passport)[:\s#]*[A-Z0-9]{6,12}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+        ["SSN"] = new Regex(@"\b\d{3}-\d{2}-\d{4}\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5)),
+        ["CreditCard"] = new Regex(@"\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5)),
+        ["Email"] = new Regex(@"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5)),
+        ["Phone"] = new Regex(@"\b(?:\+?1[-.\s]?)?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5)),
+        ["IPAddress"] = new Regex(@"\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5)),
+        ["DateOfBirth"] = new Regex(@"\b(?:DOB|Date of Birth|Birth ?Date)[:\s]*\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5)),
+        ["MedicalRecordNumber"] = new Regex(@"\b(?:MRN|Medical Record)[:\s#]*[A-Z0-9]{6,12}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5)),
+        ["DriversLicense"] = new Regex(@"\b(?:DL|Driver'?s? ?License)[:\s#]*[A-Z0-9]{5,15}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5)),
+        ["Passport"] = new Regex(@"\b(?:Passport)[:\s#]*[A-Z0-9]{6,12}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5)),
         ["BankAccount"] = new Regex(@"\b(?:Account|Acct)[:\s#]*\d{8,17}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase)
     };
 
@@ -199,8 +199,11 @@ public sealed class DataClassificationStrategy : LifecycleStrategyBase
         // Initialize default classification rules
         InitializeDefaultRules();
 
-        // Check ML availability (would connect to T90 in production)
-        _mlAvailable = false; // Fallback mode by default
+        // P2-2433: _mlAvailable defaults to false (rule-based classification only).
+        // Set to true at runtime when T90 UltimateIntelligence is available (injected via
+        // RegisterStrategy or EnableMlClassification configuration override).
+        // GetMlClassificationAsync will then route to "intelligence.classify.text" topic.
+        _mlAvailable = false;
 
         return Task.CompletedTask;
     }
@@ -541,7 +544,9 @@ public sealed class DataClassificationStrategy : LifecycleStrategyBase
                 }
                 catch
                 {
+
                     // Invalid regex - skip
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
         }
@@ -562,7 +567,9 @@ public sealed class DataClassificationStrategy : LifecycleStrategyBase
                 }
                 catch
                 {
+
                     // Invalid regex - skip
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
         }
@@ -609,7 +616,9 @@ public sealed class DataClassificationStrategy : LifecycleStrategyBase
                     }
                     catch
                     {
+
                         // Invalid regex - skip
+                        System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                     }
                 }
             }
@@ -756,16 +765,29 @@ public sealed class DataClassificationStrategy : LifecycleStrategyBase
 
     private string? GetContentForAnalysis(LifecycleDataObject data)
     {
-        // In production, this would fetch content from storage
-        // For now, return content from metadata if available
-        if (data.Metadata?.TryGetValue("content", out var content) == true)
+        // Attempt to retrieve analysable content from well-known metadata keys.
+        // Callers that have access to raw storage bytes should populate "content" or
+        // "preview" in the metadata dictionary before invoking classification.
+        if (data.Metadata?.TryGetValue("content", out var content) == true && content != null)
         {
-            return content?.ToString();
+            return content.ToString();
         }
 
-        if (data.Metadata?.TryGetValue("preview", out var preview) == true)
+        if (data.Metadata?.TryGetValue("preview", out var preview) == true && preview != null)
         {
-            return preview?.ToString();
+            return preview.ToString();
+        }
+
+        // Fall back to combining all string metadata values for keyword/PII scanning.
+        if (data.Metadata?.Count > 0)
+        {
+            var parts = data.Metadata
+                .Where(kv => kv.Value is string)
+                .Select(kv => kv.Value?.ToString())
+                .Where(v => !string.IsNullOrWhiteSpace(v));
+            var combined = string.Join(" ", parts);
+            if (!string.IsNullOrWhiteSpace(combined))
+                return combined;
         }
 
         return null;

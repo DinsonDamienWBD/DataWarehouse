@@ -289,31 +289,47 @@ public sealed class EventStoreStrategy : DataManagementStrategyBase
         CancellationToken ct = default)
     {
         ThrowIfNotInitialized();
+        ArgumentException.ThrowIfNullOrWhiteSpace(streamId);
+        ArgumentNullException.ThrowIfNull(events);
         ct.ThrowIfCancellationRequested();
 
         var sw = Stopwatch.StartNew();
         var eventList = events.ToList();
 
+        if (eventList.Count == 0)
+        {
+            return Task.FromResult(new AppendResult
+            {
+                Success = true,
+                EventsAppended = 0
+            });
+        }
+
         try
         {
             var stream = _streams.GetOrAdd(streamId, _ => new List<StoredEvent>());
-            var currentVersion = _streamVersions.GetOrAdd(streamId, -1);
-
-            // Optimistic concurrency check
-            if (expectedVersion.HasValue && currentVersion != expectedVersion.Value)
-            {
-                return Task.FromResult(new AppendResult
-                {
-                    Success = false,
-                    Error = $"Concurrency conflict: expected version {expectedVersion}, actual {currentVersion}",
-                    NextExpectedVersion = currentVersion
-                });
-            }
+            _streamVersions.GetOrAdd(streamId, -1);
 
             var appendedEvents = new List<StoredEvent>();
+            long currentVersion;
 
+            // Acquire stream-level lock BEFORE reading version to eliminate TOCTOU race.
             lock (stream)
             {
+                // Re-read version inside the lock so the check and append are atomic.
+                currentVersion = _streamVersions.GetOrAdd(streamId, -1);
+
+                // Optimistic concurrency check (inside lock)
+                if (expectedVersion.HasValue && currentVersion != expectedVersion.Value)
+                {
+                    return Task.FromResult(new AppendResult
+                    {
+                        Success = false,
+                        Error = $"Concurrency conflict: expected version {expectedVersion}, actual {currentVersion}",
+                        NextExpectedVersion = currentVersion
+                    });
+                }
+
                 _globalLogLock.EnterWriteLock();
                 try
                 {
@@ -497,7 +513,8 @@ public sealed class EventStoreStrategy : DataManagementStrategyBase
             }
             foreach (var handler in handlersCopy)
             {
-                try { handler(@event); } catch { /* Log error */ }
+                try { handler(@event); }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[EventStore] Stream subscriber threw for event {{{@event.EventId}}}: {ex}"); }
             }
         }
 
@@ -511,7 +528,8 @@ public sealed class EventStoreStrategy : DataManagementStrategyBase
             }
             foreach (var handler in handlersCopy)
             {
-                try { handler(@event); } catch { /* Log error */ }
+                try { handler(@event); }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[EventStore] Global subscriber threw for event {{{@event.EventId}}}: {ex}"); }
             }
         }
     }
@@ -950,7 +968,15 @@ public sealed class EventReplayStrategy : DataManagementStrategyBase
         var sw = Stopwatch.StartNew();
         var replayed = 0;
 
-        foreach (var @event in events.Where(e => e.Timestamp <= targetTime).OrderBy(e => e.StreamPosition))
+        // P2-2439: Materialize once to avoid triple enumeration of the lazy IEnumerable.
+        // The original code called events.Where().OrderBy() for the loop and then
+        // events.Where().Max() for FinalPosition -- three separate enumerations total.
+        var filtered = events
+            .Where(e => e.Timestamp <= targetTime)
+            .OrderBy(e => e.StreamPosition)
+            .ToList();
+
+        foreach (var @event in filtered)
         {
             ct.ThrowIfCancellationRequested();
             await handler(@event);
@@ -961,7 +987,7 @@ public sealed class EventReplayStrategy : DataManagementStrategyBase
         {
             Success = true,
             EventsReplayed = replayed,
-            FinalPosition = events.Where(e => e.Timestamp <= targetTime).Max(e => (long?)e.StreamPosition) ?? 0,
+            FinalPosition = filtered.Count > 0 ? filtered[^1].StreamPosition : 0L,
             DurationMs = sw.Elapsed.TotalMilliseconds
         };
     }

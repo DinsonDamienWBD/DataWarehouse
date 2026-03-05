@@ -19,22 +19,36 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
         public ApacheIgniteConnectionStrategy(ILogger<ApacheIgniteConnectionStrategy>? logger = null) : base(logger) { }
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var (host, port) = ParseHostPort(config.ConnectionString, 8080);
-            _httpClient = new HttpClient { BaseAddress = new Uri($"http://{host}:{port}"), Timeout = config.Timeout };
-            var response = await _httpClient.GetAsync("/ignite?cmd=version", ct);
+            var useSsl = GetConfiguration<bool>(config, "UseSsl", false);
+            var scheme = useSsl ? "https" : "http";
+            var (host, port) = ParseHostPort(config.ConnectionString, useSsl ? 8443 : 8080);
+            _httpClient = new HttpClient { BaseAddress = new Uri($"{scheme}://{host}:{port}"), Timeout = config.Timeout };
+            if (!string.IsNullOrEmpty(config.AuthCredential))
+            {
+                var creds = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{config.AuthSecondary ?? ""}:{config.AuthCredential}"));
+                _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", creds);
+            }
+            using var response = await _httpClient.GetAsync("/ignite?cmd=version", ct);
             response.EnsureSuccessStatusCode();
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object> { ["host"] = host, ["port"] = port });
         }
-        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { if (_httpClient == null) return false; try { var response = await _httpClient.GetAsync("/ignite?cmd=version", ct); return response.IsSuccessStatusCode; } catch { return false; } }
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { _httpClient?.Dispose(); _httpClient = null; await Task.CompletedTask; }
-        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var isHealthy = await TestCoreAsync(handle, ct); return new ConnectionHealth(isHealthy, isHealthy ? "Ignite healthy" : "Ignite unhealthy", TimeSpan.FromMilliseconds(8), DateTimeOffset.UtcNow); }
+        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { if (_httpClient == null) return false; try { using var response = await _httpClient.GetAsync("/ignite?cmd=version", ct); return response.IsSuccessStatusCode; } catch { return false; } }
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { _httpClient?.Dispose(); _httpClient = null; return Task.CompletedTask; }
+        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        {
+            // P2-2180: Measure actual latency with Stopwatch instead of hardcoded value.
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var isHealthy = await TestCoreAsync(handle, ct);
+            sw.Stop();
+            return new ConnectionHealth(isHealthy, isHealthy ? "Ignite healthy" : "Ignite unhealthy", sw.Elapsed, DateTimeOffset.UtcNow);
+        }
         public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
             if (_httpClient == null) return new List<Dictionary<string, object?>>();
             try
             {
                 var encodedQuery = Uri.EscapeDataString(query);
-                var response = await _httpClient.GetAsync($"/ignite?cmd=qryfldexe&pageSize=1000&qry={encodedQuery}", ct);
+                using var response = await _httpClient.GetAsync($"/ignite?cmd=qryfld&cacheName=" + Uri.EscapeDataString(parameters?.GetValueOrDefault("cacheName")?.ToString() ?? "default") + "&exe&pageSize=1000&qry={encodedQuery}", ct);
                 if (!response.IsSuccessStatusCode) return new List<Dictionary<string, object?>>();
                 var json = await response.Content.ReadAsStringAsync(ct);
                 using var doc = System.Text.Json.JsonDocument.Parse(json);
@@ -59,7 +73,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             try
             {
                 var encodedCmd = Uri.EscapeDataString(command);
-                var response = await _httpClient.GetAsync($"/ignite?cmd=qryfldexe&qry={encodedCmd}", ct);
+                using var response = await _httpClient.GetAsync($"/ignite?cmd=qryfld&cacheName=" + Uri.EscapeDataString(parameters?.GetValueOrDefault("cacheName")?.ToString() ?? "default") + "&exe&qry={encodedCmd}", ct);
                 return response.IsSuccessStatusCode ? 1 : 0;
             }
             catch { return 0; /* Operation failed - return zero */ }
@@ -69,7 +83,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             if (_httpClient == null) return new List<DataSchema>();
             try
             {
-                var response = await _httpClient.GetAsync("/ignite?cmd=top&attr=true", ct);
+                using var response = await _httpClient.GetAsync("/ignite?cmd=top&attr=true", ct);
                 if (!response.IsSuccessStatusCode) return new List<DataSchema>();
                 var json = await response.Content.ReadAsStringAsync(ct);
                 using var doc = System.Text.Json.JsonDocument.Parse(json);
@@ -86,6 +100,15 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             }
             catch { return new List<DataSchema>(); /* Schema query failed - return empty */ }
         }
-        private (string host, int port) ParseHostPort(string connectionString, int defaultPort) { var clean = connectionString.Replace("http://", "").Split('/')[0]; var parts = clean.Split(':'); return (parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : defaultPort); }
+        private (string host, int port) ParseHostPort(string connectionString, int defaultPort)
+        {
+            // P2-2132: Use Uri parsing to correctly handle IPv6 addresses like http://[::1]:8123/
+            var uriString = connectionString.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                            connectionString.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+                ? connectionString : "http://" + connectionString;
+            if (Uri.TryCreate(uriString, UriKind.Absolute, out var uri) && !string.IsNullOrEmpty(uri.Host) && uri.Port > 0)
+                return (uri.Host, uri.Port);
+            return ParseHostPortSafe(connectionString, defaultPort);
+        }
     }
 }

@@ -291,21 +291,10 @@ namespace DataWarehouse.SDK.Infrastructure.Policy.Performance
         }
 
         /// <summary>
-        /// Extracts the bloom filter from the skip optimizer via its internal state.
-        /// The optimizer wraps a BloomFilterSkipIndex; we use it for classification.
-        /// Returns null if extraction is not possible.
+        /// Extracts the bloom filter from the skip optimizer for deployment tier classification.
+        /// Returns null when no skip optimizer is registered.
         /// </summary>
         private BloomFilterSkipIndex? GetBloomFilterFromOptimizer()
-        {
-            // The PolicySkipOptimizer uses the bloom filter internally through its HasOverrideOptimized.
-            // For tier classification, we need the raw filter. Since PolicySkipOptimizer doesn't
-            // expose it directly, we create a minimal classification-only filter from the optimizer's
-            // behavior. In practice, the caller can also pass the bloom filter separately to
-            // InitializeForVdeAsync if direct access is needed.
-            //
-            // For now, fall back to VdeOnly when we can't access the raw filter.
-            // The optimizer will still be used in ResolvePerOperationAsync for ContainerStop checks.
-            return null;
-        }
+            => _skipOptimizer?.BloomFilter;
     }
 }

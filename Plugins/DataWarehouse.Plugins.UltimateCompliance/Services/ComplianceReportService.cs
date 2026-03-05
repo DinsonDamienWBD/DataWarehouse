@@ -26,6 +26,53 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Services
         /// <summary>
         /// Framework-specific control definitions mapping framework to required control IDs.
         /// </summary>
+        // Static lookup tables to avoid O(N×M×24) per-call allocations (findings #1372, #1373)
+        private static readonly IReadOnlyDictionary<string, HashSet<string>> s_categoryMapping =
+            new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Security"] = new(StringComparer.OrdinalIgnoreCase) { "security", "access", "encryption", "authentication", "authorization", "tamper", "integrity", "firewall", "ids", "ips", "waf" },
+                ["Administrative"] = new(StringComparer.OrdinalIgnoreCase) { "policy", "management", "workforce", "awareness", "training", "incident", "contingency", "compliance" },
+                ["Physical"] = new(StringComparer.OrdinalIgnoreCase) { "facility", "workstation", "device", "media" },
+                ["Technical"] = new(StringComparer.OrdinalIgnoreCase) { "access-control", "audit", "integrity", "authentication", "transmission", "encryption" },
+                ["Access Control"] = new(StringComparer.OrdinalIgnoreCase) { "access", "rbac", "abac", "mac", "dac", "acl", "identity", "authentication" },
+                ["Audit"] = new(StringComparer.OrdinalIgnoreCase) { "audit", "logging", "monitoring", "trail" },
+                ["Core"] = new(StringComparer.OrdinalIgnoreCase) { "gdpr", "privacy", "consent", "data-protection", "sovereignty" },
+                ["Data Subject Rights"] = new(StringComparer.OrdinalIgnoreCase) { "access", "erasure", "portability", "transparency", "consent" },
+                ["Availability"] = new(StringComparer.OrdinalIgnoreCase) { "availability", "monitoring", "health", "incident", "recovery" },
+                ["Confidentiality"] = new(StringComparer.OrdinalIgnoreCase) { "encryption", "confidentiality", "dlp", "classification", "masking" },
+                ["Processing Integrity"] = new(StringComparer.OrdinalIgnoreCase) { "integrity", "validation", "accuracy", "change-management" },
+                ["Privacy"] = new(StringComparer.OrdinalIgnoreCase) { "privacy", "consent", "gdpr", "pii", "personal-data" },
+                ["System Protection"] = new(StringComparer.OrdinalIgnoreCase) { "encryption", "key-management", "tls", "communication", "protection" },
+                ["System Integrity"] = new(StringComparer.OrdinalIgnoreCase) { "integrity", "monitoring", "patch", "vulnerability" },
+                ["Risk Assessment"] = new(StringComparer.OrdinalIgnoreCase) { "risk", "assessment", "vulnerability", "threat" },
+                ["Incident Response"] = new(StringComparer.OrdinalIgnoreCase) { "incident", "response", "forensic", "alert" },
+                ["Configuration"] = new(StringComparer.OrdinalIgnoreCase) { "configuration", "baseline", "change-management" },
+                ["Contingency"] = new(StringComparer.OrdinalIgnoreCase) { "contingency", "backup", "disaster-recovery", "continuity" },
+                ["Identification"] = new(StringComparer.OrdinalIgnoreCase) { "identification", "authentication", "identity", "mfa" },
+                ["Assessment"] = new(StringComparer.OrdinalIgnoreCase) { "assessment", "testing", "scanning", "audit" },
+                ["Breach"] = new(StringComparer.OrdinalIgnoreCase) { "breach", "notification", "incident", "detection" },
+                ["Risk"] = new(StringComparer.OrdinalIgnoreCase) { "risk", "impact", "assessment", "dpia" },
+                ["Third Party"] = new(StringComparer.OrdinalIgnoreCase) { "processor", "vendor", "third-party", "contract" },
+                ["Accountability"] = new(StringComparer.OrdinalIgnoreCase) { "records", "processing", "documentation", "compliance" },
+                ["International"] = new(StringComparer.OrdinalIgnoreCase) { "transfer", "cross-border", "sovereignty", "geofencing" }
+            };
+
+        private static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> s_crossFrameworkMap =
+            new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["GDPR"] = new[] { "SOC2", "HIPAA" },
+                ["HIPAA"] = new[] { "SOC2", "FedRAMP" },
+                ["SOX"] = new[] { "SOC2" },
+                ["PCI-DSS"] = new[] { "SOC2", "FedRAMP" },
+                ["FedRAMP"] = new[] { "SOC2", "HIPAA" },
+                ["SOC2"] = new[] { "HIPAA", "FedRAMP", "GDPR" },
+                ["Audit-Based"] = new[] { "SOC2", "HIPAA", "FedRAMP", "GDPR" },
+                ["Multi-Framework Reporting"] = new[] { "SOC2", "HIPAA", "FedRAMP", "GDPR" },
+                ["Access Control"] = new[] { "SOC2", "HIPAA", "FedRAMP", "GDPR" },
+                ["Encryption"] = new[] { "SOC2", "HIPAA", "FedRAMP", "GDPR" },
+                ["Data Protection"] = new[] { "GDPR", "HIPAA", "SOC2" }
+            };
+
         private static readonly Dictionary<string, List<ControlDefinition>> FrameworkControls = new()
         {
             ["SOC2"] = new List<ControlDefinition>
@@ -383,34 +430,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Services
                 return false;
 
             // Category-based matching: security strategies map to security controls, etc.
-            var categoryMapping = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["Security"] = new(StringComparer.OrdinalIgnoreCase) { "security", "access", "encryption", "authentication", "authorization", "tamper", "integrity", "firewall", "ids", "ips", "waf" },
-                ["Administrative"] = new(StringComparer.OrdinalIgnoreCase) { "policy", "management", "workforce", "awareness", "training", "incident", "contingency", "compliance" },
-                ["Physical"] = new(StringComparer.OrdinalIgnoreCase) { "facility", "workstation", "device", "media" },
-                ["Technical"] = new(StringComparer.OrdinalIgnoreCase) { "access-control", "audit", "integrity", "authentication", "transmission", "encryption" },
-                ["Access Control"] = new(StringComparer.OrdinalIgnoreCase) { "access", "rbac", "abac", "mac", "dac", "acl", "identity", "authentication" },
-                ["Audit"] = new(StringComparer.OrdinalIgnoreCase) { "audit", "logging", "monitoring", "trail" },
-                ["Core"] = new(StringComparer.OrdinalIgnoreCase) { "gdpr", "privacy", "consent", "data-protection", "sovereignty" },
-                ["Data Subject Rights"] = new(StringComparer.OrdinalIgnoreCase) { "access", "erasure", "portability", "transparency", "consent" },
-                ["Availability"] = new(StringComparer.OrdinalIgnoreCase) { "availability", "monitoring", "health", "incident", "recovery" },
-                ["Confidentiality"] = new(StringComparer.OrdinalIgnoreCase) { "encryption", "confidentiality", "dlp", "classification", "masking" },
-                ["Processing Integrity"] = new(StringComparer.OrdinalIgnoreCase) { "integrity", "validation", "accuracy", "change-management" },
-                ["Privacy"] = new(StringComparer.OrdinalIgnoreCase) { "privacy", "consent", "gdpr", "pii", "personal-data" },
-                ["System Protection"] = new(StringComparer.OrdinalIgnoreCase) { "encryption", "key-management", "tls", "communication", "protection" },
-                ["System Integrity"] = new(StringComparer.OrdinalIgnoreCase) { "integrity", "monitoring", "patch", "vulnerability" },
-                ["Risk Assessment"] = new(StringComparer.OrdinalIgnoreCase) { "risk", "assessment", "vulnerability", "threat" },
-                ["Incident Response"] = new(StringComparer.OrdinalIgnoreCase) { "incident", "response", "forensic", "alert" },
-                ["Configuration"] = new(StringComparer.OrdinalIgnoreCase) { "configuration", "baseline", "change-management" },
-                ["Contingency"] = new(StringComparer.OrdinalIgnoreCase) { "contingency", "backup", "disaster-recovery", "continuity" },
-                ["Identification"] = new(StringComparer.OrdinalIgnoreCase) { "identification", "authentication", "identity", "mfa" },
-                ["Assessment"] = new(StringComparer.OrdinalIgnoreCase) { "assessment", "testing", "scanning", "audit" },
-                ["Breach"] = new(StringComparer.OrdinalIgnoreCase) { "breach", "notification", "incident", "detection" },
-                ["Risk"] = new(StringComparer.OrdinalIgnoreCase) { "risk", "impact", "assessment", "dpia" },
-                ["Third Party"] = new(StringComparer.OrdinalIgnoreCase) { "processor", "vendor", "third-party", "contract" },
-                ["Accountability"] = new(StringComparer.OrdinalIgnoreCase) { "records", "processing", "documentation", "compliance" },
-                ["International"] = new(StringComparer.OrdinalIgnoreCase) { "transfer", "cross-border", "sovereignty", "geofencing" }
-            };
+            // Static to avoid O(N×M×24) allocation per report call.
+            var categoryMapping = s_categoryMapping;
 
             if (categoryMapping.TryGetValue(control.Category, out var keywords))
             {
@@ -424,25 +445,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Services
 
         private List<string> DetermineApplicableFrameworks(string sourceFramework)
         {
-            // Cross-framework evidence reuse mapping
+            // Cross-framework evidence reuse mapping — static to avoid per-call allocation
             var frameworks = new List<string> { sourceFramework };
 
-            var crossFrameworkMap = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["GDPR"] = new() { "SOC2", "HIPAA" },
-                ["HIPAA"] = new() { "SOC2", "FedRAMP" },
-                ["SOX"] = new() { "SOC2" },
-                ["PCI-DSS"] = new() { "SOC2", "FedRAMP" },
-                ["FedRAMP"] = new() { "SOC2", "HIPAA" },
-                ["SOC2"] = new() { "HIPAA", "FedRAMP", "GDPR" },
-                ["Audit-Based"] = new() { "SOC2", "HIPAA", "FedRAMP", "GDPR" },
-                ["Multi-Framework Reporting"] = new() { "SOC2", "HIPAA", "FedRAMP", "GDPR" },
-                ["Access Control"] = new() { "SOC2", "HIPAA", "FedRAMP", "GDPR" },
-                ["Encryption"] = new() { "SOC2", "HIPAA", "FedRAMP", "GDPR" },
-                ["Data Protection"] = new() { "GDPR", "HIPAA", "SOC2" }
-            };
-
-            if (crossFrameworkMap.TryGetValue(sourceFramework, out var additional))
+            if (s_crossFrameworkMap.TryGetValue(sourceFramework, out var additional))
             {
                 frameworks.AddRange(additional);
             }
@@ -496,8 +502,25 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Services
 
     /// <summary>
     /// Date range for compliance report periods.
+    /// Start must be before End and both must be valid (not MinValue/MaxValue).
     /// </summary>
-    public record ComplianceReportPeriod(DateTime Start, DateTime End);
+    public record ComplianceReportPeriod
+    {
+        public DateTime Start { get; }
+        public DateTime End { get; }
+
+        public ComplianceReportPeriod(DateTime start, DateTime end)
+        {
+            if (start == DateTime.MinValue || start == DateTime.MaxValue)
+                throw new ArgumentException("Start must be a valid date.", nameof(start));
+            if (end == DateTime.MinValue || end == DateTime.MaxValue)
+                throw new ArgumentException("End must be a valid date.", nameof(end));
+            if (end <= start)
+                throw new ArgumentException("End must be after Start.", nameof(end));
+            Start = start;
+            End = end;
+        }
+    }
 
     /// <summary>
     /// Complete compliance report for a single framework.

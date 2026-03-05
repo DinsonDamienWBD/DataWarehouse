@@ -46,6 +46,7 @@ public sealed class UltimateStreamingDataPlugin : StreamingPluginBase, IDisposab
     // Statistics
     private long _totalOperations;
     private long _totalEventsProcessed;
+    private long _totalFailures;
 
     /// <inheritdoc/>
     public override string Id => "com.datawarehouse.streaming.ultimate";
@@ -131,7 +132,9 @@ public sealed class UltimateStreamingDataPlugin : StreamingPluginBase, IDisposab
             }
             catch
             {
+
                 // Skip strategies that fail to instantiate
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
     }
@@ -204,14 +207,25 @@ public sealed class UltimateStreamingDataPlugin : StreamingPluginBase, IDisposab
         {
             Interlocked.Increment(ref _totalEventsProcessed);
 
-            var processed = new ProcessedEvent
+            var processStart = DateTimeOffset.UtcNow;
+            ProcessedEvent processed;
+            try
             {
-                EventId = evt.EventId,
-                Data = evt.Data,
-                Timestamp = evt.Timestamp,
-                ProcessedAt = DateTimeOffset.UtcNow,
-                PipelineId = pipeline.PipelineId
-            };
+                processed = new ProcessedEvent
+                {
+                    EventId = evt.EventId,
+                    Data = evt.Data,
+                    Timestamp = evt.Timestamp,
+                    ProcessedAt = processStart,
+                    PipelineId = pipeline.PipelineId,
+                    ProcessingLatency = DateTimeOffset.UtcNow - processStart
+                };
+            }
+            catch
+            {
+                Interlocked.Increment(ref _totalFailures);
+                throw;
+            }
 
             yield return processed;
         }
@@ -224,7 +238,7 @@ public sealed class UltimateStreamingDataPlugin : StreamingPluginBase, IDisposab
     {
         TotalOperations = Interlocked.Read(ref _totalOperations),
         TotalEventsProcessed = Interlocked.Read(ref _totalEventsProcessed),
-        TotalFailures = 0,
+        TotalFailures = Interlocked.Read(ref _totalFailures),
         RegisteredStrategies = _registry.Count,
         ActivePolicies = _policies.Count,
         UsageByStrategy = _usageStats.ToDictionary(k => k.Key, v => v.Value)
@@ -312,9 +326,11 @@ public sealed class UltimateStreamingDataPlugin : StreamingPluginBase, IDisposab
                 {
                     await channel.Writer.WriteAsync(msg.Payload).ConfigureAwait(false);
                 }
-                catch (ChannelClosedException)
+                catch (ChannelClosedException ex)
                 {
+
                     // Channel closed — subscriber gone; ignore.
+                    System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
                 }
             }
         });

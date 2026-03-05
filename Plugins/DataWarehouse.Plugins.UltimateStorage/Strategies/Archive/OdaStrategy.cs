@@ -51,8 +51,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
         private int _maxRetryAttempts = 3;
 
         private readonly SemaphoreSlim _driveLock = new(1, 1);
-        private readonly BoundedDictionary<string, CartridgeInfo> _cartridgeInventory = new BoundedDictionary<string, CartridgeInfo>(1000);
-        private readonly BoundedDictionary<string, string> _objectToCartridgeMap = new BoundedDictionary<string, string>(1000);
+        // Use ConcurrentDictionary (unbounded) instead of BoundedDictionary(1000) so that
+        // cartridge inventory and object-to-cartridge mappings are never silently evicted.
+        // Optical disc archives may contain millions of objects across thousands of cartridges.
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, CartridgeInfo> _cartridgeInventory = new();
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _objectToCartridgeMap = new();
         private OpticalCatalog? _catalog;
         private HttpClient? _httpClient;
         private string? _currentLoadedCartridge = null;
@@ -159,14 +162,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             ValidateKey(key);
             ValidateStream(data);
 
-            if (_enableWorm && await ExistsAsyncCore(key, ct))
-            {
-                throw new InvalidOperationException($"Object '{key}' already exists on WORM-enabled optical media. Modification not allowed.");
-            }
-
             await _driveLock.WaitAsync(ct);
             try
             {
+                // WORM check must be performed inside the lock to prevent a TOCTOU race
+                // where two concurrent writes both pass the existence check before either writes.
+                if (_enableWorm && await ExistsAsyncCore(key, ct))
+                {
+                    throw new InvalidOperationException($"Object '{key}' already exists on WORM-enabled optical media. Modification not allowed.");
+                }
+
                 // Calculate data size
                 var dataLength = data.CanSeek ? data.Length - data.Position : 0L;
                 if (dataLength == 0)
@@ -427,9 +432,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                     };
                 }
 
-                // Calculate available capacity
-                var totalCapacity = _cartridgeInventory.Values.Sum(c => _cartridgeCapacityBytes);
-                var usedCapacity = _cartridgeInventory.Values.Sum(c => c.UsedCapacity);
+                // Calculate available capacity in a single pass to avoid double enumeration.
+                long totalCapacity = 0;
+                long usedCapacity = 0;
+                foreach (var cartridge in _cartridgeInventory.Values)
+                {
+                    totalCapacity += _cartridgeCapacityBytes;
+                    usedCapacity += cartridge.UsedCapacity;
+                }
                 var availableCapacity = totalCapacity - usedCapacity;
 
                 // Check for cartridges approaching end of life
@@ -505,8 +515,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 throw new InvalidOperationException("HTTP client not initialized");
             }
 
+            // Buffer the stream so we can (a) compute a content-based checksum and (b) upload the bytes.
+            using var buffer = new System.IO.MemoryStream();
+            await data.CopyToAsync(buffer, ct);
+            var contentBytes = buffer.ToArray();
+
             using var content = new MultipartFormDataContent();
-            var streamContent = new StreamContent(data);
+            var streamContent = new StreamContent(new System.IO.MemoryStream(contentBytes));
             streamContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
             content.Add(streamContent, "file", key);
             content.Add(new StringContent(cartridge.Barcode), "cartridgeBarcode");
@@ -518,7 +533,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 content.Add(new StringContent(metadataJson), "metadata");
             }
 
-            var response = await _httpClient.PostAsync("/api/v1/objects/store", content, ct);
+            using var response = await _httpClient.PostAsync("/api/v1/objects/store", content, ct);
             response.EnsureSuccessStatusCode();
 
             var storeResponse = await response.Content.ReadFromJsonAsync<StoreResponse>(ct);
@@ -529,7 +544,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 Size = dataLength,
                 Created = DateTime.UtcNow,
                 Modified = DateTime.UtcNow,
-                ETag = storeResponse?.Checksum ?? GenerateChecksum(cartridge.Barcode, key),
+                ETag = storeResponse?.Checksum ?? GenerateChecksum(cartridge.Barcode, key, contentBytes),
                 ContentType = GetContentType(key),
                 CustomMetadata = metadata as IReadOnlyDictionary<string, string>,
                 Tier = Tier
@@ -543,7 +558,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 throw new InvalidOperationException("HTTP client not initialized");
             }
 
-            var response = await _httpClient.GetAsync($"/api/v1/objects/retrieve?key={Uri.EscapeDataString(entry.Key)}&cartridge={Uri.EscapeDataString(entry.CartridgeBarcode)}", ct);
+            using var response = await _httpClient.GetAsync($"/api/v1/objects/retrieve?key={Uri.EscapeDataString(entry.Key)}&cartridge={Uri.EscapeDataString(entry.CartridgeBarcode)}", ct);
             response.EnsureSuccessStatusCode();
 
             // Read into memory for proper stream management
@@ -560,7 +575,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 throw new InvalidOperationException("HTTP client not initialized");
             }
 
-            var response = await _httpClient.DeleteAsync($"/api/v1/objects/delete?key={Uri.EscapeDataString(entry.Key)}&cartridge={Uri.EscapeDataString(entry.CartridgeBarcode)}", ct);
+            using var response = await _httpClient.DeleteAsync($"/api/v1/objects/delete?key={Uri.EscapeDataString(entry.Key)}&cartridge={Uri.EscapeDataString(entry.CartridgeBarcode)}", ct);
             response.EnsureSuccessStatusCode();
         }
 
@@ -597,12 +612,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 await File.WriteAllTextAsync(metaPath, metaJson, ct);
             }
 
-            // Calculate checksum if error correction enabled
-            string? checksum = null;
-            if (_enableErrorCorrection)
-            {
-                checksum = await CalculateFileChecksumAsync(filePath, ct);
-            }
+            // Always compute a content-based checksum from the written file so the ETag reflects
+            // actual content, not just metadata. When error correction is disabled, a lightweight
+            // SHA256 pass is still needed to produce a correct ETag.
+            var checksum = await CalculateFileChecksumAsync(filePath, ct);
 
             return new StorageObjectMetadata
             {
@@ -610,7 +623,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 Size = dataLength,
                 Created = DateTime.UtcNow,
                 Modified = DateTime.UtcNow,
-                ETag = checksum ?? GenerateChecksum(cartridge.Barcode, key),
+                ETag = checksum,
                 ContentType = GetContentType(key),
                 CustomMetadata = metadata as IReadOnlyDictionary<string, string>,
                 Tier = Tier
@@ -665,7 +678,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
 
             try
             {
-                var response = await _httpClient.GetAsync("/api/v1/library/inventory", ct);
+                using var response = await _httpClient.GetAsync("/api/v1/library/inventory", ct);
                 response.EnsureSuccessStatusCode();
 
                 var inventory = await response.Content.ReadFromJsonAsync<List<CartridgeInventoryItem>>(ct);
@@ -697,7 +710,29 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             }
             catch (Exception ex)
             {
-                throw new InvalidOperationException($"Failed to refresh cartridge inventory: {ex.Message}", ex);
+                // Log and rethrow with retry guidance
+                System.Diagnostics.Debug.WriteLine($"[OdaStrategy.RefreshCartridgeInventoryAsync] Failed: {ex.GetType().Name}: {ex.Message}");
+                // Retry with backoff (up to 3 attempts)
+                for (int attempt = 1; attempt <= 3; attempt++)
+                {
+                    try
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(attempt * 2), ct);
+                        // Re-attempt the inventory refresh
+                        var retryResponse = await _httpClient!.GetAsync("/api/v1/library/inventory", ct);
+                        retryResponse.EnsureSuccessStatusCode();
+                        System.Diagnostics.Debug.WriteLine($"[OdaStrategy.RefreshCartridgeInventoryAsync] Retry {attempt} succeeded");
+                        return;
+                    }
+                    catch (Exception retryEx)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[OdaStrategy.RefreshCartridgeInventoryAsync] Retry {attempt} failed: {retryEx.Message}");
+                        if (attempt == 3)
+                        {
+                            throw new InvalidOperationException($"Failed to refresh cartridge inventory after {attempt} retries: {ex.Message}", ex);
+                        }
+                    }
+                }
             }
         }
 
@@ -726,8 +761,24 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 var response = await _httpClient.PostAsJsonAsync("/api/v1/library/load", loadRequest, ct);
                 response.EnsureSuccessStatusCode();
 
-                // Wait for load to complete
-                await Task.Delay(_loadTimeout, ct);
+                // Poll for load completion instead of using a fixed delay
+                var pollInterval = TimeSpan.FromSeconds(2);
+                var deadline = DateTime.UtcNow + _loadTimeout;
+                while (DateTime.UtcNow < deadline)
+                {
+                    await Task.Delay(pollInterval, ct);
+                    // Check cartridge status via REST API
+                    var statusResponse = await _httpClient.GetAsync($"/api/v1/library/status/{barcode}", ct);
+                    if (statusResponse.IsSuccessStatusCode)
+                    {
+                        var statusJson = await statusResponse.Content.ReadAsStringAsync(ct);
+                        if (statusJson.Contains("\"loaded\":true", StringComparison.OrdinalIgnoreCase) ||
+                            statusJson.Contains("\"status\":\"loaded\"", StringComparison.OrdinalIgnoreCase))
+                        {
+                            break;
+                        }
+                    }
+                }
             }
 
             // Update loaded cartridge
@@ -814,7 +865,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
 
             try
             {
-                var response = await _httpClient.GetAsync("/api/v1/system/health", ct);
+                using var response = await _httpClient.GetAsync("/api/v1/system/health", ct);
                 return response.IsSuccessStatusCode;
             }
             catch (Exception ex)
@@ -839,19 +890,22 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             };
         }
 
-        private string GenerateChecksum(string cartridgeBarcode, string key)
+        private static string GenerateChecksum(string cartridgeBarcode, string key, byte[] contentBytes)
         {
-            var input = $"{cartridgeBarcode}:{key}";
-            var hashBytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(input));
+            // Hash barcode + key + actual content to produce a content-dependent checksum.
+            var prefix = System.Text.Encoding.UTF8.GetBytes($"{cartridgeBarcode}:{key}:");
+            var combined = new byte[prefix.Length + contentBytes.Length];
+            prefix.CopyTo(combined, 0);
+            contentBytes.CopyTo(combined, prefix.Length);
+            var hashBytes = System.Security.Cryptography.SHA256.HashData(combined);
             return Convert.ToHexString(hashBytes)[..16].ToLowerInvariant();
         }
 
-        private async Task<string> CalculateFileChecksumAsync(string filePath, CancellationToken ct)
+        private static async Task<string> CalculateFileChecksumAsync(string filePath, CancellationToken ct)
         {
-            using var md5 = System.Security.Cryptography.MD5.Create();
             await using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, FileOptions.SequentialScan | FileOptions.Asynchronous);
-            var hashBytes = await md5.ComputeHashAsync(stream, ct);
-            return BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
+            var hashBytes = await System.Security.Cryptography.SHA256.HashDataAsync(stream, ct);
+            return Convert.ToHexString(hashBytes).ToLowerInvariant();
         }
 
         private string? GetContentType(string key)
@@ -969,7 +1023,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
     public class OpticalCatalog
     {
         private readonly string _catalogFilePath;
-        private readonly BoundedDictionary<string, OpticalCatalogEntry> _entries = new BoundedDictionary<string, OpticalCatalogEntry>(1000);
+        // ConcurrentDictionary (unbounded): optical catalogs may hold millions of entries; BoundedDictionary(1000) would silently evict them.
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, OpticalCatalogEntry> _entries = new();
         private readonly SemaphoreSlim _saveLock = new(1, 1);
 
         private OpticalCatalog(string catalogPath)

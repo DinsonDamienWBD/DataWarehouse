@@ -207,6 +207,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             var tempFile = Path.GetTempFileName();
             try
             {
+                // Write stream to temp file once before the retry loop so that the stream
+                // seek position is consumed only once regardless of retry count.
                 if (data.CanSeek) data.Position = 0;
 
                 using (var fs = File.Create(tempFile))
@@ -286,16 +288,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                     var uploadTask = new COSXMLUploadTask(_bucketName, key);
                     uploadTask.SetSrcPath(tempFile);
 
-                    // Set custom metadata via PutObjectRequest parameters
-                    if (metadata != null)
-                    {
-                        var putRequest = new PutObjectRequest(_bucketName, key, tempFile);
-                        foreach (var kvp in metadata)
-                        {
-                            putRequest.SetRequestHeader($"x-cos-meta-{kvp.Key}", kvp.Value);
-                        }
-                    }
-
                     var tcs = new TaskCompletionSource<bool>();
 
                     uploadTask.successCallback = (result) => tcs.TrySetResult(true);
@@ -303,6 +295,29 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
 
                     await _transferManager!.UploadAsync(uploadTask);
                     await tcs.Task;
+
+                    // The Tencent COS SDK's COSXMLUploadTask does not expose a public API
+                    // for setting custom metadata headers.  After the multipart upload completes,
+                    // apply metadata via a server-side CopyObject (metadata-replace) request.
+                    // This is the documented COS approach for updating metadata after upload.
+                    if (metadata != null && metadata.Count > 0)
+                    {
+                        var copyRequest = new COSXML.Model.Object.CopyObjectRequest(_bucketName, key);
+                        // Source = same object (required for metadata-replace copy)
+                        var sourceInfo = new COSXML.Model.Tag.CopySourceStruct(
+                            _appId, _bucketName, _region, key);
+                        copyRequest.SetCopySource(sourceInfo);
+                        copyRequest.SetCopyMetaDataDirective(COSXML.Common.CosMetaDataDirective.Replaced);
+                        foreach (var kvp in metadata)
+                        {
+                            var headerName = kvp.Key.StartsWith("x-cos-meta-", StringComparison.OrdinalIgnoreCase)
+                                ? kvp.Key
+                                : $"x-cos-meta-{kvp.Key}";
+                            copyRequest.SetRequestHeader(headerName, kvp.Value);
+                        }
+
+                        await Task.Run(() => _cosClient!.CopyObject(copyRequest), ct).ConfigureAwait(false);
+                    }
 
                     return true;
                 }, ct);
@@ -763,7 +778,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
         private static bool ShouldRetry(COSXML.CosException.CosClientException ex)
         {
             var retryable = new[] { "RequestTimeout", "ConnectionTimeout", "NetworkError" };
-            return ex.errorCode > 0;
+            return ex.errorCode > 0
+                || retryable.Any(code => ex.Message?.Contains(code, StringComparison.OrdinalIgnoreCase) == true);
         }
 
         private static string GetContentType(string key)

@@ -194,29 +194,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
         {
             if (MessageBus == null) return;
 
-            MessageBus.Subscribe("intelligence.request.key-rotation-prediction", async msg =>
-            {
-                if (msg.Payload.TryGetValue("keyId", out var kidObj) && kidObj is string keyId)
-                {
-                    var prediction = PredictKeyRotation(keyId, msg.Payload);
-
-                    await MessageBus.PublishAsync("intelligence.request.key-rotation-prediction.response", new PluginMessage
-                    {
-                        Type = "key-rotation-prediction.response",
-                        CorrelationId = msg.CorrelationId,
-                        Source = Id,
-                        Payload = new Dictionary<string, object>
-                        {
-                            ["success"] = true,
-                            ["keyId"] = keyId,
-                            ["shouldRotate"] = prediction.ShouldRotate,
-                            ["recommendedRotationDate"] = prediction.RecommendedDate,
-                            ["reasoning"] = prediction.Reasoning,
-                            ["confidence"] = prediction.Confidence
-                        }
-                    });
-                }
-            });
+            // P2-3602: Use async lambda returning Task so exceptions propagate to the bus
+            // rather than being fire-and-forget.
+            MessageBus.Subscribe("intelligence.request.key-rotation-prediction",
+                msg => HandleKeyRotationPredictionAsync(msg));
         }
 
         /// <summary>
@@ -259,6 +240,44 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
             return (false, DateTimeOffset.UtcNow.AddDays(daysUntilRotation),
                 $"Key is within policy. Next rotation in {daysUntilRotation} days.",
                 0.88);
+        }
+
+        /// <summary>
+        /// Handles key-rotation-prediction messages. Extracted from the Subscribe callback
+        /// so exceptions are awaitable and not silently swallowed.
+        /// </summary>
+        private async Task HandleKeyRotationPredictionAsync(PluginMessage msg)
+        {
+            try
+            {
+                if (!msg.Payload.TryGetValue("keyId", out var kidObj) || kidObj is not string keyId)
+                    return;
+
+                var prediction = PredictKeyRotation(keyId, msg.Payload);
+
+                if (MessageBus != null)
+                {
+                    await MessageBus.PublishAsync("intelligence.request.key-rotation-prediction.response", new PluginMessage
+                    {
+                        Type = "key-rotation-prediction.response",
+                        CorrelationId = msg.CorrelationId,
+                        Source = Id,
+                        Payload = new Dictionary<string, object>
+                        {
+                            ["success"] = true,
+                            ["keyId"] = keyId,
+                            ["shouldRotate"] = prediction.ShouldRotate,
+                            ["recommendedRotationDate"] = prediction.RecommendedDate,
+                            ["reasoning"] = prediction.Reasoning,
+                            ["confidence"] = prediction.Confidence
+                        }
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.TraceError($"[UltimateKeyManagementPlugin] HandleKeyRotationPredictionAsync failed: correlationId={msg.CorrelationId}, error={ex.Message}");
+            }
         }
 
         protected override async Task OnBeforeStatePersistAsync(CancellationToken ct)
@@ -586,6 +605,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
             }
             catch
             {
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
@@ -640,10 +660,6 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
 
         public override Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
         {
-            if (request.Context != null)
-            {
-            }
-
             if (request.Config != null && request.Config.TryGetValue("MessageBus", out var messageBusObj) && messageBusObj is IMessageBus messageBus)
             {
                 SetMessageBus(messageBus);

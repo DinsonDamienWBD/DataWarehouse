@@ -69,22 +69,31 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
 
             await pool.Semaphore.WaitAsync(ct);
 
-            if (pool.Connections.TryDequeue(out var entry))
+            try
             {
-                if (entry.Handle.IsConnected && !entry.IsExpired(pool.Config.IdleTimeout))
+                if (pool.Connections.TryDequeue(out var entry))
                 {
-                    Interlocked.Increment(ref pool.HitCount);
-                    entry.LastUsed = DateTimeOffset.UtcNow;
-                    return entry.Handle;
+                    if (entry.Handle.IsConnected && !entry.IsExpired(pool.Config.IdleTimeout))
+                    {
+                        Interlocked.Increment(ref pool.HitCount);
+                        Interlocked.Increment(ref pool.ActiveCount);
+                        entry.LastUsed = DateTimeOffset.UtcNow;
+                        return entry.Handle;
+                    }
+
+                    await SafeDisposeAsync(entry.Handle);
                 }
 
-                await SafeDisposeAsync(entry.Handle);
+                Interlocked.Increment(ref pool.MissCount);
+                var handle = await factory(ct);
+                Interlocked.Increment(ref pool.ActiveCount);
+                return handle;
             }
-
-            Interlocked.Increment(ref pool.MissCount);
-            var handle = await factory(ct);
-            Interlocked.Increment(ref pool.ActiveCount);
-            return handle;
+            catch
+            {
+                pool.Semaphore.Release();
+                throw;
+            }
         }
 
         /// <summary>
@@ -101,7 +110,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
                 return;
             }
 
-            if (!handle.IsConnected || pool.Connections.Count >= pool.Config.MaxSize)
+            // Finding 1867: Do not use ConcurrentQueue.Count to gate pool capacity — it races with
+            // the semaphore. Use the semaphore's CurrentCount instead: if the semaphore is at max
+            // (all slots available), the pool is at capacity and we should discard this connection.
+            if (!handle.IsConnected || pool.Semaphore.CurrentCount >= pool.Config.MaxSize)
             {
                 Interlocked.Decrement(ref pool.ActiveCount);
                 await SafeDisposeAsync(handle);
@@ -110,6 +122,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
             }
 
             pool.Connections.Enqueue(new PooledConnection(handle));
+            Interlocked.Decrement(ref pool.ActiveCount);
             pool.Semaphore.Release();
         }
 

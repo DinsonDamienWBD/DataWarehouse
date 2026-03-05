@@ -251,6 +251,7 @@ public static class DwvdContentDetector
     /// </summary>
     /// <param name="filePath">The path to the file to check.</param>
     /// <returns>True if the file starts with the DWVD magic bytes.</returns>
+    /// <remarks>Prefer <see cref="IsLikelyDwvdAsync"/> to avoid blocking thread-pool threads on network paths (finding P2-783).</remarks>
     public static bool IsLikelyDwvd(string filePath)
     {
         ArgumentException.ThrowIfNullOrEmpty(filePath);
@@ -269,6 +270,34 @@ public static class DwvdContentDetector
         }
 
         return IsLikelyDwvd(header.Slice(0, totalRead));
+    }
+
+    /// <summary>
+    /// Async version of <see cref="IsLikelyDwvd(string)"/> that uses async I/O to avoid
+    /// blocking thread-pool threads on network or slow storage paths (finding P2-783).
+    /// </summary>
+    /// <param name="filePath">The path to the file to check.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>True if the file starts with the DWVD magic bytes.</returns>
+    public static async Task<bool> IsLikelyDwvdAsync(string filePath, System.Threading.CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(filePath);
+
+        var header = new byte[16];
+        using var stream = new FileStream(
+            filePath, FileMode.Open, FileAccess.Read, FileShare.Read,
+            bufferSize: 16, useAsync: true);
+
+        int totalRead = 0;
+        while (totalRead < 16)
+        {
+            int read = await stream.ReadAsync(header.AsMemory(totalRead), ct).ConfigureAwait(false);
+            if (read == 0)
+                break;
+            totalRead += read;
+        }
+
+        return IsLikelyDwvd(header.AsSpan(0, totalRead));
     }
 
     /// <summary>

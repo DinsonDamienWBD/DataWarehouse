@@ -240,6 +240,22 @@ public sealed class UltimateWorkflowPlugin : OrchestrationPluginBase, IDisposabl
     {
         if (!workflow.ValidateDag())
             throw new ArgumentException("Workflow contains cyclic dependencies");
+
+        // Validate that all dependency references point to existing task IDs within this workflow.
+        var taskIds = new HashSet<string>(workflow.Tasks.Select(t => t.TaskId));
+        foreach (var task in workflow.Tasks)
+        {
+            foreach (var dep in task.Dependencies)
+            {
+                if (!taskIds.Contains(dep))
+                {
+                    throw new ArgumentException(
+                        $"Task '{task.TaskId}' has dependency '{dep}' that does not exist in the workflow.",
+                        nameof(workflow));
+                }
+            }
+        }
+
         _workflows[workflow.WorkflowId] = workflow;
     }
 

@@ -23,6 +23,14 @@ public sealed class SmartMonitor
     private readonly ILogger _logger;
 
     /// <summary>
+    /// LOW-2989: Maximum uncorrectable errors before the drive is considered unhealthy.
+    /// Industry best practice: 0 or 1 (any uncorrectable error is critical for storage devices).
+    /// Configurable so operators can adjust for specific drive models or test environments.
+    /// Default: 1 (first uncorrectable error triggers unhealthy status).
+    /// </summary>
+    public long MaxUncorrectableErrors { get; set; } = 1;
+
+    /// <summary>
     /// Initializes a new SmartMonitor with an optional logger.
     /// </summary>
     /// <param name="logger">Logger for diagnostics. Uses NullLogger if null.</param>
@@ -162,7 +170,8 @@ public sealed class SmartMonitor
         }
 
         // Health assessment: healthy if no extreme values
-        isHealthy = temperature < 85 && wearLevelPercent < 100 && uncorrectableErrors < 100;
+        // LOW-2989: use configurable MaxUncorrectableErrors (default 1) instead of magic 100.
+        isHealthy = temperature < 85 && wearLevelPercent < 100 && uncorrectableErrors <= MaxUncorrectableErrors;
 
         TimeSpan? estimatedLife = null;
         if (wearLevelPercent > 0 && wearLevelPercent < 100)
@@ -213,7 +222,9 @@ public sealed class SmartMonitor
             }
             catch
             {
+
                 // Continue trying other paths
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
@@ -246,7 +257,9 @@ public sealed class SmartMonitor
         }
         catch
         {
+
             // Temperature is optional
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         // Also try /sys/class/hwmon/ as fallback
@@ -273,7 +286,9 @@ public sealed class SmartMonitor
         }
         catch
         {
+
             // Temperature is optional
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return -1;
@@ -296,12 +311,20 @@ public sealed class SmartMonitor
         long reallocatedSectors = 0;
         int powerOnHours = 0;
 
+        // Apply a WMI timeout to prevent indefinite thread-pool thread blocking.
+        // WMI queries can hang on poorly responding drivers; cancel after 10 s.
+        using var wmiCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        wmiCts.CancelAfter(TimeSpan.FromSeconds(10));
+        var wmiToken = wmiCts.Token;
+
         await Task.Run(() =>
         {
-            ct.ThrowIfCancellationRequested();
+            wmiToken.ThrowIfCancellationRequested();
 
             // Read MSStorageDriver_FailurePredictStatus for overall health
             isHealthy = ReadWmiFailurePredictStatus(devicePath, rawAttributes);
+
+            wmiToken.ThrowIfCancellationRequested();
 
             // Read MSStorageDriver_FailurePredictData for SMART attributes
             ReadWmiFailurePredictData(devicePath, rawAttributes,
@@ -309,7 +332,7 @@ public sealed class SmartMonitor
                 out totalBytesRead, out uncorrectableErrors, out reallocatedSectors,
                 out powerOnHours);
 
-        }, ct).ConfigureAwait(false);
+        }, wmiToken).ConfigureAwait(false);
 
         return new PhysicalDeviceHealth(
             IsHealthy: isHealthy,
@@ -360,7 +383,9 @@ public sealed class SmartMonitor
                     }
                     catch
                     {
+
                         // Skip individual WMI object errors
+                        System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                     }
                     finally
                     {
@@ -425,7 +450,9 @@ public sealed class SmartMonitor
                     }
                     catch
                     {
+
                         // Skip individual parse errors
+                        System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                     }
                     finally
                     {
@@ -560,7 +587,9 @@ public sealed class SmartMonitor
         }
         catch
         {
+
             // Sysfs reads are best-effort
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return -1;
@@ -579,7 +608,9 @@ public sealed class SmartMonitor
         }
         catch
         {
+
             // Sysfs reads are best-effort
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return -1;

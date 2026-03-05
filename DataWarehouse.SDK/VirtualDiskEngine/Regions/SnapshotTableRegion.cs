@@ -126,6 +126,8 @@ public readonly record struct SnapshotEntry
 
         ushort labelLen = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(offset));
         offset += 2;
+        if (labelLen > MaxLabelLength || offset + labelLen > buffer.Length)
+            throw new InvalidDataException($"SnapshotEntry labelLen {labelLen} exceeds MaxLabelLength {MaxLabelLength} or buffer bounds.");
         byte[] label = buffer.Slice(offset, labelLen).ToArray();
         offset += labelLen;
 

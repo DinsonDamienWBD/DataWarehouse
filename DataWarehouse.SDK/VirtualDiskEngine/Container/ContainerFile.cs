@@ -14,7 +14,7 @@ namespace DataWarehouse.SDK.VirtualDiskEngine.Container;
 public sealed class ContainerFile : IAsyncDisposable
 {
     private readonly SemaphoreSlim _checkpointLock = new(1, 1);
-    private bool _disposed;
+    private volatile bool _disposed;
 
     /// <summary>
     /// The underlying block device.

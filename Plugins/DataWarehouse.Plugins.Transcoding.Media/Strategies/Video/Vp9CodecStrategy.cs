@@ -120,7 +120,7 @@ internal sealed class Vp9CodecStrategy : MediaStrategyBase
         Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
     {
         IncrementCounter("vp9.encode");
-        var outputStream = new MemoryStream(1024 * 1024);
+        // Finding 1107: removed unused 1 MB MemoryStream — ExecuteOrPackageAsync creates its own.
         var sourceBytes = await ReadStreamFullyAsync(inputStream, cancellationToken).ConfigureAwait(false);
 
         var cqLevel = DefaultCqLevel;

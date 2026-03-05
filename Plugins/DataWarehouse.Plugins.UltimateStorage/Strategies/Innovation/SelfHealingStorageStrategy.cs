@@ -193,9 +193,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Start with empty records
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -210,9 +212,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 var json = JsonSerializer.Serialize(_healthRecords.ToDictionary(kvp => kvp.Key, kvp => kvp.Value));
                 await File.WriteAllTextAsync(recordsPath, json, ct);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Best effort save
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -325,9 +329,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     // Primary copy corrupted - queue repair
                     QueueRepair(key, RepairPriority.High, "Primary copy checksum mismatch");
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
+
                     // Primary copy inaccessible - fall through to replicas
+                    System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
                 }
             }
 
@@ -354,9 +360,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                             }
                         }
                     }
-                    catch (Exception)
+                    catch (Exception ex)
                     {
+
                         // Try next replica
+                        System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
                     }
                 }
             }
@@ -569,9 +577,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     node.LastHealthCheck = DateTime.UtcNow;
                 }
 
-                // Sample check a subset of objects (not all, for performance)
+                // Sample check a subset of objects (not all, for performance).
+                // Use Guid-based sort key to avoid non-deterministic comparator issues.
                 var sampleSize = Math.Min(100, _healthRecords.Count);
-                var sampled = _healthRecords.Values.OrderBy(_ => Random.Shared.Next()).Take(sampleSize);
+                var sampled = _healthRecords.Values.OrderBy(_ => Guid.NewGuid()).Take(sampleSize);
 
                 foreach (var healthRecord in sampled)
                 {
@@ -588,9 +597,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Best effort health checks
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -697,9 +708,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
                 await SaveHealthRecordsAsync(ct);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Best effort scrubbing
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -754,9 +767,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Best effort repair
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -808,9 +823,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     replica.IsHealthy = true;
                     replica.LastVerified = DateTime.UtcNow;
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
+
                     // Skip failed repairs
+                    System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
                 }
             }
 
@@ -827,12 +844,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         /// AD-11: Cryptographic integrity verification delegated to UltimateDataIntegrity via bus.
         /// Self-healing uses fast checksums for corruption detection; bus handles crypto-grade integrity.
         /// </summary>
-        private string ComputeChecksum(byte[] data, HashAlgorithmName algorithmName)
+        private static string ComputeChecksum(byte[] data, HashAlgorithmName algorithmName)
         {
-            var hash = new HashCode();
-            hash.AddBytes(data);
-            hash.Add(data.Length);
-            return hash.ToHashCode().ToString("x8");
+            // Use parameterless factory methods (SYSLIB0045: string-based Create is obsolete).
+            using HashAlgorithm ha = algorithmName == HashAlgorithmName.SHA256 ? SHA256.Create()
+                : algorithmName == HashAlgorithmName.SHA512 ? SHA512.Create()
+                : algorithmName == HashAlgorithmName.SHA1 ? SHA1.Create()
+                : algorithmName == HashAlgorithmName.MD5 ? MD5.Create()
+                : throw new ArgumentException($"Unsupported hash algorithm: {algorithmName.Name}", nameof(algorithmName));
+            return Convert.ToHexString(ha.ComputeHash(data)).ToLowerInvariant();
         }
 
         #endregion

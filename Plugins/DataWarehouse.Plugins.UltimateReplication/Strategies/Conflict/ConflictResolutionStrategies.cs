@@ -498,46 +498,68 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Conflict
             }
         }
 
-        private Dictionary<string, JsonElement> MergeJsonElements(JsonElement local, JsonElement remote)
+        private static Dictionary<string, JsonElement> MergeJsonElements(JsonElement local, JsonElement remote)
         {
-            var result = new Dictionary<string, object?>();
-
-            if (local.ValueKind == JsonValueKind.Object)
+            // Build a merged JsonObject by serialising back through a writer so all values
+            // are proper JsonElement instances (avoids unsafe casts between JsonElement and
+            // Dictionary<string,object?> in the recursive case).
+            var bufferWriter = new System.Buffers.ArrayBufferWriter<byte>();
+            using (var writer = new Utf8JsonWriter(bufferWriter))
             {
-                foreach (var prop in local.EnumerateObject())
-                {
-                    result[prop.Name] = prop.Value.Clone();
-                }
-            }
+                writer.WriteStartObject();
 
-            if (remote.ValueKind == JsonValueKind.Object)
-            {
-                foreach (var prop in remote.EnumerateObject())
+                // Start with all local properties
+                var localProps = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+                if (local.ValueKind == JsonValueKind.Object)
                 {
-                    if (result.ContainsKey(prop.Name))
+                    foreach (var prop in local.EnumerateObject())
                     {
-                        // Merge nested objects, prefer remote for primitives
-                        if (prop.Value.ValueKind == JsonValueKind.Object &&
-                            result[prop.Name] is JsonElement existing &&
-                            existing.ValueKind == JsonValueKind.Object)
+                        localProps[prop.Name] = prop.Value.Clone();
+                    }
+                }
+
+                // Merge remote properties
+                if (remote.ValueKind == JsonValueKind.Object)
+                {
+                    foreach (var prop in remote.EnumerateObject())
+                    {
+                        if (localProps.TryGetValue(prop.Name, out var localValue) &&
+                            prop.Value.ValueKind == JsonValueKind.Object &&
+                            localValue.ValueKind == JsonValueKind.Object)
                         {
-                            result[prop.Name] = MergeJsonElements(existing, prop.Value);
+                            // Recursively merge nested objects by serialising the sub-result
+                            var nested = MergeJsonElements(localValue, prop.Value);
+                            writer.WritePropertyName(prop.Name);
+                            writer.WriteStartObject();
+                            foreach (var kv in nested)
+                            {
+                                writer.WritePropertyName(kv.Key);
+                                kv.Value.WriteTo(writer);
+                            }
+                            writer.WriteEndObject();
+                            localProps.Remove(prop.Name); // already written
                         }
                         else
                         {
-                            result[prop.Name] = prop.Value.Clone();
+                            // Remote wins for primitives / arrays / type mismatches
+                            localProps[prop.Name] = prop.Value.Clone();
                         }
                     }
-                    else
-                    {
-                        result[prop.Name] = prop.Value.Clone();
-                    }
                 }
+
+                // Write remaining local props (not yet written by the loop above)
+                foreach (var kv in localProps)
+                {
+                    writer.WritePropertyName(kv.Key);
+                    kv.Value.WriteTo(writer);
+                }
+
+                writer.WriteEndObject();
             }
 
-            return result.ToDictionary(kv => kv.Key, kv => kv.Value is Dictionary<string, object?> d
-                ? JsonDocument.Parse(JsonSerializer.Serialize(d)).RootElement
-                : (JsonElement)kv.Value!);
+            using var doc = JsonDocument.Parse(bufferWriter.WrittenMemory);
+            return doc.RootElement.EnumerateObject()
+                      .ToDictionary(p => p.Name, p => p.Value.Clone(), StringComparer.Ordinal);
         }
 
         private static byte[] ConcatenateBytes(byte[] a, byte[] b)

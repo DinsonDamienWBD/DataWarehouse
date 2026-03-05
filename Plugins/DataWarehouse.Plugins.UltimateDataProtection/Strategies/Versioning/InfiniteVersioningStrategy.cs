@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using DataWarehouse.SDK.Contracts;
@@ -92,7 +93,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Versioning
                 Metadata = metadata ?? new VersionMetadata(),
                 SizeBytes = 0,
                 StoredSizeBytes = 0,
-                ContentHash = string.Empty,
+                // Metadata-only version: no content bytes, so hash is a well-known sentinel.
+                // Integrity checks MUST skip empty-hash entries (no content to verify).
+                ContentHash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", // SHA-256 of empty string
                 HashAlgorithm = "SHA256",
                 IsImmutable = false,
                 IsOnLegalHold = false,
@@ -173,12 +176,15 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Versioning
             if (string.IsNullOrWhiteSpace(itemId))
                 throw new ArgumentException("Item ID cannot be empty", nameof(itemId));
 
-            if (!_versionIndex.TryGetValue(itemId, out var versions))
+            List<VersionInfo> snapshot;
+            lock (_globalLock)
             {
-                return Task.FromResult(Enumerable.Empty<VersionInfo>());
+                if (!_versionIndex.TryGetValue(itemId, out var versions))
+                    return Task.FromResult(Enumerable.Empty<VersionInfo>());
+                snapshot = new List<VersionInfo>(versions);
             }
 
-            var filtered = versions.AsEnumerable();
+            var filtered = snapshot.AsEnumerable();
 
             // Apply filters
             if (query.CreatedAfter.HasValue)
@@ -239,12 +245,13 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Versioning
             if (string.IsNullOrWhiteSpace(versionId))
                 throw new ArgumentException("Version ID cannot be empty", nameof(versionId));
 
-            if (!_versionIndex.TryGetValue(itemId, out var versions))
+            VersionInfo? version;
+            lock (_globalLock)
             {
-                return Task.FromResult<VersionInfo?>(null);
+                if (!_versionIndex.TryGetValue(itemId, out var versions))
+                    return Task.FromResult<VersionInfo?>(null);
+                version = versions.FirstOrDefault(v => v.VersionId == versionId);
             }
-
-            var version = versions.FirstOrDefault(v => v.VersionId == versionId);
             return Task.FromResult<VersionInfo?>(version);
         }
 
@@ -317,27 +324,30 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Versioning
 
             // In infinite versioning, we NEVER actually delete versions
             // Instead, we mark them as expired or move to deep archive
-            if (_versionIndex.TryGetValue(itemId, out var versions))
+            lock (_globalLock)
             {
-                var version = versions.FirstOrDefault(v => v.VersionId == versionId);
-                if (version != null)
+                if (_versionIndex.TryGetValue(itemId, out var versions))
                 {
-                    // Check if version is protected
-                    if (version.IsImmutable)
-                        throw new InvalidOperationException("Cannot delete immutable version");
-
-                    if (version.IsOnLegalHold)
-                        throw new InvalidOperationException("Cannot delete version on legal hold");
-
-                    // Mark as expired instead of deleting
-                    var updatedVersion = version with
+                    var version = versions.FirstOrDefault(v => v.VersionId == versionId);
+                    if (version != null)
                     {
-                        ExpiresAt = DateTimeOffset.UtcNow,
-                        StorageTier = StorageTier.DeepArchive
-                    };
+                        // Check if version is protected
+                        if (version.IsImmutable)
+                            throw new InvalidOperationException("Cannot delete immutable version");
 
-                    var index = versions.IndexOf(version);
-                    versions[index] = updatedVersion;
+                        if (version.IsOnLegalHold)
+                            throw new InvalidOperationException("Cannot delete version on legal hold");
+
+                        // Mark as expired instead of deleting
+                        var updatedVersion = version with
+                        {
+                            ExpiresAt = DateTimeOffset.UtcNow,
+                            StorageTier = StorageTier.DeepArchive
+                        };
+
+                        var index = versions.IndexOf(version);
+                        versions[index] = updatedVersion;
+                    }
                 }
             }
 
@@ -358,10 +368,12 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Versioning
             ContentBlock[] blocks1 = _blockIndex.TryGetValue(versionId1, out var b1) ? b1 : Array.Empty<ContentBlock>();
             ContentBlock[] blocks2 = _blockIndex.TryGetValue(versionId2, out var b2) ? b2 : Array.Empty<ContentBlock>();
 
-            // Calculate differences at block level
-            var addedBlocks = blocks2.Where(b2 => !blocks1.Any(b1 => b1.BlockHash == b2.BlockHash)).ToList();
-            var removedBlocks = blocks1.Where(b1 => !blocks2.Any(b2 => b2.BlockHash == b1.BlockHash)).ToList();
-            var commonBlocks = blocks1.Where(b1 => blocks2.Any(b2 => b2.BlockHash == b1.BlockHash)).Count();
+            // Calculate differences at block level using HashSets for O(n) instead of O(n²) .Any() chains.
+            var hashes1 = new HashSet<string>(blocks1.Select(b => b.BlockHash), StringComparer.Ordinal);
+            var hashes2 = new HashSet<string>(blocks2.Select(b => b.BlockHash), StringComparer.Ordinal);
+            var addedBlocks = blocks2.Where(b => !hashes1.Contains(b.BlockHash)).ToList();
+            var removedBlocks = blocks1.Where(b => !hashes2.Contains(b.BlockHash)).ToList();
+            var commonBlocks = blocks1.Count(b => hashes2.Contains(b.BlockHash));
 
             var totalBytesChanged = addedBlocks.Sum(b => b.OriginalSize) + removedBlocks.Sum(b => b.OriginalSize);
             var totalSize = Math.Max(blocks1.Sum(b => b.OriginalSize), blocks2.Sum(b => b.OriginalSize));
@@ -410,14 +422,17 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Versioning
             if (string.IsNullOrWhiteSpace(versionId))
                 throw new ArgumentException("Version ID cannot be empty", nameof(versionId));
 
-            if (_versionIndex.TryGetValue(itemId, out var versions))
+            lock (_globalLock)
             {
-                var version = versions.FirstOrDefault(v => v.VersionId == versionId);
-                if (version != null)
+                if (_versionIndex.TryGetValue(itemId, out var versions))
                 {
-                    var updatedVersion = version with { IsImmutable = true };
-                    var index = versions.IndexOf(version);
-                    versions[index] = updatedVersion;
+                    var version = versions.FirstOrDefault(v => v.VersionId == versionId);
+                    if (version != null)
+                    {
+                        var updatedVersion = version with { IsImmutable = true };
+                        var index = versions.IndexOf(version);
+                        versions[index] = updatedVersion;
+                    }
                 }
             }
 
@@ -437,30 +452,33 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Versioning
             if (string.IsNullOrWhiteSpace(versionId))
                 throw new ArgumentException("Version ID cannot be empty", nameof(versionId));
 
-            if (_versionIndex.TryGetValue(itemId, out var versions))
+            lock (_globalLock)
             {
-                var version = versions.FirstOrDefault(v => v.VersionId == versionId);
-                if (version != null)
+                if (_versionIndex.TryGetValue(itemId, out var versions))
                 {
-                    var updatedMetadata = version.Metadata with
+                    var version = versions.FirstOrDefault(v => v.VersionId == versionId);
+                    if (version != null)
                     {
-                        Tags = new Dictionary<string, string>(version.Metadata.Tags)
+                        var updatedMetadata = version.Metadata with
                         {
-                            ["legal-hold"] = "true",
-                            ["legal-hold-reason"] = holdReason,
-                            ["legal-hold-date"] = DateTimeOffset.UtcNow.ToString("O")
-                        }
-                    };
+                            Tags = new Dictionary<string, string>(version.Metadata.Tags)
+                            {
+                                ["legal-hold"] = "true",
+                                ["legal-hold-reason"] = holdReason,
+                                ["legal-hold-date"] = DateTimeOffset.UtcNow.ToString("O")
+                            }
+                        };
 
-                    var updatedVersion = version with
-                    {
-                        IsOnLegalHold = true,
-                        Metadata = updatedMetadata,
-                        ExpiresAt = null // Clear expiration when on legal hold
-                    };
+                        var updatedVersion = version with
+                        {
+                            IsOnLegalHold = true,
+                            Metadata = updatedMetadata,
+                            ExpiresAt = null // Clear expiration when on legal hold
+                        };
 
-                    var index = versions.IndexOf(version);
-                    versions[index] = updatedVersion;
+                        var index = versions.IndexOf(version);
+                        versions[index] = updatedVersion;
+                    }
                 }
             }
 
@@ -479,25 +497,28 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Versioning
             if (string.IsNullOrWhiteSpace(versionId))
                 throw new ArgumentException("Version ID cannot be empty", nameof(versionId));
 
-            if (_versionIndex.TryGetValue(itemId, out var versions))
+            lock (_globalLock)
             {
-                var version = versions.FirstOrDefault(v => v.VersionId == versionId);
-                if (version != null)
+                if (_versionIndex.TryGetValue(itemId, out var versions))
                 {
-                    var updatedTags = new Dictionary<string, string>(version.Metadata.Tags);
-                    updatedTags.Remove("legal-hold");
-                    updatedTags.Remove("legal-hold-reason");
-                    updatedTags.Remove("legal-hold-date");
-
-                    var updatedMetadata = version.Metadata with { Tags = updatedTags };
-                    var updatedVersion = version with
+                    var version = versions.FirstOrDefault(v => v.VersionId == versionId);
+                    if (version != null)
                     {
-                        IsOnLegalHold = false,
-                        Metadata = updatedMetadata
-                    };
+                        var updatedTags = new Dictionary<string, string>(version.Metadata.Tags);
+                        updatedTags.Remove("legal-hold");
+                        updatedTags.Remove("legal-hold-reason");
+                        updatedTags.Remove("legal-hold-date");
 
-                    var index = versions.IndexOf(version);
-                    versions[index] = updatedVersion;
+                        var updatedMetadata = version.Metadata with { Tags = updatedTags };
+                        var updatedVersion = version with
+                        {
+                            IsOnLegalHold = false,
+                            Metadata = updatedMetadata
+                        };
+
+                        var index = versions.IndexOf(version);
+                        versions[index] = updatedVersion;
+                    }
                 }
             }
 
@@ -517,15 +538,18 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Versioning
             if (string.IsNullOrWhiteSpace(versionId))
                 throw new ArgumentException("Version ID cannot be empty", nameof(versionId));
 
-            if (_versionIndex.TryGetValue(itemId, out var versions))
+            lock (_globalLock)
             {
-                var version = versions.FirstOrDefault(v => v.VersionId == versionId);
-                if (version != null)
+                if (_versionIndex.TryGetValue(itemId, out var versions))
                 {
-                    // In a real implementation, this would move data between storage tiers
-                    var updatedVersion = version with { StorageTier = targetTier };
-                    var index = versions.IndexOf(version);
-                    versions[index] = updatedVersion;
+                    var version = versions.FirstOrDefault(v => v.VersionId == versionId);
+                    if (version != null)
+                    {
+                        // In a real implementation, this would move data between storage tiers
+                        var updatedVersion = version with { StorageTier = targetTier };
+                        var index = versions.IndexOf(version);
+                        versions[index] = updatedVersion;
+                    }
                 }
             }
 
@@ -663,12 +687,12 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Versioning
 
         private int GetNextVersionNumber(string itemId)
         {
-            if (!_versionIndex.TryGetValue(itemId, out var versions) || versions.Count == 0)
-            {
+            if (!_versionIndex.TryGetValue(itemId, out var versions))
                 return 1;
+            lock (_globalLock)
+            {
+                return versions.Count == 0 ? 1 : versions.Max(v => v.VersionNumber) + 1;
             }
-
-            return versions.Max(v => v.VersionNumber) + 1;
         }
 
         private void AddVersionToIndex(string itemId, VersionInfo version)
@@ -721,18 +745,23 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Versioning
             return blocks.ToArray();
         }
 
-        private byte[] CompressBlock(byte[] data)
+        private static byte[] CompressBlock(byte[] data)
         {
-            // In a real implementation, this would use Zstd compression
-            // For now, return the original data (no compression)
-            return data;
+            using var output = new MemoryStream();
+            using (var gz = new GZipStream(output, CompressionLevel.Fastest, leaveOpen: true))
+            {
+                gz.Write(data, 0, data.Length);
+            }
+            return output.ToArray();
         }
 
-        private byte[] DecompressBlock(byte[] data)
+        private static byte[] DecompressBlock(byte[] data)
         {
-            // In a real implementation, this would use Zstd decompression
-            // For now, return the original data (no decompression)
-            return data;
+            using var input = new MemoryStream(data);
+            using var gz = new GZipStream(input, CompressionMode.Decompress);
+            using var output = new MemoryStream();
+            gz.CopyTo(output);
+            return output.ToArray();
         }
 
         private byte[] ReconstructContent(ContentBlock[] blocks)

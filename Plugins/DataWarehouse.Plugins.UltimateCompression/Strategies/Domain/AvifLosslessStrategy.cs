@@ -283,8 +283,9 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Domain
             foreach (byte b in input)
             {
                 // Simple uniform distribution model
+                // Ensure step >= 1 to prevent interval inversion when range < 256
                 uint range = high - low + 1;
-                uint step = range / 256;
+                uint step = Math.Max(1u, range / 256);
 
                 high = low + (step * (uint)(b + 1)) - 1;
                 low = low + (step * (uint)b);
@@ -344,7 +345,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Domain
             for (int i = 0; i < outputLength; i++)
             {
                 uint range = high - low + 1;
-                uint step = range / 256;
+                // Ensure step >= 1 to prevent divide-by-zero when range < 256
+                uint step = Math.Max(1u, range / 256);
                 uint value = (code - low) / step;
 
                 byte symbol = (byte)Math.Min(value, 255);

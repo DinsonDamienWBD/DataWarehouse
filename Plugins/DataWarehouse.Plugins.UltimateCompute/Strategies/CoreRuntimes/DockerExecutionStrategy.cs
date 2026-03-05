@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using DataWarehouse.SDK.Contracts.Compute;
 
 namespace DataWarehouse.Plugins.UltimateCompute.Strategies.CoreRuntimes;
@@ -13,7 +14,15 @@ namespace DataWarehouse.Plugins.UltimateCompute.Strategies.CoreRuntimes;
 internal sealed class DockerExecutionStrategy : ComputeRuntimeStrategyBase
 {
     private readonly HttpClient _httpClient;
-    private const string DefaultDockerSocket = "http://localhost:2375"; // TCP fallback
+    // Default connection: Docker Engine API over TCP (localhost:2375, no TLS).
+    // For Unix socket support, inject an HttpClient with a UnixDomainSocketEndPoint handler
+    // that connects to /var/run/docker.sock using System.Net.Http.SocketsHttpHandler.
+    private const string DefaultDockerSocket = "http://localhost:2375";
+
+    // Allowlist for env var keys and container-safe names — prevents injection.
+    private static readonly Regex SafeEnvKeyRegex = new(@"^[a-zA-Z_][a-zA-Z0-9_]*$", RegexOptions.Compiled);
+    // Allowlist for volume mount paths — no shell metacharacters.
+    private static readonly Regex SafePathRegex = new(@"^[a-zA-Z0-9/_.\-]+$", RegexOptions.Compiled);
 
     /// <inheritdoc/>
     public override string StrategyId => "compute.container.docker";
@@ -46,7 +55,7 @@ internal sealed class DockerExecutionStrategy : ComputeRuntimeStrategyBase
         // Verify Docker daemon is accessible
         try
         {
-            var response = await _httpClient.GetAsync($"{DefaultDockerSocket}/v1.43/version", cancellationToken);
+            using var response = await _httpClient.GetAsync($"{DefaultDockerSocket}/v1.43/version", cancellationToken);
             response.EnsureSuccessStatusCode();
         }
         catch
@@ -126,18 +135,26 @@ internal sealed class DockerExecutionStrategy : ComputeRuntimeStrategyBase
         if (task.ResourceLimits?.AllowNetworkAccess == false)
             args.Append(" --network none");
 
-        // Volume mounts
+        // Volume mounts — validate paths to prevent path injection.
         if (task.ResourceLimits?.AllowFileSystemAccess == true && task.ResourceLimits.AllowedFileSystemPaths != null)
         {
             foreach (var path in task.ResourceLimits.AllowedFileSystemPaths)
+            {
+                if (!SafePathRegex.IsMatch(path))
+                    throw new ArgumentException($"Volume mount path '{path}' contains invalid characters.");
                 args.Append($" -v \"{path}:{path}:ro\"");
+            }
         }
 
-        // Environment variables
+        // Environment variables — validate keys to prevent injection.
         if (task.Environment != null)
         {
             foreach (var (key, value) in task.Environment)
-                args.Append($" -e \"{key}={value}\"");
+            {
+                if (!SafeEnvKeyRegex.IsMatch(key))
+                    throw new ArgumentException($"Environment variable key '{key}' contains invalid characters.");
+                args.Append($" -e \"{key}={value.Replace("\"", "\\\"")}\"");
+            }
         }
 
         args.Append($" {image}");

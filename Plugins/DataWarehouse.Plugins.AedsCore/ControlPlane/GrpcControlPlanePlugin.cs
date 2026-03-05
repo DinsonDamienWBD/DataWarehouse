@@ -48,6 +48,7 @@ public class GrpcControlPlanePlugin : ControlPlaneTransportPluginBase
     private Task? _receiveTask;
     private Channel<IntentManifest>? _manifestChannel;
     private const int MaxBackoffSeconds = 32;
+    // Atomic reconnect counter — written from heartbeat and receive background tasks (finding 977).
     private int _reconnectAttempt;
     private readonly SemaphoreSlim _sendLock = new(1, 1);
 
@@ -135,17 +136,17 @@ public class GrpcControlPlanePlugin : ControlPlaneTransportPluginBase
 
                 _streamCall = client.StreamManifests(metadata, cancellationToken: ct);
 
-                _reconnectAttempt = 0;
+                Interlocked.Exchange(ref _reconnectAttempt, 0);
                 _logger.LogInformation("gRPC stream established to {ServerUrl}", config.ServerUrl);
                 return;
             }
             catch (Exception ex) when (!ct.IsCancellationRequested)
             {
-                var backoffSeconds = Math.Min((int)Math.Pow(2, _reconnectAttempt), MaxBackoffSeconds);
+                var attempt = Interlocked.Increment(ref _reconnectAttempt);
+                var backoffSeconds = Math.Min((int)Math.Pow(2, attempt - 1), MaxBackoffSeconds);
                 _logger.LogWarning(ex, "gRPC connection failed, retrying in {BackoffSeconds}s (attempt {Attempt})",
-                    backoffSeconds, _reconnectAttempt + 1);
+                    backoffSeconds, attempt);
 
-                _reconnectAttempt++;
                 await Task.Delay(TimeSpan.FromSeconds(backoffSeconds), ct);
             }
         }

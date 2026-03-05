@@ -63,6 +63,18 @@ namespace DataWarehouse.SDK.Edge.Protocols
         /// <summary>
         /// Gets the password for broker authentication.
         /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The password is stored as a managed <see cref="string"/> and will reside on the managed heap
+        /// until garbage-collected. It may appear in heap dumps or memory snapshots. For high-security
+        /// deployments, retrieve the credential from a secret store (e.g. Azure Key Vault, HashiCorp
+        /// Vault) at connection time rather than storing it in a long-lived settings object.
+        /// </para>
+        /// <para>
+        /// Always combine with <see cref="UseTls"/> = <c>true</c> to prevent the credential from
+        /// being transmitted in plaintext over the network.
+        /// </para>
+        /// </remarks>
         public string? Password { get; init; }
 
         /// <summary>

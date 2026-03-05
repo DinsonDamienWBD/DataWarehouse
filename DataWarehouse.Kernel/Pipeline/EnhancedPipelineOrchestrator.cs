@@ -60,8 +60,10 @@ public sealed class EnhancedPipelineOrchestrator : IPipelineOrchestrator
     /// </summary>
     public PipelineConfiguration GetConfiguration()
     {
-        // For backward compatibility, return the Instance-level policy as a PipelineConfiguration
-        var instancePolicy = _configProvider.GetPolicyAsync(PolicyLevel.Instance, "default").Result;
+        // For backward compatibility, return the Instance-level policy as a PipelineConfiguration.
+        // Task.Run avoids deadlocks on synchronization-context-bound threads (ASP.NET, WPF, etc.).
+        var instancePolicy = Task.Run(() => _configProvider.GetPolicyAsync(PolicyLevel.Instance, "default"))
+            .ConfigureAwait(false).GetAwaiter().GetResult();
 
         if (instancePolicy == null)
         {

@@ -96,7 +96,8 @@ public sealed class S3SignatureV4 : IS3AuthProvider
         var creds = _credentialStore.GetCredentials(accessKeyId);
         if (creds is null)
         {
-            throw new KeyNotFoundException($"No credentials found for access key '{accessKeyId}'");
+            // P2-4574: Do not include the access key ID in the error — information disclosure.
+            throw new KeyNotFoundException("No credentials found for the provided access key.");
         }
         return Task.FromResult(creds);
     }
@@ -126,7 +127,8 @@ public sealed class S3SignatureV4 : IS3AuthProvider
         var credentials = _credentialStore.GetCredentials(accessKeyId);
         if (credentials is null)
         {
-            return Fail($"Unknown access key: {accessKeyId}");
+            // P2-4574: Do not leak access key ID in error response — use generic message.
+            return Fail("InvalidAccessKeyId: The AWS access key ID provided does not exist.");
         }
 
         // Parse credential scope: date/region/service/aws4_request
@@ -243,7 +245,8 @@ public sealed class S3SignatureV4 : IS3AuthProvider
         var credentials = _credentialStore.GetCredentials(accessKeyId);
         if (credentials is null)
         {
-            return Fail($"Unknown access key: {accessKeyId}");
+            // P2-4574: Do not leak access key ID in error response — use generic message.
+            return Fail("InvalidAccessKeyId: The AWS access key ID provided does not exist.");
         }
 
         // For presigned URLs, build canonical query string WITHOUT X-Amz-Signature
@@ -607,7 +610,8 @@ public sealed class S3SignatureV4 : IS3AuthProvider
     /// </summary>
     private static Dictionary<string, string> ParseQueryString(string queryString)
     {
-        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        // Finding 4587: AWS query param names are case-sensitive — use Ordinal, not OrdinalIgnoreCase.
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
 
         if (string.IsNullOrEmpty(queryString))
         {

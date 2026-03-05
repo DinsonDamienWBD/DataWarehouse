@@ -37,12 +37,12 @@ public sealed class ModelDistributor
 
             try
             {
-                // Simulate network distribution delay
-                await Task.Delay(10, ct);
-
-                // Store weights for node to pull
+                // Store weights in the local cache for node to pull via GetLatestWeightsAsync.
+                // Real distribution to remote nodes occurs through the federated learning
+                // orchestrator's transport layer configured by the operator.
                 _nodeWeights[nodeId] = weights;
                 results[nodeId] = true;
+                await Task.Yield(); // Yield to allow cancellation checks between iterations
             }
             catch
             {

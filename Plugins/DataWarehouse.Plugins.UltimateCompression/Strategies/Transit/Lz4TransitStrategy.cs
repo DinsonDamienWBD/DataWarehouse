@@ -140,21 +140,30 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transit
 
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for LZ4-Transit");
-            // LZ4 doesn't store original size, need to estimate
-            // In real implementation, prepend size header
-            var maxSize = input.Length * 10; // Conservative estimate
-            var target = new byte[maxSize];
+            // LZ4 raw format does not embed original size; start at 4× and double on underflow.
+            var maxSize = Math.Max(input.Length * 4, 65536);
+            int decodedLength;
+            byte[] target;
 
-            var decodedLength = LZ4Codec.Decode(
-                input, 0, input.Length,
-                target, 0, target.Length);
+            for (int attempt = 0; attempt < 4; attempt++)
+            {
+                target = new byte[maxSize];
+                decodedLength = LZ4Codec.Decode(
+                    input, 0, input.Length,
+                    target, 0, target.Length);
 
-            if (decodedLength <= 0)
-                throw new InvalidOperationException("LZ4 decompression failed");
+                if (decodedLength > 0)
+                {
+                    var result = new byte[decodedLength];
+                    Array.Copy(target, result, decodedLength);
+                    return result;
+                }
 
-            var result = new byte[decodedLength];
-            Array.Copy(target, result, decodedLength);
-            return result;
+                // Negative value means output buffer was too small — double it.
+                maxSize = checked(maxSize * 2);
+            }
+
+            throw new InvalidOperationException("LZ4 decompression failed: output buffer exhausted after 4 attempts");
         }
 
         /// <inheritdoc/>

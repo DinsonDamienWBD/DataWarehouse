@@ -5,6 +5,69 @@
 
 ## Project: DataWarehouse.Plugins.UltimateRAID
 
+### File: Plugins/DataWarehouse.Plugins.UltimateRAID/UltimateRaidPlugin.cs
+```csharp
+[PluginProfile(ServiceProfileType.Server)]
+public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.StoragePluginBase, IDisposable
+{
+#endregion
+}
+    public override string Id;;
+    public override string Name;;
+    public override string Version;;
+    public override PluginCategory Category;;
+    public string SemanticDescription;;
+    public string[] SemanticTags;;
+    public RaidRegistry Registry;;
+    public bool AuditEnabled { get => _auditEnabled; set => _auditEnabled = value; }
+    public bool AutoRebuildEnabled { get => _autoRebuildEnabled; set => _autoRebuildEnabled = value; }
+    public int MaxConcurrentRebuilds { get => _maxConcurrentRebuilds; set => _maxConcurrentRebuilds = value > 0 ? value : 1; }
+    public UltimateRaidPlugin();
+    public override async Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request);
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities
+{
+    get
+    {
+        var capabilities = new List<RegisteredCapability>();
+        // Core RAID operations
+        capabilities.Add(new RegisteredCapability { CapabilityId = $"{Id}.initialize", DisplayName = "Initialize RAID Array", Description = "Initialize a RAID array with specified configuration", Category = CapabilityCategory.Storage, SubCategory = "RAID", PluginId = Id, PluginName = Name, PluginVersion = Version, Tags = new[] { "raid", "storage", "initialize" }, SemanticDescription = "Initialize and configure a RAID array with the specified strategy and disk configuration" });
+        capabilities.Add(new RegisteredCapability { CapabilityId = $"{Id}.write", DisplayName = "RAID Write", Description = "Write data to RAID array with parity/redundancy handling", Category = CapabilityCategory.Storage, SubCategory = "RAID", PluginId = Id, PluginName = Name, PluginVersion = Version, Tags = new[] { "raid", "storage", "write", "io" }, SemanticDescription = "Write data to RAID array with automatic striping, mirroring, or parity calculation" });
+        capabilities.Add(new RegisteredCapability { CapabilityId = $"{Id}.read", DisplayName = "RAID Read", Description = "Read data from RAID array with automatic reconstruction", Category = CapabilityCategory.Storage, SubCategory = "RAID", PluginId = Id, PluginName = Name, PluginVersion = Version, Tags = new[] { "raid", "storage", "read", "io" }, SemanticDescription = "Read data from RAID array with automatic reconstruction if disk failure is detected" });
+        capabilities.Add(new RegisteredCapability { CapabilityId = $"{Id}.rebuild", DisplayName = "RAID Rebuild", Description = "Rebuild failed disk using parity/redundancy", Category = CapabilityCategory.Storage, SubCategory = "RAID", PluginId = Id, PluginName = Name, PluginVersion = Version, Tags = new[] { "raid", "storage", "rebuild", "recovery" }, SemanticDescription = "Rebuild a failed disk in the RAID array using parity data or mirrored copies" });
+        capabilities.Add(new RegisteredCapability { CapabilityId = $"{Id}.health", DisplayName = "RAID Health Check", Description = "Check RAID array health status with SMART monitoring", Category = CapabilityCategory.Storage, SubCategory = "RAID", PluginId = Id, PluginName = Name, PluginVersion = Version, Tags = new[] { "raid", "storage", "health", "monitoring", "smart" }, SemanticDescription = "Perform comprehensive health check on RAID array including SMART data analysis" });
+        // Intelligence-enhanced capabilities
+        if (IsIntelligenceAvailable)
+        {
+            capabilities.Add(new RegisteredCapability { CapabilityId = $"{Id}.predict-failure", DisplayName = "AI-Powered Disk Failure Prediction", Description = "Predict disk failures before they occur using AI analysis", Category = CapabilityCategory.Storage, SubCategory = "RAID", PluginId = Id, PluginName = Name, PluginVersion = Version, Tags = new[] { "raid", "storage", "ai", "prediction", "smart", "predictive-maintenance" }, SemanticDescription = "Use AI to analyze SMART data and I/O patterns to predict disk failures before they occur", Metadata = new Dictionary<string, object> { ["requiresIntelligence"] = true, ["predictionType"] = "disk-failure", ["outputFormat"] = "probability-with-timeframe" } });
+            capabilities.Add(new RegisteredCapability { CapabilityId = $"{Id}.optimize-level", DisplayName = "AI RAID Level Recommendation", Description = "Get AI-powered RAID level recommendations based on workload", Category = CapabilityCategory.Storage, SubCategory = "RAID", PluginId = Id, PluginName = Name, PluginVersion = Version, Tags = new[] { "raid", "storage", "ai", "optimization", "recommendation" }, SemanticDescription = "Analyze workload patterns and requirements to recommend optimal RAID level and configuration", Metadata = new Dictionary<string, object> { ["requiresIntelligence"] = true, ["analysisType"] = "workload-optimization", ["outputFormat"] = "ranked-recommendations" } });
+        }
+
+        // Strategy-specific capabilities
+        foreach (var strategy in _registry.GetAll())
+        {
+            capabilities.Add(new RegisteredCapability { CapabilityId = $"{Id}.strategy.{strategy.StrategyId}", DisplayName = $"RAID {strategy.RaidLevel} - {strategy.StrategyName}", Description = $"{strategy.StrategyName} ({strategy.Category})", Category = CapabilityCategory.Storage, SubCategory = $"RAID-{strategy.RaidLevel}", PluginId = Id, PluginName = Name, PluginVersion = Version, Tags = new[] { "raid", "storage", $"raid-{strategy.RaidLevel}", strategy.Category.ToLowerInvariant() }, SemanticDescription = $"RAID {strategy.RaidLevel} strategy providing {strategy.FaultTolerance}-disk fault tolerance " + $"with {strategy.StorageEfficiency:P0} storage efficiency", Metadata = new Dictionary<string, object> { ["strategyId"] = strategy.StrategyId, ["raidLevel"] = strategy.RaidLevel, ["category"] = strategy.Category, ["minimumDisks"] = strategy.MinimumDisks, ["faultTolerance"] = strategy.FaultTolerance, ["storageEfficiency"] = strategy.StorageEfficiency, ["readPerformance"] = strategy.ReadPerformanceMultiplier, ["writePerformance"] = strategy.WritePerformanceMultiplier, ["supportsHotSpare"] = strategy.SupportsHotSpare, ["supportsOnlineExpansion"] = strategy.SupportsOnlineExpansion, ["supportsHardwareAcceleration"] = strategy.SupportsHardwareAcceleration } });
+        }
+
+        return capabilities;
+    }
+}
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge();
+    protected override Task OnStartWithIntelligenceAsync(CancellationToken ct);
+    protected override Task OnStartWithoutIntelligenceAsync(CancellationToken ct);
+    protected override Task OnStartCoreAsync(CancellationToken ct);
+    protected override Dictionary<string, object> GetMetadata();
+    public override Task OnMessageAsync(PluginMessage message);
+    protected override void Dispose(bool disposing);
+    public override async Task<StorageObjectMetadata> StoreAsync(string key, Stream data, IDictionary<string, string>? metadata = null, CancellationToken ct = default);
+    public override async Task<Stream> RetrieveAsync(string key, CancellationToken ct = default);
+    public override Task DeleteAsync(string key, CancellationToken ct = default);
+    public override Task<bool> ExistsAsync(string key, CancellationToken ct = default);
+    public override async IAsyncEnumerable<StorageObjectMetadata> ListAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct = default);
+    public override Task<StorageObjectMetadata> GetMetadataAsync(string key, CancellationToken ct = default);
+    public override async Task<StorageHealthInfo> GetHealthAsync(CancellationToken ct = default);
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateRAID/IRaidStrategy.cs
 ```csharp
 public interface IRaidStrategy
@@ -318,66 +381,84 @@ public static class RaidTopics
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateRAID/UltimateRaidPlugin.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Features/RaidLevelMigration.cs
 ```csharp
-[PluginProfile(ServiceProfileType.Server)]
-public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.StoragePluginBase, IDisposable
+public sealed class RaidLevelMigration
 {
-#endregion
 }
-    public override string Id;;
-    public override string Name;;
-    public override string Version;;
-    public override PluginCategory Category;;
-    public string SemanticDescription;;
-    public string[] SemanticTags;;
-    public RaidRegistry Registry;;
-    public bool AuditEnabled { get => _auditEnabled; set => _auditEnabled = value; }
-    public bool AutoRebuildEnabled { get => _autoRebuildEnabled; set => _autoRebuildEnabled = value; }
-    public int MaxConcurrentRebuilds { get => _maxConcurrentRebuilds; set => _maxConcurrentRebuilds = value > 0 ? value : 1; }
-    public UltimateRaidPlugin();
-    public override async Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request);
-    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities
+    public static readonly IReadOnlyDictionary<RaidLevel, RaidLevel[]> SupportedMigrations = new Dictionary<RaidLevel, RaidLevel[]>
 {
-    get
+    [RaidLevel.Raid0] = new[]
     {
-        var capabilities = new List<RegisteredCapability>();
-        // Core RAID operations
-        capabilities.Add(new RegisteredCapability { CapabilityId = $"{Id}.initialize", DisplayName = "Initialize RAID Array", Description = "Initialize a RAID array with specified configuration", Category = CapabilityCategory.Storage, SubCategory = "RAID", PluginId = Id, PluginName = Name, PluginVersion = Version, Tags = new[] { "raid", "storage", "initialize" }, SemanticDescription = "Initialize and configure a RAID array with the specified strategy and disk configuration" });
-        capabilities.Add(new RegisteredCapability { CapabilityId = $"{Id}.write", DisplayName = "RAID Write", Description = "Write data to RAID array with parity/redundancy handling", Category = CapabilityCategory.Storage, SubCategory = "RAID", PluginId = Id, PluginName = Name, PluginVersion = Version, Tags = new[] { "raid", "storage", "write", "io" }, SemanticDescription = "Write data to RAID array with automatic striping, mirroring, or parity calculation" });
-        capabilities.Add(new RegisteredCapability { CapabilityId = $"{Id}.read", DisplayName = "RAID Read", Description = "Read data from RAID array with automatic reconstruction", Category = CapabilityCategory.Storage, SubCategory = "RAID", PluginId = Id, PluginName = Name, PluginVersion = Version, Tags = new[] { "raid", "storage", "read", "io" }, SemanticDescription = "Read data from RAID array with automatic reconstruction if disk failure is detected" });
-        capabilities.Add(new RegisteredCapability { CapabilityId = $"{Id}.rebuild", DisplayName = "RAID Rebuild", Description = "Rebuild failed disk using parity/redundancy", Category = CapabilityCategory.Storage, SubCategory = "RAID", PluginId = Id, PluginName = Name, PluginVersion = Version, Tags = new[] { "raid", "storage", "rebuild", "recovery" }, SemanticDescription = "Rebuild a failed disk in the RAID array using parity data or mirrored copies" });
-        capabilities.Add(new RegisteredCapability { CapabilityId = $"{Id}.health", DisplayName = "RAID Health Check", Description = "Check RAID array health status with SMART monitoring", Category = CapabilityCategory.Storage, SubCategory = "RAID", PluginId = Id, PluginName = Name, PluginVersion = Version, Tags = new[] { "raid", "storage", "health", "monitoring", "smart" }, SemanticDescription = "Perform comprehensive health check on RAID array including SMART data analysis" });
-        // Intelligence-enhanced capabilities
-        if (IsIntelligenceAvailable)
-        {
-            capabilities.Add(new RegisteredCapability { CapabilityId = $"{Id}.predict-failure", DisplayName = "AI-Powered Disk Failure Prediction", Description = "Predict disk failures before they occur using AI analysis", Category = CapabilityCategory.Storage, SubCategory = "RAID", PluginId = Id, PluginName = Name, PluginVersion = Version, Tags = new[] { "raid", "storage", "ai", "prediction", "smart", "predictive-maintenance" }, SemanticDescription = "Use AI to analyze SMART data and I/O patterns to predict disk failures before they occur", Metadata = new Dictionary<string, object> { ["requiresIntelligence"] = true, ["predictionType"] = "disk-failure", ["outputFormat"] = "probability-with-timeframe" } });
-            capabilities.Add(new RegisteredCapability { CapabilityId = $"{Id}.optimize-level", DisplayName = "AI RAID Level Recommendation", Description = "Get AI-powered RAID level recommendations based on workload", Category = CapabilityCategory.Storage, SubCategory = "RAID", PluginId = Id, PluginName = Name, PluginVersion = Version, Tags = new[] { "raid", "storage", "ai", "optimization", "recommendation" }, SemanticDescription = "Analyze workload patterns and requirements to recommend optimal RAID level and configuration", Metadata = new Dictionary<string, object> { ["requiresIntelligence"] = true, ["analysisType"] = "workload-optimization", ["outputFormat"] = "ranked-recommendations" } });
-        }
-
-        // Strategy-specific capabilities
-        foreach (var strategy in _registry.GetAll())
-        {
-            capabilities.Add(new RegisteredCapability { CapabilityId = $"{Id}.strategy.{strategy.StrategyId}", DisplayName = $"RAID {strategy.RaidLevel} - {strategy.StrategyName}", Description = $"{strategy.StrategyName} ({strategy.Category})", Category = CapabilityCategory.Storage, SubCategory = $"RAID-{strategy.RaidLevel}", PluginId = Id, PluginName = Name, PluginVersion = Version, Tags = new[] { "raid", "storage", $"raid-{strategy.RaidLevel}", strategy.Category.ToLowerInvariant() }, SemanticDescription = $"RAID {strategy.RaidLevel} strategy providing {strategy.FaultTolerance}-disk fault tolerance " + $"with {strategy.StorageEfficiency:P0} storage efficiency", Metadata = new Dictionary<string, object> { ["strategyId"] = strategy.StrategyId, ["raidLevel"] = strategy.RaidLevel, ["category"] = strategy.Category, ["minimumDisks"] = strategy.MinimumDisks, ["faultTolerance"] = strategy.FaultTolerance, ["storageEfficiency"] = strategy.StorageEfficiency, ["readPerformance"] = strategy.ReadPerformanceMultiplier, ["writePerformance"] = strategy.WritePerformanceMultiplier, ["supportsHotSpare"] = strategy.SupportsHotSpare, ["supportsOnlineExpansion"] = strategy.SupportsOnlineExpansion, ["supportsHardwareAcceleration"] = strategy.SupportsHardwareAcceleration } });
-        }
-
-        return capabilities;
+        RaidLevel.Raid5,
+        RaidLevel.Raid6,
+        RaidLevel.Raid10
+    },
+    [RaidLevel.Raid1] = new[]
+    {
+        RaidLevel.Raid5,
+        RaidLevel.Raid6,
+        RaidLevel.Raid10
+    },
+    [RaidLevel.Raid5] = new[]
+    {
+        RaidLevel.Raid6,
+        RaidLevel.Raid50,
+        RaidLevel.Raid10
+    },
+    [RaidLevel.Raid6] = new[]
+    {
+        RaidLevel.Raid60,
+        RaidLevel.Raid5
+    },
+    [RaidLevel.Raid10] = new[]
+    {
+        RaidLevel.Raid5,
+        RaidLevel.Raid6,
+        RaidLevel.Raid50
+    },
+    [RaidLevel.RaidZ1] = new[]
+    {
+        RaidLevel.RaidZ2,
+        RaidLevel.RaidZ3
+    },
+    [RaidLevel.RaidZ2] = new[]
+    {
+        RaidLevel.RaidZ3
     }
+};
+    public bool CanMigrate(RaidLevel from, RaidLevel to);
+    public TimeSpan EstimateMigrationTime(RaidLevel from, RaidLevel to, long totalCapacityBytes, int diskCount, long diskThroughputBytesPerSecond = 100_000_000);
+    public async Task<MigrationResult> MigrateAsync(string arrayId, RaidLevel sourceLevel, RaidLevel targetLevel, IEnumerable<DiskInfo> disks, MigrationOptions? options = null, IProgress<MigrationProgress>? progress = null, CancellationToken cancellationToken = default);
+    public MigrationState? GetMigrationStatus(string arrayId);
+    public async Task<bool> CancelMigrationAsync(string arrayId, CancellationToken cancellationToken = default);
 }
-    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge();
-    protected override Task OnStartWithIntelligenceAsync(CancellationToken ct);
-    protected override Task OnStartWithoutIntelligenceAsync(CancellationToken ct);
-    protected override Task OnStartCoreAsync(CancellationToken ct);
-    protected override Dictionary<string, object> GetMetadata();
-    public override Task OnMessageAsync(PluginMessage message);
-    protected override void Dispose(bool disposing);
-    public override async Task<StorageObjectMetadata> StoreAsync(string key, Stream data, IDictionary<string, string>? metadata = null, CancellationToken ct = default);
-    public override async Task<Stream> RetrieveAsync(string key, CancellationToken ct = default);
-    public override Task DeleteAsync(string key, CancellationToken ct = default);
-    public override Task<bool> ExistsAsync(string key, CancellationToken ct = default);
-    public override async IAsyncEnumerable<StorageObjectMetadata> ListAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct = default);
-    public override Task<StorageObjectMetadata> GetMetadataAsync(string key, CancellationToken ct = default);
-    public override async Task<StorageHealthInfo> GetHealthAsync(CancellationToken ct = default);
+```
+```csharp
+public sealed class MigrationState
+{
+}
+    public string ArrayId { get; set; };
+    public RaidLevel SourceLevel { get; set; }
+    public RaidLevel TargetLevel { get; set; }
+    public MigrationStatus Status { get; set; }
+    public DateTime StartTime { get; set; }
+    public DateTime? EndTime { get; set; }
+    public long BlocksMigrated { get; set; }
+    public long TotalBlocks { get; set; }
+    public string? ErrorMessage { get; set; }
+    public double ProgressPercent;;
+}
+```
+```csharp
+public sealed class MigrationOptions
+{
+}
+    public int MaxIOPS { get; set; };
+    public int MaxBandwidthMBps { get; set; };
+    public bool VerifyAfterMigration { get; set; };
+    public bool CreateCheckpoints { get; set; };
+    public int CheckpointIntervalBlocks { get; set; };
 }
 ```
 
@@ -461,162 +542,12 @@ public sealed class BadBlockMapExport
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Features/Deduplication.cs
-```csharp
-public sealed class RaidDeduplication
-{
-}
-    public RaidDeduplication(DedupConfiguration? config = null);
-    public InlineDedupResult DeduplicateInline(string arrayId, byte[] data, long logicalAddress, DedupMode mode = DedupMode.FixedBlock);
-    public async Task<PostRaidDedupResult> DeduplicatePostRaidAsync(string arrayId, long startAddress, long endAddress, IProgress<double>? progress = null, CancellationToken cancellationToken = default);
-    public DedupAwareParity CalculateDedupAwareParity(string arrayId, IEnumerable<DedupChunk> chunks, int parityDisks = 1);
-    public DedupStatistics GetStatistics(string arrayId);
-    public async Task<GarbageCollectionResult> CollectGarbageAsync(string arrayId, CancellationToken cancellationToken = default);
-}
-```
-```csharp
-public sealed class DedupIndex
-{
-}
-    public DedupIndex(string arrayId);
-    public int Count;;
-    public DedupEntry? Lookup(byte[] hash);;
-    public void Add(byte[] hash, DedupEntry entry);;
-    public void Remove(byte[] hash);;
-    public IEnumerable<DedupEntry> GetEntriesWithZeroReferences();;
-}
-```
-```csharp
-public sealed class DedupEntry
-{
-}
-    public byte[] Hash { get; set; };
-    public long StorageAddress { get; set; }
-    public int Size { get; set; }
-    public int ReferenceCount { get; set; }
-    public DateTime CreatedTime { get; set; }
-    public DateTime LastReferenced { get; set; }
-}
-```
-```csharp
-public sealed class DedupConfiguration
-{
-}
-    public int BlockSize { get; set; };
-    public int MinBlockSize { get; set; };
-    public int MaxBlockSize { get; set; };
-    public bool EnableCompression { get; set; };
-}
-```
-```csharp
-public sealed class DataChunk
-{
-}
-    public int Offset { get; set; }
-    public int Length { get; set; }
-    public byte[] Data { get; set; };
-}
-```
-```csharp
-public sealed class DedupChunk
-{
-}
-    public int Offset { get; set; }
-    public int Length { get; set; }
-    public byte[] Hash { get; set; };
-    public bool IsDuplicate { get; set; }
-    public byte[]? Data { get; set; }
-    public long StorageAddress { get; set; }
-    public long ReferencedAddress { get; set; }
-}
-```
-```csharp
-public sealed class InlineDedupResult
-{
-}
-    public int OriginalSize { get; set; }
-    public int DedupedSize { get; set; }
-    public int UniqueBlocks { get; set; }
-    public int DuplicateBlocks { get; set; }
-    public double DedupRatio { get; set; }
-    public List<DedupChunk> Chunks { get; set; };
-}
-```
-```csharp
-public sealed class PostRaidDedupResult
-{
-}
-    public string ArrayId { get; set; };
-    public long StartAddress { get; set; }
-    public long EndAddress { get; set; }
-    public int DuplicateGroupsFound { get; set; }
-    public long BlocksConsolidated { get; set; }
-    public long SpaceSaved { get; set; }
-    public DateTime StartTime { get; set; }
-    public DateTime EndTime { get; set; }
-    public TimeSpan Duration { get; set; }
-}
-```
-```csharp
-public sealed class DedupAwareParity
-{
-}
-    public string ArrayId { get; set; };
-    public int TotalChunks { get; set; }
-    public int UniqueChunks { get; set; }
-    public List<byte[]> ParityBlocks { get; set; };
-    public long ParityBytesCalculated { get; set; }
-    public double ParityOptimizationRatio { get; set; }
-    public List<DedupParityReference> DuplicateReferences { get; set; };
-}
-```
-```csharp
-public sealed class DedupParityReference
-{
-}
-    public byte[] ChunkHash { get; set; };
-    public long ReferencedAddress { get; set; }
-    public long ParityAddress { get; set; }
-}
-```
-```csharp
-public sealed class DedupStatistics
-{
-}
-    public string ArrayId { get; set; };
-    public long TotalBlocksProcessed { get; set; }
-    public long DuplicateBlocksFound { get; set; }
-    public long BytesSaved { get; set; }
-    public int UniqueBlocksStored { get; set; }
-    public double DedupRatio { get; set; }
-    public long IndexSizeBytes { get; set; }
-}
-```
-```csharp
-public sealed class GarbageCollectionResult
-{
-}
-    public string ArrayId { get; set; };
-    public int EntriesRemoved { get; set; }
-    public long BytesReclaimed { get; set; }
-    public DateTime StartTime { get; set; }
-    public DateTime EndTime { get; set; }
-}
-```
-```csharp
-internal sealed class ByteArrayComparer : IEqualityComparer<byte[]>
-{
-}
-    public bool Equals(byte[]? x, byte[]? y);
-    public int GetHashCode(byte[] obj);
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Features/GeoRaid.cs
 ```csharp
 public sealed class GeoRaid
 {
 }
+    public DataWarehouse.SDK.Contracts.IMessageBus? MessageBus { get; set; }
     public void ConfigureCrossDatacenterParity(string arrayId, IEnumerable<DatacenterConfig> datacenters, ParityDistributionStrategy strategy = ParityDistributionStrategy.DistributedParity);
     public void DefineFailureDomain(string domainId, string name, GeographicLocation location, IEnumerable<string> datacenterIds, FailureDomainType domainType = FailureDomainType.Region);
     public StripeAllocation GetLatencyAwareStriping(string arrayId, long blockIndex, LatencyOptimizationMode mode = LatencyOptimizationMode.MinimizeP99);
@@ -756,6 +687,651 @@ public sealed class DatacenterStatus
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Features/Deduplication.cs
+```csharp
+public sealed class RaidDeduplication
+{
+}
+    public RaidDeduplication(DedupConfiguration? config = null);
+    public InlineDedupResult DeduplicateInline(string arrayId, byte[] data, long logicalAddress, DedupMode mode = DedupMode.FixedBlock);
+    public async Task<PostRaidDedupResult> DeduplicatePostRaidAsync(string arrayId, long startAddress, long endAddress, IProgress<double>? progress = null, CancellationToken cancellationToken = default);
+    public DedupAwareParity CalculateDedupAwareParity(string arrayId, IEnumerable<DedupChunk> chunks, int parityDisks = 1);
+    public DedupStatistics GetStatistics(string arrayId);
+    public async Task<GarbageCollectionResult> CollectGarbageAsync(string arrayId, CancellationToken cancellationToken = default);
+}
+```
+```csharp
+public sealed class DedupIndex
+{
+}
+    public string? DevicePath { get; set; }
+    public DedupIndex(string arrayId);
+    public int Count;;
+    public DedupEntry? Lookup(byte[] hash);;
+    public void Add(byte[] hash, DedupEntry entry);;
+    public void Remove(byte[] hash);;
+    public IEnumerable<DedupEntry> GetEntriesWithZeroReferences();;
+    public void UpdateReference(long from, long to);;
+    public void FreeAddress(long address);;
+    public long ResolveAddress(long address);;
+}
+```
+```csharp
+public sealed class DedupEntry
+{
+}
+    public byte[] Hash { get; set; };
+    public long StorageAddress { get; set; }
+    public int Size { get; set; }
+    public int ReferenceCount { get; set; }
+    public DateTime CreatedTime { get; set; }
+    public DateTime LastReferenced { get; set; }
+}
+```
+```csharp
+public sealed class DedupConfiguration
+{
+}
+    public int BlockSize { get; set; };
+    public int MinBlockSize { get; set; };
+    public int MaxBlockSize { get; set; };
+    public bool EnableCompression { get; set; };
+}
+```
+```csharp
+public sealed class DataChunk
+{
+}
+    public int Offset { get; set; }
+    public int Length { get; set; }
+    public byte[] Data { get; set; };
+}
+```
+```csharp
+public sealed class DedupChunk
+{
+}
+    public int Offset { get; set; }
+    public int Length { get; set; }
+    public byte[] Hash { get; set; };
+    public bool IsDuplicate { get; set; }
+    public byte[]? Data { get; set; }
+    public long StorageAddress { get; set; }
+    public long ReferencedAddress { get; set; }
+}
+```
+```csharp
+public sealed class InlineDedupResult
+{
+}
+    public int OriginalSize { get; set; }
+    public int DedupedSize { get; set; }
+    public int UniqueBlocks { get; set; }
+    public int DuplicateBlocks { get; set; }
+    public double DedupRatio { get; set; }
+    public List<DedupChunk> Chunks { get; set; };
+}
+```
+```csharp
+public sealed class PostRaidDedupResult
+{
+}
+    public string ArrayId { get; set; };
+    public long StartAddress { get; set; }
+    public long EndAddress { get; set; }
+    public int DuplicateGroupsFound { get; set; }
+    public long BlocksConsolidated { get; set; }
+    public long SpaceSaved { get; set; }
+    public DateTime StartTime { get; set; }
+    public DateTime EndTime { get; set; }
+    public TimeSpan Duration { get; set; }
+}
+```
+```csharp
+public sealed class DedupAwareParity
+{
+}
+    public string ArrayId { get; set; };
+    public int TotalChunks { get; set; }
+    public int UniqueChunks { get; set; }
+    public List<byte[]> ParityBlocks { get; set; };
+    public long ParityBytesCalculated { get; set; }
+    public double ParityOptimizationRatio { get; set; }
+    public List<DedupParityReference> DuplicateReferences { get; set; };
+}
+```
+```csharp
+public sealed class DedupParityReference
+{
+}
+    public byte[] ChunkHash { get; set; };
+    public long ReferencedAddress { get; set; }
+    public long ParityAddress { get; set; }
+}
+```
+```csharp
+public sealed class DedupStatistics
+{
+}
+    public string ArrayId { get; set; };
+    public long TotalBlocksProcessed { get; set; }
+    public long DuplicateBlocksFound { get; set; }
+    public long BytesSaved { get; set; }
+    public int UniqueBlocksStored { get; set; }
+    public double DedupRatio { get; set; }
+    public long IndexSizeBytes { get; set; }
+}
+```
+```csharp
+public sealed class GarbageCollectionResult
+{
+}
+    public string ArrayId { get; set; };
+    public int EntriesRemoved { get; set; }
+    public long BytesReclaimed { get; set; }
+    public DateTime StartTime { get; set; }
+    public DateTime EndTime { get; set; }
+}
+```
+```csharp
+internal sealed class ByteArrayComparer : IEqualityComparer<byte[]>
+{
+}
+    public bool Equals(byte[]? x, byte[]? y);
+    public int GetHashCode(byte[] obj);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Features/RaidPluginMigration.cs
+```csharp
+public sealed class RaidPluginMigration
+{
+}
+    public void RegisterLegacyPlugin(string pluginId, LegacyPluginInfo info);
+    public IReadOnlyList<LegacyPluginAdapter> GetMigrationStatus();
+    public async Task<PluginMigrationResult> MigratePluginAsync(string pluginId, PluginMigrationOptions? options = null, IProgress<double>? progress = null, CancellationToken cancellationToken = default);
+    public CompatibilityMapping CreateCompatibilityMapping(string legacyPluginId);
+    public MigrationRegistry Registry;;
+    public static IReadOnlyList<LegacyPluginInfo> GetKnownLegacyPlugins();;
+}
+```
+```csharp
+public sealed class LegacyPluginAdapter
+{
+}
+    public string PluginId { get; set; };
+    public LegacyPluginInfo Info { get; set; };
+    public PluginMigrationStatus Status { get; set; }
+    public DateTime RegisteredTime { get; set; }
+    public DateTime? MigratedTime { get; set; }
+    public string? ErrorMessage { get; set; }
+    public Dictionary<string, object>? Configuration { get; set; }
+    public IEnumerable<string>? ArrayIds { get; set; }
+}
+```
+```csharp
+public sealed class LegacyPluginInfo
+{
+}
+    public string PluginId { get; set; };
+    public string Name { get; set; };
+    public string Version { get; set; };
+    public string[] Strategies { get; set; };
+}
+```
+```csharp
+public sealed class PluginMigrationOptions
+{
+}
+    public bool PreserveOldConfig { get; set; };
+    public bool CreateBackup { get; set; };
+    public bool VerifyAfterMigration { get; set; };
+    public bool UpdateReferences { get; set; };
+    public bool CopyConfiguration { get; set; };
+}
+```
+```csharp
+public sealed class PluginMigrationResult
+{
+}
+    public bool Success { get; set; }
+    public string PluginId { get; set; };
+    public string Message { get; set; };
+    public int ConfigurationsMigrated { get; set; }
+    public int ArraysMigrated { get; set; }
+    public int StrategiesMigrated { get; set; }
+    public DateTime StartTime { get; set; }
+    public DateTime EndTime { get; set; }
+    public TimeSpan Duration;;
+}
+```
+```csharp
+public sealed class ValidationResult
+{
+}
+    public bool IsValid { get; set; }
+    public string Message { get; set; };
+    public List<string> Warnings { get; set; };
+}
+```
+```csharp
+public sealed class CompatibilityMapping
+{
+}
+    public string LegacyPluginId { get; set; };
+    public string UltimateRaidPluginId { get; set; };
+    public Dictionary<string, string> StrategyMappings { get; set; };
+    public Dictionary<string, string> ApiMappings { get; set; };
+    public Dictionary<string, string> ConfigMappings { get; set; };
+}
+```
+```csharp
+public sealed class MigrationRegistry
+{
+}
+    public void AddEntry(string pluginId, LegacyPluginInfo info);
+    public IReadOnlyList<MigrationEntry> GetEntries();
+    public void UpdateStatus(string pluginId, string status);
+    public void SetOption(string pluginId, string key, object value);
+}
+```
+```csharp
+public sealed class MigrationEntry
+{
+}
+    public string PluginId { get; set; };
+    public string PluginName { get; set; };
+    public DateTime RegisteredTime { get; set; }
+    public DateTime? UpdatedTime { get; set; }
+    public string Status { get; set; };
+    public Dictionary<string, object> Options { get; set; };
+}
+```
+```csharp
+public static class DeprecationNotices
+{
+}
+    public static readonly IReadOnlyDictionary<string, string> DeprecatedPlugins = new Dictionary<string, string>
+{
+    ["DataWarehouse.Plugins.Raid"] = "UltimateRAID Standard strategies (RAID 0/1/5)",
+    ["DataWarehouse.Plugins.StandardRaid"] = "UltimateRAID Standard strategies (RAID 0/1/5/6/10)",
+    ["DataWarehouse.Plugins.AdvancedRaid"] = "UltimateRAID Extended strategies (RAID 50/60, RAID-Z)",
+    ["DataWarehouse.Plugins.EnhancedRaid"] = "UltimateRAID Extended strategies (RAID 1E/5E/6E)",
+    ["DataWarehouse.Plugins.NestedRaid"] = "UltimateRAID Nested strategies (RAID 10/01/100)",
+    ["DataWarehouse.Plugins.SelfHealingRaid"] = "UltimateRAID Adaptive strategies (SelfHealing)",
+    ["DataWarehouse.Plugins.ZfsRaid"] = "UltimateRAID ZFS strategies (RAID-Z1/Z2/Z3)",
+    ["DataWarehouse.Plugins.VendorSpecificRaid"] = "UltimateRAID Vendor strategies (NetApp, Dell, HP, Synology)",
+    ["DataWarehouse.Plugins.ExtendedRaid"] = "UltimateRAID Extended strategies (Matrix, Tiered)",
+    ["DataWarehouse.Plugins.AutoRaid"] = "UltimateRAID Adaptive strategies (AutoLevelSelector)",
+    ["DataWarehouse.Plugins.SharedRaidUtilities"] = "DataWarehouse.SDK.Mathematics (GaloisField, ReedSolomon)",
+    ["DataWarehouse.Plugins.ErasureCoding"] = "UltimateRAID ErasureCoding strategies (ReedSolomon, LRC)"
+};
+    public static string GenerateNotice(string pluginId, string replacementId);
+    public static bool IsDeprecated(string pluginId);;
+    public static string? GetReplacement(string pluginId);;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Features/PerformanceOptimization.cs
+```csharp
+public sealed class RaidPerformanceOptimizer
+{
+}
+    public RaidPerformanceOptimizer(PerformanceConfig? config = null);
+    public async Task<CoalescedWriteResult> SubmitWriteAsync(string arrayId, long offset, byte[] data, WritePriority priority = WritePriority.Normal, CancellationToken cancellationToken = default);
+    public async Task<PrefetchedReadResult> ReadWithPrefetchAsync(string arrayId, long offset, int length, string workloadHint = "sequential", CancellationToken cancellationToken = default);
+    public async Task<CacheWriteResult> WriteWithCacheAsync(string arrayId, long offset, byte[] data, CacheWriteMode mode = CacheWriteMode.WriteBack, CancellationToken cancellationToken = default);
+    public async Task<CacheFlushResult> FlushCacheAsync(string? arrayId = null, bool force = false, CancellationToken cancellationToken = default);
+    public async Task<ScheduleResult> ScheduleIoAsync(IoRequest request, CancellationToken cancellationToken = default);
+    public void ConfigureQos(string workloadId, QosPolicy policy);
+    public QosStatistics GetQosStatistics(string workloadId);
+    public PerformanceStatistics GetStatistics();
+}
+```
+```csharp
+public sealed class WriteCoalescer
+{
+}
+    public WriteCoalescer(WriteCoalescingConfig? config = null);
+    public CoalescedWriteResult AddWrite(string arrayId, long offset, byte[] data, WritePriority priority);
+    public WriteCoalescingStatistics GetStatistics();
+}
+```
+```csharp
+public sealed class ReadAheadPrefetcher
+{
+}
+    public ReadAheadPrefetcher(PrefetchConfig? config = null);
+    public byte[]? GetCached(string arrayId, long offset, int length);
+    public async Task PrefetchAheadAsync(string arrayId, long startOffset, string workloadHint, CancellationToken cancellationToken);
+    public PrefetchStatistics GetStatistics();
+}
+```
+```csharp
+public sealed class WriteBackCache
+{
+}
+    public WriteBackCache(WriteCacheConfig? config = null);
+    public bool CacheWrite(string arrayId, long offset, byte[] data);
+    public IEnumerable<CacheEntry> GetDirtyEntries(string? arrayId = null);
+    public void MarkClean(string arrayId, long offset);
+    public WriteCacheStatistics GetStatistics();
+}
+```
+```csharp
+public sealed class IoScheduler
+{
+}
+    public IoScheduler(SchedulerConfig? config = null);
+    public async Task<ScheduleResult> ScheduleAsync(IoRequest request, CancellationToken cancellationToken);
+    public async Task<IoResult> ExecuteReadAsync(IoRequest request, CancellationToken cancellationToken);
+    public SchedulerStatistics GetStatistics();
+}
+```
+```csharp
+public sealed class QosEnforcer
+{
+}
+    public QosEnforcer(QosConfig? config = null);
+    public void SetPolicy(string workloadId, QosPolicy policy);
+    public async Task ThrottleIfNeededAsync(string workloadId, IoType type, long bytes, CancellationToken cancellationToken);
+    public QosStatistics GetStatistics(string workloadId);
+}
+```
+```csharp
+public sealed class PerformanceConfig
+{
+}
+    public WriteCoalescingConfig WriteCoalescingConfig { get; set; };
+    public PrefetchConfig PrefetchConfig { get; set; };
+    public WriteCacheConfig WriteCacheConfig { get; set; };
+    public SchedulerConfig SchedulerConfig { get; set; };
+    public QosConfig QosConfig { get; set; };
+}
+```
+```csharp
+public sealed class WriteCoalescingConfig
+{
+}
+    public int MaxBatchSizeBytes { get; set; };
+    public int MaxWritesPerBatch { get; set; };
+    public TimeSpan MaxBatchDelay { get; set; };
+    public int BatchAlignmentBytes { get; set; };
+}
+```
+```csharp
+public sealed class PrefetchConfig
+{
+}
+    public int SequentialPrefetchBytes { get; set; };
+    public int RandomPrefetchBytes { get; set; };
+    public int DefaultPrefetchBytes { get; set; };
+    public int PrefetchDepth { get; set; };
+}
+```
+```csharp
+public sealed class WriteCacheConfig
+{
+}
+    public long MaxCacheSizeBytes { get; set; };
+    public TimeSpan FlushInterval { get; set; };
+    public bool BatteryBackedRequired { get; set; };
+}
+```
+```csharp
+public sealed class SchedulerConfig
+{
+}
+    public int MaxConcurrentIo { get; set; };
+    public SchedulingAlgorithm Algorithm { get; set; };
+}
+```
+```csharp
+public sealed class QosConfig
+{
+}
+    public bool Enabled { get; set; };
+    public int DefaultMaxIops { get; set; };
+    public int DefaultMaxBandwidthMbps { get; set; };
+}
+```
+```csharp
+public sealed class CoalesceBatch
+{
+}
+    public string ArrayId { get; set; };
+    public long StartOffset { get; set; }
+    public DateTime CreatedTime { get; set; }
+    public List<PendingWrite> Writes { get; set; };
+    public int TotalBytes { get; set; }
+}
+```
+```csharp
+public sealed class PendingWrite
+{
+}
+    public long Offset { get; set; }
+    public byte[] Data { get; set; };
+    public WritePriority Priority { get; set; }
+}
+```
+```csharp
+public sealed class CoalescedWriteResult
+{
+}
+    public bool BatchReady { get; set; }
+    public int WritesCoalesced { get; set; }
+    public int WritesPending { get; set; }
+    public long BatchStartOffset { get; set; }
+    public byte[] CoalescedData { get; set; };
+}
+```
+```csharp
+public sealed class PrefetchCache
+{
+}
+    public bool TryGet(long offset, int length, out byte[]? data);;
+    public bool Contains(long offset);;
+    public void Add(long offset, byte[] data);
+    public void MarkPending(long offset, int length);;
+    public bool IsPending(long offset);;
+}
+```
+```csharp
+public sealed class PrefetchedReadResult
+{
+}
+    public byte[]? Data { get; set; }
+    public bool WasCached { get; set; }
+    public int BytesRead { get; set; }
+}
+```
+```csharp
+public sealed class CacheEntry
+{
+}
+    public string ArrayId { get; set; };
+    public long Offset { get; set; }
+    public byte[] Data { get; set; };
+    public bool IsDirty { get; set; }
+    public DateTime CachedTime { get; set; }
+    public DateTime LastAccess { get; set; }
+}
+```
+```csharp
+public sealed class CacheWriteResult
+{
+}
+    public string ArrayId { get; set; };
+    public long Offset { get; set; }
+    public int Length { get; set; }
+    public bool CacheHit { get; set; }
+    public bool Persisted { get; set; }
+    public TimeSpan Latency { get; set; }
+}
+```
+```csharp
+public sealed class CacheFlushResult
+{
+}
+    public int EntriesFlushed { get; set; }
+    public long BytesFlushed { get; set; }
+    public DateTime StartTime { get; set; }
+    public DateTime EndTime { get; set; }
+    public TimeSpan Duration { get; set; }
+    public List<string> FlushErrors { get; set; };
+}
+```
+```csharp
+public sealed class IoRequest
+{
+}
+    public string RequestId { get; set; };
+    public string ArrayId { get; set; };
+    public IoType Type { get; set; }
+    public long Offset { get; set; }
+    public int Length { get; set; }
+    public byte[]? Data { get; set; }
+    public WritePriority Priority { get; set; }
+}
+```
+```csharp
+public sealed class IoResult
+{
+}
+    public byte[]? Data { get; set; }
+    public int BytesTransferred { get; set; }
+    public TimeSpan Latency { get; set; }
+}
+```
+```csharp
+public sealed class ScheduleResult
+{
+}
+    public string RequestId { get; set; };
+    public bool Scheduled { get; set; }
+    public int QueuePosition { get; set; }
+}
+```
+```csharp
+public sealed class QosPolicy
+{
+}
+    public int? MaxIops { get; set; }
+    public int? MaxBandwidthMbps { get; set; }
+    public int? MinIops { get; set; }
+    public int? MinBandwidthMbps { get; set; }
+    public WritePriority Priority { get; set; };
+}
+```
+```csharp
+public sealed class QosStatistics
+{
+}
+    public string WorkloadId { get; set; };
+    public long TotalReadOps { get; set; }
+    public long TotalWriteOps { get; set; }
+    public long TotalReadBytes { get; set; }
+    public long TotalWriteBytes { get; set; }
+    public long ThrottledOperations { get; set; }
+    public long ThrottledBytes { get; set; }
+}
+```
+```csharp
+public sealed class PerformanceStatistics
+{
+}
+    public WriteCoalescingStatistics WriteCoalescing { get; set; };
+    public PrefetchStatistics Prefetch { get; set; };
+    public WriteCacheStatistics WriteCache { get; set; };
+    public SchedulerStatistics Scheduler { get; set; };
+}
+```
+```csharp
+public sealed class WriteCoalescingStatistics
+{
+}
+    public long TotalWrites { get; set; }
+    public long CoalescedWrites { get; set; }
+    public double CoalesceRatio { get; set; }
+    public int PendingBatches { get; set; }
+}
+```
+```csharp
+public sealed class PrefetchStatistics
+{
+}
+    public long CacheHits { get; set; }
+    public long CacheMisses { get; set; }
+    public double HitRatio { get; set; }
+    public int CachedArrays { get; set; }
+}
+```
+```csharp
+public sealed class WriteCacheStatistics
+{
+}
+    public int TotalEntries { get; set; }
+    public int DirtyEntries { get; set; }
+    public long TotalBytes { get; set; }
+    public long MaxBytes { get; set; }
+    public double Utilization { get; set; }
+}
+```
+```csharp
+public sealed class SchedulerStatistics
+{
+}
+    public long TotalRequests { get; set; }
+    public long CompletedRequests { get; set; }
+    public int PendingRequests { get; set; }
+}
+```
+```csharp
+public sealed class ParallelParityCalculator
+{
+}
+    public ParallelParityCalculator(int? maxDegreeOfParallelism = null, int minChunkSizeForParallel = 65536);
+    public byte[] CalculateXorParity(IReadOnlyList<byte[]> dataChunks);
+    public byte[] CalculateQParityParallel(IReadOnlyList<byte[]> dataChunks);
+    public ParallelParityStatistics GetStatistics();
+}
+```
+```csharp
+public static class SimdParityEngine
+{
+}
+    public static int VectorWidth;;
+    public static bool IsHardwareAccelerated;;
+    public static byte[] CalculateXorParity(IReadOnlyList<byte[]> dataChunks);
+    public static void XorRange(byte[] target, byte[] source, int start, int end);
+    public static byte[] CalculateXorParityFromMemory(IReadOnlyList<ReadOnlyMemory<byte>> dataChunks);
+    public static bool VerifyParity(IReadOnlyList<byte[]> dataChunks, byte[] existingParity);
+    public static SimdEngineInfo GetInfo();
+}
+```
+```csharp
+public sealed class ParallelParityStatistics
+{
+}
+    public long TotalCalculations { get; set; }
+    public long ParallelCalculations { get; set; }
+    public long TotalBytesProcessed { get; set; }
+    public double ParallelizationRatio { get; set; }
+    public int MaxDegreeOfParallelism { get; set; }
+}
+```
+```csharp
+public sealed class SimdEngineInfo
+{
+}
+    public bool IsHardwareAccelerated { get; set; }
+    public int VectorWidthBytes { get; set; }
+    public int VectorWidthBits { get; set; }
+    public string EstimatedInstructionSet { get; set; };
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Features/Monitoring.cs
 ```csharp
 public sealed class RaidMonitoring
@@ -814,9 +1390,45 @@ public sealed class GrafanaTemplates
 }
 ```
 ```csharp
+public interface IRaidStateProvider
+{
+}
+    IReadOnlyList<ArraySummary> GetArraySummaries();;
+    ArraySummary? GetArray(string arrayId);;
+    ArrayMetricsSummary GetMetrics();;
+}
+```
+```csharp
+public sealed class ArraySummary
+{
+}
+    public string ArrayId { get; set; };
+    public string RaidLevel { get; set; };
+    public string HealthStatus { get; set; };
+    public int TotalDisks { get; set; }
+    public int HealthyDisks { get; set; }
+    public long CapacityBytes { get; set; }
+    public long UsedBytes { get; set; }
+}
+```
+```csharp
+public sealed class ArrayMetricsSummary
+{
+}
+    public double ReadIops { get; set; }
+    public double WriteIops { get; set; }
+    public double ThroughputReadMBps { get; set; }
+    public double ThroughputWriteMBps { get; set; }
+    public double LatencyReadMs { get; set; }
+    public double LatencyWriteMs { get; set; }
+}
+```
+```csharp
 public sealed class RaidCliCommands
 {
 }
+    public RaidCliCommands();
+    public RaidCliCommands(IRaidStateProvider stateProvider);
     public CliResult Execute(string command, string[] args);
 }
 ```
@@ -824,6 +1436,8 @@ public sealed class RaidCliCommands
 public sealed class RaidRestApi
 {
 }
+    public RaidRestApi();
+    public RaidRestApi(IRaidStateProvider stateProvider);
     public ApiResponse HandleRequest(string method, string path, string? body = null);
 }
 ```
@@ -1058,369 +1672,12 @@ public sealed class ChainLink
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Features/PerformanceOptimization.cs
-```csharp
-public sealed class RaidPerformanceOptimizer
-{
-}
-    public RaidPerformanceOptimizer(PerformanceConfig? config = null);
-    public async Task<CoalescedWriteResult> SubmitWriteAsync(string arrayId, long offset, byte[] data, WritePriority priority = WritePriority.Normal, CancellationToken cancellationToken = default);
-    public async Task<PrefetchedReadResult> ReadWithPrefetchAsync(string arrayId, long offset, int length, string workloadHint = "sequential", CancellationToken cancellationToken = default);
-    public async Task<CacheWriteResult> WriteWithCacheAsync(string arrayId, long offset, byte[] data, CacheWriteMode mode = CacheWriteMode.WriteBack, CancellationToken cancellationToken = default);
-    public async Task<CacheFlushResult> FlushCacheAsync(string? arrayId = null, bool force = false, CancellationToken cancellationToken = default);
-    public async Task<ScheduleResult> ScheduleIoAsync(IoRequest request, CancellationToken cancellationToken = default);
-    public void ConfigureQos(string workloadId, QosPolicy policy);
-    public QosStatistics GetQosStatistics(string workloadId);
-    public PerformanceStatistics GetStatistics();
-}
-```
-```csharp
-public sealed class WriteCoalescer
-{
-}
-    public WriteCoalescer(WriteCoalescingConfig? config = null);
-    public CoalescedWriteResult AddWrite(string arrayId, long offset, byte[] data, WritePriority priority);
-    public WriteCoalescingStatistics GetStatistics();
-}
-```
-```csharp
-public sealed class ReadAheadPrefetcher
-{
-}
-    public ReadAheadPrefetcher(PrefetchConfig? config = null);
-    public byte[]? GetCached(string arrayId, long offset, int length);
-    public async Task PrefetchAheadAsync(string arrayId, long startOffset, string workloadHint, CancellationToken cancellationToken);
-    public PrefetchStatistics GetStatistics();
-}
-```
-```csharp
-public sealed class WriteBackCache
-{
-}
-    public WriteBackCache(WriteCacheConfig? config = null);
-    public bool CacheWrite(string arrayId, long offset, byte[] data);
-    public IEnumerable<CacheEntry> GetDirtyEntries(string? arrayId = null);
-    public void MarkClean(string arrayId, long offset);
-    public WriteCacheStatistics GetStatistics();
-}
-```
-```csharp
-public sealed class IoScheduler
-{
-}
-    public IoScheduler(SchedulerConfig? config = null);
-    public async Task<ScheduleResult> ScheduleAsync(IoRequest request, CancellationToken cancellationToken);
-    public async Task<IoResult> ExecuteReadAsync(IoRequest request, CancellationToken cancellationToken);
-    public SchedulerStatistics GetStatistics();
-}
-```
-```csharp
-public sealed class QosEnforcer
-{
-}
-    public QosEnforcer(QosConfig? config = null);
-    public void SetPolicy(string workloadId, QosPolicy policy);
-    public async Task ThrottleIfNeededAsync(string workloadId, IoType type, long bytes, CancellationToken cancellationToken);
-    public QosStatistics GetStatistics(string workloadId);
-}
-```
-```csharp
-public sealed class PerformanceConfig
-{
-}
-    public WriteCoalescingConfig WriteCoalescingConfig { get; set; };
-    public PrefetchConfig PrefetchConfig { get; set; };
-    public WriteCacheConfig WriteCacheConfig { get; set; };
-    public SchedulerConfig SchedulerConfig { get; set; };
-    public QosConfig QosConfig { get; set; };
-}
-```
-```csharp
-public sealed class WriteCoalescingConfig
-{
-}
-    public int MaxBatchSizeBytes { get; set; };
-    public int MaxWritesPerBatch { get; set; };
-    public TimeSpan MaxBatchDelay { get; set; };
-    public int BatchAlignmentBytes { get; set; };
-}
-```
-```csharp
-public sealed class PrefetchConfig
-{
-}
-    public int SequentialPrefetchBytes { get; set; };
-    public int RandomPrefetchBytes { get; set; };
-    public int DefaultPrefetchBytes { get; set; };
-    public int PrefetchDepth { get; set; };
-}
-```
-```csharp
-public sealed class WriteCacheConfig
-{
-}
-    public long MaxCacheSizeBytes { get; set; };
-    public TimeSpan FlushInterval { get; set; };
-    public bool BatteryBackedRequired { get; set; };
-}
-```
-```csharp
-public sealed class SchedulerConfig
-{
-}
-    public int MaxConcurrentIo { get; set; };
-    public SchedulingAlgorithm Algorithm { get; set; };
-}
-```
-```csharp
-public sealed class QosConfig
-{
-}
-    public bool Enabled { get; set; };
-    public int DefaultMaxIops { get; set; };
-    public int DefaultMaxBandwidthMbps { get; set; };
-}
-```
-```csharp
-public sealed class CoalesceBatch
-{
-}
-    public string ArrayId { get; set; };
-    public long StartOffset { get; set; }
-    public DateTime CreatedTime { get; set; }
-    public List<PendingWrite> Writes { get; set; };
-    public int TotalBytes { get; set; }
-}
-```
-```csharp
-public sealed class PendingWrite
-{
-}
-    public long Offset { get; set; }
-    public byte[] Data { get; set; };
-    public WritePriority Priority { get; set; }
-}
-```
-```csharp
-public sealed class CoalescedWriteResult
-{
-}
-    public bool BatchReady { get; set; }
-    public int WritesCoalesced { get; set; }
-    public int WritesPending { get; set; }
-    public long BatchStartOffset { get; set; }
-    public byte[] CoalescedData { get; set; };
-}
-```
-```csharp
-public sealed class PrefetchCache
-{
-}
-    public bool TryGet(long offset, int length, out byte[]? data);;
-    public bool Contains(long offset);;
-    public void Add(long offset, byte[] data);;
-}
-```
-```csharp
-public sealed class PrefetchedReadResult
-{
-}
-    public byte[]? Data { get; set; }
-    public bool WasCached { get; set; }
-    public int BytesRead { get; set; }
-}
-```
-```csharp
-public sealed class CacheEntry
-{
-}
-    public string ArrayId { get; set; };
-    public long Offset { get; set; }
-    public byte[] Data { get; set; };
-    public bool IsDirty { get; set; }
-    public DateTime CachedTime { get; set; }
-    public DateTime LastAccess { get; set; }
-}
-```
-```csharp
-public sealed class CacheWriteResult
-{
-}
-    public string ArrayId { get; set; };
-    public long Offset { get; set; }
-    public int Length { get; set; }
-    public bool CacheHit { get; set; }
-    public bool Persisted { get; set; }
-    public TimeSpan Latency { get; set; }
-}
-```
-```csharp
-public sealed class CacheFlushResult
-{
-}
-    public int EntriesFlushed { get; set; }
-    public long BytesFlushed { get; set; }
-    public DateTime StartTime { get; set; }
-    public DateTime EndTime { get; set; }
-    public TimeSpan Duration { get; set; }
-    public List<string> FlushErrors { get; set; };
-}
-```
-```csharp
-public sealed class IoRequest
-{
-}
-    public string RequestId { get; set; };
-    public string ArrayId { get; set; };
-    public IoType Type { get; set; }
-    public long Offset { get; set; }
-    public int Length { get; set; }
-    public byte[]? Data { get; set; }
-    public WritePriority Priority { get; set; }
-}
-```
-```csharp
-public sealed class IoResult
-{
-}
-    public byte[]? Data { get; set; }
-    public int BytesTransferred { get; set; }
-    public TimeSpan Latency { get; set; }
-}
-```
-```csharp
-public sealed class ScheduleResult
-{
-}
-    public string RequestId { get; set; };
-    public bool Scheduled { get; set; }
-    public int QueuePosition { get; set; }
-}
-```
-```csharp
-public sealed class QosPolicy
-{
-}
-    public int? MaxIops { get; set; }
-    public int? MaxBandwidthMbps { get; set; }
-    public int? MinIops { get; set; }
-    public int? MinBandwidthMbps { get; set; }
-    public WritePriority Priority { get; set; };
-}
-```
-```csharp
-public sealed class QosStatistics
-{
-}
-    public string WorkloadId { get; set; };
-    public long TotalReadOps { get; set; }
-    public long TotalWriteOps { get; set; }
-    public long TotalReadBytes { get; set; }
-    public long TotalWriteBytes { get; set; }
-    public long ThrottledOperations { get; set; }
-    public long ThrottledBytes { get; set; }
-}
-```
-```csharp
-public sealed class PerformanceStatistics
-{
-}
-    public WriteCoalescingStatistics WriteCoalescing { get; set; };
-    public PrefetchStatistics Prefetch { get; set; };
-    public WriteCacheStatistics WriteCache { get; set; };
-    public SchedulerStatistics Scheduler { get; set; };
-}
-```
-```csharp
-public sealed class WriteCoalescingStatistics
-{
-}
-    public long TotalWrites { get; set; }
-    public long CoalescedWrites { get; set; }
-    public double CoalesceRatio { get; set; }
-    public int PendingBatches { get; set; }
-}
-```
-```csharp
-public sealed class PrefetchStatistics
-{
-}
-    public long CacheHits { get; set; }
-    public long CacheMisses { get; set; }
-    public double HitRatio { get; set; }
-    public int CachedArrays { get; set; }
-}
-```
-```csharp
-public sealed class WriteCacheStatistics
-{
-}
-    public int TotalEntries { get; set; }
-    public int DirtyEntries { get; set; }
-    public long TotalBytes { get; set; }
-    public long MaxBytes { get; set; }
-    public double Utilization { get; set; }
-}
-```
-```csharp
-public sealed class SchedulerStatistics
-{
-}
-    public long TotalRequests { get; set; }
-    public long CompletedRequests { get; set; }
-    public int PendingRequests { get; set; }
-}
-```
-```csharp
-public sealed class ParallelParityCalculator
-{
-}
-    public ParallelParityCalculator(int? maxDegreeOfParallelism = null, int minChunkSizeForParallel = 65536);
-    public byte[] CalculateXorParity(IReadOnlyList<byte[]> dataChunks);
-    public byte[] CalculateQParityParallel(IReadOnlyList<byte[]> dataChunks);
-    public ParallelParityStatistics GetStatistics();
-}
-```
-```csharp
-public static class SimdParityEngine
-{
-}
-    public static int VectorWidth;;
-    public static bool IsHardwareAccelerated;;
-    public static byte[] CalculateXorParity(IReadOnlyList<byte[]> dataChunks);
-    public static void XorRange(byte[] target, byte[] source, int start, int end);
-    public static byte[] CalculateXorParityFromMemory(IReadOnlyList<ReadOnlyMemory<byte>> dataChunks);
-    public static bool VerifyParity(IReadOnlyList<byte[]> dataChunks, byte[] existingParity);
-    public static SimdEngineInfo GetInfo();
-}
-```
-```csharp
-public sealed class ParallelParityStatistics
-{
-}
-    public long TotalCalculations { get; set; }
-    public long ParallelCalculations { get; set; }
-    public long TotalBytesProcessed { get; set; }
-    public double ParallelizationRatio { get; set; }
-    public int MaxDegreeOfParallelism { get; set; }
-}
-```
-```csharp
-public sealed class SimdEngineInfo
-{
-}
-    public bool IsHardwareAccelerated { get; set; }
-    public int VectorWidthBytes { get; set; }
-    public int VectorWidthBits { get; set; }
-    public string EstimatedInstructionSet { get; set; };
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Features/QuantumSafeIntegrity.cs
 ```csharp
 public sealed class QuantumSafeIntegrity
 {
 }
+    public DataWarehouse.SDK.Contracts.IMessageBus? MessageBus { get; set; }
     public QuantumSafeIntegrity(HashAlgorithmType defaultAlgorithm = HashAlgorithmType.SHA3_256);
     public QuantumSafeChecksum CalculateChecksum(byte[] data, HashAlgorithmType algorithm = HashAlgorithmType.Default);
     public bool VerifyChecksum(byte[] data, QuantumSafeChecksum checksum);
@@ -1519,212 +1776,6 @@ public sealed class AttestationVerification
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Features/RaidLevelMigration.cs
-```csharp
-public sealed class RaidLevelMigration
-{
-}
-    public static readonly IReadOnlyDictionary<RaidLevel, RaidLevel[]> SupportedMigrations = new Dictionary<RaidLevel, RaidLevel[]>
-{
-    [RaidLevel.Raid0] = new[]
-    {
-        RaidLevel.Raid5,
-        RaidLevel.Raid6,
-        RaidLevel.Raid10
-    },
-    [RaidLevel.Raid1] = new[]
-    {
-        RaidLevel.Raid5,
-        RaidLevel.Raid6,
-        RaidLevel.Raid10
-    },
-    [RaidLevel.Raid5] = new[]
-    {
-        RaidLevel.Raid6,
-        RaidLevel.Raid50,
-        RaidLevel.Raid10
-    },
-    [RaidLevel.Raid6] = new[]
-    {
-        RaidLevel.Raid60,
-        RaidLevel.Raid5
-    },
-    [RaidLevel.Raid10] = new[]
-    {
-        RaidLevel.Raid5,
-        RaidLevel.Raid6,
-        RaidLevel.Raid50
-    },
-    [RaidLevel.RaidZ1] = new[]
-    {
-        RaidLevel.RaidZ2,
-        RaidLevel.RaidZ3
-    },
-    [RaidLevel.RaidZ2] = new[]
-    {
-        RaidLevel.RaidZ3
-    }
-};
-    public bool CanMigrate(RaidLevel from, RaidLevel to);
-    public TimeSpan EstimateMigrationTime(RaidLevel from, RaidLevel to, long totalCapacityBytes, int diskCount, long diskThroughputBytesPerSecond = 100_000_000);
-    public async Task<MigrationResult> MigrateAsync(string arrayId, RaidLevel sourceLevel, RaidLevel targetLevel, IEnumerable<DiskInfo> disks, MigrationOptions? options = null, IProgress<MigrationProgress>? progress = null, CancellationToken cancellationToken = default);
-    public MigrationState? GetMigrationStatus(string arrayId);
-    public async Task<bool> CancelMigrationAsync(string arrayId, CancellationToken cancellationToken = default);
-}
-```
-```csharp
-public sealed class MigrationState
-{
-}
-    public string ArrayId { get; set; };
-    public RaidLevel SourceLevel { get; set; }
-    public RaidLevel TargetLevel { get; set; }
-    public MigrationStatus Status { get; set; }
-    public DateTime StartTime { get; set; }
-    public DateTime? EndTime { get; set; }
-    public long BlocksMigrated { get; set; }
-    public long TotalBlocks { get; set; }
-    public string? ErrorMessage { get; set; }
-    public double ProgressPercent;;
-}
-```
-```csharp
-public sealed class MigrationOptions
-{
-}
-    public int MaxIOPS { get; set; };
-    public int MaxBandwidthMBps { get; set; };
-    public bool VerifyAfterMigration { get; set; };
-    public bool CreateCheckpoints { get; set; };
-    public int CheckpointIntervalBlocks { get; set; };
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Features/RaidPluginMigration.cs
-```csharp
-public sealed class RaidPluginMigration
-{
-}
-    public void RegisterLegacyPlugin(string pluginId, LegacyPluginInfo info);
-    public IReadOnlyList<LegacyPluginAdapter> GetMigrationStatus();
-    public async Task<PluginMigrationResult> MigratePluginAsync(string pluginId, PluginMigrationOptions? options = null, IProgress<double>? progress = null, CancellationToken cancellationToken = default);
-    public CompatibilityMapping CreateCompatibilityMapping(string legacyPluginId);
-    public MigrationRegistry Registry;;
-    public static IReadOnlyList<LegacyPluginInfo> GetKnownLegacyPlugins();;
-}
-```
-```csharp
-public sealed class LegacyPluginAdapter
-{
-}
-    public string PluginId { get; set; };
-    public LegacyPluginInfo Info { get; set; };
-    public PluginMigrationStatus Status { get; set; }
-    public DateTime RegisteredTime { get; set; }
-    public DateTime? MigratedTime { get; set; }
-    public string? ErrorMessage { get; set; }
-}
-```
-```csharp
-public sealed class LegacyPluginInfo
-{
-}
-    public string PluginId { get; set; };
-    public string Name { get; set; };
-    public string Version { get; set; };
-    public string[] Strategies { get; set; };
-}
-```
-```csharp
-public sealed class PluginMigrationOptions
-{
-}
-    public bool PreserveOldConfig { get; set; };
-    public bool CreateBackup { get; set; };
-    public bool VerifyAfterMigration { get; set; };
-    public bool UpdateReferences { get; set; };
-}
-```
-```csharp
-public sealed class PluginMigrationResult
-{
-}
-    public bool Success { get; set; }
-    public string PluginId { get; set; };
-    public string Message { get; set; };
-    public int ConfigurationsMigrated { get; set; }
-    public int ArraysMigrated { get; set; }
-    public int StrategiesMigrated { get; set; }
-    public DateTime StartTime { get; set; }
-    public DateTime EndTime { get; set; }
-    public TimeSpan Duration;;
-}
-```
-```csharp
-public sealed class ValidationResult
-{
-}
-    public bool IsValid { get; set; }
-    public string Message { get; set; };
-    public List<string> Warnings { get; set; };
-}
-```
-```csharp
-public sealed class CompatibilityMapping
-{
-}
-    public string LegacyPluginId { get; set; };
-    public string UltimateRaidPluginId { get; set; };
-    public Dictionary<string, string> StrategyMappings { get; set; };
-    public Dictionary<string, string> ApiMappings { get; set; };
-    public Dictionary<string, string> ConfigMappings { get; set; };
-}
-```
-```csharp
-public sealed class MigrationRegistry
-{
-}
-    public void AddEntry(string pluginId, LegacyPluginInfo info);
-    public IReadOnlyList<MigrationEntry> GetEntries();;
-    public void UpdateStatus(string pluginId, string status);
-}
-```
-```csharp
-public sealed class MigrationEntry
-{
-}
-    public string PluginId { get; set; };
-    public string PluginName { get; set; };
-    public DateTime RegisteredTime { get; set; }
-    public DateTime? UpdatedTime { get; set; }
-    public string Status { get; set; };
-}
-```
-```csharp
-public static class DeprecationNotices
-{
-}
-    public static readonly IReadOnlyDictionary<string, string> DeprecatedPlugins = new Dictionary<string, string>
-{
-    ["DataWarehouse.Plugins.Raid"] = "UltimateRAID Standard strategies (RAID 0/1/5)",
-    ["DataWarehouse.Plugins.StandardRaid"] = "UltimateRAID Standard strategies (RAID 0/1/5/6/10)",
-    ["DataWarehouse.Plugins.AdvancedRaid"] = "UltimateRAID Extended strategies (RAID 50/60, RAID-Z)",
-    ["DataWarehouse.Plugins.EnhancedRaid"] = "UltimateRAID Extended strategies (RAID 1E/5E/6E)",
-    ["DataWarehouse.Plugins.NestedRaid"] = "UltimateRAID Nested strategies (RAID 10/01/100)",
-    ["DataWarehouse.Plugins.SelfHealingRaid"] = "UltimateRAID Adaptive strategies (SelfHealing)",
-    ["DataWarehouse.Plugins.ZfsRaid"] = "UltimateRAID ZFS strategies (RAID-Z1/Z2/Z3)",
-    ["DataWarehouse.Plugins.VendorSpecificRaid"] = "UltimateRAID Vendor strategies (NetApp, Dell, HP, Synology)",
-    ["DataWarehouse.Plugins.ExtendedRaid"] = "UltimateRAID Extended strategies (Matrix, Tiered)",
-    ["DataWarehouse.Plugins.AutoRaid"] = "UltimateRAID Adaptive strategies (AutoLevelSelector)",
-    ["DataWarehouse.Plugins.SharedRaidUtilities"] = "DataWarehouse.SDK.Mathematics (GaloisField, ReedSolomon)",
-    ["DataWarehouse.Plugins.ErasureCoding"] = "UltimateRAID ErasureCoding strategies (ReedSolomon, LRC)"
-};
-    public static string GenerateNotice(string pluginId, string replacementId);
-    public static bool IsDeprecated(string pluginId);;
-    public static string? GetReplacement(string pluginId);;
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Features/Snapshots.cs
 ```csharp
 public sealed class RaidSnapshots
@@ -1751,16 +1802,17 @@ public sealed class CowBlockManager
 }
     public const int BlockSize = 4096;
     public CowState CreateCowState(string arrayId, string snapshotId);
+    public void SetBlockCount(string stateId, long blockCount);
     public CowState CreateCloneCowState(string arrayId, string cloneId, string sourceSnapshotId);
     public CowState? GetCowState(string stateId);;
-    public void ReleaseCowState(string stateId);;
+    public void ReleaseCowState(string stateId);
     public IEnumerable<long> GetModifiedBlocks(string stateId);;
-    public IEnumerable<long> GetSharedBlocks(string stateId);;
-    public List<long> GetDeltaBlocks(string fromSnapshotId, string toSnapshotId);;
-    public List<long> GetAllBlocks(string stateId);;
+    public IEnumerable<long> GetSharedBlocks(string stateId);
+    public List<long> GetDeltaBlocks(string fromStateId, string toStateId);
+    public List<long> GetAllBlocks(string stateId);
     public Task<CowWriteResult> CopyOnWriteAsync(string stateId, long blockIndex, byte[] data, CancellationToken ct);
-    public Task MaterializeBlockAsync(string stateId, long blockIndex, CancellationToken ct);;
-    public Task<byte[]> ReadBlockAsync(string stateId, long blockIndex, CancellationToken ct);;
+    public Task MaterializeBlockAsync(string stateId, long blockIndex, CancellationToken ct);
+    public Task<byte[]> ReadBlockAsync(string stateId, long blockIndex, CancellationToken ct);
 }
 ```
 ```csharp
@@ -1788,7 +1840,7 @@ public sealed class SnapshotTree
 {
 }
     public SnapshotTree(string arrayId);
-    public string? ActiveSnapshotId { get; private set; }
+    public string? ActiveSnapshotId;;
     public void AddSnapshot(Snapshot snapshot);
     public Snapshot? GetSnapshot(string snapshotId);;
     public void RemoveSnapshot(string snapshotId);;
@@ -1862,10 +1914,22 @@ public sealed class Clone
     public string SourceSnapshotId { get; set; };
     public string CowStateId { get; set; };
     public DateTime CreatedTime { get; set; }
-    public DateTime? LastModified { get; set; }
     public CloneStatus Status { get; set; }
-    public long SharedBlocks { get; set; }
-    public long UniqueBlocks { get; set; }
+    internal long _sharedBlocks;
+    internal long _uniqueBlocks;
+    internal long _lastModifiedTicks;
+    public long SharedBlocks { get => Interlocked.Read(ref _sharedBlocks); set => Interlocked.Exchange(ref _sharedBlocks, value); }
+    public long UniqueBlocks { get => Interlocked.Read(ref _uniqueBlocks); set => Interlocked.Exchange(ref _uniqueBlocks, value); }
+    public DateTime? LastModified
+{
+    get
+    {
+        var ticks = Volatile.Read(ref _lastModifiedTicks);
+        return ticks == 0 ? null : new DateTime(ticks, DateTimeKind.Utc);
+    }
+
+    set => Volatile.Write(ref _lastModifiedTicks, value?.Ticks ?? 0);
+}
 }
 ```
 ```csharp
@@ -1973,6 +2037,47 @@ public sealed class ReplicationProgress
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Strategies/ZFS/ZfsRaidStrategies.cs
+```csharp
+public class RaidZ1Strategy : SdkRaidStrategyBase
+{
+}
+    public RaidZ1Strategy(int stripeWidth = 4);
+    public override RaidLevel Level;;
+    public override RaidCapabilities Capabilities;;
+    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
+    public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
+    public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
+    public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
+}
+```
+```csharp
+public class RaidZ2Strategy : SdkRaidStrategyBase
+{
+}
+    public RaidZ2Strategy(int stripeWidth = 6);
+    public override RaidLevel Level;;
+    public override RaidCapabilities Capabilities;;
+    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
+    public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
+    public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
+    public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
+}
+```
+```csharp
+public class RaidZ3Strategy : SdkRaidStrategyBase
+{
+}
+    public RaidZ3Strategy(int stripeWidth = 8);
+    public override RaidLevel Level;;
+    public override RaidCapabilities Capabilities;;
+    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
+    public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
+    public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
+    public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Strategies/Adaptive/AdaptiveRaidStrategies.cs
 ```csharp
 public class AdaptiveRaidStrategy : SdkRaidStrategyBase
@@ -1984,7 +2089,7 @@ public class AdaptiveRaidStrategy : SdkRaidStrategyBase
     public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
     public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
     public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
-    public override Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
+    public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
 }
 ```
 ```csharp
@@ -2414,179 +2519,73 @@ public sealed class AnomalyExplanation
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Strategies/ErasureCoding/ErasureCodingStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Strategies/Nested/AdvancedNestedRaidStrategies.cs
 ```csharp
-public class ReedSolomonStrategy : SdkRaidStrategyBase
+public sealed class Raid10Strategy : SdkRaidStrategyBase
 {
 }
-    public ReedSolomonStrategy(int dataChunks = 8, int parityChunks = 4);
+    public Raid10Strategy(int chunkSize = 64 * 1024, int disksPerMirror = 2);
     public override RaidLevel Level;;
     public override RaidCapabilities Capabilities;;
     public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
     public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
     public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
     public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
+    public void ActivateHotSpare(int mirrorGroup, int hotSpareDiskIndex);
+    public IReadOnlyList<int> GetDegradedGroups(IReadOnlyList<DiskInfo> disks);
 }
 ```
 ```csharp
-public class LocalReconstructionCodeStrategy : SdkRaidStrategyBase
+public sealed class RebuildState
 {
 }
-    public LocalReconstructionCodeStrategy(int dataChunks = 12, int localGroups = 3, int globalParity = 2);
-    public override RaidLevel Level;;
-    public override RaidCapabilities Capabilities;;
-    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
-    public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
-    public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
-    public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
+    public int MirrorGroup { get; init; }
+    public int SourceDisk { get; init; }
+    public int TargetDisk { get; init; }
+    public DateTime StartedAt { get; init; }
+    public long TotalBytes { get; init; }
 }
 ```
 ```csharp
-public class IsalErasureStrategy : SdkRaidStrategyBase
+public sealed class Raid50Strategy : SdkRaidStrategyBase
 {
 }
-    public IsalErasureStrategy(int dataChunks = 10, int parityChunks = 4);
+    public Raid50Strategy(int chunkSize = 64 * 1024, int disksPerRaid5Group = 4);
     public override RaidLevel Level;;
     public override RaidCapabilities Capabilities;;
     public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
     public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
     public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
     public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
+    public IReadOnlyList<int> GetDegradedGroups();;
+}
+```
+```csharp
+public sealed class Raid60Strategy : SdkRaidStrategyBase
+{
+}
+    public Raid60Strategy(int chunkSize = 64 * 1024, int disksPerRaid6Group = 5);
+    public override RaidLevel Level;;
+    public override RaidCapabilities Capabilities;;
+    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
+    public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
+    public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
+    public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
+    public IReadOnlyList<(string Key, RebuildPriority Priority)> GetRebuildQueue();
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Strategies/ErasureCoding/ErasureCodingStrategiesB7.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Strategies/Nested/NestedRaidStrategies.cs
 ```csharp
-public sealed class LdpcStrategy : SdkRaidStrategyBase
+public sealed class Raid03Strategy : SdkRaidStrategyBase
 {
 }
-    public LdpcStrategy(int chunkSize = 128 * 1024, int dataChunks = 8, int parityChunks = 4, int rowWeight = 6, int colWeight = 3, int maxIterations = 50);
+    public Raid03Strategy(int chunkSize = 64 * 1024, int disksPerRaid3Group = 3);
     public override RaidLevel Level;;
     public override RaidCapabilities Capabilities;;
     public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
     public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
     public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
-    public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
-}
-```
-```csharp
-public sealed class FountainCodesStrategy : SdkRaidStrategyBase
-{
-}
-    public FountainCodesStrategy(int chunkSize = 64 * 1024, int sourceSymbols = 10, int encodedSymbols = 15, double overheadFactor = 1.05);
-    public override RaidLevel Level;;
-    public override RaidCapabilities Capabilities;;
-    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
-    public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
-    public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
-    public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
-}
-```
-```csharp
-private sealed class EncodedSymbol
-{
-}
-    public int Index { get; set; }
-    public byte[] Data { get; set; };
-    public int Degree { get; set; }
-    public List<int> Neighbors { get; set; };
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Strategies/Extended/ExtendedRaidStrategies.cs
-```csharp
-public class Raid01Strategy : SdkRaidStrategyBase
-{
-}
-    public override RaidLevel Level;;
-    public override RaidCapabilities Capabilities;;
-    public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
-    public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
-    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
-    public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
-}
-```
-```csharp
-public class Raid100Strategy : SdkRaidStrategyBase
-{
-}
-    public override RaidLevel Level;;
-    public override RaidCapabilities Capabilities;;
-    public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
-    public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
-    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
-    public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
-}
-```
-```csharp
-public class Raid50Strategy : SdkRaidStrategyBase
-{
-}
-    public override RaidLevel Level;;
-    public override RaidCapabilities Capabilities;;
-    public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
-    public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
-    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
-    public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
-}
-```
-```csharp
-public class Raid60Strategy : SdkRaidStrategyBase
-{
-}
-    public override RaidLevel Level;;
-    public override RaidCapabilities Capabilities;;
-    public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
-    public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
-    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
-    public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
-}
-```
-```csharp
-public class Raid1EStrategy : SdkRaidStrategyBase
-{
-}
-    public override RaidLevel Level;;
-    public override RaidCapabilities Capabilities;;
-    public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
-    public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
-    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
-    public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
-}
-```
-```csharp
-public class Raid5EStrategy : SdkRaidStrategyBase
-{
-}
-    public override RaidLevel Level;;
-    public override RaidCapabilities Capabilities;;
-    public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
-    public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
-    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
-    public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
-}
-```
-```csharp
-public class Raid5EEStrategy : SdkRaidStrategyBase
-{
-}
-    public override RaidLevel Level;;
-    public override RaidCapabilities Capabilities;;
-    public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
-    public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
-    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
-    public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
-}
-```
-```csharp
-public class Raid6EStrategy : SdkRaidStrategyBase
-{
-}
-    public override RaidLevel Level;;
-    public override RaidCapabilities Capabilities;;
-    public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
-    public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
-    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
     public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
 }
 ```
@@ -2705,196 +2704,100 @@ public sealed class LinearStrategy : SdkRaidStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Strategies/Nested/AdvancedNestedRaidStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Strategies/Extended/ExtendedRaidStrategies.cs
 ```csharp
-public sealed class Raid10Strategy : SdkRaidStrategyBase
+public class Raid01Strategy : SdkRaidStrategyBase
 {
 }
-    public Raid10Strategy(int chunkSize = 64 * 1024, int disksPerMirror = 2);
     public override RaidLevel Level;;
     public override RaidCapabilities Capabilities;;
-    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
     public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
     public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
-    public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
-    public void ActivateHotSpare(int mirrorGroup, int hotSpareDiskIndex);
-    public IReadOnlyList<int> GetDegradedGroups(IReadOnlyList<DiskInfo> disks);
-}
-```
-```csharp
-public sealed class RebuildState
-{
-}
-    public int MirrorGroup { get; init; }
-    public int SourceDisk { get; init; }
-    public int TargetDisk { get; init; }
-    public DateTime StartedAt { get; init; }
-    public long TotalBytes { get; init; }
-}
-```
-```csharp
-public sealed class Raid50Strategy : SdkRaidStrategyBase
-{
-}
-    public Raid50Strategy(int chunkSize = 64 * 1024, int disksPerRaid5Group = 4);
-    public override RaidLevel Level;;
-    public override RaidCapabilities Capabilities;;
     public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
-    public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
-    public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
-    public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
-    public IReadOnlyList<int> GetDegradedGroups();;
-}
-```
-```csharp
-public sealed class Raid60Strategy : SdkRaidStrategyBase
-{
-}
-    public Raid60Strategy(int chunkSize = 64 * 1024, int disksPerRaid6Group = 5);
-    public override RaidLevel Level;;
-    public override RaidCapabilities Capabilities;;
-    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
-    public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
-    public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
-    public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
-    public IReadOnlyList<(string Key, RebuildPriority Priority)> GetRebuildQueue();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Strategies/Nested/NestedRaidStrategies.cs
-```csharp
-public sealed class Raid03Strategy : SdkRaidStrategyBase
-{
-}
-    public Raid03Strategy(int chunkSize = 64 * 1024, int disksPerRaid3Group = 3);
-    public override RaidLevel Level;;
-    public override RaidCapabilities Capabilities;;
-    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
-    public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
-    public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
-    public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Strategies/Standard/StandardRaidStrategies.cs
-```csharp
-public sealed class Raid0Strategy : SdkRaidStrategyBase
-{
-}
-    public Raid0Strategy(int chunkSize = 64 * 1024);
-    public override RaidLevel Level;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    public override async Task<RaidHealth> CheckHealthAsync(IEnumerable<DiskInfo> disks, CancellationToken cancellationToken = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public override RaidCapabilities Capabilities;;
-    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
-    public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
-    public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
-    public override Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
-}
-```
-```csharp
-public sealed class Raid1Strategy : SdkRaidStrategyBase
-{
-}
-    public Raid1Strategy(int chunkSize = 64 * 1024);
-    public override RaidLevel Level;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    public override async Task<RaidHealth> CheckHealthAsync(IEnumerable<DiskInfo> disks, CancellationToken cancellationToken = default);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public override RaidCapabilities Capabilities;;
-    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
-    public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
-    public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
     public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
 }
 ```
 ```csharp
-public sealed class Raid5Strategy : SdkRaidStrategyBase
+public class Raid100Strategy : SdkRaidStrategyBase
 {
 }
-    public Raid5Strategy(int chunkSize = 64 * 1024);
     public override RaidLevel Level;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    public override async Task<RaidHealth> CheckHealthAsync(IEnumerable<DiskInfo> disks, CancellationToken cancellationToken = default);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
     public override RaidCapabilities Capabilities;;
-    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
     public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
     public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
+    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
     public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
 }
 ```
 ```csharp
-public sealed class Raid6Strategy : SdkRaidStrategyBase
+public class Raid50Strategy : SdkRaidStrategyBase
 {
 }
-    public Raid6Strategy(int chunkSize = 64 * 1024);
     public override RaidLevel Level;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    public override async Task<RaidHealth> CheckHealthAsync(IEnumerable<DiskInfo> disks, CancellationToken cancellationToken = default);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
     public override RaidCapabilities Capabilities;;
-    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
     public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
     public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
+    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
     public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
 }
 ```
 ```csharp
-public sealed class Raid10Strategy : SdkRaidStrategyBase
+public class Raid60Strategy : SdkRaidStrategyBase
 {
 }
-    public Raid10Strategy(int chunkSize = 64 * 1024);
-    public override RaidLevel Level;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    public override async Task<RaidHealth> CheckHealthAsync(IEnumerable<DiskInfo> disks, CancellationToken cancellationToken = default);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public override RaidCapabilities Capabilities;;
-    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
-    public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
-    public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
-    public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Strategies/Standard/StandardRaidStrategiesB1.cs
-```csharp
-public sealed class Raid2Strategy : SdkRaidStrategyBase
-{
-}
-    public Raid2Strategy(int chunkSize = 64 * 1024, bool useHamming74 = true);
     public override RaidLevel Level;;
     public override RaidCapabilities Capabilities;;
-    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
     public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
     public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
+    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
     public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
 }
 ```
 ```csharp
-public sealed class Raid3Strategy : SdkRaidStrategyBase
+public class Raid1EStrategy : SdkRaidStrategyBase
 {
 }
-    public Raid3Strategy(int chunkSize = 64 * 1024);
     public override RaidLevel Level;;
     public override RaidCapabilities Capabilities;;
-    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
     public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
     public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
+    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
     public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
 }
 ```
 ```csharp
-public sealed class Raid4Strategy : SdkRaidStrategyBase
+public class Raid5EStrategy : SdkRaidStrategyBase
 {
 }
-    public Raid4Strategy(int chunkSize = 64 * 1024);
     public override RaidLevel Level;;
     public override RaidCapabilities Capabilities;;
-    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
     public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
     public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
+    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
+    public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
+}
+```
+```csharp
+public class Raid5EEStrategy : SdkRaidStrategyBase
+{
+}
+    public override RaidLevel Level;;
+    public override RaidCapabilities Capabilities;;
+    public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
+    public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
+    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
+    public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
+}
+```
+```csharp
+public class Raid6EStrategy : SdkRaidStrategyBase
+{
+}
+    public override RaidLevel Level;;
+    public override RaidCapabilities Capabilities;;
+    public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
+    public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
+    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
     public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
 }
 ```
@@ -3050,12 +2953,12 @@ private sealed class SnapshotInfo
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Strategies/ZFS/ZfsRaidStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Strategies/ErasureCoding/ErasureCodingStrategies.cs
 ```csharp
-public class RaidZ1Strategy : SdkRaidStrategyBase
+public class ReedSolomonStrategy : SdkRaidStrategyBase
 {
 }
-    public RaidZ1Strategy(int stripeWidth = 4);
+    public ReedSolomonStrategy(int dataChunks = 8, int parityChunks = 4);
     public override RaidLevel Level;;
     public override RaidCapabilities Capabilities;;
     public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
@@ -3065,10 +2968,10 @@ public class RaidZ1Strategy : SdkRaidStrategyBase
 }
 ```
 ```csharp
-public class RaidZ2Strategy : SdkRaidStrategyBase
+public class LocalReconstructionCodeStrategy : SdkRaidStrategyBase
 {
 }
-    public RaidZ2Strategy(int stripeWidth = 6);
+    public LocalReconstructionCodeStrategy(int dataChunks = 12, int localGroups = 3, int globalParity = 2);
     public override RaidLevel Level;;
     public override RaidCapabilities Capabilities;;
     public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
@@ -3078,10 +2981,171 @@ public class RaidZ2Strategy : SdkRaidStrategyBase
 }
 ```
 ```csharp
-public class RaidZ3Strategy : SdkRaidStrategyBase
+public class IsalErasureStrategy : SdkRaidStrategyBase
 {
 }
-    public RaidZ3Strategy(int stripeWidth = 8);
+    public IsalErasureStrategy(int dataChunks = 10, int parityChunks = 4);
+    public override RaidLevel Level;;
+    public override RaidCapabilities Capabilities;;
+    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
+    public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
+    public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
+    public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Strategies/ErasureCoding/ErasureCodingStrategiesB7.cs
+```csharp
+public sealed class LdpcStrategy : SdkRaidStrategyBase
+{
+}
+    public LdpcStrategy(int chunkSize = 128 * 1024, int dataChunks = 8, int parityChunks = 4, int rowWeight = 6, int colWeight = 3, int maxIterations = 50);
+    public override RaidLevel Level;;
+    public override RaidCapabilities Capabilities;;
+    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
+    public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
+    public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
+    public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
+}
+```
+```csharp
+public sealed class FountainCodesStrategy : SdkRaidStrategyBase
+{
+}
+    public FountainCodesStrategy(int chunkSize = 64 * 1024, int sourceSymbols = 10, int encodedSymbols = 15, double overheadFactor = 1.05);
+    public override RaidLevel Level;;
+    public override RaidCapabilities Capabilities;;
+    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
+    public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
+    public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
+    public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
+}
+```
+```csharp
+private sealed class EncodedSymbol
+{
+}
+    public int Index { get; set; }
+    public byte[] Data { get; set; };
+    public int Degree { get; set; }
+    public List<int> Neighbors { get; set; };
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Strategies/Standard/StandardRaidStrategies.cs
+```csharp
+public sealed class Raid0Strategy : SdkRaidStrategyBase
+{
+}
+    public Raid0Strategy(int chunkSize = 64 * 1024);
+    public override RaidLevel Level;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    public override async Task<RaidHealth> CheckHealthAsync(IEnumerable<DiskInfo> disks, CancellationToken cancellationToken = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public override RaidCapabilities Capabilities;;
+    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
+    public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
+    public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
+    public override Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
+}
+```
+```csharp
+public sealed class Raid1Strategy : SdkRaidStrategyBase
+{
+}
+    public Raid1Strategy(int chunkSize = 64 * 1024);
+    public override RaidLevel Level;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    public override async Task<RaidHealth> CheckHealthAsync(IEnumerable<DiskInfo> disks, CancellationToken cancellationToken = default);
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public override RaidCapabilities Capabilities;;
+    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
+    public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
+    public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
+    public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
+}
+```
+```csharp
+public sealed class Raid5Strategy : SdkRaidStrategyBase
+{
+}
+    public Raid5Strategy(int chunkSize = 64 * 1024);
+    public override RaidLevel Level;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    public override async Task<RaidHealth> CheckHealthAsync(IEnumerable<DiskInfo> disks, CancellationToken cancellationToken = default);
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public override RaidCapabilities Capabilities;;
+    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
+    public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
+    public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
+    public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
+}
+```
+```csharp
+public sealed class Raid6Strategy : SdkRaidStrategyBase
+{
+}
+    public Raid6Strategy(int chunkSize = 64 * 1024);
+    public override RaidLevel Level;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    public override async Task<RaidHealth> CheckHealthAsync(IEnumerable<DiskInfo> disks, CancellationToken cancellationToken = default);
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public override RaidCapabilities Capabilities;;
+    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
+    public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
+    public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
+    public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
+}
+```
+```csharp
+public sealed class Raid10Strategy : SdkRaidStrategyBase
+{
+}
+    public Raid10Strategy(int chunkSize = 64 * 1024);
+    public override RaidLevel Level;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    public override async Task<RaidHealth> CheckHealthAsync(IEnumerable<DiskInfo> disks, CancellationToken cancellationToken = default);
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public override RaidCapabilities Capabilities;;
+    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
+    public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
+    public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
+    public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Strategies/Standard/StandardRaidStrategiesB1.cs
+```csharp
+public sealed class Raid2Strategy : SdkRaidStrategyBase
+{
+}
+    public Raid2Strategy(int chunkSize = 64 * 1024, bool useHamming74 = true);
+    public override RaidLevel Level;;
+    public override RaidCapabilities Capabilities;;
+    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
+    public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
+    public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
+    public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
+}
+```
+```csharp
+public sealed class Raid3Strategy : SdkRaidStrategyBase
+{
+}
+    public Raid3Strategy(int chunkSize = 64 * 1024);
+    public override RaidLevel Level;;
+    public override RaidCapabilities Capabilities;;
+    public override StripeInfo CalculateStripe(long blockIndex, int diskCount);
+    public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks, long offset, CancellationToken cancellationToken = default);
+    public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks, long offset, int length, CancellationToken cancellationToken = default);
+    public override async Task RebuildDiskAsync(DiskInfo failedDisk, IEnumerable<DiskInfo> healthyDisks, DiskInfo targetDisk, IProgress<RebuildProgress>? progressCallback = null, CancellationToken cancellationToken = default);
+}
+```
+```csharp
+public sealed class Raid4Strategy : SdkRaidStrategyBase
+{
+}
+    public Raid4Strategy(int chunkSize = 64 * 1024);
     public override RaidLevel Level;;
     public override RaidCapabilities Capabilities;;
     public override StripeInfo CalculateStripe(long blockIndex, int diskCount);

@@ -476,7 +476,8 @@ public abstract class EncryptionPluginBase : DataTransformationPluginBase
 
             // Prepend envelope header to encrypted data
             var headerBytes = envelope.Serialize();
-            var result = new MemoryStream(headerBytes.Length + (int)encryptedData.Length);
+            var encryptedLength = encryptedData.CanSeek ? encryptedData.Length : 0;
+            var result = new MemoryStream(headerBytes.Length + (int)Math.Min(encryptedLength, int.MaxValue));
             await result.WriteAsync(headerBytes, ct).ConfigureAwait(false);
             await encryptedData.CopyToAsync(result, ct).ConfigureAwait(false);
             result.Position = 0;
@@ -791,7 +792,7 @@ public abstract class EncryptionPluginBase : DataTransformationPluginBase
         /// <inheritdoc/>
         public IEnumerable<string> Roles => new[] { "system" };
         /// <inheritdoc/>
-        public bool IsSystemAdmin => true;
+        public bool IsSystemAdmin => false;
     }
 
     #endregion

@@ -40,6 +40,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private bool _enableAutoMigration = true;
         private int _migrationCheckIntervalSeconds = 300;
         private readonly SemaphoreSlim _initLock = new(1, 1);
+        private readonly SemaphoreSlim _migrationLock = new(1, 1); // Re-entry guard for timer callback
         private readonly BoundedDictionary<string, ObjectAccessProfile> _accessProfiles = new BoundedDictionary<string, ObjectAccessProfile>(1000);
         private readonly BoundedDictionary<string, StorageTier> _objectTiers = new BoundedDictionary<string, StorageTier>(1000);
         private readonly BoundedDictionary<string, byte[]> _dataCache = new BoundedDictionary<string, byte[]>(1000);
@@ -148,9 +149,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Start with empty profiles
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -165,9 +168,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 var json = System.Text.Json.JsonSerializer.Serialize(_accessProfiles.ToDictionary(kvp => kvp.Key, kvp => kvp.Value));
                 await File.WriteAllTextAsync(profilePath, json, ct);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Best effort save
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -413,11 +418,19 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         {
             EnsureInitialized();
 
-            var totalObjects = _objectTiers.Count;
-            var hotCount = _objectTiers.Values.Count(t => t == StorageTier.Hot);
-            var warmCount = _objectTiers.Values.Count(t => t == StorageTier.Warm);
-            var coldCount = _objectTiers.Values.Count(t => t == StorageTier.Cold);
-            var archiveCount = _objectTiers.Values.Count(t => t == StorageTier.Archive);
+            // Single pass over _objectTiers.Values to compute all four tier counts.
+            int hotCount = 0, warmCount = 0, coldCount = 0, archiveCount = 0;
+            foreach (var tier in _objectTiers.Values)
+            {
+                switch (tier)
+                {
+                    case StorageTier.Hot: hotCount++; break;
+                    case StorageTier.Warm: warmCount++; break;
+                    case StorageTier.Cold: coldCount++; break;
+                    case StorageTier.Archive: archiveCount++; break;
+                }
+            }
+            var totalObjects = hotCount + warmCount + coldCount + archiveCount;
 
             var message = $"Objects: {totalObjects} (Hot: {hotCount}, Warm: {warmCount}, Cold: {coldCount}, Archive: {archiveCount})";
 
@@ -566,7 +579,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             var currentTier = profile.CurrentTier;
             var optimalTier = DetermineOptimalTier(profile.AccessScore);
 
-            if (optimalTier < currentTier) // Lower enum value = higher tier
+            // StorageTier enum: Hot(0) < Warm(1) < Cold(2) < Archive(3).
+            // A smaller numeric value means a faster (hotter) tier, so optimalTier < currentTier
+            // means we want to promote to a faster tier.
+            if ((int)optimalTier < (int)currentTier) // Explicit cast documents the intent
             {
                 await MigrateObjectAsync(key, optimalTier, ct);
             }
@@ -577,6 +593,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         /// </summary>
         private async Task PerformAutoMigrationAsync(CancellationToken ct)
         {
+            // Re-entry guard: skip this cycle if a migration is already in progress.
+            if (!await _migrationLock.WaitAsync(0))
+                return;
             try
             {
                 foreach (var kvp in _accessProfiles.ToArray())
@@ -600,9 +619,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 // Save updated profiles
                 await SaveAccessProfilesAsync(ct);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 // Best effort migration
+                System.Diagnostics.Debug.WriteLine($"[AiTieredStorageStrategy.PerformAutoMigrationAsync] {ex.GetType().Name}: {ex.Message}");
+            }
+            finally
+            {
+                _migrationLock.Release();
             }
         }
 
@@ -641,9 +665,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     _dataCache.TryRemove(key, out _);
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Migration failure - object remains in current tier
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -673,7 +699,20 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         /// </summary>
         private string GetSafeFileName(string key)
         {
-            return string.Join("_", key.Split(Path.GetInvalidFileNameChars()));
+            // Replace invalid file-name characters and path separators to prevent path traversal.
+            // We also replace '..' sequences so keys like "../../etc/passwd" cannot escape the tier directory.
+            var sanitized = string.Join("_", key.Split(Path.GetInvalidFileNameChars()));
+            // Replace directory separators and parent-directory references.
+            sanitized = sanitized
+                .Replace('/', '_')
+                .Replace('\\', '_');
+            // Collapse any ".." that would survive the above (e.g. the ".." itself has no invalid chars).
+            while (sanitized.Contains(".."))
+                sanitized = sanitized.Replace("..", "__");
+            // Ensure the result is not empty or a reserved device name.
+            if (string.IsNullOrWhiteSpace(sanitized))
+                sanitized = "_empty_";
+            return sanitized;
         }
 
         /// <summary>

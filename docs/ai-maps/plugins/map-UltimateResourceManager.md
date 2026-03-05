@@ -5,6 +5,31 @@
 
 ## Project: DataWarehouse.Plugins.UltimateResourceManager
 
+### File: Plugins/DataWarehouse.Plugins.UltimateResourceManager/UltimateResourceManagerPlugin.cs
+```csharp
+public sealed class UltimateResourceManagerPlugin : InfrastructurePluginBase, IDisposable
+{
+}
+    public override string Id;;
+    public override string Name;;
+    public override string Version;;
+    public override string InfrastructureDomain;;
+    public override PluginCategory Category;;
+    public string SemanticDescription;;
+    public string[] SemanticTags;;
+    public ResourceStrategyRegistry Registry;;
+    public bool AuditEnabled { get => _auditEnabled; set => _auditEnabled = value; }
+    public bool FairSchedulingEnabled { get => _fairSchedulingEnabled; set => _fairSchedulingEnabled = value; }
+    public bool PreemptionEnabled { get => _preemptionEnabled; set => _preemptionEnabled = value; }
+    public UltimateResourceManagerPlugin();
+    public override async Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request);
+    protected override List<PluginCapabilityDescriptor> GetCapabilities();
+    protected override Dictionary<string, object> GetMetadata();
+    public override Task OnMessageAsync(PluginMessage message);
+    protected override void Dispose(bool disposing);
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateResourceManager/ResourceStrategyBase.cs
 ```csharp
 public sealed record ResourceMetrics
@@ -55,6 +80,7 @@ public sealed record ResourceAllocation
 {
 }
     public required string RequestId { get; init; }
+    public string? RequesterId { get; init; }
     public bool Success { get; init; }
     public double AllocatedCpuCores { get; init; }
     public long AllocatedMemoryBytes { get; init; }
@@ -138,28 +164,141 @@ public sealed class ResourceStrategyRegistry
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateResourceManager/UltimateResourceManagerPlugin.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateResourceManager/Strategies/GpuStrategies.cs
 ```csharp
-public sealed class UltimateResourceManagerPlugin : InfrastructurePluginBase, IDisposable
+public sealed class TimeSlicingGpuStrategy : ResourceStrategyBase
 {
 }
-    public override string Id;;
-    public override string Name;;
-    public override string Version;;
-    public override string InfrastructureDomain;;
-    public override PluginCategory Category;;
-    public string SemanticDescription;;
-    public string[] SemanticTags;;
-    public ResourceStrategyRegistry Registry;;
-    public bool AuditEnabled { get => _auditEnabled; set => _auditEnabled = value; }
-    public bool FairSchedulingEnabled { get => _fairSchedulingEnabled; set => _fairSchedulingEnabled = value; }
-    public bool PreemptionEnabled { get => _preemptionEnabled; set => _preemptionEnabled = value; }
-    public UltimateResourceManagerPlugin();
-    public override async Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request);
-    protected override List<PluginCapabilityDescriptor> GetCapabilities();
-    protected override Dictionary<string, object> GetMetadata();
-    public override Task OnMessageAsync(PluginMessage message);
-    protected override void Dispose(bool disposing);
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ResourceCategory Category;;
+    public override ResourceStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
+    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
+    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
+}
+```
+```csharp
+public sealed class MigGpuStrategy : ResourceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ResourceCategory Category;;
+    public override ResourceStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
+    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
+}
+```
+```csharp
+public sealed class MpsGpuStrategy : ResourceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ResourceCategory Category;;
+    public override ResourceStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
+    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
+    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
+}
+```
+```csharp
+public sealed class VgpuStrategy : ResourceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ResourceCategory Category;;
+    public override ResourceStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
+    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
+    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateResourceManager/Strategies/CpuStrategies.cs
+```csharp
+public sealed class FairShareCpuStrategy : ResourceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ResourceCategory Category;;
+    public override ResourceStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
+    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
+    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
+}
+```
+```csharp
+public sealed class PriorityCpuStrategy : ResourceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ResourceCategory Category;;
+    public override ResourceStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
+    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
+    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
+}
+```
+```csharp
+public sealed class AffinityCpuStrategy : ResourceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ResourceCategory Category;;
+    public override ResourceStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
+    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
+    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
+}
+```
+```csharp
+public sealed class RealTimeCpuStrategy : ResourceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ResourceCategory Category;;
+    public override ResourceStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
+    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
+    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
+}
+```
+```csharp
+public sealed class NumaCpuStrategy : ResourceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ResourceCategory Category;;
+    public override ResourceStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
+    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
+    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
 }
 ```
 
@@ -285,316 +424,6 @@ public sealed class NamespaceIsolationStrategy : ResourceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateResourceManager/Strategies/CpuStrategies.cs
-```csharp
-public sealed class FairShareCpuStrategy : ResourceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ResourceCategory Category;;
-    public override ResourceStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
-    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
-    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
-}
-```
-```csharp
-public sealed class PriorityCpuStrategy : ResourceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ResourceCategory Category;;
-    public override ResourceStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
-    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
-}
-```
-```csharp
-public sealed class AffinityCpuStrategy : ResourceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ResourceCategory Category;;
-    public override ResourceStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
-    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
-}
-```
-```csharp
-public sealed class RealTimeCpuStrategy : ResourceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ResourceCategory Category;;
-    public override ResourceStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
-    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
-}
-```
-```csharp
-public sealed class NumaCpuStrategy : ResourceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ResourceCategory Category;;
-    public override ResourceStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
-    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateResourceManager/Strategies/GpuStrategies.cs
-```csharp
-public sealed class TimeSlicingGpuStrategy : ResourceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ResourceCategory Category;;
-    public override ResourceStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
-    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
-    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
-}
-```
-```csharp
-public sealed class MigGpuStrategy : ResourceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ResourceCategory Category;;
-    public override ResourceStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
-    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
-}
-```
-```csharp
-public sealed class MpsGpuStrategy : ResourceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ResourceCategory Category;;
-    public override ResourceStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
-    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
-}
-```
-```csharp
-public sealed class VgpuStrategy : ResourceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ResourceCategory Category;;
-    public override ResourceStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
-    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateResourceManager/Strategies/IoStrategies.cs
-```csharp
-public sealed class DeadlineIoStrategy : ResourceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ResourceCategory Category;;
-    public override ResourceStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
-    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
-    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
-}
-```
-```csharp
-public sealed class TokenBucketIoStrategy : ResourceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ResourceCategory Category;;
-    public override ResourceStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
-    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
-    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
-}
-```
-```csharp
-public sealed class BandwidthLimitIoStrategy : ResourceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ResourceCategory Category;;
-    public override ResourceStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
-    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
-}
-```
-```csharp
-public sealed class PriorityIoStrategy : ResourceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ResourceCategory Category;;
-    public override ResourceStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
-    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateResourceManager/Strategies/MemoryStrategies.cs
-```csharp
-public sealed class CgroupMemoryStrategy : ResourceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ResourceCategory Category;;
-    public override ResourceStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
-    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
-    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
-}
-```
-```csharp
-public sealed class BalloonMemoryStrategy : ResourceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ResourceCategory Category;;
-    public override ResourceStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
-    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
-}
-```
-```csharp
-public sealed class PressureAwareMemoryStrategy : ResourceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ResourceCategory Category;;
-    public override ResourceStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
-    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
-}
-```
-```csharp
-public sealed class HugePagesMemoryStrategy : ResourceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ResourceCategory Category;;
-    public override ResourceStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
-    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateResourceManager/Strategies/NetworkStrategies.cs
-```csharp
-public sealed class TokenBucketNetworkStrategy : ResourceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ResourceCategory Category;;
-    public override ResourceStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
-    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
-    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
-}
-```
-```csharp
-public sealed class QosNetworkStrategy : ResourceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ResourceCategory Category;;
-    public override ResourceStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
-    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
-}
-```
-```csharp
-public sealed class CompositeResourceStrategy : ResourceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ResourceCategory Category;;
-    public override ResourceStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
-    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
-}
-```
-```csharp
-public sealed class HierarchicalQuotaStrategy : ResourceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ResourceCategory Category;;
-    public override ResourceStrategyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
-    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateResourceManager/Strategies/PowerStrategies.cs
 ```csharp
 public sealed class DvfsCpuStrategy : ResourceStrategyBase
@@ -714,5 +543,198 @@ public sealed class SuspendResumeStrategy : ResourceStrategyBase
     public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
     protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
     protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateResourceManager/Strategies/NetworkStrategies.cs
+```csharp
+public sealed class TokenBucketNetworkStrategy : ResourceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ResourceCategory Category;;
+    public override ResourceStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
+    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
+    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
+}
+```
+```csharp
+public sealed class QosNetworkStrategy : ResourceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ResourceCategory Category;;
+    public override ResourceStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
+    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
+    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
+}
+```
+```csharp
+public sealed class CompositeResourceStrategy : ResourceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ResourceCategory Category;;
+    public override ResourceStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
+    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
+    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
+}
+```
+```csharp
+private sealed class CompositeAlloc
+{
+}
+    public long CoreMilliunits;
+    public long MemoryBytes;
+    public long Iops;
+    public long IoBandwidth;
+    public long GpuPercentMilliunits;
+}
+```
+```csharp
+public sealed class HierarchicalQuotaStrategy : ResourceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ResourceCategory Category;;
+    public override ResourceStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
+    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateResourceManager/Strategies/IoStrategies.cs
+```csharp
+public sealed class DeadlineIoStrategy : ResourceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ResourceCategory Category;;
+    public override ResourceStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
+    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
+    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
+}
+```
+```csharp
+public sealed class TokenBucketIoStrategy : ResourceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ResourceCategory Category;;
+    public override ResourceStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
+    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
+    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
+}
+```
+```csharp
+public sealed class BandwidthLimitIoStrategy : ResourceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ResourceCategory Category;;
+    public override ResourceStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
+    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
+    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
+}
+```
+```csharp
+public sealed class PriorityIoStrategy : ResourceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ResourceCategory Category;;
+    public override ResourceStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
+    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
+    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateResourceManager/Strategies/MemoryStrategies.cs
+```csharp
+public sealed class CgroupMemoryStrategy : ResourceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ResourceCategory Category;;
+    public override ResourceStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
+    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
+    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct);
+}
+```
+```csharp
+public sealed class BalloonMemoryStrategy : ResourceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ResourceCategory Category;;
+    public override ResourceStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
+    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
+}
+```
+```csharp
+public sealed class PressureAwareMemoryStrategy : ResourceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ResourceCategory Category;;
+    public override ResourceStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
+    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
+}
+```
+```csharp
+public sealed class HugePagesMemoryStrategy : ResourceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ResourceCategory Category;;
+    public override ResourceStrategyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default);
+    protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct);
 }
 ```

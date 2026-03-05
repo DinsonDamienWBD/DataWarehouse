@@ -23,7 +23,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var endpoint = config.ConnectionString;
+            // Finding 1967: Null-check ConnectionString before calling Contains.
+            var endpoint = config.ConnectionString ?? throw new ArgumentException("Azure IoT Hub endpoint required (*.azure-devices.net)");
             if (!endpoint.Contains(".azure-devices.net"))
                 throw new ArgumentException("Azure IoT Hub endpoint required (*.azure-devices.net)");
             var client = new HttpClient { BaseAddress = new Uri($"https://{endpoint}") };
@@ -34,8 +35,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             var client = handle.GetConnection<HttpClient>();
-            var response = await client.GetAsync("/", ct);
-            return response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable;
+            using var response = await client.GetAsync("/", ct);
+            return response.IsSuccessStatusCode;
         }
 
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
@@ -59,7 +60,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
             var twinUrl = $"/twins/{deviceId}?api-version=2021-04-12";
             try
             {
-                var response = await client.GetAsync(twinUrl, ct);
+                using var response = await client.GetAsync(twinUrl, ct);
+                response.EnsureSuccessStatusCode();
                 var content = await response.Content.ReadAsStringAsync(ct);
                 return new Dictionary<string, object>
                 {
@@ -91,7 +93,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
             var methodUrl = $"/twins/{deviceId}/methods?api-version=2021-04-12";
             try
             {
-                var response = await client.GetAsync(methodUrl, ct);
+                using var response = await client.GetAsync(methodUrl, ct);
                 return $"{{\"status\":\"queued\",\"deviceId\":\"{deviceId}\",\"methodName\":\"{command}\",\"endpoint\":\"{methodUrl}\"}}";
             }
             catch (Exception ex)

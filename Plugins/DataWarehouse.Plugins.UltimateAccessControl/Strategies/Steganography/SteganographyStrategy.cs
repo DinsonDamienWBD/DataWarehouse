@@ -537,13 +537,15 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
         {
             var dataToHide = PrepareDataForHiding(secretData, encrypt);
 
-            // For simplicity, embed in video container data using LSB
-            // Production implementation would parse video codec frames
-            int videoHeaderSize = 512; // Conservative estimate for video headers
+            // LSB steganography across raw bytes starting after a skip zone.
+            // LOW-1326: 512-byte skip is a conservative estimate; callers operating on
+            // format-parsed frames should pass pre-extracted frame payloads to avoid
+            // any container-header overlap.  This method does NOT parse codec containers.
+            int videoHeaderSize = 512;
 
             if (carrierData.Length < videoHeaderSize + 1000)
             {
-                throw new InvalidOperationException("Video carrier too small");
+                throw new InvalidOperationException("Video carrier too small (need at least 1512 bytes after header skip)");
             }
 
             var minCarrierSize = (dataToHide.Length + HeaderSize) * 8 + videoHeaderSize;
@@ -597,6 +599,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
         /// <returns>The extracted secret data.</returns>
         public byte[] ExtractFromVideo(byte[] carrierData, bool decrypt = true)
         {
+            // LOW-1326: Must match HideInVideo skip value; see note there about codec-specific parsing
             int videoHeaderSize = 512;
             if (carrierData.Length < videoHeaderSize + HeaderSize * 8)
             {

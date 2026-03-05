@@ -133,40 +133,42 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
         /// </summary>
         protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
-            var startTime = DateTimeOffset.UtcNow;
+            // P2-1904: Use Stopwatch — DateTimeOffset subtraction is susceptible to NTP clock adjustments.
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             try
             {
                 var directoryInfo = handle.GetConnection<DirectoryInfo>();
-                var start = DateTimeOffset.UtcNow;
 
                 // Refresh and verify accessibility
                 directoryInfo.Refresh();
 
                 if (!directoryInfo.Exists)
                 {
+                    sw.Stop();
                     return Task.FromResult(new ConnectionHealth(
                         IsHealthy: false,
                         StatusMessage: "Lustre mount point no longer exists",
-                        Latency: DateTimeOffset.UtcNow - start,
+                        Latency: sw.Elapsed,
                         CheckedAt: DateTimeOffset.UtcNow));
                 }
 
                 // Perform a stat operation
                 var fileSystemInfos = directoryInfo.GetFileSystemInfos();
-                var latency = DateTimeOffset.UtcNow - start;
+                sw.Stop();
 
                 return Task.FromResult(new ConnectionHealth(
                     IsHealthy: true,
                     StatusMessage: $"Lustre filesystem healthy ({fileSystemInfos.Length} entries)",
-                    Latency: latency,
+                    Latency: sw.Elapsed,
                     CheckedAt: DateTimeOffset.UtcNow));
             }
             catch (Exception ex)
             {
+                sw.Stop();
                 return Task.FromResult(new ConnectionHealth(
                     IsHealthy: false,
                     StatusMessage: $"Lustre health check failed: {ex.Message}",
-                    Latency: DateTimeOffset.UtcNow - startTime,
+                    Latency: sw.Elapsed,
                     CheckedAt: DateTimeOffset.UtcNow));
             }
         }

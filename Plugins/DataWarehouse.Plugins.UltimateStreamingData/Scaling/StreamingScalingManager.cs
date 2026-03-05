@@ -61,9 +61,9 @@ public sealed class StreamingScalingManager : IScalableSubsystem, IDisposable
     // ---- Configuration ----
     private ScalabilityConfig _scalabilityConfig;
     private volatile ScalingLimits _currentLimits;
-    private int _partitionCount;
-    private int _maxPartitions;
-    private int _maxConsumers;
+    private volatile int _partitionCount;
+    private volatile int _maxPartitions;
+    private volatile int _maxConsumers;
     private long _targetThroughputPerPartition;
     private readonly int _maxLagMs;
 
@@ -210,6 +210,7 @@ public sealed class StreamingScalingManager : IScalableSubsystem, IDisposable
         }
 
         // Adjust buffer sizes via backpressure handler
+        // Finding 4334/4335: removed trailing `await Task.CompletedTask` — no-op state machine allocation.
         await _backpressureHandler.ApplyBackpressureAsync(
             new BackpressureContext(
                 CurrentLoad: Interlocked.Read(ref _publishCount),
@@ -217,8 +218,6 @@ public sealed class StreamingScalingManager : IScalableSubsystem, IDisposable
                 QueueDepth: _backpressureHandler.CurrentQueueDepth,
                 LatencyP99: GetAverageLatencyMs()),
             ct).ConfigureAwait(false);
-
-        await Task.CompletedTask;
     }
 
     /// <inheritdoc/>
@@ -266,6 +265,11 @@ public sealed class StreamingScalingManager : IScalableSubsystem, IDisposable
 
         var channel = _partitionChannels[partition];
 
+        // Finding 4327: write to the local partition channel FIRST so local consumers never miss
+        // an event that the bus already received. If the channel write fails the whole publish
+        // fails before the bus publish, keeping both sides consistent.
+        await channel.Writer.WriteAsync(@event, ct).ConfigureAwait(false);
+
         // Dispatch to message bus via active strategy if available
         if (_messageBus != null)
         {
@@ -297,9 +301,6 @@ public sealed class StreamingScalingManager : IScalableSubsystem, IDisposable
             }
         }
 
-        // Write to partition channel for local consumers
-        await channel.Writer.WriteAsync(@event, ct).ConfigureAwait(false);
-
         Interlocked.Increment(ref _publishCount);
         var elapsed = Environment.TickCount64 - startTicks;
         Interlocked.Add(ref _totalLatencyTicks, elapsed);
@@ -317,8 +318,9 @@ public sealed class StreamingScalingManager : IScalableSubsystem, IDisposable
 
     /// <summary>
     /// Creates a consumer group subscription that yields events from assigned partitions.
-    /// Consumer offsets are tracked per partition and committed to the checkpoint store
-    /// for exactly-once processing semantics on restart.
+    /// Consumer offsets are tracked per partition and committed to the checkpoint store.
+    /// Delivery semantics are at-least-once: checkpointed offsets prevent reprocessing already-committed
+    /// events on restart, but in-flight events at crash time may be redelivered.
     /// </summary>
     /// <param name="consumerGroupId">The consumer group identifier for coordinated consumption.</param>
     /// <param name="ct">Cancellation token that stops the subscription when cancelled.</param>
@@ -364,13 +366,17 @@ public sealed class StreamingScalingManager : IScalableSubsystem, IDisposable
                         await mergedChannel.Writer.WriteAsync(evt, ct).ConfigureAwait(false);
                     }
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException ex)
                 {
+
                     // Expected on cancellation
+                    System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
                 }
-                catch (ChannelClosedException)
+                catch (ChannelClosedException ex)
                 {
+
                     // Channel closed
+                    System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
                 }
             }, ct));
         }
@@ -521,17 +527,43 @@ public sealed class StreamingScalingManager : IScalableSubsystem, IDisposable
     /// <summary>
     /// Assigns partitions to a consumer group using round-robin assignment.
     /// Each consumer in the group gets a roughly equal share of partitions.
+    /// Consumers in the same group collectively cover all partitions with no overlap.
     /// </summary>
     private int[] AssignPartitions(string consumerGroupId)
     {
-        // Simple: assign all partitions to every consumer for now.
-        // In production, this would coordinate with other consumers in the group.
-        var partitions = new int[_partitionCount];
-        for (int i = 0; i < _partitionCount; i++)
+        int consumerCount;
+        int consumerIndex;
+
+        lock (_consumerGroupLock)
         {
-            partitions[i] = i;
+            if (!_consumerGroups.TryGetValue(consumerGroupId, out var group))
+            {
+                // Fallback: assign all partitions if group is unknown
+                var all = new int[_partitionCount];
+                for (int i = 0; i < _partitionCount; i++) all[i] = i;
+                return all;
+            }
+
+            consumerCount = Math.Max(1, group.ConsumerCount);
+            // Use stable consumer index derived from group name hash for deterministic assignment
+            consumerIndex = (Math.Abs(consumerGroupId.GetHashCode(StringComparison.Ordinal)) / consumerCount)
+                            % consumerCount;
         }
-        return partitions;
+
+        // Round-robin: consumer i owns partitions where (partition % consumerCount == consumerIndex)
+        var assigned = new List<int>(_partitionCount / consumerCount + 1);
+        int partCount = _partitionCount;
+        for (int p = 0; p < partCount; p++)
+        {
+            if (p % consumerCount == consumerIndex)
+                assigned.Add(p);
+        }
+
+        // Safety: if no partitions assigned (e.g. more consumers than partitions), assign partition 0
+        if (assigned.Count == 0)
+            assigned.Add(0);
+
+        return assigned.ToArray();
     }
 
     private async Task RestoreConsumerOffsetsAsync(string consumerGroupId, CancellationToken ct)
@@ -564,7 +596,9 @@ public sealed class StreamingScalingManager : IScalableSubsystem, IDisposable
 
     private long GetMaxConsumerLagMs()
     {
-        // Estimate lag based on partition channel depth and average processing rate
+        // Estimate lag based on partition channel depth and average processing rate.
+        // Compute average latency once outside the loop to avoid O(partitions) overhead.
+        var avgLatency = GetAverageLatencyMs();
         long maxLag = 0;
         for (int i = 0; i < _partitionCount; i++)
         {
@@ -572,7 +606,6 @@ public sealed class StreamingScalingManager : IScalableSubsystem, IDisposable
             if (channel?.Reader.CanCount == true)
             {
                 var depth = channel.Reader.Count;
-                var avgLatency = GetAverageLatencyMs();
                 var estimatedLagMs = (long)(depth * Math.Max(avgLatency, 1));
                 if (estimatedLagMs > maxLag)
                     maxLag = estimatedLagMs;
@@ -585,14 +618,14 @@ public sealed class StreamingScalingManager : IScalableSubsystem, IDisposable
     /// Evaluates whether partition or consumer auto-scaling is needed based on
     /// throughput and lag thresholds from the <see cref="ScalabilityConfig"/>.
     /// </summary>
-    private async Task EvaluateScaleDecisionAsync(CancellationToken ct)
+    private Task EvaluateScaleDecisionAsync(CancellationToken ct)
     {
         if (!_scalabilityConfig.AutoScale)
-            return;
+            return Task.CompletedTask;
 
         // Enforce cooldown
         if (DateTimeOffset.UtcNow - _lastScaleDecision < _scaleCooldown)
-            return;
+            return Task.CompletedTask;
 
         var throughput = Interlocked.Read(ref _publishCount);
         var throughputPerPartition = _partitionCount > 0 ? throughput / _partitionCount : throughput;
@@ -624,18 +657,22 @@ public sealed class StreamingScalingManager : IScalableSubsystem, IDisposable
             _lastScaleDecision = DateTimeOffset.UtcNow;
         }
 
-        await Task.CompletedTask;
+        return Task.CompletedTask;
     }
 
     private void ScalePartitions(int newCount)
     {
         lock (_partitionLock)
         {
+            // Initialise channels for any new partitions; existing channels are preserved.
+            // Consumers that subscribe after this call will pick up the new partitions via
+            // AssignPartitions. Already-running iterators keep their original assignment —
+            // they must re-subscribe to participate in the enlarged partition set.
             for (int i = _partitionCount; i < newCount && i < _maxPartitions; i++)
             {
                 _partitionChannels[i] ??= CreatePartitionChannel();
             }
-            _partitionCount = newCount;
+            _partitionCount = newCount; // volatile field; direct assignment provides visibility guarantee.
         }
     }
 

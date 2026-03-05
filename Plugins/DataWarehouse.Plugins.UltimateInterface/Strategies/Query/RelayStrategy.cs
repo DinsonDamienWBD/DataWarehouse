@@ -29,6 +29,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Query;
 /// </remarks>
 internal sealed class RelayStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
+    public override bool IsProductionReady => false;
     public override string StrategyId => "relay";
     public string DisplayName => "Relay (GraphQL)";
     public string SemanticDescription => "Relay specification GraphQL with Node interface, Connection pagination, and global IDs.";

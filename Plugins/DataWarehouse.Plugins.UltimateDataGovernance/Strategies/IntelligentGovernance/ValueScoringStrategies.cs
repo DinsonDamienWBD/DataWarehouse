@@ -53,7 +53,7 @@ public sealed class AccessFrequencyValueStrategy : ConsciousnessStrategyBase
     /// </summary>
     /// <param name="metadata">Metadata dictionary containing access_count, last_accessed, and access_trend keys.</param>
     /// <returns>A score from 0 to 100, or 50 (neutral) if no access metadata is present.</returns>
-    public double Score(Dictionary<string, object> metadata)
+    public double Score(IReadOnlyDictionary<string, object> metadata)
     {
         IncrementCounter("score_invocations");
 
@@ -151,7 +151,7 @@ public sealed class LineageDepthValueStrategy : ConsciousnessStrategyBase
     /// </summary>
     /// <param name="metadata">Metadata dictionary containing downstream_count, upstream_count, and lineage_depth keys.</param>
     /// <returns>A score from 0 to 100, or 25 (low) if no lineage metadata is present.</returns>
-    public double Score(Dictionary<string, object> metadata)
+    public double Score(IReadOnlyDictionary<string, object> metadata)
     {
         IncrementCounter("score_invocations");
 
@@ -223,7 +223,7 @@ public sealed class UniquenessValueStrategy : ConsciousnessStrategyBase
     /// </summary>
     /// <param name="metadata">Metadata dictionary containing duplicate_count, similarity_score, and is_primary_copy keys.</param>
     /// <returns>A score from 0 to 100.</returns>
-    public double Score(Dictionary<string, object> metadata)
+    public double Score(IReadOnlyDictionary<string, object> metadata)
     {
         IncrementCounter("score_invocations");
 
@@ -308,7 +308,7 @@ public sealed class FreshnessValueStrategy : ConsciousnessStrategyBase
     /// </summary>
     /// <param name="metadata">Metadata dictionary containing created_at, modified_at, and freshness_half_life_days keys.</param>
     /// <returns>A score from 0 to 100 based on exponential decay.</returns>
-    public double Score(Dictionary<string, object> metadata)
+    public double Score(IReadOnlyDictionary<string, object> metadata)
     {
         IncrementCounter("score_invocations");
 
@@ -388,7 +388,7 @@ public sealed class BusinessCriticalityValueStrategy : ConsciousnessStrategyBase
     /// </summary>
     /// <param name="metadata">Metadata dictionary containing criticality_tier, business_unit, and revenue_impact keys.</param>
     /// <returns>A score from 0 to 100.</returns>
-    public double Score(Dictionary<string, object> metadata)
+    public double Score(IReadOnlyDictionary<string, object> metadata)
     {
         IncrementCounter("score_invocations");
 
@@ -472,7 +472,7 @@ public sealed class ComplianceValueStrategy : ConsciousnessStrategyBase
     /// </summary>
     /// <param name="metadata">Metadata dictionary containing regulatory_frameworks, audit_required, and legal_hold keys.</param>
     /// <returns>A score from 0 to 100.</returns>
-    public double Score(Dictionary<string, object> metadata)
+    public double Score(IReadOnlyDictionary<string, object> metadata)
     {
         IncrementCounter("score_invocations");
 
@@ -508,18 +508,9 @@ public sealed class ComplianceValueStrategy : ConsciousnessStrategyBase
                 frameworkCount = frameworkStrings.Count();
             }
 
-            score = Math.Max(score, frameworkCount * 10.0);
-            // If audit was set, keep the max of audit base + framework bonus
-            if (metadata.TryGetValue("audit_required", out var auditObj2) && Convert.ToBoolean(auditObj2))
-            {
-                score = Math.Max(80.0, score) + frameworkCount * 10.0;
-                // But re-applying: the base is 80, add framework bonus on top
-                score = 80.0 + frameworkCount * 10.0;
-            }
-            else
-            {
-                score = frameworkCount * 10.0;
-            }
+            // Framework bonus: each framework adds 10 points, take max with existing (audit) base.
+            var frameworkBonus = frameworkCount * 10.0;
+            score = Math.Max(score, frameworkBonus);
         }
 
         // If audit is required but no frameworks, ensure minimum 80
@@ -615,7 +606,7 @@ public sealed class CompositeValueScoringStrategy : ConsciousnessStrategyBase, I
     public Task<ValueScore> ScoreValueAsync(
         string objectId,
         byte[] data,
-        Dictionary<string, object> metadata,
+        IReadOnlyDictionary<string, object> metadata,
         CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();

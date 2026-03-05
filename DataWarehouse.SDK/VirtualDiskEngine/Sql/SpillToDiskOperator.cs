@@ -302,6 +302,13 @@ public sealed class SpillToDiskOperator : IAsyncDisposable
     private readonly ConcurrentBag<long> _tempBlocks = new();
     private long _currentMemoryUsage;
 
+    // Cat 13 (finding 923): dictionary keys are byte[] serialized as Base64 strings.
+    // Base64 adds ~33% size overhead per key and requires encode/decode on every lookup.
+    // For a large-aggregation hot path, replace with a byte[]-keyed dictionary using
+    // a span-aware IEqualityComparer<byte[]> (e.g., ByteArrayEqualityComparer) to avoid
+    // the string allocation entirely. The current Base64 approach is functionally correct
+    // but suboptimal for high-cardinality aggregation workloads.
+
     /// <summary>Last operation statistics.</summary>
     public SpillStats LastStats { get; private set; }
 
@@ -411,10 +418,15 @@ public sealed class SpillToDiskOperator : IAsyncDisposable
                 while (offset + 4 < blockData.Length)
                 {
                     int entryLen = BinaryPrimitives.ReadInt32LittleEndian(blockData.AsSpan(offset, 4));
-                    if (entryLen <= 0) break;
+                    if (entryLen <= 0) break; // end-of-block sentinel (zero padding)
                     offset += 4;
 
-                    if (offset + entryLen > blockData.Length) break;
+                    if (offset + entryLen > blockData.Length)
+                    {
+                        // Malformed block: entry claims more bytes than remain — log and skip block
+                        System.Diagnostics.Debug.WriteLine($"[SpillToDiskOperator] Block {blockNum}: malformed entry at offset {offset - 4}, entryLen={entryLen} exceeds block boundary. Skipping remainder of block.");
+                        break;
+                    }
 
                     // Entry format: [keyLen:4][key:N][aggState:M]
                     int keyLen = BinaryPrimitives.ReadInt32LittleEndian(blockData.AsSpan(offset, 4));

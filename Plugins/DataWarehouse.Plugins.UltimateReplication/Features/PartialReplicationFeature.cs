@@ -32,6 +32,10 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
         private readonly IMessageBus _messageBus;
         private readonly BoundedDictionary<string, ReplicationFilter> _filters = new BoundedDictionary<string, ReplicationFilter>(1000);
         private readonly BoundedDictionary<string, FilterSubscription> _subscriptions = new BoundedDictionary<string, FilterSubscription>(1000);
+        // Pre-compiled regexes keyed by "{filterId}:{ruleIndex}" to avoid ReDoS (finding 3706).
+        // Compiled once at filter creation time with a 1 s match timeout.
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, Regex> _compiledPatterns = new();
+        private static readonly TimeSpan _regexTimeout = TimeSpan.FromSeconds(1);
         private bool _disposed;
         private IDisposable? _messageBusSubscription;
 
@@ -88,6 +92,21 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
                 CreatedAt = DateTimeOffset.UtcNow,
                 IsActive = true
             };
+
+            // Pre-compile pattern rules with a match timeout to prevent ReDoS (finding 3706).
+            for (int i = 0; i < filter.Rules.Count; i++)
+            {
+                var rule = filter.Rules[i];
+                if ((rule.Type == FilterRuleType.KeyPattern || rule.Type == FilterRuleType.KeyPatternExclude)
+                    && !string.IsNullOrEmpty(rule.Pattern))
+                {
+                    var key = $"{filterId}:{i}";
+                    _compiledPatterns[key] = new Regex(
+                        rule.Pattern,
+                        RegexOptions.Compiled | RegexOptions.CultureInvariant,
+                        _regexTimeout);
+                }
+            }
 
             _filters[filterId] = filter;
             return filter;
@@ -198,34 +217,68 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
             long dataSizeBytes,
             TimeSpan? dataAge)
         {
-            var results = filter.Rules.Select(rule => EvaluateRule(rule, dataKey, tags, dataSizeBytes, dataAge));
+            // Pass filterId + ruleIndex so EvaluateRule can use the pre-compiled regex (finding 3706).
+            var results = filter.Rules.Select((rule, i) =>
+                EvaluateRule(rule, filter.FilterId, i, dataKey, tags, dataSizeBytes, dataAge));
 
             return filter.CombineMode == FilterCombineMode.And
                 ? results.All(r => r)
                 : results.Any(r => r);
         }
 
-        private static bool EvaluateRule(
+        private bool EvaluateRule(
             FilterRule rule,
+            string filterId,
+            int ruleIndex,
             string dataKey,
             IReadOnlySet<string>? tags,
             long dataSizeBytes,
             TimeSpan? dataAge)
         {
-            var match = rule.Type switch
+            bool match;
+            try
             {
-                FilterRuleType.TagInclude => tags != null && rule.Values.Any(v => tags.Contains(v)),
-                FilterRuleType.TagExclude => tags == null || !rule.Values.Any(v => tags.Contains(v)),
-                FilterRuleType.KeyPattern => !string.IsNullOrEmpty(rule.Pattern) && Regex.IsMatch(dataKey, rule.Pattern),
-                FilterRuleType.KeyPatternExclude => string.IsNullOrEmpty(rule.Pattern) || !Regex.IsMatch(dataKey, rule.Pattern),
-                FilterRuleType.MinSize => dataSizeBytes >= rule.SizeThreshold,
-                FilterRuleType.MaxSize => dataSizeBytes <= rule.SizeThreshold,
-                FilterRuleType.MaxAge => dataAge.HasValue && dataAge.Value <= rule.AgeThreshold,
-                FilterRuleType.MinAge => dataAge.HasValue && dataAge.Value >= rule.AgeThreshold,
-                _ => true
-            };
+                match = rule.Type switch
+                {
+                    FilterRuleType.TagInclude => tags != null && rule.Values.Any(v => tags.Contains(v)),
+                    FilterRuleType.TagExclude => tags == null || !rule.Values.Any(v => tags.Contains(v)),
+                    FilterRuleType.KeyPattern => EvaluateKeyPattern(filterId, ruleIndex, rule.Pattern, dataKey, invert: false),
+                    FilterRuleType.KeyPatternExclude => EvaluateKeyPattern(filterId, ruleIndex, rule.Pattern, dataKey, invert: true),
+                    FilterRuleType.MinSize => dataSizeBytes >= rule.SizeThreshold,
+                    FilterRuleType.MaxSize => dataSizeBytes <= rule.SizeThreshold,
+                    FilterRuleType.MaxAge => dataAge.HasValue && dataAge.Value <= rule.AgeThreshold,
+                    FilterRuleType.MinAge => dataAge.HasValue && dataAge.Value >= rule.AgeThreshold,
+                    _ => true
+                };
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                // On timeout, default to not-matching to avoid ReDoS blocking the caller.
+                match = false;
+            }
 
             return rule.Negate ? !match : match;
+        }
+
+        /// <summary>
+        /// Evaluates a key pattern using the pre-compiled regex. Falls back to
+        /// a non-compiled regex with timeout if no compiled version is available.
+        /// </summary>
+        private bool EvaluateKeyPattern(string filterId, int ruleIndex, string? pattern, string dataKey, bool invert)
+        {
+            if (string.IsNullOrEmpty(pattern))
+                return invert; // Empty pattern: invert=false → no match; invert=true → treat as match-all
+
+            var key = $"{filterId}:{ruleIndex}";
+            if (_compiledPatterns.TryGetValue(key, out var compiled))
+            {
+                var matched = compiled.IsMatch(dataKey);
+                return invert ? !matched : matched;
+            }
+
+            // Fallback: runtime regex with timeout (no compiled instance available)
+            var fallbackMatched = Regex.IsMatch(dataKey, pattern, RegexOptions.None, _regexTimeout);
+            return invert ? !fallbackMatched : fallbackMatched;
         }
 
         private async Task HandleFilterEvaluateAsync(PluginMessage message)

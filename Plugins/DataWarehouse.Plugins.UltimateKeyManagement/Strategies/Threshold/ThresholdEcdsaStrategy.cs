@@ -466,14 +466,14 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
                 // For simplicity, we compute partial sigma directly
                 var sigmaI = state.Ki.Multiply(state.GammaI).Mod(DomainParams.N);
 
-                // Add MtA contributions (simplified - real impl uses Paillier MtA)
-                foreach (var msg in round1Messages)
+                // #3584: MtA (Multiplicative-to-Additive) protocol requires Paillier
+                // homomorphic encryption, which cannot be replaced with random values.
+                // The placeholder random values produce incorrect sigma_i and will fail.
+                if (round1Messages.Any(m => m.PartyIndex != _config.PartyIndex))
                 {
-                    if (msg.PartyIndex == _config.PartyIndex) continue;
-
-                    // In real GG20, this uses Paillier homomorphic properties
-                    var partialMtA = GenerateRandomScalar(); // Placeholder for MtA result
-                    sigmaI = sigmaI.Add(partialMtA).Mod(DomainParams.N);
+                    throw new NotSupportedException(
+                        "MtA (Multiplicative-to-Additive) protocol requires Paillier homomorphic " +
+                        "encryption library. Configure via EcdsaOptions.PaillierProvider.");
                 }
 
                 state.SigmaI = sigmaI;
@@ -657,13 +657,22 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
 
         private BigInteger GenerateSafePrime(int bits)
         {
-            // Generate safe prime p where (p-1)/2 is also prime
+            // #3586: Enforce minimum prime size to prevent weak Paillier keys.
+            if (bits < 512)
+                throw new ArgumentOutOfRangeException(nameof(bits),
+                    $"Safe prime must be at least 512 bits (requested {bits}). " +
+                    "For Paillier with 2048-bit n, use GenerateSafePrime(1024).");
+
+            // Generate safe prime p = 2q + 1 where both p and q are prime (Sophie Germain prime pair).
+            // Use 200 Miller-Rabin rounds (FIPS 186-5 recommended for prime sizes >= 512 bits).
+            const int millerRabinRounds = 200;
             while (true)
             {
-                var q = new BigInteger(bits - 1, 100, _secureRandom);
+                // q must be prime with bits-1 bit length so that p=2q+1 has exactly bits bits.
+                var q = new BigInteger(bits - 1, millerRabinRounds, _secureRandom);
                 var p = q.ShiftLeft(1).Add(BigInteger.One); // p = 2q + 1
 
-                if (p.IsProbablePrime(100))
+                if (p.IsProbablePrime(millerRabinRounds))
                     return p;
             }
         }

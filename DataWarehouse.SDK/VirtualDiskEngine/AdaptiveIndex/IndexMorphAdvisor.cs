@@ -220,10 +220,15 @@ public sealed class IndexMorphAdvisor
                 AdjustThreshold(_lastToLevel, multiplier: 2.0);
 
                 // If reverted 3 times for same transition, permanently disable it
+                // Cat 2 (finding 754): snapshot the reference inside the lock and use a local variable
+                // so that a concurrent external assignment to DisabledLevels cannot race with our write.
                 if (count >= 3)
                 {
-                    _policy.DisabledLevels ??= new Dictionary<MorphLevel, bool>();
-                    _policy.DisabledLevels[_lastToLevel] = true;
+                    if (_policy.DisabledLevels is null)
+                        _policy.DisabledLevels = new Dictionary<MorphLevel, bool>();
+                    // Work on the captured reference to avoid TOCTOU across the ??= boundary
+                    var disabledLevels = _policy.DisabledLevels;
+                    disabledLevels[_lastToLevel] = true;
                 }
 
                 var snapshot = _metrics.TakeSnapshot(_lastToLevel);

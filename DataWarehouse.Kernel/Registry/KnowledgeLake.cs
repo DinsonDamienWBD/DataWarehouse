@@ -11,9 +11,14 @@ namespace DataWarehouse.Kernel.Registry;
 /// </summary>
 public sealed class KnowledgeLake : IKnowledgeLake, IDisposable
 {
-    private readonly BoundedDictionary<string, KnowledgeEntry> _entries = new BoundedDictionary<string, KnowledgeEntry>(1000);
-    private readonly BoundedDictionary<string, ConcurrentBag<string>> _byTopic = new BoundedDictionary<string, ConcurrentBag<string>>(1000);
-    private readonly BoundedDictionary<string, ConcurrentBag<string>> _byPlugin = new BoundedDictionary<string, ConcurrentBag<string>>(1000);
+    // Cat 7 (finding 966): cap total entries to prevent unbounded growth
+    private const int MaxEntries = 10_000;
+    private const int MaxTopicsOrPlugins = 1_000;
+    // Use ConcurrentDictionary<string, byte> as a bounded hash set for O(1) membership
+    // The inner set is bounded via _entries cap: a bag cannot exceed MaxEntries unique IDs.
+    private readonly BoundedDictionary<string, KnowledgeEntry> _entries = new BoundedDictionary<string, KnowledgeEntry>(MaxEntries);
+    private readonly BoundedDictionary<string, ConcurrentDictionary<string, byte>> _byTopic = new BoundedDictionary<string, ConcurrentDictionary<string, byte>>(MaxTopicsOrPlugins);
+    private readonly BoundedDictionary<string, ConcurrentDictionary<string, byte>> _byPlugin = new BoundedDictionary<string, ConcurrentDictionary<string, byte>>(MaxTopicsOrPlugins);
     private readonly Timer? _cleanupTimer;
 
     public KnowledgeLake(bool enableAutoCleanup = true)
@@ -37,8 +42,10 @@ public sealed class KnowledgeLake : IKnowledgeLake, IDisposable
         };
 
         _entries[knowledge.Id] = entry;
-        _byTopic.GetOrAdd(knowledge.Topic, _ => new()).Add(knowledge.Id);
-        _byPlugin.GetOrAdd(knowledge.SourcePluginId, _ => new()).Add(knowledge.Id);
+        _byTopic.GetOrAdd(knowledge.Topic, _ => new ConcurrentDictionary<string, byte>(StringComparer.Ordinal))
+            .TryAdd(knowledge.Id, 0);
+        _byPlugin.GetOrAdd(knowledge.SourcePluginId, _ => new ConcurrentDictionary<string, byte>(StringComparer.Ordinal))
+            .TryAdd(knowledge.Id, 0);
 
         return Task.CompletedTask;
     }
@@ -53,7 +60,14 @@ public sealed class KnowledgeLake : IKnowledgeLake, IDisposable
 
     public Task RemoveAsync(string knowledgeId, CancellationToken ct = default)
     {
-        _entries.TryRemove(knowledgeId, out _);
+        if (_entries.TryRemove(knowledgeId, out var removed))
+        {
+            // Also remove from index bags to prevent stale ID accumulation
+            if (_byTopic.TryGetValue(removed.Knowledge.Topic, out var topicSet))
+                topicSet.TryRemove(knowledgeId, out _);
+            if (_byPlugin.TryGetValue(removed.Knowledge.SourcePluginId, out var pluginSet))
+                pluginSet.TryRemove(knowledgeId, out _);
+        }
         return Task.CompletedTask;
     }
 
@@ -61,7 +75,7 @@ public sealed class KnowledgeLake : IKnowledgeLake, IDisposable
     {
         if (_byPlugin.TryRemove(pluginId, out var ids))
         {
-            foreach (var id in ids)
+            foreach (var id in ids.Keys)
             {
                 _entries.TryRemove(id, out _);
             }
@@ -73,7 +87,7 @@ public sealed class KnowledgeLake : IKnowledgeLake, IDisposable
     {
         if (_byTopic.TryRemove(topic, out var ids))
         {
-            foreach (var id in ids)
+            foreach (var id in ids.Keys)
             {
                 _entries.TryRemove(id, out _);
             }
@@ -95,13 +109,13 @@ public sealed class KnowledgeLake : IKnowledgeLake, IDisposable
     public IReadOnlyList<KnowledgeEntry> GetByTopic(string topic)
     {
         if (!_byTopic.TryGetValue(topic, out var ids)) return Array.Empty<KnowledgeEntry>();
-        return ids.Select(id => Get(id)).Where(e => e != null).Cast<KnowledgeEntry>().ToList();
+        return ids.Keys.Select(id => Get(id)).Where(e => e != null).Cast<KnowledgeEntry>().ToList();
     }
 
     public IReadOnlyList<KnowledgeEntry> GetByPlugin(string pluginId)
     {
         if (!_byPlugin.TryGetValue(pluginId, out var ids)) return Array.Empty<KnowledgeEntry>();
-        return ids.Select(id => Get(id)).Where(e => e != null).Cast<KnowledgeEntry>().ToList();
+        return ids.Keys.Select(id => Get(id)).Where(e => e != null).Cast<KnowledgeEntry>().ToList();
     }
 
     public Task<IReadOnlyList<KnowledgeEntry>> QueryAsync(KnowledgeQuery query, CancellationToken ct = default)

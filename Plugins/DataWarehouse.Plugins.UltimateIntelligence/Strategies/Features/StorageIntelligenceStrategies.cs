@@ -360,7 +360,7 @@ Return JSON:
             if (jsonStart >= 0 && jsonEnd > jsonStart)
             {
                 var json = response.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                var doc = JsonDocument.Parse(json);
+                using var doc = JsonDocument.Parse(json);
 
                 profile.WorkloadType = doc.RootElement.TryGetProperty("workload_type", out var wt) ? wt.GetString() ?? "MIXED" : "MIXED";
                 profile.ApplicationSignature = doc.RootElement.TryGetProperty("application_signature", out var ap) ? ap.GetString() ?? "general" : "general";
@@ -404,7 +404,7 @@ Return JSON:
             if (jsonStart >= 0 && jsonEnd > jsonStart)
             {
                 var json = response.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                var doc = JsonDocument.Parse(json);
+                using var doc = JsonDocument.Parse(json);
 
                 if (doc.RootElement.TryGetProperty("predicted_iops", out var iops))
                     prediction.PredictedIops = iops.EnumerateArray().Select(e => e.GetDouble()).ToList();
@@ -479,10 +479,10 @@ public sealed class AiTierMigrationStrategy : FeatureStrategyBase
         return await ExecuteWithTrackingAsync(async () =>
         {
             var history = accessHistory.ToList();
-            var hotThreshold = double.Parse(GetConfig("HotThreshold") ?? "0.8");
-            var warmThreshold = double.Parse(GetConfig("WarmThreshold") ?? "0.5");
-            var coldThreshold = double.Parse(GetConfig("ColdThreshold") ?? "0.2");
-            var decayFactor = double.Parse(GetConfig("DecayFactor") ?? "0.95");
+            var hotThreshold = GetConfigDouble("HotThreshold", 0.8);
+            var warmThreshold = GetConfigDouble("WarmThreshold", 0.5);
+            var coldThreshold = GetConfigDouble("ColdThreshold", 0.2);
+            var decayFactor = GetConfigDouble("DecayFactor", 0.95);
 
             // Calculate weighted access score with temporal decay
             var accessScore = CalculateAccessScore(history, decayFactor);
@@ -564,7 +564,7 @@ Return JSON:
                 };
             }
 
-            var horizonDays = int.Parse(GetConfig("PredictionHorizonDays") ?? "7");
+            var horizonDays = GetConfigInt("PredictionHorizonDays", 7);
 
             var prompt = $@"Predict access patterns for the next {horizonDays} days:
 
@@ -619,9 +619,14 @@ Return JSON:
     public void RecordAccess(string objectId, TierAccessEvent accessEvent)
     {
         var history = _accessHistories.GetOrAdd(objectId, _ => new AccessHistory { ObjectId = objectId });
-        history.TotalAccesses++;
-        history.LastAccess = accessEvent.Timestamp;
-        history.UpdatedAt = DateTime.UtcNow;
+        // Finding 3127: Lock on the individual history object to prevent torn writes
+        // when concurrent callers update TotalAccesses and LastAccess.
+        lock (history)
+        {
+            history.TotalAccesses++;
+            history.LastAccess = accessEvent.Timestamp;
+            history.UpdatedAt = DateTime.UtcNow;
+        }
     }
 
     private double CalculateAccessScore(List<TierAccessEvent> history, double decayFactor)
@@ -659,7 +664,7 @@ Return JSON:
             if (jsonStart >= 0 && jsonEnd > jsonStart)
             {
                 var json = response.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                var doc = JsonDocument.Parse(json);
+                using var doc = JsonDocument.Parse(json);
 
                 if (doc.RootElement.TryGetProperty("recommended_tier", out var tier))
                     recommendation.RecommendedTier = tier.GetString() ?? fallbackTier;
@@ -699,7 +704,7 @@ Return JSON:
             if (jsonStart >= 0 && jsonEnd > jsonStart)
             {
                 var json = response.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                var doc = JsonDocument.Parse(json);
+                using var doc = JsonDocument.Parse(json);
 
                 if (doc.RootElement.TryGetProperty("daily_probabilities", out var probs))
                     prediction.DailyAccessProbabilities = probs.EnumerateArray().Select(e => e.GetDouble()).ToList();

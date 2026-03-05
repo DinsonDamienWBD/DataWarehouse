@@ -68,6 +68,7 @@ public sealed class ChaffPaddingStrategy : EncryptionStrategyBase
     private const byte MagicMarker1 = 0xCF; // "Chaff"
     private const byte MagicMarker2 = 0xAF;
     private const int HeaderSize = 10; // Marker(2) + Length(4) + ChaffPercent(1) + Distribution(1) + Reserved(2)
+    private const int HmacSize = 32;   // HMAC-SHA256 appended after all other data to authenticate header+nonce+combined
 
     // Configurable chaff percentage (10-50%)
     private readonly int _chaffPercentage;
@@ -185,8 +186,12 @@ public sealed class ChaffPaddingStrategy : EncryptionStrategyBase
         // Step 3: Interleave chaff with ciphertext according to distribution
         var combined = InterleaveChaffWithCiphertext(ciphertext, chaff, _distribution);
 
-        // Step 4: Build final payload with header
-        var result = new byte[HeaderSize + NonceSize + combined.Length];
+        // Step 4: Build final payload with authenticated header.
+        // Structure: [header:10][nonce:16][combined][hmac:32]
+        // HMAC-SHA256 is computed over header+nonce+combined using a key derived from the
+        // encryption key, authenticating the header against tampering (#2997).
+        var macKey = HKDF.DeriveKey(System.Security.Cryptography.HashAlgorithmName.SHA256, key, 32, salt: default, info: new byte[] { 0x68, 0x6d, 0x61, 0x63, 0x2d, 0x6b, 0x65, 0x79 });
+        var result = new byte[HeaderSize + NonceSize + combined.Length + HmacSize];
         var offset = 0;
 
         // Write header
@@ -205,6 +210,13 @@ public sealed class ChaffPaddingStrategy : EncryptionStrategyBase
 
         // Write combined ciphertext + chaff
         combined.CopyTo(result, offset);
+        offset += combined.Length;
+
+        // Write HMAC over header + nonce + combined (all bytes before this point)
+        var hmac = HMACSHA256.HashData(macKey, result.AsSpan(0, HeaderSize + NonceSize + combined.Length));
+        hmac.CopyTo(result, offset);
+
+        CryptographicOperations.ZeroMemory(macKey);
 
         return result;
     }
@@ -216,14 +228,26 @@ public sealed class ChaffPaddingStrategy : EncryptionStrategyBase
         byte[]? associatedData,
         CancellationToken cancellationToken)
     {
-        // Step 1: Validate minimum size
-        if (ciphertext.Length < HeaderSize + NonceSize)
+        // Step 1: Validate minimum size (header + nonce + at least 1 byte + hmac)
+        if (ciphertext.Length < HeaderSize + NonceSize + HmacSize)
         {
             throw new CryptographicException(
-                $"Invalid chaff-padded ciphertext. Minimum size: {HeaderSize + NonceSize} bytes, got: {ciphertext.Length} bytes");
+                $"Invalid chaff-padded ciphertext. Minimum size: {HeaderSize + NonceSize + HmacSize} bytes, got: {ciphertext.Length} bytes");
         }
 
-        // Step 2: Validate and parse header
+        // Step 1a: Verify HMAC-SHA256 before parsing any header fields (#2997).
+        // This prevents header-flip attacks and authenticates the original-length field.
+        var macKey = HKDF.DeriveKey(System.Security.Cryptography.HashAlgorithmName.SHA256, key, 32, salt: default, info: new byte[] { 0x68, 0x6d, 0x61, 0x63, 0x2d, 0x6b, 0x65, 0x79 });
+        var storedHmac = ciphertext.AsSpan(ciphertext.Length - HmacSize, HmacSize);
+        var computedHmac = HMACSHA256.HashData(macKey, ciphertext.AsSpan(0, ciphertext.Length - HmacSize));
+        CryptographicOperations.ZeroMemory(macKey);
+
+        if (!CryptographicOperations.FixedTimeEquals(storedHmac, computedHmac))
+        {
+            throw new CryptographicException("Chaff padding authentication failed: header or ciphertext has been tampered with");
+        }
+
+        // Step 2: Validate and parse header (safe to read after HMAC verification)
         var offset = 0;
         if (ciphertext[offset++] != MagicMarker1 || ciphertext[offset++] != MagicMarker2)
         {
@@ -242,8 +266,8 @@ public sealed class ChaffPaddingStrategy : EncryptionStrategyBase
         Buffer.BlockCopy(ciphertext, offset, nonce, 0, NonceSize);
         offset += NonceSize;
 
-        // Step 4: Extract combined data
-        var combinedLength = ciphertext.Length - offset;
+        // Step 4: Extract combined data (excluding the trailing HMAC)
+        var combinedLength = ciphertext.Length - offset - HmacSize;
         var combined = new byte[combinedLength];
         Buffer.BlockCopy(ciphertext, offset, combined, 0, combinedLength);
 
@@ -374,25 +398,24 @@ public sealed class ChaffPaddingStrategy : EncryptionStrategyBase
                 break;
 
             case ChaffDistribution.RandomBurst:
-                // Insert random bursts of chaff
-                using (var rng = RandomNumberGenerator.Create())
+                // Insert random bursts of chaff using Fisher-Yates shuffle over result indices
+                // to guarantee termination regardless of collision patterns.
+                // LOW-3009: use BitArray instead of bool[] to reduce heap allocation
+                // (1 bit per entry vs 1 byte per entry — 8× smaller).
                 {
-                    var positions = new bool[result.Length];
-                    var remaining = chaff.Length;
-
-                    while (remaining > 0)
+                    var positions = new System.Collections.BitArray(result.Length);
+                    // Build a shuffled list of all result indices, then mark the first chaff.Length
+                    // of them as chaff slots — guaranteed no infinite loop.
+                    var indices = new int[result.Length];
+                    for (int i = 0; i < result.Length; i++) indices[i] = i;
+                    for (int i = result.Length - 1; i > 0; i--)
                     {
-                        var burstSize = Math.Min(remaining, RandomNumberGenerator.GetInt32(1, Math.Min(16, remaining + 1)));
-                        var position = RandomNumberGenerator.GetInt32(0, result.Length - burstSize + 1);
-
-                        for (int i = 0; i < burstSize && position + i < positions.Length; i++)
-                        {
-                            if (!positions[position + i])
-                            {
-                                positions[position + i] = true;
-                                remaining--;
-                            }
-                        }
+                        var j = RandomNumberGenerator.GetInt32(0, i + 1);
+                        (indices[i], indices[j]) = (indices[j], indices[i]);
+                    }
+                    for (int i = 0; i < Math.Min(chaff.Length, result.Length); i++)
+                    {
+                        positions[indices[i]] = true;
                     }
 
                     for (int i = 0; i < result.Length; i++)
@@ -520,27 +543,27 @@ public sealed class ChaffPaddingStrategy : EncryptionStrategyBase
                 break;
 
             case ChaffDistribution.RandomBurst:
-                // For random burst, we need to extract exactly originalLength bytes sequentially
-                // The pattern is reconstructed deterministically based on seed (not available)
-                // Fallback: extract first originalLength non-chaff bytes
-                // NOTE: This is a simplified approach - production would use stored pattern
-                Array.Copy(combined, 0, result, 0, Math.Min(originalLength, combined.Length));
-                break;
+                // RandomBurst places chaff at cryptographically random positions that are not
+                // stored in the output. The positions map cannot be reconstructed at decryption
+                // time, making this mode irreversible as currently designed (finding #2990).
+                // Per Rule 13, throw rather than silently corrupt the recovered ciphertext.
+                throw new NotSupportedException(
+                    "ChaffDistribution.RandomBurst cannot be reversed: the random burst " +
+                    "position map is not stored in the ciphertext. Use ChaffDistribution.Uniform " +
+                    "which uses a deterministic, reversible interleaving pattern.");
 
             case ChaffDistribution.HeaderHeavy:
             case ChaffDistribution.TailHeavy:
-                // For distribution-based strategies, extract based on pattern
-                // Simplified: take proportional bytes
-                var step = (double)combined.Length / originalLength;
-                for (int i = 0; i < originalLength; i++)
-                {
-                    var sourceIndex = (int)(i * step);
-                    if (sourceIndex < combined.Length)
-                    {
-                        result[i] = combined[sourceIndex];
-                    }
-                }
-                break;
+                // HeaderHeavy and TailHeavy use position-dependent interleaving rules
+                // (modular patterns that vary with result position) that cannot be reversed
+                // without replaying the exact same interleave logic on the combined buffer.
+                // The current reversal logic (proportional sampling) produces wrong output
+                // for any non-trivial input (finding #2990). Per Rule 13, throw.
+                throw new NotSupportedException(
+                    $"ChaffDistribution.{distribution} cannot be reliably reversed with the " +
+                    "current implementation: the position-dependent interleaving is not " +
+                    "bijective. Use ChaffDistribution.Uniform which uses a deterministic, " +
+                    "reversible interleaving pattern.");
         }
 
         return result;

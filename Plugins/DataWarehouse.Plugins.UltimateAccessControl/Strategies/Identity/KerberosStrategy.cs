@@ -309,7 +309,6 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
                 //   authenticator [4] EncryptedData
                 // }
 
-                string? extractedPrincipal = null;
                 string? extractedRealm = null;
 
                 // Look for Kerberos version number (pvno = 5)
@@ -331,15 +330,14 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
                         // 3. Decrypt enc-part with service key
                         // 4. Extract client principal name and realm
 
-                        // For now, validate structure and use configured realm
+                        // Without GSSAPI/SSPI binding and a keytab file, we cannot decrypt or validate the ticket
+                        // Fail-closed: Kerberos ticket validation requires real KDC integration
                         extractedRealm = _realm ?? "KERBEROS.REALM";
-                        extractedPrincipal = $"user@{extractedRealm}";
-
                         return new KerberosValidationResult
                         {
-                            IsValid = true,
-                            Principal = extractedPrincipal,
-                            Realm = extractedRealm
+                            IsValid = false,
+                            Error = "Kerberos ticket validation requires GSSAPI/SSPI integration and a configured keytab. " +
+                                    "Structure-only validation is not sufficient for authentication."
                         };
                     }
                 }

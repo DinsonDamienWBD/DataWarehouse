@@ -206,6 +206,7 @@ public sealed class ReplicationStateRegion
     /// <summary>Size of the fixed header at the start of block 0.</summary>
     private const int Block0HeaderSize = 8;
 
+    private readonly object _stateLock = new();
     private readonly DottedVersionVector[] _vectors = new DottedVersionVector[MaxReplicas];
     private readonly ReplicationWatermark[] _watermarks = new ReplicationWatermark[MaxReplicas];
     private byte[] _dirtyBitmap;
@@ -240,8 +241,11 @@ public sealed class ReplicationStateRegion
     public void SetVector(int replicaIndex, DottedVersionVector dvv)
     {
         ValidateReplicaIndex(replicaIndex);
-        _vectors[replicaIndex] = dvv;
-        RecalculateActiveCount();
+        lock (_stateLock)
+        {
+            _vectors[replicaIndex] = dvv;
+            RecalculateActiveCount();
+        }
     }
 
     /// <summary>
@@ -262,11 +266,14 @@ public sealed class ReplicationStateRegion
     public void IncrementVector(int replicaIndex)
     {
         ValidateReplicaIndex(replicaIndex);
-        var current = _vectors[replicaIndex];
-        _vectors[replicaIndex] = new DottedVersionVector(
-            current.ReplicaId,
-            current.Counter + 1,
-            DateTime.UtcNow.Ticks);
+        lock (_stateLock)
+        {
+            var current = _vectors[replicaIndex];
+            _vectors[replicaIndex] = new DottedVersionVector(
+                current.ReplicaId,
+                current.Counter + 1,
+                DateTime.UtcNow.Ticks);
+        }
     }
 
     /// <summary>
@@ -291,7 +298,7 @@ public sealed class ReplicationStateRegion
     public void SetWatermark(int replicaIndex, ReplicationWatermark watermark)
     {
         ValidateReplicaIndex(replicaIndex);
-        _watermarks[replicaIndex] = watermark;
+        lock (_stateLock) { _watermarks[replicaIndex] = watermark; }
     }
 
     /// <summary>
@@ -314,7 +321,7 @@ public sealed class ReplicationStateRegion
         ValidateBlockIndex(blockIndex);
         int byteIndex = (int)(blockIndex / 8);
         int bitIndex = (int)(blockIndex % 8);
-        _dirtyBitmap[byteIndex] |= (byte)(1 << bitIndex);
+        lock (_stateLock) { _dirtyBitmap[byteIndex] |= (byte)(1 << bitIndex); }
     }
 
     /// <summary>
@@ -326,7 +333,7 @@ public sealed class ReplicationStateRegion
         ValidateBlockIndex(blockIndex);
         int byteIndex = (int)(blockIndex / 8);
         int bitIndex = (int)(blockIndex % 8);
-        _dirtyBitmap[byteIndex] &= (byte)~(1 << bitIndex);
+        lock (_stateLock) { _dirtyBitmap[byteIndex] &= (byte)~(1 << bitIndex); }
     }
 
     /// <summary>

@@ -19,8 +19,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
     /// </summary>
     public class StripeConnectionStrategy : SaaSConnectionStrategyBase
     {
-        private string _secretKey = "";
-        private string _webhookSecret = "";
+        private volatile string _secretKey = "";
+        private volatile string _webhookSecret = "";
 
         public override string StrategyId => "stripe";
         public override string DisplayName => "Stripe";
@@ -56,16 +56,13 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             try
             {
                 var response = await handle.GetConnection<HttpClient>().GetAsync("/v1/balance", ct);
-                return response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable;
+                return response.IsSuccessStatusCode;
             }
             catch { return false; }
         }
 
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
-        {
-            handle.GetConnection<HttpClient>()?.Dispose();
-            await Task.CompletedTask;
-        }
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) {
+            handle.GetConnection<HttpClient>()?.Dispose(); return Task.CompletedTask; }
 
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
@@ -100,7 +97,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                     formData[$"metadata[{key}]"] = value;
             }
 
-            var response = await client.PostAsync("/v1/customers", new FormUrlEncodedContent(formData), ct);
+            using var response = await client.PostAsync("/v1/customers", new FormUrlEncodedContent(formData), ct);
             return await ParseStripeResponseAsync(response, ct);
         }
 
@@ -125,7 +122,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                     formData[$"metadata[{key}]"] = value;
             }
 
-            var response = await client.PostAsync("/v1/payment_intents", new FormUrlEncodedContent(formData), ct);
+            using var response = await client.PostAsync("/v1/payment_intents", new FormUrlEncodedContent(formData), ct);
             return await ParseStripeResponseAsync(response, ct);
         }
 
@@ -143,7 +140,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                 ["payment_behavior"] = paymentBehavior ?? "default_incomplete"
             };
 
-            var response = await client.PostAsync("/v1/subscriptions", new FormUrlEncodedContent(formData), ct);
+            using var response = await client.PostAsync("/v1/subscriptions", new FormUrlEncodedContent(formData), ct);
             return await ParseStripeResponseAsync(response, ct);
         }
 
@@ -159,7 +156,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             if (startingAfter != null) queryParams.Add($"starting_after={startingAfter}");
 
             var url = $"/v1/charges?{string.Join("&", queryParams)}";
-            var response = await client.GetAsync(url, ct);
+            using var response = await client.GetAsync(url, ct);
+            response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)

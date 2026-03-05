@@ -60,14 +60,22 @@ internal sealed class LodGenerationStrategy : StorageProcessingStrategyBase
             }
             else
             {
-                // Use gltfpack for simplification
+                // Use gltfpack for simplification (requires gltfpack binary on PATH).
                 var simplifyRatio = ratio;
                 var args = $"-i \"{query.Source}\" -o \"{lodPath}\" -si {simplifyRatio}";
-                await CliProcessHelper.RunAsync("gltfpack", args, Path.GetDirectoryName(query.Source), ct: ct);
+                var result = await CliProcessHelper.RunAsync("gltfpack", args, Path.GetDirectoryName(query.Source), ct: ct);
 
-                // If tool not available, create a placeholder by copying original
+                // If gltfpack is unavailable or failed, throw a NotSupportedException rather than
+                // silently copying the original mesh for all LOD levels (findings 4291/4294: the copy
+                // placeholder produces identical files at different "detailRatio" values, which is
+                // worse than failing — consumers would ship un-simplified meshes believing they are LODs).
                 if (!File.Exists(lodPath))
-                    File.Copy(query.Source, lodPath, overwrite: true);
+                {
+                    throw new NotSupportedException(
+                        $"gltfpack is required for LOD generation but was not found or failed for LOD{i} (ratio={ratio}). " +
+                        $"Exit code: {result.ExitCode}. Install gltfpack from https://meshoptimizer.org/gltf/ and ensure it is on PATH. " +
+                        $"Error: {result.StandardError.Trim()}");
+                }
             }
 
             var lodSize = File.Exists(lodPath) ? new FileInfo(lodPath).Length : 0L;

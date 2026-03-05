@@ -30,6 +30,9 @@ internal sealed class PythonWasmLanguageStrategy : WasmLanguageStrategyBase
     public override string StrategyId => "compute.wasm.lang.python";
 
     /// <inheritdoc/>
+    protected override string[] GetToolchainBinaryNames() => new[] { "python3", "wasi-sdk" };
+
+    /// <inheritdoc/>
     public override string StrategyName => "Python WASM Language";
 
     /// <inheritdoc/>

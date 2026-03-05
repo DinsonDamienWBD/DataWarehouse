@@ -42,7 +42,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private readonly SemaphoreSlim _initLock = new(1, 1);
         private readonly BoundedDictionary<string, SatelliteNode> _availableSatellites = new BoundedDictionary<string, SatelliteNode>(1000);
         private readonly BoundedDictionary<string, GroundStation> _groundStations = new BoundedDictionary<string, GroundStation>(1000);
-        private readonly Timer? _orbitUpdateTimer = null;
+        private Timer? _orbitUpdateTimer = null;
         private readonly BoundedDictionary<string, byte[]> _fallbackCache = new BoundedDictionary<string, byte[]>(1000);
 
         public override string StrategyId => "satellite-storage";
@@ -103,7 +103,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     BaseAddress = new Uri(_groundStationApiEndpoint),
                     Timeout = TimeSpan.FromSeconds(30)
                 };
+                _httpClient.DefaultRequestHeaders.Remove("Authorization");
                 _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_apiKey}");
+                _httpClient.DefaultRequestHeaders.Remove("User-Agent");
                 _httpClient.DefaultRequestHeaders.Add("User-Agent", "DataWarehouse-SatelliteStorage/1.0");
 
                 // Ensure fallback storage directory exists
@@ -115,14 +117,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 // Initialize ground stations
                 await InitializeGroundStationsAsync(ct);
 
-                // Start orbit tracking timer
-                var timer = new Timer(
+                // Start orbit tracking timer — store to prevent GC collection and enable disposal
+                _orbitUpdateTimer = new Timer(
                     async _ => await UpdateSatelliteOrbitsAsync(CancellationToken.None),
                     null,
                     TimeSpan.Zero,
                     TimeSpan.FromSeconds(_orbitUpdateIntervalSeconds));
-
-                // Note: Store timer reference if needed for disposal
             }
             finally
             {
@@ -212,9 +212,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Continue with cached positions
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -363,7 +365,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 try
                 {
                     var response = await _httpClient!.GetAsync(
-                        $"/api/v1/storage/download?key={Uri.EscapeDataString(key)}&satelliteId={satellite.SatelliteId}&groundStationId={groundStation.StationId}",
+                        $"/api/v1/storage/download?key={Uri.EscapeDataString(key)}&satelliteId={Uri.EscapeDataString(satellite.SatelliteId)}&groundStationId={Uri.EscapeDataString(groundStation.StationId)}",
                         ct);
 
                     if (response.IsSuccessStatusCode)
@@ -379,9 +381,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                         }
                     }
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
+
                     // Fall through to fallback
+                    System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
                 }
             }
 
@@ -418,9 +422,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     File.Delete(fallbackFilePath);
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Best effort deletion
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -448,9 +454,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Fall through to fallback check
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
 
             // Check fallback storage
@@ -484,9 +492,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Continue to fallback listing
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
 
             // Yield satellite results
@@ -540,9 +550,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Fall through to fallback
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
 
             // Check fallback storage
@@ -589,9 +601,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     };
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Fall through to unhealthy status
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
 
             return new StorageHealthInfo
@@ -652,16 +666,23 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         }
 
         /// <summary>
-        /// Calculates elevation angle between satellite and ground station.
+        /// Calculates elevation angle between satellite and ground station using a
+        /// simplified geometric model based on orbital altitude and ground-track distance.
+        /// For production missions requiring high precision, replace with an SGP4/SDP4 propagator
+        /// (e.g., the Orekit or CoordinateSharp libraries) and real TLE data.
         /// </summary>
-        private double CalculateElevationAngle(SatelliteNode satellite, GroundStation station)
+        private static double CalculateElevationAngle(SatelliteNode satellite, GroundStation station)
         {
-            // Simplified calculation - real implementation would use SGP4 propagator
-            // For now, return a simulated elevation based on altitude
+            // Earth radius in km
+            const double earthRadiusKm = 6371.0;
             var altitudeKm = satellite.Altitude / 1000.0;
-            var baseElevation = Math.Max(0, 90 - (altitudeKm / 10.0));
 
-            return baseElevation + Random.Shared.NextDouble() * 20 - 10; // +/- 10 degrees variation
+            // Approximate slant angle: elevation ≈ arcsin(altitude / slant_range) clamped to [0,90].
+            // Without real orbital elements we derive slant range from altitude alone (nadir pass).
+            // This is a conservative lower bound — contacts near the horizon will report lower angles.
+            var slantRangeKm = Math.Sqrt(altitudeKm * altitudeKm + 2 * earthRadiusKm * altitudeKm);
+            var elevationRad = Math.Asin(altitudeKm / slantRangeKm);
+            return Math.Max(0, Math.Min(90, elevationRad * (180.0 / Math.PI)));
         }
 
         /// <summary>
@@ -714,15 +735,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         /// <summary>
         /// Stores data in fallback storage.
         /// </summary>
-        private Task<StorageObjectMetadata> StoreFallbackAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct)
+        private async Task<StorageObjectMetadata> StoreFallbackAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct)
         {
             _fallbackCache[key] = data;
 
             var fallbackFilePath = GetFallbackFilePath(key);
             Directory.CreateDirectory(Path.GetDirectoryName(fallbackFilePath)!);
-            File.WriteAllBytes(fallbackFilePath, data);
+            await File.WriteAllBytesAsync(fallbackFilePath, data, ct).ConfigureAwait(false);
 
-            return Task.FromResult(new StorageObjectMetadata
+            return new StorageObjectMetadata
             {
                 Key = key,
                 Size = data.Length,
@@ -732,7 +753,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 ContentType = "application/octet-stream",
                 CustomMetadata = metadata != null ? new Dictionary<string, string>(metadata) : null,
                 Tier = StorageTier.Warm
-            });
+            };
         }
 
         /// <summary>

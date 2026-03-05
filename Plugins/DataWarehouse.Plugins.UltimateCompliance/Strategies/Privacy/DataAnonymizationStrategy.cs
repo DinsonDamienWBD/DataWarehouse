@@ -38,6 +38,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
         private readonly BoundedDictionary<string, AnonymizationProfile> _profiles = new BoundedDictionary<string, AnonymizationProfile>(1000);
         private readonly BoundedDictionary<string, AnonymizationResult> _resultCache = new BoundedDictionary<string, AnonymizationResult>(1000);
         private readonly ConcurrentBag<AnonymizationAuditEntry> _auditLog = new();
+        // Per-instance ephemeral hash salt; configurable via "HashSalt" in InitializeAsync
+        private string _defaultHashSalt = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
 
         private int _kAnonymityDefault = 5;
         private int _lDiversityDefault = 3;
@@ -63,6 +65,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
 
             if (configuration.TryGetValue("DifferentialPrivacyEpsilon", out var epsObj) && epsObj is double eps)
                 _differentialPrivacyEpsilon = Math.Max(0.1, eps);
+
+            // Allow operator to supply a stable deployment-wide salt (Base64-encoded, min 16 bytes)
+            if (configuration.TryGetValue("HashSalt", out var saltObj) && saltObj is string saltStr && saltStr.Length >= 24)
+                _defaultHashSalt = saltStr;
 
             InitializeDefaultProfiles();
             return base.InitializeAsync(configuration, cancellationToken);
@@ -177,7 +183,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("data_anonymization.check");
+            IncrementCounter("data_anonymization.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -229,9 +235,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
                 }
             }
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -340,7 +347,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
 
         private string HashValue(string value, FieldAnonymizationRule rule)
         {
-            var salt = rule.HashSalt ?? "default-salt";
+            var salt = rule.HashSalt ?? _defaultHashSalt;
             using var sha256 = SHA256.Create();
             var bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(value + salt));
             return Convert.ToHexString(bytes)[..16].ToLowerInvariant();
@@ -438,7 +445,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
 
             if (profile.PrivacyModel == PrivacyModel.KAnonymity)
             {
-                var kValue = options.KAnonymityValue ?? profile.KAnonymityValue ?? _kAnonymityDefault;
+                // P2-1493: Enforce minimum k=2; k≤1 provides no anonymization guarantee.
+                var kValue = Math.Max(2, options.KAnonymityValue ?? profile.KAnonymityValue ?? _kAnonymityDefault);
                 result.RequiredK = kValue;
                 result.AchievedK = CalculateKAnonymity(records, profile.QuasiIdentifiers);
                 result.MeetsKAnonymity = result.AchievedK >= kValue;
@@ -454,7 +462,13 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
 
             if (profile.PrivacyModel == PrivacyModel.DifferentialPrivacy)
             {
-                result.EpsilonUsed = options.DifferentialPrivacyEpsilon ?? _differentialPrivacyEpsilon;
+                // P2-1494: Clamp epsilon to [0.01, 10.0]. Epsilon > 10 is effectively
+                // no differential privacy guarantee; warn so operators can detect misconfiguration.
+                var rawEpsilon = options.DifferentialPrivacyEpsilon ?? _differentialPrivacyEpsilon;
+                if (rawEpsilon > 10.0)
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[DataAnonymization] WARNING: DifferentialPrivacyEpsilon={rawEpsilon} exceeds recommended maximum of 10.0; clamping to 10.0.");
+                result.EpsilonUsed = Math.Clamp(rawEpsilon, 0.01, 10.0);
                 result.MeetsDifferentialPrivacy = true; // Verified by noise addition
             }
 
@@ -597,14 +611,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("data_anonymization.initialized");
+            IncrementCounter("data_anonymization.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("data_anonymization.shutdown");
+            IncrementCounter("data_anonymization.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

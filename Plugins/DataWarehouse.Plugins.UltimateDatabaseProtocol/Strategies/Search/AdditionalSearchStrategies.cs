@@ -13,7 +13,6 @@ public sealed class SolrProtocolStrategy : DatabaseProtocolStrategyBase
     private HttpClient? _httpClient;
     private string _collection = "";
     private string _baseUrl = "";
-    private bool _verifySsl = true;
 
     /// <inheritdoc/>
     public override string StrategyId => "solr-rest";
@@ -66,14 +65,13 @@ public sealed class SolrProtocolStrategy : DatabaseProtocolStrategyBase
     protected override async Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct)
     {
         var handler = new HttpClientHandler();
-        // SECURITY: TLS certificate validation is enabled by default.
-        // Only bypass when explicitly configured to false.
-        if (parameters.UseSsl && !_verifySsl)
-        {
-            handler.ServerCertificateCustomValidationCallback =
-                (message, cert, chain, errors) => true;
-        }
+        // SECURITY: TLS certificate validation must never be bypassed in production.
+        // The _verifySsl flag is intentionally removed to prevent accidental activation
+        // of the cert-skip callback (finding 2729). Certificate pinning or custom CA
+        // should be configured via X509 stores, not by disabling validation globally.
 
+        // P2-2740: dispose the previous HttpClient to prevent handler leak on reconnect.
+        _httpClient?.Dispose();
         _httpClient = new HttpClient(handler) { BaseAddress = new Uri(_baseUrl) };
 
         if (!string.IsNullOrEmpty(parameters.Username))
@@ -85,7 +83,7 @@ public sealed class SolrProtocolStrategy : DatabaseProtocolStrategyBase
         }
 
         // Verify connection with admin ping
-        var response = await _httpClient.GetAsync($"/{_collection}/admin/ping", ct);
+        using var response = await _httpClient.GetAsync($"/{_collection}/admin/ping", ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -117,7 +115,7 @@ public sealed class SolrProtocolStrategy : DatabaseProtocolStrategyBase
         var queryString = string.Join("&", queryParams.Select(p =>
             $"{Uri.EscapeDataString(p.Key)}={Uri.EscapeDataString(p.Value)}"));
 
-        var response = await _httpClient.GetAsync($"/{_collection}/select?{queryString}", ct);
+        using var response = await _httpClient.GetAsync($"/{_collection}/select?{queryString}", ct);
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync(ct);
@@ -171,7 +169,7 @@ public sealed class SolrProtocolStrategy : DatabaseProtocolStrategyBase
 
         // Parse command as JSON for updates
         var content = new StringContent(command, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"/{_collection}/update?commit=true", content, ct);
+        using var response = await _httpClient.PostAsync($"/{_collection}/update?commit=true", content, ct);
         response.EnsureSuccessStatusCode();
 
         return new QueryResult { Success = true, RowsAffected = 1 };
@@ -207,7 +205,7 @@ public sealed class SolrProtocolStrategy : DatabaseProtocolStrategyBase
         if (_httpClient == null) return false;
         try
         {
-            var response = await _httpClient.GetAsync($"/{_collection}/admin/ping", ct);
+            using var response = await _httpClient.GetAsync($"/{_collection}/admin/ping", ct);
             return response.IsSuccessStatusCode;
         }
         catch
@@ -294,7 +292,7 @@ public sealed class MeiliSearchProtocolStrategy : DatabaseProtocolStrategyBase
         }
 
         // Verify connection
-        var response = await _httpClient.GetAsync("/health", ct);
+        using var response = await _httpClient.GetAsync("/health", ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -372,7 +370,7 @@ public sealed class MeiliSearchProtocolStrategy : DatabaseProtocolStrategyBase
 
         // Assume command is JSON for document operations
         var content = new StringContent(command, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"/indexes/{_index}/documents", content, ct);
+        using var response = await _httpClient.PostAsync($"/indexes/{_index}/documents", content, ct);
         response.EnsureSuccessStatusCode();
 
         return new QueryResult { Success = true, RowsAffected = 1 };
@@ -408,7 +406,7 @@ public sealed class MeiliSearchProtocolStrategy : DatabaseProtocolStrategyBase
         if (_httpClient == null) return false;
         try
         {
-            var response = await _httpClient.GetAsync("/health", ct);
+            using var response = await _httpClient.GetAsync("/health", ct);
             return response.IsSuccessStatusCode;
         }
         catch
@@ -485,10 +483,11 @@ public sealed class TypesenseProtocolStrategy : DatabaseProtocolStrategyBase
         var baseUrl = $"{scheme}://{parameters.Host}:{port}";
 
         _httpClient = new HttpClient { BaseAddress = new Uri(baseUrl) };
+        _httpClient.DefaultRequestHeaders.Remove("X-TYPESENSE-API-KEY");
         _httpClient.DefaultRequestHeaders.Add("X-TYPESENSE-API-KEY", parameters.Password ?? "");
 
         // Verify connection
-        var response = await _httpClient.GetAsync("/health", ct);
+        using var response = await _httpClient.GetAsync("/health", ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -519,7 +518,7 @@ public sealed class TypesenseProtocolStrategy : DatabaseProtocolStrategyBase
         var queryString = string.Join("&", searchParams.Select(p =>
             $"{Uri.EscapeDataString(p.Key)}={Uri.EscapeDataString(p.Value)}"));
 
-        var response = await _httpClient.GetAsync($"/collections/{_collection}/documents/search?{queryString}", ct);
+        using var response = await _httpClient.GetAsync($"/collections/{_collection}/documents/search?{queryString}", ct);
         response.EnsureSuccessStatusCode();
 
         var result = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
@@ -572,7 +571,7 @@ public sealed class TypesenseProtocolStrategy : DatabaseProtocolStrategyBase
             throw new InvalidOperationException("Not connected");
 
         var content = new StringContent(command, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"/collections/{_collection}/documents", content, ct);
+        using var response = await _httpClient.PostAsync($"/collections/{_collection}/documents", content, ct);
         response.EnsureSuccessStatusCode();
 
         return new QueryResult { Success = true, RowsAffected = 1 };
@@ -608,7 +607,7 @@ public sealed class TypesenseProtocolStrategy : DatabaseProtocolStrategyBase
         if (_httpClient == null) return false;
         try
         {
-            var response = await _httpClient.GetAsync("/health", ct);
+            using var response = await _httpClient.GetAsync("/health", ct);
             return response.IsSuccessStatusCode;
         }
         catch

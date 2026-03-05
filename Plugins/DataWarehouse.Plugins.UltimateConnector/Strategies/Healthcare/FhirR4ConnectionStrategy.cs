@@ -22,7 +22,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Healthcare
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
             var client = new HttpClient { BaseAddress = new Uri(config.ConnectionString) };
-            var response = await client.GetAsync("/metadata", ct);
+            using var response = await client.GetAsync("/metadata", ct);
             response.EnsureSuccessStatusCode();
             return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "FHIR R4" });
         }
@@ -39,7 +39,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Healthcare
         {
             var client = handle.GetConnection<HttpClient>();
             var url = string.IsNullOrEmpty(query) ? $"/{resourceType}" : $"/{resourceType}?{query}";
-            var response = await client.GetAsync(url, ct);
+            using var response = await client.GetAsync(url, ct);
+ response.EnsureSuccessStatusCode();
             return await response.Content.ReadAsStringAsync(ct);
         }
 
@@ -52,7 +53,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Healthcare
         /// <exception cref="ArgumentException">Thrown if the JSON is invalid or missing required fields.</exception>
         public async Task<FhirResourceWrapper> DeserializeResourceAsync(string json, CancellationToken ct = default)
         {
-            await Task.CompletedTask; // Make async for consistency
+            // Finding 1921: Removed no-op await. Synchronous parsing completes as Task via caller's await.
             ct.ThrowIfCancellationRequested();
 
             if (string.IsNullOrWhiteSpace(json))

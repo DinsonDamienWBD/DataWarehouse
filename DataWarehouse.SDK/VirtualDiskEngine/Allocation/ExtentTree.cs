@@ -505,7 +505,8 @@ public sealed class ExtentTree
         // Try to merge with next sibling
         if (leafNode.NextSiblingBlock != 0)
         {
-            var sibling = await ReadNodeAsync(leafNode.NextSiblingBlock, ct).ConfigureAwait(false);
+            long siblingBlockNumber = leafNode.NextSiblingBlock; // capture before mutation
+            var sibling = await ReadNodeAsync(siblingBlockNumber, ct).ConfigureAwait(false);
             int combinedCount = leafNode.EntryCount + sibling.EntryCount;
 
             if (combinedCount <= maxEntries)
@@ -528,10 +529,8 @@ public sealed class ExtentTree
 
                 await WriteNodeAsync(leafBlock, leafNode, ct).ConfigureAwait(false);
 
-                // Free the merged sibling block
-                _allocator.FreeBlock(leafNode.NextSiblingBlock == sibling.NextSiblingBlock
-                    ? path[^1].Node.NextSiblingBlock
-                    : leafNode.NextSiblingBlock);
+                // Free the merged sibling block (use captured block number to avoid stale-reference bug)
+                _allocator.FreeBlock(siblingBlockNumber);
                 NodeCount--;
                 return;
             }

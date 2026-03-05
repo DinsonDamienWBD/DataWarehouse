@@ -32,6 +32,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 
         /// <inheritdoc/>
         public override string StrategyId => "crash-recovery";
+        public override bool IsProductionReady => false;
 
         /// <inheritdoc/>
         public override string StrategyName => "Crash Recovery";
@@ -122,7 +123,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
                     var lsn = await WriteLogEntryAsync(transactionId, "WRITE_FILE", file.Path, token);
 
                     // Perform file write
-                    var written = await WriteFileWithJournalingAsync(file, lsn, token);
+                    var written = await WriteFileWithJournalingAsync(file, lsn, request.Destination, token);
                     Interlocked.Add(ref storedBytes, written);
 
                     // Mark operation complete in WAL
@@ -510,24 +511,43 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 
         private Task<List<FileMetadata>> ScanSourceFilesAsync(IReadOnlyList<string> sources, CancellationToken ct)
         {
-            // In production, scan source directories
             var files = new List<FileMetadata>();
-            for (int i = 0; i < 15000; i++)
+            foreach (var source in sources)
             {
-                files.Add(new FileMetadata
+                if (string.IsNullOrWhiteSpace(source)) continue;
+                ct.ThrowIfCancellationRequested();
+                try
                 {
-                    Path = $"/data/file{i}.dat",
-                    Size = 1024 * 512 // 512 KB
-                });
+                    if (Directory.Exists(source))
+                    {
+                        foreach (var f in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+                        {
+                            try
+                            {
+                                var fi = new FileInfo(f);
+                                files.Add(new FileMetadata { Path = f, Size = fi.Length });
+                            }
+                            catch { /* skip inaccessible files */ }
+                            if (files.Count >= 500000) break; // safety cap
+                        }
+                    }
+                    else if (File.Exists(source))
+                    {
+                        var fi = new FileInfo(source);
+                        files.Add(new FileMetadata { Path = source, Size = fi.Length });
+                    }
+                }
+                catch (UnauthorizedAccessException) { /* skip inaccessible paths */ }
+                catch (DirectoryNotFoundException) { /* skip missing paths */ }
             }
             return Task.FromResult(files);
         }
 
-        private Task<string> BeginTransactionAsync(string backupId, CancellationToken ct)
+        private async Task<string> BeginTransactionAsync(string backupId, CancellationToken ct)
         {
             var transactionId = Guid.NewGuid().ToString("N");
-            WriteLogEntryAsync(transactionId, "BEGIN_TRANSACTION", backupId, ct).Wait(ct);
-            return Task.FromResult(transactionId);
+            await WriteLogEntryAsync(transactionId, "BEGIN_TRANSACTION", backupId, ct).ConfigureAwait(false);
+            return transactionId;
         }
 
         private Task<long> WriteLogEntryAsync(string transactionId, string operation, string target, CancellationToken ct)
@@ -547,15 +567,32 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
             }
         }
 
-        private async Task<long> WriteFileWithJournalingAsync(FileMetadata file, long lsn, CancellationToken ct)
+        private async Task<long> WriteFileWithJournalingAsync(FileMetadata file, long lsn, string? destinationRoot, CancellationToken ct)
         {
-            // In production, write file with journaling
-            await Task.Delay(1, ct); // Simulate write
-            return file.Size;
+            if (string.IsNullOrEmpty(destinationRoot) || !File.Exists(file.Path))
+                return file.Size; // Non-file sources (DB, etc.) — metadata-only, size already known
+
+            // Compute relative path so the backup mirrors the source tree layout.
+            var relativePath = Path.IsPathRooted(file.Path)
+                ? file.Path.TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                : file.Path;
+
+            var destPath = Path.Combine(destinationRoot, relativePath);
+            var destDir = Path.GetDirectoryName(destPath)!;
+            if (!Directory.Exists(destDir))
+                Directory.CreateDirectory(destDir);
+
+            await using var src = new FileStream(file.Path, FileMode.Open, FileAccess.Read, FileShare.Read, 65536, useAsync: true);
+            await using var dst = new FileStream(destPath, FileMode.Create, FileAccess.Write, FileShare.None, 65536, useAsync: true);
+            await src.CopyToAsync(dst, ct);
+            return src.Length;
         }
 
         private async Task<Checkpoint> CreateCheckpointAsync(string backupId, string transactionId, CancellationToken ct)
         {
+            // Write a CHECKPOINT entry into the WAL to mark the consistent point.
+            await WriteLogEntryAsync(transactionId, "CHECKPOINT", backupId, ct);
+
             var checkpoint = new Checkpoint
             {
                 CheckpointId = Guid.NewGuid().ToString("N"),
@@ -565,8 +602,6 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
                 LogSequenceNumber = Interlocked.Read(ref _currentLogSequenceNumber)
             };
 
-            // In production, flush all pending operations and write checkpoint
-            await Task.Delay(10, ct);
             return checkpoint;
         }
 
@@ -602,7 +637,36 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 
         private Task RestoreFromCheckpointAsync(Checkpoint checkpoint, string targetPath, CancellationToken ct)
         {
-            // In production, restore data state from checkpoint
+            ct.ThrowIfCancellationRequested();
+
+            // Anchor the in-memory state: mark the associated transaction log as committed at
+            // the checkpoint LSN so that subsequent log replay only replays entries AFTER this LSN.
+            if (_transactionLogs.TryGetValue(checkpoint.BackupId, out var log))
+            {
+                log.Committed = log.Committed || checkpoint.LogSequenceNumber >= 0;
+                log.CheckpointId = checkpoint.CheckpointId;
+            }
+
+            // Write a checkpoint marker file to targetPath so the hosting process can verify
+            // the checkpoint was applied before replaying WAL entries.
+            if (!string.IsNullOrEmpty(targetPath))
+            {
+                try
+                {
+                    var markerDir = System.IO.Path.GetDirectoryName(targetPath);
+                    if (!string.IsNullOrEmpty(markerDir) && System.IO.Directory.Exists(markerDir))
+                    {
+                        var markerPath = System.IO.Path.Combine(markerDir, $".checkpoint-{checkpoint.CheckpointId}");
+                        System.IO.File.WriteAllText(markerPath,
+                            $"lsn={checkpoint.LogSequenceNumber}\ttimestamp={checkpoint.Timestamp:O}\tbackup={checkpoint.BackupId}");
+                    }
+                }
+                catch
+                {
+                    // Non-fatal: marker file is optional diagnostic artifact
+                }
+            }
+
             return Task.CompletedTask;
         }
 

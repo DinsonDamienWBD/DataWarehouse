@@ -81,7 +81,10 @@ public sealed class InMemoryGraphStrategy : LineageStrategyBase
 
             if (_upstreamLinks.TryGetValue(currentId, out var uplinks))
             {
-                foreach (var upId in uplinks)
+                // P2-2368: snapshot under lock — concurrent TrackAsync mutates the same HashSet
+                string[] uplinkSnapshot;
+                lock (uplinks) { uplinkSnapshot = [.. uplinks]; }
+                foreach (var upId in uplinkSnapshot)
                 {
                     queue.Enqueue((upId, depth + 1));
                     edges.Add(new LineageEdge
@@ -101,7 +104,7 @@ public sealed class InMemoryGraphStrategy : LineageStrategyBase
             Nodes = nodes.AsReadOnly(),
             Edges = edges.AsReadOnly(),
             Depth = maxDepth,
-            UpstreamCount = nodes.Count - 1
+            UpstreamCount = Math.Max(0, nodes.Count - 1)
         });
     }
 
@@ -124,7 +127,10 @@ public sealed class InMemoryGraphStrategy : LineageStrategyBase
 
             if (_downstreamLinks.TryGetValue(currentId, out var downlinks))
             {
-                foreach (var downId in downlinks)
+                // P2-2368: snapshot under lock — concurrent TrackAsync mutates the same HashSet
+                string[] downlinkSnapshot;
+                lock (downlinks) { downlinkSnapshot = [.. downlinks]; }
+                foreach (var downId in downlinkSnapshot)
                 {
                     queue.Enqueue((downId, depth + 1));
                     edges.Add(new LineageEdge
@@ -144,7 +150,7 @@ public sealed class InMemoryGraphStrategy : LineageStrategyBase
             Nodes = nodes.AsReadOnly(),
             Edges = edges.AsReadOnly(),
             Depth = maxDepth,
-            DownstreamCount = nodes.Count - 1
+            DownstreamCount = Math.Max(0, nodes.Count - 1)
         });
     }
 

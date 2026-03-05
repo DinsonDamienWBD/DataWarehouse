@@ -49,6 +49,7 @@ public sealed class DataWarehouseWriteFanOutOrchestrator : WriteFanOutOrchestrat
     private readonly BoundedDictionary<string, long> _writeStats = new BoundedDictionary<string, long>(1000);
     private readonly BoundedDictionary<string, IFanOutStrategy> _strategies = new BoundedDictionary<string, IFanOutStrategy>(1000);
     private readonly List<IContentProcessor> _contentProcessors = new();
+    private readonly object _processorLock = new();
     private IMessageBus? _messageBus;
     private IFanOutStrategy _activeStrategy;
     private FanOutDeploymentMode _deploymentMode;
@@ -222,7 +223,10 @@ public sealed class DataWarehouseWriteFanOutOrchestrator : WriteFanOutOrchestrat
     public void RegisterContentProcessor(IContentProcessor processor)
     {
         ArgumentNullException.ThrowIfNull(processor);
-        _contentProcessors.Add(processor);
+        lock (_processorLock)
+        {
+            _contentProcessors.Add(processor);
+        }
     }
 
     /// <inheritdoc/>
@@ -230,15 +234,14 @@ public sealed class DataWarehouseWriteFanOutOrchestrator : WriteFanOutOrchestrat
     {
         if (_initialized) return;
 
-        await base.StartAsync(ct);
-
         // Auto-register default destinations if none registered
         if (GetDestinations().Count == 0)
         {
             await RegisterDefaultDestinationsAsync();
         }
 
-        // Validate active strategy has required destinations
+        // Validate active strategy has required destinations BEFORE calling base.StartAsync
+        // to avoid leaving partially-started state on validation failure.
         var validation = _activeStrategy.ValidateDestinations(
             GetDestinations().Select(d => d.DestinationType));
 
@@ -248,6 +251,8 @@ public sealed class DataWarehouseWriteFanOutOrchestrator : WriteFanOutOrchestrat
                 $"Strategy '{_activeStrategy.StrategyId}' validation failed: " +
                 string.Join("; ", validation.Errors));
         }
+
+        await base.StartAsync(ct);
 
         _initialized = true;
     }
@@ -282,12 +287,19 @@ public sealed class DataWarehouseWriteFanOutOrchestrator : WriteFanOutOrchestrat
             dataBytes = ms.ToArray();
         }
 
+        // Take a snapshot of processors to avoid holding the lock during async work.
+        List<IContentProcessor> processorSnapshot;
+        lock (_processorLock)
+        {
+            processorSnapshot = new List<IContentProcessor>(_contentProcessors);
+        }
+
         // Process through each processor
         foreach (var processingType in options.ProcessingTypes)
         {
             ct.ThrowIfCancellationRequested();
 
-            var processor = _contentProcessors.FirstOrDefault(p => p.ProcessingType == processingType);
+            var processor = processorSnapshot.FirstOrDefault(p => p.ProcessingType == processingType);
             if (processor != null)
             {
                 using var processingStream = new MemoryStream(dataBytes);
@@ -498,9 +510,10 @@ public sealed class DataWarehouseWriteFanOutOrchestrator : WriteFanOutOrchestrat
                 };
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // Processing unavailable
+            // Content processing service unavailable; non-fatal.
+            System.Diagnostics.Debug.WriteLine($"[FanOut] Content processing via message bus failed for {processingType}: {ex.Message}");
         }
 
         return null;

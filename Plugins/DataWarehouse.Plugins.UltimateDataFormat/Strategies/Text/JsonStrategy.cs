@@ -95,7 +95,13 @@ public sealed class JsonStrategy : DataFormatStrategyBase
 
             var options = new JsonSerializerOptions
             {
-                WriteIndented = context.Options?.ContainsKey("indent") == true && (bool)context.Options["indent"]
+                WriteIndented = context.Options?.ContainsKey("indent") == true
+                    && context.Options["indent"] switch
+                    {
+                        bool b => b,
+                        string s => bool.TryParse(s, out var bv) && bv,
+                        _ => false
+                    }
             };
 
             await JsonSerializer.SerializeAsync(output, data, options, ct);

@@ -31,12 +31,17 @@ public static class BlockAddressing
     /// <param name="byteOffset">The byte offset (must be block-aligned).</param>
     /// <param name="blockSize">The block size in bytes.</param>
     /// <returns>The block number.</returns>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="byteOffset"/> is not aligned to <paramref name="blockSize"/>.</exception>
     public static long ByteOffsetToBlock(long byteOffset, int blockSize)
     {
         if (byteOffset < 0)
             throw new ArgumentOutOfRangeException(nameof(byteOffset), "Byte offset must be non-negative.");
         if (!IsValidBlockSize(blockSize))
             throw new ArgumentOutOfRangeException(nameof(blockSize), $"Block size must be a power of 2 between {FormatConstants.MinBlockSize} and {FormatConstants.MaxBlockSize}.");
+        // P2-812: Enforce block alignment — silently truncating a non-aligned offset would return
+        // the wrong block number and corrupt callers that rely on the documented contract.
+        if ((byteOffset & (blockSize - 1)) != 0)
+            throw new ArgumentException($"Byte offset {byteOffset} is not aligned to block size {blockSize}.", nameof(byteOffset));
 
         return byteOffset / blockSize;
     }

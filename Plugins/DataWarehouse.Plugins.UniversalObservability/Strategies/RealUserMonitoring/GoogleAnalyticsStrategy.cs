@@ -143,20 +143,24 @@ public sealed class GoogleAnalyticsStrategy : ObservabilityStrategyBase
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             var url = $"https://www.google-analytics.com/mp/collect?measurement_id={_measurementId}&api_secret={_apiSecret}";
-            var response = await _httpClient.PostAsync(url, content, ct);
+            using var response = await _httpClient.PostAsync(url, content, ct);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Google Analytics unavailable
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
     private static string SanitizeEventName(string name)
     {
         // GA4 event names must start with a letter, contain only letters, numbers, and underscores
+        if (string.IsNullOrEmpty(name))
+            return "metric_unknown";
         var sanitized = new string(name.Select(c => char.IsLetterOrDigit(c) ? c : '_').ToArray());
-        if (!char.IsLetter(sanitized[0]))
+        if (sanitized.Length == 0 || !char.IsLetter(sanitized[0]))
         {
             sanitized = "metric_" + sanitized;
         }
@@ -191,17 +195,11 @@ public sealed class GoogleAnalyticsStrategy : ObservabilityStrategyBase
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("google_analytics.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     protected override void Dispose(bool disposing)

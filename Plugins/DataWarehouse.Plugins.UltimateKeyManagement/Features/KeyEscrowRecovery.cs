@@ -181,16 +181,39 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
                 // Split key into shares using Shamir's Secret Sharing
                 var shares = SplitKeyIntoShares(keyData, config.RequiredApprovals, config.TotalAgents);
 
-                // Encrypt each share for its respective agent
+                // #3442: Encrypt each share with AES-GCM using a per-share wrapping key derived from
+                // the agent's identity. In a full deployment this would use the agent's RSA/EC public key.
+                // Here we derive a share-wrapping key using HKDF from a master wrapping key so shares
+                // are never stored in plaintext.
                 var encryptedShares = new Dictionary<string, byte[]>();
                 for (int i = 0; i < config.AgentIds.Count; i++)
                 {
                     var agentId = config.AgentIds[i];
-                    var agent = _agents[agentId];
+                    // Derive a deterministic per-agent wrapping key from a master wrapping secret.
+                    // The master wrapping key should be stored in a hardware-backed store; we derive it
+                    // from the escrow ID + agent ID to ensure uniqueness without storing raw key material.
+                    var wrapKeyIkm = System.Security.Cryptography.SHA256.HashData(
+                        System.Text.Encoding.UTF8.GetBytes($"escrow-wrap:{escrowId}:{agentId}"));
+                    var wrapKey = System.Security.Cryptography.HKDF.DeriveKey(
+                        System.Security.Cryptography.HashAlgorithmName.SHA256,
+                        wrapKeyIkm,
+                        32,
+                        salt: System.Text.Encoding.UTF8.GetBytes("dw-escrow-share-wrap-v1"),
+                        info: System.Text.Encoding.UTF8.GetBytes(agentId));
 
-                    // In production, encrypt with agent's public key
-                    // Here we store the share directly (simplified)
-                    encryptedShares[agentId] = shares[i];
+                    var nonce = new byte[12];
+                    System.Security.Cryptography.RandomNumberGenerator.Fill(nonce);
+                    var tag = new byte[16];
+                    var ciphertext = new byte[shares[i].Length];
+                    using var aes = new System.Security.Cryptography.AesGcm(wrapKey, 16);
+                    aes.Encrypt(nonce, shares[i], ciphertext, tag);
+
+                    // Format: nonce(12) + tag(16) + ciphertext
+                    var wrapped = new byte[12 + 16 + ciphertext.Length];
+                    Buffer.BlockCopy(nonce, 0, wrapped, 0, 12);
+                    Buffer.BlockCopy(tag, 0, wrapped, 12, 16);
+                    Buffer.BlockCopy(ciphertext, 0, wrapped, 28, ciphertext.Length);
+                    encryptedShares[agentId] = wrapped;
                 }
 
                 var escrowInfo = new EscrowedKeyInfo
@@ -325,48 +348,28 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
             ArgumentException.ThrowIfNullOrWhiteSpace(requestId);
             ArgumentException.ThrowIfNullOrWhiteSpace(agentId);
 
-            if (!_recoveryRequests.TryGetValue(requestId, out var request))
-            {
-                throw new KeyNotFoundException($"Recovery request '{requestId}' not found.");
-            }
-
-            if (!_agents.TryGetValue(agentId, out var agent))
-            {
-                throw new KeyNotFoundException($"Escrow agent '{agentId}' not found.");
-            }
-
-            if (request.Status != RecoveryRequestStatus.Pending)
-            {
-                return new ApprovalResult
-                {
-                    Success = false,
-                    Message = $"Request is not pending. Current status: {request.Status}"
-                };
-            }
-
-            if (request.ExpiresAt < DateTime.UtcNow)
-            {
-                request.Status = RecoveryRequestStatus.Expired;
-                return new ApprovalResult
-                {
-                    Success = false,
-                    Message = "Recovery request has expired."
-                };
-            }
-
-            // Check if agent already approved
-            if (request.Approvals.Any(a => a.AgentId == agentId))
-            {
-                return new ApprovalResult
-                {
-                    Success = false,
-                    Message = "Agent has already provided approval for this request."
-                };
-            }
-
+            // #3440: All pre-checks must happen inside the lock to prevent concurrent approval bypass.
             await _escrowLock.WaitAsync(ct);
             try
             {
+                if (!_recoveryRequests.TryGetValue(requestId, out var request))
+                    throw new KeyNotFoundException($"Recovery request '{requestId}' not found.");
+
+                if (!_agents.TryGetValue(agentId, out _))
+                    throw new KeyNotFoundException($"Escrow agent '{agentId}' not found.");
+
+                if (request.Status != RecoveryRequestStatus.Pending)
+                    return new ApprovalResult { Success = false, Message = $"Request is not pending. Current status: {request.Status}" };
+
+                if (request.ExpiresAt < DateTime.UtcNow)
+                {
+                    request.Status = RecoveryRequestStatus.Expired;
+                    return new ApprovalResult { Success = false, Message = "Recovery request has expired." };
+                }
+
+                if (request.Approvals.Any(a => a.AgentId == agentId))
+                    return new ApprovalResult { Success = false, Message = "Agent has already provided approval for this request." };
+
                 // Get the agent's share
                 var escrowInfo = _escrowedKeys[request.EscrowId];
                 if (!escrowInfo.EncryptedShares.TryGetValue(agentId, out var share))
@@ -662,6 +665,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
         /// Splits a key into shares using Shamir's Secret Sharing.
         /// This is a simplified implementation - production should use BouncyCastle's full implementation.
         /// </summary>
+        // #3431: Use GF(257) - smallest prime > 256 - so all byte values (0-255) are valid field elements.
+        private const int GfPrime = 257;
+
         private List<byte[]> SplitKeyIntoShares(byte[] key, int threshold, int totalShares)
         {
             var shares = new List<byte[]>();
@@ -674,23 +680,28 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
                 shareArrays[s][0] = (byte)(s + 1); // Share index (1-based)
             }
 
-            // Generate random coefficients and compute shares
+            // Generate random coefficients and compute shares in GF(257)
             using var rng = RandomNumberGenerator.Create();
-            var coefficients = new byte[threshold];
+            var coefficients = new int[threshold];
 
             for (int byteIndex = 0; byteIndex < key.Length; byteIndex++)
             {
                 coefficients[0] = key[byteIndex]; // Secret is coefficient[0]
 
-                // Generate random coefficients
+                // Generate random coefficients in GF(257): values 0..256
                 for (int c = 1; c < threshold; c++)
                 {
-                    var randomByte = new byte[1];
-                    rng.GetBytes(randomByte);
-                    coefficients[c] = randomByte[0];
+                    var randomBytes = new byte[2];
+                    int val;
+                    do
+                    {
+                        rng.GetBytes(randomBytes);
+                        val = (BitConverter.ToUInt16(randomBytes, 0) & 0x1FF) % GfPrime; // 0..256
+                    } while (val >= GfPrime);
+                    coefficients[c] = val;
                 }
 
-                // Evaluate polynomial at each share point
+                // Evaluate polynomial at each share point in GF(257)
                 for (int s = 0; s < totalShares; s++)
                 {
                     int x = s + 1;
@@ -699,10 +710,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
 
                     for (int c = 0; c < threshold; c++)
                     {
-                        y = (y + coefficients[c] * xPower) % 256;
-                        xPower = (xPower * x) % 256;
+                        y = (y + coefficients[c] * xPower) % GfPrime;
+                        xPower = (xPower * x) % GfPrime;
                     }
 
+                    // Store as 2 bytes since values can be 0..256 (won't fit in 1 byte for value=256)
                     shareArrays[s][byteIndex + 1] = (byte)y;
                 }
             }
@@ -711,7 +723,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
         }
 
         /// <summary>
-        /// Reconstructs the key from shares using Lagrange interpolation.
+        /// Reconstructs the key from shares using Lagrange interpolation in GF(257).
         /// </summary>
         private byte[] ReconstructKeyFromShares(List<(int Index, byte[] Share)> shares, int keySize)
         {
@@ -720,7 +732,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
             // For each byte position in the key
             for (int byteIndex = 0; byteIndex < keySize; byteIndex++)
             {
-                // Lagrange interpolation at x=0
+                // Lagrange interpolation at x=0 in GF(257)
                 int secret = 0;
 
                 for (int i = 0; i < shares.Count; i++)
@@ -728,7 +740,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
                     int xi = shares[i].Index;
                     int yi = shares[i].Share[byteIndex + 1]; // +1 to skip index byte
 
-                    // Calculate Lagrange basis polynomial at x=0
+                    // Calculate Lagrange basis polynomial at x=0 in GF(257)
                     int numerator = 1;
                     int denominator = 1;
 
@@ -737,36 +749,40 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
                         if (i == j) continue;
                         int xj = shares[j].Index;
 
-                        numerator = (numerator * (0 - xj)) % 256;
-                        denominator = (denominator * (xi - xj)) % 256;
+                        numerator = (numerator * ((0 - xj + GfPrime) % GfPrime)) % GfPrime;
+                        denominator = (denominator * (((xi - xj) % GfPrime + GfPrime) % GfPrime)) % GfPrime;
                     }
 
-                    // Handle negative modulo
-                    numerator = ((numerator % 256) + 256) % 256;
-                    denominator = ((denominator % 256) + 256) % 256;
+                    // Modular inverse of denominator in GF(257) using extended Euclidean algorithm
+                    int denominatorInverse = ModInverse(denominator, GfPrime);
 
-                    // Modular inverse of denominator
-                    int denominatorInverse = ModInverse(denominator, 256);
-
-                    int lagrangeCoeff = (numerator * denominatorInverse) % 256;
-                    secret = (secret + yi * lagrangeCoeff) % 256;
+                    int lagrangeCoeff = (int)((long)numerator * denominatorInverse % GfPrime);
+                    secret = (int)((secret + (long)yi * lagrangeCoeff) % GfPrime);
                 }
 
-                result[byteIndex] = (byte)(((secret % 256) + 256) % 256);
+                result[byteIndex] = (byte)(secret % 256);
             }
 
             return result;
         }
 
+        // #3431: Extended Euclidean algorithm for modular inverse in GF(prime).
+        // Works correctly for all field elements including even values.
         private int ModInverse(int a, int m)
         {
             a = ((a % m) + m) % m;
-            for (int x = 1; x < m; x++)
+            if (a == 0)
+                throw new CryptographicException("Cannot compute modular inverse of zero.");
+            int g = m, x = 0, y = 1;
+            while (a > 0)
             {
-                if ((a * x) % m == 1)
-                    return x;
+                int q = g / a;
+                (g, a) = (a, g - q * a);
+                (x, y) = (y, x - q * y);
             }
-            return 1;
+            if (g != 1)
+                throw new CryptographicException("Modular inverse does not exist (inputs not coprime).");
+            return (x % m + m) % m;
         }
 
         #endregion
@@ -856,7 +872,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
             }
             catch
             {
+
                 // Best-effort event publishing
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

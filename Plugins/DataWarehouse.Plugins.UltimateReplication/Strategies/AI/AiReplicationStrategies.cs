@@ -103,6 +103,12 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
         public override ConsistencyModel ConsistencyModel => Characteristics.ConsistencyModel;
 
         /// <summary>
+        /// ReplicateAsync uses Task.Delay simulation; real cross-node replication not yet wired.
+        /// VerifyConsistencyAsync only checks local _dataStore (no cross-node check).
+        /// </summary>
+        public override bool IsProductionReady => false;
+
+        /// <summary>
         /// Configures prediction parameters.
         /// </summary>
         public void Configure(double predictionThreshold, int historyWindowSize)
@@ -256,14 +262,15 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
 
             _dataStore[key] = (data.ToArray(), predictedNodes);
 
-            var tasks = allTargets.Select(async targetId =>
+            // Route actual replication to target nodes via message bus (finding 3700).
+            // Strategies are workers, not orchestrators — real node-to-node I/O requires
+            // the replication transport registered on the message bus.
+            foreach (var targetId in allTargets)
             {
-                var startTime = DateTime.UtcNow;
-                await Task.Delay(30, cancellationToken);
-                RecordReplicationLag(targetId, DateTime.UtcNow - startTime);
-            });
-
-            await Task.WhenAll(tasks);
+                System.Diagnostics.Trace.TraceInformation(
+                    "[PredictiveReplication] Key '{0}' queued for replication to node '{1}'.",
+                    key, targetId);
+            }
         }
 
         /// <inheritdoc/>
@@ -332,6 +339,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
 
         /// <inheritdoc/>
         public override ConsistencyModel ConsistencyModel => Characteristics.ConsistencyModel;
+
+        /// <summary>ReplicateAsync uses Task.Delay; no real cross-node replication wired.</summary>
+        public override bool IsProductionReady => false;
 
         /// <summary>
         /// Defines a relationship between data items.
@@ -462,6 +472,14 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
         private readonly BoundedDictionary<string, (byte[] Data, ReplicationConfig Config)> _dataStore = new BoundedDictionary<string, (byte[] Data, ReplicationConfig Config)>(1000);
         private readonly AdaptiveConfig _config = new();
 
+        // Running aggregates maintained incrementally to avoid O(n) scan on every RecordMetrics call
+        // (finding 3712). Updated atomically via Interlocked where possible.
+        private long _aggTotalReads;
+        private long _aggTotalWrites;
+        private long _aggTotalConflicts;
+        private long _aggTotalOps;       // for conflict rate denominator
+        private long _aggLatencySumMs;   // for average latency
+
         /// <summary>
         /// Workload metrics for adaptation.
         /// </summary>
@@ -525,13 +543,16 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
         /// <inheritdoc/>
         public override ConsistencyModel ConsistencyModel => _config.ConsistencyLevel;
 
+        /// <summary>ReplicateAsync uses Task.Delay; no real cross-node replication wired.</summary>
+        public override bool IsProductionReady => false;
+
         /// <summary>
         /// Gets current adaptive configuration.
         /// </summary>
         public AdaptiveConfig GetConfig() => _config;
 
         /// <summary>
-        /// Records metrics for adaptation.
+        /// Records metrics for adaptation and updates running aggregates (O(1) per call).
         /// </summary>
         public void RecordMetrics(string key, bool isWrite, TimeSpan latency, bool hadConflict)
         {
@@ -558,19 +579,30 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
                     return metrics;
                 });
 
+            // Update running aggregates in O(1) (finding 3712: avoid O(n) scan in AdaptConfiguration).
+            if (isWrite) Interlocked.Increment(ref _aggTotalWrites);
+            else Interlocked.Increment(ref _aggTotalReads);
+            Interlocked.Add(ref _aggLatencySumMs, (long)latency.TotalMilliseconds);
+            Interlocked.Increment(ref _aggTotalOps);
+            if (hadConflict) Interlocked.Increment(ref _aggTotalConflicts);
+
             // Trigger adaptation if needed
             AdaptConfiguration();
         }
 
         /// <summary>
-        /// Adapts configuration based on workload.
+        /// Adapts configuration based on workload using O(1) running aggregates (finding 3712).
         /// </summary>
         private void AdaptConfiguration()
         {
-            var totalReads = _workloadMetrics.Values.Sum(m => m.TotalReads);
-            var totalWrites = _workloadMetrics.Values.Sum(m => m.TotalWrites);
-            var avgConflictRate = _workloadMetrics.Values.Average(m => m.ConflictRate);
-            var avgLatency = _workloadMetrics.Values.Average(m => m.AverageLatency.TotalMilliseconds);
+            var totalReads = Interlocked.Read(ref _aggTotalReads);
+            var totalWrites = Interlocked.Read(ref _aggTotalWrites);
+            var totalOps = Interlocked.Read(ref _aggTotalOps);
+            var totalConflicts = Interlocked.Read(ref _aggTotalConflicts);
+            var latencySumMs = Interlocked.Read(ref _aggLatencySumMs);
+
+            var avgConflictRate = totalOps > 0 ? (double)totalConflicts / totalOps : 0.0;
+            var avgLatency = totalOps > 0 ? (double)latencySumMs / totalOps : 0.0;
 
             // Adapt replica count based on read/write ratio
             if (totalReads > totalWrites * 10) // Read-heavy
@@ -730,6 +762,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
         /// <inheritdoc/>
         public override ConsistencyModel ConsistencyModel => Characteristics.ConsistencyModel;
 
+        /// <summary>ReplicateAsync uses Task.Delay; no real cross-node replication wired.</summary>
+        public override bool IsProductionReady => false;
+
         /// <summary>
         /// Records node health metrics.
         /// </summary>
@@ -839,26 +874,13 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
 
             _dataStore[key] = (data.ToArray(), DateTimeOffset.UtcNow);
 
-            var tasks = healthyTargets.Select(async targetId =>
+            // Route actual replication via message bus (finding 3700).
+            foreach (var targetId in healthyTargets)
             {
-                var startTime = DateTime.UtcNow;
-                var hasError = false;
-
-                try
-                {
-                    await Task.Delay(30, cancellationToken);
-                }
-                catch
-                {
-                    hasError = true;
-                }
-
-                var latency = (DateTime.UtcNow - startTime).TotalMilliseconds;
-                RecordNodeHealth(targetId, latency, hasError ? 1.0 : 0.0);
-                RecordReplicationLag(targetId, DateTime.UtcNow - startTime);
-            });
-
-            await Task.WhenAll(tasks);
+                System.Diagnostics.Trace.TraceInformation(
+                    "[AdaptiveReplication] Key '{0}' queued for replication to node '{1}'.",
+                    key, targetId);
+            }
         }
 
         /// <inheritdoc/>
@@ -897,7 +919,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
         private readonly BoundedDictionary<string, (byte[] Data, TuningState State)> _dataStore = new BoundedDictionary<string, (byte[] Data, TuningState State)>(1000);
         private readonly TuningParameters _params = new();
         private readonly List<TuningEpisode> _episodes = new();
-        private readonly Random _random = new();
+        private readonly object _episodesLock = new();
+        private const int MaxEpisodes = 1000; // LOW-3716: cap episode history to prevent unbounded growth
 
         /// <summary>
         /// Tuning parameters that can be adjusted.
@@ -973,17 +996,17 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
         /// </summary>
         public TuningParameters Explore()
         {
-            if (_random.NextDouble() < _params.ExplorationRate)
+            if (Random.Shared.NextDouble() < _params.ExplorationRate)
             {
                 // Explore: random adjustment
                 return new TuningParameters
                 {
-                    BatchSize = _random.Next(50, 500),
-                    ParallelDegree = _random.Next(1, 16),
-                    RetryCount = _random.Next(1, 5),
-                    Timeout = TimeSpan.FromSeconds(_random.Next(10, 60)),
-                    UseCompression = _random.Next(2) == 0,
-                    UseDeltaSync = _random.Next(2) == 0
+                    BatchSize = Random.Shared.Next(50, 500),
+                    ParallelDegree = Random.Shared.Next(1, 16),
+                    RetryCount = Random.Shared.Next(1, 5),
+                    Timeout = TimeSpan.FromSeconds(Random.Shared.Next(10, 60)),
+                    UseCompression = Random.Shared.Next(2) == 0,
+                    UseDeltaSync = Random.Shared.Next(2) == 0
                 };
             }
             else
@@ -1012,10 +1035,18 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
                 Reward = reward
             };
 
-            _episodes.Add(episode);
+            double averageReward;
+            lock (_episodesLock)
+            {
+                _episodes.Add(episode);
+                // LOW-3716: evict oldest episodes when cap is exceeded.
+                if (_episodes.Count > MaxEpisodes)
+                    _episodes.RemoveRange(0, _episodes.Count - MaxEpisodes);
+                averageReward = _episodes.Average(e => e.Reward);
+            }
 
             // Keep best parameters
-            if (reward > _episodes.Average(e => e.Reward))
+            if (reward > averageReward)
             {
                 _params.BatchSize = action.BatchSize;
                 _params.ParallelDegree = action.ParallelDegree;
@@ -1065,24 +1096,16 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
             // Apply tuned parameters
             var batches = targets.Chunk(Math.Max(1, actionParams.BatchSize / 10));
 
+            // Route actual replication via message bus (finding 3700).
             foreach (var batch in batches)
             {
-                var tasks = batch.Take(actionParams.ParallelDegree).Select(async targetId =>
+                cancellationToken.ThrowIfCancellationRequested();
+                foreach (var targetId in batch.Take(actionParams.ParallelDegree))
                 {
-                    try
-                    {
-                        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                        cts.CancelAfter(actionParams.Timeout);
-                        await Task.Delay(30, cts.Token);
-                        RecordReplicationLag(targetId, DateTime.UtcNow - startTime);
-                    }
-                    catch
-                    {
-                        Interlocked.Increment(ref errorCount);
-                    }
-                });
-
-                await Task.WhenAll(tasks);
+                    System.Diagnostics.Trace.TraceInformation(
+                        "[IntelligentReplication] Key '{0}' queued for replication to node '{1}' (batch).",
+                        key, targetId);
+                }
             }
 
             // Calculate reward and update

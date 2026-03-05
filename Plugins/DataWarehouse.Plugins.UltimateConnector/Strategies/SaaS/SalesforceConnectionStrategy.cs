@@ -20,10 +20,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
     public class SalesforceConnectionStrategy : SaaSConnectionStrategyBase
     {
         private const string ApiVersion = "v58.0";
-        private string _instanceUrl = "";
-        private string _clientId = "";
-        private string _clientSecret = "";
-        private string _refreshToken = "";
+        private volatile string _instanceUrl = "";
+        private volatile string _clientId = "";
+        private volatile string _clientSecret = "";
+        private volatile string _refreshToken = "";
 
         public override string StrategyId => "salesforce";
         public override string DisplayName => "Salesforce";
@@ -65,17 +65,14 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                 var token = await EnsureValidTokenAsync(handle, ct);
                 using var request = new HttpRequestMessage(HttpMethod.Get, $"/services/data/{ApiVersion}/");
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-                var response = await client.SendAsync(request, ct);
-                return response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable;
+                using var response = await client.SendAsync(request, ct);
+                return response.IsSuccessStatusCode;
             }
             catch { return false; }
         }
 
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
-        {
-            handle.GetConnection<HttpClient>()?.Dispose();
-            await Task.CompletedTask;
-        }
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) {
+            handle.GetConnection<HttpClient>()?.Dispose(); return Task.CompletedTask; }
 
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
@@ -91,7 +88,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
         {
             var client = handle.GetConnection<HttpClient>();
 
-            // OAuth 2.0 JWT Bearer flow or Refresh Token flow
+            // OAuth 2.0 Refresh Token flow
             var tokenRequestBody = new Dictionary<string, string>
             {
                 ["grant_type"] = "refresh_token",
@@ -100,29 +97,26 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                 ["refresh_token"] = _refreshToken
             };
 
-            try
+            using var tokenRequest = new HttpRequestMessage(HttpMethod.Post, "/services/oauth2/token")
             {
-                using var tokenRequest = new HttpRequestMessage(HttpMethod.Post, "/services/oauth2/token")
-                {
-                    Content = new FormUrlEncodedContent(tokenRequestBody)
-                };
-                var response = await client.SendAsync(tokenRequest, ct);
+                Content = new FormUrlEncodedContent(tokenRequestBody)
+            };
+            using var response = await client.SendAsync(tokenRequest, ct);
 
-                if (response.IsSuccessStatusCode)
-                {
-                    var json = await response.Content.ReadAsStringAsync(ct);
-                    using var doc = JsonDocument.Parse(json);
-                    var accessToken = doc.RootElement.GetProperty("access_token").GetString() ?? "";
-                    // Salesforce tokens typically last 2 hours
-                    return (accessToken, DateTimeOffset.UtcNow.AddHours(2));
-                }
-            }
-            catch
+            if (!response.IsSuccessStatusCode)
             {
-                // Fallback for testing / dev environments
+                var errorBody = await response.Content.ReadAsStringAsync(ct);
+                throw new InvalidOperationException(
+                    $"Salesforce OAuth2 token request failed ({(int)response.StatusCode}): {errorBody}");
             }
 
-            return (Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow.AddHours(2));
+            var json = await response.Content.ReadAsStringAsync(ct);
+            using var doc = JsonDocument.Parse(json);
+            var accessToken = doc.RootElement.GetProperty("access_token").GetString()
+                ?? throw new InvalidOperationException("Salesforce token response did not contain 'access_token'.");
+
+            // Salesforce tokens typically last 2 hours
+            return (accessToken, DateTimeOffset.UtcNow.AddHours(2));
         }
 
         protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(
@@ -136,13 +130,30 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
         {
             var client = handle.GetConnection<HttpClient>();
             var token = await EnsureValidTokenAsync(handle, ct);
-            var encodedQuery = Uri.EscapeDataString(soqlQuery);
 
-            using var request = new HttpRequestMessage(HttpMethod.Get,
-                $"/services/data/{ApiVersion}/query/?q={encodedQuery}");
+            // Finding 2161: Use POST for queries that may exceed URL length limits imposed by proxies
+            // (typically 2–8 KB). GET with a URL-encoded query string silently fails on long SOQL.
+            HttpRequestMessage request;
+            if (soqlQuery.Length > 2000)
+            {
+                // Salesforce supports POST to /query with a JSON body for large queries
+                var bodyJson = System.Text.Json.JsonSerializer.Serialize(new { q = soqlQuery });
+                request = new HttpRequestMessage(HttpMethod.Post, $"/services/data/{ApiVersion}/query/")
+                {
+                    Content = new StringContent(bodyJson, Encoding.UTF8, "application/json")
+                };
+            }
+            else
+            {
+                var encodedQuery = Uri.EscapeDataString(soqlQuery);
+                request = new HttpRequestMessage(HttpMethod.Get,
+                    $"/services/data/{ApiVersion}/query/?q={encodedQuery}");
+            }
+
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            var response = await client.SendAsync(request, ct);
+            using var response = await client.SendAsync(request, ct);
+            response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
@@ -203,7 +214,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             };
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            var response = await client.SendAsync(request, ct);
+            using var response = await client.SendAsync(request, ct);
+            response.EnsureSuccessStatusCode();
             var responseJson = await response.Content.ReadAsStringAsync(ct);
 
             if (response.IsSuccessStatusCode)
@@ -236,7 +248,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             };
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            var response = await client.SendAsync(request, ct);
+            using var response = await client.SendAsync(request, ct);
             return new SObjectResult
             {
                 Success = response.IsSuccessStatusCode,
@@ -258,7 +270,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                 $"/services/data/{ApiVersion}/sobjects/{objectType}/{objectId}");
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            var response = await client.SendAsync(request, ct);
+            using var response = await client.SendAsync(request, ct);
             return new SObjectResult
             {
                 Success = response.IsSuccessStatusCode,
@@ -298,8 +310,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
 
             var createJson = await createResponse.Content.ReadAsStringAsync(ct);
             using var createDoc = JsonDocument.Parse(createJson);
-            var jobId = createDoc.RootElement.GetProperty("id").GetString()!;
-            var contentUrl = createDoc.RootElement.GetProperty("contentUrl").GetString()!;
+            // Finding 2156: Avoid null-forgiving operator — throw clearly if response body is unexpected.
+            var jobId = createDoc.RootElement.GetProperty("id").GetString()
+                ?? throw new InvalidOperationException("Salesforce Bulk API response missing 'id' field.");
+            var contentUrl = createDoc.RootElement.GetProperty("contentUrl").GetString()
+                ?? throw new InvalidOperationException("Salesforce Bulk API response missing 'contentUrl' field.");
 
             // Step 2: Upload CSV data
             using var uploadRequest = new HttpRequestMessage(HttpMethod.Put, contentUrl)
@@ -337,7 +352,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                 $"/services/data/{ApiVersion}/sobjects/{objectType}/describe/");
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            var response = await client.SendAsync(request, ct);
+            using var response = await client.SendAsync(request, ct);
             if (!response.IsSuccessStatusCode) return null;
 
             var json = await response.Content.ReadAsStringAsync(ct);

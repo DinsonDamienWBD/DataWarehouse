@@ -48,6 +48,9 @@ public sealed class AmplitudeStrategy : ObservabilityStrategyBase
     /// <param name="deviceId">Device identifier (generated if not provided).</param>
     public void Configure(string apiKey, string userId = "system", string? deviceId = null)
     {
+        // P2-4674: Reject empty apiKey early; blank key silently swallows 401 errors in SendEventsAsync.
+        if (string.IsNullOrWhiteSpace(apiKey))
+            throw new ArgumentException("Amplitude API key must not be empty.", nameof(apiKey));
         _apiKey = apiKey;
         _userId = userId;
         _deviceId = deviceId ?? Guid.NewGuid().ToString();
@@ -146,12 +149,14 @@ public sealed class AmplitudeStrategy : ObservabilityStrategyBase
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync("https://api2.amplitude.com/identify", content, ct);
+            using var response = await _httpClient.PostAsync("https://api2.amplitude.com/identify", content, ct);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Amplitude unavailable
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -168,12 +173,14 @@ public sealed class AmplitudeStrategy : ObservabilityStrategyBase
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync("https://api2.amplitude.com/2/httpapi", content, ct);
+            using var response = await _httpClient.PostAsync("https://api2.amplitude.com/2/httpapi", content, ct);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Amplitude unavailable
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -194,32 +201,26 @@ public sealed class AmplitudeStrategy : ObservabilityStrategyBase
     }
 
     /// <inheritdoc/>
-
-    /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        // Configuration validated via Configure method
+        if (string.IsNullOrWhiteSpace(_apiKey))
+            throw new InvalidOperationException("AmplitudeStrategy: API key is required. Call Configure() with a valid apiKey before initializing.");
         IncrementCounter("amplitude.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("amplitude.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     protected override void Dispose(bool disposing)
     {
+                _apiKey = string.Empty;
         if (disposing)
         {
             _httpClient.Dispose();

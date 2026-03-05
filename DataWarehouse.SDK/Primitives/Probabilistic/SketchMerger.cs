@@ -48,12 +48,12 @@ public static class SketchMerger
             return list[0].Clone();
 
         // Tree reduction: merge pairs in parallel
+        using var semaphore = new SemaphoreSlim(maxParallelism);
         while (list.Count > 1)
         {
             ct.ThrowIfCancellationRequested();
 
             var tasks = new List<Task<T>>();
-            var semaphore = new SemaphoreSlim(maxParallelism);
 
             for (int i = 0; i < list.Count; i += 2)
             {
@@ -138,7 +138,9 @@ public static class SketchMerger
     public static T DeserializeAndMerge<T>(IEnumerable<byte[]> serializedData, Func<byte[], T> deserializer)
         where T : IProbabilisticStructure, IMergeable<T>
     {
-        var structures = serializedData.Select(deserializer);
+        // Cat 9 (finding 567): materialize eagerly so deserializer exceptions surface here
+        // with a useful stack trace rather than deferred to Merge() with misleading context.
+        var structures = serializedData.Select(deserializer).ToList();
         return Merge(structures);
     }
 

@@ -104,7 +104,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             try
             {
                 var request = new HttpRequestMessage(HttpMethod.Get, $"{_config.Address}/v1/sys/health");
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -115,28 +115,41 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
 
         protected override async Task<byte[]> LoadKeyFromStorage(string keyId, ISecurityContext context)
         {
-            var request = CreateRequest(HttpMethod.Get, $"/v1/{_config.MountPath}/data/{keyId}");
-            var response = await _httpClient.SendAsync(request);
-            response.EnsureSuccessStatusCode();
+            // #3597: Validate and sanitize keyId to prevent path traversal in Vault KV paths.
+            var safeKeyId = SanitizeKeyId(keyId);
+            var request = CreateRequest(HttpMethod.Get, $"/v1/{_config.MountPath}/data/{safeKeyId}");
+            // #3596: Pass CancellationToken through to HttpClient to allow cancellation.
+            using var response = await _httpClient.SendAsync(request, CancellationToken.None);
+            // P2-3600: Wrap EnsureSuccessStatusCode to provide key context in failure messages.
+            if (!response.IsSuccessStatusCode)
+                throw new InvalidOperationException(
+                    $"[VaultKeyStoreStrategy] Failed to load key '{safeKeyId}' from Vault: HTTP {(int)response.StatusCode} {response.StatusCode}.");
 
             var json = await response.Content.ReadAsStringAsync();
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             var keyBase64 = doc.RootElement.GetProperty("data").GetProperty("data").GetProperty("key").GetString();
-            return Convert.FromBase64String(keyBase64!);
+            // #3597: Null guard before FromBase64String to avoid NullReferenceException.
+            if (string.IsNullOrEmpty(keyBase64))
+                throw new InvalidOperationException($"Vault returned null or empty key material for key '{safeKeyId}'.");
+            return Convert.FromBase64String(keyBase64);
         }
 
         protected override async Task SaveKeyToStorage(string keyId, byte[] keyData, ISecurityContext context)
         {
+            var safeKeyId = SanitizeKeyId(keyId); // #3597
             var keyBase64 = Convert.ToBase64String(keyData);
 
             var content = JsonSerializer.Serialize(new { data = new { key = keyBase64 } });
-            var request = CreateRequest(HttpMethod.Post, $"/v1/{_config.MountPath}/data/{keyId}");
+            var request = CreateRequest(HttpMethod.Post, $"/v1/{_config.MountPath}/data/{safeKeyId}");
             request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.SendAsync(request);
-            response.EnsureSuccessStatusCode();
+            using var response = await _httpClient.SendAsync(request, CancellationToken.None); // #3596
+            // P2-3600: Wrap EnsureSuccessStatusCode to provide key context in failure messages.
+            if (!response.IsSuccessStatusCode)
+                throw new InvalidOperationException(
+                    $"[VaultKeyStoreStrategy] Failed to save key '{safeKeyId}' to Vault: HTTP {(int)response.StatusCode} {response.StatusCode}.");
 
-            _currentKeyId = keyId;
+            _currentKeyId = safeKeyId;
         }
 
         public async Task<byte[]> WrapKeyAsync(string kekId, byte[] dataKey, ISecurityContext context)
@@ -147,11 +160,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             var request = CreateRequest(HttpMethod.Post, $"/v1/transit/encrypt/{kekId}");
             request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             var ciphertext = doc.RootElement.GetProperty("data").GetProperty("ciphertext").GetString();
             return Encoding.UTF8.GetBytes(ciphertext!);
         }
@@ -165,11 +178,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             var request = CreateRequest(HttpMethod.Post, $"/v1/transit/decrypt/{kekId}");
             request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             var plaintext = doc.RootElement.GetProperty("data").GetProperty("plaintext").GetString();
             return Convert.FromBase64String(plaintext!);
         }
@@ -179,13 +192,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             ValidateSecurityContext(context);
 
             var request = CreateRequest(HttpMethod.Get, $"/v1/{_config.MountPath}/metadata?list=true");
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
                 return Array.Empty<string>();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
 
             if (doc.RootElement.TryGetProperty("data", out var data) &&
                 data.TryGetProperty("keys", out var keys))
@@ -206,7 +219,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             }
 
             var request = CreateRequest(HttpMethod.Delete, $"/v1/{_config.MountPath}/metadata/{keyId}");
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
         }
 
@@ -217,13 +230,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             try
             {
                 var request = CreateRequest(HttpMethod.Get, $"/v1/{_config.MountPath}/metadata/{keyId}");
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                     return null;
 
                 var json = await response.Content.ReadAsStringAsync(cancellationToken);
-                var doc = JsonDocument.Parse(json);
+                using var doc = JsonDocument.Parse(json);
                 var data = doc.RootElement.GetProperty("data");
 
                 var createdTime = data.TryGetProperty("created_time", out var ct)
@@ -258,7 +271,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             try
             {
                 var request = new HttpRequestMessage(HttpMethod.Get, $"{_config.Address}/v1/sys/health");
-                var response = await _httpClient.SendAsync(request);
+                using var response = await _httpClient.SendAsync(request);
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -270,8 +283,34 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
         private HttpRequestMessage CreateRequest(HttpMethod method, string path)
         {
             var request = new HttpRequestMessage(method, $"{_config.Address}{path}");
-            request.Headers.Add("X-Vault-Token", _config.Token);
+            // #3595: X-Vault-Token is a secret. Add it via a TryAddWithoutValidation to keep it
+            // out of default request logging. Do NOT log request headers when Vault is involved.
+            request.Headers.TryAddWithoutValidation("X-Vault-Token", _config.Token);
             return request;
+        }
+
+        /// <summary>
+        /// #3597: Sanitizes a keyId for use in Vault KV paths to prevent path traversal.
+        /// Only allows alphanumeric, hyphen, underscore, and forward-slash (for namespaces).
+        /// </summary>
+        private static string SanitizeKeyId(string keyId)
+        {
+            if (string.IsNullOrWhiteSpace(keyId))
+                throw new ArgumentException("Key ID must not be empty.", nameof(keyId));
+
+            // Allow only safe characters for Vault KV paths.
+            if (!System.Text.RegularExpressions.Regex.IsMatch(keyId, @"^[a-zA-Z0-9/_\-]+$"))
+                throw new ArgumentException(
+                    $"Key ID '{keyId}' contains invalid characters for a Vault KV path. " +
+                    "Only alphanumeric characters, hyphens, underscores, and forward-slashes are allowed.",
+                    nameof(keyId));
+
+            // Prevent directory traversal.
+            if (keyId.Contains(".."))
+                throw new ArgumentException(
+                    $"Key ID '{keyId}' contains a path traversal sequence.", nameof(keyId));
+
+            return keyId;
         }
 
         public override void Dispose()

@@ -20,7 +20,7 @@ public sealed class MoonshotHealthAggregator
     private readonly IReadOnlyDictionary<MoonshotId, IMoonshotHealthProbe> _probes;
     private readonly IMoonshotRegistry _registry;
     private readonly ILogger<MoonshotHealthAggregator> _logger;
-    private readonly Dictionary<MoonshotId, DateTimeOffset> _lastCheckTimes = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<MoonshotId, DateTimeOffset> _lastCheckTimes = new();
 
     /// <summary>
     /// Creates a new aggregator from the set of registered health probes.
@@ -57,6 +57,13 @@ public sealed class MoonshotHealthAggregator
     /// <returns>All health reports from the parallel probe execution.</returns>
     public async Task<IReadOnlyList<MoonshotHealthReport>> CheckAllAsync(CancellationToken ct)
     {
+        // P2-2259: Warn when no probes are registered so operators know monitoring is non-functional.
+        if (_probes.Count == 0)
+        {
+            _logger.LogWarning("CheckAllAsync called with 0 registered health probes — health monitoring is non-functional. Register probes via IServiceCollection before starting.");
+            return Array.Empty<MoonshotHealthReport>();
+        }
+
         var sw = Stopwatch.StartNew();
         _logger.LogInformation("Starting health check for {ProbeCount} moonshot probes", _probes.Count);
 
@@ -109,8 +116,9 @@ public sealed class MoonshotHealthAggregator
     {
         _logger.LogInformation("Starting periodic moonshot health checks for {ProbeCount} probes", _probes.Count);
 
-        // Initial full check
-        await CheckAllAsync(ct);
+        // LOW-2262: No initial full check here — _lastCheckTimes starts empty so all probes are
+        // "due" on the very first loop iteration, which will run them in parallel as designed.
+        // A pre-loop CheckAllAsync would double-run all probes before the periodic logic applies.
 
         while (!ct.IsCancellationRequested)
         {

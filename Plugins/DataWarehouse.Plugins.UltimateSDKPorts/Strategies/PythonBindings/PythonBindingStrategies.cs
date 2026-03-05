@@ -33,9 +33,22 @@ public sealed class PythonCtypesStrategy : SDKPortStrategyBase
 
         foreach (var method in _registeredMethods.Values)
         {
-            sb.AppendLine($"    def {ToSnakeCase(method.MethodName)}(self, {string.Join(", ", method.ParameterTypes.Select((t, i) => $"arg{i}: {MapType(t, LanguageTarget.Python)}"))}) -> {MapType(method.ReturnType, LanguageTarget.Python)}:");
-            sb.AppendLine($"        \"\"\"" + method.Description + "\"\"\"");
-            sb.AppendLine($"        pass  # Implementation via ctypes");
+            var snakeName = ToSnakeCase(method.MethodName);
+            var paramList = string.Join(", ", method.ParameterTypes.Select((t, i) => $"arg{i}: {MapType(t, LanguageTarget.Python)}"));
+            var returnType = MapType(method.ReturnType, LanguageTarget.Python);
+            var argPack = string.Join(", ", method.ParameterTypes.Select((t, i) => $"arg{i}"));
+            sb.AppendLine($"    def {snakeName}(self, {paramList}) -> {returnType}:");
+            sb.AppendLine($"        \"\"\"{method.Description}\"\"\"");
+            // Wire ctypes function signature and call
+            sb.AppendLine($"        fn = getattr(self._lib, '{method.MethodName}', None)");
+            sb.AppendLine($"        if fn is None:");
+            sb.AppendLine($"            raise AttributeError(f'Symbol {{method.MethodName}} not found in library')".Replace("{method.MethodName}", method.MethodName));
+            if (!string.IsNullOrEmpty(method.ReturnType) && !string.Equals(method.ReturnType, "void", StringComparison.OrdinalIgnoreCase))
+                sb.AppendLine($"        fn.restype = ctypes.c_int  # adjust per actual return type");
+            sb.AppendLine($"        fn.argtypes = [{string.Join(", ", method.ParameterTypes.Select(_ => "ctypes.c_void_p"))}]");
+            sb.AppendLine(string.IsNullOrEmpty(argPack)
+                ? $"        return fn()"
+                : $"        return fn({argPack})");
         }
 
         return Task.FromResult(sb.ToString());

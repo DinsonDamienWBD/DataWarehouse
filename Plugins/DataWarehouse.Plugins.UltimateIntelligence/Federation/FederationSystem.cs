@@ -175,6 +175,13 @@ public sealed record InstanceConfiguration
     /// <summary>Whether to validate the server certificate.</summary>
     public bool ValidateServerCertificate { get; init; } = true;
 
+    /// <summary>
+    /// Secondary dangerous-mode flag. Both ValidateServerCertificate=false AND AllowInsecureTls=true
+    /// must be set to bypass TLS validation. This prevents accidental certificate bypass from a
+    /// single misconfigured property. Only for non-production/test environments.
+    /// </summary>
+    public bool AllowInsecureTls { get; init; } = false;
+
     /// <summary>Priority of this instance (higher = preferred).</summary>
     public int Priority { get; init; } = 50;
 
@@ -338,11 +345,6 @@ public sealed class InstanceRegistry : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(config);
 
-        if (_instances.ContainsKey(config.InstanceId))
-        {
-            throw new InvalidOperationException($"Instance '{config.InstanceId}' is already registered");
-        }
-
         var info = new InstanceInfo
         {
             Configuration = config,
@@ -351,13 +353,18 @@ public sealed class InstanceRegistry : IAsyncDisposable
 
         // Create HTTP client for this instance
         var httpClient = CreateHttpClient(config);
+
+        // Atomically register all associated state; if a concurrent call already won, discard ours.
+        if (!_instances.TryAdd(config.InstanceId, info))
+        {
+            httpClient.Dispose();
+            throw new InvalidOperationException($"Instance '{config.InstanceId}' is already registered");
+        }
+
         _httpClients[config.InstanceId] = httpClient;
 
         // Create request semaphore for concurrency control
         _requestSemaphores[config.InstanceId] = new SemaphoreSlim(config.MaxConcurrentRequests);
-
-        // Register the instance
-        _instances[config.InstanceId] = info;
 
         // Perform initial health check
         await PerformHealthCheckAsync(config.InstanceId, ct);
@@ -508,7 +515,7 @@ public sealed class InstanceRegistry : IAsyncDisposable
 
         try
         {
-            var response = await httpClient.GetAsync("/health", ct);
+            using var response = await httpClient.GetAsync("/health", ct);
             sw.Stop();
 
             if (response.IsSuccessStatusCode)
@@ -524,10 +531,11 @@ public sealed class InstanceRegistry : IAsyncDisposable
                         details = healthResponse;
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    Debug.WriteLine($"Caught exception in FederationSystem.cs");
-                    // Ignore JSON parsing errors
+                    // P2-3056: Surface JSON parse errors via Trace so health-check failures
+                    // are visible in production (Debug.WriteLine is stripped in Release builds).
+                    Trace.TraceWarning($"[FederationSystem] PerformHealthCheckAsync: failed to parse health response JSON: {ex.GetType().Name}: {ex.Message}");
                 }
 
                 result = new HealthCheckResult
@@ -603,9 +611,10 @@ public sealed class InstanceRegistry : IAsyncDisposable
     {
         var handler = new HttpClientHandler();
 
-        // SECURITY: TLS certificate validation is always enabled by default.
-        // Only bypass validation if explicitly configured to false.
-        if (!config.ValidateServerCertificate)
+        // SECURITY: TLS certificate validation must be explicitly disabled via both
+        // ValidateServerCertificate=false AND AllowInsecureTls=true (defense-in-depth).
+        // Bypassing TLS validation in production exposes connections to MITM attacks.
+        if (!config.ValidateServerCertificate && config.AllowInsecureTls)
         {
             handler.ServerCertificateCustomValidationCallback = (_, _, _, _) => true;
         }
@@ -632,6 +641,7 @@ public sealed class InstanceRegistry : IAsyncDisposable
                 break;
 
             case InstanceAuthMethod.ApiKey:
+                client.DefaultRequestHeaders.Remove("X-API-Key");
                 client.DefaultRequestHeaders.Add("X-API-Key", config.AuthCredential);
                 break;
 
@@ -642,6 +652,7 @@ public sealed class InstanceRegistry : IAsyncDisposable
         }
 
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        client.DefaultRequestHeaders.Remove("X-Federation-Instance");
         client.DefaultRequestHeaders.Add("X-Federation-Instance", config.InstanceId);
 
         return client;
@@ -937,7 +948,7 @@ public sealed class FederationProtocol : IAsyncDisposable
                 instance.TotalRequests++;
 
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
-                var response = await httpClient.PostAsync("/federation/message", content, ct);
+                using var response = await httpClient.PostAsync("/federation/message", content, ct);
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -1075,7 +1086,7 @@ public sealed class FederationProtocol : IAsyncDisposable
         {
             Debug.WriteLine($"Caught exception in FederationSystem.cs: {ex.Message}");
             // Log error
-            Console.Error.WriteLine($"Error handling incoming message: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"Error handling incoming message: {ex.Message}");
         }
     }
 
@@ -2085,7 +2096,7 @@ public sealed class FederationManager : IAsyncDisposable
     private void OnInstanceStatusChanged(object? sender, InstanceStatusChangedEventArgs e)
     {
         // Log or handle status changes
-        Console.WriteLine($"Instance '{e.InstanceId}' status changed from {e.OldStatus} to {e.NewStatus}");
+        System.Diagnostics.Debug.WriteLine($"Instance '{e.InstanceId}' status changed from {e.OldStatus} to {e.NewStatus}");
     }
 
     /// <inheritdoc/>

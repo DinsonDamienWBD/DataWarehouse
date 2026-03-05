@@ -106,7 +106,7 @@ public class Http3DataPlanePlugin : DataPlaneTransportPluginBase
                 };
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", config.AuthToken);
 
-                var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+                using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
 
                 if (response.Version < HttpVersion.Version30)
                 {
@@ -202,7 +202,7 @@ public class Http3DataPlanePlugin : DataPlaneTransportPluginBase
                 };
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", config.AuthToken);
 
-                var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+                using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
 
                 if (response.Version < HttpVersion.Version30)
                 {
@@ -314,7 +314,7 @@ public class Http3DataPlanePlugin : DataPlaneTransportPluginBase
                 };
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", config.AuthToken);
 
-                var response = await _httpClient.SendAsync(request, cts.Token);
+                using var response = await _httpClient.SendAsync(request, cts.Token);
 
                 if (response.Version < HttpVersion.Version30)
                 {
@@ -371,7 +371,7 @@ public class Http3DataPlanePlugin : DataPlaneTransportPluginBase
             };
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", config.AuthToken);
 
-            var response = await _httpClient.SendAsync(request, cts.Token);
+            using var response = await _httpClient.SendAsync(request, cts.Token);
             return response.IsSuccessStatusCode;
         }
         catch (HttpRequestException ex)
@@ -401,7 +401,7 @@ public class Http3DataPlanePlugin : DataPlaneTransportPluginBase
             };
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", config.AuthToken);
 
-            var response = await _httpClient.SendAsync(request, cts.Token);
+            using var response = await _httpClient.SendAsync(request, cts.Token);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(cts.Token);

@@ -366,8 +366,19 @@ public sealed class DataCleansingStrategy : DataIntegrationStrategyBase
                 break;
 
             case CleansingOperation.Standardize:
-                // Apply standardization rules
-                modified = true;
+                // P2-2326: Apply standardization — format driven by Parameters["standardFormat"].
+                // Supported: TitleCase, PhoneDigitsOnly, TrimWhitespace (default).
+                if (value is string s5)
+                {
+                    var fmt = rule.Parameters.GetValueOrDefault("standardFormat", "TrimWhitespace")?.ToString();
+                    newValue = fmt switch
+                    {
+                        "TitleCase"       => System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(s5.ToLowerInvariant()),
+                        "PhoneDigitsOnly" => new string(s5.Where(char.IsDigit).ToArray()),
+                        _                 => s5.Trim()
+                    };
+                    modified = !string.Equals(s5, (string?)newValue, StringComparison.Ordinal);
+                }
                 break;
         }
 
@@ -649,13 +660,35 @@ public sealed class DataNormalizationStrategy : DataIntegrationStrategyBase
                 break;
 
             case NormalizationType.UnitConversion:
-                // Apply unit conversion based on parameters
-                modified = true;
+                // P2-2327: Apply unit conversion using Parameters["factor"] (multiplicative).
+                // E.g., Parameters = { "factor": 0.0254 } converts inches → meters.
+                if (value is double dv &&
+                    rule.Parameters.TryGetValue("factor", out var factorObj) &&
+                    factorObj is double factor)
+                {
+                    newValue = dv * factor;
+                    modified = true;
+                }
+                else if (value is string sv2 &&
+                         double.TryParse(sv2, System.Globalization.NumberStyles.Float,
+                             System.Globalization.CultureInfo.InvariantCulture, out var dv2) &&
+                         rule.Parameters.TryGetValue("factor", out var factorObj2) &&
+                         factorObj2 is double factor2)
+                {
+                    newValue = (dv2 * factor2).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    modified = true;
+                }
                 break;
 
             case NormalizationType.AddressStandard:
-                // Apply address standardization
-                modified = true;
+                // P2-2327: Apply basic address standardization — uppercase + trim.
+                // Full USPS/CASS normalization requires an external address validation API
+                // (route via message bus to address-validation connector).
+                if (value is string addr)
+                {
+                    newValue = addr.Trim().ToUpperInvariant();
+                    modified = !string.Equals(addr, (string?)newValue, StringComparison.Ordinal);
+                }
                 break;
         }
 

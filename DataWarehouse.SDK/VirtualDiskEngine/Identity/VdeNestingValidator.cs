@@ -77,7 +77,7 @@ public static class VdeNestingValidator
         long dataStartOffset = (FormatConstants.RegionDirectoryStartBlock + FormatConstants.RegionDirectoryBlocks) * blockSize;
         long streamLength = outerVdeStream.Length;
 
-        int currentDepth = ScanForNestedMagic(outerVdeStream, magicBuffer, dataStartOffset, streamLength, blockSize);
+        int currentDepth = ScanForNestedMagic(outerVdeStream, magicBuffer, dataStartOffset, streamLength, blockSize, maxRecursionDepth: MaxNestingDepth + 1);
         depth = Math.Max(depth, 1 + currentDepth);
 
         return Math.Min(depth, MaxNestingDepth + 1); // Cap to avoid infinite scan
@@ -145,8 +145,12 @@ public static class VdeNestingValidator
         byte[] magicBuffer,
         long startOffset,
         long streamLength,
-        int blockSize)
+        int blockSize,
+        int maxRecursionDepth = MaxNestingDepth + 1)
     {
+        // Enforce recursion depth limit to prevent unbounded I/O on deeply nested VDEs
+        if (maxRecursionDepth <= 0) return 0;
+
         // Limit scan to prevent excessive I/O on large volumes
         const int maxBlocksToScan = 4096;
         int blocksScanned = 0;
@@ -170,7 +174,7 @@ public static class VdeNestingValidator
                 long innerDataStart = offset + ((FormatConstants.RegionDirectoryStartBlock + FormatConstants.RegionDirectoryBlocks) * blockSize);
                 if (innerDataStart < streamLength)
                 {
-                    return 1 + ScanForNestedMagic(stream, magicBuffer, innerDataStart, streamLength, blockSize);
+                    return 1 + ScanForNestedMagic(stream, magicBuffer, innerDataStart, streamLength, blockSize, maxRecursionDepth - 1);
                 }
                 return 1;
             }

@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using SdkInterface = DataWarehouse.SDK.Contracts.Interface;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Innovation;
 
@@ -43,6 +44,7 @@ internal sealed class PredictiveApiStrategy : SdkInterface.InterfaceStrategyBase
     public string[] Tags => new[] { "predictive", "prefetch", "ai", "performance", "innovation" };
 
     // SDK contract properties
+    public override bool IsProductionReady => false;
     public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.REST;
     public override SdkInterface.InterfaceCapabilities Capabilities => new SdkInterface.InterfaceCapabilities(
         SupportsStreaming: false,
@@ -142,13 +144,17 @@ internal sealed class PredictiveApiStrategy : SdkInterface.InterfaceStrategyBase
     {
         if (request.Headers.TryGetValue("X-Client-Id", out var clientId))
         {
+            // P2-3321: Enforce a maximum length on user-supplied client IDs to prevent
+            // memory exhaustion by extremely long keys in _clientQueryHistory and _popularQueries.
+            if (clientId.Length > 256)
+                clientId = $"truncated-{StableHash.Compute(clientId):X16}";
             return clientId;
         }
 
         if (request.Headers.TryGetValue("Authorization", out var auth))
         {
             // Use hash of auth token as client ID
-            return $"auth-{Math.Abs(auth.GetHashCode())}";
+            return $"auth-{Math.Abs(StableHash.Compute(auth))}";
         }
 
         return "anonymous";
@@ -175,13 +181,17 @@ internal sealed class PredictiveApiStrategy : SdkInterface.InterfaceStrategyBase
                 _clientQueryHistory[clientId].RemoveAt(0);
             }
 
-            // Track global popularity
-            if (!_popularQueries.ContainsKey(query))
+            // P2-3325: Cap _popularQueries at 10,000 entries. When the cap is reached,
+            // evict the least-popular entry to prevent unbounded memory growth.
+            if (!_popularQueries.ContainsKey(query) && _popularQueries.Count >= 10_000)
             {
-                _popularQueries[query] = 0;
+                var leastPopular = _popularQueries.MinBy(kv => kv.Value);
+                if (leastPopular.Key != null)
+                    _popularQueries.Remove(leastPopular.Key);
             }
 
-            _popularQueries[query]++;
+            _popularQueries.TryGetValue(query, out var current);
+            _popularQueries[query] = current + 1;
         }
     }
 
@@ -249,7 +259,7 @@ internal sealed class PredictiveApiStrategy : SdkInterface.InterfaceStrategyBase
             "status" => new
             {
                 status = "healthy",
-                uptime = "72 hours"
+                uptimeSeconds = (long)(DateTimeOffset.UtcNow - System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime()).TotalSeconds
             },
             _ => new
             {

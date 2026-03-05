@@ -299,8 +299,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Full
     /// </summary>
     public sealed class ParallelFullBackupStrategy : DataProtectionStrategyBase
     {
-        private static readonly BoundedDictionary<string, BackupCatalogEntry> _sharedCatalog = new BoundedDictionary<string, BackupCatalogEntry>(1000);
-        private static readonly BoundedDictionary<string, byte[]> _sharedData = new BoundedDictionary<string, byte[]>(1000);
+        // P2-2558: Instance fields (not static) to prevent cross-instance state contamination.
+        private readonly BoundedDictionary<string, BackupCatalogEntry> _sharedCatalog = new BoundedDictionary<string, BackupCatalogEntry>(1000);
+        private readonly BoundedDictionary<string, byte[]> _sharedData = new BoundedDictionary<string, byte[]>(1000);
 
         /// <inheritdoc/>
         public override string StrategyId => "parallel-full-backup";
@@ -486,9 +487,10 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Full
     /// </summary>
     public sealed class BlockLevelFullBackupStrategy : DataProtectionStrategyBase
     {
-        private static readonly BoundedDictionary<string, BackupCatalogEntry> _blockCatalog = new BoundedDictionary<string, BackupCatalogEntry>(1000);
-        private static readonly BoundedDictionary<string, HashSet<string>> _blockHashes = new BoundedDictionary<string, HashSet<string>>(1000);
-        private static readonly BoundedDictionary<string, byte[]> _blockData = new BoundedDictionary<string, byte[]>(1000);
+        // P2-2558: Instance fields (not static) to prevent cross-instance state contamination.
+        private readonly BoundedDictionary<string, BackupCatalogEntry> _blockCatalog = new BoundedDictionary<string, BackupCatalogEntry>(1000);
+        private readonly BoundedDictionary<string, HashSet<string>> _blockHashes = new BoundedDictionary<string, HashSet<string>>(1000);
+        private readonly BoundedDictionary<string, byte[]> _blockData = new BoundedDictionary<string, byte[]>(1000);
 
         /// <inheritdoc/>
         public override string StrategyId => "block-level-full-backup";
@@ -698,9 +700,10 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Full
     /// </summary>
     public sealed class SnapMirrorFullBackupStrategy : DataProtectionStrategyBase
     {
-        private static readonly BoundedDictionary<string, BackupCatalogEntry> _snapCatalog = new BoundedDictionary<string, BackupCatalogEntry>(1000);
-        private static readonly BoundedDictionary<string, List<DateTimeOffset>> _snapTimestamps = new BoundedDictionary<string, List<DateTimeOffset>>(1000);
-        private static readonly BoundedDictionary<string, byte[]> _snapData = new BoundedDictionary<string, byte[]>(1000);
+        // P2-2558: Instance fields (not static) to prevent cross-instance state contamination.
+        private readonly BoundedDictionary<string, BackupCatalogEntry> _snapCatalog = new BoundedDictionary<string, BackupCatalogEntry>(1000);
+        private readonly BoundedDictionary<string, List<DateTimeOffset>> _snapTimestamps = new BoundedDictionary<string, List<DateTimeOffset>>(1000);
+        private readonly BoundedDictionary<string, byte[]> _snapData = new BoundedDictionary<string, byte[]>(1000);
 
         /// <inheritdoc/>
         public override string StrategyId => "snapmirror-full-backup";

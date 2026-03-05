@@ -28,6 +28,7 @@ public sealed class CrdtTagCollection
     private readonly string _nodeId;
     private readonly TagMergeMode _defaultMode;
     private readonly BoundedDictionary<TagKey, TagMergeMode> _mergeOverrides;
+    private readonly object _writeLock = new();
     private TagVersionVector _currentVersion;
 
     /// <summary>
@@ -86,13 +87,16 @@ public sealed class CrdtTagCollection
         ArgumentNullException.ThrowIfNull(key);
         ArgumentNullException.ThrowIfNull(tag);
 
-        var keyStr = key.ToString();
-        // Only add to OR-Set if not already present
-        if (!_tagKeys.Elements.Contains(keyStr))
-            _tagKeys.Add(keyStr, _nodeId);
+        lock (_writeLock)
+        {
+            var keyStr = key.ToString();
+            // Only add to OR-Set if not already present
+            if (!_tagKeys.Elements.Contains(keyStr))
+                _tagKeys.Add(keyStr, _nodeId);
 
-        _currentVersion = _currentVersion.Increment(_nodeId);
-        _tagValues[key] = (tag, _currentVersion);
+            _currentVersion = _currentVersion.Increment(_nodeId);
+            _tagValues[key] = (tag, _currentVersion);
+        }
     }
 
     /// <summary>
@@ -104,10 +108,13 @@ public sealed class CrdtTagCollection
     {
         ArgumentNullException.ThrowIfNull(key);
 
-        var keyStr = key.ToString();
-        _tagKeys.Remove(keyStr);
-        _tagValues.TryRemove(key, out _);
-        _currentVersion = _currentVersion.Increment(_nodeId);
+        lock (_writeLock)
+        {
+            var keyStr = key.ToString();
+            _tagKeys.Remove(keyStr);
+            _tagValues.TryRemove(key, out _);
+            _currentVersion = _currentVersion.Increment(_nodeId);
+        }
     }
 
     /// <summary>

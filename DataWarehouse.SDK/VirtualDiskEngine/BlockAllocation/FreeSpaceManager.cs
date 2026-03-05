@@ -14,7 +14,10 @@ public sealed class FreeSpaceManager : IBlockAllocator
 {
     private readonly BitmapAllocator _bitmap;
     private readonly ExtentTree _extents;
-    private readonly SemaphoreSlim _lock = new(1, 1);
+    // _syncLock for synchronous callers (FreeBlock, FreeExtent, AllocateBlock) — avoids
+    // the SemaphoreSlim.Wait() deadlock risk when called from async continuations (finding P2-760).
+    private readonly object _syncLock = new();
+    private readonly SemaphoreSlim _asyncLock = new(1, 1);
 
     /// <summary>
     /// Creates a new free space manager.
@@ -55,8 +58,8 @@ public sealed class FreeSpaceManager : IBlockAllocator
     /// <inheritdoc/>
     public long AllocateBlock(CancellationToken ct = default)
     {
-        _lock.Wait(ct);
-        try
+        ct.ThrowIfCancellationRequested();
+        lock (_syncLock)
         {
             long block = _bitmap.AllocateBlock();
 
@@ -64,15 +67,7 @@ public sealed class FreeSpaceManager : IBlockAllocator
             var extent = new FreeExtent(block, 1);
             _extents.RemoveExtent(extent);
 
-            // If the block was part of a larger extent, split it
-            // This is handled by the extent tree's split logic during next rebuild or by explicit tracking
-            // For simplicity, we rely on periodic rebuilding or explicit extent updates
-
             return block;
-        }
-        finally
-        {
-            _lock.Release();
         }
     }
 
@@ -80,66 +75,41 @@ public sealed class FreeSpaceManager : IBlockAllocator
     public long[] AllocateExtent(int blockCount, CancellationToken ct = default)
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(blockCount, 0);
+        ct.ThrowIfCancellationRequested();
 
-        _lock.Wait(ct);
-        try
+        lock (_syncLock)
         {
             // Try to find a suitable extent from the extent tree (best-fit)
             var extent = _extents.FindExtent(blockCount);
 
             if (extent != null)
             {
-                // Allocate from the extent
-                var allocated = new long[blockCount];
-                for (int i = 0; i < blockCount; i++)
-                {
-                    allocated[i] = extent.StartBlock + i;
-                    // Mark in bitmap
-                    _bitmap.FreeBlock(extent.StartBlock + i); // First free it if it was marked allocated
-                    _bitmap.AllocateBlock(); // Then reallocate to update count
-                }
-
-                // Actually, we need to directly manipulate the bitmap. Let's use the extent allocator from bitmap.
-                // For now, delegate to bitmap's AllocateExtent which does linear scan.
                 var result = _bitmap.AllocateExtent(blockCount);
-
-                // Update extent tree: split the extent
                 _extents.SplitExtent(extent, blockCount);
-
                 return result;
             }
             else
             {
                 // Fall back to bitmap scan
-                var result = _bitmap.AllocateExtent(blockCount);
-
-                // Remove the allocated extent from the tree (linear scan approach)
-                // For simplicity, we'll rebuild the extent tree periodically or lazily
-                // Here, we just remove the allocated blocks from tracking
-
-                return result;
+                return _bitmap.AllocateExtent(blockCount);
             }
         }
-        finally
-        {
-            _lock.Release();
-        }
+    }
+
+    /// <inheritdoc/>
+    public bool IsAllocated(long blockNumber)
+    {
+        return _bitmap.IsAllocated(blockNumber);
     }
 
     /// <inheritdoc/>
     public void FreeBlock(long blockNumber)
     {
-        _lock.Wait();
-        try
+        // Use regular lock (not SemaphoreSlim.Wait) to avoid deadlock from async continuations (finding P2-760).
+        lock (_syncLock)
         {
             _bitmap.FreeBlock(blockNumber);
-
-            // Update extent tree: add free extent (will merge with adjacent)
             _extents.AddFreeExtent(blockNumber, 1);
-        }
-        finally
-        {
-            _lock.Release();
         }
     }
 
@@ -149,24 +119,18 @@ public sealed class FreeSpaceManager : IBlockAllocator
         ArgumentOutOfRangeException.ThrowIfNegative(startBlock);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(blockCount, 0);
 
-        _lock.Wait();
-        try
+        // Use regular lock (not SemaphoreSlim.Wait) to avoid deadlock from async continuations (finding P2-760).
+        lock (_syncLock)
         {
             _bitmap.FreeExtent(startBlock, blockCount);
-
-            // Update extent tree: add free extent (will merge with adjacent)
             _extents.AddFreeExtent(startBlock, blockCount);
-        }
-        finally
-        {
-            _lock.Release();
         }
     }
 
     /// <inheritdoc/>
     public async Task PersistAsync(IBlockDevice device, long bitmapStartBlock, CancellationToken ct = default)
     {
-        await _lock.WaitAsync(ct);
+        await _asyncLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             // Persist bitmap to disk (extent tree is derived from bitmap on load)
@@ -174,7 +138,7 @@ public sealed class FreeSpaceManager : IBlockAllocator
         }
         finally
         {
-            _lock.Release();
+            _asyncLock.Release();
         }
     }
 

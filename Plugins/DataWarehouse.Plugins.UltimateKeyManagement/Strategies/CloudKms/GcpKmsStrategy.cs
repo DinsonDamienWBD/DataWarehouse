@@ -27,9 +27,19 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
     /// </summary>
     public sealed class GcpKmsStrategy : KeyStoreStrategyBase, IEnvelopeKeyStore
     {
-        private readonly HttpClient _httpClient;
+        // P2-3450: Shared static HttpClient to prevent socket exhaustion
+        private static readonly HttpClient _httpClient = new(new SocketsHttpHandler
+        {
+            PooledConnectionLifetime = TimeSpan.FromMinutes(15),
+            PooledConnectionIdleTimeout = TimeSpan.FromMinutes(5)
+        })
+        {
+            Timeout = TimeSpan.FromSeconds(30)
+        };
         private GcpKmsConfig _config = new();
         private string? _currentKeyId;
+        // #3459: Protect token fields with a dedicated lock to prevent race conditions.
+        private readonly SemaphoreSlim _tokenLock = new(1, 1);
         private string? _accessToken;
         private DateTime _tokenExpiry = DateTime.MinValue;
 
@@ -70,7 +80,6 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
         public GcpKmsStrategy()
         {
-            _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
         }
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
@@ -125,7 +134,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 await EnsureAuthenticatedAsync(cancellationToken);
                 var keyResourceName = GetKeyResourceName();
                 var request = CreateAuthenticatedRequest(HttpMethod.Get, $"https://cloudkms.googleapis.com/v1/{keyResourceName}");
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -136,42 +145,65 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
         protected override async Task<byte[]> LoadKeyFromStorage(string keyId, ISecurityContext context)
         {
-            // GCP KMS doesn't store keys externally - it generates data keys on demand
-            // This method generates a new data key for the given key ID
+            // #3453: Check if encrypted key file exists at storage path. If exists, decrypt via KMS.
+            // If not, generate new key, encrypt with KMS, persist, then return.
             await EnsureAuthenticatedAsync(CancellationToken.None);
 
-            var keyResourceName = string.IsNullOrEmpty(keyId) || keyId == GetKeyResourceName()
-                ? GetKeyResourceName()
-                : keyId;
+            var storagePath = _config.StoragePath;
+            if (string.IsNullOrEmpty(storagePath))
+                throw new InvalidOperationException(
+                    "Key storage path not configured. Set GcpKmsConfig.StoragePath to enable key persistence.");
 
-            var request = CreateAuthenticatedRequest(
+            var keyFilePath = GetGcpKeyFilePath(storagePath, keyId);
+            var keyResourceName = GetKeyResourceName();
+
+            if (File.Exists(keyFilePath))
+            {
+                // Load existing encrypted key and decrypt via KMS
+                var encryptedKeyBase64 = await File.ReadAllTextAsync(keyFilePath);
+                var decryptRequest = CreateAuthenticatedRequest(
+                    HttpMethod.Post,
+                    $"https://cloudkms.googleapis.com/v1/{keyResourceName}:decrypt",
+                    new { ciphertext = encryptedKeyBase64.Trim() });
+
+                var decryptResponse = await _httpClient.SendAsync(decryptRequest);
+                decryptResponse.EnsureSuccessStatusCode();
+
+                var decryptJson = await decryptResponse.Content.ReadAsStringAsync();
+                using var decryptDoc = JsonDocument.Parse(decryptJson);
+                var plaintext = decryptDoc.RootElement.GetProperty("plaintext").GetString();
+                return Convert.FromBase64String(plaintext!);
+            }
+
+            // Key does not exist: generate, encrypt, persist, return
+            var newKey = RandomNumberGenerator.GetBytes(32);
+            var newKeyBase64 = Convert.ToBase64String(newKey);
+
+            var encryptRequest = CreateAuthenticatedRequest(
                 HttpMethod.Post,
                 $"https://cloudkms.googleapis.com/v1/{keyResourceName}:encrypt",
-                new
-                {
-                    plaintext = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
-                });
+                new { plaintext = newKeyBase64 });
 
-            var response = await _httpClient.SendAsync(request);
-            response.EnsureSuccessStatusCode();
+            using var encryptResponse = await _httpClient.SendAsync(encryptRequest);
+            encryptResponse.EnsureSuccessStatusCode();
 
-            var json = await response.Content.ReadAsStringAsync();
-            var doc = JsonDocument.Parse(json);
-            var ciphertext = doc.RootElement.GetProperty("ciphertext").GetString();
+            var encryptJson = await encryptResponse.Content.ReadAsStringAsync();
+            using var encryptDoc = JsonDocument.Parse(encryptJson);
+            var ciphertext = encryptDoc.RootElement.GetProperty("ciphertext").GetString();
 
-            // Decrypt to get the data key
-            var decryptRequest = CreateAuthenticatedRequest(
-                HttpMethod.Post,
-                $"https://cloudkms.googleapis.com/v1/{keyResourceName}:decrypt",
-                new { ciphertext = ciphertext });
+            // Persist the KMS-encrypted key to storage
+            if (!Directory.Exists(storagePath))
+                Directory.CreateDirectory(storagePath);
+            await File.WriteAllTextAsync(keyFilePath, ciphertext!);
 
-            var decryptResponse = await _httpClient.SendAsync(decryptRequest);
-            decryptResponse.EnsureSuccessStatusCode();
+            return newKey;
+        }
 
-            var decryptJson = await decryptResponse.Content.ReadAsStringAsync();
-            var decryptDoc = JsonDocument.Parse(decryptJson);
-            var plaintext = decryptDoc.RootElement.GetProperty("plaintext").GetString();
-            return Convert.FromBase64String(plaintext!);
+        private static string GetGcpKeyFilePath(string storagePath, string keyId)
+        {
+            var safeId = Convert.ToHexString(SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(keyId)));
+            return Path.Combine(storagePath, $"gcp-key-{safeId[..16]}.enc");
         }
 
         protected override async Task SaveKeyToStorage(string keyId, byte[] keyData, ISecurityContext context)
@@ -194,11 +226,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                     }
                 });
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             var name = doc.RootElement.GetProperty("name").GetString();
 
             _currentKeyId = name ?? keyId;
@@ -221,11 +253,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                     plaintext = Convert.ToBase64String(dataKey)
                 });
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             var ciphertext = doc.RootElement.GetProperty("ciphertext").GetString();
             return Convert.FromBase64String(ciphertext!);
         }
@@ -247,11 +279,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                     ciphertext = Convert.ToBase64String(wrappedKey)
                 });
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             var plaintext = doc.RootElement.GetProperty("plaintext").GetString();
             return Convert.FromBase64String(plaintext!);
         }
@@ -263,13 +295,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
             var keyRingPath = $"projects/{_config.ProjectId}/locations/{_config.Location}/keyRings/{_config.KeyRing}";
             var request = CreateAuthenticatedRequest(HttpMethod.Get, $"https://cloudkms.googleapis.com/v1/{keyRingPath}/cryptoKeys");
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
                 return Array.Empty<string>();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
 
             if (doc.RootElement.TryGetProperty("cryptoKeys", out var keys))
             {
@@ -305,7 +337,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             getResponse.EnsureSuccessStatusCode();
 
             var getJson = await getResponse.Content.ReadAsStringAsync(cancellationToken);
-            var getDoc = JsonDocument.Parse(getJson);
+            using var getDoc = JsonDocument.Parse(getJson);
             var primaryVersion = getDoc.RootElement.GetProperty("primary").GetProperty("name").GetString();
 
             // Schedule destruction of the primary version
@@ -314,7 +346,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 $"https://cloudkms.googleapis.com/v1/{primaryVersion}:destroy",
                 new { });
 
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
         }
 
@@ -331,13 +363,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                     : keyId;
 
                 var request = CreateAuthenticatedRequest(HttpMethod.Get, $"https://cloudkms.googleapis.com/v1/{keyResourceName}");
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                     return null;
 
                 var json = await response.Content.ReadAsStringAsync(cancellationToken);
-                var doc = JsonDocument.Parse(json);
+                using var doc = JsonDocument.Parse(json);
 
                 var createdAt = doc.RootElement.TryGetProperty("createTime", out var created)
                     ? DateTime.Parse(created.GetString()!)
@@ -379,7 +411,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             if (!string.IsNullOrEmpty(_config.ServiceAccountJson))
             {
                 // Parse service account JSON and get access token
-                var saDoc = JsonDocument.Parse(_config.ServiceAccountJson);
+                using var saDoc = JsonDocument.Parse(_config.ServiceAccountJson);
                 var clientEmail = saDoc.RootElement.GetProperty("client_email").GetString();
                 var privateKey = saDoc.RootElement.GetProperty("private_key").GetString();
 
@@ -390,18 +422,49 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             }
             else
             {
-                // Use Application Default Credentials (ADC)
-                // This would typically use the metadata service or gcloud CLI credentials
-                // For simplicity, we'll throw an exception if no service account is provided
-                throw new InvalidOperationException("ServiceAccountJson is required. ADC support not implemented in this version.");
+                // P2-3474: Application Default Credentials (ADC) — attempt GCE metadata server first.
+                // On GCE/GKE the metadata server provides tokens without any service account JSON.
+                var metadataUrl = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
+                var metadataRequest = new HttpRequestMessage(HttpMethod.Get, metadataUrl);
+                metadataRequest.Headers.Add("Metadata-Flavor", "Google");
+                try
+                {
+                    using var metadataResponse = await _httpClient.SendAsync(metadataRequest, cancellationToken);
+                    if (metadataResponse.IsSuccessStatusCode)
+                    {
+                        var metadataJson = await metadataResponse.Content.ReadAsStringAsync(cancellationToken);
+                        using var doc = JsonDocument.Parse(metadataJson);
+                        _accessToken = doc.RootElement.GetProperty("access_token").GetString();
+                        var expiresIn = doc.RootElement.TryGetProperty("expires_in", out var ei) ? ei.GetInt32() : 3600;
+                        _tokenExpiry = DateTime.UtcNow.AddSeconds(expiresIn - 60);
+                        return;
+                    }
+                }
+                catch (HttpRequestException)
+                {
+                    // Not on GCE — fall through to error
+                }
+                throw new InvalidOperationException(
+                    "GCP KMS authentication failed: no ServiceAccountJson provided and GCE metadata server is unreachable. " +
+                    "Provide 'ServiceAccountJson' in configuration or run on GCE/GKE for ADC.");
             }
         }
 
         private async Task EnsureAuthenticatedAsync(CancellationToken cancellationToken)
         {
-            if (string.IsNullOrEmpty(_accessToken) || DateTime.UtcNow >= _tokenExpiry)
+            // #3459: Double-checked lock pattern to prevent concurrent token refresh races.
+            if (!string.IsNullOrEmpty(_accessToken) && DateTime.UtcNow < _tokenExpiry)
+                return;
+
+            await _tokenLock.WaitAsync(cancellationToken);
+            try
             {
-                await AuthenticateAsync(cancellationToken);
+                if (string.IsNullOrEmpty(_accessToken) || DateTime.UtcNow >= _tokenExpiry)
+                    await AuthenticateAsync(cancellationToken);
+            }
+            finally
+            {
+                _tokenLock.Release();
             }
         }
 
@@ -442,11 +505,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 new KeyValuePair<string, string>("assertion", jwt)
             });
 
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             return doc.RootElement.GetProperty("access_token").GetString()!;
         }
 
@@ -466,7 +529,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
         public override void Dispose()
         {
-            _httpClient?.Dispose();
+            // _httpClient is shared (static) — not disposed here to prevent breaking other callers.
             base.Dispose();
         }
     }
@@ -481,5 +544,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
         public string KeyRing { get; set; } = string.Empty;
         public string KeyName { get; set; } = string.Empty;
         public string ServiceAccountJson { get; set; } = string.Empty;
+        /// <summary>
+        /// Local directory for persisting KMS-encrypted data keys.
+        /// Required for key persistence across restarts.
+        /// </summary>
+        public string? StoragePath { get; set; }
     }
 }

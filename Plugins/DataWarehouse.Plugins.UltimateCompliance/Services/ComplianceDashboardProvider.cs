@@ -22,7 +22,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Services
         private readonly string _pluginId;
         private readonly BoundedDictionary<string, FrameworkDashboardStatus> _frameworkStatuses = new BoundedDictionary<string, FrameworkDashboardStatus>(1000);
         private readonly ConcurrentQueue<ComplianceTrendPoint> _trendHistory = new();
-        private DateTime _lastCheckTimestamp = DateTime.UtcNow;
+        // _lastCheckTimestampUtcTicks is accessed via Interlocked for thread-safe read/write of DateTime.Ticks
+        private long _lastCheckTimestampUtcTicks = DateTime.UtcNow.Ticks;
         private static readonly int MaxTrendPoints = 1000;
 
         public ComplianceDashboardProvider(
@@ -98,7 +99,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Services
                 ? (double)totalCompliant / totalChecks * 100.0
                 : 100.0;
 
-            _lastCheckTimestamp = DateTime.UtcNow;
+            Interlocked.Exchange(ref _lastCheckTimestampUtcTicks, DateTime.UtcNow.Ticks);
 
             // Record trend point
             var trendPoint = new ComplianceTrendPoint
@@ -125,7 +126,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Services
                 EvidenceCollectionStatus = BuildEvidenceCollectionStatus(),
                 TrendingMetrics = BuildTrendingMetrics(),
                 IntegrityStatus = BuildIntegrityStatus(frameworkStatuses),
-                LastCheckTimestamp = _lastCheckTimestamp
+                LastCheckTimestamp = new DateTime(Interlocked.Read(ref _lastCheckTimestampUtcTicks), DateTimeKind.Utc)
             };
 
             // Publish dashboard update via message bus
@@ -237,7 +238,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Services
             {
                 OverallHealth = overallHealth,
                 FrameworkHealthMap = statuses.ToDictionary(s => s.Framework, s => s.Status),
-                LastCheckUtc = _lastCheckTimestamp,
+                LastCheckUtc = new DateTime(Interlocked.Read(ref _lastCheckTimestampUtcTicks), DateTimeKind.Utc),
                 HealthyFrameworks = statuses.Count(s => s.Status == FrameworkHealthStatus.Healthy),
                 WarningFrameworks = statuses.Count(s => s.Status == FrameworkHealthStatus.Warning),
                 CriticalFrameworks = statuses.Count(s => s.Status == FrameworkHealthStatus.Critical)

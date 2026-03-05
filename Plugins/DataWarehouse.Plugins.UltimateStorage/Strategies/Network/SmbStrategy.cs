@@ -146,8 +146,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 // Create and configure client
                 _client = new SMB2Client();
 
-                var connected = _client.Connect(IPAddress.Parse(ResolveHostname(_serverAddress)), _transportType);
-                if (!connected)
+                // SMBLibrary only exposes a synchronous Connect; offload to thread pool to avoid blocking the caller.
+                var connectedResult = await Task.Run(
+                    () => _client.Connect(IPAddress.Parse(ResolveHostname(_serverAddress)), _transportType),
+                    ct).ConfigureAwait(false);
+                if (!connectedResult)
                 {
                     throw new InvalidOperationException($"Failed to connect to SMB server: {_serverAddress}:{_port}");
                 }

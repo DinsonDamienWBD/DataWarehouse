@@ -231,7 +231,7 @@ public sealed class ElectricityMapsApiStrategy : SustainabilityStrategyBase
                     $"{ApiEndpoint}/carbon-intensity/latest?zone={Uri.EscapeDataString(zone)}");
                 request.Headers.Add("auth-token", ApiKey);
 
-                var response = await _httpClient.SendAsync(request, ct);
+                using var response = await _httpClient.SendAsync(request, ct);
 
                 if (response.StatusCode == HttpStatusCode.TooManyRequests && attempt < MaxRetries)
                 {
@@ -275,7 +275,7 @@ public sealed class ElectricityMapsApiStrategy : SustainabilityStrategyBase
                     $"{ApiEndpoint}/power-breakdown/latest?zone={Uri.EscapeDataString(zone)}");
                 request.Headers.Add("auth-token", ApiKey);
 
-                var response = await _httpClient.SendAsync(request, ct);
+                using var response = await _httpClient.SendAsync(request, ct);
 
                 if (response.StatusCode == HttpStatusCode.TooManyRequests && attempt < MaxRetries)
                 {
@@ -314,7 +314,7 @@ public sealed class ElectricityMapsApiStrategy : SustainabilityStrategyBase
                     $"{ApiEndpoint}/carbon-intensity/forecast?zone={Uri.EscapeDataString(zone)}");
                 request.Headers.Add("auth-token", ApiKey);
 
-                var response = await _httpClient.SendAsync(request, ct);
+                using var response = await _httpClient.SendAsync(request, ct);
 
                 if (response.StatusCode == HttpStatusCode.TooManyRequests && attempt < MaxRetries)
                 {

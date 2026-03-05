@@ -270,7 +270,9 @@ public sealed class SleepStatesStrategy : SustainabilityStrategyBase
         }
         catch
         {
+
             // Permission denied or not available
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 
@@ -305,7 +307,9 @@ public sealed class SleepStatesStrategy : SustainabilityStrategyBase
         }
         catch
         {
+
             // Failed to request S-state
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 
@@ -328,7 +332,9 @@ public sealed class SleepStatesStrategy : SustainabilityStrategyBase
         }
         catch
         {
+
             // Permission denied
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

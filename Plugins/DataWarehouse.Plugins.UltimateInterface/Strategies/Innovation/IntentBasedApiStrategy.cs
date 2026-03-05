@@ -38,6 +38,7 @@ internal sealed class IntentBasedApiStrategy : SdkInterface.InterfaceStrategyBas
     public string[] Tags => new[] { "intent", "declarative", "high-level", "ai", "innovation" };
 
     // SDK contract properties
+    public override bool IsProductionReady => false;
     public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.REST;
     public override SdkInterface.InterfaceCapabilities Capabilities => new SdkInterface.InterfaceCapabilities(
         SupportsStreaming: false,
@@ -72,7 +73,24 @@ internal sealed class IntentBasedApiStrategy : SdkInterface.InterfaceStrategyBas
         CancellationToken cancellationToken)
     {
         var bodyText = Encoding.UTF8.GetString(request.Body.Span);
-        using var doc = JsonDocument.Parse(bodyText);
+
+        // P2-3306: empty or non-JSON body causes JsonDocument.Parse to throw JsonException.
+        // Return 400 Bad Request instead of propagating the parse error.
+        if (string.IsNullOrWhiteSpace(bodyText))
+            return SdkInterface.InterfaceResponse.BadRequest("Request body must be a JSON object with an 'intent' field");
+
+        JsonDocument doc;
+        try
+        {
+            doc = JsonDocument.Parse(bodyText);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return SdkInterface.InterfaceResponse.BadRequest("Request body is not valid JSON");
+        }
+
+        using (doc)
+        {
         var root = doc.RootElement;
 
         if (!root.TryGetProperty("intent", out var intentElement))
@@ -149,6 +167,7 @@ internal sealed class IntentBasedApiStrategy : SdkInterface.InterfaceStrategyBas
             },
             Body: responseBody
         );
+        } // end using (doc)
     }
 
     /// <summary>

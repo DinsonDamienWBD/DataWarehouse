@@ -23,7 +23,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.ISO
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("iso22301.check");
+            IncrementCounter("iso22301.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -54,7 +54,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.ISO
             }
 
             // Check backup and recovery (8.4.4)
-            if (context.DataClassification.Equals("critical", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("critical", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("BackupConfigured", out var backupObj) || backupObj is not true)
                 {
@@ -101,9 +101,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.ISO
 
             recommendations.Add("Ensure RTO and RPO metrics are defined and monitored for critical business processes");
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -119,14 +120,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.ISO
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("iso22301.initialized");
+            IncrementCounter("iso22301.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("iso22301.shutdown");
+            IncrementCounter("iso22301.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

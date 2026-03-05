@@ -109,6 +109,24 @@ public sealed record StrategyMetrics
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateDataIntegration/Composition/SchemaEvolutionEngine.cs
+```csharp
+[SdkCompatibility("3.0.0")]
+public sealed class SchemaEvolutionEngine : IDisposable
+{
+}
+    public SchemaEvolutionEngine(IMessageBus messageBus, SchemaEvolutionEngineConfig? config = null, ILogger? logger = null);
+    public Task StartAsync(CancellationToken ct = default);
+    public Task StopAsync();
+    public async Task EvaluateProposalAsync(string proposalId, CancellationToken ct = default);
+    public async Task ApproveProposalAsync(string proposalId, string approvedBy, CancellationToken ct = default);
+    public async Task RejectProposalAsync(string proposalId, string rejectedBy, CancellationToken ct = default);
+    public Task<IReadOnlyList<SchemaEvolutionProposal>> GetPendingProposalsAsync();
+    public Task<IReadOnlyList<SchemaEvolutionProposal>> GetProposalHistoryAsync(string schemaId);
+    public void Dispose();
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateDataIntegration/Composition/DataValidationEngine.cs
 ```csharp
 public sealed class DataValidationEngine
@@ -231,21 +249,1580 @@ public sealed class ColumnQualityScore
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataIntegration/Composition/SchemaEvolutionEngine.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDataIntegration/Strategies/ELT/EltPatternStrategies.cs
 ```csharp
-[SdkCompatibility("3.0.0")]
-public sealed class SchemaEvolutionEngine : IDisposable
+public sealed class CloudNativeEltStrategy : DataIntegrationStrategyBase
 {
 }
-    public SchemaEvolutionEngine(IMessageBus messageBus, SchemaEvolutionEngineConfig? config = null, ILogger? logger = null);
-    public Task StartAsync(CancellationToken ct = default);
-    public Task StopAsync();
-    public async Task EvaluateProposalAsync(string proposalId, CancellationToken ct = default);
-    public async Task ApproveProposalAsync(string proposalId, string approvedBy, CancellationToken ct = default);
-    public async Task RejectProposalAsync(string proposalId, string rejectedBy, CancellationToken ct = default);
-    public Task<IReadOnlyList<SchemaEvolutionProposal>> GetPendingProposalsAsync();
-    public Task<IReadOnlyList<SchemaEvolutionProposal>> GetProposalHistoryAsync(string schemaId);
-    public void Dispose();
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<EltPipeline> CreatePipelineAsync(string pipelineId, EltSource source, EltTarget target, IReadOnlyList<EltTransformation> transformations, EltConfig? config = null, CancellationToken ct = default);
+    public async Task<EltExecutionResult> ExecuteAsync(string pipelineId, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class DbtStyleTransformationStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<DbtProject> CreateProjectAsync(string projectId, string projectName, DbtProjectConfig? config = null, CancellationToken ct = default);
+    public Task<DbtModel> AddModelAsync(string projectId, string modelName, string sqlQuery, MaterializationType materialization = MaterializationType.View, IReadOnlyList<string>? dependencies = null, CancellationToken ct = default);
+    public async Task<DbtRunResult> RunAsync(string projectId, DbtRunOptions? options = null, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class ReverseEltStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<ReverseEltSync> CreateSyncAsync(string syncId, WarehouseSource source, OperationalTarget target, SyncConfig? config = null, CancellationToken ct = default);
+    public async Task<ReverseSyncResult> ExecuteSyncAsync(string syncId, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class MedallionArchitectureStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<MedallionPipeline> CreatePipelineAsync(string pipelineId, MedallionSource source, MedallionConfig? config = null, CancellationToken ct = default);
+    public async Task<MedallionResult> ProcessAsync(string pipelineId, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class SemanticLayerStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<SemanticModel> CreateModelAsync(string modelId, string modelName, IReadOnlyList<Dimension> dimensions, IReadOnlyList<Measure> measures, CancellationToken ct = default);
+    public Task<MetricDefinition> DefineMetricAsync(string metricId, string metricName, string expression, MetricType metricType, string? description = null, CancellationToken ct = default);
+    public Task<SemanticQueryResult> QueryAsync(string modelId, SemanticQuery query, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed record EltPipeline
+{
+}
+    public required string PipelineId { get; init; }
+    public required EltSource Source { get; init; }
+    public required EltTarget Target { get; init; }
+    public required List<EltTransformation> Transformations { get; init; }
+    public required EltConfig Config { get; init; }
+    public EltPipelineStatus Status { get; set; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record EltSource
+{
+}
+    public required string SourceType { get; init; }
+    public required string ConnectionString { get; init; }
+    public string? Path { get; init; }
+    public string? Format { get; init; }
+}
+```
+```csharp
+public sealed record EltTarget
+{
+}
+    public required string WarehouseType { get; init; }
+    public required string ConnectionString { get; init; }
+    public required string Schema { get; init; }
+    public required string Table { get; init; }
+}
+```
+```csharp
+public sealed record EltTransformation
+{
+}
+    public required string TransformationId { get; init; }
+    public required string Name { get; init; }
+    public required string SqlQuery { get; init; }
+    public IReadOnlyList<string>? Dependencies { get; init; }
+}
+```
+```csharp
+public sealed record EltConfig
+{
+}
+    public bool EnableIncremental { get; init; };
+    public int Parallelism { get; init; };
+    public TimeSpan Timeout { get; init; };
+}
+```
+```csharp
+public sealed record EltExecutionResult
+{
+}
+    public required string PipelineId { get; init; }
+    public required string ExecutionId { get; init; }
+    public long RecordsLoaded { get; init; }
+    public required List<TransformationResult> TransformationResults { get; init; }
+    public DateTime StartTime { get; init; }
+    public DateTime EndTime { get; init; }
+    public EltExecutionStatus Status { get; init; }
+}
+```
+```csharp
+public sealed record LoadResult
+{
+}
+    public long RecordsLoaded { get; init; }
+    public long BytesLoaded { get; init; }
+}
+```
+```csharp
+public sealed record TransformationResult
+{
+}
+    public required string TransformationId { get; init; }
+    public long RowsAffected { get; init; }
+    public long DurationMs { get; init; }
+    public TransformationStatus Status { get; init; }
+}
+```
+```csharp
+public sealed record DbtProject
+{
+}
+    public required string ProjectId { get; init; }
+    public required string ProjectName { get; init; }
+    public required DbtProjectConfig Config { get; init; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record DbtProjectConfig
+{
+}
+    public string? TargetSchema { get; init; }
+    public bool EnableTests { get; init; };
+    public bool EnableDocs { get; init; };
+}
+```
+```csharp
+public sealed record DbtModel
+{
+}
+    public required string ModelId { get; init; }
+    public required string ProjectId { get; init; }
+    public required string ModelName { get; init; }
+    public required string SqlQuery { get; init; }
+    public MaterializationType Materialization { get; init; }
+    public required List<string> Dependencies { get; init; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record DbtRunOptions
+{
+}
+    public bool FullRefresh { get; init; };
+    public IReadOnlyList<string>? SelectModels { get; init; }
+    public IReadOnlyList<string>? ExcludeModels { get; init; }
+}
+```
+```csharp
+public sealed record DbtRunResult
+{
+}
+    public required string ProjectId { get; init; }
+    public required string RunId { get; init; }
+    public int ModelsExecuted { get; init; }
+    public required List<DbtModelResult> ModelResults { get; init; }
+    public DateTime StartTime { get; init; }
+    public DateTime EndTime { get; init; }
+    public DbtRunStatus Status { get; init; }
+}
+```
+```csharp
+public sealed record DbtModelResult
+{
+}
+    public required string ModelId { get; init; }
+    public required string ModelName { get; init; }
+    public long RowsAffected { get; init; }
+    public long DurationMs { get; init; }
+    public DbtModelStatus Status { get; init; }
+}
+```
+```csharp
+public sealed record ReverseEltSync
+{
+}
+    public required string SyncId { get; init; }
+    public required WarehouseSource Source { get; init; }
+    public required OperationalTarget Target { get; init; }
+    public required SyncConfig Config { get; init; }
+    public SyncStatus Status { get; set; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record WarehouseSource
+{
+}
+    public required string WarehouseType { get; init; }
+    public required string ConnectionString { get; init; }
+    public required string Query { get; init; }
+}
+```
+```csharp
+public sealed record OperationalTarget
+{
+}
+    public required string TargetType { get; init; }
+    public required string ConnectionString { get; init; }
+    public required string ObjectName { get; init; }
+    public Dictionary<string, string>? FieldMappings { get; init; }
+}
+```
+```csharp
+public sealed record SyncConfig
+{
+}
+    public SyncMode Mode { get; init; };
+    public int BatchSize { get; init; };
+    public TimeSpan Interval { get; init; };
+}
+```
+```csharp
+public sealed record ReverseSyncResult
+{
+}
+    public required string SyncId { get; init; }
+    public required string ExecutionId { get; init; }
+    public int RecordsExtracted { get; init; }
+    public int RecordsSynced { get; init; }
+    public int RecordsFailed { get; init; }
+    public DateTime StartTime { get; init; }
+    public DateTime EndTime { get; init; }
+    public ReverseSyncStatus Status { get; init; }
+}
+```
+```csharp
+public sealed record MedallionPipeline
+{
+}
+    public required string PipelineId { get; init; }
+    public required MedallionSource Source { get; init; }
+    public required MedallionConfig Config { get; init; }
+    public MedallionStatus Status { get; set; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record MedallionSource
+{
+}
+    public required string SourceType { get; init; }
+    public required string Path { get; init; }
+    public string? Format { get; init; }
+}
+```
+```csharp
+public sealed record MedallionConfig
+{
+}
+    public string BronzePath { get; init; };
+    public string SilverPath { get; init; };
+    public string GoldPath { get; init; };
+    public string Format { get; init; };
+}
+```
+```csharp
+public sealed record MedallionResult
+{
+}
+    public required string PipelineId { get; init; }
+    public required string ExecutionId { get; init; }
+    public int BronzeRecords { get; init; }
+    public int SilverRecords { get; init; }
+    public int GoldRecords { get; init; }
+    public DateTime StartTime { get; init; }
+    public DateTime EndTime { get; init; }
+    public MedallionExecutionStatus Status { get; init; }
+}
+```
+```csharp
+public sealed record TierResult
+{
+}
+    public required string Tier { get; init; }
+    public int Records { get; init; }
+}
+```
+```csharp
+public sealed record SemanticModel
+{
+}
+    public required string ModelId { get; init; }
+    public required string ModelName { get; init; }
+    public required List<Dimension> Dimensions { get; init; }
+    public required List<Measure> Measures { get; init; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record Dimension
+{
+}
+    public required string DimensionId { get; init; }
+    public required string Name { get; init; }
+    public required string Expression { get; init; }
+    public string? Description { get; init; }
+}
+```
+```csharp
+public sealed record Measure
+{
+}
+    public required string MeasureId { get; init; }
+    public required string Name { get; init; }
+    public required string Expression { get; init; }
+    public required string AggregationType { get; init; }
+    public string? Description { get; init; }
+}
+```
+```csharp
+public sealed record MetricDefinition
+{
+}
+    public required string MetricId { get; init; }
+    public required string MetricName { get; init; }
+    public required string Expression { get; init; }
+    public MetricType MetricType { get; init; }
+    public string? Description { get; init; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record SemanticQuery
+{
+}
+    public required IReadOnlyList<string> Metrics { get; init; }
+    public required IReadOnlyList<string> Dimensions { get; init; }
+    public IReadOnlyList<string>? Filters { get; init; }
+    public int? Limit { get; init; }
+}
+```
+```csharp
+public sealed record SemanticQueryResult
+{
+}
+    public required string QueryId { get; init; }
+    public required string ModelId { get; init; }
+    public int RowCount { get; init; }
+    public required List<string> Columns { get; init; }
+    public long ExecutionTimeMs { get; init; }
+    public QueryStatus Status { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataIntegration/Strategies/Transformation/DataTransformationStrategies.cs
+```csharp
+public sealed class TypeConversionStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<TypeMapping> RegisterMappingAsync(string mappingId, string sourceType, string targetType, ConversionRule rule, CancellationToken ct = default);
+    public Task<ConversionResult> ConvertAsync(object? value, string sourceType, string targetType, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class AggregationStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<AggregationResult> AggregateAsync(IReadOnlyList<Dictionary<string, object>> records, IReadOnlyList<string> groupByColumns, IReadOnlyList<AggregationFunction> aggregations, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class DataCleansingStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<CleansingRule> RegisterRuleAsync(string ruleId, string targetColumn, CleansingOperation operation, Dictionary<string, object>? parameters = null, CancellationToken ct = default);
+    public Task<CleansingResult> CleanseAsync(IReadOnlyList<Dictionary<string, object>> records, IReadOnlyList<string>? ruleIds = null, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class DataEnrichmentStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<EnrichmentSource> RegisterSourceAsync(string sourceId, EnrichmentSourceType sourceType, string connectionString, EnrichmentConfig? config = null, CancellationToken ct = default);
+    public async Task<EnrichmentResult> EnrichAsync(IReadOnlyList<Dictionary<string, object>> records, string sourceId, string keyColumn, IReadOnlyList<string> enrichColumns, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class DataNormalizationStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<NormalizationRule> RegisterRuleAsync(string ruleId, string targetColumn, NormalizationType normType, Dictionary<string, object>? parameters = null, CancellationToken ct = default);
+    public Task<NormalizationResult> NormalizeAsync(IReadOnlyList<Dictionary<string, object>> records, IReadOnlyList<string>? ruleIds = null, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class FlattenNestStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<FlattenResult> FlattenAsync(IReadOnlyList<Dictionary<string, object>> records, FlattenConfig? config = null, CancellationToken ct = default);
+    public Task<NestResult> NestAsync(IReadOnlyList<Dictionary<string, object>> records, NestConfig? config = null, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed record TypeMapping
+{
+}
+    public required string MappingId { get; init; }
+    public required string SourceType { get; init; }
+    public required string TargetType { get; init; }
+    public ConversionRule Rule { get; init; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record ConversionResult
+{
+}
+    public object? OriginalValue { get; init; }
+    public object? ConvertedValue { get; set; }
+    public required string SourceType { get; init; }
+    public required string TargetType { get; init; }
+    public bool Success { get; set; }
+    public string? ErrorMessage { get; set; }
+}
+```
+```csharp
+public sealed record AggregationFunction
+{
+}
+    public required string InputColumn { get; init; }
+    public required string OutputColumn { get; init; }
+    public required AggFunction Function { get; init; }
+}
+```
+```csharp
+public sealed record AggregationResult
+{
+}
+    public int InputRecords { get; init; }
+    public int OutputRecords { get; init; }
+    public required List<Dictionary<string, object>> AggregatedData { get; init; }
+    public AggregationStatus Status { get; init; }
+}
+```
+```csharp
+public sealed record CleansingRule
+{
+}
+    public required string RuleId { get; init; }
+    public required string TargetColumn { get; init; }
+    public CleansingOperation Operation { get; init; }
+    public required Dictionary<string, object> Parameters { get; init; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record CleansingResult
+{
+}
+    public int InputRecords { get; init; }
+    public int OutputRecords { get; init; }
+    public int ModificationsApplied { get; init; }
+    public required List<Dictionary<string, object>> CleansedData { get; init; }
+    public CleansingStatus Status { get; init; }
+}
+```
+```csharp
+public sealed record EnrichmentSource
+{
+}
+    public required string SourceId { get; init; }
+    public EnrichmentSourceType SourceType { get; init; }
+    public required string ConnectionString { get; init; }
+    public required EnrichmentConfig Config { get; init; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record EnrichmentConfig
+{
+}
+    public bool EnableCache { get; init; };
+    public TimeSpan CacheTtl { get; init; };
+    public int MaxConcurrentLookups { get; init; };
+}
+```
+```csharp
+public sealed record EnrichmentResult
+{
+}
+    public int InputRecords { get; init; }
+    public int OutputRecords { get; init; }
+    public int EnrichmentsApplied { get; init; }
+    public required List<Dictionary<string, object>> EnrichedData { get; init; }
+    public EnrichmentStatus Status { get; init; }
+}
+```
+```csharp
+public sealed record NormalizationRule
+{
+}
+    public required string RuleId { get; init; }
+    public required string TargetColumn { get; init; }
+    public NormalizationType NormalizationType { get; init; }
+    public required Dictionary<string, object> Parameters { get; init; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record NormalizationResult
+{
+}
+    public int InputRecords { get; init; }
+    public int OutputRecords { get; init; }
+    public int ModificationsApplied { get; init; }
+    public required List<Dictionary<string, object>> NormalizedData { get; init; }
+    public NormalizationStatus Status { get; init; }
+}
+```
+```csharp
+public sealed record FlattenConfig
+{
+}
+    public string Separator { get; init; };
+    public int MaxDepth { get; init; };
+}
+```
+```csharp
+public sealed record FlattenResult
+{
+}
+    public int InputRecords { get; init; }
+    public int OutputRecords { get; init; }
+    public required List<Dictionary<string, object>> FlattenedData { get; init; }
+    public FlattenStatus Status { get; init; }
+}
+```
+```csharp
+public sealed record NestConfig
+{
+}
+    public string Separator { get; init; };
+}
+```
+```csharp
+public sealed record NestResult
+{
+}
+    public int InputRecords { get; init; }
+    public int OutputRecords { get; init; }
+    public required List<Dictionary<string, object>> NestedData { get; init; }
+    public NestStatus Status { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataIntegration/Strategies/SchemaEvolution/SchemaEvolutionStrategies.cs
+```csharp
+public sealed class ForwardCompatibleSchemaStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<SchemaVersion> RegisterSchemaAsync(string schemaId, string schemaName, IReadOnlyList<FieldDefinition> fields, CancellationToken ct = default);
+    public Task<CompatibilityCheckResult> CheckCompatibilityAsync(string schemaId, IReadOnlyList<FieldDefinition> newFields, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class BackwardCompatibleSchemaStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<SchemaVersion> RegisterSchemaAsync(string schemaId, string schemaName, IReadOnlyList<FieldDefinition> fields, CancellationToken ct = default);
+    public Task<CompatibilityCheckResult> CheckCompatibilityAsync(string schemaId, IReadOnlyList<FieldDefinition> newFields, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class FullCompatibleSchemaStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<SchemaVersion> RegisterSchemaAsync(string schemaId, string schemaName, IReadOnlyList<FieldDefinition> fields, CancellationToken ct = default);
+    public Task<CompatibilityCheckResult> CheckCompatibilityAsync(string schemaId, IReadOnlyList<FieldDefinition> newFields, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class SchemaMigrationStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<SchemaMigration> CreateMigrationAsync(string migrationId, string schemaId, int fromVersion, int toVersion, IReadOnlyList<MigrationStep> upSteps, IReadOnlyList<MigrationStep>? downSteps = null, CancellationToken ct = default);
+    public async Task<MigrationExecution> ExecuteMigrationAsync(string migrationId, MigrationDirection direction = MigrationDirection.Up, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class SchemaRegistryStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<SchemaSubject> CreateSubjectAsync(string subjectName, SchemaCompatibility compatibility = SchemaCompatibility.Backward, CancellationToken ct = default);
+    public Task<RegisteredSchema> RegisterSchemaAsync(string subjectName, string schemaDefinition, SchemaType schemaType = SchemaType.Avro, CancellationToken ct = default);
+    public Task<RegisteredSchema?> GetSchemaAsync(string subjectName, int? version = null, CancellationToken ct = default);
+    public Task<List<int>> GetVersionsAsync(string subjectName, CancellationToken ct = default);
+    public Task<bool> DeleteSchemaAsync(string subjectName, int version, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed record SchemaVersion
+{
+}
+    public required string SchemaId { get; init; }
+    public required string SchemaName { get; init; }
+    public int Version { get; init; }
+    public required List<FieldDefinition> Fields { get; init; }
+    public SchemaCompatibility Compatibility { get; init; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record FieldDefinition
+{
+}
+    public required string Name { get; init; }
+    public required string DataType { get; init; }
+    public bool IsNullable { get; init; };
+    public object? DefaultValue { get; init; }
+    public string? Documentation { get; init; }
+}
+```
+```csharp
+public sealed record CompatibilityCheckResult
+{
+}
+    public bool IsCompatible { get; init; }
+    public required string Message { get; init; }
+    public List<string>? Issues { get; init; }
+}
+```
+```csharp
+public sealed record SchemaMigration
+{
+}
+    public required string MigrationId { get; init; }
+    public required string SchemaId { get; init; }
+    public int FromVersion { get; init; }
+    public int ToVersion { get; init; }
+    public required List<MigrationStep> UpSteps { get; init; }
+    public required List<MigrationStep> DownSteps { get; init; }
+    public MigrationStatus Status { get; set; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record MigrationStep
+{
+}
+    public required string StepId { get; init; }
+    public MigrationStepType Type { get; init; }
+    public string? ColumnName { get; init; }
+    public string? NewColumnName { get; init; }
+    public string? DataType { get; init; }
+    public string? CustomSql { get; init; }
+}
+```
+```csharp
+public sealed record MigrationExecution
+{
+}
+    public required string ExecutionId { get; init; }
+    public required string MigrationId { get; init; }
+    public MigrationDirection Direction { get; init; }
+    public MigrationExecutionStatus Status { get; set; }
+    public DateTime StartedAt { get; init; }
+    public DateTime? CompletedAt { get; set; }
+    public string? ErrorMessage { get; set; }
+    public List<StepResult>? StepResults { get; set; }
+}
+```
+```csharp
+public sealed record StepResult
+{
+}
+    public required string StepId { get; init; }
+    public bool Success { get; init; }
+    public long DurationMs { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+```
+```csharp
+public sealed record SchemaSubject
+{
+}
+    public required string SubjectName { get; init; }
+    public SchemaCompatibility Compatibility { get; init; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record RegisteredSchema
+{
+}
+    public required int SchemaId { get; init; }
+    public required string SubjectName { get; init; }
+    public int Version { get; init; }
+    public required string SchemaDefinition { get; init; }
+    public SchemaType SchemaType { get; init; }
+    public required string Fingerprint { get; init; }
+    public DateTime RegisteredAt { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataIntegration/Strategies/Monitoring/IntegrationMonitoringStrategies.cs
+```csharp
+public sealed class PipelineHealthMonitoringStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<PipelineHealth> RegisterPipelineAsync(string pipelineId, HealthMonitoringConfig? config = null, CancellationToken ct = default);
+    public Task<HealthCheck> RecordHealthCheckAsync(string pipelineId, HealthMetrics metrics, CancellationToken ct = default);
+    public Task<PipelineHealth> GetHealthAsync(string pipelineId, CancellationToken ct = default);
+    public Task<List<HealthCheck>> GetHealthHistoryAsync(string pipelineId, DateTime? since = null, int limit = 100, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class SlaTrackingStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<SlaDefinition> DefineSlaAsync(string slaId, string name, SlaRequirements requirements, CancellationToken ct = default);
+    public Task<SlaComplianceResult> CheckComplianceAsync(string slaId, SlaMetrics metrics, CancellationToken ct = default);
+    public Task<SlaReport> GetReportAsync(string slaId, DateTime fromDate, DateTime toDate, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class DataQualityMonitoringStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<DataQualityProfile> CreateProfileAsync(string profileId, string datasetName, IReadOnlyList<QualityRule> rules, CancellationToken ct = default);
+    public Task<QualityEvaluation> EvaluateQualityAsync(string profileId, IReadOnlyList<Dictionary<string, object>> records, CancellationToken ct = default);
+    public Task<QualityTrend> GetTrendAsync(string profileId, int periods = 10, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class IntegrationLineageTrackingStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<LineageNode> RegisterNodeAsync(string nodeId, string nodeName, LineageNodeType nodeType, Dictionary<string, object>? metadata = null, CancellationToken ct = default);
+    public Task<LineageEdge> RecordEdgeAsync(string sourceNodeId, string targetNodeId, LineageEdgeType edgeType, Dictionary<string, object>? transformations = null, CancellationToken ct = default);
+    public Task<LineageGraph> GetUpstreamLineageAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
+    public Task<LineageGraph> GetDownstreamLineageAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
+    public Task<ImpactAnalysis> AnalyzeImpactAsync(string nodeId, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class AlertNotificationStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<AlertRule> CreateRuleAsync(string ruleId, string ruleName, AlertCondition condition, AlertAction action, CancellationToken ct = default);
+    public Task<NotificationChannel> RegisterChannelAsync(string channelId, string channelName, ChannelType channelType, Dictionary<string, string> config, CancellationToken ct = default);
+    public Task<Alert> TriggerAlertAsync(string ruleId, Dictionary<string, object> context, CancellationToken ct = default);
+    public Task<Alert> AcknowledgeAlertAsync(string alertId, string acknowledgedBy, CancellationToken ct = default);
+    public Task<List<Alert>> GetActiveAlertsAsync(AlertSeverity? minSeverity = null, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed record PipelineHealth
+{
+}
+    public required string PipelineId { get; init; }
+    public required HealthMonitoringConfig Config { get; init; }
+    public PipelineHealthStatus Status { get; set; }
+    public DateTime RegisteredAt { get; init; }
+    public DateTime? LastCheckedAt { get; set; }
+    public HealthCheck? LastCheck { get; set; }
+    public List<HealthAlert> ActiveAlerts { get; init; };
+}
+```
+```csharp
+public sealed record HealthMonitoringConfig
+{
+}
+    public TimeSpan CheckInterval { get; init; };
+    public double WarningErrorRateThreshold { get; init; };
+    public double CriticalErrorRateThreshold { get; init; };
+    public TimeSpan WarningLatencyThreshold { get; init; };
+    public TimeSpan CriticalLatencyThreshold { get; init; };
+}
+```
+```csharp
+public sealed record HealthMetrics
+{
+}
+    public long RecordsProcessed { get; init; }
+    public long Errors { get; init; }
+    public double ErrorRate;;
+    public TimeSpan Latency { get; init; }
+    public double CpuUtilization { get; init; }
+    public double MemoryUtilization { get; init; }
+}
+```
+```csharp
+public sealed record HealthCheck
+{
+}
+    public required string CheckId { get; init; }
+    public required string PipelineId { get; init; }
+    public required HealthMetrics Metrics { get; init; }
+    public PipelineHealthStatus Status { get; init; }
+    public DateTime Timestamp { get; init; }
+}
+```
+```csharp
+public sealed record HealthAlert
+{
+}
+    public required string AlertId { get; init; }
+    public required string PipelineId { get; init; }
+    public AlertSeverity Severity { get; init; }
+    public required string Message { get; init; }
+    public DateTime TriggeredAt { get; init; }
+}
+```
+```csharp
+public sealed record SlaDefinition
+{
+}
+    public required string SlaId { get; init; }
+    public required string Name { get; init; }
+    public required SlaRequirements Requirements { get; init; }
+    public SlaStatus Status { get; set; }
+    public DateTime CreatedAt { get; init; }
+    public DateTime? LastChecked { get; set; }
+    public bool? LastComplianceResult { get; set; }
+}
+```
+```csharp
+public sealed record SlaRequirements
+{
+}
+    public TimeSpan? MaxDataAge { get; init; }
+    public double? MinCompleteness { get; init; }
+    public double? MinAvailability { get; init; }
+    public TimeSpan? MaxLatency { get; init; }
+}
+```
+```csharp
+public sealed record SlaMetrics
+{
+}
+    public TimeSpan DataAge { get; init; }
+    public double Completeness { get; init; }
+    public double Availability { get; init; }
+    public TimeSpan ProcessingLatency { get; init; }
+}
+```
+```csharp
+public sealed record SlaComplianceResult
+{
+}
+    public required string SlaId { get; init; }
+    public DateTime CheckedAt { get; init; }
+    public bool IsCompliant { get; set; }
+    public required List<string> Violations { get; init; }
+}
+```
+```csharp
+public sealed record SlaViolation
+{
+}
+    public required string ViolationId { get; init; }
+    public required string SlaId { get; init; }
+    public required List<string> Violations { get; init; }
+    public required SlaMetrics Metrics { get; init; }
+    public DateTime OccurredAt { get; init; }
+}
+```
+```csharp
+public sealed record SlaReport
+{
+}
+    public required string SlaId { get; init; }
+    public required string SlaName { get; init; }
+    public DateTime FromDate { get; init; }
+    public DateTime ToDate { get; init; }
+    public int TotalViolations { get; init; }
+    public double ComplianceRate { get; init; }
+    public required List<SlaViolation> Violations { get; init; }
+}
+```
+```csharp
+public sealed record DataQualityProfile
+{
+}
+    public required string ProfileId { get; init; }
+    public required string DatasetName { get; init; }
+    public required List<QualityRule> Rules { get; init; }
+    public DateTime CreatedAt { get; init; }
+    public DateTime? LastEvaluated { get; set; }
+    public double? LastScore { get; set; }
+}
+```
+```csharp
+public sealed record QualityRule
+{
+}
+    public required string RuleId { get; init; }
+    public required string Name { get; init; }
+    public QualityRuleType Type { get; init; }
+    public string? ColumnName { get; init; }
+    public bool AllowNull { get; init; };
+    public double? MinValue { get; init; }
+    public double? MaxValue { get; init; }
+    public string? Pattern { get; init; }
+}
+```
+```csharp
+public sealed record QualityEvaluation
+{
+}
+    public required string EvaluationId { get; init; }
+    public required string ProfileId { get; init; }
+    public int RecordsEvaluated { get; init; }
+    public DateTime EvaluatedAt { get; init; }
+    public double OverallScore { get; set; }
+    public required List<RuleResult> RuleResults { get; init; }
+}
+```
+```csharp
+public sealed record RuleResult
+{
+}
+    public required string RuleId { get; init; }
+    public required string RuleName { get; init; }
+    public double Score { get; init; }
+    public int Violations { get; init; }
+}
+```
+```csharp
+public sealed record QualityScore
+{
+}
+    public required string ProfileId { get; init; }
+    public double Score { get; init; }
+    public DateTime RecordedAt { get; init; }
+}
+```
+```csharp
+public sealed record QualityTrend
+{
+}
+    public required string ProfileId { get; init; }
+    public required List<QualityScore> Scores { get; init; }
+    public TrendDirection TrendDirection { get; init; }
+    public double TrendValue { get; init; }
+}
+```
+```csharp
+public sealed record LineageNode
+{
+}
+    public required string NodeId { get; init; }
+    public required string NodeName { get; init; }
+    public LineageNodeType NodeType { get; init; }
+    public required Dictionary<string, object> Metadata { get; init; }
+    public DateTime RegisteredAt { get; init; }
+}
+```
+```csharp
+public sealed record LineageEdge
+{
+}
+    public required string EdgeId { get; init; }
+    public required string SourceNodeId { get; init; }
+    public required string TargetNodeId { get; init; }
+    public LineageEdgeType EdgeType { get; init; }
+    public required Dictionary<string, object> Transformations { get; init; }
+    public DateTime RecordedAt { get; init; }
+}
+```
+```csharp
+public sealed record LineageGraph
+{
+}
+    public required string RootNodeId { get; init; }
+    public LineageDirection Direction { get; init; }
+    public required List<LineageNode> Nodes { get; init; }
+    public required List<LineageEdge> Edges { get; init; }
+}
+```
+```csharp
+public sealed record ImpactAnalysis
+{
+}
+    public required string SourceNodeId { get; init; }
+    public required List<LineageNode> ImpactedNodes { get; init; }
+    public int TotalImpactedCount { get; init; }
+    public DateTime AnalyzedAt { get; init; }
+}
+```
+```csharp
+public sealed record AlertRule
+{
+}
+    public required string RuleId { get; init; }
+    public required string RuleName { get; init; }
+    public required AlertCondition Condition { get; init; }
+    public required AlertAction Action { get; init; }
+    public bool IsEnabled { get; set; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record AlertCondition
+{
+}
+    public required string Metric { get; init; }
+    public required string Operator { get; init; }
+    public required double Threshold { get; init; }
+    public AlertSeverity Severity { get; init; }
+    public string? MessageTemplate { get; init; }
+}
+```
+```csharp
+public sealed record AlertAction
+{
+}
+    public List<string>? NotifyChannels { get; init; }
+    public TimeSpan? EscalateAfter { get; init; }
+    public List<string>? EscalateTo { get; init; }
+}
+```
+```csharp
+public sealed record NotificationChannel
+{
+}
+    public required string ChannelId { get; init; }
+    public required string ChannelName { get; init; }
+    public ChannelType ChannelType { get; init; }
+    public required Dictionary<string, string> Config { get; init; }
+    public bool IsEnabled { get; set; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record Alert
+{
+}
+    public required string AlertId { get; init; }
+    public required string RuleId { get; init; }
+    public required string RuleName { get; init; }
+    public AlertSeverity Severity { get; init; }
+    public required string Message { get; init; }
+    public required Dictionary<string, object> Context { get; init; }
+    public AlertStatus Status { get; set; }
+    public DateTime TriggeredAt { get; init; }
+    public DateTime? AcknowledgedAt { get; set; }
+    public string? AcknowledgedBy { get; set; }
+    public DateTime? ResolvedAt { get; set; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataIntegration/Strategies/ETL/EtlPipelineStrategies.cs
+```csharp
+public sealed class ClassicEtlPipelineStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<EtlJob> CreateJobAsync(string jobId, EtlSource source, IReadOnlyList<EtlTransformation> transformations, EtlTarget target, EtlJobConfig? config = null, CancellationToken ct = default);
+    public async Task<JobExecution> ExecuteJobAsync(string jobId, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class StreamingEtlPipelineStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<StreamingEtlJob> CreateJobAsync(string jobId, StreamingSource source, IReadOnlyList<StreamingTransformation> transformations, StreamingSink sink, StreamingEtlConfig? config = null, CancellationToken ct = default);
+    public Task StartJobAsync(string jobId, CancellationToken ct = default);
+    public async IAsyncEnumerable<ProcessedEvent> ProcessEventsAsync(string jobId, IAsyncEnumerable<StreamingEvent> events, [EnumeratorCancellation] CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class MicroBatchEtlPipelineStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<MicroBatchJob> CreateJobAsync(string jobId, MicroBatchSource source, IReadOnlyList<EtlTransformation> transformations, MicroBatchSink sink, MicroBatchConfig? config = null, CancellationToken ct = default);
+    public async Task<MicroBatchResult> ProcessBatchAsync(string jobId, IReadOnlyList<Dictionary<string, object>> records, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class ParallelEtlPipelineStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<ParallelEtlJob> CreateJobAsync(string jobId, ParallelSource source, IReadOnlyList<EtlTransformation> transformations, ParallelSink sink, ParallelConfig? config = null, CancellationToken ct = default);
+    public async Task<ParallelExecutionResult> ExecuteAsync(string jobId, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class IncrementalEtlPipelineStrategy : DataIntegrationStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override IntegrationCategory Category;;
+    public override DataIntegrationCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<IncrementalEtlJob> CreateJobAsync(string jobId, IncrementalSource source, IReadOnlyList<EtlTransformation> transformations, IncrementalTarget target, IncrementalConfig? config = null, CancellationToken ct = default);
+    public async Task<IncrementalRunResult> ExecuteRunAsync(string jobId, CancellationToken ct = default);
+    public Task<WatermarkState> GetWatermarkAsync(string jobId);
+}
+```
+```csharp
+public sealed record EtlJob
+{
+}
+    public required string JobId { get; init; }
+    public required EtlSource Source { get; init; }
+    public required List<EtlTransformation> Transformations { get; init; }
+    public required EtlTarget Target { get; init; }
+    public required EtlJobConfig Config { get; init; }
+    public JobStatus Status { get; set; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record EtlSource
+{
+}
+    public required string SourceType { get; init; }
+    public required string ConnectionString { get; init; }
+    public string? Query { get; init; }
+    public Dictionary<string, object>? Options { get; init; }
+}
+```
+```csharp
+public sealed record EtlTarget
+{
+}
+    public required string TargetType { get; init; }
+    public required string ConnectionString { get; init; }
+    public string? TableName { get; init; }
+    public WriteMode WriteMode { get; init; };
+    public Dictionary<string, object>? Options { get; init; }
+}
+```
+```csharp
+public sealed record EtlTransformation
+{
+}
+    public required string TransformationId { get; init; }
+    public required TransformationType Type { get; init; }
+    public Dictionary<string, string>? FieldMappings { get; init; }
+    public Dictionary<string, string>? TypeMappings { get; init; }
+    public Dictionary<string, string>? Expressions { get; init; }
+    public string? FilterPredicate { get; init; }
+}
+```
+```csharp
+public sealed record EtlJobConfig
+{
+}
+    public int BatchSize { get; init; };
+    public int Parallelism { get; init; };
+    public bool EnableStaging { get; init; };
+    public bool EnableDataQuality { get; init; };
+    public TimeSpan Timeout { get; init; };
+}
+```
+```csharp
+public sealed record JobExecution
+{
+}
+    public required string ExecutionId { get; init; }
+    public required string JobId { get; init; }
+    public ExecutionStatus Status { get; set; }
+    public DateTime StartedAt { get; init; }
+    public DateTime? CompletedAt { get; set; }
+    public int ExtractedRecords { get; set; }
+    public int TransformedRecords { get; set; }
+    public int LoadedRecords { get; set; }
+    public string? ErrorMessage { get; set; }
+}
+```
+```csharp
+public sealed record StreamingEtlJob
+{
+}
+    public required string JobId { get; init; }
+    public required StreamingSource Source { get; init; }
+    public required List<StreamingTransformation> Transformations { get; init; }
+    public required StreamingSink Sink { get; init; }
+    public required StreamingEtlConfig Config { get; init; }
+    public StreamingJobStatus Status { get; set; }
+    public DateTime CreatedAt { get; init; }
+    public DateTime? StartedAt { get; set; }
+}
+```
+```csharp
+public sealed record StreamingSource
+{
+}
+    public required string SourceType { get; init; }
+    public required string ConnectionString { get; init; }
+    public string? Topic { get; init; }
+    public string? ConsumerGroup { get; init; }
+}
+```
+```csharp
+public sealed record StreamingSink
+{
+}
+    public required string SinkType { get; init; }
+    public required string ConnectionString { get; init; }
+    public string? Topic { get; init; }
+}
+```
+```csharp
+public sealed record StreamingTransformation
+{
+}
+    public required string TransformationId { get; init; }
+    public required string TransformationType { get; init; }
+    public Dictionary<string, object>? Config { get; init; }
+}
+```
+```csharp
+public sealed record StreamingEtlConfig
+{
+}
+    public CheckpointMode CheckpointMode { get; init; };
+    public TimeSpan CheckpointInterval { get; init; };
+    public int Parallelism { get; init; };
+}
+```
+```csharp
+public sealed record StreamingEvent
+{
+}
+    public required string EventId { get; init; }
+    public required Dictionary<string, object> Data { get; init; }
+    public DateTime ProcessingTime { get; init; }
+    public DateTime? EventTime { get; init; }
+}
+```
+```csharp
+public sealed record ProcessedEvent
+{
+}
+    public required string EventId { get; init; }
+    public required Dictionary<string, object> Data { get; init; }
+    public DateTime ProcessedAt { get; init; }
+    public DateTime Watermark { get; init; }
+}
+```
+```csharp
+public sealed record MicroBatchJob
+{
+}
+    public required string JobId { get; init; }
+    public required MicroBatchSource Source { get; init; }
+    public required List<EtlTransformation> Transformations { get; init; }
+    public required MicroBatchSink Sink { get; init; }
+    public required MicroBatchConfig Config { get; init; }
+    public MicroBatchStatus Status { get; set; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record MicroBatchSource
+{
+}
+    public required string SourceType { get; init; }
+    public required string ConnectionString { get; init; }
+}
+```
+```csharp
+public sealed record MicroBatchSink
+{
+}
+    public required string SinkType { get; init; }
+    public required string ConnectionString { get; init; }
+}
+```
+```csharp
+public sealed record MicroBatchConfig
+{
+}
+    public TimeSpan BatchInterval { get; init; };
+    public int MaxBatchSize { get; init; };
+    public int Parallelism { get; init; };
+}
+```
+```csharp
+public sealed record MicroBatchResult
+{
+}
+    public required string BatchId { get; init; }
+    public required string JobId { get; init; }
+    public int InputRecords { get; init; }
+    public int OutputRecords { get; init; }
+    public DateTime StartTime { get; init; }
+    public DateTime EndTime { get; init; }
+    public BatchStatus Status { get; init; }
+}
+```
+```csharp
+public sealed record ParallelEtlJob
+{
+}
+    public required string JobId { get; init; }
+    public required ParallelSource Source { get; init; }
+    public required List<EtlTransformation> Transformations { get; init; }
+    public required ParallelSink Sink { get; init; }
+    public required ParallelConfig Config { get; init; }
+    public ParallelJobStatus Status { get; set; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record ParallelSource
+{
+}
+    public required string SourceType { get; init; }
+    public required string ConnectionString { get; init; }
+    public string? PartitionColumn { get; init; }
+}
+```
+```csharp
+public sealed record ParallelSink
+{
+}
+    public required string SinkType { get; init; }
+    public required string ConnectionString { get; init; }
+}
+```
+```csharp
+public sealed record ParallelConfig
+{
+}
+    public int Parallelism { get; init; };
+    public bool DynamicPartitioning { get; init; };
+}
+```
+```csharp
+public sealed record ParallelExecutionResult
+{
+}
+    public required string JobId { get; init; }
+    public int TotalPartitions { get; init; }
+    public required List<PartitionResult> PartitionResults { get; init; }
+    public DateTime StartTime { get; init; }
+    public DateTime EndTime { get; init; }
+    public ParallelExecutionStatus Status { get; init; }
+}
+```
+```csharp
+public sealed record PartitionResult
+{
+}
+    public int PartitionId { get; init; }
+    public int RecordsProcessed { get; init; }
+    public PartitionStatus Status { get; init; }
+}
+```
+```csharp
+public sealed record IncrementalEtlJob
+{
+}
+    public required string JobId { get; init; }
+    public required IncrementalSource Source { get; init; }
+    public required List<EtlTransformation> Transformations { get; init; }
+    public required IncrementalTarget Target { get; init; }
+    public required IncrementalConfig Config { get; init; }
+    public IncrementalStatus Status { get; set; }
+    public DateTime CreatedAt { get; init; }
+}
+```
+```csharp
+public sealed record IncrementalSource
+{
+}
+    public required string SourceType { get; init; }
+    public required string ConnectionString { get; init; }
+    public required string WatermarkColumn { get; init; }
+}
+```
+```csharp
+public sealed record IncrementalTarget
+{
+}
+    public required string TargetType { get; init; }
+    public required string ConnectionString { get; init; }
+    public MergeStrategy MergeStrategy { get; init; };
+}
+```
+```csharp
+public sealed record IncrementalConfig
+{
+}
+    public DateTime? InitialWatermark { get; init; }
+    public TimeSpan LookbackWindow { get; init; };
+}
+```
+```csharp
+public sealed record WatermarkState
+{
+}
+    public required string JobId { get; init; }
+    public DateTime LastWatermark { get; set; }
+    public DateTime? LastRunAt { get; set; }
+}
+```
+```csharp
+public sealed record IncrementalRunResult
+{
+}
+    public required string JobId { get; init; }
+    public required string RunId { get; init; }
+    public DateTime PreviousWatermark { get; init; }
+    public DateTime NewWatermark { get; init; }
+    public int RecordsProcessed { get; init; }
+    public DateTime StartTime { get; init; }
+    public DateTime EndTime { get; init; }
+    public IncrementalRunStatus Status { get; init; }
 }
 ```
 
@@ -881,789 +2458,6 @@ public sealed record DomainEvent
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataIntegration/Strategies/ELT/EltPatternStrategies.cs
-```csharp
-public sealed class CloudNativeEltStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<EltPipeline> CreatePipelineAsync(string pipelineId, EltSource source, EltTarget target, IReadOnlyList<EltTransformation> transformations, EltConfig? config = null, CancellationToken ct = default);
-    public async Task<EltExecutionResult> ExecuteAsync(string pipelineId, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class DbtStyleTransformationStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<DbtProject> CreateProjectAsync(string projectId, string projectName, DbtProjectConfig? config = null, CancellationToken ct = default);
-    public Task<DbtModel> AddModelAsync(string projectId, string modelName, string sqlQuery, MaterializationType materialization = MaterializationType.View, IReadOnlyList<string>? dependencies = null, CancellationToken ct = default);
-    public async Task<DbtRunResult> RunAsync(string projectId, DbtRunOptions? options = null, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class ReverseEltStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<ReverseEltSync> CreateSyncAsync(string syncId, WarehouseSource source, OperationalTarget target, SyncConfig? config = null, CancellationToken ct = default);
-    public async Task<ReverseSyncResult> ExecuteSyncAsync(string syncId, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class MedallionArchitectureStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<MedallionPipeline> CreatePipelineAsync(string pipelineId, MedallionSource source, MedallionConfig? config = null, CancellationToken ct = default);
-    public async Task<MedallionResult> ProcessAsync(string pipelineId, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class SemanticLayerStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<SemanticModel> CreateModelAsync(string modelId, string modelName, IReadOnlyList<Dimension> dimensions, IReadOnlyList<Measure> measures, CancellationToken ct = default);
-    public Task<MetricDefinition> DefineMetricAsync(string metricId, string metricName, string expression, MetricType metricType, string? description = null, CancellationToken ct = default);
-    public Task<SemanticQueryResult> QueryAsync(string modelId, SemanticQuery query, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed record EltPipeline
-{
-}
-    public required string PipelineId { get; init; }
-    public required EltSource Source { get; init; }
-    public required EltTarget Target { get; init; }
-    public required List<EltTransformation> Transformations { get; init; }
-    public required EltConfig Config { get; init; }
-    public EltPipelineStatus Status { get; set; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record EltSource
-{
-}
-    public required string SourceType { get; init; }
-    public required string ConnectionString { get; init; }
-    public string? Path { get; init; }
-    public string? Format { get; init; }
-}
-```
-```csharp
-public sealed record EltTarget
-{
-}
-    public required string WarehouseType { get; init; }
-    public required string ConnectionString { get; init; }
-    public required string Schema { get; init; }
-    public required string Table { get; init; }
-}
-```
-```csharp
-public sealed record EltTransformation
-{
-}
-    public required string TransformationId { get; init; }
-    public required string Name { get; init; }
-    public required string SqlQuery { get; init; }
-    public IReadOnlyList<string>? Dependencies { get; init; }
-}
-```
-```csharp
-public sealed record EltConfig
-{
-}
-    public bool EnableIncremental { get; init; };
-    public int Parallelism { get; init; };
-    public TimeSpan Timeout { get; init; };
-}
-```
-```csharp
-public sealed record EltExecutionResult
-{
-}
-    public required string PipelineId { get; init; }
-    public required string ExecutionId { get; init; }
-    public long RecordsLoaded { get; init; }
-    public required List<TransformationResult> TransformationResults { get; init; }
-    public DateTime StartTime { get; init; }
-    public DateTime EndTime { get; init; }
-    public EltExecutionStatus Status { get; init; }
-}
-```
-```csharp
-public sealed record LoadResult
-{
-}
-    public long RecordsLoaded { get; init; }
-    public long BytesLoaded { get; init; }
-}
-```
-```csharp
-public sealed record TransformationResult
-{
-}
-    public required string TransformationId { get; init; }
-    public long RowsAffected { get; init; }
-    public long DurationMs { get; init; }
-    public TransformationStatus Status { get; init; }
-}
-```
-```csharp
-public sealed record DbtProject
-{
-}
-    public required string ProjectId { get; init; }
-    public required string ProjectName { get; init; }
-    public required DbtProjectConfig Config { get; init; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record DbtProjectConfig
-{
-}
-    public string? TargetSchema { get; init; }
-    public bool EnableTests { get; init; };
-    public bool EnableDocs { get; init; };
-}
-```
-```csharp
-public sealed record DbtModel
-{
-}
-    public required string ModelId { get; init; }
-    public required string ProjectId { get; init; }
-    public required string ModelName { get; init; }
-    public required string SqlQuery { get; init; }
-    public MaterializationType Materialization { get; init; }
-    public required List<string> Dependencies { get; init; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record DbtRunOptions
-{
-}
-    public bool FullRefresh { get; init; };
-    public IReadOnlyList<string>? SelectModels { get; init; }
-    public IReadOnlyList<string>? ExcludeModels { get; init; }
-}
-```
-```csharp
-public sealed record DbtRunResult
-{
-}
-    public required string ProjectId { get; init; }
-    public required string RunId { get; init; }
-    public int ModelsExecuted { get; init; }
-    public required List<DbtModelResult> ModelResults { get; init; }
-    public DateTime StartTime { get; init; }
-    public DateTime EndTime { get; init; }
-    public DbtRunStatus Status { get; init; }
-}
-```
-```csharp
-public sealed record DbtModelResult
-{
-}
-    public required string ModelId { get; init; }
-    public required string ModelName { get; init; }
-    public long RowsAffected { get; init; }
-    public long DurationMs { get; init; }
-    public DbtModelStatus Status { get; init; }
-}
-```
-```csharp
-public sealed record ReverseEltSync
-{
-}
-    public required string SyncId { get; init; }
-    public required WarehouseSource Source { get; init; }
-    public required OperationalTarget Target { get; init; }
-    public required SyncConfig Config { get; init; }
-    public SyncStatus Status { get; set; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record WarehouseSource
-{
-}
-    public required string WarehouseType { get; init; }
-    public required string ConnectionString { get; init; }
-    public required string Query { get; init; }
-}
-```
-```csharp
-public sealed record OperationalTarget
-{
-}
-    public required string TargetType { get; init; }
-    public required string ConnectionString { get; init; }
-    public required string ObjectName { get; init; }
-    public Dictionary<string, string>? FieldMappings { get; init; }
-}
-```
-```csharp
-public sealed record SyncConfig
-{
-}
-    public SyncMode Mode { get; init; };
-    public int BatchSize { get; init; };
-    public TimeSpan Interval { get; init; };
-}
-```
-```csharp
-public sealed record ReverseSyncResult
-{
-}
-    public required string SyncId { get; init; }
-    public required string ExecutionId { get; init; }
-    public int RecordsExtracted { get; init; }
-    public int RecordsSynced { get; init; }
-    public int RecordsFailed { get; init; }
-    public DateTime StartTime { get; init; }
-    public DateTime EndTime { get; init; }
-    public ReverseSyncStatus Status { get; init; }
-}
-```
-```csharp
-public sealed record MedallionPipeline
-{
-}
-    public required string PipelineId { get; init; }
-    public required MedallionSource Source { get; init; }
-    public required MedallionConfig Config { get; init; }
-    public MedallionStatus Status { get; set; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record MedallionSource
-{
-}
-    public required string SourceType { get; init; }
-    public required string Path { get; init; }
-    public string? Format { get; init; }
-}
-```
-```csharp
-public sealed record MedallionConfig
-{
-}
-    public string BronzePath { get; init; };
-    public string SilverPath { get; init; };
-    public string GoldPath { get; init; };
-    public string Format { get; init; };
-}
-```
-```csharp
-public sealed record MedallionResult
-{
-}
-    public required string PipelineId { get; init; }
-    public required string ExecutionId { get; init; }
-    public int BronzeRecords { get; init; }
-    public int SilverRecords { get; init; }
-    public int GoldRecords { get; init; }
-    public DateTime StartTime { get; init; }
-    public DateTime EndTime { get; init; }
-    public MedallionExecutionStatus Status { get; init; }
-}
-```
-```csharp
-public sealed record TierResult
-{
-}
-    public required string Tier { get; init; }
-    public int Records { get; init; }
-}
-```
-```csharp
-public sealed record SemanticModel
-{
-}
-    public required string ModelId { get; init; }
-    public required string ModelName { get; init; }
-    public required List<Dimension> Dimensions { get; init; }
-    public required List<Measure> Measures { get; init; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record Dimension
-{
-}
-    public required string DimensionId { get; init; }
-    public required string Name { get; init; }
-    public required string Expression { get; init; }
-    public string? Description { get; init; }
-}
-```
-```csharp
-public sealed record Measure
-{
-}
-    public required string MeasureId { get; init; }
-    public required string Name { get; init; }
-    public required string Expression { get; init; }
-    public required string AggregationType { get; init; }
-    public string? Description { get; init; }
-}
-```
-```csharp
-public sealed record MetricDefinition
-{
-}
-    public required string MetricId { get; init; }
-    public required string MetricName { get; init; }
-    public required string Expression { get; init; }
-    public MetricType MetricType { get; init; }
-    public string? Description { get; init; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record SemanticQuery
-{
-}
-    public required IReadOnlyList<string> Metrics { get; init; }
-    public required IReadOnlyList<string> Dimensions { get; init; }
-    public IReadOnlyList<string>? Filters { get; init; }
-    public int? Limit { get; init; }
-}
-```
-```csharp
-public sealed record SemanticQueryResult
-{
-}
-    public required string QueryId { get; init; }
-    public required string ModelId { get; init; }
-    public int RowCount { get; init; }
-    public required List<string> Columns { get; init; }
-    public long ExecutionTimeMs { get; init; }
-    public QueryStatus Status { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataIntegration/Strategies/ETL/EtlPipelineStrategies.cs
-```csharp
-public sealed class ClassicEtlPipelineStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<EtlJob> CreateJobAsync(string jobId, EtlSource source, IReadOnlyList<EtlTransformation> transformations, EtlTarget target, EtlJobConfig? config = null, CancellationToken ct = default);
-    public async Task<JobExecution> ExecuteJobAsync(string jobId, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class StreamingEtlPipelineStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<StreamingEtlJob> CreateJobAsync(string jobId, StreamingSource source, IReadOnlyList<StreamingTransformation> transformations, StreamingSink sink, StreamingEtlConfig? config = null, CancellationToken ct = default);
-    public Task StartJobAsync(string jobId, CancellationToken ct = default);
-    public async IAsyncEnumerable<ProcessedEvent> ProcessEventsAsync(string jobId, IAsyncEnumerable<StreamingEvent> events, [EnumeratorCancellation] CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class MicroBatchEtlPipelineStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<MicroBatchJob> CreateJobAsync(string jobId, MicroBatchSource source, IReadOnlyList<EtlTransformation> transformations, MicroBatchSink sink, MicroBatchConfig? config = null, CancellationToken ct = default);
-    public async Task<MicroBatchResult> ProcessBatchAsync(string jobId, IReadOnlyList<Dictionary<string, object>> records, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class ParallelEtlPipelineStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<ParallelEtlJob> CreateJobAsync(string jobId, ParallelSource source, IReadOnlyList<EtlTransformation> transformations, ParallelSink sink, ParallelConfig? config = null, CancellationToken ct = default);
-    public async Task<ParallelExecutionResult> ExecuteAsync(string jobId, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class IncrementalEtlPipelineStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<IncrementalEtlJob> CreateJobAsync(string jobId, IncrementalSource source, IReadOnlyList<EtlTransformation> transformations, IncrementalTarget target, IncrementalConfig? config = null, CancellationToken ct = default);
-    public async Task<IncrementalRunResult> ExecuteRunAsync(string jobId, CancellationToken ct = default);
-    public Task<WatermarkState> GetWatermarkAsync(string jobId);
-}
-```
-```csharp
-public sealed record EtlJob
-{
-}
-    public required string JobId { get; init; }
-    public required EtlSource Source { get; init; }
-    public required List<EtlTransformation> Transformations { get; init; }
-    public required EtlTarget Target { get; init; }
-    public required EtlJobConfig Config { get; init; }
-    public JobStatus Status { get; set; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record EtlSource
-{
-}
-    public required string SourceType { get; init; }
-    public required string ConnectionString { get; init; }
-    public string? Query { get; init; }
-    public Dictionary<string, object>? Options { get; init; }
-}
-```
-```csharp
-public sealed record EtlTarget
-{
-}
-    public required string TargetType { get; init; }
-    public required string ConnectionString { get; init; }
-    public string? TableName { get; init; }
-    public WriteMode WriteMode { get; init; };
-    public Dictionary<string, object>? Options { get; init; }
-}
-```
-```csharp
-public sealed record EtlTransformation
-{
-}
-    public required string TransformationId { get; init; }
-    public required TransformationType Type { get; init; }
-    public Dictionary<string, string>? FieldMappings { get; init; }
-    public Dictionary<string, string>? TypeMappings { get; init; }
-    public Dictionary<string, string>? Expressions { get; init; }
-    public string? FilterPredicate { get; init; }
-}
-```
-```csharp
-public sealed record EtlJobConfig
-{
-}
-    public int BatchSize { get; init; };
-    public int Parallelism { get; init; };
-    public bool EnableStaging { get; init; };
-    public bool EnableDataQuality { get; init; };
-    public TimeSpan Timeout { get; init; };
-}
-```
-```csharp
-public sealed record JobExecution
-{
-}
-    public required string ExecutionId { get; init; }
-    public required string JobId { get; init; }
-    public ExecutionStatus Status { get; set; }
-    public DateTime StartedAt { get; init; }
-    public DateTime? CompletedAt { get; set; }
-    public int ExtractedRecords { get; set; }
-    public int TransformedRecords { get; set; }
-    public int LoadedRecords { get; set; }
-    public string? ErrorMessage { get; set; }
-}
-```
-```csharp
-public sealed record StreamingEtlJob
-{
-}
-    public required string JobId { get; init; }
-    public required StreamingSource Source { get; init; }
-    public required List<StreamingTransformation> Transformations { get; init; }
-    public required StreamingSink Sink { get; init; }
-    public required StreamingEtlConfig Config { get; init; }
-    public StreamingJobStatus Status { get; set; }
-    public DateTime CreatedAt { get; init; }
-    public DateTime? StartedAt { get; set; }
-}
-```
-```csharp
-public sealed record StreamingSource
-{
-}
-    public required string SourceType { get; init; }
-    public required string ConnectionString { get; init; }
-    public string? Topic { get; init; }
-    public string? ConsumerGroup { get; init; }
-}
-```
-```csharp
-public sealed record StreamingSink
-{
-}
-    public required string SinkType { get; init; }
-    public required string ConnectionString { get; init; }
-    public string? Topic { get; init; }
-}
-```
-```csharp
-public sealed record StreamingTransformation
-{
-}
-    public required string TransformationId { get; init; }
-    public required string TransformationType { get; init; }
-    public Dictionary<string, object>? Config { get; init; }
-}
-```
-```csharp
-public sealed record StreamingEtlConfig
-{
-}
-    public CheckpointMode CheckpointMode { get; init; };
-    public TimeSpan CheckpointInterval { get; init; };
-    public int Parallelism { get; init; };
-}
-```
-```csharp
-public sealed record StreamingEvent
-{
-}
-    public required string EventId { get; init; }
-    public required Dictionary<string, object> Data { get; init; }
-    public DateTime ProcessingTime { get; init; }
-    public DateTime? EventTime { get; init; }
-}
-```
-```csharp
-public sealed record ProcessedEvent
-{
-}
-    public required string EventId { get; init; }
-    public required Dictionary<string, object> Data { get; init; }
-    public DateTime ProcessedAt { get; init; }
-    public DateTime Watermark { get; init; }
-}
-```
-```csharp
-public sealed record MicroBatchJob
-{
-}
-    public required string JobId { get; init; }
-    public required MicroBatchSource Source { get; init; }
-    public required List<EtlTransformation> Transformations { get; init; }
-    public required MicroBatchSink Sink { get; init; }
-    public required MicroBatchConfig Config { get; init; }
-    public MicroBatchStatus Status { get; set; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record MicroBatchSource
-{
-}
-    public required string SourceType { get; init; }
-    public required string ConnectionString { get; init; }
-}
-```
-```csharp
-public sealed record MicroBatchSink
-{
-}
-    public required string SinkType { get; init; }
-    public required string ConnectionString { get; init; }
-}
-```
-```csharp
-public sealed record MicroBatchConfig
-{
-}
-    public TimeSpan BatchInterval { get; init; };
-    public int MaxBatchSize { get; init; };
-    public int Parallelism { get; init; };
-}
-```
-```csharp
-public sealed record MicroBatchResult
-{
-}
-    public required string BatchId { get; init; }
-    public required string JobId { get; init; }
-    public int InputRecords { get; init; }
-    public int OutputRecords { get; init; }
-    public DateTime StartTime { get; init; }
-    public DateTime EndTime { get; init; }
-    public BatchStatus Status { get; init; }
-}
-```
-```csharp
-public sealed record ParallelEtlJob
-{
-}
-    public required string JobId { get; init; }
-    public required ParallelSource Source { get; init; }
-    public required List<EtlTransformation> Transformations { get; init; }
-    public required ParallelSink Sink { get; init; }
-    public required ParallelConfig Config { get; init; }
-    public ParallelJobStatus Status { get; set; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record ParallelSource
-{
-}
-    public required string SourceType { get; init; }
-    public required string ConnectionString { get; init; }
-    public string? PartitionColumn { get; init; }
-}
-```
-```csharp
-public sealed record ParallelSink
-{
-}
-    public required string SinkType { get; init; }
-    public required string ConnectionString { get; init; }
-}
-```
-```csharp
-public sealed record ParallelConfig
-{
-}
-    public int Parallelism { get; init; };
-    public bool DynamicPartitioning { get; init; };
-}
-```
-```csharp
-public sealed record ParallelExecutionResult
-{
-}
-    public required string JobId { get; init; }
-    public int TotalPartitions { get; init; }
-    public required List<PartitionResult> PartitionResults { get; init; }
-    public DateTime StartTime { get; init; }
-    public DateTime EndTime { get; init; }
-    public ParallelExecutionStatus Status { get; init; }
-}
-```
-```csharp
-public sealed record PartitionResult
-{
-}
-    public int PartitionId { get; init; }
-    public int RecordsProcessed { get; init; }
-    public PartitionStatus Status { get; init; }
-}
-```
-```csharp
-public sealed record IncrementalEtlJob
-{
-}
-    public required string JobId { get; init; }
-    public required IncrementalSource Source { get; init; }
-    public required List<EtlTransformation> Transformations { get; init; }
-    public required IncrementalTarget Target { get; init; }
-    public required IncrementalConfig Config { get; init; }
-    public IncrementalStatus Status { get; set; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record IncrementalSource
-{
-}
-    public required string SourceType { get; init; }
-    public required string ConnectionString { get; init; }
-    public required string WatermarkColumn { get; init; }
-}
-```
-```csharp
-public sealed record IncrementalTarget
-{
-}
-    public required string TargetType { get; init; }
-    public required string ConnectionString { get; init; }
-    public MergeStrategy MergeStrategy { get; init; };
-}
-```
-```csharp
-public sealed record IncrementalConfig
-{
-}
-    public DateTime? InitialWatermark { get; init; }
-    public TimeSpan LookbackWindow { get; init; };
-}
-```
-```csharp
-public sealed record WatermarkState
-{
-}
-    public required string JobId { get; init; }
-    public DateTime LastWatermark { get; set; }
-    public DateTime? LastRunAt { get; set; }
-}
-```
-```csharp
-public sealed record IncrementalRunResult
-{
-}
-    public required string JobId { get; init; }
-    public required string RunId { get; init; }
-    public DateTime PreviousWatermark { get; init; }
-    public DateTime NewWatermark { get; init; }
-    public int RecordsProcessed { get; init; }
-    public DateTime StartTime { get; init; }
-    public DateTime EndTime { get; init; }
-    public IncrementalRunStatus Status { get; init; }
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateDataIntegration/Strategies/Mapping/DataMappingStrategies.cs
 ```csharp
 public sealed class SchemaMappingStrategy : DataIntegrationStrategyBase
@@ -1980,799 +2774,5 @@ public sealed record BidirectionalMappingResult
     public int OutputRecords { get; init; }
     public required List<Dictionary<string, object>> MappedData { get; init; }
     public BidirectionalMappingStatus Status { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataIntegration/Strategies/Monitoring/IntegrationMonitoringStrategies.cs
-```csharp
-public sealed class PipelineHealthMonitoringStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<PipelineHealth> RegisterPipelineAsync(string pipelineId, HealthMonitoringConfig? config = null, CancellationToken ct = default);
-    public Task<HealthCheck> RecordHealthCheckAsync(string pipelineId, HealthMetrics metrics, CancellationToken ct = default);
-    public Task<PipelineHealth> GetHealthAsync(string pipelineId, CancellationToken ct = default);
-    public Task<List<HealthCheck>> GetHealthHistoryAsync(string pipelineId, DateTime? since = null, int limit = 100, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class SlaTrackingStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<SlaDefinition> DefineSlaAsync(string slaId, string name, SlaRequirements requirements, CancellationToken ct = default);
-    public Task<SlaComplianceResult> CheckComplianceAsync(string slaId, SlaMetrics metrics, CancellationToken ct = default);
-    public Task<SlaReport> GetReportAsync(string slaId, DateTime fromDate, DateTime toDate, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class DataQualityMonitoringStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<DataQualityProfile> CreateProfileAsync(string profileId, string datasetName, IReadOnlyList<QualityRule> rules, CancellationToken ct = default);
-    public Task<QualityEvaluation> EvaluateQualityAsync(string profileId, IReadOnlyList<Dictionary<string, object>> records, CancellationToken ct = default);
-    public Task<QualityTrend> GetTrendAsync(string profileId, int periods = 10, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class IntegrationLineageTrackingStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<LineageNode> RegisterNodeAsync(string nodeId, string nodeName, LineageNodeType nodeType, Dictionary<string, object>? metadata = null, CancellationToken ct = default);
-    public Task<LineageEdge> RecordEdgeAsync(string sourceNodeId, string targetNodeId, LineageEdgeType edgeType, Dictionary<string, object>? transformations = null, CancellationToken ct = default);
-    public Task<LineageGraph> GetUpstreamLineageAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
-    public Task<LineageGraph> GetDownstreamLineageAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
-    public Task<ImpactAnalysis> AnalyzeImpactAsync(string nodeId, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class AlertNotificationStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<AlertRule> CreateRuleAsync(string ruleId, string ruleName, AlertCondition condition, AlertAction action, CancellationToken ct = default);
-    public Task<NotificationChannel> RegisterChannelAsync(string channelId, string channelName, ChannelType channelType, Dictionary<string, string> config, CancellationToken ct = default);
-    public Task<Alert> TriggerAlertAsync(string ruleId, Dictionary<string, object> context, CancellationToken ct = default);
-    public Task<Alert> AcknowledgeAlertAsync(string alertId, string acknowledgedBy, CancellationToken ct = default);
-    public Task<List<Alert>> GetActiveAlertsAsync(AlertSeverity? minSeverity = null, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed record PipelineHealth
-{
-}
-    public required string PipelineId { get; init; }
-    public required HealthMonitoringConfig Config { get; init; }
-    public PipelineHealthStatus Status { get; set; }
-    public DateTime RegisteredAt { get; init; }
-    public DateTime? LastCheckedAt { get; set; }
-    public HealthCheck? LastCheck { get; set; }
-    public List<HealthAlert> ActiveAlerts { get; init; };
-}
-```
-```csharp
-public sealed record HealthMonitoringConfig
-{
-}
-    public TimeSpan CheckInterval { get; init; };
-    public double WarningErrorRateThreshold { get; init; };
-    public double CriticalErrorRateThreshold { get; init; };
-    public TimeSpan WarningLatencyThreshold { get; init; };
-    public TimeSpan CriticalLatencyThreshold { get; init; };
-}
-```
-```csharp
-public sealed record HealthMetrics
-{
-}
-    public long RecordsProcessed { get; init; }
-    public long Errors { get; init; }
-    public double ErrorRate;;
-    public TimeSpan Latency { get; init; }
-    public double CpuUtilization { get; init; }
-    public double MemoryUtilization { get; init; }
-}
-```
-```csharp
-public sealed record HealthCheck
-{
-}
-    public required string CheckId { get; init; }
-    public required string PipelineId { get; init; }
-    public required HealthMetrics Metrics { get; init; }
-    public PipelineHealthStatus Status { get; init; }
-    public DateTime Timestamp { get; init; }
-}
-```
-```csharp
-public sealed record HealthAlert
-{
-}
-    public required string AlertId { get; init; }
-    public required string PipelineId { get; init; }
-    public AlertSeverity Severity { get; init; }
-    public required string Message { get; init; }
-    public DateTime TriggeredAt { get; init; }
-}
-```
-```csharp
-public sealed record SlaDefinition
-{
-}
-    public required string SlaId { get; init; }
-    public required string Name { get; init; }
-    public required SlaRequirements Requirements { get; init; }
-    public SlaStatus Status { get; set; }
-    public DateTime CreatedAt { get; init; }
-    public DateTime? LastChecked { get; set; }
-    public bool? LastComplianceResult { get; set; }
-}
-```
-```csharp
-public sealed record SlaRequirements
-{
-}
-    public TimeSpan? MaxDataAge { get; init; }
-    public double? MinCompleteness { get; init; }
-    public double? MinAvailability { get; init; }
-    public TimeSpan? MaxLatency { get; init; }
-}
-```
-```csharp
-public sealed record SlaMetrics
-{
-}
-    public TimeSpan DataAge { get; init; }
-    public double Completeness { get; init; }
-    public double Availability { get; init; }
-    public TimeSpan ProcessingLatency { get; init; }
-}
-```
-```csharp
-public sealed record SlaComplianceResult
-{
-}
-    public required string SlaId { get; init; }
-    public DateTime CheckedAt { get; init; }
-    public bool IsCompliant { get; set; }
-    public required List<string> Violations { get; init; }
-}
-```
-```csharp
-public sealed record SlaViolation
-{
-}
-    public required string ViolationId { get; init; }
-    public required string SlaId { get; init; }
-    public required List<string> Violations { get; init; }
-    public required SlaMetrics Metrics { get; init; }
-    public DateTime OccurredAt { get; init; }
-}
-```
-```csharp
-public sealed record SlaReport
-{
-}
-    public required string SlaId { get; init; }
-    public required string SlaName { get; init; }
-    public DateTime FromDate { get; init; }
-    public DateTime ToDate { get; init; }
-    public int TotalViolations { get; init; }
-    public double ComplianceRate { get; init; }
-    public required List<SlaViolation> Violations { get; init; }
-}
-```
-```csharp
-public sealed record DataQualityProfile
-{
-}
-    public required string ProfileId { get; init; }
-    public required string DatasetName { get; init; }
-    public required List<QualityRule> Rules { get; init; }
-    public DateTime CreatedAt { get; init; }
-    public DateTime? LastEvaluated { get; set; }
-    public double? LastScore { get; set; }
-}
-```
-```csharp
-public sealed record QualityRule
-{
-}
-    public required string RuleId { get; init; }
-    public required string Name { get; init; }
-    public QualityRuleType Type { get; init; }
-    public string? ColumnName { get; init; }
-    public bool AllowNull { get; init; };
-    public double? MinValue { get; init; }
-    public double? MaxValue { get; init; }
-    public string? Pattern { get; init; }
-}
-```
-```csharp
-public sealed record QualityEvaluation
-{
-}
-    public required string EvaluationId { get; init; }
-    public required string ProfileId { get; init; }
-    public int RecordsEvaluated { get; init; }
-    public DateTime EvaluatedAt { get; init; }
-    public double OverallScore { get; set; }
-    public required List<RuleResult> RuleResults { get; init; }
-}
-```
-```csharp
-public sealed record RuleResult
-{
-}
-    public required string RuleId { get; init; }
-    public required string RuleName { get; init; }
-    public double Score { get; init; }
-    public int Violations { get; init; }
-}
-```
-```csharp
-public sealed record QualityScore
-{
-}
-    public required string ProfileId { get; init; }
-    public double Score { get; init; }
-    public DateTime RecordedAt { get; init; }
-}
-```
-```csharp
-public sealed record QualityTrend
-{
-}
-    public required string ProfileId { get; init; }
-    public required List<QualityScore> Scores { get; init; }
-    public TrendDirection TrendDirection { get; init; }
-    public double TrendValue { get; init; }
-}
-```
-```csharp
-public sealed record LineageNode
-{
-}
-    public required string NodeId { get; init; }
-    public required string NodeName { get; init; }
-    public LineageNodeType NodeType { get; init; }
-    public required Dictionary<string, object> Metadata { get; init; }
-    public DateTime RegisteredAt { get; init; }
-}
-```
-```csharp
-public sealed record LineageEdge
-{
-}
-    public required string EdgeId { get; init; }
-    public required string SourceNodeId { get; init; }
-    public required string TargetNodeId { get; init; }
-    public LineageEdgeType EdgeType { get; init; }
-    public required Dictionary<string, object> Transformations { get; init; }
-    public DateTime RecordedAt { get; init; }
-}
-```
-```csharp
-public sealed record LineageGraph
-{
-}
-    public required string RootNodeId { get; init; }
-    public LineageDirection Direction { get; init; }
-    public required List<LineageNode> Nodes { get; init; }
-    public required List<LineageEdge> Edges { get; init; }
-}
-```
-```csharp
-public sealed record ImpactAnalysis
-{
-}
-    public required string SourceNodeId { get; init; }
-    public required List<LineageNode> ImpactedNodes { get; init; }
-    public int TotalImpactedCount { get; init; }
-    public DateTime AnalyzedAt { get; init; }
-}
-```
-```csharp
-public sealed record AlertRule
-{
-}
-    public required string RuleId { get; init; }
-    public required string RuleName { get; init; }
-    public required AlertCondition Condition { get; init; }
-    public required AlertAction Action { get; init; }
-    public bool IsEnabled { get; set; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record AlertCondition
-{
-}
-    public required string Metric { get; init; }
-    public required string Operator { get; init; }
-    public required double Threshold { get; init; }
-    public AlertSeverity Severity { get; init; }
-    public string? MessageTemplate { get; init; }
-}
-```
-```csharp
-public sealed record AlertAction
-{
-}
-    public List<string>? NotifyChannels { get; init; }
-    public TimeSpan? EscalateAfter { get; init; }
-    public List<string>? EscalateTo { get; init; }
-}
-```
-```csharp
-public sealed record NotificationChannel
-{
-}
-    public required string ChannelId { get; init; }
-    public required string ChannelName { get; init; }
-    public ChannelType ChannelType { get; init; }
-    public required Dictionary<string, string> Config { get; init; }
-    public bool IsEnabled { get; set; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record Alert
-{
-}
-    public required string AlertId { get; init; }
-    public required string RuleId { get; init; }
-    public required string RuleName { get; init; }
-    public AlertSeverity Severity { get; init; }
-    public required string Message { get; init; }
-    public required Dictionary<string, object> Context { get; init; }
-    public AlertStatus Status { get; set; }
-    public DateTime TriggeredAt { get; init; }
-    public DateTime? AcknowledgedAt { get; set; }
-    public string? AcknowledgedBy { get; set; }
-    public DateTime? ResolvedAt { get; set; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataIntegration/Strategies/SchemaEvolution/SchemaEvolutionStrategies.cs
-```csharp
-public sealed class ForwardCompatibleSchemaStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<SchemaVersion> RegisterSchemaAsync(string schemaId, string schemaName, IReadOnlyList<FieldDefinition> fields, CancellationToken ct = default);
-    public Task<CompatibilityCheckResult> CheckCompatibilityAsync(string schemaId, IReadOnlyList<FieldDefinition> newFields, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class BackwardCompatibleSchemaStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<SchemaVersion> RegisterSchemaAsync(string schemaId, string schemaName, IReadOnlyList<FieldDefinition> fields, CancellationToken ct = default);
-    public Task<CompatibilityCheckResult> CheckCompatibilityAsync(string schemaId, IReadOnlyList<FieldDefinition> newFields, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class FullCompatibleSchemaStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<SchemaVersion> RegisterSchemaAsync(string schemaId, string schemaName, IReadOnlyList<FieldDefinition> fields, CancellationToken ct = default);
-    public Task<CompatibilityCheckResult> CheckCompatibilityAsync(string schemaId, IReadOnlyList<FieldDefinition> newFields, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class SchemaMigrationStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<SchemaMigration> CreateMigrationAsync(string migrationId, string schemaId, int fromVersion, int toVersion, IReadOnlyList<MigrationStep> upSteps, IReadOnlyList<MigrationStep>? downSteps = null, CancellationToken ct = default);
-    public async Task<MigrationExecution> ExecuteMigrationAsync(string migrationId, MigrationDirection direction = MigrationDirection.Up, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class SchemaRegistryStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<SchemaSubject> CreateSubjectAsync(string subjectName, SchemaCompatibility compatibility = SchemaCompatibility.Backward, CancellationToken ct = default);
-    public Task<RegisteredSchema> RegisterSchemaAsync(string subjectName, string schemaDefinition, SchemaType schemaType = SchemaType.Avro, CancellationToken ct = default);
-    public Task<RegisteredSchema?> GetSchemaAsync(string subjectName, int? version = null, CancellationToken ct = default);
-    public Task<List<int>> GetVersionsAsync(string subjectName, CancellationToken ct = default);
-    public Task<bool> DeleteSchemaAsync(string subjectName, int version, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed record SchemaVersion
-{
-}
-    public required string SchemaId { get; init; }
-    public required string SchemaName { get; init; }
-    public int Version { get; init; }
-    public required List<FieldDefinition> Fields { get; init; }
-    public SchemaCompatibility Compatibility { get; init; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record FieldDefinition
-{
-}
-    public required string Name { get; init; }
-    public required string DataType { get; init; }
-    public bool IsNullable { get; init; };
-    public object? DefaultValue { get; init; }
-    public string? Documentation { get; init; }
-}
-```
-```csharp
-public sealed record CompatibilityCheckResult
-{
-}
-    public bool IsCompatible { get; init; }
-    public required string Message { get; init; }
-    public List<string>? Issues { get; init; }
-}
-```
-```csharp
-public sealed record SchemaMigration
-{
-}
-    public required string MigrationId { get; init; }
-    public required string SchemaId { get; init; }
-    public int FromVersion { get; init; }
-    public int ToVersion { get; init; }
-    public required List<MigrationStep> UpSteps { get; init; }
-    public required List<MigrationStep> DownSteps { get; init; }
-    public MigrationStatus Status { get; set; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record MigrationStep
-{
-}
-    public required string StepId { get; init; }
-    public MigrationStepType Type { get; init; }
-    public string? ColumnName { get; init; }
-    public string? NewColumnName { get; init; }
-    public string? DataType { get; init; }
-    public string? CustomSql { get; init; }
-}
-```
-```csharp
-public sealed record MigrationExecution
-{
-}
-    public required string ExecutionId { get; init; }
-    public required string MigrationId { get; init; }
-    public MigrationDirection Direction { get; init; }
-    public MigrationExecutionStatus Status { get; set; }
-    public DateTime StartedAt { get; init; }
-    public DateTime? CompletedAt { get; set; }
-    public string? ErrorMessage { get; set; }
-    public List<StepResult>? StepResults { get; set; }
-}
-```
-```csharp
-public sealed record StepResult
-{
-}
-    public required string StepId { get; init; }
-    public bool Success { get; init; }
-    public long DurationMs { get; init; }
-    public string? ErrorMessage { get; init; }
-}
-```
-```csharp
-public sealed record SchemaSubject
-{
-}
-    public required string SubjectName { get; init; }
-    public SchemaCompatibility Compatibility { get; init; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record RegisteredSchema
-{
-}
-    public required int SchemaId { get; init; }
-    public required string SubjectName { get; init; }
-    public int Version { get; init; }
-    public required string SchemaDefinition { get; init; }
-    public SchemaType SchemaType { get; init; }
-    public required string Fingerprint { get; init; }
-    public DateTime RegisteredAt { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataIntegration/Strategies/Transformation/DataTransformationStrategies.cs
-```csharp
-public sealed class TypeConversionStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<TypeMapping> RegisterMappingAsync(string mappingId, string sourceType, string targetType, ConversionRule rule, CancellationToken ct = default);
-    public Task<ConversionResult> ConvertAsync(object? value, string sourceType, string targetType, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class AggregationStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<AggregationResult> AggregateAsync(IReadOnlyList<Dictionary<string, object>> records, IReadOnlyList<string> groupByColumns, IReadOnlyList<AggregationFunction> aggregations, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class DataCleansingStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<CleansingRule> RegisterRuleAsync(string ruleId, string targetColumn, CleansingOperation operation, Dictionary<string, object>? parameters = null, CancellationToken ct = default);
-    public Task<CleansingResult> CleanseAsync(IReadOnlyList<Dictionary<string, object>> records, IReadOnlyList<string>? ruleIds = null, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class DataEnrichmentStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<EnrichmentSource> RegisterSourceAsync(string sourceId, EnrichmentSourceType sourceType, string connectionString, EnrichmentConfig? config = null, CancellationToken ct = default);
-    public async Task<EnrichmentResult> EnrichAsync(IReadOnlyList<Dictionary<string, object>> records, string sourceId, string keyColumn, IReadOnlyList<string> enrichColumns, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class DataNormalizationStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<NormalizationRule> RegisterRuleAsync(string ruleId, string targetColumn, NormalizationType normType, Dictionary<string, object>? parameters = null, CancellationToken ct = default);
-    public Task<NormalizationResult> NormalizeAsync(IReadOnlyList<Dictionary<string, object>> records, IReadOnlyList<string>? ruleIds = null, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class FlattenNestStrategy : DataIntegrationStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override IntegrationCategory Category;;
-    public override DataIntegrationCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<FlattenResult> FlattenAsync(IReadOnlyList<Dictionary<string, object>> records, FlattenConfig? config = null, CancellationToken ct = default);
-    public Task<NestResult> NestAsync(IReadOnlyList<Dictionary<string, object>> records, NestConfig? config = null, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed record TypeMapping
-{
-}
-    public required string MappingId { get; init; }
-    public required string SourceType { get; init; }
-    public required string TargetType { get; init; }
-    public ConversionRule Rule { get; init; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record ConversionResult
-{
-}
-    public object? OriginalValue { get; init; }
-    public object? ConvertedValue { get; set; }
-    public required string SourceType { get; init; }
-    public required string TargetType { get; init; }
-    public bool Success { get; set; }
-    public string? ErrorMessage { get; set; }
-}
-```
-```csharp
-public sealed record AggregationFunction
-{
-}
-    public required string InputColumn { get; init; }
-    public required string OutputColumn { get; init; }
-    public required AggFunction Function { get; init; }
-}
-```
-```csharp
-public sealed record AggregationResult
-{
-}
-    public int InputRecords { get; init; }
-    public int OutputRecords { get; init; }
-    public required List<Dictionary<string, object>> AggregatedData { get; init; }
-    public AggregationStatus Status { get; init; }
-}
-```
-```csharp
-public sealed record CleansingRule
-{
-}
-    public required string RuleId { get; init; }
-    public required string TargetColumn { get; init; }
-    public CleansingOperation Operation { get; init; }
-    public required Dictionary<string, object> Parameters { get; init; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record CleansingResult
-{
-}
-    public int InputRecords { get; init; }
-    public int OutputRecords { get; init; }
-    public int ModificationsApplied { get; init; }
-    public required List<Dictionary<string, object>> CleansedData { get; init; }
-    public CleansingStatus Status { get; init; }
-}
-```
-```csharp
-public sealed record EnrichmentSource
-{
-}
-    public required string SourceId { get; init; }
-    public EnrichmentSourceType SourceType { get; init; }
-    public required string ConnectionString { get; init; }
-    public required EnrichmentConfig Config { get; init; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record EnrichmentConfig
-{
-}
-    public bool EnableCache { get; init; };
-    public TimeSpan CacheTtl { get; init; };
-    public int MaxConcurrentLookups { get; init; };
-}
-```
-```csharp
-public sealed record EnrichmentResult
-{
-}
-    public int InputRecords { get; init; }
-    public int OutputRecords { get; init; }
-    public int EnrichmentsApplied { get; init; }
-    public required List<Dictionary<string, object>> EnrichedData { get; init; }
-    public EnrichmentStatus Status { get; init; }
-}
-```
-```csharp
-public sealed record NormalizationRule
-{
-}
-    public required string RuleId { get; init; }
-    public required string TargetColumn { get; init; }
-    public NormalizationType NormalizationType { get; init; }
-    public required Dictionary<string, object> Parameters { get; init; }
-    public DateTime CreatedAt { get; init; }
-}
-```
-```csharp
-public sealed record NormalizationResult
-{
-}
-    public int InputRecords { get; init; }
-    public int OutputRecords { get; init; }
-    public int ModificationsApplied { get; init; }
-    public required List<Dictionary<string, object>> NormalizedData { get; init; }
-    public NormalizationStatus Status { get; init; }
-}
-```
-```csharp
-public sealed record FlattenConfig
-{
-}
-    public string Separator { get; init; };
-    public int MaxDepth { get; init; };
-}
-```
-```csharp
-public sealed record FlattenResult
-{
-}
-    public int InputRecords { get; init; }
-    public int OutputRecords { get; init; }
-    public required List<Dictionary<string, object>> FlattenedData { get; init; }
-    public FlattenStatus Status { get; init; }
-}
-```
-```csharp
-public sealed record NestConfig
-{
-}
-    public string Separator { get; init; };
-}
-```
-```csharp
-public sealed record NestResult
-{
-}
-    public int InputRecords { get; init; }
-    public int OutputRecords { get; init; }
-    public required List<Dictionary<string, object>> NestedData { get; init; }
-    public NestStatus Status { get; init; }
 }
 ```

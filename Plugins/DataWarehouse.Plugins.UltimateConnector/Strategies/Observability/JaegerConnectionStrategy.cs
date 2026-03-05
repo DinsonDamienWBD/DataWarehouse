@@ -59,7 +59,7 @@ public sealed class JaegerConnectionStrategy : ObservabilityConnectionStrategyBa
         var httpClient = handle.GetConnection<HttpClient>();
         var json = JsonSerializer.Serialize(new { batch = traces });
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await httpClient.PostAsync("/api/traces", content, ct);
+        using var response = await httpClient.PostAsync("/api/traces", content, ct);
         response.EnsureSuccessStatusCode();
     }
 }

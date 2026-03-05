@@ -300,7 +300,8 @@ public sealed class InMemoryFederatedDataSourceRegistry : IFederatedDataSourceRe
         }
 
         // Search all sources for a matching table (unqualified name)
-        foreach (var source in _sources.Values)
+        // Snapshot Values to avoid enumeration-during-mutation (finding P2-177)
+        foreach (var source in _sources.Values.ToList())
         {
             var info = source.GetInfo();
             if (info.AvailableTables.Any(t =>

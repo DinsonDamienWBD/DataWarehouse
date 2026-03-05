@@ -26,7 +26,9 @@ public sealed class SystemResourceStrategy : ObservabilityStrategyBase
     private Timer? _collectionTimer;
     private int _collectionIntervalMs = 5000;
     private volatile bool _isCollecting;
-    private readonly List<MetricValue> _collectedMetrics = new();
+    private readonly object _collectionStartLock = new(); // guards StartCollection/StopCollection CAS
+    // P2-4676: Use Queue for O(1) dequeue from front instead of List.RemoveRange (O(n)).
+    private readonly Queue<MetricValue> _collectedMetrics = new();
     private readonly object _metricsLock = new();
     private DateTimeOffset _lastCpuTime = DateTimeOffset.UtcNow;
     private TimeSpan _lastTotalProcessorTime = TimeSpan.Zero;
@@ -73,23 +75,30 @@ public sealed class SystemResourceStrategy : ObservabilityStrategyBase
     }
 
     /// <summary>
-    /// Starts automatic resource collection.
+    /// Starts automatic resource collection. Idempotent — safe to call from multiple threads.
     /// </summary>
     public void StartCollection()
     {
-        if (_isCollecting) return;
-        _isCollecting = true;
-        _collectionTimer = new Timer(CollectResourceMetrics, null, 0, _collectionIntervalMs);
+        lock (_collectionStartLock)
+        {
+            if (_isCollecting) return;
+            _isCollecting = true;
+            _collectionTimer = new Timer(CollectResourceMetrics, null, 0, _collectionIntervalMs);
+        }
     }
 
     /// <summary>
-    /// Stops automatic resource collection.
+    /// Stops automatic resource collection. Idempotent.
     /// </summary>
     public void StopCollection()
     {
-        _isCollecting = false;
-        _collectionTimer?.Dispose();
-        _collectionTimer = null;
+        lock (_collectionStartLock)
+        {
+            if (!_isCollecting) return;
+            _isCollecting = false;
+            _collectionTimer?.Dispose();
+            _collectionTimer = null;
+        }
     }
 
     /// <summary>
@@ -261,18 +270,19 @@ public sealed class SystemResourceStrategy : ObservabilityStrategyBase
             var metrics = CollectCurrentMetrics();
             lock (_metricsLock)
             {
-                _collectedMetrics.AddRange(metrics);
+                foreach (var m in metrics)
+                    _collectedMetrics.Enqueue(m);
 
-                // Keep only last 1000 metrics to prevent unbounded growth
-                if (_collectedMetrics.Count > 1000)
-                {
-                    _collectedMetrics.RemoveRange(0, _collectedMetrics.Count - 1000);
-                }
+                // P2-4676: Dequeue oldest entries to cap at 1000 — O(1) per removal.
+                while (_collectedMetrics.Count > 1000)
+                    _collectedMetrics.Dequeue();
             }
         }
         catch
         {
+
             // Ignore collection errors
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 
@@ -290,7 +300,8 @@ public sealed class SystemResourceStrategy : ObservabilityStrategyBase
         // Store externally provided metrics alongside collected ones
         lock (_metricsLock)
         {
-            _collectedMetrics.AddRange(metrics);
+            foreach (var m in metrics)
+                _collectedMetrics.Enqueue(m);
         }
         return Task.CompletedTask;
     }

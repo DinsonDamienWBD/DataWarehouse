@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Linq;
 using System.Reflection;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Hierarchy;
@@ -360,6 +361,8 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
                 // Audit cost-aware route selection
                 _auditService?.LogEvent(new TransitAuditEntry
                 {
+                    AuditId = Guid.NewGuid().ToString("N"),
+                    Timestamp = DateTime.UtcNow,
                     TransferId = request.TransferId,
                     EventType = TransitAuditEventType.CostRouteSelected,
                     StrategyId = selectedRoute.StrategyId,
@@ -378,9 +381,11 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
                 if (costSelectedStrategy != null)
                     return costSelectedStrategy;
             }
-            catch (InvalidOperationException)
+            catch (InvalidOperationException ex)
             {
+
                 // No routes within cost limit; fall through to standard scoring
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -403,6 +408,8 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
         {
             _auditService?.LogEvent(new TransitAuditEntry
             {
+                AuditId = Guid.NewGuid().ToString("N"),
+                Timestamp = DateTime.UtcNow,
                 TransferId = request.TransferId,
                 EventType = TransitAuditEventType.StrategySelected,
                 StrategyId = bestStrategy.StrategyId,
@@ -437,6 +444,8 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
         // Audit: transfer started
         _auditService?.LogEvent(new TransitAuditEntry
         {
+            AuditId = Guid.NewGuid().ToString("N"),
+            Timestamp = DateTime.UtcNow,
             TransferId = request.TransferId,
             EventType = TransitAuditEventType.TransferStarted,
             StrategyId = strategy.StrategyId,
@@ -479,6 +488,8 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
 
                 _auditService?.LogEvent(new TransitAuditEntry
                 {
+                    AuditId = Guid.NewGuid().ToString("N"),
+                    Timestamp = DateTime.UtcNow,
                     TransferId = request.TransferId,
                     EventType = TransitAuditEventType.QoSEnforced,
                     StrategyId = strategy.StrategyId,
@@ -502,6 +513,8 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
 
                     _auditService?.LogEvent(new TransitAuditEntry
                     {
+                        AuditId = Guid.NewGuid().ToString("N"),
+                        Timestamp = DateTime.UtcNow,
                         TransferId = request.TransferId,
                         EventType = TransitAuditEventType.LayerApplied,
                         StrategyId = strategy.StrategyId,
@@ -519,6 +532,8 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
 
                     _auditService?.LogEvent(new TransitAuditEntry
                     {
+                        AuditId = Guid.NewGuid().ToString("N"),
+                        Timestamp = DateTime.UtcNow,
                         TransferId = request.TransferId,
                         EventType = TransitAuditEventType.LayerApplied,
                         StrategyId = strategy.StrategyId,
@@ -539,6 +554,8 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
                 // Audit: transfer completed
                 _auditService?.LogEvent(new TransitAuditEntry
                 {
+                    AuditId = Guid.NewGuid().ToString("N"),
+                    Timestamp = DateTime.UtcNow,
                     TransferId = request.TransferId,
                     EventType = TransitAuditEventType.TransferCompleted,
                     StrategyId = strategy.StrategyId,
@@ -563,6 +580,8 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
                 // Audit: transfer failed
                 _auditService?.LogEvent(new TransitAuditEntry
                 {
+                    AuditId = Guid.NewGuid().ToString("N"),
+                    Timestamp = DateTime.UtcNow,
                     TransferId = request.TransferId,
                     EventType = TransitAuditEventType.TransferFailed,
                     StrategyId = strategy.StrategyId,
@@ -588,6 +607,8 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
         {
             _auditService?.LogEvent(new TransitAuditEntry
             {
+                AuditId = Guid.NewGuid().ToString("N"),
+                Timestamp = DateTime.UtcNow,
                 TransferId = request.TransferId,
                 EventType = TransitAuditEventType.TransferCancelled,
                 StrategyId = strategy.StrategyId,
@@ -617,6 +638,8 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
         {
             _auditService?.LogEvent(new TransitAuditEntry
             {
+                AuditId = Guid.NewGuid().ToString("N"),
+                Timestamp = DateTime.UtcNow,
                 TransferId = request.TransferId,
                 EventType = TransitAuditEventType.TransferFailed,
                 StrategyId = strategy.StrategyId,
@@ -759,7 +782,9 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
         }
         catch
         {
+
             // Message bus publish failures should not fail the transfer
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 
@@ -786,10 +811,52 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
 
     #region Hierarchy DataTransitPluginBase Abstract Methods
     /// <inheritdoc/>
-    public override Task<Dictionary<string, object>> TransferAsync(string key, Dictionary<string, object> target, CancellationToken ct = default)
+    public override async Task<Dictionary<string, object>> TransferAsync(string key, Dictionary<string, object> target, CancellationToken ct = default)
     {
-        var result = new Dictionary<string, object> { ["key"] = key, ["status"] = "delegated-to-strategy", ["target"] = target };
-        return Task.FromResult(result);
+        // Cat 12 (finding 2685): actually delegate to the typed TransferAsync strategy rather than returning a placeholder.
+        var sourceUriStr = target.TryGetValue("sourceUri", out var src) ? src?.ToString() : null;
+        var destinationUriStr = target.TryGetValue("destinationUri", out var dst) ? dst?.ToString() : null;
+
+        Uri sourceUri;
+        Uri destinationUri;
+        try
+        {
+            sourceUri = new Uri(sourceUriStr ?? $"transfer://{key}");
+            destinationUri = new Uri(destinationUriStr ?? $"transfer://{key}/dest");
+        }
+        catch (UriFormatException ex)
+        {
+            return new Dictionary<string, object>
+            {
+                ["key"] = key,
+                ["status"] = "failed",
+                ["error"] = $"Invalid URI in target dictionary: {ex.Message}"
+            };
+        }
+
+        var metadata = target
+            .Where(kvp => kvp.Value is string)
+            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value?.ToString() ?? string.Empty);
+
+        var request = new TransitRequest
+        {
+            TransferId = key,
+            Source = new TransitEndpoint { Uri = sourceUri },
+            Destination = new TransitEndpoint { Uri = destinationUri },
+            Metadata = metadata
+        };
+
+        var transitResult = await TransferAsync(request, null, ct).ConfigureAwait(false);
+
+        return new Dictionary<string, object>
+        {
+            ["key"] = key,
+            ["transferId"] = transitResult.TransferId,
+            ["status"] = transitResult.Success ? "completed" : "failed",
+            ["bytesTransferred"] = transitResult.BytesTransferred,
+            ["strategyId"] = transitResult.StrategyUsed ?? string.Empty,
+            ["error"] = transitResult.ErrorMessage ?? string.Empty
+        };
     }
     /// <inheritdoc/>
     public override Task<Dictionary<string, object>> GetTransferStatusAsync(string transferId, CancellationToken ct = default)

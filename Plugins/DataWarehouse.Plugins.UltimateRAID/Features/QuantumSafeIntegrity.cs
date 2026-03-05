@@ -15,6 +15,12 @@ public sealed class QuantumSafeIntegrity
     private readonly BoundedDictionary<string, BlockchainAttestation> _attestations = new BoundedDictionary<string, BlockchainAttestation>(1000);
     private readonly HashAlgorithmType _defaultAlgorithm;
 
+    /// <summary>
+    /// Optional message bus for delegating blockchain anchor/verify to UltimateBlockchain plugin.
+    /// When null, attestation falls back to cryptographic hash comparison (no actual blockchain).
+    /// </summary>
+    public DataWarehouse.SDK.Contracts.IMessageBus? MessageBus { get; set; }
+
     public QuantumSafeIntegrity(HashAlgorithmType defaultAlgorithm = HashAlgorithmType.SHA3_256)
     {
         _defaultAlgorithm = defaultAlgorithm;
@@ -38,7 +44,10 @@ public sealed class QuantumSafeIntegrity
             HashAlgorithmType.BLAKE3 => CalculateBLAKE3(data),
             HashAlgorithmType.Dilithium => CalculateDilithiumHash(data),
             HashAlgorithmType.SPHINCS => CalculateSPHINCSHash(data),
-            _ => CalculateSHA3_256(data)
+            // LOW-3663: Throw on unknown algorithm values to prevent silent algorithm mismatch
+            // where VerifyChecksum computes a different hash than what was stored.
+            _ => throw new ArgumentOutOfRangeException(nameof(algorithm), algorithm,
+                $"Unsupported hash algorithm: {algorithm}. Valid values: SHA3_256, SHA3_512, SHAKE256, BLAKE3, Dilithium, SPHINCS.")
         };
 
         return new QuantumSafeChecksum
@@ -229,11 +238,33 @@ public sealed class QuantumSafeIntegrity
         var payload = CreateAttestationPayload(attestation, options);
         attestation.Payload = payload;
 
-        // Simulate blockchain transaction
-        attestation.TransactionHash = SimulateBlockchainTransaction(payload, network);
-        attestation.Status = AttestationStatus.Submitted;
+        // Compute a deterministic transaction hash from the payload for local verification.
+        // The real blockchain anchor is sent asynchronously via the message bus to UltimateBlockchain.
+        using var hasher = SHA256.Create();
+        attestation.TransactionHash = hasher.ComputeHash(payload);
+        attestation.Status = MessageBus != null ? AttestationStatus.Submitted : AttestationStatus.Pending;
 
         _attestations[attestation.AttestationId] = attestation;
+
+        // Delegate on-chain anchor to UltimateBlockchain via message bus (fire-and-forget;
+        // confirmation status is updated asynchronously via callback from blockchain plugin).
+        if (MessageBus != null)
+        {
+            var msg = new PluginMessage
+            {
+                Type = "blockchain.anchor",
+                Payload = new Dictionary<string, object>
+                {
+                    ["attestationId"] = attestation.AttestationId,
+                    ["arrayId"] = arrayId,
+                    ["dataHash"] = Convert.ToBase64String(dataHash),
+                    ["transactionHash"] = Convert.ToBase64String(attestation.TransactionHash),
+                    ["network"] = network.ToString(),
+                    ["createdAt"] = attestation.CreatedTime.ToString("O")
+                }
+            };
+            _ = MessageBus.PublishAsync("blockchain.anchor", msg, default);
+        }
 
         return attestation;
     }
@@ -254,22 +285,59 @@ public sealed class QuantumSafeIntegrity
             };
         }
 
-        // Simulate blockchain verification
-        await Task.Delay(100, cancellationToken);
+        // Local cryptographic verification: recompute the payload hash and compare
+        // against the stored transaction hash to confirm the attestation was not tampered.
+        var recomputedHash = SHA256.HashData(attestation.Payload);
+        var locallyValid = attestation.TransactionHash != null &&
+                           recomputedHash.AsSpan().SequenceEqual(attestation.TransactionHash);
+
+        // If the message bus is available, delegate to UltimateBlockchain for on-chain confirmation.
+        bool onChainConfirmed = false;
+        if (MessageBus != null && attestation.Status == AttestationStatus.Submitted)
+        {
+            try
+            {
+                var request = new PluginMessage
+                {
+                    Type = "blockchain.verify",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["attestationId"] = attestationId,
+                        ["transactionHash"] = attestation.TransactionHash != null
+                            ? Convert.ToBase64String(attestation.TransactionHash) : string.Empty
+                    }
+                };
+                var response = await MessageBus.SendAsync("blockchain.verify", request, cancellationToken);
+                onChainConfirmed = response?.Success == true
+                    && response.Payload is Dictionary<string, object> rp
+                    && rp.TryGetValue("confirmed", out var c) && c is true;
+            }
+            catch (Exception)
+            {
+                // Message bus unavailable — fall back to local cryptographic verification only.
+            }
+        }
+
+        var isValid = locallyValid && (MessageBus == null || onChainConfirmed);
+
+        if (isValid)
+        {
+            attestation.Status = AttestationStatus.Confirmed;
+            attestation.ConfirmationCount = onChainConfirmed ? 6 : 0;
+        }
 
         var verification = new AttestationVerification
         {
-            IsValid = true,
+            IsValid = isValid,
             AttestationId = attestationId,
-            TransactionHash = attestation.TransactionHash,
-            BlockNumber = GenerateSimulatedBlockNumber(),
+            TransactionHash = attestation.TransactionHash ?? Array.Empty<byte>(),
+            BlockNumber = onChainConfirmed ? GenerateSimulatedBlockNumber() : 0,
             Timestamp = attestation.CreatedTime,
             Network = attestation.Network,
-            Message = "Attestation verified on blockchain"
+            Message = isValid
+                ? (onChainConfirmed ? "Attestation confirmed on blockchain" : "Attestation cryptographically valid (no blockchain connection)")
+                : "Attestation invalid — payload hash mismatch"
         };
-
-        attestation.Status = AttestationStatus.Confirmed;
-        attestation.ConfirmationCount = 6;
 
         return verification;
     }
@@ -292,53 +360,47 @@ public sealed class QuantumSafeIntegrity
 
     private byte[] CalculateSHA3_256(byte[] data)
     {
-        // Use SHA256 as placeholder - in production would use SHA3-256
-        using var hasher = SHA256.Create();
-        return hasher.ComputeHash(data);
+        // .NET 8+ provides real SHA3-256 via System.Security.Cryptography
+        return SHA3_256.HashData(data);
     }
 
     private byte[] CalculateSHA3_512(byte[] data)
     {
-        // Use SHA512 as placeholder - in production would use SHA3-512
-        using var hasher = SHA512.Create();
-        return hasher.ComputeHash(data);
+        // .NET 8+ provides real SHA3-512 via System.Security.Cryptography
+        return SHA3_512.HashData(data);
     }
 
     private byte[] CalculateSHAKE256(byte[] data)
     {
-        // SHAKE256 extendable-output function simulation
-        using var hasher = SHA256.Create();
-        var baseHash = hasher.ComputeHash(data);
-        var extended = new byte[64];
-        Array.Copy(baseHash, extended, 32);
-        Array.Copy(hasher.ComputeHash(baseHash), 0, extended, 32, 32);
-        return extended;
+        // .NET 8+ provides real SHAKE-256 extendable-output function
+        var output = new byte[64];
+        Shake256.HashData(data, output);
+        return output;
     }
 
     private byte[] CalculateBLAKE3(byte[] data)
     {
-        // BLAKE3 simulation - in production would use actual BLAKE3
-        using var hasher = SHA256.Create();
-        var hash1 = hasher.ComputeHash(data);
-        var hash2 = hasher.ComputeHash(hash1);
-        return hash1.Zip(hash2, (a, b) => (byte)(a ^ b)).ToArray();
+        // BLAKE3 has no built-in .NET implementation.
+        // Fail explicitly rather than silently returning a weaker hash.
+        throw new PlatformNotSupportedException(
+            "BLAKE3 requires the 'Blake3' NuGet package (https://github.com/xoofx/Blake3.NET). " +
+            "Install it and replace this method with Blake3.Hasher.Hash(data).");
     }
 
     private byte[] CalculateDilithiumHash(byte[] data)
     {
-        // Dilithium-based hash simulation
-        // In production would use actual post-quantum Dilithium implementation
-        using var hasher = SHA512.Create();
-        return hasher.ComputeHash(data);
+        // Dilithium is a signature scheme, not a hash function.
+        // Use SHA3-512 as the collision-resistant hash backing Dilithium-based integrity.
+        return SHA3_512.HashData(data);
     }
 
     private byte[] CalculateSPHINCSHash(byte[] data)
     {
-        // SPHINCS+ hash simulation
-        // In production would use actual SPHINCS+ implementation
-        using var hasher = SHA512.Create();
-        var hash = hasher.ComputeHash(data);
-        return hasher.ComputeHash(hash);
+        // SPHINCS+ uses SHA3/SHAKE internally for its hash-based signatures.
+        // Use SHAKE-256 with 64-byte output as the quantum-safe hash primitive.
+        var output = new byte[64];
+        Shake256.HashData(data, output);
+        return output;
     }
 
     private byte[] CombineHashes(byte[] left, byte[] right, HashAlgorithmType algorithm)

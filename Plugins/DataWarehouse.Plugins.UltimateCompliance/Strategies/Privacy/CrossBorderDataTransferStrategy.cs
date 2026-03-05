@@ -420,7 +420,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("cross_border_data_transfer.check");
+            IncrementCounter("cross_border_data_transfer.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -479,9 +479,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
                 recommendations.Add($"{highRiskTransfers} transfer(s) to high-risk countries in last 30 days. Review supplementary measures.");
             }
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -738,14 +739,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("cross_border_data_transfer.initialized");
+            IncrementCounter("cross_border_data_transfer.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("cross_border_data_transfer.shutdown");
+            IncrementCounter("cross_border_data_transfer.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

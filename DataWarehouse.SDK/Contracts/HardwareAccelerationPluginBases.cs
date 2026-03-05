@@ -28,11 +28,11 @@ namespace DataWarehouse.SDK.Contracts
         public override Task<Dictionary<string, object>> ExecuteWorkloadAsync(Dictionary<string, object> workload, CancellationToken ct = default)
             => Task.FromResult(new Dictionary<string, object> { ["status"] = "delegated-to-hardware-accelerator" });
 
-        private bool _initialized;
+        private volatile bool _initialized;
         private long _operationsCompleted;
         private long _totalBytesProcessed;
-        private DateTime _startTime;
-        private TimeSpan _totalProcessingTime;
+        private long _startTimeTicks;
+        private long _totalProcessingTimeTicks;
 
         #region Intelligence Socket
 
@@ -143,13 +143,22 @@ namespace DataWarehouse.SDK.Contracts
         /// Only initializes if available and not already initialized.
         /// </summary>
         /// <returns>A task representing the initialization operation.</returns>
+        private volatile bool _initStarted;
         public async Task InitializeAsync()
         {
-            if (!_initialized && IsAvailable)
+            if (_initialized || !IsAvailable) return;
+            if (_initStarted) return;
+            _initStarted = true;
+            try
             {
                 await InitializeHardwareAsync();
+                Interlocked.Exchange(ref _startTimeTicks, DateTime.UtcNow.Ticks);
                 _initialized = true;
-                _startTime = DateTime.UtcNow;
+            }
+            catch
+            {
+                _initStarted = false;
+                throw;
             }
         }
 
@@ -174,7 +183,7 @@ namespace DataWarehouse.SDK.Contracts
             // Update statistics
             Interlocked.Increment(ref _operationsCompleted);
             Interlocked.Add(ref _totalBytesProcessed, data.Length);
-            _totalProcessingTime += duration;
+            Interlocked.Add(ref _totalProcessingTimeTicks, duration.Ticks);
 
             return result;
         }
@@ -225,10 +234,12 @@ namespace DataWarehouse.SDK.Contracts
         {
             var operations = Interlocked.Read(ref _operationsCompleted);
             var totalBytes = Interlocked.Read(ref _totalBytesProcessed);
-            var uptime = _initialized ? DateTime.UtcNow - _startTime : TimeSpan.Zero;
+            var startTicks = Interlocked.Read(ref _startTimeTicks);
+            var uptime = _initialized && startTicks > 0 ? DateTime.UtcNow - new DateTime(startTicks, DateTimeKind.Utc) : TimeSpan.Zero;
             var throughputMBps = uptime.TotalSeconds > 0 ? (totalBytes / (1024.0 * 1024.0)) / uptime.TotalSeconds : 0;
-            var utilization = _totalProcessingTime.TotalSeconds > 0 && uptime.TotalSeconds > 0
-                ? _totalProcessingTime.TotalSeconds / uptime.TotalSeconds
+            var totalProcessingTime = TimeSpan.FromTicks(Interlocked.Read(ref _totalProcessingTimeTicks));
+            var utilization = totalProcessingTime.TotalSeconds > 0 && uptime.TotalSeconds > 0
+                ? totalProcessingTime.TotalSeconds / uptime.TotalSeconds
                 : 0.0;
 
             return Task.FromResult(new AcceleratorStatistics(
@@ -236,7 +247,7 @@ namespace DataWarehouse.SDK.Contracts
                 operations,
                 throughputMBps,
                 Math.Min(1.0, utilization),
-                _totalProcessingTime
+                totalProcessingTime
             ));
         }
 
@@ -332,7 +343,13 @@ namespace DataWarehouse.SDK.Contracts
         /// <param name="data">Data to encrypt.</param>
         /// <param name="key">Encryption key.</param>
         /// <returns>Encrypted data.</returns>
-        public Task<byte[]> EncryptQatAsync(byte[] data, byte[] key) => QatEncryptAsync(data, key);
+        public Task<byte[]> EncryptQatAsync(byte[] data, byte[] key)
+        {
+            ArgumentNullException.ThrowIfNull(data);
+            ArgumentNullException.ThrowIfNull(key);
+            if (key.Length == 0) throw new ArgumentException("Encryption key must not be empty.", nameof(key));
+            return QatEncryptAsync(data, key);
+        }
 
         /// <summary>
         /// Decrypts data using Intel QAT hardware.
@@ -340,7 +357,13 @@ namespace DataWarehouse.SDK.Contracts
         /// <param name="data">Encrypted data.</param>
         /// <param name="key">Decryption key.</param>
         /// <returns>Decrypted data.</returns>
-        public Task<byte[]> DecryptQatAsync(byte[] data, byte[] key) => QatDecryptAsync(data, key);
+        public Task<byte[]> DecryptQatAsync(byte[] data, byte[] key)
+        {
+            ArgumentNullException.ThrowIfNull(data);
+            ArgumentNullException.ThrowIfNull(key);
+            if (key.Length == 0) throw new ArgumentException("Decryption key must not be empty.", nameof(key));
+            return QatDecryptAsync(data, key);
+        }
 
         /// <summary>
         /// Implements QAT compression.
@@ -411,13 +434,16 @@ namespace DataWarehouse.SDK.Contracts
     public abstract class GpuAcceleratorPluginBase : HardwareAcceleratorPluginBase, IGpuAccelerator
     {
         /// <summary>
-        /// Gets the accelerator type. Returns NvidiaGpu or AmdGpu based on runtime.
+        /// Gets the accelerator type. Returns NvidiaGpu, AmdGpu, AppleGpu, VulkanGpu, or WebGpu based on runtime.
         /// </summary>
         public override AcceleratorType Type => Runtime switch
         {
             GpuRuntime.Cuda => AcceleratorType.NvidiaGpu,
             GpuRuntime.RoCm => AcceleratorType.AmdGpu,
-            _ => AcceleratorType.NvidiaGpu | AcceleratorType.AmdGpu
+            GpuRuntime.Metal => AcceleratorType.AppleGpu,
+            GpuRuntime.Vulkan => AcceleratorType.VulkanGpu,
+            GpuRuntime.WebGpu => AcceleratorType.WebGpu,
+            _ => AcceleratorType.None  // finding P2-370: do not return NvidiaGpu|AmdGpu for unknown runtimes
         };
 
         /// <summary>
@@ -804,8 +830,14 @@ namespace DataWarehouse.SDK.Contracts
 
         /// <summary>
         /// Gets the currently connected slot ID, or null if not connected.
+        /// Reads are done via Volatile.Read to avoid torn reads on multi-core platforms.
         /// </summary>
-        protected string? ConnectedSlot { get; private set; }
+        private string? _connectedSlot;
+        protected string? ConnectedSlot
+        {
+            get => Volatile.Read(ref _connectedSlot);
+            private set => Volatile.Write(ref _connectedSlot, value);
+        }
 
         /// <summary>
         /// Gets whether the HSM is currently connected.
@@ -897,6 +929,10 @@ namespace DataWarehouse.SDK.Contracts
         /// <returns>A task representing the connection operation.</returns>
         public async Task ConnectAsync(string slotId, string pin)
         {
+            if (string.IsNullOrEmpty(slotId))
+                throw new ArgumentException("HSM slot identifier must not be null or empty.", nameof(slotId));
+            if (string.IsNullOrEmpty(pin))
+                throw new ArgumentException("HSM PIN must not be null or empty.", nameof(pin));
             await OpenSessionAsync(slotId, pin);
             ConnectedSlot = slotId;
         }

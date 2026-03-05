@@ -779,9 +779,10 @@ public sealed class SemanticClusterIndex : ContextIndexBase
 
     private static float[] GeneratePlaceholderEmbedding(byte[] content)
     {
-        // Placeholder - in production, would use actual embedding model
-        var random = new Random(BitConverter.ToInt32(content.Take(4).ToArray(), 0));
-        return Enumerable.Range(0, 384).Select(_ => (float)random.NextDouble()).ToArray();
+        throw new InvalidOperationException(
+            "Pre-computed embedding is required. Content must be embedded using a configured " +
+            "embedding provider (e.g., ONNXEmbeddingProvider) before indexing into SemanticClusterIndex. " +
+            "Random placeholder embeddings are not suitable for production use.");
     }
 
     private ContextNode ClusterToNode(ClusterNode cluster)

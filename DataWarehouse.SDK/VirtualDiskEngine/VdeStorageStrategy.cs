@@ -60,7 +60,7 @@ public sealed class VdeStorageStrategy : Contracts.Storage.StorageStrategyBase
         // For now, use default options with a container path in the working directory
         var options = new VdeOptions
         {
-            ContainerPath = GetConfigValue<string>("ContainerPath") ?? "datawarehouse.dwvd",
+            ContainerPath = EnsureAbsoluteContainerPath(GetConfigValue<string>("ContainerPath") ?? "datawarehouse.dwvd"),
             BlockSize = GetConfigValue<int>("BlockSize", 4096),
             TotalBlocks = GetConfigValue<long>("TotalBlocks", 1_048_576),
             WalSizePercent = GetConfigValue<int>("WalSizePercent", 1),
@@ -170,6 +170,21 @@ public sealed class VdeStorageStrategy : Contracts.Storage.StorageStrategyBase
 
         var health = await _engine.GetHealthReportAsync(ct);
         return health.FreeBlocks * _blockSize;
+    }
+
+    /// <summary>
+    /// Ensures the container path is absolute. Relative paths resolve to the current working
+    /// directory which is environment-dependent and leads to data in unexpected locations.
+    /// </summary>
+    private static string EnsureAbsoluteContainerPath(string path)
+    {
+        if (!System.IO.Path.IsPathRooted(path))
+        {
+            // Resolve relative to the process's base directory, not CWD, for predictability
+            string baseDir = AppContext.BaseDirectory;
+            path = System.IO.Path.GetFullPath(System.IO.Path.Combine(baseDir, path));
+        }
+        return path;
     }
 
     /// <summary>

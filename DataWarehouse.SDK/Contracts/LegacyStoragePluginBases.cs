@@ -63,12 +63,7 @@ namespace DataWarehouse.SDK.Contracts
                 using var stream = await LoadAsync(uri);
                 if (stream == null) return false;
 
-                if (stream.CanRead)
-                {
-                    var buffer = new byte[1];
-                    var bytesRead = await stream.ReadAsync(buffer, 0, 1);
-                    return true;
-                }
+                // Stream obtained successfully — file exists regardless of readability
                 return true;
             }
             catch (FileNotFoundException)
@@ -81,7 +76,9 @@ namespace DataWarehouse.SDK.Contracts
             }
             catch (UnauthorizedAccessException)
             {
-                return true;
+                // Access denied does not reliably indicate existence across all providers.
+                // Fail-closed: report as not found rather than guessing.
+                return false;
             }
             catch
             {
@@ -198,7 +195,7 @@ namespace DataWarehouse.SDK.Contracts
                 CreatedAt = DateTime.UtcNow,
                 ExpiresAt = DateTime.UtcNow.Add(ttl),
                 LastAccessedAt = DateTime.UtcNow,
-                Size = data.Length
+                Size = data.CanSeek ? data.Length : 0
             };
         }
 
@@ -408,15 +405,8 @@ namespace DataWarehouse.SDK.Contracts
         /// </summary>
         public virtual Task IndexDocumentAsync(string id, Dictionary<string, object> metadata, CancellationToken ct = default)
         {
-            if (MaxIndexStoreSize > 0 && !_indexStore.ContainsKey(id) && _indexStore.Count >= MaxIndexStoreSize)
-            {
-                var firstKey = _indexStore.Keys.FirstOrDefault();
-                if (firstKey != null)
-                {
-                    _indexStore.TryRemove(firstKey, out _);
-                }
-            }
-
+            // BoundedDictionary handles LRU eviction internally.
+            // No manual capacity check needed (avoids TOCTOU race on concurrent access).
             metadata["_indexed_at"] = DateTime.UtcNow;
             _indexStore[id] = metadata;
             Interlocked.Increment(ref _indexedCount);
@@ -436,6 +426,11 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Search the index with a text query.
         /// </summary>
+        /// <remarks>
+        /// <b>Performance warning:</b> This implementation is O(N×M) where N is the number of
+        /// indexed documents and M is the number of metadata values per document. It will degrade
+        /// severely at large scale. Override with a proper inverted index in production subclasses.
+        /// </remarks>
         public virtual Task<string[]> SearchIndexAsync(string query, int limit = 100, CancellationToken ct = default)
         {
             var queryLower = query.ToLowerInvariant();
@@ -523,7 +518,7 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Index a manifest.
         /// </summary>
-        public virtual async Task IndexManifestAsync(Manifest manifest)
+        public virtual async Task IndexManifestAsync(Manifest manifest, CancellationToken ct = default)
         {
             var metadata = new Dictionary<string, object>
             {
@@ -542,13 +537,13 @@ namespace DataWarehouse.SDK.Contracts
                 }
             }
 
-            await IndexDocumentAsync(manifest.Id, metadata);
+            await IndexDocumentAsync(manifest.Id, metadata, ct);
         }
 
         /// <summary>
         /// Search manifests with optional vector.
         /// </summary>
-        public virtual Task<string[]> SearchAsync(string query, float[]? vector, int limit)
+        public virtual Task<string[]> SearchAsync(string query, float[]? vector, int limit, CancellationToken ct = default)
         {
             return SearchIndexAsync(query, limit);
         }
@@ -574,15 +569,15 @@ namespace DataWarehouse.SDK.Contracts
                     Metadata = kv.Value.Where(x => !x.Key.StartsWith("_"))
                         .ToDictionary(x => x.Key, x => x.Value?.ToString() ?? "")
                 };
-
-                await Task.Yield();
+                // No Task.Yield() per item — this is an in-memory enumeration and yielding
+                // every item causes needless thread-pool context switches.
             }
         }
 
         /// <summary>
         /// Update last access time for a manifest.
         /// </summary>
-        public virtual Task UpdateLastAccessAsync(string id, long timestamp)
+        public virtual Task UpdateLastAccessAsync(string id, long timestamp, CancellationToken ct = default)
         {
             if (_indexStore.TryGetValue(id, out var metadata))
             {

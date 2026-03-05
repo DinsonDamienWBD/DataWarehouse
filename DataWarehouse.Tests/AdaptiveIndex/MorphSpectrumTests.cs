@@ -91,6 +91,8 @@ public sealed class InMemoryBlockAllocator : IBlockAllocator
 
     public void FreeBlock(long blockNumber) { }
     public void FreeExtent(long startBlock, int blockCount) { }
+    // For this test stub every block is treated as allocated to satisfy the interface contract.
+    public bool IsAllocated(long blockNumber) => blockNumber < _nextBlock;
     public Task PersistAsync(IBlockDevice device, long bitmapStartBlock, CancellationToken ct = default)
         => Task.CompletedTask;
 }

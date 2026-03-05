@@ -9,6 +9,9 @@ namespace DataWarehouse.Plugins.UltimateCompute.Strategies.Gpu;
 /// </summary>
 internal sealed class VulkanComputeStrategy : ComputeRuntimeStrategyBase
 {
+    // Allowlist for Vulkan host app binaries — prevents arbitrary executable injection.
+    private static readonly string[] AllowedHostApps = ["vulkan-compute-host", "vulkan-runner", "vulkan-host"];
+
     /// <inheritdoc/>
     public override string StrategyId => "compute.gpu.vulkan";
     /// <inheritdoc/>
@@ -64,6 +67,8 @@ internal sealed class VulkanComputeStrategy : ComputeRuntimeStrategyBase
                 }
 
                 var hostApp = task.Metadata?.TryGetValue("host_app", out var ha) == true && ha is string has ? has : "vulkan-compute-host";
+                if (!Array.Exists(AllowedHostApps, h => h == hostApp))
+                    throw new ArgumentException($"Host app '{hostApp}' is not in the allowed list. Permitted: {string.Join(", ", AllowedHostApps)}.");
                 var args = $"--spirv \"{spirvPath}\" --dispatch {workGroupX},{workGroupY},{workGroupZ}";
 
                 var timeout = GetEffectiveTimeout(task);

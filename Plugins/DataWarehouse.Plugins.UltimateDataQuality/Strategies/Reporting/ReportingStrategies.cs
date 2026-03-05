@@ -499,28 +499,41 @@ public sealed class ReportGenerationStrategy : DataQualityStrategyBase
 
         sb.AppendLine("Section,Name,Value");
         sb.AppendLine($"Summary,OverallScore,{score.OverallScore:F2}");
-        sb.AppendLine($"Summary,Grade,{score.Grade}");
+        sb.AppendLine($"Summary,Grade,{CsvEscape(score.Grade.ToString())}");
         sb.AppendLine($"Summary,TotalRecords,{score.TotalRecords}");
 
         foreach (var (dim, dimScore) in score.DimensionScores)
         {
-            sb.AppendLine($"Dimension,{dim},{dimScore:F2}");
+            // P2-2659: enum.ToString() can't contain commas but escape for safety
+            sb.AppendLine($"Dimension,{CsvEscape(dim.ToString())},{dimScore:F2}");
         }
 
         if (config.IncludeFieldDetails)
         {
             foreach (var (field, fieldScore) in score.FieldScores)
             {
-                sb.AppendLine($"Field,{field},{fieldScore:F2}");
+                // P2-2659: field names may contain commas or quotes
+                sb.AppendLine($"Field,{CsvEscape(field)},{fieldScore:F2}");
             }
         }
 
         foreach (var issue in score.TopIssues.Take(config.MaxIssues))
         {
-            sb.AppendLine($"Issue,\"{issue.Description}\",{issue.AffectedCount}");
+            // P2-2659: issue descriptions can contain commas, quotes, and newlines
+            sb.AppendLine($"Issue,{CsvEscape(issue.Description)},{issue.AffectedCount}");
         }
 
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// P2-2659: RFC 4180 CSV field escaping — wraps in double-quotes and escapes internal quotes.
+    /// </summary>
+    private static string CsvEscape(string value)
+    {
+        if (value.IndexOfAny([',', '"', '\r', '\n']) < 0)
+            return value;
+        return $"\"{value.Replace("\"", "\"\"")}\"";
     }
 
     private List<string> GenerateRecommendations(Scoring.DatasetQualityScore score)

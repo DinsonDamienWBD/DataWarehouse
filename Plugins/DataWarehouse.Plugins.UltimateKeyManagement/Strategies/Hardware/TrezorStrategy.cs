@@ -233,6 +233,18 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
 
         protected override async Task SaveKeyToStorage(string keyId, byte[] keyData, ISecurityContext context)
         {
+            // P2-3505: Trezor derives keys via CipherKeyValue (BIP32 path + device entropy).
+            // The supplied keyData is NOT stored on the device — key material always lives in Trezor.
+            // Log a warning so callers understand that the provided keyData is intentionally discarded;
+            // the actual key is derived deterministically from keyId on each use.
+            if (keyData.Length > 0)
+            {
+                System.Diagnostics.Trace.TraceWarning(
+                    $"[TrezorStrategy] SaveKeyToStorage: provided keyData ({keyData.Length} bytes) for key '{keyId}' " +
+                    "is discarded. Trezor derives keys deterministically via CipherKeyValue; " +
+                    "the device is the only source of key material.");
+            }
+
             await _deviceLock.WaitAsync();
             try
             {
@@ -455,18 +467,15 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
 
         private byte[] EncodeMessage(ushort msgType, byte[] payload)
         {
-            // Trezor message format: ## + type (2 bytes) + length (4 bytes) + payload
-            var message = new byte[6 + payload.Length];
+            // #3482: Fixed Trezor message format: ## (2) + msgType (2) + length (4) + payload
+            // Handle empty payloads correctly — allocate minimum 8 bytes.
+            var messageLength = 8 + payload.Length;
+            var message = new byte[messageLength];
+
             message[0] = (byte)'#';
             message[1] = (byte)'#';
             message[2] = (byte)(msgType >> 8);
             message[3] = (byte)(msgType & 0xFF);
-            message[4] = (byte)(payload.Length >> 24);
-            message[5] = (byte)(payload.Length >> 16);
-            message[6 - 2] = (byte)(payload.Length >> 8);
-            message[7 - 2] = (byte)(payload.Length & 0xFF);
-
-            // Fix: proper length encoding
             message[4] = (byte)((payload.Length >> 24) & 0xFF);
             message[5] = (byte)((payload.Length >> 16) & 0xFF);
             message[6] = (byte)((payload.Length >> 8) & 0xFF);
@@ -474,21 +483,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
 
             if (payload.Length > 0)
             {
-                // Resize array properly
-                var fullMessage = new byte[8 + payload.Length];
-                fullMessage[0] = (byte)'#';
-                fullMessage[1] = (byte)'#';
-                fullMessage[2] = (byte)(msgType >> 8);
-                fullMessage[3] = (byte)(msgType & 0xFF);
-                fullMessage[4] = (byte)((payload.Length >> 24) & 0xFF);
-                fullMessage[5] = (byte)((payload.Length >> 16) & 0xFF);
-                fullMessage[6] = (byte)((payload.Length >> 8) & 0xFF);
-                fullMessage[7] = (byte)(payload.Length & 0xFF);
-                payload.CopyTo(fullMessage, 8);
-                return fullMessage;
+                payload.CopyTo(message, 8);
             }
 
-            return message[..8];
+            return message;
         }
 
         private void SendMessage(byte[] message)
@@ -674,7 +672,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                     continue;
 
                 var hardened = part.EndsWith("'") || part.EndsWith("h");
-                var value = uint.Parse(hardened ? part.TrimEnd('\'', 'h') : part);
+                var raw = hardened ? part.TrimEnd('\'', 'h') : part;
+                if (!uint.TryParse(raw, out var value))
+                    throw new FormatException($"Invalid BIP-32 path component: '{part}'");
 
                 if (hardened)
                 {
@@ -689,16 +689,69 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
 
         private TrezorFeatures ParseFeatures(byte[] payload)
         {
-            // Simplified parsing - in production, use proper protobuf
+            // P2-3499: Parse the Trezor Features protobuf response using wire-format field tags.
+            // Without a generated protobuf binding, we walk the wire format manually.
+            // Field numbers (from trezor/messages-management.proto Features message):
+            //   1 = vendor (string), 2 = major_version (varint), 3 = minor_version (varint),
+            //   4 = patch_version (varint), 10 = model (string), 14 = initialized (bool),
+            //   17 = label (string).
             var features = new TrezorFeatures();
-
-            // Extract common fields from protobuf-like structure
-            var text = Encoding.UTF8.GetString(payload);
-
-            if (payload.Length > 10)
+            int pos = 0;
+            while (pos < payload.Length)
             {
-                features.Initialized = true;
-                features.Model = payload.Length > 50 ? "Model T" : "Model One";
+                // Read tag byte: field_number << 3 | wire_type
+                int tagByte = payload[pos++];
+                int wireType = tagByte & 0x07;
+                int fieldNumber = tagByte >> 3;
+
+                switch (wireType)
+                {
+                    case 0: // varint
+                    {
+                        long varint = 0;
+                        int shift = 0;
+                        while (pos < payload.Length)
+                        {
+                            byte b = payload[pos++];
+                            varint |= (long)(b & 0x7F) << shift;
+                            if ((b & 0x80) == 0) break;
+                            shift += 7;
+                        }
+                        if (fieldNumber == 2) features.MajorVersion = (int)varint;
+                        else if (fieldNumber == 3) features.MinorVersion = (int)varint;
+                        else if (fieldNumber == 4) features.PatchVersion = (int)varint;
+                        else if (fieldNumber == 14) features.Initialized = varint != 0;
+                        break;
+                    }
+                    case 2: // length-delimited (string, bytes)
+                    {
+                        int len = 0, shift = 0;
+                        while (pos < payload.Length)
+                        {
+                            byte b = payload[pos++];
+                            len |= (b & 0x7F) << shift;
+                            if ((b & 0x80) == 0) break;
+                            shift += 7;
+                        }
+                        if (pos + len > payload.Length) break; // truncated
+                        var strVal = Encoding.UTF8.GetString(payload, pos, len);
+                        if (fieldNumber == 1) features.Vendor = strVal;
+                        else if (fieldNumber == 10) features.Model = strVal;
+                        else if (fieldNumber == 17) features.Label = strVal;
+                        pos += len;
+                        break;
+                    }
+                    case 5: // 32-bit fixed
+                        pos += 4;
+                        break;
+                    case 1: // 64-bit fixed
+                        pos += 8;
+                        break;
+                    default:
+                        // Unknown wire type — stop parsing to avoid corruption
+                        pos = payload.Length;
+                        break;
+                }
             }
 
             return features;
@@ -749,7 +802,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
             }
             catch
             {
+
                 // Ignore errors
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
@@ -841,6 +896,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
     /// </summary>
     public class TrezorFeatures
     {
+        public string? Vendor { get; set; }
+        public int MajorVersion { get; set; }
+        public int MinorVersion { get; set; }
+        public int PatchVersion { get; set; }
         public string? Model { get; set; }
         public string? Label { get; set; }
         public bool Initialized { get; set; }

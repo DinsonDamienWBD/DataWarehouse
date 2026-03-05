@@ -83,6 +83,9 @@ public sealed class FilesystemScalingManager : IScalableSubsystem, IDisposable
     // ---- Backpressure ----
     private volatile BackpressureState _backpressureState = BackpressureState.Normal;
 
+    // ---- Concurrency control ----
+    private readonly SemaphoreSlim _ioConcurrencySemaphore;
+
     // ---- Disposal ----
     private bool _disposed;
 
@@ -145,15 +148,20 @@ public sealed class FilesystemScalingManager : IScalableSubsystem, IDisposable
         };
         _callerQuotas = new BoundedCache<string, IoQuotaInfo>(quotaCacheOptions);
 
+        // Initialize concurrency limiter for I/O dispatch
+        var maxConcurrentIo = Environment.ProcessorCount * 2;
+        _ioConcurrencySemaphore = new SemaphoreSlim(maxConcurrentIo, maxConcurrentIo);
+
         // Start priority dispatch loop
         _dispatchCts = new CancellationTokenSource();
         _dispatchTask = Task.Run(() => DispatchLoopAsync(_dispatchCts.Token));
 
-        // Start kernel bypass re-detection timer
+        // Start kernel bypass re-detection timer.
+        // LOW-3035: Use 1s initial delay (not TimeSpan.Zero) so callback cannot fire before constructor returns.
         _kernelBypassRedetectTimer = new Timer(
             KernelBypassRedetectCallback,
             null,
-            TimeSpan.Zero,
+            TimeSpan.FromSeconds(1),
             TimeSpan.FromMilliseconds(_kernelBypassRedetectIntervalMs));
     }
 
@@ -235,8 +243,15 @@ public sealed class FilesystemScalingManager : IScalableSubsystem, IDisposable
         ArgumentNullException.ThrowIfNull(operation);
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        // Check caller quota
-        if (!string.IsNullOrEmpty(callerId) && IsCallerThrottled(callerId))
+        // Atomically check quota and increment in a single operation to avoid TOCTOU race
+        // between IsCallerThrottled and IncrementCallerQuota.
+        bool throttled = false;
+        if (!string.IsNullOrEmpty(callerId))
+        {
+            throttled = CheckAndIncrementCallerQuota(callerId);
+        }
+
+        if (throttled)
         {
             Interlocked.Increment(ref _opsThrottled);
 
@@ -269,12 +284,6 @@ public sealed class FilesystemScalingManager : IScalableSubsystem, IDisposable
         Interlocked.Increment(ref _opsScheduled);
         await channel.Writer.WriteAsync(ioOp, ct).ConfigureAwait(false);
         UpdateBackpressureState();
-
-        // Track quota usage
-        if (!string.IsNullOrEmpty(callerId))
-        {
-            IncrementCallerQuota(callerId);
-        }
     }
 
     // ---------------------------------------------------------------
@@ -382,7 +391,9 @@ public sealed class FilesystemScalingManager : IScalableSubsystem, IDisposable
                     _normalPriorityQueue.Reader.TryRead(out op) ||
                     _lowPriorityQueue.Reader.TryRead(out op))
                 {
-                    _ = ExecuteIoOperationAsync(op, ct);
+                    // Acquire concurrency slot before dispatching — limits unbounded parallelism
+                    await _ioConcurrencySemaphore.WaitAsync(ct).ConfigureAwait(false);
+                    _ = ExecuteIoOperationWithConcurrencyLimitAsync(op, ct);
                     continue;
                 }
 
@@ -394,10 +405,33 @@ public sealed class FilesystemScalingManager : IScalableSubsystem, IDisposable
             {
                 break;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Continue dispatch loop on errors
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
+        }
+    }
+
+    /// <summary>
+    /// Executes an I/O operation with concurrency limiting. Releases the semaphore slot
+    /// when the operation completes (success or failure) and logs any exceptions.
+    /// </summary>
+    private async Task ExecuteIoOperationWithConcurrencyLimitAsync(IoOperation op, CancellationToken ct)
+    {
+        try
+        {
+            await ExecuteIoOperationAsync(op, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            // Log but do not propagate — dispatch loop must continue
+            System.Diagnostics.Debug.WriteLine($"[FilesystemScaling] I/O operation failed: {ex.GetType().Name}: {ex.Message}");
+        }
+        finally
+        {
+            _ioConcurrencySemaphore.Release();
         }
     }
 
@@ -462,11 +496,18 @@ public sealed class FilesystemScalingManager : IScalableSubsystem, IDisposable
             }
 
             // Assume available if on Linux 5.1+ (check /proc/version)
+            // io_uring was introduced in 5.1; we must not match 5.0 or older minor versions.
             if (System.IO.File.Exists("/proc/version"))
             {
                 var version = System.IO.File.ReadAllText("/proc/version");
-                // Simple heuristic -- not the only check in production
-                return version.Contains("Linux version 5.") || version.Contains("Linux version 6.");
+                // Parse major.minor from "Linux version X.Y..." to correctly handle 5.1+, 6.x, 7.x, etc.
+                var match = System.Text.RegularExpressions.Regex.Match(version, @"Linux version (\d+)\.(\d+)");
+                if (match.Success
+                    && int.TryParse(match.Groups[1].Value, out var major)
+                    && int.TryParse(match.Groups[2].Value, out var minor))
+                {
+                    return major > 5 || (major == 5 && minor >= 1);
+                }
             }
 
             return false;
@@ -484,44 +525,58 @@ public sealed class FilesystemScalingManager : IScalableSubsystem, IDisposable
     }
 
     /// <summary>
-    /// Checks whether a caller has exceeded their I/O quota.
+    /// Atomically checks whether a caller has exceeded their I/O quota and, if not,
+    /// increments their operation count in a single operation.
+    /// Returns true if the caller is throttled (quota exceeded); false if the operation
+    /// was accepted and the count has been incremented.
     /// </summary>
-    private bool IsCallerThrottled(string callerId)
+    private bool CheckAndIncrementCallerQuota(string callerId)
     {
-        var quota = _callerQuotas.GetOrDefault(callerId);
-        if (quota == null) return false;
-
-        // Reset quota window if expired (1-hour window)
-        if ((DateTime.UtcNow - quota.WindowStartUtc).TotalHours >= 1)
+        // Spin until we can atomically read + replace the quota record.
+        // BoundedCache.Put is a lock-free CAS replacement, so the loop terminates
+        // quickly under contention.
+        while (true)
         {
-            var resetQuota = quota with { CurrentOperations = 0, WindowStartUtc = DateTime.UtcNow };
-            _callerQuotas.Put(callerId, resetQuota);
-            return false;
-        }
+            var quota = _callerQuotas.GetOrDefault(callerId);
 
-        return quota.CurrentOperations >= quota.MaxOperations;
-    }
-
-    /// <summary>
-    /// Increments the I/O operation count for a caller's quota tracking.
-    /// </summary>
-    private void IncrementCallerQuota(string callerId)
-    {
-        var quota = _callerQuotas.GetOrDefault(callerId);
-        if (quota == null)
-        {
-            quota = new IoQuotaInfo
+            if (quota == null)
             {
-                CallerId = callerId,
-                MaxOperations = _defaultIoQuotaPerCaller,
-                CurrentOperations = 1,
-                WindowStartUtc = DateTime.UtcNow
-            };
-            _callerQuotas.Put(callerId, quota);
-        }
-        else
-        {
-            _callerQuotas.Put(callerId, quota with { CurrentOperations = quota.CurrentOperations + 1 });
+                // First time we see this caller — create a quota record with count 1 (not throttled).
+                var newQuota = new IoQuotaInfo
+                {
+                    CallerId = callerId,
+                    MaxOperations = _defaultIoQuotaPerCaller,
+                    CurrentOperations = 1,
+                    WindowStartUtc = DateTime.UtcNow
+                };
+                _callerQuotas.Put(callerId, newQuota);
+                return false; // not throttled
+            }
+
+            // Reset quota window if expired (1-hour window).
+            if ((DateTime.UtcNow - quota.WindowStartUtc).TotalHours >= 1)
+            {
+                var resetQuota = quota with { CurrentOperations = 1, WindowStartUtc = DateTime.UtcNow };
+                _callerQuotas.Put(callerId, resetQuota);
+                return false; // not throttled
+            }
+
+            // Over quota — throttle without incrementing.
+            if (quota.CurrentOperations >= quota.MaxOperations)
+                return true;
+
+            // Attempt to atomically increment the count.
+            var updated = quota with { CurrentOperations = quota.CurrentOperations + 1 };
+            // Re-read after constructing updated to detect a concurrent modification.
+            var current = _callerQuotas.GetOrDefault(callerId);
+            if (current?.CurrentOperations != quota.CurrentOperations ||
+                current?.WindowStartUtc != quota.WindowStartUtc)
+            {
+                // Another thread modified the record — retry.
+                continue;
+            }
+            _callerQuotas.Put(callerId, updated);
+            return false; // not throttled
         }
     }
 
@@ -572,14 +627,27 @@ public sealed class FilesystemScalingManager : IScalableSubsystem, IDisposable
         _disposed = true;
 
         _dispatchCts.Cancel();
+
+        // Complete the queues before waiting to unblock the dispatch task
+        _highPriorityQueue.Writer.TryComplete();
+        _normalPriorityQueue.Writer.TryComplete();
+        _lowPriorityQueue.Writer.TryComplete();
+
+        // Wait for the dispatch task to finish so in-flight operations don't reference disposed objects
+        try
+        {
+            _dispatchTask.Wait(TimeSpan.FromSeconds(5));
+        }
+        catch (AggregateException)
+        {
+            // Ignore cancellation/timeout from shutdown
+        }
+
         _dispatchCts.Dispose();
         _kernelBypassRedetectTimer.Dispose();
         _strategyQueueDepths.Dispose();
         _callerQuotas.Dispose();
-
-        _highPriorityQueue.Writer.TryComplete();
-        _normalPriorityQueue.Writer.TryComplete();
-        _lowPriorityQueue.Writer.TryComplete();
+        _ioConcurrencySemaphore.Dispose();
     }
 
     // ---------------------------------------------------------------

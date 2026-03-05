@@ -130,7 +130,7 @@ public abstract class HybridStoragePluginBase<TConfig> : IndexableStoragePluginB
     /// <summary>
     /// Whether the plugin has been disposed.
     /// </summary>
-    private bool _disposed;
+    private volatile bool _disposed;
 
     /// <summary>
     /// Storage category for this plugin (e.g., "Local", "Cloud", "Network").
@@ -149,7 +149,7 @@ public abstract class HybridStoragePluginBase<TConfig> : IndexableStoragePluginB
         if (_config.EnableHealthMonitoring && _config.HealthCheckIntervalSeconds > 0)
         {
             _healthMonitorTimer = new Timer(
-                async _ => await CheckAllHealthAsync(),
+                async _ => { try { await CheckAllHealthAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } },
                 null,
                 TimeSpan.FromSeconds(_config.HealthCheckIntervalSeconds),
                 TimeSpan.FromSeconds(_config.HealthCheckIntervalSeconds));
@@ -280,9 +280,16 @@ public abstract class HybridStoragePluginBase<TConfig> : IndexableStoragePluginB
     /// </summary>
     public InstanceHealthStatus GetAggregateHealth()
     {
-        if (!_healthCache.Any()) return InstanceHealthStatus.Unknown;
-        if (_healthCache.Values.All(h => h == InstanceHealthStatus.Healthy)) return InstanceHealthStatus.Healthy;
-        if (_healthCache.Values.Any(h => h == InstanceHealthStatus.Healthy)) return InstanceHealthStatus.Degraded;
+        // Cat 13 (finding 636): single pass over Values to avoid O(3n) multiple enumerations.
+        int total = 0, healthy = 0;
+        foreach (var h in _healthCache.Values)
+        {
+            total++;
+            if (h == InstanceHealthStatus.Healthy) healthy++;
+        }
+        if (total == 0) return InstanceHealthStatus.Unknown;
+        if (healthy == total) return InstanceHealthStatus.Healthy;
+        if (healthy > 0) return InstanceHealthStatus.Degraded;
         return InstanceHealthStatus.Unhealthy;
     }
 
@@ -402,18 +409,19 @@ public abstract class HybridStoragePluginBase<TConfig> : IndexableStoragePluginB
 
     private void HandleListInstances(PluginMessage message)
     {
-        var instances = _connectionRegistry.GetAll().Select(i => new
+        var instances = _connectionRegistry.GetAll().Select(i => new Dictionary<string, object>
         {
-            i.InstanceId,
-            i.Roles,
-            i.Priority,
-            i.Health,
-            i.IsConnected,
-            i.LastActivity,
-            i.Stats
-        }).ToList();
+            ["instanceId"] = i.InstanceId,
+            ["roles"] = (int)i.Roles,
+            ["priority"] = i.Priority,
+            ["health"] = (int)i.Health,
+            ["isConnected"] = i.IsConnected,
+            ["lastActivity"] = i.LastActivity?.ToString("O") ?? string.Empty,
+        }).ToList<object>();
 
-        // Response would be sent via message context
+        // Populate the message payload with the result so callers awaiting this key can retrieve it
+        message.Payload["instances"] = instances;
+        message.Payload["count"] = instances.Count;
     }
 
     private async Task HandleHealthCheckAsync(PluginMessage message)
@@ -436,9 +444,13 @@ public abstract class HybridStoragePluginBase<TConfig> : IndexableStoragePluginB
 
     private async Task HandleAggregateHealthAsync(PluginMessage message)
     {
-        await CheckAllHealthAsync();
+        var instanceHealthMap = await CheckAllHealthAsync();
         var health = GetAggregateHealth();
-        // Response would be sent via message context
+
+        // Populate the message payload with the result so callers awaiting this key can retrieve it
+        message.Payload["aggregateHealth"] = (int)health;
+        message.Payload["aggregateHealthName"] = health.ToString();
+        message.Payload["instanceCount"] = instanceHealthMap.Count;
     }
 
     /// <summary>

@@ -9,14 +9,15 @@ using System.Threading.Tasks;
 namespace DataWarehouse.SDK.Deployment.CloudProviders;
 
 /// <summary>
-/// GCP cloud provider implementation (placeholder).
-/// Production uses Google Cloud Client Libraries (Compute, Storage, Monitoring).
+/// GCP cloud provider stub. Fails fast with <see cref="NotSupportedException"/> on all operations.
+/// Production deployment requires registering a real ICloudProvider backed by Google.Cloud.Compute.V1,
+/// Google.Cloud.Storage.V1, and Google.Cloud.Monitoring.V3 via CloudProviderFactory.
 /// </summary>
 [SdkCompatibility("3.0.0", Notes = "Phase 37: GCP provisioning provider (ENV-04)")]
 public sealed class GcpProvider : ICloudProvider
 {
     private readonly ILogger<GcpProvider> _logger;
-    private bool _disposed;
+    private int _disposed;
 
     public string Name => "GCP";
 
@@ -27,43 +28,41 @@ public sealed class GcpProvider : ICloudProvider
 
     public Task<string> ProvisionVmAsync(VmSpec spec, CancellationToken ct = default)
     {
-        _logger.LogInformation("GCP: Provisioning VM (machine type: {InstanceType}, zone: {Region})",
-            spec.InstanceType, spec.Region);
-        return Task.FromResult($"instance-{Guid.NewGuid():N}");
+        throw new NotSupportedException(
+            "GCP VM provisioning requires the Google.Cloud.Compute.V1 package. " +
+            "Register a real ICloudProvider implementation via CloudProviderFactory.");
     }
 
     public Task<string> ProvisionStorageAsync(StorageSpec spec, CancellationToken ct = default)
     {
-        _logger.LogInformation("GCP: Provisioning storage ({Type}, {SizeGb} GB)",
-            spec.StorageType, spec.SizeGb);
-        return Task.FromResult($"pd-{Guid.NewGuid():N}");
+        throw new NotSupportedException(
+            "GCP storage provisioning requires the Google.Cloud.Compute.V1/Storage.V1 package. " +
+            "Register a real ICloudProvider implementation via CloudProviderFactory.");
     }
 
     public Task<bool> DeprovisionAsync(string resourceId, CancellationToken ct = default)
     {
-        _logger.LogInformation("GCP: Deprovisioning resource {ResourceId}", resourceId);
-        return Task.FromResult(true);
+        throw new NotSupportedException(
+            "GCP deprovisioning requires the Google.Cloud.Compute.V1 package. " +
+            "Register a real ICloudProvider implementation via CloudProviderFactory.");
     }
 
     public Task<CloudResourceMetrics?> GetMetricsAsync(string resourceId, CancellationToken ct = default)
     {
-        return Task.FromResult<CloudResourceMetrics?>(new CloudResourceMetrics
-        {
-            ResourceId = resourceId,
-            CpuUtilizationPercent = 55.0,
-            StorageUtilizationPercent = 75.0,
-            Timestamp = DateTimeOffset.UtcNow
-        });
+        throw new NotSupportedException(
+            "GCP metrics retrieval requires the Google.Cloud.Monitoring.V3 package. " +
+            "Register a real ICloudProvider implementation via CloudProviderFactory.");
     }
 
     public Task<IReadOnlyList<string>> ListManagedResourcesAsync(CancellationToken ct = default)
     {
-        return Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
+        throw new NotSupportedException(
+            "GCP resource listing requires the Google.Cloud.Compute.V1 package. " +
+            "Register a real ICloudProvider implementation via CloudProviderFactory.");
     }
 
     public void Dispose()
     {
-        if (_disposed) return;
-        _disposed = true;
+        Interlocked.CompareExchange(ref _disposed, 1, 0);
     }
 }

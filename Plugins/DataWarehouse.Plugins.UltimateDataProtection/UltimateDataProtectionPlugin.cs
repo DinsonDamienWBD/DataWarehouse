@@ -584,11 +584,25 @@ namespace DataWarehouse.Plugins.UltimateDataProtection
 
         private Dictionary<string, object> RecommendStrategy(string scenario, Dictionary<string, object> context)
         {
+            // Validate and sanitize scenario input before embedding in any output string.
+            if (string.IsNullOrWhiteSpace(scenario) || scenario.Length > 200)
+            {
+                return new Dictionary<string, object>
+                {
+                    ["success"] = false,
+                    ["error"] = "Invalid scenario: must be a non-empty string of at most 200 characters."
+                };
+            }
+
+            // Strip non-alphanumeric chars (except hyphens/underscores) to prevent injection.
+            var sanitizedScenario = System.Text.RegularExpressions.Regex.Replace(
+                scenario, @"[^a-zA-Z0-9_\-]", "");
+
             // AI-driven strategy recommendation
             DataProtectionCategory? category = null;
             DataProtectionCapabilities required = DataProtectionCapabilities.None;
 
-            switch (scenario.ToLowerInvariant())
+            switch (sanitizedScenario.ToLowerInvariant())
             {
                 case "database":
                     category = DataProtectionCategory.FullBackup;
@@ -621,20 +635,63 @@ namespace DataWarehouse.Plugins.UltimateDataProtection
                 ["recommendedStrategy"] = strategy?.StrategyId ?? "streaming-full-backup",
                 ["strategyName"] = strategy?.StrategyName ?? "Streaming Full Backup",
                 ["category"] = strategy?.Category.ToString() ?? category?.ToString() ?? "FullBackup",
-                ["reasoning"] = $"Selected based on scenario '{scenario}' requirements"
+                ["reasoning"] = $"Selected based on scenario '{sanitizedScenario}' requirements"
             };
         }
 
-        private Task<Dictionary<string, object>> RecommendRecoveryPointAsync(string backupId, Dictionary<string, object> context)
+        private async Task<Dictionary<string, object>> RecommendRecoveryPointAsync(string backupId, Dictionary<string, object> context)
         {
-            // AI-driven recovery point recommendation
-            return Task.FromResult(new Dictionary<string, object>
+            // Analyze registered strategies to find the best recovery point.
+            // Collect all catalog entries asynchronously from all registered strategies.
+            var allEntries = new List<BackupCatalogEntry>();
+            var query = new BackupListQuery();
+            foreach (var strategy in _registry.Strategies)
+            {
+                try
+                {
+                    var entries = await strategy.ListBackupsAsync(query, CancellationToken.None).ConfigureAwait(false);
+                    allEntries.AddRange(entries);
+                }
+                catch
+                {
+                    // Strategy doesn't support catalog listing; skip
+                }
+            }
+
+            // IsValid == null means not yet validated; IsValid == false means failed validation.
+            var candidates = allEntries
+                .Where(e => e.IsValid != false)
+                .OrderByDescending(e => e.IsValid == true ? 1 : 0)
+                .ThenByDescending(e => e.CreatedAt)
+                .ToList();
+
+            if (candidates.Count == 0)
+            {
+                // No catalog entries; return the input backupId with low confidence
+                return new Dictionary<string, object>
+                {
+                    ["success"] = true,
+                    ["recommendedBackupId"] = backupId,
+                    ["confidence"] = 0.5,
+                    ["reasoning"] = "No catalog entries available; returning requested backup ID as-is"
+                };
+            }
+
+            // Prefer the requested backup if it is among valid candidates, otherwise suggest best.
+            var best = candidates.FirstOrDefault(e => e.BackupId == backupId) ?? candidates[0];
+            var isRequested = best.BackupId == backupId;
+            var isVerified = best.IsValid == true;
+            var confidence = isVerified ? 0.95 : 0.7;
+
+            return new Dictionary<string, object>
             {
                 ["success"] = true,
-                ["recommendedBackupId"] = backupId,
-                ["confidence"] = 0.95,
-                ["reasoning"] = "Most recent valid backup with complete integrity verification"
-            });
+                ["recommendedBackupId"] = best.BackupId,
+                ["confidence"] = confidence,
+                ["reasoning"] = isRequested
+                    ? $"Requested backup '{backupId}' is valid and {(isVerified ? "integrity-verified" : "not yet verified")}"
+                    : $"Requested backup not found; most recent valid backup '{best.BackupId}' recommended (age: {(DateTimeOffset.UtcNow - best.CreatedAt).TotalHours:F1}h)"
+            };
         }
 
         #endregion
@@ -666,7 +723,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection
                 }
                 catch
                 {
+
                     // Strategy failed to instantiate, skip
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
         }

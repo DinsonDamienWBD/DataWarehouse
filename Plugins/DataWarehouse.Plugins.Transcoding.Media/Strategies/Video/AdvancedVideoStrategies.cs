@@ -38,6 +38,9 @@ internal sealed class Stereo3DVideoStrategy : MediaStrategyBase
 
     public override string StrategyId => "stereo-3d-video";
     public override string Name => "3D Stereoscopic Video Processing";
+    // Finding 1068/1074: all core methods return empty MemoryStream / about:blank URI.
+    // Requires native stereo3d processing library. Not production-ready.
+    public override bool IsProductionReady => false;
 
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
@@ -149,6 +152,9 @@ internal sealed class Video360Strategy : MediaStrategyBase
 
     public override string StrategyId => "video-360";
     public override string Name => "360-Degree Video Processing";
+    // Finding 1068/1074: all core methods return empty MemoryStream / about:blank URI.
+    // Requires native 360-video processing library. Not production-ready.
+    public override bool IsProductionReady => false;
 
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
@@ -259,6 +265,9 @@ internal sealed class VrVideoStrategy : MediaStrategyBase
 
     public override string StrategyId => "vr-video";
     public override string Name => "VR Video Processing (Head-Tracked)";
+    // Finding 1068/1074: all core methods return empty MemoryStream / about:blank URI.
+    // Requires native VR video processing library. Not production-ready.
+    public override bool IsProductionReady => false;
 
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
@@ -376,6 +385,9 @@ internal sealed class HdrToneMappingStrategy : MediaStrategyBase
 
     public override string StrategyId => "hdr-tone-mapping";
     public override string Name => "HDR to SDR Tone Mapping";
+    // Finding 1068/1074: all core methods return empty MemoryStream / about:blank URI.
+    // Requires native HDR tone-mapping library. Not production-ready.
+    public override bool IsProductionReady => false;
 
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {

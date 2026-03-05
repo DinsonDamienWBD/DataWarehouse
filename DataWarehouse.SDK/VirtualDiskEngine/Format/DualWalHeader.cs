@@ -30,7 +30,7 @@ public enum WalType : byte
 public readonly struct WalHeader : IEquatable<WalHeader>
 {
     /// <summary>Serialized size of the WAL header in bytes.</summary>
-    public const int SerializedSize = 82;
+    public const int SerializedSize = 83;
 
     /// <summary>Minimum number of blocks for a Metadata WAL.</summary>
     public const long MinMetadataWalBlocks = 64;

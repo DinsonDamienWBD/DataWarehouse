@@ -88,7 +88,7 @@ internal sealed class StompStrategy : SdkInterface.InterfaceStrategyBase, IPlugi
             SdkInterface.HttpMethod.POST => await HandleSend(destination, request, cancellationToken),
             SdkInterface.HttpMethod.GET => HandleSubscribe(destination, sessionId, request),
             SdkInterface.HttpMethod.DELETE => HandleUnsubscribe(destination, sessionId),
-            SdkInterface.HttpMethod.PUT => HandleTransactionOrAck(request),
+            SdkInterface.HttpMethod.PUT => await HandleTransactionOrAck(request),
             SdkInterface.HttpMethod.CONNECT => HandleConnect(sessionId, request),
             _ => SdkInterface.InterfaceResponse.BadRequest($"Unsupported STOMP operation: {request.Method}")
         };
@@ -211,14 +211,14 @@ internal sealed class StompStrategy : SdkInterface.InterfaceStrategyBase, IPlugi
         return SdkInterface.InterfaceResponse.Ok(responsePayload, "application/json");
     }
 
-    private SdkInterface.InterfaceResponse HandleTransactionOrAck(SdkInterface.InterfaceRequest request)
+    private async Task<SdkInterface.InterfaceResponse> HandleTransactionOrAck(SdkInterface.InterfaceRequest request)
     {
         var operation = request.QueryParameters.TryGetValue("operation", out var op) ? op : "ack";
 
         return operation switch
         {
             "begin" => BeginTransaction(request),
-            "commit" => CommitTransaction(request),
+            "commit" => await CommitTransactionAsync(request),
             "abort" => AbortTransaction(request),
             "ack" => AcknowledgeMessage(request),
             "nack" => NegativeAcknowledgeMessage(request),
@@ -247,17 +247,17 @@ internal sealed class StompStrategy : SdkInterface.InterfaceStrategyBase, IPlugi
         return SdkInterface.InterfaceResponse.Ok(responsePayload, "application/json");
     }
 
-    private SdkInterface.InterfaceResponse CommitTransaction(SdkInterface.InterfaceRequest request)
+    private async Task<SdkInterface.InterfaceResponse> CommitTransactionAsync(SdkInterface.InterfaceRequest request)
     {
         var transactionId = request.QueryParameters.TryGetValue("transaction", out var txn) ? txn : null;
 
         if (string.IsNullOrEmpty(transactionId) || !_transactions.TryRemove(transactionId, out var transaction))
             return SdkInterface.InterfaceResponse.BadRequest($"Transaction not found: {transactionId}");
 
-        // Deliver all messages in transaction
+        // Deliver all messages in transaction — await each to surface errors
         foreach (var message in transaction.Messages)
         {
-            _ = DeliverMessage(message, CancellationToken.None);
+            await DeliverMessage(message, CancellationToken.None);
         }
 
         var responsePayload = JsonSerializer.SerializeToUtf8Bytes(new
@@ -340,10 +340,16 @@ internal sealed class StompStrategy : SdkInterface.InterfaceStrategyBase, IPlugi
 
     private async Task DeliverMessage(StompMessage message, CancellationToken cancellationToken)
     {
-        // Add to destination
+        // P2-3326: Cap each destination queue at 10,000 messages to prevent unbounded growth.
+        // When the cap is reached, evict the oldest (head) message (FIFO drop).
         _destinations.AddOrUpdate(message.Destination,
             _ => new List<StompMessage> { message },
-            (_, list) => { list.Add(message); return list; });
+            (_, list) =>
+            {
+                if (list.Count >= 10_000) list.RemoveAt(0);
+                list.Add(message);
+                return list;
+            });
 
         // Deliver to active subscriptions
         var matchingSubscriptions = _subscriptions.Values

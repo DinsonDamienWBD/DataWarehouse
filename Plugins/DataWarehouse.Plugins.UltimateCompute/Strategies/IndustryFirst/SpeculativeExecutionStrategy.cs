@@ -56,6 +56,7 @@ internal sealed class SpeculativeExecutionStrategy : ComputeRuntimeStrategyBase
             string? winner = null;
             var winnerOutput = Array.Empty<byte>();
             var winnerLogs = "";
+            var winnerLock = new object();
 
             // Launch all runtimes in parallel
             var tasks = runtimes.Select(runtime => Task.Run(async () =>
@@ -74,11 +75,14 @@ internal sealed class SpeculativeExecutionStrategy : ComputeRuntimeStrategyBase
 
                     if (result.ExitCode == 0)
                     {
-                        // First success wins the race
+                        // First success wins the race — use lock after CAS to safely write winner output.
                         if (Interlocked.CompareExchange(ref winner, runtime, null) == null)
                         {
-                            winnerOutput = EncodeOutput(result.StandardOutput);
-                            winnerLogs = $"SpecExec winner: {runtime} in {result.Elapsed.TotalMilliseconds:F0}ms";
+                            lock (winnerLock)
+                            {
+                                winnerOutput = EncodeOutput(result.StandardOutput);
+                                winnerLogs = $"SpecExec winner: {runtime} in {result.Elapsed.TotalMilliseconds:F0}ms";
+                            }
                             try { await raceCts.CancelAsync(); } catch { /* Best-effort cleanup */ }
                         }
                     }

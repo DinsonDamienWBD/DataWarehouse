@@ -571,7 +571,7 @@ public sealed class DeceptionNetworkStrategy : AccessControlStrategyBase, IDispo
         if (configuration.TryGetValue("EnableAutoRotation", out var autoRotate) && autoRotate is true)
         {
             _environmentRotationTimer = new Timer(
-                _ => RotateEnvironments(),
+                _ => { try { RotateEnvironments(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[DeceptionNetwork] RotateEnvironments failed: {ex.Message}"); } },
                 null,
                 _rotationInterval,
                 _rotationInterval);
@@ -580,7 +580,7 @@ public sealed class DeceptionNetworkStrategy : AccessControlStrategyBase, IDispo
         if (configuration.TryGetValue("EnableAdaptation", out var adapt) && adapt is true)
         {
             _adaptationTimer = new Timer(
-                _ => PerformAdaptation(),
+                _ => { try { PerformAdaptation(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[DeceptionNetwork] PerformAdaptation failed: {ex.Message}"); } },
                 null,
                 TimeSpan.FromMinutes(15),
                 TimeSpan.FromMinutes(15));
@@ -729,7 +729,9 @@ public sealed class DeceptionNetworkStrategy : AccessControlStrategyBase, IDispo
             }
             catch
             {
+
                 // Log but don't fail
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
     }
@@ -751,7 +753,14 @@ public sealed class DeceptionNetworkStrategy : AccessControlStrategyBase, IDispo
     private void PerformAdaptation()
     {
         // Analyze recent events and adapt deception strategies
-        var recentEvents = _eventQueue.ToArray().Where(e => e.Timestamp > DateTime.UtcNow.AddHours(-1)).ToList();
+        // LOW-1238: Filter while iterating instead of materialising the full queue then LINQ-filtering
+        var cutoff = DateTime.UtcNow.AddHours(-1);
+        var recentEvents = new List<DeceptionEvent>();
+        foreach (var ev in _eventQueue)
+        {
+            if (ev.Timestamp > cutoff)
+                recentEvents.Add(ev);
+        }
 
         if (recentEvents.Count > 10)
         {

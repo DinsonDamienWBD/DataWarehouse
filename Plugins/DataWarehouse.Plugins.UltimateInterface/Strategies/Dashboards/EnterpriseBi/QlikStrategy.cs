@@ -278,10 +278,10 @@ public sealed class QlikStrategy : DashboardStrategyBase
             Tags: null,
             Owner: attrs.TryGetProperty("ownerId", out var owner) ? owner.GetString() : null,
             CreatedAt: attrs.TryGetProperty("createdDate", out var created)
-                ? DateTimeOffset.Parse(created.GetString() ?? DateTimeOffset.UtcNow.ToString("O"))
+                ? DateTimeOffset.Parse(created.GetString() ?? DateTimeOffset.UtcNow.ToString("O"), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind)
                 : null,
             UpdatedAt: attrs.TryGetProperty("modifiedDate", out var modified)
-                ? DateTimeOffset.Parse(modified.GetString() ?? DateTimeOffset.UtcNow.ToString("O"))
+                ? DateTimeOffset.Parse(modified.GetString() ?? DateTimeOffset.UtcNow.ToString("O"), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind)
                 : null,
             Version: 1
         );
@@ -340,7 +340,7 @@ public sealed class QlikStrategy : DashboardStrategyBase
                 DateTimeOffset? createdAt = null;
                 if (attrs.TryGetProperty("createdDate", out var created))
                 {
-                    createdAt = DateTimeOffset.Parse(created.GetString() ?? DateTimeOffset.UtcNow.ToString("O"));
+                    createdAt = DateTimeOffset.Parse(created.GetString() ?? DateTimeOffset.UtcNow.ToString("O"), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind);
                 }
 
                 // Apply date filters
@@ -361,7 +361,7 @@ public sealed class QlikStrategy : DashboardStrategyBase
                     Owner: attrs.TryGetProperty("ownerId", out var owner) ? owner.GetString() : null,
                     CreatedAt: createdAt,
                     UpdatedAt: attrs.TryGetProperty("modifiedDate", out var modified)
-                        ? DateTimeOffset.Parse(modified.GetString() ?? DateTimeOffset.UtcNow.ToString("O"))
+                        ? DateTimeOffset.Parse(modified.GetString() ?? DateTimeOffset.UtcNow.ToString("O"), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind)
                         : null,
                     Version: 1
                 ));

@@ -195,7 +195,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await _httpClient.PostAsync(
+            using var response = await _httpClient.PostAsync(
                 $"https://{_config.HsmIpAddress}:2223/cloudhsm/api",
                 content,
                 cancellationToken);
@@ -203,7 +203,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
             if (response.IsSuccessStatusCode)
             {
                 var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
-                var result = JsonDocument.Parse(responseContent);
+                using var result = JsonDocument.Parse(responseContent);
                 if (result.RootElement.TryGetProperty("handle", out var handleElement))
                 {
                     _hsmHandle = handleElement.GetString();
@@ -211,8 +211,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
             }
             else
             {
-                // Fallback for testing - consider HSM connected if management API is reachable
-                _hsmHandle = Guid.NewGuid().ToString();
+                // #3491: Do NOT fabricate a random handle. A missing handle from the management API
+                // means the HSM cluster is not properly initialized. Fail loudly so operators are alerted.
+                throw new InvalidOperationException(
+                    "AWS CloudHSM cluster API did not return a handle. " +
+                    "Verify that the cluster is active and the management endpoint is reachable.");
             }
         }
 
@@ -311,14 +314,14 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
                     Encoding.UTF8,
                     "application/json");
 
-                var response = await _httpClient.PostAsync(
+                using var response = await _httpClient.PostAsync(
                     $"https://{_config.HsmIpAddress}:2223/cloudhsm/api",
                     content);
 
                 response.EnsureSuccessStatusCode();
 
                 var responseContent = await response.Content.ReadAsStringAsync();
-                var result = JsonDocument.Parse(responseContent);
+                using var result = JsonDocument.Parse(responseContent);
                 var keyData = result.RootElement.GetProperty("keyData").GetString();
                 return Convert.FromBase64String(keyData!);
             }
@@ -349,7 +352,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await _httpClient.PostAsync(
+            using var response = await _httpClient.PostAsync(
                 $"https://{_config.HsmIpAddress}:2223/cloudhsm/api",
                 content);
 
@@ -376,14 +379,14 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await _httpClient.PostAsync(
+            using var response = await _httpClient.PostAsync(
                 $"https://{_config.HsmIpAddress}:2223/cloudhsm/api",
                 content);
 
             response.EnsureSuccessStatusCode();
 
             var responseContent = await response.Content.ReadAsStringAsync();
-            var result = JsonDocument.Parse(responseContent);
+            using var result = JsonDocument.Parse(responseContent);
             var wrappedKey = result.RootElement.GetProperty("wrappedKey").GetString();
             return Convert.FromBase64String(wrappedKey!);
         }
@@ -409,14 +412,14 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await _httpClient.PostAsync(
+            using var response = await _httpClient.PostAsync(
                 $"https://{_config.HsmIpAddress}:2223/cloudhsm/api",
                 content);
 
             response.EnsureSuccessStatusCode();
 
             var responseContent = await response.Content.ReadAsStringAsync();
-            var result = JsonDocument.Parse(responseContent);
+            using var result = JsonDocument.Parse(responseContent);
             var unwrappedKey = result.RootElement.GetProperty("keyData").GetString();
             return Convert.FromBase64String(unwrappedKey!);
         }
@@ -435,7 +438,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await _httpClient.PostAsync(
+            using var response = await _httpClient.PostAsync(
                 $"https://{_config.HsmIpAddress}:2223/cloudhsm/api",
                 content);
 
@@ -443,7 +446,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
                 return null;
 
             var responseContent = await response.Content.ReadAsStringAsync();
-            var result = JsonDocument.Parse(responseContent);
+            using var result = JsonDocument.Parse(responseContent);
 
             if (result.RootElement.TryGetProperty("keyHandle", out var keyHandle))
             {
@@ -467,7 +470,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await _httpClient.PostAsync(
+            using var response = await _httpClient.PostAsync(
                 $"https://{_config.HsmIpAddress}:2223/cloudhsm/api",
                 content);
 
@@ -493,7 +496,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await _httpClient.PostAsync(
+            using var response = await _httpClient.PostAsync(
                 $"https://{_config.HsmIpAddress}:2223/cloudhsm/api",
                 content,
                 cancellationToken);
@@ -502,7 +505,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
                 return Array.Empty<string>();
 
             var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
-            var result = JsonDocument.Parse(responseContent);
+            using var result = JsonDocument.Parse(responseContent);
 
             if (result.RootElement.TryGetProperty("keys", out var keys))
             {
@@ -539,7 +542,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await _httpClient.PostAsync(
+            using var response = await _httpClient.PostAsync(
                 $"https://{_config.HsmIpAddress}:2223/cloudhsm/api",
                 content,
                 cancellationToken);

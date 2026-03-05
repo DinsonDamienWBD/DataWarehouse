@@ -381,7 +381,10 @@ public sealed class ResilienceScalingManager : IScalableSubsystem, IDisposable
     /// <summary>
     /// Gets all tracked strategy identifiers.
     /// </summary>
-    internal IReadOnlyCollection<string> TrackedStrategies => _strategyMetrics.Keys.ToArray();
+    // ConcurrentDictionary.Keys is a live snapshot-like collection; wrap in a list for
+    // IReadOnlyCollection<string>. The allocation is bounded by the number of tracked strategies
+    // (typically small) and avoids repeated ToArray() at call sites.
+    internal IReadOnlyCollection<string> TrackedStrategies => new List<string>(_strategyMetrics.Keys);
 
     #endregion
 
@@ -432,6 +435,10 @@ public sealed class ResilienceScalingManager : IScalableSubsystem, IDisposable
             }
             catch (Exception) when (attempt < options.MaxRetries && !ct.IsCancellationRequested)
             {
+                // Note: `when` filter fires BEFORE increment (attempt < MaxRetries), then we increment.
+                // After increment, check `attempt >= MaxRetries` to re-throw on the final attempt.
+                // This asymmetry is intentional: the filter admits the catch block only when retries remain;
+                // the inner check re-throws immediately without delay when the last retry was just consumed.
                 attempt++;
                 Interlocked.Increment(ref _retryAttempts);
                 metrics.RecordRetry();
@@ -446,7 +453,7 @@ public sealed class ResilienceScalingManager : IScalableSubsystem, IDisposable
                     throw new OperationCanceledException(ct);
                 }
 
-                // If this was the last retry, re-throw
+                // Re-throw on the final attempt (no more retries remain after this one)
                 if (attempt >= options.MaxRetries)
                 {
                     throw;
@@ -512,7 +519,9 @@ public sealed class ResilienceScalingManager : IScalableSubsystem, IDisposable
         }
         catch
         {
+
             // Best-effort distributed state sharing -- do not fail the operation
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

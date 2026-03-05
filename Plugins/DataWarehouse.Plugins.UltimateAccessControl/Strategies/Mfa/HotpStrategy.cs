@@ -88,9 +88,15 @@ protected override async Task<AccessDecision> EvaluateAccessCoreAsync(
 
                 if (validationResult.IsValid)
                 {
-                    // Update counter to matched value + 1
-                    userData.Counter = validationResult.MatchedCounter + 1;
-                    _userData[context.SubjectId] = userData;
+                    // Compute drift BEFORE mutating counter
+                    var counterDrift = validationResult.MatchedCounter - userData.Counter;
+
+                    // Update counter atomically
+                    lock (_userData)
+                    {
+                        userData.Counter = validationResult.MatchedCounter + 1;
+                        _userData[context.SubjectId] = userData;
+                    }
 
                     return new AccessDecision
                     {
@@ -101,7 +107,7 @@ protected override async Task<AccessDecision> EvaluateAccessCoreAsync(
                         {
                             ["mfa_method"] = "hotp",
                             ["counter"] = validationResult.MatchedCounter,
-                            ["counter_drift"] = validationResult.MatchedCounter - (userData.Counter - 1),
+                            ["counter_drift"] = counterDrift,
                             ["algorithm"] = userData.Algorithm.ToString()
                         }
                     };
@@ -192,16 +198,22 @@ protected override async Task<AccessDecision> EvaluateAccessCoreAsync(
 
                 if (ConstantTimeEquals(code1, expectedCode1) && ConstantTimeEquals(code2, expectedCode2))
                 {
-                    // Found matching consecutive codes - update counter
-                    userData.Counter = counter + 2; // Move past both used codes
-                    _userData[userId] = userData;
+                    // Compute drift BEFORE mutating counter
+                    var drift = counter - userData.Counter;
+
+                    // Found matching consecutive codes - update counter atomically
+                    lock (_userData)
+                    {
+                        userData.Counter = counter + 2; // Move past both used codes
+                        _userData[userId] = userData;
+                    }
 
                     return new ResyncResult
                     {
                         Success = true,
                         Message = "Counter resynchronized successfully",
-                        NewCounter = userData.Counter,
-                        CounterDrift = counter - userData.Counter
+                        NewCounter = counter + 2,
+                        CounterDrift = drift
                     };
                 }
             }

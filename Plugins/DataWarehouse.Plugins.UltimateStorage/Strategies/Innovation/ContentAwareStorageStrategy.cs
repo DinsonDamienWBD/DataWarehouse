@@ -124,7 +124,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             }
 
             var categoryPath = GetCategoryPath(contentType);
-            var filePath = Path.Combine(_baseStoragePath, categoryPath, key);
+            var rawFilePath = Path.Combine(_baseStoragePath, categoryPath, key);
+            var filePath = Path.GetFullPath(rawFilePath);
+            if (!filePath.StartsWith(_baseStoragePath, StringComparison.OrdinalIgnoreCase))
+                throw new UnauthorizedAccessException($"Key '{key}' resolves outside storage root.");
             var dir = Path.GetDirectoryName(filePath);
             if (!string.IsNullOrEmpty(dir))
             {
@@ -400,14 +403,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         }
 
         /// <summary>
-        /// Generates a non-cryptographic hash from content using fast hashing.
-        /// AD-11: Cryptographic hashing delegated to UltimateDataIntegrity via bus.
+        /// Computes a SHA-256 fingerprint for content-addressed deduplication.
+        /// A 32-bit hash is insufficient for deduplication: birthday collisions occur
+        /// around 65K objects, causing wrong-file returns on collision.
+        /// SHA-256 is collision-resistant and safe for deduplication fingerprinting.
         /// </summary>
         private static string ComputeHash(byte[] data)
         {
-            var hash = new HashCode();
-            hash.AddBytes(data);
-            return hash.ToHashCode().ToString("x8");
+            return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(data));
         }
 
         #endregion

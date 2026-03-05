@@ -187,10 +187,10 @@ public sealed class ExtendedInode512
             IndirectExtentBlock = standard.IndirectExtentBlock,
             DoubleIndirectBlock = standard.DoubleIndirectBlock,
             ExtendedAttributeBlock = standard.ExtendedAttributeBlock,
-            // Extended fields default: nanosecond timestamps from tick-based ones
-            CreatedNs = standard.CreatedUtc * 100, // ticks to nanoseconds
-            ModifiedNs = standard.ModifiedUtc * 100,
-            AccessedNs = standard.AccessedUtc * 100,
+            // Extended fields: ticks (100ns each) → nanoseconds; cap at long.MaxValue to prevent overflow
+            CreatedNs = standard.CreatedUtc <= long.MaxValue / 100 ? standard.CreatedUtc * 100 : long.MaxValue,
+            ModifiedNs = standard.ModifiedUtc <= long.MaxValue / 100 ? standard.ModifiedUtc * 100 : long.MaxValue,
+            AccessedNs = standard.AccessedUtc <= long.MaxValue / 100 ? standard.AccessedUtc * 100 : long.MaxValue,
         };
 
         // Copy extents

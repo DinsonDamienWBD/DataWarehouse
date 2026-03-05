@@ -31,8 +31,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             var client = handle.GetConnection<HttpClient>();
-            var response = await client.GetAsync("/", ct);
-            return response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable;
+            using var response = await client.GetAsync("/", ct);
+            return response.IsSuccessStatusCode;
         }
 
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
@@ -56,7 +56,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
             var stateUrl = $"/v1/projects/-/locations/-/registries/-/devices/{deviceId}/states";
             try
             {
-                var response = await client.GetAsync(stateUrl, ct);
+                using var response = await client.GetAsync(stateUrl, ct);
+                response.EnsureSuccessStatusCode();
                 var content = await response.Content.ReadAsStringAsync(ct);
                 return new Dictionary<string, object>
                 {
@@ -88,7 +89,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
             var commandUrl = $"/v1/projects/-/locations/-/registries/-/devices/{deviceId}:sendCommandToDevice";
             try
             {
-                var response = await client.GetAsync(commandUrl, ct);
+                using var response = await client.GetAsync(commandUrl, ct);
                 return $"{{\"status\":\"queued\",\"deviceId\":\"{deviceId}\",\"command\":\"{command}\",\"endpoint\":\"{commandUrl}\"}}";
             }
             catch (Exception ex)

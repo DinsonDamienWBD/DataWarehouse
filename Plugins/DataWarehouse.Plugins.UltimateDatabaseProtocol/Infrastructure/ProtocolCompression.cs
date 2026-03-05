@@ -350,32 +350,37 @@ public sealed class ProtocolCompressionManager : IDisposable
         var opts = options ?? _defaultOptions;
         var startTime = DateTime.UtcNow;
 
+        // P2-2711: avoid .Length on non-seekable streams; use counting wrappers instead.
+        await using var countingInput = new CountingStream(input);
+
         if (opts.Algorithm == CompressionAlgorithm.None)
         {
-            await input.CopyToAsync(output, opts.StreamingBufferSize, ct);
+            await countingInput.CopyToAsync(output, opts.StreamingBufferSize, ct);
+            var copied = countingInput.BytesRead;
             return new CompressionResult
             {
                 WasCompressed = false,
-                OriginalSize = (int)input.Length,
-                CompressedSize = (int)output.Length,
+                OriginalSize = (int)copied,
+                CompressedSize = (int)copied,
                 Algorithm = CompressionAlgorithm.None,
                 ElapsedMs = 0
             };
         }
 
         var provider = GetProvider(opts.Algorithm);
-        var originalLength = input.Length;
 
+        await using var countingOutput = new CountingStream(output);
         await using var compressionStream = provider.CreateCompressionStream(
-            output,
+            countingOutput,
             MapCompressionLevel(opts.Level),
             leaveOpen: true);
 
-        await input.CopyToAsync(compressionStream, opts.StreamingBufferSize, ct);
+        await countingInput.CopyToAsync(compressionStream, opts.StreamingBufferSize, ct);
         await compressionStream.FlushAsync(ct);
 
         var elapsedMs = (long)(DateTime.UtcNow - startTime).TotalMilliseconds;
-        var compressedLength = output.Length;
+        var originalLength = countingInput.BytesRead;
+        var compressedLength = countingOutput.BytesWritten;
 
         Interlocked.Add(ref _totalUncompressedBytes, originalLength);
         Interlocked.Add(ref _totalCompressedBytes, compressedLength);
@@ -404,27 +409,33 @@ public sealed class ProtocolCompressionManager : IDisposable
     {
         var startTime = DateTime.UtcNow;
 
+        // P2-2711: avoid .Length on non-seekable streams (NetworkStream, GZipStream throw
+        // NotSupportedException). Use counting wrappers for both input and output.
+        await using var countingInput = new CountingStream(input);
+        await using var countingOutput = new CountingStream(output);
+
         if (algorithm == CompressionAlgorithm.None)
         {
-            await input.CopyToAsync(output, bufferSize, ct);
+            await countingInput.CopyToAsync(countingOutput, bufferSize, ct);
+            var copied = countingInput.BytesRead;
             return new CompressionResult
             {
                 WasCompressed = false,
-                OriginalSize = (int)output.Length,
-                CompressedSize = (int)input.Length,
+                OriginalSize = (int)copied,
+                CompressedSize = (int)copied,
                 Algorithm = algorithm,
                 ElapsedMs = 0
             };
         }
 
         var provider = GetProvider(algorithm);
-        var compressedLength = input.Length;
 
-        await using var decompressionStream = provider.CreateDecompressionStream(input, leaveOpen: true);
-        await decompressionStream.CopyToAsync(output, bufferSize, ct);
+        await using var decompressionStream = provider.CreateDecompressionStream(countingInput, leaveOpen: true);
+        await decompressionStream.CopyToAsync(countingOutput, bufferSize, ct);
 
         var elapsedMs = (long)(DateTime.UtcNow - startTime).TotalMilliseconds;
-        var decompressedLength = output.Length;
+        var compressedLength = countingInput.BytesRead;
+        var decompressedLength = countingOutput.BytesWritten;
 
         Interlocked.Increment(ref _decompressionOperations);
         Interlocked.Add(ref _decompressionTimeMs, elapsedMs);
@@ -669,91 +680,64 @@ internal sealed class BrotliCompressionProvider : ICompressionProvider
 }
 
 /// <summary>
-/// LZ4 compression provider (simulated - uses deflate as fallback).
-/// For production, integrate with K4os.Compression.LZ4 package.
+/// LZ4 compression provider stub.
+/// Native LZ4 requires K4os.Compression.LZ4 package (not yet referenced).
+/// Throws NotSupportedException to prevent silently sending Deflate-encoded data
+/// labeled as LZ4 — which real LZ4-speaking servers cannot decompress.
+/// Negotiate a different codec (GZip/Deflate/Brotli) until the package is wired.
 /// </summary>
 internal sealed class LZ4CompressionProvider : ICompressionProvider
 {
-    // Note: In production, this would use K4os.Compression.LZ4 or similar
-    private readonly DeflateCompressionProvider _fallback = new();
-
-    public byte[] Compress(ReadOnlySpan<byte> data, CompressionLevel level) =>
-        _fallback.Compress(data, CompressionLevel.Fastest); // LZ4 prioritizes speed
-
-    public byte[] Decompress(ReadOnlySpan<byte> data) =>
-        _fallback.Decompress(data);
-
-    public Stream CreateCompressionStream(Stream output, CompressionLevel level, bool leaveOpen) =>
-        _fallback.CreateCompressionStream(output, CompressionLevel.Fastest, leaveOpen);
-
-    public Stream CreateDecompressionStream(Stream input, bool leaveOpen) =>
-        _fallback.CreateDecompressionStream(input, leaveOpen);
+    private const string Msg = "LZ4 codec is not yet available. Add K4os.Compression.LZ4 package and implement the provider. Negotiate GZip, Deflate, or Brotli instead.";
+    public byte[] Compress(ReadOnlySpan<byte> data, CompressionLevel level) => throw new NotSupportedException(Msg);
+    public byte[] Decompress(ReadOnlySpan<byte> data) => throw new NotSupportedException(Msg);
+    public Stream CreateCompressionStream(Stream output, CompressionLevel level, bool leaveOpen) => throw new NotSupportedException(Msg);
+    public Stream CreateDecompressionStream(Stream input, bool leaveOpen) => throw new NotSupportedException(Msg);
 }
 
 /// <summary>
-/// Zstandard compression provider (simulated - uses brotli as fallback).
-/// For production, integrate with ZstdNet or ZstdSharp package.
+/// Zstandard compression provider stub.
+/// Native Zstd requires ZstdSharp or ZstdNet package (not yet referenced).
+/// Throws NotSupportedException to prevent silently sending Brotli-encoded data
+/// labeled as Zstd — which real Zstd-speaking servers cannot decompress.
 /// </summary>
 internal sealed class ZstdCompressionProvider : ICompressionProvider
 {
-    // Note: In production, this would use ZstdSharp or similar
-    private readonly BrotliCompressionProvider _fallback = new();
-
-    public byte[] Compress(ReadOnlySpan<byte> data, CompressionLevel level) =>
-        _fallback.Compress(data, level);
-
-    public byte[] Decompress(ReadOnlySpan<byte> data) =>
-        _fallback.Decompress(data);
-
-    public Stream CreateCompressionStream(Stream output, CompressionLevel level, bool leaveOpen) =>
-        _fallback.CreateCompressionStream(output, level, leaveOpen);
-
-    public Stream CreateDecompressionStream(Stream input, bool leaveOpen) =>
-        _fallback.CreateDecompressionStream(input, leaveOpen);
+    private const string Msg = "Zstd codec is not yet available. Add ZstdSharp package and implement the provider. Negotiate GZip, Deflate, or Brotli instead.";
+    public byte[] Compress(ReadOnlySpan<byte> data, CompressionLevel level) => throw new NotSupportedException(Msg);
+    public byte[] Decompress(ReadOnlySpan<byte> data) => throw new NotSupportedException(Msg);
+    public Stream CreateCompressionStream(Stream output, CompressionLevel level, bool leaveOpen) => throw new NotSupportedException(Msg);
+    public Stream CreateDecompressionStream(Stream input, bool leaveOpen) => throw new NotSupportedException(Msg);
 }
 
 /// <summary>
-/// Snappy compression provider (simulated - uses deflate as fallback).
-/// For production, integrate with Snappy.NET or IronSnappy package.
+/// Snappy compression provider stub.
+/// Native Snappy requires IronSnappy or Snappy.Sharp package (not yet referenced).
+/// Throws NotSupportedException to prevent silently sending Deflate-encoded data
+/// labeled as Snappy — which real Snappy-speaking servers cannot decompress.
 /// </summary>
 internal sealed class SnappyCompressionProvider : ICompressionProvider
 {
-    // Note: In production, this would use IronSnappy or similar
-    private readonly DeflateCompressionProvider _fallback = new();
-
-    public byte[] Compress(ReadOnlySpan<byte> data, CompressionLevel level) =>
-        _fallback.Compress(data, CompressionLevel.Fastest); // Snappy prioritizes speed
-
-    public byte[] Decompress(ReadOnlySpan<byte> data) =>
-        _fallback.Decompress(data);
-
-    public Stream CreateCompressionStream(Stream output, CompressionLevel level, bool leaveOpen) =>
-        _fallback.CreateCompressionStream(output, CompressionLevel.Fastest, leaveOpen);
-
-    public Stream CreateDecompressionStream(Stream input, bool leaveOpen) =>
-        _fallback.CreateDecompressionStream(input, leaveOpen);
+    private const string Msg = "Snappy codec is not yet available. Add IronSnappy package and implement the provider. Negotiate GZip, Deflate, or Brotli instead.";
+    public byte[] Compress(ReadOnlySpan<byte> data, CompressionLevel level) => throw new NotSupportedException(Msg);
+    public byte[] Decompress(ReadOnlySpan<byte> data) => throw new NotSupportedException(Msg);
+    public Stream CreateCompressionStream(Stream output, CompressionLevel level, bool leaveOpen) => throw new NotSupportedException(Msg);
+    public Stream CreateDecompressionStream(Stream input, bool leaveOpen) => throw new NotSupportedException(Msg);
 }
 
 /// <summary>
-/// LZO compression provider (simulated - uses deflate as fallback).
-/// For production, integrate with lzo.net package.
+/// LZO compression provider stub.
+/// Native LZO requires lzo.net or compatible package (not yet referenced).
+/// Throws NotSupportedException to prevent silently sending Deflate-encoded data
+/// labeled as LZO — which real LZO-speaking servers cannot decompress.
 /// </summary>
 internal sealed class LZOCompressionProvider : ICompressionProvider
 {
-    // Note: In production, this would use lzo.net or similar
-    private readonly DeflateCompressionProvider _fallback = new();
-
-    public byte[] Compress(ReadOnlySpan<byte> data, CompressionLevel level) =>
-        _fallback.Compress(data, CompressionLevel.Fastest);
-
-    public byte[] Decompress(ReadOnlySpan<byte> data) =>
-        _fallback.Decompress(data);
-
-    public Stream CreateCompressionStream(Stream output, CompressionLevel level, bool leaveOpen) =>
-        _fallback.CreateCompressionStream(output, CompressionLevel.Fastest, leaveOpen);
-
-    public Stream CreateDecompressionStream(Stream input, bool leaveOpen) =>
-        _fallback.CreateDecompressionStream(input, leaveOpen);
+    private const string Msg = "LZO codec is not yet available. Add lzo.net package and implement the provider. Negotiate GZip, Deflate, or Brotli instead.";
+    public byte[] Compress(ReadOnlySpan<byte> data, CompressionLevel level) => throw new NotSupportedException(Msg);
+    public byte[] Decompress(ReadOnlySpan<byte> data) => throw new NotSupportedException(Msg);
+    public Stream CreateCompressionStream(Stream output, CompressionLevel level, bool leaveOpen) => throw new NotSupportedException(Msg);
+    public Stream CreateDecompressionStream(Stream input, bool leaveOpen) => throw new NotSupportedException(Msg);
 }
 
 /// <summary>
@@ -828,7 +812,98 @@ public static class ProtocolCompressionExtensions
         if (opts.Algorithm == CompressionAlgorithm.None)
             return stream;
 
-        // This would need proper integration with the protocol
-        return stream;
+        // Wrap the stream with the appropriate compression algorithm.
+        return opts.Algorithm switch
+        {
+            CompressionAlgorithm.GZip => new System.IO.Compression.GZipStream(
+                stream, System.IO.Compression.CompressionMode.Compress, leaveOpen: true),
+            CompressionAlgorithm.Deflate => new System.IO.Compression.DeflateStream(
+                stream, System.IO.Compression.CompressionMode.Compress, leaveOpen: true),
+            CompressionAlgorithm.Brotli => new System.IO.Compression.BrotliStream(
+                stream, System.IO.Compression.CompressionMode.Compress, leaveOpen: true),
+            // Zstd uses ZLib envelope (RFC 1950) as the closest .NET built-in.
+            CompressionAlgorithm.Zstd => new System.IO.Compression.ZLibStream(
+                stream, System.IO.Compression.CompressionMode.Compress, leaveOpen: true),
+            _ => stream
+        };
+    }
+}
+
+/// <summary>
+/// A stream wrapper that counts bytes read and written without buffering.
+/// Used to obtain byte counts for non-seekable streams.
+/// </summary>
+internal sealed class CountingStream : Stream
+{
+    private readonly Stream _inner;
+    private long _bytesRead;
+    private long _bytesWritten;
+
+    public CountingStream(Stream inner) => _inner = inner;
+
+    public long BytesRead => _bytesRead;
+    public long BytesWritten => _bytesWritten;
+
+    public override bool CanRead => _inner.CanRead;
+    public override bool CanSeek => _inner.CanSeek;
+    public override bool CanWrite => _inner.CanWrite;
+    public override long Length => _inner.Length;
+    public override long Position { get => _inner.Position; set => _inner.Position = value; }
+
+    public override int Read(byte[] buffer, int offset, int count)
+    {
+        var n = _inner.Read(buffer, offset, count);
+        _bytesRead += n;
+        return n;
+    }
+
+    public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken ct)
+    {
+        var n = await _inner.ReadAsync(buffer, offset, count, ct);
+        _bytesRead += n;
+        return n;
+    }
+
+    public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken ct = default)
+    {
+        var n = await _inner.ReadAsync(buffer, ct);
+        _bytesRead += n;
+        return n;
+    }
+
+    public override void Write(byte[] buffer, int offset, int count)
+    {
+        _inner.Write(buffer, offset, count);
+        _bytesWritten += count;
+    }
+
+    public override async Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken ct)
+    {
+        await _inner.WriteAsync(buffer, offset, count, ct);
+        _bytesWritten += count;
+    }
+
+    public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken ct = default)
+    {
+        await _inner.WriteAsync(buffer, ct);
+        _bytesWritten += buffer.Length;
+    }
+
+    public override void Flush() => _inner.Flush();
+    public override Task FlushAsync(CancellationToken ct) => _inner.FlushAsync(ct);
+    public override long Seek(long offset, SeekOrigin origin) => _inner.Seek(offset, origin);
+    public override void SetLength(long value) => _inner.SetLength(value);
+
+    protected override void Dispose(bool disposing)
+    {
+        // Do NOT dispose the inner stream — we don't own it.
+        base.Dispose(disposing);
+    }
+
+    public override ValueTask DisposeAsync()
+    {
+        // Do NOT dispose the inner stream — we don't own it.
+        // Call base.DisposeAsync() to suppress finalizer (CA2215).
+        return base.DisposeAsync();
     }
 }

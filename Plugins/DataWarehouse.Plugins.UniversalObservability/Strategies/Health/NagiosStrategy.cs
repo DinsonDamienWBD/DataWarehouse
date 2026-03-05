@@ -34,11 +34,22 @@ public sealed class NagiosStrategy : ObservabilityStrategyBase
         _username = username;
         _password = password;
         _hostname = string.IsNullOrEmpty(hostname) ? Environment.MachineName : hostname;
-
-        var auth = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_username}:{_password}"));
-        _httpClient.DefaultRequestHeaders.Clear();
-        _httpClient.DefaultRequestHeaders.Add("Authorization", $"Basic {auth}");
     }
+
+    /// <summary>Adds basic-auth header to each request (per-request, thread-safe).</summary>
+    private void AddAuth(HttpRequestMessage request)
+    {
+        var auth = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_username}:{_password}"));
+        request.Headers.Add("Authorization", $"Basic {auth}");
+    }
+
+    /// <summary>
+    /// Sanitizes plugin output text to prevent corruption of the Nagios CGI passive-check format.
+    /// Strips pipe characters (Nagios perf-data delimiter) and newlines from the output line.
+    /// Performance data is always passed via the dedicated <paramref name="performanceData"/> parameter.
+    /// </summary>
+    private static string SanitizeOutput(string output)
+        => output.Replace("|", " ").Replace("\r", " ").Replace("\n", " ").Trim();
 
     /// <summary>
     /// Sends a passive check result to Nagios via CGI.
@@ -47,7 +58,9 @@ public sealed class NagiosStrategy : ObservabilityStrategyBase
         string? performanceData = null, CancellationToken ct = default)
     {
         var statusCode = (int)status;
-        var fullOutput = performanceData != null ? $"{output}|{performanceData}" : output;
+        // P2-4611: Sanitize output before embedding in the CGI form to prevent pipe/newline injection.
+        var sanitizedOutput = SanitizeOutput(output);
+        var fullOutput = performanceData != null ? $"{sanitizedOutput}|{performanceData}" : sanitizedOutput;
 
         var formData = new Dictionary<string, string>
         {
@@ -61,7 +74,9 @@ public sealed class NagiosStrategy : ObservabilityStrategyBase
         };
 
         var content = new FormUrlEncodedContent(formData);
-        var response = await _httpClient.PostAsync($"{_nagiosUrl}/cgi-bin/cmd.cgi", content, ct);
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{_nagiosUrl}/cgi-bin/cmd.cgi") { Content = content };
+        AddAuth(request);
+        using var response = await _httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -76,12 +91,14 @@ public sealed class NagiosStrategy : ObservabilityStrategyBase
             ["cmd_mod"] = "2",
             ["host"] = _hostname,
             ["plugin_state"] = ((int)status).ToString(),
-            ["plugin_output"] = output,
+            ["plugin_output"] = SanitizeOutput(output),
             ["btnSubmit"] = "Commit"
         };
 
         var content = new FormUrlEncodedContent(formData);
-        var response = await _httpClient.PostAsync($"{_nagiosUrl}/cgi-bin/cmd.cgi", content, ct);
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{_nagiosUrl}/cgi-bin/cmd.cgi") { Content = content };
+        AddAuth(request);
+        using var response = await _httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -130,7 +147,9 @@ public sealed class NagiosStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{_nagiosUrl}/cgi-bin/statusjson.cgi?query=host&hostname={_hostname}", ct);
+            using var healthReq = new HttpRequestMessage(HttpMethod.Get, $"{_nagiosUrl}/cgi-bin/statusjson.cgi?query=host&hostname={_hostname}");
+            AddAuth(healthReq);
+            using var response = await _httpClient.SendAsync(healthReq, ct);
             return new HealthCheckResult(response.IsSuccessStatusCode,
                 response.IsSuccessStatusCode ? "Nagios is accessible" : "Nagios inaccessible",
                 new Dictionary<string, object> { ["url"] = _nagiosUrl, ["hostname"] = _hostname });
@@ -150,20 +169,15 @@ public sealed class NagiosStrategy : ObservabilityStrategyBase
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("nagios.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
-    protected override void Dispose(bool disposing) { if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }
+    protected override void Dispose(bool disposing) {
+                _password = string.Empty; if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }
 
     public enum NagiosStatus { Ok = 0, Warning = 1, Critical = 2, Unknown = 3 }
 }

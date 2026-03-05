@@ -333,9 +333,12 @@ public sealed class OnlineDefragmenter
         if (fragRatio < 0.01)
             return Task.FromResult(0);
 
-        // Estimate merges from fragmentation: higher fragmentation = more potential merges
-        // This is a conservative estimate; actual merges happen during allocation group compaction
-        mergeCount = Math.Max(0, (int)(fragRatio * freeBlocks / 2));
+        // In a bitmap allocator, adjacent free blocks are inherently represented
+        // as contiguous runs. The actual merge requires walking the bitmap to find
+        // adjacent free regions that were deallocated separately. Without direct bitmap
+        // access, we report 0 merges (honest metric) rather than a fabricated estimate.
+        // The allocator itself handles free-space coalescing during deallocation.
+        mergeCount = 0;
 
         return Task.FromResult(mergeCount);
     }
@@ -487,52 +490,21 @@ public sealed class OnlineDefragmenter
     /// </summary>
     private List<(long[] SourceBlocks, int TotalBlocks)> IdentifyCandidateExtents(int allocationGroupId)
     {
-        // In production, this would walk the inode table and find files whose
-        // extent lists span the given allocation group with > MinExtentsToDefrag extents.
-        // For the engine-level implementation, we identify non-contiguous allocated
-        // block runs that could benefit from compaction.
-        //
-        // The allocator's fragmentation ratio guides whether candidates exist.
-        // With high fragmentation, there are likely scattered allocated blocks
-        // that belong to the same logical files.
-
         var candidates = new List<(long[] SourceBlocks, int TotalBlocks)>();
 
         // Only attempt relocation when fragmentation warrants it
         if (_allocator.FragmentationRatio <= _policy.FragmentationThreshold)
             return candidates;
 
-        // Estimate candidate count based on fragmentation severity
-        // Higher fragmentation = more scattered allocations to compact
-        int estimatedCandidates = Math.Min(
-            _policy.MaxBlockMovesPerCycle / Math.Max(1, _policy.MinExtentsToDefrag),
-            16);
-
-        // Each candidate represents a set of scattered blocks belonging to one file.
-        // In bitmap-based allocation, we identify runs of allocated blocks that are
-        // separated by free gaps (indicating fragmentation).
-        for (int i = 0; i < estimatedCandidates; i++)
-        {
-            // Generate representative candidate: MinExtentsToDefrag + 1 blocks
-            // that need to be compacted into a contiguous extent.
-            int blockCount = _policy.MinExtentsToDefrag + 1;
-
-            // The actual source blocks would come from inode extent tree traversal.
-            // At the engine level, we provide the structural framework for the
-            // upper-layer inode manager to populate.
-            var sourceBlocks = new long[blockCount];
-
-            // Placeholder source block addresses; in production these come from
-            // actual inode extent entries within the allocation group range.
-            long baseBlock = (long)allocationGroupId * 1024 + i * (blockCount * 2);
-            for (int j = 0; j < blockCount; j++)
-            {
-                sourceBlocks[j] = baseBlock + j * 2; // Non-contiguous (gap of 1 between each)
-            }
-
-            candidates.Add((sourceBlocks, blockCount));
-        }
-
+        // Candidate identification requires walking the inode table to find files
+        // with extent lists that span the given allocation group.
+        // Without an IInodeTable reference, we cannot safely identify real block addresses
+        // and must not fabricate addresses that would cause data corruption on relocation.
+        // The defragmenter requires an InodeTable integration point to be wired up
+        // by the VDE mount pipeline before candidates can be identified.
+        //
+        // Upper-layer integration: VDE must call SetInodeTable(IInodeTable) to enable
+        // actual extent scanning. Until then, return empty (safe no-op).
         return candidates;
     }
 }

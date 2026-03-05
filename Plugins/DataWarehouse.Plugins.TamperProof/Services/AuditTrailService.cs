@@ -140,7 +140,7 @@ public class AuditTrailService : IAuditTrailService
                 operation.Type,
                 DateTime.UtcNow,
                 operation.UserId,
-                operation.Details,
+                operation.Details ?? string.Empty, // Guard null to maintain correct hash chain integrity
                 previousEntryHash,
                 operation.DataHash,
                 operation.Version);
@@ -151,7 +151,7 @@ public class AuditTrailService : IAuditTrailService
                 Operation: operation.Type,
                 Timestamp: DateTime.UtcNow,
                 UserId: operation.UserId,
-                Details: operation.Details,
+                Details: operation.Details ?? string.Empty,
                 PreviousEntryHash: previousEntryHash,
                 EntryHash: entryHash,
                 DataHash: operation.DataHash,
@@ -506,7 +506,7 @@ public class AuditTrailService : IAuditTrailService
         AuditOperationType operation,
         DateTime timestamp,
         string? userId,
-        string details,
+        string? details,
         string? previousEntryHash,
         string? dataHash,
         int? version)
@@ -517,7 +517,7 @@ public class AuditTrailService : IAuditTrailService
             Operation = operation.ToString(),
             Timestamp = timestamp.ToString("O"),
             UserId = userId ?? string.Empty,
-            Details = details,
+            Details = details ?? string.Empty,
             PreviousEntryHash = previousEntryHash ?? string.Empty,
             DataHash = dataHash ?? string.Empty,
             Version = version ?? 0
@@ -552,7 +552,7 @@ public record TamperProofAuditEntry(
     AuditOperationType Operation,
     DateTime Timestamp,
     string? UserId,
-    string Details,
+    string? Details,
     string? PreviousEntryHash,
     string EntryHash,
     string? DataHash = null,
@@ -573,7 +573,7 @@ public record AuditOperation(
     Guid BlockId,
     AuditOperationType Type,
     string? UserId,
-    string Details,
+    string? Details,
     string? DataHash = null,
     int? Version = null,
     Dictionary<string, string>? Metadata = null);

@@ -30,9 +30,12 @@ public sealed class OpsGenieStrategy : ObservabilityStrategyBase
     {
         _apiKey = apiKey;
         _region = region;
-        _httpClient.DefaultRequestHeaders.Clear();
-        _httpClient.DefaultRequestHeaders.Add("Authorization", $"GenieKey {_apiKey}");
+        // Do NOT set DefaultRequestHeaders — inject per-request to avoid thread-safety issues.
     }
+
+    /// <summary>Adds the OpsGenie API key to the request headers (per-request, thread-safe).</summary>
+    private void AddApiKey(HttpRequestMessage request) =>
+        request.Headers.Add("Authorization", $"GenieKey {_apiKey}");
 
     private string GetBaseUrl() => _region.ToLowerInvariant() == "eu"
         ? "https://api.eu.opsgenie.com/v2"
@@ -58,7 +61,9 @@ public sealed class OpsGenieStrategy : ObservabilityStrategyBase
 
         var json = JsonSerializer.Serialize(alert);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{GetBaseUrl()}/alerts", content, ct);
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{GetBaseUrl()}/alerts") { Content = content };
+        AddApiKey(request);
+        using var response = await _httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -70,7 +75,9 @@ public sealed class OpsGenieStrategy : ObservabilityStrategyBase
         var payload = new { note };
         var json = JsonSerializer.Serialize(payload);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        await _httpClient.PostAsync($"{GetBaseUrl()}/alerts/{alias}/acknowledge?identifierType=alias", content, ct);
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{GetBaseUrl()}/alerts/{alias}/acknowledge?identifierType=alias") { Content = content };
+        AddApiKey(request);
+        await _httpClient.SendAsync(request, ct);
     }
 
     /// <summary>
@@ -81,7 +88,9 @@ public sealed class OpsGenieStrategy : ObservabilityStrategyBase
         var payload = new { note };
         var json = JsonSerializer.Serialize(payload);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        await _httpClient.PostAsync($"{GetBaseUrl()}/alerts/{alias}/close?identifierType=alias", content, ct);
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{GetBaseUrl()}/alerts/{alias}/close?identifierType=alias") { Content = content };
+        AddApiKey(request);
+        await _httpClient.SendAsync(request, ct);
     }
 
     /// <summary>
@@ -92,7 +101,9 @@ public sealed class OpsGenieStrategy : ObservabilityStrategyBase
         var payload = new { note };
         var json = JsonSerializer.Serialize(payload);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        await _httpClient.PostAsync($"{GetBaseUrl()}/alerts/{alias}/notes?identifierType=alias", content, ct);
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{GetBaseUrl()}/alerts/{alias}/notes?identifierType=alias") { Content = content };
+        AddApiKey(request);
+        await _httpClient.SendAsync(request, ct);
     }
 
     protected override Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken ct)
@@ -122,7 +133,9 @@ public sealed class OpsGenieStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{GetBaseUrl()}/heartbeats", ct);
+            using var hcRequest = new HttpRequestMessage(HttpMethod.Get, $"{GetBaseUrl()}/heartbeats");
+            AddApiKey(hcRequest);
+            using var response = await _httpClient.SendAsync(hcRequest, ct);
             return new HealthCheckResult(response.IsSuccessStatusCode,
                 response.IsSuccessStatusCode ? "OpsGenie is healthy" : "OpsGenie unhealthy",
                 new Dictionary<string, object> { ["region"] = _region });
@@ -141,18 +154,13 @@ public sealed class OpsGenieStrategy : ObservabilityStrategyBase
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("ops_genie.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
-    protected override void Dispose(bool disposing) { if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }
+    protected override void Dispose(bool disposing) {
+                _apiKey = string.Empty; if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }
 }

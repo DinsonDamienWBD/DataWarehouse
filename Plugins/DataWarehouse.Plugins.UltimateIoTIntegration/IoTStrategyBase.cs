@@ -48,7 +48,7 @@ public abstract class IoTStrategyBase : StrategyBase, IIoTStrategyBase
 {
     private long _totalOperations;
     private long _failedOperations;
-    private DateTimeOffset? _lastActivity;
+    private long _lastActivityTicks; // Written/read via Interlocked; 0 = never
 
     /// <inheritdoc/>
     public abstract override string StrategyId { get; }
@@ -90,7 +90,9 @@ public abstract class IoTStrategyBase : StrategyBase, IIoTStrategyBase
             StrategyId = StrategyId,
             TotalOperations = total,
             FailedOperations = failed,
-            LastActivity = _lastActivity
+            LastActivity = Interlocked.Read(ref _lastActivityTicks) == 0
+                ? null
+                : new DateTimeOffset(Interlocked.Read(ref _lastActivityTicks), TimeSpan.Zero)
         };
     }
 
@@ -100,7 +102,7 @@ public abstract class IoTStrategyBase : StrategyBase, IIoTStrategyBase
     protected void RecordOperation()
     {
         Interlocked.Increment(ref _totalOperations);
-        _lastActivity = DateTimeOffset.UtcNow;
+        Interlocked.Exchange(ref _lastActivityTicks, DateTimeOffset.UtcNow.UtcTicks);
     }
 
     /// <summary>
@@ -110,7 +112,7 @@ public abstract class IoTStrategyBase : StrategyBase, IIoTStrategyBase
     {
         Interlocked.Increment(ref _totalOperations);
         Interlocked.Increment(ref _failedOperations);
-        _lastActivity = DateTimeOffset.UtcNow;
+        Interlocked.Exchange(ref _lastActivityTicks, DateTimeOffset.UtcNow.UtcTicks);
     }
 
     /// <summary>
@@ -170,25 +172,24 @@ public abstract class IoTStrategyBase : StrategyBase, IIoTStrategyBase
     }
 
     /// <summary>
-    /// Publishes a message to the message bus.
+    /// Publishes a message to the message bus asynchronously.
+    /// Callers should await this method to ensure delivery and proper error propagation.
+    /// Errors are logged and suppressed to avoid disrupting the calling strategy.
     /// </summary>
-    protected Task PublishMessage(string topic, PluginMessage message)
+    protected async Task PublishMessage(string topic, PluginMessage message)
     {
-        if (MessageBus != null)
+        if (MessageBus == null)
+            return;
+
+        try
         {
-            return Task.Run(async () =>
-            {
-                try
-                {
-                    await MessageBus.PublishAsync(topic, message);
-                }
-                catch (Exception ex)
-                {
-                    // Gracefully handle message bus unavailability
-                    System.Diagnostics.Debug.WriteLine($"IoT message publish failed: {ex.Message}");
-                }
-            });
+            await MessageBus.PublishAsync(topic, message).ConfigureAwait(false);
         }
-        return Task.CompletedTask;
+        catch (Exception ex)
+        {
+            // Log failure but do not propagate — message bus unavailability should not crash the strategy.
+            System.Diagnostics.Debug.WriteLine($"IoT message publish failed for topic '{topic}': {ex.Message}");
+            RecordFailure();
+        }
     }
 }

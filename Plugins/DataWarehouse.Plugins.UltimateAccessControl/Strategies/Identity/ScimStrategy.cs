@@ -80,7 +80,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
 
             try
             {
-                var response = await _httpClient.GetAsync($"{_scimEndpoint}/ServiceProviderConfig", cancellationToken);
+                using var response = await _httpClient.GetAsync($"{_scimEndpoint}/ServiceProviderConfig", cancellationToken);
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -99,7 +99,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
 
             try
             {
-                var response = await _httpClient.GetAsync($"{_scimEndpoint}/Users/{userId}", cancellationToken);
+                using var response = await _httpClient.GetAsync($"{_scimEndpoint}/Users/{userId}", cancellationToken);
                 if (!response.IsSuccessStatusCode)
                     return null;
 
@@ -125,7 +125,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
                 var json = JsonSerializer.Serialize(user);
                 var content = new StringContent(json, Encoding.UTF8, "application/scim+json");
 
-                var response = await _httpClient.PostAsync($"{_scimEndpoint}/Users", content, cancellationToken);
+                using var response = await _httpClient.PostAsync($"{_scimEndpoint}/Users", content, cancellationToken);
                 response.EnsureSuccessStatusCode();
 
                 var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -150,7 +150,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
                 var json = JsonSerializer.Serialize(user);
                 var content = new StringContent(json, Encoding.UTF8, "application/scim+json");
 
-                var response = await _httpClient.PutAsync($"{_scimEndpoint}/Users/{userId}", content, cancellationToken);
+                using var response = await _httpClient.PutAsync($"{_scimEndpoint}/Users/{userId}", content, cancellationToken);
                 response.EnsureSuccessStatusCode();
 
                 var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -172,7 +172,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
 
             try
             {
-                var response = await _httpClient.DeleteAsync($"{_scimEndpoint}/Users/{userId}", cancellationToken);
+                using var response = await _httpClient.DeleteAsync($"{_scimEndpoint}/Users/{userId}", cancellationToken);
                 return response.IsSuccessStatusCode;
             }
             catch

@@ -231,6 +231,8 @@ public sealed class PipelineScalingManager : IScalableSubsystem, IDisposable
     {
         ArgumentException.ThrowIfNullOrEmpty(pipelineId);
         ArgumentNullException.ThrowIfNull(stateData);
+        if (stageIndex < 0)
+            throw new ArgumentOutOfRangeException(nameof(stageIndex), stageIndex, "Stage index must be zero or greater.");
 
         bool isSpilled = false;
         byte[]? storedData = stateData;
@@ -257,9 +259,10 @@ public sealed class PipelineScalingManager : IScalableSubsystem, IDisposable
             isSpilled,
             dependsOnStages ?? Array.Empty<int>());
 
-        // Get or create the snapshot list for this pipeline
-        var snapshots = _stateSnapshots.GetOrDefault(pipelineId);
-        if (snapshots == null)
+        // Use TryGet then conditional Put under the downstream lock to eliminate the TOCTOU
+        // between GetOrDefault and Put that allowed concurrent callers to orphan list objects.
+        // BoundedCache does not expose GetOrAdd, so we lock the inner list as the guard.
+        if (!_stateSnapshots.TryGet(pipelineId, out var snapshots) || snapshots == null)
         {
             snapshots = new List<PipelineStageCapturedState>();
             _stateSnapshots.Put(pipelineId, snapshots);

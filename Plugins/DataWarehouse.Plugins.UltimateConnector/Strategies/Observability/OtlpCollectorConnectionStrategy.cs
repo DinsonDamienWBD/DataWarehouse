@@ -55,7 +55,7 @@ public sealed class OtlpCollectorConnectionStrategy : ObservabilityConnectionStr
         var httpClient = handle.GetConnection<HttpClient>();
         var json = JsonSerializer.Serialize(new { resourceMetrics = metrics });
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await httpClient.PostAsync("/v1/metrics", content, ct);
+        using var response = await httpClient.PostAsync("/v1/metrics", content, ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -64,7 +64,7 @@ public sealed class OtlpCollectorConnectionStrategy : ObservabilityConnectionStr
         var httpClient = handle.GetConnection<HttpClient>();
         var json = JsonSerializer.Serialize(new { resourceLogs = logs });
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await httpClient.PostAsync("/v1/logs", content, ct);
+        using var response = await httpClient.PostAsync("/v1/logs", content, ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -73,7 +73,7 @@ public sealed class OtlpCollectorConnectionStrategy : ObservabilityConnectionStr
         var httpClient = handle.GetConnection<HttpClient>();
         var json = JsonSerializer.Serialize(new { resourceSpans = traces });
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await httpClient.PostAsync("/v1/traces", content, ct);
+        using var response = await httpClient.PostAsync("/v1/traces", content, ct);
         response.EnsureSuccessStatusCode();
     }
 }

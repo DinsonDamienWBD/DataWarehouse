@@ -45,7 +45,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("pci_dss.check");
+            IncrementCounter("pci_dss.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -78,9 +78,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
                 CheckSecurityPolicy(context, violations, recommendations);
             }
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -133,8 +134,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
 
             if (hasSensitiveAuthData)
             {
-                if (context.OperationType.Equals("store", StringComparison.OrdinalIgnoreCase) ||
-                    context.OperationType.Equals("persist", StringComparison.OrdinalIgnoreCase))
+                if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("store", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(context.OperationType, "persist", StringComparison.OrdinalIgnoreCase))
                 {
                     violations.Add(new ComplianceViolation
                     {
@@ -148,8 +149,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
             }
 
             // Requirement 3.3: Mask PAN when displayed
-            if (context.OperationType.Equals("display", StringComparison.OrdinalIgnoreCase) ||
-                context.OperationType.Equals("render", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("display", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(context.OperationType, "render", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("PANMasked", out var maskedObj) || maskedObj is not true)
                 {
@@ -502,14 +503,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("pci_dss.initialized");
+            IncrementCounter("pci_dss.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("pci_dss.shutdown");
+            IncrementCounter("pci_dss.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

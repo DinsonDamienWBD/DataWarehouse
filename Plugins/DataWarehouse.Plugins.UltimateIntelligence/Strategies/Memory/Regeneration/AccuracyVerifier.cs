@@ -360,8 +360,15 @@ public sealed class AccuracyVerifier
         return 1.0 - ((double)distance / maxLen);
     }
 
+    // Finding 3172: Cap inputs to 4096 chars to prevent O(m×n) heap allocation on megabyte strings.
+    private const int LevenshteinMaxLength = 4096;
+
     private int CalculateLevenshteinDistance(string s1, string s2)
     {
+        // Truncate to cap before matrix allocation; accuracy on large strings is approximate anyway.
+        if (s1.Length > LevenshteinMaxLength) s1 = s1[..LevenshteinMaxLength];
+        if (s2.Length > LevenshteinMaxLength) s2 = s2[..LevenshteinMaxLength];
+
         var m = s1.Length;
         var n = s2.Length;
         var dp = new int[m + 1, n + 1];
@@ -446,6 +453,10 @@ public sealed class AccuracyVerifier
 
     private int CalculateLCSLength(string s1, string s2)
     {
+        // Finding 3173: Cap inputs identically to Levenshtein to avoid O(m×n) allocation.
+        if (s1.Length > LevenshteinMaxLength) s1 = s1[..LevenshteinMaxLength];
+        if (s2.Length > LevenshteinMaxLength) s2 = s2[..LevenshteinMaxLength];
+
         var m = s1.Length;
         var n = s2.Length;
         var dp = new int[m + 1, n + 1];

@@ -265,23 +265,27 @@ public class AzureWormStorage : WormStorageProviderPluginBase
 
         try
         {
-            // In production, this would call:
-            // var containerClient = new BlobContainerClient(_config.ConnectionString, _config.ContainerName);
-            // var properties = await containerClient.GetPropertiesAsync(ct);
-            // Check properties.Value.HasImmutabilityPolicy or version-level immutability
+            // Finding 1023: AzureWormStorage uses in-memory Dictionary simulation because
+            // Azure.Storage.Blobs (Azure SDK) is not referenced. VerifyImmutabilityConfigurationAsync
+            // previously set _immutabilityVerified = true unconditionally after a Task.Delay(10).
+            // The simulation is acceptable for dev/test, but we must NOT auto-verify in production
+            // environments. We log a prominent warning and treat this as development mode only.
+            _logger.LogWarning(
+                "AzureWormStorage is running in SIMULATION MODE — Azure.Storage.Blobs SDK is not referenced. " +
+                "All data is stored in-memory only. Do NOT use in production. " +
+                "Integrate the Azure.Storage.Blobs NuGet package to enable real Azure WORM storage.");
 
-            // Simulated verification
-            await Task.Delay(10, ct);
-            _immutabilityVerified = true;
+            await Task.CompletedTask;
+            _immutabilityVerified = false; // Not verified — simulation does not contact Azure
 
             _logger.LogInformation(
-                "Azure Blob immutability verified for container {Container}: PolicyType={PolicyType}, DefaultRetention={Retention}, VersionLevel={VersionLevel}",
+                "Azure Blob immutability simulation initialized for container {Container}: PolicyType={PolicyType}, DefaultRetention={Retention}, VersionLevel={VersionLevel}",
                 _config.ContainerName,
                 _config.DefaultPolicyType,
                 _config.EffectiveDefaultRetention,
                 _config.EnableVersionLevelImmutability);
 
-            return true;
+            return false; // Not actually verified — production must use real Azure SDK
         }
         catch (Exception ex)
         {

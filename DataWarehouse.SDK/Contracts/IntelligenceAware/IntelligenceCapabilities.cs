@@ -458,38 +458,38 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         MissingValueImputation = 1L << 63,
 
         // ========================================
-        // Agent Capabilities (bits 64-69)
+        // Agent Capabilities
+        // NOTE: All 64 bits of a long are consumed by capabilities above (bits 0-63).
+        // Agent capabilities are modeled as named groupings of existing Core bits rather than
+        // new bit positions, which would silently wrap (1L<<64 == 1L<<0 in C#).
+        // A dedicated AgentCapabilities flags enum should be introduced in a future version
+        // to represent these independently. See SDK-AUDIT finding #129.
         // ========================================
 
         /// <summary>
-        /// Task planning and decomposition.
-        /// Break complex tasks into subtasks.
+        /// Task planning and decomposition (agent mode: uses FunctionCalling + Prediction bits).
         /// </summary>
-        TaskPlanning = 1L << 64,
+        TaskPlanning = FunctionCalling | Prediction,
 
         /// <summary>
-        /// Tool and function use by agents.
-        /// Execute external tools and APIs.
+        /// Tool and function use by agents (agent mode: maps to FunctionCalling).
         /// </summary>
-        ToolUse = 1L << 65,
+        ToolUse = FunctionCalling,
 
         /// <summary>
-        /// Reasoning chain generation.
-        /// Explain thought process step-by-step.
+        /// Reasoning chain generation (agent mode: maps to TextCompletion + NLP).
         /// </summary>
-        ReasoningChain = 1L << 66,
+        ReasoningChain = TextCompletion | NLP,
 
         /// <summary>
-        /// Self-reflection and learning.
-        /// Improve behavior based on feedback.
+        /// Self-reflection and learning (agent mode: maps to BehaviorAnalytics).
         /// </summary>
-        SelfReflection = 1L << 67,
+        SelfReflection = BehaviorAnalytics,
 
         /// <summary>
-        /// Multi-agent collaboration.
-        /// Coordinate multiple agents for complex tasks.
+        /// Multi-agent collaboration (agent mode: maps to Conversation + FunctionCalling).
         /// </summary>
-        MultiAgentCollaboration = 1L << 68,
+        MultiAgentCollaboration = Conversation | FunctionCalling,
 
         // ========================================
         // Capability Groups

@@ -47,7 +47,7 @@ public class TamperDetectionTests
             HashAlgorithmType.SHA256, 4096, 4096, "manifest-checksum");
         var attribution = AttributionAnalysis.CreateConfirmed(
             "user:admin-rogue",
-            new List<object> { "log-entry-1", "log-entry-2" },
+            new List<AccessLogEntry> { new() { EntryId = Guid.NewGuid(), ObjectId = Guid.NewGuid(), Principal = "admin", AccessType = AccessType.Read, Timestamp = DateTimeOffset.UtcNow, Succeeded = true }, new() { EntryId = Guid.NewGuid(), ObjectId = Guid.NewGuid(), Principal = "admin", AccessType = AccessType.Write, Timestamp = DateTimeOffset.UtcNow, Succeeded = true } },
             "Logged write operation directly correlates with hash mismatch",
             DateTimeOffset.UtcNow.AddMinutes(-5));
 
@@ -124,7 +124,7 @@ public class TamperDetectionTests
     {
         var analysis = AttributionAnalysis.CreateSuspected(
             "user:suspect-1",
-            new List<object> { "log-1" },
+            new List<AccessLogEntry> { new() { EntryId = Guid.NewGuid(), ObjectId = Guid.NewGuid(), Principal = "u1", AccessType = AccessType.Read, Timestamp = DateTimeOffset.UtcNow, Succeeded = true } },
             "Multiple principals accessed during time window",
             DateTimeOffset.UtcNow.AddHours(-2),
             DateTimeOffset.UtcNow.AddHours(-1));
@@ -140,7 +140,7 @@ public class TamperDetectionTests
     {
         var analysis = AttributionAnalysis.CreateLikely(
             "user:insider",
-            new List<object> { "log-1", "log-2" },
+            new List<AccessLogEntry> { new() { EntryId = Guid.NewGuid(), ObjectId = Guid.NewGuid(), Principal = "u1", AccessType = AccessType.Read, Timestamp = DateTimeOffset.UtcNow, Succeeded = true }, new() { EntryId = Guid.NewGuid(), ObjectId = Guid.NewGuid(), Principal = "u2", AccessType = AccessType.Write, Timestamp = DateTimeOffset.UtcNow, Succeeded = true } },
             "Exclusive access during window");
 
         analysis.Confidence.Should().Be(AttributionConfidence.Likely);
@@ -153,7 +153,7 @@ public class TamperDetectionTests
         var tamperTime = DateTimeOffset.UtcNow.AddMinutes(-15);
         var analysis = AttributionAnalysis.CreateConfirmed(
             "user:confirmed-tamperer",
-            new List<object>(),
+            new List<AccessLogEntry>(),
             "Direct write correlation",
             tamperTime);
 

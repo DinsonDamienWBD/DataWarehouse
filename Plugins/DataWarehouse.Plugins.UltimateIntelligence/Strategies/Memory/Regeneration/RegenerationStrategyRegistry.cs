@@ -95,15 +95,23 @@ public sealed class RegenerationStrategyRegistry
     public IReadOnlyList<IAdvancedRegenerationStrategy> GetStrategiesForFormat(string format)
     {
         var normalizedFormat = format.ToLowerInvariant();
-        if (_formatToStrategies.TryGetValue(normalizedFormat, out var strategyIds))
+
+        // P2-3230: The List<string> stored in _formatToStrategies is mutated (Remove) by
+        // Unregister under _registrationLock.  Take a snapshot of the IDs under the same
+        // lock before iterating so a concurrent Unregister cannot invalidate the enumerator.
+        string[] snapshotIds;
+        lock (_registrationLock)
         {
-            return strategyIds
-                .Select(id => _strategies.GetValueOrDefault(id))
-                .Where(s => s != null)
-                .Cast<IAdvancedRegenerationStrategy>()
-                .ToList();
+            if (!_formatToStrategies.TryGetValue(normalizedFormat, out var strategyIds))
+                return Array.Empty<IAdvancedRegenerationStrategy>();
+            snapshotIds = strategyIds.ToArray();
         }
-        return Array.Empty<IAdvancedRegenerationStrategy>();
+
+        return snapshotIds
+            .Select(id => _strategies.GetValueOrDefault(id))
+            .Where(s => s != null)
+            .Cast<IAdvancedRegenerationStrategy>()
+            .ToList();
     }
 
     /// <summary>

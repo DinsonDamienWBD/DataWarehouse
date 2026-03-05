@@ -49,24 +49,13 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.EmbeddedIdentit
             IncrementCounter("rocksdb.identity.shutdown");
             return base.ShutdownAsyncCore(cancellationToken);
         }
-protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
             IncrementCounter("rocksdb.identity.evaluate");
-            await Task.Yield();
-
-            var hasValidIdentity = context.SubjectId.Length > 0;
-
-            return new AccessDecision
-            {
-                IsGranted = hasValidIdentity,
-                Reason = hasValidIdentity ? "RocksDB Identity Strategy verified" : "Authentication failed",
-                ApplicablePolicies = new[] { "rocksdb-identity-policy" },
-                Metadata = new Dictionary<string, object>
-                {
-                    ["storage_engine"] = "RocksDB",
-                    ["strategy_type"] = "EmbeddedIdentity"
-                }
-            };
+            throw new NotSupportedException(
+                "RocksDbIdentityStrategy requires the RocksDbSharp NuGet package, a configured RocksDB database path, " +
+                "and real credential lookup against stored identity records. " +
+                "Granting access for any non-empty SubjectId is not a valid implementation.");
         }
     }
 }

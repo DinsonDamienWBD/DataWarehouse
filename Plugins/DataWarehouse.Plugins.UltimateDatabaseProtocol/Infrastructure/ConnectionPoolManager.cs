@@ -91,9 +91,15 @@ internal sealed class PooledConnection<TConnection> where TConnection : IDatabas
 {
     public TConnection Connection { get; }
     public DateTime CreatedAt { get; }
-    public DateTime LastUsedAt { get; private set; }
-    public int UseCount { get; private set; }
-    public bool IsInUse { get; private set; }
+    // P2-2308: volatile/Interlocked fields ensure visibility across the acquire/release path.
+    // DateTime cannot be volatile; store ticks as a long (Interlocked-safe).
+    private long _lastUsedAtTicks;
+    private volatile int _useCount;
+    private volatile bool _isInUse;
+
+    public DateTime LastUsedAt => new DateTime(Interlocked.Read(ref _lastUsedAtTicks), DateTimeKind.Utc);
+    public int UseCount => _useCount;
+    public bool IsInUse => _isInUse;
     public string PoolKey { get; }
 
     public PooledConnection(TConnection connection, string poolKey)
@@ -101,22 +107,22 @@ internal sealed class PooledConnection<TConnection> where TConnection : IDatabas
         Connection = connection;
         PoolKey = poolKey;
         CreatedAt = DateTime.UtcNow;
-        LastUsedAt = DateTime.UtcNow;
-        UseCount = 0;
-        IsInUse = false;
+        Interlocked.Exchange(ref _lastUsedAtTicks, DateTime.UtcNow.Ticks);
+        _useCount = 0;
+        _isInUse = false;
     }
 
     public void MarkInUse()
     {
-        IsInUse = true;
-        LastUsedAt = DateTime.UtcNow;
-        UseCount++;
+        _isInUse = true;
+        Interlocked.Exchange(ref _lastUsedAtTicks, DateTime.UtcNow.Ticks);
+        Interlocked.Increment(ref _useCount);
     }
 
     public void MarkAvailable()
     {
-        IsInUse = false;
-        LastUsedAt = DateTime.UtcNow;
+        _isInUse = false;
+        Interlocked.Exchange(ref _lastUsedAtTicks, DateTime.UtcNow.Ticks);
     }
 
     public bool IsExpired(int maxLifetimeMs) =>
@@ -139,7 +145,7 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
     private readonly Func<ConnectionParameters, Task<TConnection>> _connectionFactory;
     private readonly CancellationTokenSource _shutdownCts = new();
     private readonly Task _maintenanceTask;
-    private bool _disposed;
+    private int _disposed; // 0 = not disposed; 1 = disposed; Interlocked for atomic check-and-set
 
     // Statistics
     private long _totalConnectionsCreated;
@@ -175,6 +181,8 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
     /// </summary>
     public ConnectionPool GetOrCreatePool(ConnectionParameters parameters, ConnectionPoolOptions? options = null)
     {
+        // LOW-2721: guard against null parameters before accessing Host/Port/Database.
+        ArgumentNullException.ThrowIfNull(parameters);
         var key = GeneratePoolKey(parameters);
         return _pools.GetOrAdd(key, _ => new ConnectionPool(
             key,
@@ -223,7 +231,10 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
             }
         }
 
-        // Connection not found in any pool - just dispose it
+        // P2-2716: Connection not found in any pool — dispose and trace so callers are aware.
+        System.Diagnostics.Trace.TraceWarning(
+            "[ConnectionPool] ReleaseAsync: connection not found in any pool; disposing directly. " +
+            "This may indicate a pool mismatch or the connection was never acquired via this manager.");
         connection.Dispose();
     }
 
@@ -278,7 +289,10 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
 
     private static string GeneratePoolKey(ConnectionParameters parameters)
     {
-        return $"{parameters.Host}:{parameters.Port ?? 0}:{parameters.Database}:{parameters.Username}:{parameters.UseSsl}";
+        // LOW-2718: Distinguish null username from empty string so unauthenticated and
+        // authenticated connections don't accidentally share the same pool bucket.
+        var user = parameters.Username is null ? "<null>" : parameters.Username;
+        return $"{parameters.Host}:{parameters.Port ?? 0}:{parameters.Database}:{user}:{parameters.UseSsl}";
     }
 
     private void UpdatePeakInUse()
@@ -311,7 +325,9 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
             }
             catch
             {
+
                 // Continue on error
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
     }
@@ -324,8 +340,7 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
 
     public void Dispose()
     {
-        if (_disposed) return;
-        _disposed = true;
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
 
         _shutdownCts.Cancel();
         try { _maintenanceTask.Wait(TimeSpan.FromSeconds(5)); } catch { /* Best-effort task wait */ }
@@ -340,8 +355,7 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
 
     public async ValueTask DisposeAsync()
     {
-        if (_disposed) return;
-        _disposed = true;
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
 
         _shutdownCts.Cancel();
         try { await _maintenanceTask.WaitAsync(TimeSpan.FromSeconds(5)); } catch { /* Best-effort task wait */ }
@@ -369,7 +383,8 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
         private readonly SemaphoreSlim _acquireSemaphore;
         private readonly SemaphoreSlim _createLock = new(1, 1);
         private int _totalCreated;
-        private bool _disposed;
+        // P2-2700: use int with Interlocked for atomic check-and-set; 0=not disposed, 1=disposed
+        private int _disposed;
 
         internal ConnectionPool(
             string key,
@@ -418,13 +433,15 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
             }
             catch
             {
+
                 // Ignore warm-up failures
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
         public async Task<TConnection> AcquireAsync(CancellationToken ct = default)
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
+            ObjectDisposedException.ThrowIf(_disposed != 0, this);
 
             // Wait for slot in pool
             if (!await _acquireSemaphore.WaitAsync(_options.AcquireTimeoutMs, ct))
@@ -507,6 +524,11 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
                 return false;
             }
 
+            // P2-2707: only release semaphore when connection is returned to the available queue.
+            // Disposing an expired or invalid connection does NOT release a slot because that
+            // connection was never "available" — it is being destroyed. Releasing the semaphore in
+            // those paths inflates available slot count beyond MaxPoolSize.
+            bool releaseSlot = false;
             try
             {
                 // Check if should be recycled
@@ -528,13 +550,15 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
                     }
                 }
 
-                // Return to pool
+                // Return to pool — slot is becoming available
                 pooled.MarkAvailable();
                 _available.Enqueue(pooled);
+                releaseSlot = true;
             }
             finally
             {
-                _acquireSemaphore.Release();
+                if (releaseSlot)
+                    _acquireSemaphore.Release();
             }
 
             return true;
@@ -617,7 +641,9 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
             }
             catch
             {
+
                 // Ignore disposal errors
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             _manager.OnConnectionDestroyed();
@@ -625,19 +651,31 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
 
         public void Dispose()
         {
-            if (_disposed) return;
-            _disposed = true;
+            // P2-2700: atomic check-and-set prevents double-dispose from concurrent calls
+            if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
 
-            // Call async dispose and block (safer than GetAwaiter().GetResult())
-            DisposeAsync().AsTask().Wait();
+            // Dispose connections synchronously without blocking on DisposeAsync to avoid
+            // deadlocks in ASP.NET Core synchronization contexts (finding 2691).
+            while (_available.TryDequeue(out var pooled))
+            {
+                try { pooled.Connection.Dispose(); } catch { /* Best-effort */ }
+                _manager.OnConnectionDestroyed();
+            }
+            foreach (var kvp in _inUse)
+            {
+                try { kvp.Value.Connection.Dispose(); } catch { /* Best-effort */ }
+                _manager.OnConnectionDestroyed();
+            }
+            _inUse.Clear();
+
             _acquireSemaphore.Dispose();
             _createLock.Dispose();
         }
 
         public async ValueTask DisposeAsync()
         {
-            if (_disposed) return;
-            _disposed = true;
+            // P2-2700: atomic check-and-set prevents double-dispose from concurrent calls
+            if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
 
             await ClearAsync();
             _acquireSemaphore.Dispose();

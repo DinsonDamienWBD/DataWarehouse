@@ -53,6 +53,8 @@ public sealed class StripedWriteLock : IAsyncDisposable
     /// <returns>A <see cref="WriteRegion"/> that releases the stripe lock when disposed.</returns>
     public async ValueTask<WriteRegion> AcquireAsync(string key, CancellationToken ct = default)
     {
+        // Cat 14 (finding 774): explicit null guard so callers get ArgumentNullException (not NRE).
+        ArgumentNullException.ThrowIfNull(key);
         ObjectDisposedException.ThrowIf(_disposed, this);
         int stripe = GetStripe(key);
         await _stripes[stripe].WaitAsync(ct);

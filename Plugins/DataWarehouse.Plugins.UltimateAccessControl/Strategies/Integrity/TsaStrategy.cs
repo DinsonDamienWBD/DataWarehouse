@@ -94,7 +94,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
                 Nonce = nonce,
                 TsaName = "DataWarehouse-TSA",
                 SerialNumber = Guid.NewGuid().ToString("N"),
-                Policy = "1.2.3.4.5" // OID for timestamp policy
+                Policy = "1.3.6.1.4.1.99999.1.1" // Private enterprise OID for DataWarehouse TSA policy
             };
 
             _tokens[resourceId] = token;

@@ -128,9 +128,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     _uniqueChunks = _chunkIndex.Count;
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Start with empty index
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -153,9 +155,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Start with empty manifests
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -167,9 +171,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 var json = System.Text.Json.JsonSerializer.Serialize(_chunkIndex.ToDictionary(kvp => kvp.Key, kvp => kvp.Value));
                 await File.WriteAllTextAsync(indexPath, json, ct);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Best effort save
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -181,9 +187,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 var json = System.Text.Json.JsonSerializer.Serialize(_manifests.ToDictionary(kvp => kvp.Key, kvp => kvp.Value));
                 await File.WriteAllTextAsync(manifestsPath, json, ct);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Best effort save
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -260,10 +268,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 }
                 else
                 {
-                    // Existing chunk - just increment reference count
+                    // Existing chunk - increment reference count atomically under per-chunk lock
                     if (_chunkIndex.TryGetValue(chunkHash, out var chunkMeta))
                     {
-                        chunkMeta.RefCount++;
+                        lock (chunkMeta)
+                        {
+                            chunkMeta.RefCount++;
+                        }
                     }
                 }
             }
@@ -330,10 +341,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             {
                 if (_chunkIndex.TryGetValue(chunkHash, out var chunkMeta))
                 {
-                    chunkMeta.RefCount--;
+                    int remaining;
+                    lock (chunkMeta)
+                    {
+                        remaining = --chunkMeta.RefCount;
+                    }
 
                     // Delete chunk if no longer referenced
-                    if (chunkMeta.RefCount <= 0)
+                    if (remaining <= 0)
                     {
                         await DeleteChunkAsync(chunkHash, ct);
                         _chunkIndex.TryRemove(chunkHash, out _);
@@ -493,15 +508,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         /// Computes hash of a chunk for content-addressable storage using fast hashing.
         /// AD-11: Cryptographic hashing delegated to UltimateDataIntegrity via bus.
         /// </summary>
-        private string ComputeChunkHash(byte[] chunk)
+        private static string ComputeChunkHash(byte[] chunk)
         {
-            var hash = new HashCode();
-            hash.AddBytes(chunk);
-            var h1 = hash.ToHashCode();
-            var hash2 = new HashCode();
-            hash2.Add(h1);
-            hash2.Add(chunk.Length);
-            return $"{h1:x8}{hash2.ToHashCode():x8}";
+            // SHA-256 is collision-resistant for content-addressed storage.
+            // Process-randomized HashCode cannot be used as a content address —
+            // the same chunk would get a different address on each restart.
+            return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(chunk)).ToLowerInvariant();
         }
 
         #endregion

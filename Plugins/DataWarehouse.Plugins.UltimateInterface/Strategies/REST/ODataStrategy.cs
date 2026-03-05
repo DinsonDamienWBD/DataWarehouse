@@ -428,7 +428,9 @@ internal sealed class ODataStrategy : SdkInterface.InterfaceStrategyBase, IPlugi
             Filter = queryParams.TryGetValue("$filter", out var f) ? f : null,
             Select = queryParams.TryGetValue("$select", out var s) ? s : null,
             OrderBy = queryParams.TryGetValue("$orderby", out var o) ? o : null,
-            Top = queryParams.TryGetValue("$top", out var t) && int.TryParse(t, out var top) ? top : 20,
+            // P2-3343: Clamp $top to [1, 1000]. $top=0 produces empty page with nextLink that
+            // points to skip=0&top=0 again, causing client to poll forever.
+            Top = queryParams.TryGetValue("$top", out var t) && int.TryParse(t, out var top) ? Math.Clamp(top, 1, 1000) : 20,
             Skip = queryParams.TryGetValue("$skip", out var sk) && int.TryParse(sk, out var skip) ? skip : 0,
             Count = queryParams.ContainsKey("$count") && queryParams["$count"] == "true",
             Expand = queryParams.TryGetValue("$expand", out var e) ? e : null

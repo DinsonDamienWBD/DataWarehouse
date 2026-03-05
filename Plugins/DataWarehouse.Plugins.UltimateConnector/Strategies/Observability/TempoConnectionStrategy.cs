@@ -58,7 +58,7 @@ public sealed class TempoConnectionStrategy : ObservabilityConnectionStrategyBas
         var httpClient = handle.GetConnection<HttpClient>();
         var json = JsonSerializer.Serialize(new { batches = traces });
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await httpClient.PostAsync("/v1/traces", content, ct);
+        using var response = await httpClient.PostAsync("/v1/traces", content, ct);
         response.EnsureSuccessStatusCode();
     }
 }

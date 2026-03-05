@@ -32,6 +32,22 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Conversational;
 /// </remarks>
 internal sealed class SlackChannelStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
+    private volatile byte[]? _signingSecret;
+
+    /// <summary>
+    /// Configures the Slack signing secret used for HMAC-SHA256 request verification.
+    /// Must be called before handling requests. The secret is available in the Slack app settings
+    /// under "Signing Secret".
+    /// </summary>
+    /// <param name="signingSecret">The Slack app signing secret (non-empty).</param>
+    /// <exception cref="ArgumentException">Thrown when signingSecret is null or empty.</exception>
+    public void ConfigureSigningSecret(string signingSecret)
+    {
+        if (string.IsNullOrWhiteSpace(signingSecret))
+            throw new ArgumentException("Slack signing secret must not be null or empty.", nameof(signingSecret));
+        _signingSecret = Encoding.UTF8.GetBytes(signingSecret);
+    }
+
     // IPluginInterfaceStrategy metadata
     public override string StrategyId => "slack";
     public string DisplayName => "Slack Channel";
@@ -133,7 +149,8 @@ internal sealed class SlackChannelStrategy : SdkInterface.InterfaceStrategyBase,
     /// <summary>
     /// Handles Slack event callbacks (message, app_mention, etc.).
     /// </summary>
-    private async Task<SdkInterface.InterfaceResponse> HandleSlackEventAsync(
+    // Cat 15 (finding 3287): removed spurious async — no await in body.
+    private Task<SdkInterface.InterfaceResponse> HandleSlackEventAsync(
         JsonElement eventElement,
         CancellationToken cancellationToken)
     {
@@ -171,25 +188,26 @@ internal sealed class SlackChannelStrategy : SdkInterface.InterfaceStrategyBase,
             };
 
             var responseBody = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(response));
-            return new SdkInterface.InterfaceResponse(
+            return Task.FromResult(new SdkInterface.InterfaceResponse(
                 StatusCode: 200,
                 Headers: new Dictionary<string, string> { ["Content-Type"] = "application/json" },
                 Body: responseBody
-            );
+            ));
         }
 
         // Acknowledge other event types
-        return new SdkInterface.InterfaceResponse(
+        return Task.FromResult(new SdkInterface.InterfaceResponse(
             StatusCode: 200,
             Headers: new Dictionary<string, string> { ["Content-Type"] = "application/json" },
             Body: Encoding.UTF8.GetBytes("{}")
-        );
+        ));
     }
 
     /// <summary>
     /// Handles Slack slash commands.
     /// </summary>
-    private async Task<SdkInterface.InterfaceResponse> HandleSlashCommandAsync(
+    // Cat 15 (finding 3287): removed spurious async — no await in body.
+    private Task<SdkInterface.InterfaceResponse> HandleSlashCommandAsync(
         JsonElement root,
         CancellationToken cancellationToken)
     {
@@ -204,17 +222,18 @@ internal sealed class SlackChannelStrategy : SdkInterface.InterfaceStrategyBase,
         };
 
         var responseBody = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(response));
-        return new SdkInterface.InterfaceResponse(
+        return Task.FromResult(new SdkInterface.InterfaceResponse(
             StatusCode: 200,
             Headers: new Dictionary<string, string> { ["Content-Type"] = "application/json" },
             Body: responseBody
-        );
+        ));
     }
 
     /// <summary>
     /// Handles Slack interactive components (button clicks, modal submissions).
     /// </summary>
-    private async Task<SdkInterface.InterfaceResponse> HandleInteractiveComponentAsync(
+    // Cat 15 (finding 3287): removed spurious async — no await in body.
+    private Task<SdkInterface.InterfaceResponse> HandleInteractiveComponentAsync(
         JsonElement root,
         CancellationToken cancellationToken)
     {
@@ -234,11 +253,11 @@ internal sealed class SlackChannelStrategy : SdkInterface.InterfaceStrategyBase,
         }
 
         // Acknowledge interactive component
-        return new SdkInterface.InterfaceResponse(
+        return Task.FromResult(new SdkInterface.InterfaceResponse(
             StatusCode: 200,
             Headers: new Dictionary<string, string> { ["Content-Type"] = "application/json" },
             Body: Encoding.UTF8.GetBytes("{}")
-        );
+        ));
     }
 
     /// <summary>
@@ -250,28 +269,46 @@ internal sealed class SlackChannelStrategy : SdkInterface.InterfaceStrategyBase,
     /// <returns>True if signature is valid; otherwise, false.</returns>
     private bool VerifySlackSignature(ReadOnlyMemory<byte> body, string signature, string timestamp)
     {
+        var secret = _signingSecret
+            ?? throw new InvalidOperationException(
+                "Slack signing secret not configured. Call ConfigureSigningSecret() before handling requests.");
+
         // Verify timestamp is within 5 minutes to prevent replay attacks
-        if (long.TryParse(timestamp, out var ts))
+        if (!long.TryParse(timestamp, out var ts))
         {
-            var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            if (Math.Abs(now - ts) > 300) // 5 minutes
-            {
-                return false;
-            }
+            return false;
         }
 
-        // In production, this would use the actual Slack signing secret
-        // For now, perform structural validation only
-        if (!signature.StartsWith("v0="))
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        if (Math.Abs(now - ts) > 300) // 5 minutes
+        {
+            return false;
+        }
+
+        // Validate signature format prefix
+        if (!signature.StartsWith("v0=", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var providedHex = signature.Substring(3);
+        if (providedHex.Length != 64) // SHA-256 = 32 bytes = 64 hex chars
         {
             return false;
         }
 
         // Construct signature base string: v0:{timestamp}:{body}
         var sigBaseString = $"v0:{timestamp}:{Encoding.UTF8.GetString(body.Span)}";
+        var sigBaseBytes = Encoding.UTF8.GetBytes(sigBaseString);
 
-        // In production: compute HMAC-SHA256 with signing secret and compare
-        // For now, accept signature format validation
-        return true;
+        // Compute HMAC-SHA256 with signing secret
+        using var hmac = new HMACSHA256(secret);
+        var computedHash = hmac.ComputeHash(sigBaseBytes);
+        var computedHex = Convert.ToHexString(computedHash).ToLowerInvariant();
+
+        // Timing-safe comparison to prevent timing attacks
+        return CryptographicOperations.FixedTimeEquals(
+            Encoding.UTF8.GetBytes(computedHex),
+            Encoding.UTF8.GetBytes(providedHex.ToLowerInvariant()));
     }
 }

@@ -11,6 +11,7 @@ namespace DataWarehouse.Plugins.UltimateServerless.Strategies.ColdStart;
 public sealed class ProvisionedConcurrencyStrategy : ServerlessStrategyBase
 {
     private readonly BoundedDictionary<string, ProvisionedConfig> _configs = new BoundedDictionary<string, ProvisionedConfig>(1000);
+    private readonly BoundedDictionary<string, long> _utilizationCounters = new BoundedDictionary<string, long>(1000);
 
     public override string StrategyId => "coldstart-provisioned-concurrency";
     public override string DisplayName => "Provisioned Concurrency";
@@ -95,13 +96,16 @@ public sealed class ProvisionedConcurrencyStrategy : ServerlessStrategyBase
     public Task<ProvisionedMetrics> GetMetricsAsync(string functionId, string qualifier, CancellationToken ct = default)
     {
         RecordOperation("GetMetrics");
+        var key = $"{functionId}:{qualifier}";
+        _configs.TryGetValue(key, out var config);
+        _utilizationCounters.TryGetValue(key, out var utilizationCount);
         return Task.FromResult(new ProvisionedMetrics
         {
             FunctionId = functionId,
             Qualifier = qualifier,
-            AllocatedConcurrency = _configs.TryGetValue($"{functionId}:{qualifier}", out var config) ? config.AllocatedConcurrency : 0,
-            UtilizedConcurrency = Random.Shared.Next(0, config?.AllocatedConcurrency ?? 1),
-            SpilloverInvocations = Random.Shared.Next(0, 100)
+            AllocatedConcurrency = config?.AllocatedConcurrency ?? 0,
+            UtilizedConcurrency = (int)Math.Min(utilizationCount, config?.AllocatedConcurrency ?? 0),
+            SpilloverInvocations = 0 // Real spillover requires runtime telemetry
         });
     }
 }
@@ -116,6 +120,9 @@ public sealed class ProvisionedConcurrencyStrategy : ServerlessStrategyBase
 /// </summary>
 public sealed class LambdaSnapStartStrategy : ServerlessStrategyBase
 {
+    private readonly BoundedDictionary<string, (string functionArn, Func<Task> hook)> _restoreHooks
+        = new BoundedDictionary<string, (string, Func<Task>)>(500);
+
     public override string StrategyId => "coldstart-snapstart";
     public override string DisplayName => "Lambda SnapStart";
     public override ServerlessCategory Category => ServerlessCategory.ColdStartOptimization;
@@ -159,11 +166,29 @@ public sealed class LambdaSnapStartStrategy : ServerlessStrategyBase
         });
     }
 
-    /// <summary>Registers a restore hook for state restoration.</summary>
+    /// <summary>Registers a restore hook for state restoration after SnapStart restore.</summary>
     public Task RegisterRestoreHookAsync(string functionArn, string hookName, Func<Task> hook, CancellationToken ct = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(functionArn);
+        ArgumentException.ThrowIfNullOrWhiteSpace(hookName);
+        ArgumentNullException.ThrowIfNull(hook);
+        _restoreHooks[hookName] = (functionArn, hook);
         RecordOperation("RegisterRestoreHook");
         return Task.CompletedTask;
+    }
+
+    /// <summary>Invokes all restore hooks registered for the given function ARN (called during restore simulation).</summary>
+    public async Task InvokeRestoreHooksAsync(string functionArn, CancellationToken ct = default)
+    {
+        foreach (var (name, (arn, hook)) in _restoreHooks)
+        {
+            if (arn == functionArn)
+            {
+                ct.ThrowIfCancellationRequested();
+                await hook().ConfigureAwait(false);
+            }
+        }
+        RecordOperation("InvokeRestoreHooks");
     }
 }
 
@@ -223,22 +248,24 @@ public sealed class WarmupSchedulerStrategy : ServerlessStrategyBase
             Success = true,
             FunctionId = functionId,
             WarmedInstances = concurrency,
-            Duration = TimeSpan.FromMilliseconds(Random.Shared.Next(50, 200)),
+            Duration = TimeSpan.Zero, // Real duration requires runtime measurement
             Timestamp = DateTimeOffset.UtcNow
         });
     }
 
-    /// <summary>Gets warmup statistics.</summary>
+    /// <summary>Gets warmup statistics from tracked schedules.</summary>
     public Task<WarmupStats> GetStatsAsync(string functionId, CancellationToken ct = default)
     {
         RecordOperation("GetStats");
+        // Count schedules for this function as a proxy for warmup activity
+        var count = _schedules.Values.Count(s => s.FunctionId == functionId);
         return Task.FromResult(new WarmupStats
         {
             FunctionId = functionId,
-            TotalWarmups = Random.Shared.Next(100, 10000),
-            SuccessfulWarmups = Random.Shared.Next(95, 100),
-            AverageWarmupTimeMs = Random.Shared.Next(50, 150),
-            EstimatedMonthlyCost = Random.Shared.Next(1, 10)
+            TotalWarmups = count,
+            SuccessfulWarmups = count,
+            AverageWarmupTimeMs = 0, // Runtime telemetry required for accurate value
+            EstimatedMonthlyCost = 0
         });
     }
 
@@ -267,6 +294,7 @@ public sealed class LazyLoadingStrategy : ServerlessStrategyBase
     public override string StrategyId => "coldstart-lazy-loading";
     public override string DisplayName => "Lazy Loading";
     public override ServerlessCategory Category => ServerlessCategory.ColdStartOptimization;
+    public override bool IsProductionReady => false; // Analysis returns static recommendations
 
     public override ServerlessStrategyCapabilities Capabilities => new() { SupportsSyncInvocation = true };
 
@@ -418,6 +446,7 @@ public sealed class PredictiveWarmingStrategy : ServerlessStrategyBase
     public override string StrategyId => "coldstart-predictive";
     public override string DisplayName => "Predictive Warming";
     public override ServerlessCategory Category => ServerlessCategory.ColdStartOptimization;
+    public override bool IsProductionReady => false; // ML model requires training data
 
     public override ServerlessStrategyCapabilities Capabilities => new() { SupportsSyncInvocation = true };
 

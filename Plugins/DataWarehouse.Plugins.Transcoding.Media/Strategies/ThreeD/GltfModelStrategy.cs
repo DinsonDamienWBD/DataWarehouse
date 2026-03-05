@@ -77,6 +77,11 @@ internal sealed class GltfModelStrategy : MediaStrategyBase
     /// <inheritdoc/>
     public override string Name => "glTF 2.0 3D Model";
 
+    // Finding 1070: GenerateBinaryBuffer returns SHA256 hash (32 bytes) instead of actual
+    // GLB binary buffer — any glTF consumer will report accessor out-of-bounds. Requires
+    // a proper glTF/GLB serializer library. Not production-ready.
+    public override bool IsProductionReady => false;
+
     /// <summary>Production hardening: initialization with counter tracking.</summary>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken) { IncrementCounter("gltf.init"); return base.InitializeAsyncCore(cancellationToken); }
     /// <summary>Production hardening: graceful shutdown.</summary>
@@ -249,6 +254,9 @@ internal sealed class GltfModelStrategy : MediaStrategyBase
 
         // Skip JSON chunk
         int jsonChunkLength = BitConverter.ToInt32(data, 12);
+        // LOW-1093: Guard against negative/corrupt chunk length — negative value causes binOffset < 20
+        // which bypasses the bounds check below and reads from an invalid offset.
+        if (jsonChunkLength < 0) return Array.Empty<byte>();
         int binOffset = 20 + jsonChunkLength;
 
         // Align to 4 bytes

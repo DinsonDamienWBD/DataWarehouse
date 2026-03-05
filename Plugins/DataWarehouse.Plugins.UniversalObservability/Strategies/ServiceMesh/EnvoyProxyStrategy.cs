@@ -65,7 +65,7 @@ public sealed class EnvoyProxyStrategy : ObservabilityStrategyBase
 
         try
         {
-            var response = await _httpClient.GetAsync($"{_adminUrl}/stats?format=json", ct);
+            using var response = await _httpClient.GetAsync($"{_adminUrl}/stats?format=json", ct);
 
             if (response.IsSuccessStatusCode)
             {
@@ -91,7 +91,9 @@ public sealed class EnvoyProxyStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // Admin API not accessible
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return metrics;
@@ -107,7 +109,7 @@ public sealed class EnvoyProxyStrategy : ObservabilityStrategyBase
 
         try
         {
-            var response = await _httpClient.GetAsync($"{_adminUrl}/clusters?format=json", ct);
+            using var response = await _httpClient.GetAsync($"{_adminUrl}/clusters?format=json", ct);
 
             if (response.IsSuccessStatusCode)
             {
@@ -200,7 +202,9 @@ public sealed class EnvoyProxyStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // Admin API not accessible
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return clusters;
@@ -216,7 +220,7 @@ public sealed class EnvoyProxyStrategy : ObservabilityStrategyBase
 
         try
         {
-            var response = await _httpClient.GetAsync($"{_adminUrl}/listeners?format=json", ct);
+            using var response = await _httpClient.GetAsync($"{_adminUrl}/listeners?format=json", ct);
 
             if (response.IsSuccessStatusCode)
             {
@@ -246,7 +250,9 @@ public sealed class EnvoyProxyStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // Admin API not accessible
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return listeners;
@@ -262,7 +268,7 @@ public sealed class EnvoyProxyStrategy : ObservabilityStrategyBase
 
         try
         {
-            var response = await _httpClient.GetAsync($"{_adminUrl}/server_info", ct);
+            using var response = await _httpClient.GetAsync($"{_adminUrl}/server_info", ct);
 
             if (response.IsSuccessStatusCode)
             {
@@ -281,7 +287,9 @@ public sealed class EnvoyProxyStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // Admin API not accessible
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return info;
@@ -295,7 +303,7 @@ public sealed class EnvoyProxyStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.PostAsync($"{_adminUrl}/drain_listeners", null, ct);
+            using var response = await _httpClient.PostAsync($"{_adminUrl}/drain_listeners", null, ct);
             return response.IsSuccessStatusCode;
         }
         catch
@@ -327,10 +335,14 @@ public sealed class EnvoyProxyStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
-        IncrementCounter("envoy_proxy.metrics_sent");
+        // Collect live Envoy sidecar metrics and merge with caller-supplied metrics
         var envoyMetrics = await CollectMetricsAsync(cancellationToken);
-        // Combine and forward
-        await Task.CompletedTask;
+        var combined = metrics.Concat(envoyMetrics).ToList();
+        IncrementCounter("envoy_proxy.metrics_sent");
+        foreach (var m in combined)
+        {
+            IncrementCounter($"envoy_proxy.metric.{m.Name.Replace('.', '_')}");
+        }
     }
 
     /// <inheritdoc/>
@@ -386,17 +398,11 @@ public sealed class EnvoyProxyStrategy : ObservabilityStrategyBase
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("envoy_proxy.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     protected override void Dispose(bool disposing)

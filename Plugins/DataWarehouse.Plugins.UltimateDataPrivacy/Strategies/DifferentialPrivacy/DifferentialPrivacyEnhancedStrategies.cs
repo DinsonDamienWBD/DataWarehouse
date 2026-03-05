@@ -10,6 +10,9 @@ public sealed class EpsilonDeltaTrackingStrategy : DataPrivacyStrategyBase
 {
     private readonly BoundedDictionary<string, PrivacyBudget> _budgets = new BoundedDictionary<string, PrivacyBudget>(1000);
     private readonly BoundedDictionary<string, List<PrivacyQuery>> _queryHistory = new BoundedDictionary<string, List<PrivacyQuery>>(1000);
+    // P2-2517: Per-dataset lock serialises budget check + update so concurrent queries cannot both
+    // pass the budget check and overshoot the epsilon/delta totals.
+    private readonly BoundedDictionary<string, object> _budgetLocks = new BoundedDictionary<string, object>(1000);
 
     public override string StrategyId => "epsilon-delta-tracking";
     public override string DisplayName => "Epsilon-Delta Tracking";
@@ -28,6 +31,14 @@ public sealed class EpsilonDeltaTrackingStrategy : DataPrivacyStrategyBase
     /// </summary>
     public PrivacyBudget InitializeBudget(string datasetId, double totalEpsilon, double totalDelta)
     {
+        // Cat 14 (finding 2519): validate DP parameters — zero/negative epsilon produces nonsensical results.
+        if (totalEpsilon <= 0)
+            throw new ArgumentOutOfRangeException(nameof(totalEpsilon), totalEpsilon,
+                "Differential privacy epsilon must be positive (ε > 0).");
+        if (totalDelta < 0)
+            throw new ArgumentOutOfRangeException(nameof(totalDelta), totalDelta,
+                "Differential privacy delta must be non-negative (δ ≥ 0).");
+
         var budget = new PrivacyBudget
         {
             DatasetId = datasetId,
@@ -50,6 +61,12 @@ public sealed class EpsilonDeltaTrackingStrategy : DataPrivacyStrategyBase
     /// </summary>
     public PrivacyQueryResult ConsumePrivacy(string datasetId, double queryEpsilon, double queryDelta, string queryDescription)
     {
+        // P2-2517: Serialise entire check+update under a per-dataset lock to prevent concurrent
+        // callers from both passing the budget check and overspending the privacy budget.
+        var datasetLock = _budgetLocks.GetOrAdd(datasetId, _ => new object());
+        lock (datasetLock)
+        {
+
         if (!_budgets.TryGetValue(datasetId, out var budget))
             return new PrivacyQueryResult { Allowed = false, Reason = "No budget initialized" };
 
@@ -86,10 +103,10 @@ public sealed class EpsilonDeltaTrackingStrategy : DataPrivacyStrategyBase
             Timestamp = DateTimeOffset.UtcNow
         };
 
-        _queryHistory.AddOrUpdate(
-            datasetId,
-            _ => new List<PrivacyQuery> { query },
-            (_, list) => { lock (list) { list.Add(query); } return list; });
+        // P2-2516: Use GetOrAdd to ensure a single canonical list; then mutate under lock.
+        // AddOrUpdate add-factory may be called multiple times under contention, dropping entries.
+        var historyList = _queryHistory.GetOrAdd(datasetId, _ => new List<PrivacyQuery>());
+        lock (historyList) { historyList.Add(query); }
 
         // Update budget
         var updatedBudget = budget with
@@ -113,6 +130,8 @@ public sealed class EpsilonDeltaTrackingStrategy : DataPrivacyStrategyBase
             RemainingDelta = updatedBudget.RemainingDelta,
             BudgetUtilization = composedEpsilon / budget.TotalEpsilon
         };
+
+        } // end lock(datasetLock)
     }
 
     /// <summary>
@@ -212,6 +231,10 @@ public sealed class FederatedAnalyticsStrategy : DataPrivacyStrategyBase
     /// </summary>
     public FederatedContributionResult SubmitContribution(string sessionId, string participantId, double value)
     {
+        // Cat 14 (finding 2520): reject NaN/Infinity — these corrupt aggregate results silently.
+        if (!double.IsFinite(value))
+            return new FederatedContributionResult { Accepted = false, Reason = $"Contribution value must be finite; got {value}" };
+
         if (!_sessions.TryGetValue(sessionId, out var session))
             return new FederatedContributionResult { Accepted = false, Reason = "Session not found" };
 
@@ -383,6 +406,8 @@ public sealed class SyntheticDataGenerationStrategy : DataPrivacyStrategyBase
 /// </summary>
 public sealed class PiiDetectionStrategy : DataPrivacyStrategyBase
 {
+    // P2-2518: Pre-compile all Regex patterns at class init to avoid per-call allocation
+    // inside the nested loop over all patterns × all input rows.
     private static readonly Dictionary<string, PiiPattern[]> PiiPatterns = new()
     {
         ["email"] = new[] { new PiiPattern(@"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", 0.95, PiiType.Email) },
@@ -393,9 +418,22 @@ public sealed class PiiDetectionStrategy : DataPrivacyStrategyBase
         ["name"] = new[] { new PiiPattern(@"^[A-Z][a-z]+ [A-Z][a-z]+$", 0.60, PiiType.PersonName) }
     };
 
+    // Pre-compiled Regex per pattern, keyed by pattern string.
+    private static readonly Dictionary<string, System.Text.RegularExpressions.Regex> CompiledPatterns =
+        PiiPatterns.Values
+            .SelectMany(arr => arr)
+            .GroupBy(p => p.Pattern)
+            .ToDictionary(
+                g => g.Key,
+                g => new System.Text.RegularExpressions.Regex(
+                    g.Key,
+                    System.Text.RegularExpressions.RegexOptions.Compiled |
+                    System.Text.RegularExpressions.RegexOptions.CultureInvariant));
+
     public override string StrategyId => "pii-detection";
     public override string DisplayName => "PII Detection";
-    public override PrivacyCategory Category => PrivacyCategory.DifferentialPrivacy;
+    // Cat 15 (finding 2521): PII detection is classification, not differential privacy.
+    public override PrivacyCategory Category => PrivacyCategory.DataClassification;
     public override DataPrivacyCapabilities Capabilities => new()
     {
         SupportsAsync = true, SupportsBatch = true,
@@ -416,7 +454,7 @@ public sealed class PiiDetectionStrategy : DataPrivacyStrategyBase
         {
             foreach (var pattern in patterns)
             {
-                var regex = new System.Text.RegularExpressions.Regex(pattern.Pattern);
+                var regex = CompiledPatterns[pattern.Pattern];
                 var matches = regex.Matches(text);
 
                 foreach (System.Text.RegularExpressions.Match match in matches)

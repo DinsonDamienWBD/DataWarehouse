@@ -153,11 +153,13 @@ namespace DataWarehouse.SDK.Infrastructure.Authority
             if (string.IsNullOrEmpty(action))
                 return Array.Empty<AuthorityDecision>();
 
-            if (!_decisionHistory.TryGetValue(action, out var list))
-                return Array.Empty<AuthorityDecision>();
-
+            // Acquire lock BEFORE TryGetValue to prevent TOCTOU: the list reference could be
+            // replaced and the list itself mutated between TryGetValue and the lock below.
             lock (_historyLock)
             {
+                if (!_decisionHistory.TryGetValue(action, out var list))
+                    return Array.Empty<AuthorityDecision>();
+
                 return list.OrderByDescending(d => d.Timestamp).ToList().AsReadOnly();
             }
         }

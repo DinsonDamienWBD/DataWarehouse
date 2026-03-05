@@ -200,13 +200,17 @@ public sealed class PowercapEnergyMeasurementStrategy : SustainabilityStrategyBa
             // If no package-level zone found, use the first available zone
             _primaryZonePath ??= _zonePaths.Values.FirstOrDefault();
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException ex)
         {
+
             // Insufficient permissions to enumerate powercap zones
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
-        catch (IOException)
+        catch (IOException ex)
         {
+
             // Sysfs enumeration failure
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -241,15 +245,20 @@ public sealed class PowercapEnergyMeasurementStrategy : SustainabilityStrategyBa
             try
             {
                 var text = await File.ReadAllTextAsync(path, ct);
-                totalUj += long.Parse(text.Trim());
+                // Finding 4449: TryParse guards against corrupt sysfs values.
+                if (long.TryParse(text.Trim(), out var uj)) totalUj += uj;
             }
-            catch (FileNotFoundException)
+            catch (FileNotFoundException ex)
             {
+
                 // Zone removed during operation -- skip
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
-            catch (UnauthorizedAccessException)
+            catch (UnauthorizedAccessException ex)
             {
+
                 // Permission lost -- skip
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -259,11 +268,17 @@ public sealed class PowercapEnergyMeasurementStrategy : SustainabilityStrategyBa
             try
             {
                 var text = await File.ReadAllTextAsync(_primaryZonePath, ct);
-                totalUj = long.Parse(text.Trim());
+                // Finding 4449: TryParse guards against corrupt sysfs values.
+                if (!long.TryParse(text.Trim(), out totalUj))
+                    throw new InvalidOperationException("Failed to parse primary powercap energy counter value.");
             }
-            catch
+            catch (OperationCanceledException)
             {
-                throw new InvalidOperationException("Failed to read any powercap energy counter.");
+                throw;
+            }
+            catch (Exception ex) when (ex is not InvalidOperationException)
+            {
+                throw new InvalidOperationException("Failed to read any powercap energy counter.", ex);
             }
         }
 

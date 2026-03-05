@@ -49,24 +49,13 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.EmbeddedIdentit
             IncrementCounter("offline.auth.shutdown");
             return base.ShutdownAsyncCore(cancellationToken);
         }
-protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
             IncrementCounter("offline.auth.evaluate");
-            await Task.Yield();
-
-            var hasValidIdentity = context.SubjectId.Length > 0;
-
-            return new AccessDecision
-            {
-                IsGranted = hasValidIdentity,
-                Reason = hasValidIdentity ? "Offline Authentication Strategy verified" : "Authentication failed",
-                ApplicablePolicies = new[] { "offline-auth-policy" },
-                Metadata = new Dictionary<string, object>
-                {
-                    ["offline_capable"] = "true",
-                    ["strategy_type"] = "EmbeddedIdentity"
-                }
-            };
+            throw new NotSupportedException(
+                "OfflineAuthenticationStrategy requires a real offline credential store (e.g., encrypted local vault), " +
+                "challenge-response or cached credential verification, and replay protection. " +
+                "Granting access for any non-empty SubjectId is not a valid implementation.");
         }
     }
 }

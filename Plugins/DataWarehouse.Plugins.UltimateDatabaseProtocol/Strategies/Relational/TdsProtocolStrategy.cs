@@ -115,12 +115,13 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
 
     // Protocol state
     private int _packetId;
+    private readonly object _packetIdLock = new();
     private int _spid = 0;
     private string _serverVersion = "";
     private string _instanceName = "";
     private bool _encryptionRequired;
     private byte[] _serverNonce = [];
-    private Dictionary<string, string> _envChanges = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _envChanges = new();
 
     /// <inheritdoc/>
     public override string StrategyId => "tds-protocol";
@@ -264,11 +265,13 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
     }
 
     /// <inheritdoc/>
-    protected override async Task NotifySslUpgradeAsync(CancellationToken ct)
+    protected override Task NotifySslUpgradeAsync(CancellationToken ct)
     {
-        // TDS SSL negotiation is done via pre-login ENCRYPTION option
-        // If encryption is required, the SSL handshake happens after pre-login
-        // but the actual TLS upgrade is handled by the base class
+        // TDS SSL upgrade is initiated by the base class after we return from PerformHandshakeAsync.
+        // The pre-login ENCRYPTION option (set during PerformHandshakeAsync) signals the server to
+        // accept TLS; the actual SslStream wrap is performed by the base class ConnectCoreAsync.
+        // This override is synchronous — delegate up so the base class applies the TLS wrap.
+        return base.NotifySslUpgradeAsync(ct);
     }
 
     /// <inheritdoc/>
@@ -494,12 +497,12 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
                     break;
 
                 default:
-                    // Skip unknown tokens
-                    if (index + 2 <= payload.Length)
-                    {
-                        var length = payload[index] | (payload[index + 1] << 8);
-                        index += 2 + length;
-                    }
+                    // P2-2747: TDS tokens have variable header formats (2-byte, 4-byte, or fixed).
+                    // Blindly reading 2-byte length and skipping would corrupt parsing for other formats.
+                    // Abort parsing for the current response on unknown tokens to prevent misinterpretation.
+                    System.Diagnostics.Trace.TraceWarning(
+                        $"[TDS] Unknown token type 0x{token:X2} at offset {index - 1}; stopping token parse.");
+                    index = payload.Length; // Exit loop
                     break;
             }
         }
@@ -1001,7 +1004,6 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
 
     private object? ParseColumnValue(byte[] payload, ref int index, string dataType)
     {
-        // Simplified parsing - production code would handle all types
         switch (dataType)
         {
             case "INT":
@@ -1014,21 +1016,96 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
                 index += 8;
                 return longVal;
 
+            case "SMALLINT":
+                var shortVal = (short)(payload[index] | (payload[index + 1] << 8));
+                index += 2;
+                return shortVal;
+
+            case "TINYINT":
+                var byteVal = payload[index];
+                index += 1;
+                return byteVal;
+
+            case "BIT":
+                var bitVal = payload[index] != 0;
+                index += 1;
+                return bitVal;
+
+            case "FLOAT":
+                var doubleVal = BitConverter.ToDouble(payload, index);
+                index += 8;
+                return doubleVal;
+
+            case "REAL":
+                var floatVal = BitConverter.ToSingle(payload, index);
+                index += 4;
+                return floatVal;
+
+            case "DECIMAL":
+            case "NUMERIC":
+            case "MONEY":
+                // TDS MONEY is 8 bytes: high 4 bytes then low 4 bytes, value / 10000
+                var moneyHigh = ReadInt32LE(payload.AsSpan(index, 4));
+                var moneyLow = ReadInt32LE(payload.AsSpan(index + 4, 4));
+                index += 8;
+                var moneyRaw = ((long)moneyHigh << 32) | (uint)moneyLow;
+                return moneyRaw / 10000m;
+
+            case "SMALLMONEY":
+                var smallMoneyRaw = ReadInt32LE(payload.AsSpan(index, 4));
+                index += 4;
+                return smallMoneyRaw / 10000m;
+
+            case "DATETIME":
+                // TDS DATETIME: 4 bytes days since 1900-01-01, 4 bytes 1/300th second intervals
+                var daysSince1900 = ReadInt32LE(payload.AsSpan(index, 4));
+                var timeTicks = ReadInt32LE(payload.AsSpan(index + 4, 4));
+                index += 8;
+                var baseDate = new DateTime(1900, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                return baseDate.AddDays(daysSince1900).AddSeconds(timeTicks / 300.0);
+
+            case "SMALLDATETIME":
+                var sdDays = (ushort)(payload[index] | (payload[index + 1] << 8));
+                var sdMinutes = (ushort)(payload[index + 2] | (payload[index + 3] << 8));
+                index += 4;
+                var sdBase = new DateTime(1900, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                return sdBase.AddDays(sdDays).AddMinutes(sdMinutes);
+
+            case "UNIQUEIDENTIFIER":
+                var guidBytes = new byte[16];
+                Array.Copy(payload, index, guidBytes, 0, 16);
+                index += 16;
+                return new Guid(guidBytes);
+
             case "NVARCHAR":
             case "VARCHAR":
+            case "NCHAR":
+            case "CHAR":
                 var strLen = payload[index] | (payload[index + 1] << 8);
                 index += 2;
                 if (strLen == 0xffff)
                     return null;
-                var str = dataType == "NVARCHAR"
+                var str = dataType.StartsWith('N')
                     ? Encoding.Unicode.GetString(payload, index, strLen)
                     : Encoding.UTF8.GetString(payload, index, strLen);
                 index += strLen;
                 return str;
 
+            case "BINARY":
+            case "VARBINARY":
+                var binLen = payload[index] | (payload[index + 1] << 8);
+                index += 2;
+                if (binLen == 0xffff)
+                    return null;
+                var binData = new byte[binLen];
+                Array.Copy(payload, index, binData, 0, binLen);
+                index += binLen;
+                return binData;
+
             default:
-                // Skip unknown types
-                return null;
+                throw new NotSupportedException(
+                    $"TDS column type '{dataType}' is not supported. " +
+                    "Add a handler for this type or use a supported column type.");
         }
     }
 
@@ -1074,7 +1151,7 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
             header[3] = (byte)packetLength;
             header[4] = (byte)(_spid >> 8);
             header[5] = (byte)_spid;
-            header[6] = (byte)_packetId++;
+            header[6] = (byte)Interlocked.Increment(ref _packetId);
             header[7] = 0; // Window
 
             await SendAsync(header, ct);

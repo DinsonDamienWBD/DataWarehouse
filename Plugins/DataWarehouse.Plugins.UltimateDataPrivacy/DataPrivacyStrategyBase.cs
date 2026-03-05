@@ -21,7 +21,9 @@ public enum PrivacyCategory
     /// <summary>124.7: Privacy-Preserving Analytics</summary>
     PrivacyPreservingAnalytics,
     /// <summary>124.8: Privacy Metrics</summary>
-    PrivacyMetrics
+    PrivacyMetrics,
+    /// <summary>124.9: Data Classification (PII detection, sensitivity labeling)</summary>
+    DataClassification
 }
 
 /// <summary>Capabilities of a data privacy strategy.</summary>
@@ -72,14 +74,11 @@ public abstract class DataPrivacyStrategyBase : StrategyBase, IDataPrivacyStrate
         await Task.CompletedTask;
     }
 
-    /// <summary>Gets cached health status, refreshing every 60 seconds.</summary>
-    public bool IsHealthy()
-    {
-        var result = GetCachedHealthAsync(ct =>
-            Task.FromResult(new StrategyHealthCheckResult(IsInitialized)),
-            TimeSpan.FromSeconds(60)).GetAwaiter().GetResult();
-        return result.IsHealthy;
-    }
+    /// <summary>Gets cached health status synchronously.</summary>
+    // P2-2515: Avoid sync-over-async deadlock — derive health from initialization state directly
+    // without invoking GetCachedHealthAsync. The health check factory only reads IsInitialized,
+    // so we can compute the result inline.
+    public bool IsHealthy() => IsInitialized;
 
     /// <summary>Gets all counter values.</summary>
     public IReadOnlyDictionary<string, long> GetCounters() => GetAllCounters();

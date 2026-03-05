@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
 {
     public class FaunaDbConnectionStrategy : DatabaseConnectionStrategyBase
     {
-        private HttpClient? _httpClient;
+        private volatile HttpClient? _httpClient;
         public override string StrategyId => "faunadb";
         public override string DisplayName => "FaunaDB";
         public override string SemanticDescription => "Serverless distributed document-relational database with native GraphQL support";
@@ -26,8 +26,15 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object> { ["endpoint"] = endpoint });
         }
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { await Task.Delay(10, ct); return _httpClient != null; }
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { _httpClient?.Dispose(); _httpClient = null; await Task.CompletedTask; }
-        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var isHealthy = await TestCoreAsync(handle, ct); return new ConnectionHealth(isHealthy, isHealthy ? "FaunaDB healthy" : "FaunaDB unhealthy", TimeSpan.FromMilliseconds(10), DateTimeOffset.UtcNow); }
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { _httpClient?.Dispose(); _httpClient = null; return Task.CompletedTask; }
+        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        {
+            // P2-2180: Measure actual latency with Stopwatch instead of hardcoded value.
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var isHealthy = await TestCoreAsync(handle, ct);
+            sw.Stop();
+            return new ConnectionHealth(isHealthy, isHealthy ? "FaunaDB healthy" : "FaunaDB unhealthy", sw.Elapsed, DateTimeOffset.UtcNow);
+        }
         public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
             if (_httpClient == null) return new List<Dictionary<string, object?>>();
@@ -36,7 +43,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
                 // FaunaDB uses FQL queries sent as POST to /
                 var requestBody = System.Text.Json.JsonSerializer.Serialize(new { query });
                 var content = new StringContent(requestBody, System.Text.Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync("/", content, ct);
+                using var response = await _httpClient.PostAsync("/", content, ct);
                 if (!response.IsSuccessStatusCode) return new List<Dictionary<string, object?>>();
                 var json = await response.Content.ReadAsStringAsync(ct);
                 using var doc = System.Text.Json.JsonDocument.Parse(json);
@@ -72,7 +79,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             {
                 var requestBody = System.Text.Json.JsonSerializer.Serialize(new { query = command });
                 var content = new StringContent(requestBody, System.Text.Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync("/", content, ct);
+                using var response = await _httpClient.PostAsync("/", content, ct);
                 return response.IsSuccessStatusCode ? 1 : 0;
             }
             catch { return 0; /* Operation failed - return zero */ }
@@ -85,7 +92,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
                 // Query for collections using FQL
                 var requestBody = System.Text.Json.JsonSerializer.Serialize(new { query = "Paginate(Collections())" });
                 var content = new StringContent(requestBody, System.Text.Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync("/", content, ct);
+                using var response = await _httpClient.PostAsync("/", content, ct);
                 if (!response.IsSuccessStatusCode) return new List<DataSchema>();
                 var json = await response.Content.ReadAsStringAsync(ct);
                 using var doc = System.Text.Json.JsonDocument.Parse(json);

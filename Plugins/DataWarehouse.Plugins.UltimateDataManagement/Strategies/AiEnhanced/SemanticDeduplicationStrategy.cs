@@ -112,6 +112,12 @@ public sealed class ContentSignature
     /// When the signature was created.
     /// </summary>
     public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// Extracted text tokens for fallback Jaccard-similarity deduplication.
+    /// Stored only for text/document content types; null for binary/image content.
+    /// </summary>
+    public HashSet<string>? ExtractedTokens { get; init; }
 }
 
 /// <summary>
@@ -226,13 +232,21 @@ public sealed class SemanticDeduplicationStrategy : AiEnhancedStrategyBase
             embedding = await GetEmbeddingAsync(textContent, ct);
         }
 
+        // P2-2406: Store extracted tokens alongside signature to enable fallback Jaccard dedup.
+        HashSet<string>? extractedTokens = null;
+        if (!string.IsNullOrWhiteSpace(textContent) && embedding == null)
+        {
+            extractedTokens = TokenizeForFallback(textContent);
+        }
+
         var signature = new ContentSignature
         {
             ObjectId = objectId,
             ContentHash = hash,
             ContentType = contentType,
             Embedding = embedding,
-            SizeBytes = content.Length
+            SizeBytes = content.Length,
+            ExtractedTokens = extractedTokens
         };
 
         // Store signature
@@ -496,12 +510,32 @@ public sealed class SemanticDeduplicationStrategy : AiEnhancedStrategyBase
 
     private List<(string ObjectId, double Similarity)> FindFallbackDuplicates(string textContent, string? excludeObjectId)
     {
-        // Simple Jaccard similarity based on word tokens
+        // P2-2406: Compute Jaccard similarity against stored token sets.
         var results = new List<(string ObjectId, double Similarity)>();
         var sourceTokens = TokenizeForFallback(textContent);
+        if (sourceTokens.Count == 0) return results;
 
-        // We'd need stored text content for this - for now, return empty
-        // In a real implementation, you'd store extracted text alongside signatures
+        foreach (var (objectId, sig) in _signatures)
+        {
+            if (objectId == excludeObjectId || sig.ExtractedTokens == null || sig.ExtractedTokens.Count == 0)
+                continue;
+
+            // Jaccard: |intersection| / |union|
+            int intersectionCount = 0;
+            foreach (var token in sourceTokens)
+            {
+                if (sig.ExtractedTokens.Contains(token))
+                    intersectionCount++;
+            }
+
+            int unionCount = sourceTokens.Count + sig.ExtractedTokens.Count - intersectionCount;
+            double jaccard = unionCount > 0 ? (double)intersectionCount / unionCount : 0.0;
+
+            if (jaccard >= _nearDuplicateThreshold)
+                results.Add((objectId, jaccard));
+        }
+
+        results.Sort((a, b) => b.Similarity.CompareTo(a.Similarity));
         return results;
     }
 

@@ -235,8 +235,12 @@ public sealed class RaidPerformanceOptimizer
 
     private Task FlushToDiskAsync(string arrayId, long offset, byte[] data, CancellationToken ct)
     {
-        // Disk write latency (actual I/O delegated to RAID strategy layer)
-        return Task.Delay(1, ct);
+        // LOW-3660: Actual disk I/O is performed by the RAID strategy layer (WriteToDiskAsync
+        // in strategy classes) which is invoked via the plugin's WriteAsync pipeline.
+        // This manager layer tracks coalescing/caching metadata only; persistence is confirmed
+        // when the strategy's WriteToDiskAsync completes, not via a redundant flush here.
+        ct.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
     }
 }
 
@@ -298,7 +302,7 @@ public sealed class WriteCoalescer
         {
             TotalWrites = _totalWrites,
             CoalescedWrites = _coalescedWrites,
-            CoalesceRatio = _totalWrites > 0 ? 1.0 - ((double)_batches.Count / _totalWrites) : 0,
+            CoalesceRatio = _totalWrites > 0 ? (double)_coalescedWrites / _totalWrites : 0, // P2-3655: ratio of writes that were actually coalesced
             PendingBatches = _batches.Count
         };
     }
@@ -374,17 +378,14 @@ public sealed class ReadAheadPrefetcher
 
         var cache = _caches.GetOrAdd(arrayId, _ => new PrefetchCache());
 
-        // Prefetch in background
+        // Prefetch metadata: record which offsets should be prefetched so the
+        // caller (RAID strategy layer) can schedule the actual I/O and then call
+        // Populate() with the real data. Storing zeroed buffers here would cause
+        // GetCached() to return all-zeros for legitimate cache hits.
         for (int i = 0; i < _config.PrefetchDepth; i++)
         {
             var offset = startOffset + (i * prefetchSize);
-
-            if (!cache.Contains(offset))
-            {
-                // Prefetch read (actual I/O delegated to RAID strategy layer)
-                var data = new byte[prefetchSize];
-                cache.Add(offset, data);
-            }
+            cache.MarkPending(offset, prefetchSize);
         }
 
         await Task.CompletedTask;
@@ -477,10 +478,14 @@ public sealed class WriteBackCache
 
     private void EvictOldest()
     {
+        // P2-3654: prefer evicting clean entries; fall back to dirty entries if all dirty
         var oldest = _cache.Values
             .Where(e => !e.IsDirty)
             .OrderBy(e => e.LastAccess)
-            .FirstOrDefault();
+            .FirstOrDefault()
+            ?? _cache.Values
+               .OrderBy(e => e.LastAccess)
+               .FirstOrDefault();
 
         if (oldest != null)
         {
@@ -745,10 +750,28 @@ public sealed class CoalescedWriteResult
 
 public sealed class PrefetchCache
 {
+    // Stores real data populated by the caller after actual I/O.
     private readonly BoundedDictionary<long, byte[]> _data = new BoundedDictionary<long, byte[]>(1000);
+    // Tracks offsets that have been scheduled for prefetch but not yet populated.
+    private readonly BoundedDictionary<long, int> _pending = new BoundedDictionary<long, int>(1000);
+
+    /// <summary>Returns real data if the offset has been populated; skips pending-only entries.</summary>
     public bool TryGet(long offset, int length, out byte[]? data) => _data.TryGetValue(offset, out data);
+
     public bool Contains(long offset) => _data.ContainsKey(offset);
-    public void Add(long offset, byte[] data) => _data[offset] = data;
+
+    /// <summary>Adds real (caller-supplied) data to the cache.</summary>
+    public void Add(long offset, byte[] data)
+    {
+        _data[offset] = data;
+        _pending.TryRemove(offset, out _);
+    }
+
+    /// <summary>Marks an offset as scheduled for prefetch; the caller must later call Add() with real data.</summary>
+    public void MarkPending(long offset, int length) => _pending[offset] = length;
+
+    /// <summary>Returns true if the offset has a pending prefetch request not yet fulfilled.</summary>
+    public bool IsPending(long offset) => _pending.ContainsKey(offset);
 }
 
 public sealed class PrefetchedReadResult

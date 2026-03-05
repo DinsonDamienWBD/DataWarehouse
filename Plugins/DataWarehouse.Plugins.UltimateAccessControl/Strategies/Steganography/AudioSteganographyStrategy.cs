@@ -389,8 +389,26 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
                 {
                     channels = (data[offset + 8] << 8) | data[offset + 9];
                     bitsPerSample = (data[offset + 14] << 8) | data[offset + 15];
-                    // Sample rate is 80-bit IEEE 754 extended precision
-                    sampleRate = 44100; // Default
+                    // Parse 80-bit IEEE 754 extended precision sample rate
+                    // Byte layout: 1 sign + 15 exponent + 64 mantissa (big-endian at offset+16)
+                    if (offset + 26 <= data.Length)
+                    {
+                        var srOffset = offset + 16;
+                        int exponent = ((data[srOffset] & 0x7F) << 8) | data[srOffset + 1];
+                        long mantissa = 0;
+                        for (int b = 0; b < 8; b++)
+                            mantissa = (mantissa << 8) | data[srOffset + 2 + b];
+                        if (exponent == 0 && mantissa == 0)
+                            sampleRate = 0;
+                        else
+                            sampleRate = (int)(mantissa * Math.Pow(2.0, exponent - 16383 - 63));
+                        if (sampleRate <= 0 || sampleRate > 384000)
+                            sampleRate = 44100; // Fallback for out-of-range
+                    }
+                    else
+                    {
+                        sampleRate = 44100; // Default if data too short
+                    }
                 }
                 else if (chunkId == "SSND")
                 {
@@ -786,8 +804,21 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
 
         private double[] GeneratePnSequence(int length)
         {
+            // Derive PN seed from configured secret key using HMAC-SHA256
+            // This ensures the sequence is deterministic but not predictable without the key
+            var seedKey = Configuration.TryGetValue("SpreadSpectrumKey", out var keyObj) && keyObj is string key
+                ? key
+                : throw new InvalidOperationException(
+                    "SpreadSpectrumKey must be configured for spread-spectrum steganography. " +
+                    "A hardcoded seed provides zero security.");
+
+            var seedBytes = System.Security.Cryptography.HMACSHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(seedKey),
+                System.Text.Encoding.UTF8.GetBytes("pn-sequence-seed"));
+            var seed = BitConverter.ToInt32(seedBytes, 0);
+
             var pn = new double[length];
-            var rng = new Random(12345); // Fixed seed for reproducibility
+            var rng = new Random(seed);
 
             for (int i = 0; i < length; i++)
             {

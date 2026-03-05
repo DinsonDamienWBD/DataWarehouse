@@ -49,8 +49,10 @@ public sealed class XRayStrategy : ObservabilityStrategyBase
                 ["name"] = span.OperationName,
                 ["id"] = span.SpanId.Length >= 16 ? span.SpanId[..16] : span.SpanId.PadLeft(16, '0'),
                 ["trace_id"] = FormatXRayTraceId(span.TraceId, span.StartTime),
-                ["start_time"] = span.StartTime.ToUnixTimeSeconds() + (span.StartTime.Millisecond / 1000.0),
-                ["end_time"] = span.StartTime.Add(span.Duration).ToUnixTimeSeconds() + ((span.StartTime.Millisecond + span.Duration.Milliseconds) / 1000.0),
+                // P2-4669: .Millisecond / .Duration.Milliseconds are 0-999 components — use
+                // ToUnixTimeMilliseconds() / 1000.0 to get sub-second precision across boundaries.
+                ["start_time"] = span.StartTime.ToUnixTimeMilliseconds() / 1000.0,
+                ["end_time"] = span.StartTime.Add(span.Duration).ToUnixTimeMilliseconds() / 1000.0,
                 ["service"] = new { version = "1.0" },
                 ["origin"] = "AWS::EC2::Instance"
             };
@@ -100,7 +102,11 @@ public sealed class XRayStrategy : ObservabilityStrategyBase
 
     private async Task PutTraceSegmentsAsync(string documents, CancellationToken ct)
     {
-        var payload = JsonSerializer.Serialize(new { TraceSegmentDocuments = documents.Split('\n').Where(s => s.StartsWith("{\"name")).ToArray() });
+        // Filter only actual JSON segment lines (each starts with '{'); envelope header lines are excluded.
+        var segmentDocs = documents.Split('\n')
+            .Where(s => !string.IsNullOrWhiteSpace(s) && s.TrimStart().StartsWith("{\"name", StringComparison.Ordinal))
+            .ToArray();
+        var payload = JsonSerializer.Serialize(new { TraceSegmentDocuments = segmentDocs });
         var host = $"xray.{_region}.amazonaws.com";
         var endpoint = $"https://{host}/TraceSegments";
 
@@ -127,7 +133,7 @@ public sealed class XRayStrategy : ObservabilityStrategyBase
         request.Headers.Add("Authorization", authorization);
         request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
 
-        var response = await _httpClient.SendAsync(request, ct);
+        using var response = await _httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -148,11 +154,28 @@ public sealed class XRayStrategy : ObservabilityStrategyBase
     protected override Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken ct)
         => throw new NotSupportedException("X-Ray does not support logging - use CloudWatch Logs");
 
-    protected override Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken ct)
+    protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken ct)
     {
-        return Task.FromResult(new HealthCheckResult(!string.IsNullOrEmpty(_accessKeyId),
-            !string.IsNullOrEmpty(_accessKeyId) ? "X-Ray configured" : "X-Ray not configured",
-            new Dictionary<string, object> { ["region"] = _region, ["service"] = _serviceName }));
+        // P2-4673: Verify actual connectivity by sending a minimal well-formed batch rather than
+        // only checking whether credentials are non-empty (wrong credentials still report healthy).
+        if (string.IsNullOrEmpty(_accessKeyId))
+        {
+            return new HealthCheckResult(false, "X-Ray not configured: accessKeyId is empty",
+                new Dictionary<string, object> { ["region"] = _region, ["service"] = _serviceName });
+        }
+
+        try
+        {
+            // Attempt a real API call with an empty segment list; X-Ray returns 200 for an empty batch.
+            await PutTraceSegmentsAsync(string.Empty, ct);
+            return new HealthCheckResult(true, "X-Ray configured and reachable",
+                new Dictionary<string, object> { ["region"] = _region, ["service"] = _serviceName });
+        }
+        catch (Exception ex)
+        {
+            return new HealthCheckResult(false, $"X-Ray connectivity check failed: {ex.Message}",
+                new Dictionary<string, object> { ["region"] = _region, ["service"] = _serviceName });
+        }
     }
 
 
@@ -166,18 +189,14 @@ public sealed class XRayStrategy : ObservabilityStrategyBase
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("x_ray.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
-    protected override void Dispose(bool disposing) { if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }
+    protected override void Dispose(bool disposing) {
+                _accessKeyId = string.Empty;
+                _secretAccessKey = string.Empty; if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }
 }

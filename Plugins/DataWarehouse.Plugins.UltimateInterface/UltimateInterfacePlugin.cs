@@ -61,6 +61,8 @@ public sealed class UltimateInterfacePlugin : DataWarehouse.SDK.Contracts.Hierar
     private readonly InterfaceStrategyRegistry _registry;
     private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private readonly BoundedDictionary<string, InterfaceHealthStatus> _healthStatus = new BoundedDictionary<string, InterfaceHealthStatus>(1000);
+    // LOW-3375: Active bridge registry so HandleBridgeAsync persists bridge state
+    private readonly BoundedDictionary<string, (string Source, string Target, DateTimeOffset CreatedAt)> _activeBridges = new(1000);
     private bool _disposed;
 
     // Configuration
@@ -455,15 +457,21 @@ public sealed class UltimateInterfacePlugin : DataWarehouse.SDK.Contracts.Hierar
         var sourceStrategy = GetStrategyOrThrow(sourceProtocol);
         var targetStrategy = GetStrategyOrThrow(targetProtocol);
 
-        // Create bridge configuration
+        // LOW-3375: Register the bridge so its state is persisted and queryable
         var bridgeId = $"{sourceProtocol}-to-{targetProtocol}-{Guid.NewGuid():N}";
+        var now = DateTimeOffset.UtcNow;
+        _activeBridges[bridgeId] = (sourceProtocol, targetProtocol, now);
+
+        // Ensure both endpoint strategies are started
+        await sourceStrategy.StartAsync(CancellationToken.None).ConfigureAwait(false);
+        await targetStrategy.StartAsync(CancellationToken.None).ConfigureAwait(false);
 
         message.Payload["success"] = true;
         message.Payload["bridgeId"] = bridgeId;
         message.Payload["sourceProtocol"] = sourceProtocol;
         message.Payload["targetProtocol"] = targetProtocol;
-
-        await Task.CompletedTask;
+        message.Payload["createdAt"] = now.ToString("O");
+        message.Payload["activeBridges"] = _activeBridges.Count;
     }
 
     private async Task HandleParseIntentAsync(PluginMessage message)
@@ -709,10 +717,19 @@ public sealed class UltimateInterfacePlugin : DataWarehouse.SDK.Contracts.Hierar
         return _registry.Get(strategyId) != null;
     }
 
-    private void IncrementUsageStats(string strategyId)
+    private void IncrementUsageStats(string strategyId, bool success = true, long bytesIn = 0, long bytesOut = 0)
     {
+        // LOW-3374: Track all stats counters so GetMetadata/stats handler returns real values
         _usageStats.AddOrUpdate(strategyId, 1, (_, count) => count + 1);
         Interlocked.Increment(ref _totalRequests);
+        if (success)
+            Interlocked.Increment(ref _totalResponses);
+        else
+            Interlocked.Increment(ref _totalFailures);
+        if (bytesIn > 0)
+            Interlocked.Add(ref _totalBytesReceived, bytesIn);
+        if (bytesOut > 0)
+            Interlocked.Add(ref _totalBytesSent, bytesOut);
     }
 
     private void DiscoverAndRegisterStrategies()
@@ -887,15 +904,14 @@ public sealed class UltimateInterfacePlugin : DataWarehouse.SDK.Contracts.Hierar
             if (_disposed) return;
             _disposed = true;
 
-            // Stop all running strategies
-            foreach (var strategy in _registry.GetAll())
-            {
+            // LOW-3376: Stop strategies in parallel with a shared timeout to avoid blocking
+            // the sync-context for O(n) * 5s. Task.WhenAll finishes all within one 5s window.
             try
             {
-            strategy.StopAsync().Wait(TimeSpan.FromSeconds(5));
+                var stopTasks = _registry.GetAll().Select(s => s.StopAsync()).ToArray();
+                Task.WhenAll(stopTasks).Wait(TimeSpan.FromSeconds(5));
             }
             catch { /* Ignore disposal errors */ }
-            }
 
             _usageStats.Clear();
             _healthStatus.Clear();

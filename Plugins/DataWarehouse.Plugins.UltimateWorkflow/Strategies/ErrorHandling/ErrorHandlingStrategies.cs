@@ -236,9 +236,10 @@ public sealed class FallbackStrategy : WorkflowStrategyBase
 /// <summary>
 /// Bulkhead isolation error handling strategy.
 /// </summary>
-public sealed class BulkheadIsolationStrategy : WorkflowStrategyBase
+public sealed class BulkheadIsolationStrategy : WorkflowStrategyBase, IDisposable
 {
     private readonly BoundedDictionary<string, SemaphoreSlim> _bulkheads = new BoundedDictionary<string, SemaphoreSlim>(1000);
+    private bool _disposed;
 
     public override WorkflowCharacteristics Characteristics { get; } = new()
     {
@@ -305,6 +306,15 @@ public sealed class BulkheadIsolationStrategy : WorkflowStrategyBase
             Duration = DateTime.UtcNow - startTime,
             TaskResults = completed.ToDictionary(kv => kv.Key, kv => kv.Value)
         };
+    }
+
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        foreach (var semaphore in _bulkheads.Values)
+            semaphore.Dispose();
     }
 }
 

@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.MiddleEastAfrica
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("popia.check");
+            IncrementCounter("popia.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -26,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.MiddleEastAfrica
                 violations.Add(new ComplianceViolation { Code = "POPIA-001", Description = "Conditions for lawful processing not met", Severity = ViolationSeverity.Critical, Remediation = "Ensure all eight conditions for lawful processing", RegulatoryReference = "POPIA Section 4" });
             }
 
-            if (context.OperationType.Equals("direct-marketing", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("direct-marketing", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("OptInConsent", out var consentObj) || consentObj is not true)
                 {
@@ -34,11 +34,12 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.MiddleEastAfrica
                 }
             }
 
-            if (!context.Attributes.TryGetValue("PriorAuthorization", out var authObj))
+            // Check PriorAuthorization for special personal information; treat missing OR false as violation
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("special-personal", StringComparison.OrdinalIgnoreCase))
             {
-                if (context.DataClassification.Equals("special-personal", StringComparison.OrdinalIgnoreCase))
+                if (!context.Attributes.TryGetValue("PriorAuthorization", out var authObj) || authObj is not true)
                 {
-                    violations.Add(new ComplianceViolation { Code = "POPIA-003", Description = "Special personal information requires prior authorization", Severity = ViolationSeverity.High, Remediation = "Obtain Information Regulator authorization", RegulatoryReference = "POPIA Section 26-32" });
+                    violations.Add(new ComplianceViolation { Code = "POPIA-003", Description = "Special personal information requires prior authorization from Information Regulator", Severity = ViolationSeverity.High, Remediation = "Obtain Information Regulator authorization", RegulatoryReference = "POPIA Section 26-32" });
                 }
             }
 
@@ -47,22 +48,22 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.MiddleEastAfrica
                 violations.Add(new ComplianceViolation { Code = "POPIA-004", Description = "Information Officer not appointed", Severity = ViolationSeverity.High, Remediation = "Appoint and register Information Officer", RegulatoryReference = "POPIA Section 55" });
             }
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
             var status = violations.Count == 0 ? ComplianceStatus.Compliant : violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant : ComplianceStatus.PartiallyCompliant;
+            var isCompliant = status == ComplianceStatus.Compliant;
             return Task.FromResult(new ComplianceResult { IsCompliant = isCompliant, Framework = Framework, Status = status, Violations = violations, Recommendations = recommendations });
         }
     
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("popia.initialized");
+            IncrementCounter("popia.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("popia.shutdown");
+            IncrementCounter("popia.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

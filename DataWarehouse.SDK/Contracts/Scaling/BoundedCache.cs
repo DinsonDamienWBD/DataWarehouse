@@ -238,6 +238,9 @@ namespace DataWarehouse.SDK.Contracts.Scaling
         /// <returns>The value if found; otherwise <c>default</c>.</returns>
         public TValue? GetOrDefault(TKey key)
         {
+            // LRU/ARC Get promotes the accessed item (mutation), requiring a write lock.
+            // For LRU this serialises all concurrent reads; use a dedicated read-through
+            // cache if read concurrency is a bottleneck.
             _lock.EnterWriteLock();
             try
             {
@@ -287,6 +290,29 @@ namespace DataWarehouse.SDK.Contracts.Scaling
                 if (_evictionPolicy == CacheEvictionMode.ARC)
                     return ArcTryRemove(key, out value);
                 return LruTryRemove(key, out value);
+            }
+            finally { _lock.ExitWriteLock(); }
+        }
+
+        /// <summary>
+        /// Attempts to get the value associated with the specified key in a single atomic lookup.
+        /// Avoids the TOCTOU race of separate ContainsKey + GetOrDefault calls.
+        /// </summary>
+        /// <param name="key">The key to look up.</param>
+        /// <param name="value">When this method returns true, the cached value; otherwise default.</param>
+        /// <returns><c>true</c> if found and promoted; otherwise <c>false</c>.</returns>
+        public bool TryGet(TKey key, out TValue value)
+        {
+            _lock.EnterWriteLock();
+            try
+            {
+                bool found = _evictionPolicy switch
+                {
+                    CacheEvictionMode.ARC => ArcGet(key, out value!),
+                    _ => LruGet(key, out value!),
+                };
+                if (!found) value = default!;
+                return found;
             }
             finally { _lock.ExitWriteLock(); }
         }

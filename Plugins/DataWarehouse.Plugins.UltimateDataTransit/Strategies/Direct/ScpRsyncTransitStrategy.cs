@@ -125,9 +125,13 @@ internal sealed class ScpRsyncTransitStrategy : DataTransitStrategyBase
             {
                 destinationData = await DownloadViaScpAsync(request.Destination, cts.Token);
             }
-            catch
+            catch (Exception ex)
             {
-                // Destination file does not exist; full upload required
+                // Destination file does not exist or is unreachable — full upload required.
+                // Log the specific failure reason (file-not-found vs connection refused) for diagnostics.
+                System.Diagnostics.Trace.TraceInformation(
+                    "[ScpRsync] Delta download failed ({0}: {1}), falling back to full upload.",
+                    ex.GetType().Name, ex.Message);
             }
 
             byte[] dataToTransfer;
@@ -170,7 +174,8 @@ internal sealed class ScpRsyncTransitStrategy : DataTransitStrategyBase
                 remotePath = $"/tmp/{transferId}";
             }
 
-            await UploadViaScpAsync(request.Destination, remotePath, sourceData, cts.Token);
+            // P2-2679: upload the computed delta (or full source when no delta), not raw sourceData
+            await UploadViaScpAsync(request.Destination, remotePath, dataToTransfer, cts.Token);
 
             stopwatch.Stop();
 

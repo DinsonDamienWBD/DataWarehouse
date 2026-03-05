@@ -550,7 +550,9 @@ public sealed class ColdDataCarbonMigrationStrategy : SustainabilityStrategyBase
         }
         catch
         {
+
             // Publishing completion event is best-effort
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 
@@ -590,7 +592,9 @@ public sealed class ColdDataCarbonMigrationStrategy : SustainabilityStrategyBase
             });
         }
 
-        // If significant portion of data is cold on high-carbon backends
+        // Finding 4435: single snapshot from the bounded queue (at most MaxHistoryEntries entries),
+        // then take the last 100 in-place. The trailing .ToArray() was redundant; TakeLast returns
+        // an IEnumerable and callers below use Count() + indexer — use ToList() once.
         var recentHistory = _migrationHistory.ToArray().TakeLast(100).ToList();
         if (recentHistory.Count >= 50)
         {

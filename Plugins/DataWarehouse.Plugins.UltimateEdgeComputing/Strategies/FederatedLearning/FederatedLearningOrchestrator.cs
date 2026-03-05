@@ -44,6 +44,8 @@ public sealed class FederatedLearningOrchestrator
     /// <param name="nodeId">Node identifier to register.</param>
     public void RegisterNode(string nodeId)
     {
+        // Cat 14 (finding 2931): validate nodeId — null/empty would create a degenerate entry.
+        ArgumentException.ThrowIfNullOrWhiteSpace(nodeId, nameof(nodeId));
         _registeredNodes[nodeId] = true;
     }
 
@@ -103,7 +105,12 @@ public sealed class FederatedLearningOrchestrator
                 dataProvider,
                 ct);
 
-            // Check minimum participation
+            // Check minimum participation.
+            // P2-2925: guard against division by zero when no nodes are registered.
+            if (nodeIds.Length == 0)
+            {
+                continue; // Skip round if no nodes available
+            }
             var participationRate = (double)updates.Length / nodeIds.Length;
             if (participationRate < _config.MinParticipation)
             {
@@ -198,13 +205,17 @@ public sealed class FederatedLearningOrchestrator
 
                 updates.Add(update);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException ex)
             {
+
                 // Straggler timeout or cancellation - skip this node
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
             catch
             {
+
                 // Training error - skip this node
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }).ToArray();
 
@@ -215,7 +226,9 @@ public sealed class FederatedLearningOrchestrator
         }
         catch
         {
+
             // Some tasks failed or timed out
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return updates.ToArray();

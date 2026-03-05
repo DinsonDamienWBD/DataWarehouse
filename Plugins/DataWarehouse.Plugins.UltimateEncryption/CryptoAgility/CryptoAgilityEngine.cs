@@ -96,6 +96,12 @@ public sealed class CryptoAgilityEngine : CryptoAgilityEngineBase, IDisposable
                 $"Cannot start migration in phase '{plan.Phase}'. Plan must be in NotStarted or RolledBack state.");
         }
 
+        // Guard: MessageBus must be non-null before starting a migration that requires it
+        if (MessageBus is null)
+            throw new InvalidOperationException(
+                "Cannot start migration: MessageBus is not initialized. " +
+                "Ensure the plugin has been started via StartAsync before initiating migrations.");
+
         await _migrationConcurrencyLimiter.WaitAsync(ct).ConfigureAwait(false);
         try
         {
@@ -113,7 +119,7 @@ public sealed class CryptoAgilityEngine : CryptoAgilityEngineBase, IDisposable
             // Phase 2: DoubleEncryption - create services for dual-algorithm writes
             plan.Phase = MigrationPhase.DoubleEncryption;
 
-            var doubleEncryptionService = new DoubleEncryptionService(MessageBus!);
+            var doubleEncryptionService = new DoubleEncryptionService(MessageBus);
             _doubleEncryptionServices[planId] = doubleEncryptionService;
 
             // Create migration worker for batch processing existing objects
@@ -124,7 +130,7 @@ public sealed class CryptoAgilityEngine : CryptoAgilityEngineBase, IDisposable
                 RollbackOnFailureThreshold = plan.RollbackOnFailureThreshold
             };
 
-            var worker = new MigrationWorker(plan, doubleEncryptionService, MessageBus!, options);
+            var worker = new MigrationWorker(plan, doubleEncryptionService, MessageBus, options);
             _workers[planId] = worker;
 
             // Start the worker
@@ -309,8 +315,11 @@ public sealed class CryptoAgilityEngine : CryptoAgilityEngineBase, IDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(secondaryAlgorithmId);
 
         // Find or create a DoubleEncryptionService for this operation
+        if (MessageBus is null)
+            throw new InvalidOperationException(
+                "Cannot double-encrypt: MessageBus is not initialized. Ensure the plugin has been started.");
         var service = _doubleEncryptionServices.Values.FirstOrDefault()
-            ?? new DoubleEncryptionService(MessageBus!);
+            ?? new DoubleEncryptionService(MessageBus);
 
         return await service.EncryptAsync(objectId, plaintext, primaryAlgorithmId, secondaryAlgorithmId, ct)
             .ConfigureAwait(false);
@@ -332,8 +341,11 @@ public sealed class CryptoAgilityEngine : CryptoAgilityEngineBase, IDisposable
         ArgumentNullException.ThrowIfNull(envelope);
         ArgumentException.ThrowIfNullOrWhiteSpace(preferredAlgorithmId);
 
+        if (MessageBus is null)
+            throw new InvalidOperationException(
+                "Cannot decrypt envelope: MessageBus is not initialized. Ensure the plugin has been started.");
         var service = _doubleEncryptionServices.Values.FirstOrDefault()
-            ?? new DoubleEncryptionService(MessageBus!);
+            ?? new DoubleEncryptionService(MessageBus);
 
         return await service.DecryptAsync(envelope, preferredAlgorithmId, ct)
             .ConfigureAwait(false);

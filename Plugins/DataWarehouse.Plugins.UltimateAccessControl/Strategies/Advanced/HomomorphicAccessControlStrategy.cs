@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Advanced
 {
@@ -60,26 +61,67 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Advanced
 protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
             IncrementCounter("homomorphic.access.control.evaluate");
-            await Task.Yield();
 
-            // Simplified homomorphic evaluation (production would use actual HE library)
-            var hasAdminRole = context.Roles.Count > 0 && context.Roles[0].Contains("admin", StringComparison.OrdinalIgnoreCase);
-            var isPublicResource = context.ResourceId.StartsWith("public/", StringComparison.OrdinalIgnoreCase);
+            // Delegate homomorphic operations to UltimateEncryption plugin via message bus
+            if (_messageBus != null)
+            {
+                try
+                {
+                    var request = new PluginMessage
+                    {
+                        Type = "encryption.homomorphic.evaluate",
+                        Source = "UltimateAccessControl",
+                        Payload = new Dictionary<string, object>
+                        {
+                            ["SubjectId"] = context.SubjectId,
+                            ["ResourceId"] = context.ResourceId,
+                            ["Action"] = context.Action,
+                            ["Roles"] = context.Roles,
+                            ["Attributes"] = context.SubjectAttributes
+                        }
+                    };
 
-            var isGranted = hasAdminRole || isPublicResource;
+                    var response = await _messageBus.SendAsync(
+                        "encryption.homomorphic.evaluate", request, TimeSpan.FromSeconds(30), cancellationToken);
 
+                    if (response.Success && response.Payload is Dictionary<string, object> payload)
+                    {
+                        var isGranted = payload.TryGetValue("IsGranted", out var g) && g is bool granted && granted;
+                        var scheme = payload.TryGetValue("EncryptionScheme", out var s) && s is string sch ? sch : "BFV";
+
+                        return new AccessDecision
+                        {
+                            IsGranted = isGranted,
+                            Reason = isGranted
+                                ? "Access granted via homomorphic policy evaluation (delegated to encryption plugin)"
+                                : "Access denied by homomorphic policy evaluation",
+                            ApplicablePolicies = new[] { "homomorphic-policy" },
+                            Metadata = new Dictionary<string, object>
+                            {
+                                ["encryption_scheme"] = scheme,
+                                ["evaluation_delegated"] = true,
+                                ["plaintext_exposure"] = false
+                            }
+                        };
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Homomorphic evaluation via encryption plugin failed, denying access (fail-closed)");
+                }
+            }
+
+            // Fail-closed: no HE capability available, deny access
             return new AccessDecision
             {
-                IsGranted = isGranted,
-                Reason = isGranted
-                    ? "Access granted via homomorphic policy evaluation (no plaintext exposure)"
-                    : "Access denied by homomorphic policy evaluation",
+                IsGranted = false,
+                Reason = "Homomorphic encryption plugin unavailable — access denied (fail-closed)",
                 ApplicablePolicies = new[] { "homomorphic-policy" },
                 Metadata = new Dictionary<string, object>
                 {
-                    ["encryption_scheme"] = "BFV",
-                    ["security_level"] = "128-bit",
-                    ["plaintext_exposure"] = false
+                    ["evaluation_delegated"] = false,
+                    ["plaintext_exposure"] = false,
+                    ["he_available"] = false
                 }
             };
         }

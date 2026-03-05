@@ -10,7 +10,7 @@ namespace DataWarehouse.SDK.VirtualDiskEngine.Journal;
 /// Coordinates flushing dirty data and advancing the WAL tail.
 /// </summary>
 [SdkCompatibility("3.0.0", Notes = "Phase 33: Virtual Disk Engine (VDE-03 WAL)")]
-public sealed class CheckpointManager
+public sealed class CheckpointManager : IDisposable
 {
     private readonly WriteAheadLog _wal;
     private readonly IBlockDevice _device;

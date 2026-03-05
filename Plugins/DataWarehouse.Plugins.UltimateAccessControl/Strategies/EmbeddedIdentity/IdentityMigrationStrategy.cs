@@ -49,24 +49,12 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.EmbeddedIdentit
             IncrementCounter("identity.migration.shutdown");
             return base.ShutdownAsyncCore(cancellationToken);
         }
-protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
             IncrementCounter("identity.migration.evaluate");
-            await Task.Yield();
-
-            var hasValidIdentity = context.SubjectId.Length > 0;
-
-            return new AccessDecision
-            {
-                IsGranted = hasValidIdentity,
-                Reason = hasValidIdentity ? "Identity Migration Strategy verified" : "Authentication failed",
-                ApplicablePolicies = new[] { "identity-migration-policy" },
-                Metadata = new Dictionary<string, object>
-                {
-                    ["migration_capable"] = "true",
-                    ["strategy_type"] = "EmbeddedIdentity"
-                }
-            };
+            throw new NotSupportedException(
+                "IdentityMigrationStrategy requires a real identity migration engine with source/target schema mappings, " +
+                "credential transformation, and rollback support. Granting access for any non-empty SubjectId is not a valid implementation.");
         }
     }
 }

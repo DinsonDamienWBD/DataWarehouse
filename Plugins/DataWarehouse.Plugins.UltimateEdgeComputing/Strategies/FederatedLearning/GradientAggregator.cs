@@ -75,7 +75,7 @@ public sealed class GradientAggregator
 
         return new ModelWeights(
             LayerWeights: aggregatedWeights,
-            Version: updates[0].LayerGradients.GetHashCode(), // Simple versioning
+            Version: ComputeContentVersion(aggregatedWeights),
             CreatedAt: DateTimeOffset.UtcNow);
     }
 
@@ -114,7 +114,7 @@ public sealed class GradientAggregator
 
         return new ModelWeights(
             LayerWeights: aggregatedWeights,
-            Version: updates[0].LayerGradients.GetHashCode(),
+            Version: ComputeContentVersion(aggregatedWeights),
             CreatedAt: DateTimeOffset.UtcNow);
     }
 
@@ -156,5 +156,30 @@ public sealed class GradientAggregator
             LayerWeights: newWeights,
             Version: currentWeights.Version + 1,
             CreatedAt: DateTimeOffset.UtcNow);
+    }
+
+    /// <summary>
+    /// Computes a content-based version hash from aggregated weights using SHA-256.
+    /// Produces a stable, deterministic version that reflects actual weight content,
+    /// unlike object.GetHashCode() which is identity-based and non-deterministic.
+    /// </summary>
+    private static int ComputeContentVersion(Dictionary<string, double[]> weights)
+    {
+        // Serialize weight magnitudes deterministically and hash them
+        using var sha = System.Security.Cryptography.SHA256.Create();
+        var buffer = new System.IO.MemoryStream();
+        using var writer = new System.IO.BinaryWriter(buffer);
+
+        foreach (var layer in weights.Keys.OrderBy(k => k, StringComparer.Ordinal))
+        {
+            writer.Write(layer);
+            foreach (var w in weights[layer])
+                writer.Write(w);
+        }
+
+        writer.Flush();
+        var hash = sha.ComputeHash(buffer.ToArray());
+        // Use first 4 bytes as int version (deterministic, content-based)
+        return System.BitConverter.ToInt32(hash, 0);
     }
 }

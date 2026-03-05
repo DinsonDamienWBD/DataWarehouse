@@ -17,12 +17,13 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("automated_dsar.check");
+            IncrementCounter("automated_dsar.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
-            bool isDsarRequest = context.OperationType.Contains("request", StringComparison.OrdinalIgnoreCase) &&
-                                context.DataSubjectCategories.Any();
+            bool isDsarRequest = !string.IsNullOrEmpty(context.OperationType) &&
+                                context.OperationType.Contains("request", StringComparison.OrdinalIgnoreCase) &&
+                                context.DataSubjectCategories != null && context.DataSubjectCategories.Any();
 
             if (!isDsarRequest)
             {
@@ -74,9 +75,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
 
             recommendations.Add("Integrate DSAR portal with data catalog for efficient processing");
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -92,14 +94,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("automated_dsar.initialized");
+            IncrementCounter("automated_dsar.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("automated_dsar.shutdown");
+            IncrementCounter("automated_dsar.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

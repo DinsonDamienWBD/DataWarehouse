@@ -139,9 +139,13 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
                 return await _ruleEngine.EvaluateAsync(context, cancellationToken);
             }
 
-            var recommendation = payload.TryGetValue("Recommendation", out var recObj) && recObj is string r
-                ? Enum.Parse<SecurityRecommendation>(r, true)
-                : SecurityRecommendation.Review;
+            var recommendation = SecurityRecommendation.Review;
+            if (payload.TryGetValue("Recommendation", out var recObj) && recObj is string r &&
+                Enum.TryParse<SecurityRecommendation>(r, true, out var parsed) &&
+                parsed != SecurityRecommendation.Allow) // Disallow external override to Allow - must go through proper evaluation
+            {
+                recommendation = parsed;
+            }
 
             var confidence = payload.TryGetValue("Confidence", out var confObj) && confObj is double c ? c : 0.0;
             var reasoning = payload.TryGetValue("Reasoning", out var reasonObj) && reasonObj is string reason ? reason : "AI analysis";

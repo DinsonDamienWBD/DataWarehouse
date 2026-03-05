@@ -24,7 +24,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("coppa.check");
+            IncrementCounter("coppa.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -33,9 +33,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
             CheckPrivacyNotice(context, violations, recommendations);
             CheckDataRetention(context, violations, recommendations);
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -69,7 +70,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
                     methodObj is string method &&
                     method.Equals("email-only", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (context.DataClassification.Equals("sensitive", StringComparison.OrdinalIgnoreCase))
+                    if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("sensitive", StringComparison.OrdinalIgnoreCase))
                     {
                         violations.Add(new ComplianceViolation
                         {
@@ -162,7 +163,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
                     });
                 }
 
-                if (context.OperationType.Equals("parent-deletion-request", StringComparison.OrdinalIgnoreCase))
+                if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("parent-deletion-request", StringComparison.OrdinalIgnoreCase))
                 {
                     if (!context.Attributes.TryGetValue("RequestHonored", out var honoredObj) || honoredObj is not true)
                     {
@@ -182,14 +183,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("coppa.initialized");
+            IncrementCounter("coppa.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("coppa.shutdown");
+            IncrementCounter("coppa.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

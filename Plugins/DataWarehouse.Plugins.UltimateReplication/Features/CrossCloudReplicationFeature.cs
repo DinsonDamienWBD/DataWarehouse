@@ -102,13 +102,15 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
             foreach (var targetProvider in targetProviders)
             {
                 var providerStatus = GetProviderStatus(targetProvider);
-                if (providerStatus?.Health == CloudHealth.Offline)
+                // Treat unknown providers (null status) as non-healthy — never assume healthy
+                // when status is unknown; that would silently skip writes to unregistered providers.
+                if (providerStatus == null || providerStatus.Health == CloudHealth.Offline)
                 {
                     providerResults[targetProvider] = new CloudProviderResult
                     {
                         ProviderId = targetProvider,
                         Success = false,
-                        Reason = "Provider offline",
+                        Reason = providerStatus == null ? "Provider not registered" : "Provider offline",
                         DurationMs = 0
                     };
                     continue;
@@ -136,8 +138,14 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
                 {
                     Interlocked.Add(ref _totalBytesReplicated, data.Length);
                     var egressCost = EstimateEgressCost(data.Length, sourceProvider, targetProvider);
-                    Interlocked.Exchange(ref _totalEgressCostEstimate,
-                        Volatile.Read(ref _totalEgressCostEstimate) + egressCost);
+                    // CAS retry loop for atomic double accumulation
+                    double prev, updated;
+                    do
+                    {
+                        prev = Volatile.Read(ref _totalEgressCostEstimate);
+                        updated = prev + egressCost;
+                    }
+                    while (Interlocked.CompareExchange(ref _totalEgressCostEstimate, updated, prev) != prev);
                 }
 
                 providerResults[targetProvider] = new CloudProviderResult
@@ -253,6 +261,10 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
 
                 return await tcs.Task.WaitAsync(cts.Token);
             }
+            catch (OperationCanceledException)
+            {
+                throw; // Propagate cancellation — do not swallow
+            }
             catch
             {
                 return false;
@@ -310,6 +322,10 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
                 cts.CancelAfter(TimeSpan.FromSeconds(15));
 
                 return await tcs.Task.WaitAsync(cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                throw; // Propagate cancellation — do not swallow
             }
             catch
             {

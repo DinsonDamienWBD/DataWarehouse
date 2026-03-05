@@ -41,6 +41,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 
         /// <inheritdoc/>
         public override string StrategyId => "semantic";
+        public override bool IsProductionReady => false;
 
         /// <inheritdoc/>
         public override string StrategyName => "Semantic Backup";
@@ -592,7 +593,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             }
             catch
             {
+
                 // Graceful degradation
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             return embeddings;
@@ -762,7 +765,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                 }
                 catch
                 {
+
                     // Index creation is optional
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
 
@@ -894,7 +899,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             }
             catch
             {
+
                 // Best effort
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

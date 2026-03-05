@@ -84,7 +84,26 @@ public sealed class CheckpointStateStrategy : WorkflowStrategyBase
         {
             var checkpoint = JsonSerializer.Deserialize<JsonElement>(data);
             completed = checkpoint.GetProperty("Completed").EnumerateArray().Select(e => e.GetString()!).ToHashSet();
+
+            // Deserialize the State dictionary — previously this was always returning an empty dict,
+            // making checkpoint recovery useless for state-dependent tasks.
             state = new Dictionary<string, object>();
+            if (checkpoint.TryGetProperty("State", out var stateEl))
+            {
+                foreach (var prop in stateEl.EnumerateObject())
+                {
+                    state[prop.Name] = prop.Value.ValueKind switch
+                    {
+                        JsonValueKind.String => prop.Value.GetString()!,
+                        JsonValueKind.Number when prop.Value.TryGetInt64(out var l) => (object)l,
+                        JsonValueKind.Number => prop.Value.GetDouble(),
+                        JsonValueKind.True => true,
+                        JsonValueKind.False => false,
+                        _ => prop.Value.GetRawText()
+                    };
+                }
+            }
+
             return true;
         }
         completed = null;

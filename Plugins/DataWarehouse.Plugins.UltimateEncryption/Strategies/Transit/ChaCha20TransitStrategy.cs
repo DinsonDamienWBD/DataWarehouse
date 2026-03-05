@@ -32,7 +32,7 @@ public sealed class ChaCha20TransitStrategy : TransitEncryptionPluginBase
     public override string Version => "1.0.0";
 
     /// <inheritdoc/>
-    protected override async Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(
+    protected override Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(
         byte[] plaintext,
         CipherPreset preset,
         byte[] key,
@@ -77,11 +77,11 @@ public sealed class ChaCha20TransitStrategy : TransitEncryptionPluginBase
             ["EncryptedAt"] = DateTime.UtcNow
         };
 
-        return await Task.FromResult((combined, metadata));
+        return Task.FromResult((combined, metadata));
     }
 
     /// <inheritdoc/>
-    protected override async Task<byte[]> DecryptDataAsync(
+    protected override Task<byte[]> DecryptDataAsync(
         byte[] ciphertext,
         CipherPreset preset,
         byte[] key,
@@ -129,7 +129,7 @@ public sealed class ChaCha20TransitStrategy : TransitEncryptionPluginBase
 
         chacha.Decrypt(nonce, encryptedData, tag, plaintext, aad);
 
-        return await Task.FromResult(plaintext);
+        return Task.FromResult(plaintext);
     }
 
     /// <inheritdoc/>
@@ -152,7 +152,10 @@ public sealed class ChaCha20TransitStrategy : TransitEncryptionPluginBase
         // Write master nonce to stream header
         await ciphertextStream.WriteAsync(masterNonce, cancellationToken);
 
-        var keyId = await KeyStore!.GetCurrentKeyIdAsync();
+        if (KeyStore is null)
+            throw new InvalidOperationException("KeyStore has not been initialized. Call InitializeAsync before streaming encryption (#3000).");
+
+        var keyId = await KeyStore.GetCurrentKeyIdAsync();
         var key = await KeyStore.GetKeyAsync(keyId, context);
 
         if (key.Length != KeySize)
@@ -190,6 +193,10 @@ public sealed class ChaCha20TransitStrategy : TransitEncryptionPluginBase
             await ciphertextStream.WriteAsync(tag, cancellationToken);
         }
 
+        // Write end-of-stream sentinel: chunk size of 0 with no data or tag.
+        // Decryptors must verify this sentinel is present to detect truncation attacks (#2995).
+        await ciphertextStream.WriteAsync(BitConverter.GetBytes(0), cancellationToken);
+
         // Secure memory cleanup
         CryptographicOperations.ZeroMemory(key);
 
@@ -200,6 +207,7 @@ public sealed class ChaCha20TransitStrategy : TransitEncryptionPluginBase
             ["StreamingMode"] = true,
             ["ChunkSize"] = ChunkSize,
             ["TotalBytes"] = totalBytes,
+            ["ChunkCount"] = chunkCounter,
             ["EncryptedAt"] = DateTime.UtcNow
         };
 
@@ -210,6 +218,60 @@ public sealed class ChaCha20TransitStrategy : TransitEncryptionPluginBase
             EncryptionMetadata = metadata,
             WasCompressed = false
         };
+    }
+
+    /// <summary>
+    /// Decrypts a stream written by <see cref="EncryptStreamForTransitAsync"/> — LOW-3010.
+    /// </summary>
+    public override async Task<TransitDecryptionResult> DecryptStreamFromTransitAsync(
+        System.IO.Stream ciphertextStream,
+        System.IO.Stream plaintextStream,
+        ISecurityContext context,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(ciphertextStream);
+        ArgumentNullException.ThrowIfNull(plaintextStream);
+        ArgumentNullException.ThrowIfNull(context);
+        if (KeyStore is null) throw new InvalidOperationException("KeyStore not initialized.");
+
+        var masterNonce = new byte[NonceSize];
+        if (await ReadExactAsync(ciphertextStream, masterNonce, cancellationToken) != NonceSize)
+            throw new System.Security.Cryptography.CryptographicException("Stream header truncated.");
+
+        var keyId = await KeyStore.GetCurrentKeyIdAsync().ConfigureAwait(false);
+        var key = await KeyStore.GetKeyAsync(keyId, context).ConfigureAwait(false);
+        if (key.Length != KeySize) throw new System.Security.Cryptography.CryptographicException("Key size mismatch.");
+
+        var lenBytes = new byte[4];
+        var buffer = new byte[ChunkSize + TagSize];
+        long totalBytes = 0;
+        ulong chunkCounter = 0;
+
+        using var chacha = new ChaCha20Poly1305(key);
+        while (true)
+        {
+            if (await ReadExactAsync(ciphertextStream, lenBytes, cancellationToken) != 4)
+                throw new System.Security.Cryptography.CryptographicException("Truncated chunk length.");
+            var plainSize = BitConverter.ToInt32(lenBytes, 0);
+            if (plainSize == 0) break;
+            if (plainSize < 0 || plainSize > ChunkSize) throw new System.Security.Cryptography.CryptographicException($"Invalid chunk size {plainSize}.");
+            if (await ReadExactAsync(ciphertextStream, buffer.AsMemory(0, plainSize + TagSize), cancellationToken) != plainSize + TagSize)
+                throw new System.Security.Cryptography.CryptographicException("Truncated chunk data.");
+            var plainChunk = new byte[plainSize];
+            chacha.Decrypt(DeriveChunkNonce(masterNonce, chunkCounter++), buffer.AsSpan(0, plainSize), buffer.AsSpan(plainSize, TagSize), plainChunk);
+            await plaintextStream.WriteAsync(plainChunk, cancellationToken).ConfigureAwait(false);
+            totalBytes += plainSize;
+        }
+
+        System.Security.Cryptography.CryptographicOperations.ZeroMemory(key);
+        return new TransitDecryptionResult { Plaintext = Array.Empty<byte>(), UsedPresetId = "standard-chacha20", WasDecompressed = false };
+    }
+
+    private static async Task<int> ReadExactAsync(System.IO.Stream stream, Memory<byte> buffer, CancellationToken ct)
+    {
+        int offset = 0;
+        while (offset < buffer.Length) { var r = await stream.ReadAsync(buffer.Slice(offset), ct).ConfigureAwait(false); if (r == 0) return offset; offset += r; }
+        return offset;
     }
 
     /// <summary>

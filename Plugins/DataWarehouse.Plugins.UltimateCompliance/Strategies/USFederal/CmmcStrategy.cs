@@ -24,7 +24,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("cmmc.check");
+            IncrementCounter("cmmc.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -34,9 +34,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
             CheckAssessmentStatus(context, violations, recommendations);
             CheckCuiHandling(context, violations, recommendations);
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -99,7 +100,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckAccessControl(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.DataClassification.Equals("cui", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("cui", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("MultiFactorAuth", out var mfaObj) || mfaObj is not true)
                 {
@@ -129,9 +130,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckIncidentResponse(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.OperationType.Equals("security-incident", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("security-incident", StringComparison.OrdinalIgnoreCase))
             {
-                if (context.DataClassification.Equals("cui", StringComparison.OrdinalIgnoreCase))
+                if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("cui", StringComparison.OrdinalIgnoreCase))
                 {
                     if (!context.Attributes.TryGetValue("DibcacReported", out var reportObj) || reportObj is not true)
                     {
@@ -180,7 +181,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckCuiHandling(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.DataClassification.Equals("cui", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("cui", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("CuiMarked", out var markedObj) || markedObj is not true)
                 {
@@ -211,14 +212,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("cmmc.initialized");
+            IncrementCounter("cmmc.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("cmmc.shutdown");
+            IncrementCounter("cmmc.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

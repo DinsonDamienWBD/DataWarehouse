@@ -437,11 +437,13 @@ namespace DataWarehouse.SDK.Contracts.Replication
         {
             // Compare timestamps to determine winner
             var localTimestamp = conflict.LocalMetadata?.TryGetValue("timestamp", out var localTs) == true
-                ? DateTimeOffset.Parse(localTs)
+                ? DateTimeOffset.Parse(localTs, System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.RoundtripKind)
                 : DateTimeOffset.MinValue;
 
             var remoteTimestamp = conflict.RemoteMetadata?.TryGetValue("timestamp", out var remoteTs) == true
-                ? DateTimeOffset.Parse(remoteTs)
+                ? DateTimeOffset.Parse(remoteTs, System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.RoundtripKind)
                 : DateTimeOffset.MinValue;
 
             if (remoteTimestamp > localTimestamp)
@@ -465,7 +467,10 @@ namespace DataWarehouse.SDK.Contracts.Replication
         /// <exception cref="ArgumentException">Thrown when the node count is invalid.</exception>
         protected virtual void ValidateReplicationTargets(IEnumerable<string> targetNodeIds)
         {
-            var nodeCount = targetNodeIds.Count();
+            // Use a counted loop instead of IEnumerable.Count() to avoid double-enumeration
+            var nodeCount = targetNodeIds is ICollection<string> col
+                ? col.Count
+                : targetNodeIds.Count();
 
             if (nodeCount < Capabilities.MinReplicaCount)
                 throw new ArgumentException(

@@ -26,6 +26,7 @@ public sealed class CloudWatchStrategy : ObservabilityStrategyBase
     private string _logGroupName = "/datawarehouse/application";
     private string _logStreamName = "";
     private readonly int _batchSize = 20; // CloudWatch limit
+    private volatile bool _logStreamEnsured = false;
 
     private record MetricDatum(string Name, double Value, string Unit, DateTimeOffset Timestamp, Dictionary<string, string> Dimensions);
     private record LogEvent(string Message, DateTimeOffset Timestamp);
@@ -147,8 +148,12 @@ public sealed class CloudWatchStrategy : ObservabilityStrategyBase
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken)
     {
         IncrementCounter("cloud_watch.logs_sent");
-        // Ensure log group and stream exist
-        await EnsureLogStreamExistsAsync(cancellationToken);
+        // Ensure log group and stream exist — called once per session, not every batch.
+        if (!_logStreamEnsured)
+        {
+            await EnsureLogStreamExistsAsync(cancellationToken);
+            _logStreamEnsured = true;
+        }
 
         var logEvents = logEntries.Select(entry => new Dictionary<string, object>
         {
@@ -156,10 +161,33 @@ public sealed class CloudWatchStrategy : ObservabilityStrategyBase
             ["message"] = FormatLogMessage(entry)
         }).ToList();
 
-        // CloudWatch Logs accepts max 10,000 events per request
-        foreach (var batch in logEvents.Chunk(10000))
+        // CloudWatch Logs: max 10,000 events AND max 1MB (1,048,576 bytes) per request.
+        // LOW-4649: Chunk by count first, then further split batches that exceed the byte limit.
+        const int MaxEventsPerBatch = 10000;
+        const int MaxBytesPerBatch = 1_048_576;
+        // Each event has a 26-byte overhead in the CloudWatch protocol.
+        const int PerEventOverhead = 26;
+
+        foreach (var countBatch in logEvents.Chunk(MaxEventsPerBatch))
         {
-            await PutLogEventsAsync(batch, cancellationToken);
+            var sizeBatch = new List<Dictionary<string, object>>();
+            int batchBytes = 0;
+
+            foreach (var evt in countBatch)
+            {
+                var msgBytes = Encoding.UTF8.GetByteCount(evt["message"]?.ToString() ?? "") + PerEventOverhead;
+                if (sizeBatch.Count > 0 && batchBytes + msgBytes > MaxBytesPerBatch)
+                {
+                    await PutLogEventsAsync(sizeBatch, cancellationToken);
+                    sizeBatch = new List<Dictionary<string, object>>();
+                    batchBytes = 0;
+                }
+                sizeBatch.Add(evt);
+                batchBytes += msgBytes;
+            }
+
+            if (sizeBatch.Count > 0)
+                await PutLogEventsAsync(sizeBatch, cancellationToken);
         }
     }
 
@@ -276,7 +304,7 @@ public sealed class CloudWatchStrategy : ObservabilityStrategyBase
         request.Headers.Add("Authorization", authorizationHeader);
         request.Content = new StringContent("", Encoding.UTF8, "application/x-www-form-urlencoded");
 
-        var response = await _httpClient.SendAsync(request, ct);
+        using var response = await _httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -349,28 +377,29 @@ public sealed class CloudWatchStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        // Configuration validated via Configure method
+        if (string.IsNullOrWhiteSpace(_region))
+            throw new InvalidOperationException("CloudWatchStrategy: AWS region is required. Call Configure() before initialization.");
+        if (string.IsNullOrWhiteSpace(_accessKeyId))
+            throw new InvalidOperationException("CloudWatchStrategy: AWS access key ID is required. Call Configure() before initialization.");
+        if (string.IsNullOrWhiteSpace(_secretAccessKey))
+            throw new InvalidOperationException("CloudWatchStrategy: AWS secret access key is required. Call Configure() before initialization.");
         IncrementCounter("cloud_watch.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("cloud_watch.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     protected override void Dispose(bool disposing)
     {
+                _accessKeyId = string.Empty;
+                _secretAccessKey = string.Empty;
         if (disposing)
         {
             _httpClient.Dispose();

@@ -105,7 +105,9 @@ public class SecretReference
 
         var reference = new SecretReference
         {
-            Provider = Enum.Parse<SecretProvider>(match.Groups["provider"].Value, ignoreCase: true),
+            Provider = Enum.TryParse<SecretProvider>(match.Groups["provider"].Value, ignoreCase: true, out var provider)
+                ? provider
+                : throw new ArgumentException($"Unknown secret provider: '{match.Groups["provider"].Value}'. URI: {uri}"),
             Path = match.Groups["path"].Value
         };
 

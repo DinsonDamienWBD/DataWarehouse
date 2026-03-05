@@ -284,6 +284,14 @@ public sealed class TopKHeavyHitters<T> : IProbabilisticStructure, IMergeable<To
         using var reader = new System.IO.BinaryReader(ms);
 
         var k = reader.ReadInt32();
+        // Finding 553: bound k against a reasonable maximum to prevent unbounded Dictionary
+        // allocation from untrusted serialized data.
+        const int MaxDeserializedK = 100_000;
+        if (k < 1 || k > MaxDeserializedK)
+            throw new ArgumentException(
+                $"Deserialized k={k} is out of valid range [1, {MaxDeserializedK}]. Data may be corrupt.",
+                nameof(data));
+
         var totalCount = reader.ReadInt64();
         var count = reader.ReadInt32();
 

@@ -24,7 +24,7 @@ public sealed class ElasticsearchProtocolStrategy : DatabaseProtocolStrategyBase
     private string? _apiKey;
     private string _clusterName = "";
     private string _clusterVersion = "";
-    private bool _verifySsl = true;
+
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -77,10 +77,8 @@ public sealed class ElasticsearchProtocolStrategy : DatabaseProtocolStrategyBase
         var handler = new HttpClientHandler();
         // SECURITY: TLS certificate validation is enabled by default.
         // Only bypass when explicitly configured to false.
-        if (parameters.UseSsl && !_verifySsl)
-        {
-            handler.ServerCertificateCustomValidationCallback = (_, _, _, _) => true;
-        }
+        // SECURITY: SSL certificate validation must never be bypassed in production (finding 2729).
+        // Removed _verifySsl bypass. Use X509 trust stores for custom CAs.
 
         _httpClient = new HttpClient(handler)
         {
@@ -116,11 +114,11 @@ public sealed class ElasticsearchProtocolStrategy : DatabaseProtocolStrategyBase
         }
 
         // Verify connection and get cluster info
-        var response = await _httpClient.GetAsync("/", ct);
+        using var response = await _httpClient.GetAsync("/", ct);
         response.EnsureSuccessStatusCode();
 
         var content = await response.Content.ReadAsStringAsync(ct);
-        var info = JsonDocument.Parse(content);
+        using var info = JsonDocument.Parse(content);
 
         if (info.RootElement.TryGetProperty("cluster_name", out var clusterName))
             _clusterName = clusterName.GetString() ?? "";
@@ -434,7 +432,7 @@ public sealed class ElasticsearchProtocolStrategy : DatabaseProtocolStrategyBase
 
         try
         {
-            var doc = JsonDocument.Parse(responseBody);
+            using var doc = JsonDocument.Parse(responseBody);
             var root = doc.RootElement;
 
             switch (operationType)
@@ -636,10 +634,10 @@ public sealed class ElasticsearchProtocolStrategy : DatabaseProtocolStrategyBase
     }
 
     /// <inheritdoc/>
-    protected override async Task SendDisconnectMessageAsync(CancellationToken ct)
+    protected override Task SendDisconnectMessageAsync(CancellationToken ct)
     {
         // No disconnect message for HTTP
-        await Task.CompletedTask;
+        return Task.CompletedTask;
     }
 
     /// <inheritdoc/>
@@ -649,7 +647,7 @@ public sealed class ElasticsearchProtocolStrategy : DatabaseProtocolStrategyBase
 
         try
         {
-            var response = await _httpClient.GetAsync("/_cluster/health", ct);
+            using var response = await _httpClient.GetAsync("/_cluster/health", ct);
             return response.IsSuccessStatusCode;
         }
         catch
@@ -691,7 +689,7 @@ public sealed class OpenSearchProtocolStrategy : DatabaseProtocolStrategyBase
     private HttpClient? _httpClient;
     private string _baseUrl = "";
     private string _clusterVersion = "";
-    private bool _verifySsl = true;
+
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -745,10 +743,8 @@ public sealed class OpenSearchProtocolStrategy : DatabaseProtocolStrategyBase
         var handler = new HttpClientHandler();
         // SECURITY: TLS certificate validation is enabled by default.
         // Only bypass when explicitly configured to false.
-        if (parameters.UseSsl && !_verifySsl)
-        {
-            handler.ServerCertificateCustomValidationCallback = (_, _, _, _) => true;
-        }
+        // SECURITY: SSL certificate validation must never be bypassed in production (finding 2729).
+        // Removed _verifySsl bypass. Use X509 trust stores for custom CAs.
 
         _httpClient = new HttpClient(handler)
         {
@@ -772,11 +768,11 @@ public sealed class OpenSearchProtocolStrategy : DatabaseProtocolStrategyBase
                 new AuthenticationHeaderValue("Basic", credentials);
         }
 
-        var response = await _httpClient.GetAsync("/", ct);
+        using var response = await _httpClient.GetAsync("/", ct);
         response.EnsureSuccessStatusCode();
 
         var content = await response.Content.ReadAsStringAsync(ct);
-        var info = JsonDocument.Parse(content);
+        using var info = JsonDocument.Parse(content);
 
         if (info.RootElement.TryGetProperty("version", out var version) &&
             version.TryGetProperty("number", out var number))
@@ -855,7 +851,7 @@ public sealed class OpenSearchProtocolStrategy : DatabaseProtocolStrategyBase
 
         try
         {
-            var doc = JsonDocument.Parse(responseBody);
+            using var doc = JsonDocument.Parse(responseBody);
 
             if (doc.RootElement.TryGetProperty("hits", out var hits))
             {
@@ -942,7 +938,7 @@ public sealed class OpenSearchProtocolStrategy : DatabaseProtocolStrategyBase
 
         try
         {
-            var response = await _httpClient.GetAsync("/_cluster/health", ct);
+            using var response = await _httpClient.GetAsync("/_cluster/health", ct);
             return response.IsSuccessStatusCode;
         }
         catch

@@ -272,7 +272,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
                     var json = JsonSerializer.Serialize(request);
                     var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                    var response = await _httpClient.PostAsync($"{_zanzibarEndpoint}/v1/check", content, cancellationToken);
+                    using var response = await _httpClient.PostAsync($"{_zanzibarEndpoint}/v1/check", content, cancellationToken);
 
                     if (!response.IsSuccessStatusCode)
                     {

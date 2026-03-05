@@ -39,6 +39,13 @@ internal sealed class ZigbeeStreamStrategy : StreamingDataStrategyBase, IStreami
     private long _nextNwkAddress = 1; // 0x0000 is coordinator
     private long _totalFramesSent;
 
+    /// <summary>
+    /// Instance-specific Trust Center link key (128-bit AES key).
+    /// Generated with a CSPRNG at construction time. In production, replace with the
+    /// key provisioned during network commissioning (loaded from a secrets manager or HSM).
+    /// </summary>
+    private readonly byte[] _trustCenterLinkKey = System.Security.Cryptography.RandomNumberGenerator.GetBytes(16);
+
     /// <inheritdoc/>
     public override string StrategyId => "zigbee";
 
@@ -356,13 +363,20 @@ internal sealed class ZigbeeStreamStrategy : StreamingDataStrategyBase, IStreami
     #region Zigbee Security and Mesh Helpers
 
     /// <summary>
-    /// Derives the network-wide encryption key.
-    /// In production, distributed during device commissioning via Trust Center.
+    /// Derives the network-wide encryption key from the Trust Center's secret link key.
+    /// The Trust Center link key must be provisioned at device commissioning time and
+    /// stored in a secure key store — never hardcoded or derived from public constants.
+    /// This implementation uses a per-instance CSPRNG-generated Trust Center key as the
+    /// secret root, providing unique key material for every ZigbeeStreamStrategy instance.
+    /// In a production deployment, replace <see cref="_trustCenterLinkKey"/> with the
+    /// actual key loaded from a hardware security module or secrets manager.
     /// </summary>
-    private static byte[] DeriveNetworkKey()
+    private byte[] DeriveNetworkKey()
     {
-        // Default Trust Center link key (well-known for Zigbee HA profile)
-        return SHA256.HashData(Encoding.UTF8.GetBytes("ZigBeeAlliance09"))[..16];
+        // Derive the Network Key from the instance-specific Trust Center link key.
+        // Using HMAC-SHA256 with a domain-separation constant to produce a 128-bit AES key.
+        using var hmac = new System.Security.Cryptography.HMACSHA256(_trustCenterLinkKey);
+        return hmac.ComputeHash(Encoding.UTF8.GetBytes("zigbee-network-key-v1"))[..16];
     }
 
     /// <summary>

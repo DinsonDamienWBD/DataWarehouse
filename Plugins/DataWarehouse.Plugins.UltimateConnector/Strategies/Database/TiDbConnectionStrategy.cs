@@ -67,8 +67,8 @@ public sealed class TiDbConnectionStrategy : DatabaseConnectionStrategyBase
             ["State"] = "Connected"
         };
 
-        var mockConnection = new TiDbTcpConnection(host, port, connectionString);
-        return new DefaultConnectionHandle(mockConnection, connectionInfo);
+        var tcpConnection = new TiDbTcpConnection(host, port, connectionString);
+        return new DefaultConnectionHandle(tcpConnection, connectionInfo);
     }
 
     /// <inheritdoc/>
@@ -76,9 +76,9 @@ public sealed class TiDbConnectionStrategy : DatabaseConnectionStrategyBase
     {
         try
         {
-            var mockConnection = handle.GetConnection<TiDbTcpConnection>();
+            var tcpConnection = handle.GetConnection<TiDbTcpConnection>();
             using var tcpClient = new TcpClient();
-            await tcpClient.ConnectAsync(mockConnection.Host, mockConnection.Port, ct);
+            await tcpClient.ConnectAsync(tcpConnection.Host, tcpConnection.Port, ct);
             return true;
         }
         catch { return false; /* Connection validation - failure acceptable */ }
@@ -98,12 +98,12 @@ public sealed class TiDbConnectionStrategy : DatabaseConnectionStrategyBase
 
         try
         {
-            var mockConnection = handle.GetConnection<TiDbTcpConnection>();
+            var tcpConnection = handle.GetConnection<TiDbTcpConnection>();
             using var tcpClient = new TcpClient();
-            await tcpClient.ConnectAsync(mockConnection.Host, mockConnection.Port, ct);
+            await tcpClient.ConnectAsync(tcpConnection.Host, tcpConnection.Port, ct);
             sw.Stop();
 
-            return new ConnectionHealth(true, $"TiDB TCP connection active - {mockConnection.Host}:{mockConnection.Port}", sw.Elapsed, DateTimeOffset.UtcNow);
+            return new ConnectionHealth(true, $"TiDB TCP connection active - {tcpConnection.Host}:{tcpConnection.Port}", sw.Elapsed, DateTimeOffset.UtcNow);
         }
         catch (Exception ex)
         {

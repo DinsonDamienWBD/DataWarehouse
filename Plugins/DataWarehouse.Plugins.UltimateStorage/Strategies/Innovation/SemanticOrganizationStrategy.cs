@@ -92,16 +92,22 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             var categoryPath = Path.Combine(_baseStoragePath, category);
             Directory.CreateDirectory(categoryPath);
 
-            var filePath = Path.Combine(categoryPath, Path.GetFileName(key));
+            // Use SHA256 of the key as the filename to prevent collisions between keys sharing the same Path.GetFileName.
+            var safeFileName = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(key))).ToLowerInvariant() + ".bin";
+            var filePath = Path.Combine(categoryPath, safeFileName);
             await File.WriteAllBytesAsync(filePath, dataBytes, ct);
 
             _semanticIndex[key] = semanticData;
+            // Store actual file path in semantic data for retrieval
+            semanticData.FilePath = filePath;
 
-            if (!_categoryIndex.ContainsKey(category))
+            // GetOrAdd is atomic; lock the list before mutating to prevent concurrent Add races.
+            var categoryList = _categoryIndex.GetOrAdd(category, _ => new List<string>());
+            lock (categoryList)
             {
-                _categoryIndex[category] = new List<string>();
+                categoryList.Add(key);
             }
-            _categoryIndex[category].Add(key);
 
             var fileInfo = new FileInfo(filePath);
             return new StorageObjectMetadata
@@ -129,8 +135,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 throw new FileNotFoundException($"Object with key '{key}' not found", key);
             }
 
-            var categoryPath = Path.Combine(_baseStoragePath, semanticData.Category);
-            var filePath = Path.Combine(categoryPath, Path.GetFileName(key));
+            // Use stored FilePath for O(1) retrieval instead of reconstructing from GetFileName
+            var filePath = !string.IsNullOrEmpty(semanticData.FilePath)
+                ? semanticData.FilePath
+                : Path.Combine(_baseStoragePath, semanticData.Category, Path.GetFileName(key));
 
             if (!File.Exists(filePath))
             {
@@ -147,8 +155,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
             if (_semanticIndex.TryRemove(key, out var semanticData))
             {
-                var categoryPath = Path.Combine(_baseStoragePath, semanticData.Category);
-                var filePath = Path.Combine(categoryPath, Path.GetFileName(key));
+                var filePath = !string.IsNullOrEmpty(semanticData.FilePath)
+                    ? semanticData.FilePath
+                    : Path.Combine(_baseStoragePath, semanticData.Category, Path.GetFileName(key));
 
                 if (File.Exists(filePath))
                 {
@@ -157,7 +166,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
                 if (_categoryIndex.TryGetValue(semanticData.Category, out var categoryList))
                 {
-                    categoryList.Remove(key);
+                    lock (categoryList)
+                    {
+                        categoryList.Remove(key);
+                    }
                 }
             }
 
@@ -326,6 +338,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             public string DetectedType { get; set; } = string.Empty;
             public List<string> Tags { get; set; } = new();
             public string Category { get; set; } = string.Empty;
+            /// <summary>Full path to the stored file, enabling O(1) retrieval without directory scan.</summary>
+            public string FilePath { get; set; } = string.Empty;
         }
     }
 }

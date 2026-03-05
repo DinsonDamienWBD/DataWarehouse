@@ -68,6 +68,17 @@ public sealed record NodeRegistration
     public long TotalBytes { get; init; }
 
     /// <summary>
+    /// Gets the free storage in bytes at the time of registration.
+    /// </summary>
+    /// <remarks>
+    /// Should be set by re-joining nodes to report their current free space.
+    /// A value of 0 means "not provided" — the orchestrator will default to TotalBytes
+    /// (assuming a fresh/empty node). For re-joining nodes with existing data, always
+    /// set this to the actual free space to avoid write-routing to nearly-full nodes.
+    /// </remarks>
+    public long FreeBytes { get; init; }
+
+    /// <summary>
     /// Gets the timestamp when this registration was created.
     /// </summary>
     public DateTimeOffset RegisteredAt { get; init; } = DateTimeOffset.UtcNow;

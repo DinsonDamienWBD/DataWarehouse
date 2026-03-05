@@ -37,9 +37,10 @@ internal sealed class SparkStrategy : ComputeRuntimeStrategyBase
         ValidateTask(task);
         return await MeasureExecutionAsync(task.Id, async () =>
         {
-            var jobPath = Path.GetTempFileName();
+            var tmpBase = Path.GetTempFileName();
             var ext = task.Language.Contains("python", StringComparison.OrdinalIgnoreCase) ? ".py" : ".jar";
-            var codePath = jobPath + ext;
+            var codePath = Path.ChangeExtension(tmpBase, ext);
+            File.Move(tmpBase, codePath); // rename avoids orphaned zero-byte .tmp file
 
             try
             {

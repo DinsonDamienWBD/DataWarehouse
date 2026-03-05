@@ -543,8 +543,9 @@ public sealed class Ext4Operations : FilesystemOperationsBase
             BitConverter.TryWriteBytes(span[152..156], 8u); // Journal inode = 8 (standard)
         }
 
-        // Write to device/image
-        using var fs = new FileStream(devicePath, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None, 4096, FileOptions.Asynchronous);
+        // Write to device/image. LOW-3033: Use FileMode.Create to truncate stale bytes beyond the written range,
+        // preventing e2fsck from being confused by leftover superblock data.
+        using var fs = new FileStream(devicePath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, FileOptions.Asynchronous);
         fs.Seek(SuperblockOffset, SeekOrigin.Begin);
         await fs.WriteAsync(superblock, ct);
         await fs.FlushAsync(ct);
@@ -559,8 +560,11 @@ public sealed class Ext4Operations : FilesystemOperationsBase
         if (dir != null && !Directory.Exists(dir))
             Directory.CreateDirectory(dir);
 
-        // ext4 inline data: files <= 60 bytes stored directly in inode
-        // For our implementation, small files still go to regular storage but we track the optimization
+        // LOW-3031: Clarifying comment — ext4 inline data (EXT4_INLINE_DATA_FL) would store
+        // files ≤ 60 bytes inside the inode itself on real ext4 kernels. This layer delegates
+        // to the host filesystem and does NOT apply inline-data optimisation; all files go to
+        // regular file storage regardless of size. The optimisation is tracked here for future
+        // P/Invoke or FUSE implementation.
         await File.WriteAllBytesAsync(path, content, ct);
 
         var info = new FileInfo(path);

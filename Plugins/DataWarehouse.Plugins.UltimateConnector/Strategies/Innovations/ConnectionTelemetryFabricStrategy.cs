@@ -104,10 +104,12 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 DefaultRequestVersion = new Version(2, 0)
             };
 
+            client.DefaultRequestHeaders.Remove("traceparent");
             client.DefaultRequestHeaders.Add("traceparent", $"00-{traceId}-{spanId}-01");
 
             if (enableBaggage)
             {
+                client.DefaultRequestHeaders.Remove("baggage");
                 client.DefaultRequestHeaders.Add("baggage",
                     $"service.name={serviceName},connector.strategy=telemetry-fabric");
             }
@@ -149,7 +151,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await client.PostAsync("/api/v1/telemetry/register", content, ct);
+            using var response = await client.PostAsync("/api/v1/telemetry/register", content, ct);
             response.EnsureSuccessStatusCode();
 
             var result = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
@@ -160,6 +162,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             connectSpan?.SetTag("connector.session_id", telemetrySessionId);
             connectSpan?.SetStatus(ActivityStatusCode.Ok);
 
+            client.DefaultRequestHeaders.Remove("X-Telemetry-Session");
             client.DefaultRequestHeaders.Add("X-Telemetry-Session", telemetrySessionId);
 
             var info = new Dictionary<string, object>
@@ -186,7 +189,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
 
             var client = handle.GetConnection<HttpClient>();
 
-            var response = await client.GetAsync("/api/v1/telemetry/ping", ct);
+            using var response = await client.GetAsync("/api/v1/telemetry/ping", ct);
             var success = response.IsSuccessStatusCode;
 
             Interlocked.Increment(ref _totalSpansCreated);
@@ -237,7 +240,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             var client = handle.GetConnection<HttpClient>();
             var sessionId = handle.ConnectionInfo["session_id"]?.ToString();
 
-            var response = await client.GetAsync($"/api/v1/telemetry/sessions/{sessionId}/health", ct);
+            using var response = await client.GetAsync($"/api/v1/telemetry/sessions/{sessionId}/health", ct);
             sw.Stop();
 
             Interlocked.Increment(ref _totalSpansCreated);

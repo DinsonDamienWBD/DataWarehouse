@@ -30,6 +30,8 @@ public sealed class JsonSchemaRegenerationStrategy : RegenerationStrategyBase
         var startTime = DateTime.UtcNow;
         var warnings = new List<string>();
         var diagnostics = new Dictionary<string, object>();
+        // Finding 3223: Declared outside try so catch/finally can dispose it.
+        JsonDocument? schemaDoc = null;
 
         try
         {
@@ -45,7 +47,8 @@ public sealed class JsonSchemaRegenerationStrategy : RegenerationStrategyBase
             {
                 try
                 {
-                    schema = JsonDocument.Parse(options.SchemaDefinition).RootElement;
+                    schemaDoc = JsonDocument.Parse(options.SchemaDefinition);
+                    schema = schemaDoc.RootElement;
                     diagnostics["schema_provided"] = true;
                 }
                 catch
@@ -73,8 +76,20 @@ public sealed class JsonSchemaRegenerationStrategy : RegenerationStrategyBase
                 Debug.WriteLine($"Caught exception in JsonSchemaRegenerationStrategy.cs: {ex.Message}");
                 warnings.Add($"Initial parse failed: {ex.Message}");
                 jsonContent = RepairJson(jsonContent);
-                doc = JsonDocument.Parse(jsonContent);
-                diagnostics["json_repaired"] = true;
+                // P2-3227: Wrap the second parse — RepairJson may still produce invalid JSON.
+                // Without this guard, a second JsonException leaves doc==null and line 84
+                // (doc.RootElement) throws NullReferenceException instead of a clear error.
+                try
+                {
+                    doc = JsonDocument.Parse(jsonContent);
+                    diagnostics["json_repaired"] = true;
+                }
+                catch (JsonException repairEx)
+                {
+                    throw new InvalidOperationException(
+                        $"[JsonSchemaRegenerationStrategy] JSON repair failed: {repairEx.Message}. " +
+                        $"Original error: {ex.Message}", repairEx);
+                }
             }
 
             // Reconstruct with proper formatting
@@ -106,6 +121,7 @@ public sealed class JsonSchemaRegenerationStrategy : RegenerationStrategyBase
             RecordRegeneration(true, accuracy, "json");
 
             doc?.Dispose();
+            schemaDoc?.Dispose();
 
             return new RegenerationResult
             {
@@ -132,6 +148,8 @@ public sealed class JsonSchemaRegenerationStrategy : RegenerationStrategyBase
             Debug.WriteLine($"Caught exception in JsonSchemaRegenerationStrategy.cs: {ex.Message}");
             var duration = DateTime.UtcNow - startTime;
             RecordRegeneration(false, 0, "json");
+            // Ensure documents are disposed on exception path too.
+            schemaDoc?.Dispose();
 
             return new RegenerationResult
             {
@@ -354,7 +372,8 @@ public sealed class JsonSchemaRegenerationStrategy : RegenerationStrategyBase
             Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
         };
 
-        var stream = new MemoryStream(65536);
+        // Finding 3222: Dispose MemoryStream when done.
+        using var stream = new MemoryStream(65536);
         await using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions
         {
             Indented = options.PreserveFormatting,

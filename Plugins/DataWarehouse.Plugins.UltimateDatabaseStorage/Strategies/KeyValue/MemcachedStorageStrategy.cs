@@ -26,6 +26,14 @@ public sealed class MemcachedStorageStrategy : DatabaseStorageStrategyBase
     private string _metadataPrefix = "meta:";
     private string _indexKey = "storage:index";
     private TimeSpan _defaultExpiration = TimeSpan.Zero;
+    // Serializes index read-modify-write to prevent lost-update races.
+    private readonly SemaphoreSlim _indexLock = new(1, 1);
+    // P2-2811: In-process index cache to avoid O(n) Memcached round-trips on every
+    // store/delete. Cache is invalidated on every mutation and refreshed from Memcached
+    // lazily. Multi-process deployments still round-trip Memcached under the lock.
+    private HashSet<string>? _cachedIndex;
+    private DateTime _cacheValidUntil = DateTime.MinValue;
+    private static readonly TimeSpan _cacheValidFor = TimeSpan.FromSeconds(5);
 
     public override string StrategyId => "memcached";
     public override string Name => "Memcached Storage";
@@ -258,32 +266,74 @@ public sealed class MemcachedStorageStrategy : DatabaseStorageStrategyBase
 
     private async Task AddToIndexAsync(string key)
     {
-        var indexResult = await _client!.GetAsync<string>(_indexKey);
-        var keys = indexResult.Success && !string.IsNullOrEmpty(indexResult.Value)
-            ? JsonSerializer.Deserialize<HashSet<string>>(indexResult.Value, JsonOptions) ?? new HashSet<string>()
-            : new HashSet<string>();
+        // Serialize index read-modify-write through a local semaphore to prevent
+        // lost-update races. Note: this protects only within a single process instance;
+        // multi-process environments require a distributed lock or a server-side set.
+        await _indexLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            // P2-2811: Use cached index when still valid to avoid O(n) Memcached round-trip.
+            HashSet<string> keys;
+            if (_cachedIndex != null && DateTime.UtcNow < _cacheValidUntil)
+            {
+                keys = _cachedIndex;
+            }
+            else
+            {
+                var indexResult = await _client!.GetAsync<string>(_indexKey).ConfigureAwait(false);
+                keys = indexResult.Success && !string.IsNullOrEmpty(indexResult.Value)
+                    ? JsonSerializer.Deserialize<HashSet<string>>(indexResult.Value, JsonOptions) ?? new HashSet<string>()
+                    : new HashSet<string>();
+                _cachedIndex = keys;
+                _cacheValidUntil = DateTime.UtcNow.Add(_cacheValidFor);
+            }
 
-        keys.Add(key);
-
-        var indexJson = JsonSerializer.Serialize(keys, JsonOptions);
-        await _client.SetAsync(_indexKey, indexJson, 0);
+            if (keys.Add(key))
+            {
+                await _client!.SetAsync(_indexKey, JsonSerializer.Serialize(keys, JsonOptions), (int)_defaultExpiration.TotalSeconds).ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            _indexLock.Release();
+        }
     }
 
     private async Task RemoveFromIndexAsync(string key)
     {
-        var indexResult = await _client!.GetAsync<string>(_indexKey);
-        if (!indexResult.Success || string.IsNullOrEmpty(indexResult.Value)) return;
+        await _indexLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            // P2-2811: Use cached index to avoid O(n) round-trip.
+            HashSet<string> keys;
+            if (_cachedIndex != null && DateTime.UtcNow < _cacheValidUntil)
+            {
+                keys = _cachedIndex;
+            }
+            else
+            {
+                var indexResult = await _client!.GetAsync<string>(_indexKey).ConfigureAwait(false);
+                if (!indexResult.Success || string.IsNullOrEmpty(indexResult.Value)) return;
+                keys = JsonSerializer.Deserialize<HashSet<string>>(indexResult.Value, JsonOptions) ?? new HashSet<string>();
+                _cachedIndex = keys;
+                _cacheValidUntil = DateTime.UtcNow.Add(_cacheValidFor);
+            }
 
-        var keys = JsonSerializer.Deserialize<HashSet<string>>(indexResult.Value, JsonOptions) ?? new HashSet<string>();
-        keys.Remove(key);
-
-        var indexJson = JsonSerializer.Serialize(keys, JsonOptions);
-        await _client.SetAsync(_indexKey, indexJson, 0);
+            if (keys.Remove(key))
+            {
+                await _client!.SetAsync(_indexKey, JsonSerializer.Serialize(keys, JsonOptions), (int)_defaultExpiration.TotalSeconds).ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            _indexLock.Release();
+        }
     }
 
     protected override async ValueTask DisposeAsyncCore()
     {
         _client?.Dispose();
+        _indexLock.Dispose();
         await base.DisposeAsyncCore();
     }
 

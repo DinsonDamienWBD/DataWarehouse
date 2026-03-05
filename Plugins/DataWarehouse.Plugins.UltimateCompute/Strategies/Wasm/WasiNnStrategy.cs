@@ -73,7 +73,7 @@ internal sealed class WasiNnStrategy : ComputeRuntimeStrategyBase
                 if (task.Arguments != null)
                 {
                     foreach (var arg in task.Arguments)
-                        args.Append($" {arg}");
+                        args.Append($" \"{arg.Replace("\"", "\\\"")}\"");
                 }
 
                 var timeout = GetEffectiveTimeout(task, TimeSpan.FromMinutes(10));

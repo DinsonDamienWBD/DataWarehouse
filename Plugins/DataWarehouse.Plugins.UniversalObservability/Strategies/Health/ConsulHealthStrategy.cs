@@ -32,12 +32,14 @@ public sealed class ConsulHealthStrategy : ObservabilityStrategyBase
         _consulUrl = consulUrl.TrimEnd('/');
         _token = token;
         _serviceId = serviceId;
+        // Token injected per-request via AddToken() to avoid DefaultRequestHeaders thread-safety issues.
+    }
 
-        _httpClient.DefaultRequestHeaders.Clear();
+    /// <summary>Adds the Consul token header to a request if configured (per-request, thread-safe).</summary>
+    private void AddToken(HttpRequestMessage request)
+    {
         if (!string.IsNullOrEmpty(_token))
-        {
-            _httpClient.DefaultRequestHeaders.Add("X-Consul-Token", _token);
-        }
+            request.Headers.Add("X-Consul-Token", _token);
     }
 
     /// <summary>
@@ -46,6 +48,9 @@ public sealed class ConsulHealthStrategy : ObservabilityStrategyBase
     public async Task RegisterServiceAsync(string serviceName, int port, string[]? tags = null,
         int ttlSeconds = 30, CancellationToken ct = default)
     {
+        if (port < 1 || port > 65535)
+            throw new ArgumentOutOfRangeException(nameof(port), port, "Port must be between 1 and 65535.");
+
         var service = new
         {
             ID = _serviceId,
@@ -62,8 +67,10 @@ public sealed class ConsulHealthStrategy : ObservabilityStrategyBase
         };
 
         var json = JsonSerializer.Serialize(service);
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PutAsync($"{_consulUrl}/v1/agent/service/register", content, ct);
+        var body = new StringContent(json, Encoding.UTF8, "application/json");
+        using var request = new HttpRequestMessage(HttpMethod.Put, $"{_consulUrl}/v1/agent/service/register") { Content = body };
+        AddToken(request);
+        using var response = await _httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -115,7 +122,8 @@ public sealed class ConsulHealthStrategy : ObservabilityStrategyBase
     {
         var url = $"{_consulUrl}/v1/health/service/{serviceName}";
         if (passingOnly) url += "?passing=true";
-        var response = await _httpClient.GetAsync(url, ct);
+        using var response = await _httpClient.GetAsync(url, ct);
+ response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(ct);
     }
 
@@ -124,7 +132,8 @@ public sealed class ConsulHealthStrategy : ObservabilityStrategyBase
     /// </summary>
     public async Task<string> GetHealthChecksByStateAsync(string state = "any", CancellationToken ct = default)
     {
-        var response = await _httpClient.GetAsync($"{_consulUrl}/v1/health/state/{state}", ct);
+        using var response = await _httpClient.GetAsync($"{_consulUrl}/v1/health/state/{state}", ct);
+ response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(ct);
     }
 
@@ -156,13 +165,17 @@ public sealed class ConsulHealthStrategy : ObservabilityStrategyBase
             await FailTtlCheckAsync("Critical log entries detected", cancellationToken);
         else if (hasErrors)
             await WarnTtlCheckAsync("Error log entries detected", cancellationToken);
+        else
+            // LOW-4616: Without a Pass update the TTL check remains stuck in warn/fail state.
+            await PassTtlCheckAsync($"Logs OK - {logEntries.Count()} entries processed", cancellationToken);
     }
 
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken ct)
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{_consulUrl}/v1/agent/self", ct);
+            using var response = await _httpClient.GetAsync($"{_consulUrl}/v1/agent/self", ct);
+            response.EnsureSuccessStatusCode();
             var content = await response.Content.ReadAsStringAsync(ct);
             var result = JsonSerializer.Deserialize<JsonElement>(content);
             var nodeName = result.GetProperty("Config").GetProperty("NodeName").GetString();
@@ -185,18 +198,13 @@ public sealed class ConsulHealthStrategy : ObservabilityStrategyBase
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("consul_health.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
-    protected override void Dispose(bool disposing) { if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }
+    protected override void Dispose(bool disposing) {
+                _token = string.Empty; if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }
 }

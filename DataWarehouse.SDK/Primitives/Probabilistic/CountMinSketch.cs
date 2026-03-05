@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
 
 namespace DataWarehouse.SDK.Primitives.Probabilistic;
 
@@ -33,7 +34,8 @@ public sealed class CountMinSketch<T> : IProbabilisticStructure, IMergeable<Coun
     private readonly double _delta;
     private readonly Func<T, byte[]> _serializer;
     private long _totalCount;
-    private long _lastQueryResult;
+    // Cat 15 (finding 565): renamed from _lastEstimate to _lastEstimate for clarity
+    private long _lastEstimate;
 
     /// <inheritdoc/>
     public string StructureType => "CountMinSketch";
@@ -133,7 +135,7 @@ public sealed class CountMinSketch<T> : IProbabilisticStructure, IMergeable<Coun
             _counters[i, index] += count;
         }
 
-        _totalCount += count;
+        Interlocked.Add(ref _totalCount, count);
     }
 
     /// <summary>
@@ -152,8 +154,9 @@ public sealed class CountMinSketch<T> : IProbabilisticStructure, IMergeable<Coun
             minCount = Math.Min(minCount, _counters[i, index]);
         }
 
-        _lastQueryResult = minCount == long.MaxValue ? 0 : minCount;
-        return _lastQueryResult;
+        var result = minCount == long.MaxValue ? 0 : minCount;
+        Interlocked.Exchange(ref _lastEstimate, result);
+        return result;
     }
 
     /// <summary>
@@ -177,12 +180,21 @@ public sealed class CountMinSketch<T> : IProbabilisticStructure, IMergeable<Coun
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// The confidence interval is computed from the last result of <see cref="Estimate"/> or <see cref="Query"/>.
+    /// Callers must invoke <see cref="Estimate"/> immediately before calling this method;
+    /// intervening calls from other threads may update the cached result.
+    /// For thread-safe usage, use <see cref="Query"/> which atomically returns
+    /// the estimate and its confidence interval together.
+    /// </remarks>
     public (double Lower, double Upper) GetConfidenceInterval(double confidenceLevel = 0.95)
     {
         // True count is guaranteed to be <= estimate
         // With high probability, true count >= estimate - epsilon * total
-        var errorBound = _epsilon * _totalCount;
-        return (Math.Max(0, _lastQueryResult - errorBound), _lastQueryResult);
+        // Read _lastEstimate once to avoid tearing if updated concurrently
+        var lastResult = Interlocked.Read(ref _lastEstimate);
+        var errorBound = _epsilon * Interlocked.Read(ref _totalCount);
+        return (Math.Max(0, lastResult - errorBound), lastResult);
     }
 
     /// <summary>
@@ -232,7 +244,7 @@ public sealed class CountMinSketch<T> : IProbabilisticStructure, IMergeable<Coun
             }
         }
 
-        _totalCount += other._totalCount;
+        Interlocked.Add(ref _totalCount, other._totalCount);
     }
 
     /// <inheritdoc/>
@@ -265,11 +277,24 @@ public sealed class CountMinSketch<T> : IProbabilisticStructure, IMergeable<Coun
     /// </summary>
     public static CountMinSketch<T> Deserialize(byte[] data, Func<T, byte[]>? serializer = null)
     {
+        ArgumentNullException.ThrowIfNull(data);
+        if (data.Length < 32)
+            throw new ArgumentException($"Data too short: expected at least 32 bytes header, got {data.Length}.", nameof(data));
+
         var width = BitConverter.ToInt32(data, 0);
         var depth = BitConverter.ToInt32(data, 4);
         var epsilon = BitConverter.ToDouble(data, 8);
         var delta = BitConverter.ToDouble(data, 16);
         var totalCount = BitConverter.ToInt64(data, 24);
+
+        if (width < 1 || width > 10_000_000)
+            throw new ArgumentException($"Invalid width {width}: must be between 1 and 10,000,000.", nameof(data));
+        if (depth < 1 || depth > 100)
+            throw new ArgumentException($"Invalid depth {depth}: must be between 1 and 100.", nameof(data));
+
+        var expectedSize = 32 + (long)width * depth * sizeof(long);
+        if (data.Length < expectedSize)
+            throw new ArgumentException($"Data too short: expected {expectedSize} bytes, got {data.Length}.", nameof(data));
 
         var counters = new long[depth, width];
         Buffer.BlockCopy(data, 32, counters, 0, width * depth * sizeof(long));

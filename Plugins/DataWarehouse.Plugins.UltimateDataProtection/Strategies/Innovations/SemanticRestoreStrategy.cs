@@ -33,6 +33,14 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
         private readonly BoundedDictionary<string, BackupSemanticMetadata> _semanticCatalog = new BoundedDictionary<string, BackupSemanticMetadata>(1000);
         private readonly BoundedDictionary<string, QueryInterpretation> _interpretationCache = new BoundedDictionary<string, QueryInterpretation>(1000);
 
+        // Pre-compiled patterns for IsSemanticQuery — avoids per-call Regex compilation.
+        private static readonly Regex GuidHashPattern = new Regex(@"^[a-f0-9]{32}$", RegexOptions.IgnoreCase | RegexOptions.Compiled, TimeSpan.FromMilliseconds(50));
+        private static readonly Regex CommonWordsPattern = new Regex(@"\b(my|the|from|restore|get|find|recover)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled, TimeSpan.FromMilliseconds(50));
+        // Pre-compiled temporal pattern union for O(1) IsSemanticQuery checks.
+        private static readonly Regex CompiledTemporalPattern = new Regex(
+            string.Join("|", new[] { @"today", @"yesterday", @"last\s+week", @"last\s+month", @"last\s+year", @"last\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)", @"(\d{4})" }),
+            RegexOptions.IgnoreCase | RegexOptions.Compiled, TimeSpan.FromMilliseconds(50));
+
         /// <summary>
         /// Patterns for extracting temporal references from queries.
         /// </summary>
@@ -45,7 +53,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             [@"last\s+year"] = () => DateTimeOffset.UtcNow.AddYears(-1),
             [@"last\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)"] =
                 () => GetLastDayOfWeek(DateTimeOffset.UtcNow),
-            [@"(\d{4})"] = () => DateTimeOffset.MinValue // Year pattern, extracted separately
+            // Year pattern extracted separately via regex capture; use a sentinel that callers can detect.
+            // Callers that need the actual year must parse the captured group, not use this lambda.
+            [@"(\d{4})"] = () => DateTimeOffset.UnixEpoch // Sentinel: indicates year-only pattern
         };
 
         /// <summary>
@@ -137,10 +147,22 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             foreach (var source in request.Sources)
             {
                 ct.ThrowIfCancellationRequested();
-                await Task.Delay(50, ct);
-                totalBytes += 1024 * 1024 * 80;
-                storedBytes += 1024 * 1024 * 25;
-                fileCount += 400;
+                // Measure actual source size.
+                if (!string.IsNullOrEmpty(source) && Directory.Exists(source))
+                {
+                    var di = new DirectoryInfo(source);
+                    var files = di.GetFiles("*", SearchOption.AllDirectories);
+                    totalBytes += files.Sum(f => f.Length);
+                    storedBytes += files.Sum(f => f.Length);
+                    fileCount += files.Length;
+                }
+                else if (!string.IsNullOrEmpty(source) && File.Exists(source))
+                {
+                    var fi = new FileInfo(source);
+                    totalBytes += fi.Length;
+                    storedBytes += fi.Length;
+                    fileCount += 1;
+                }
             }
 
             progressCallback(new BackupProgress
@@ -262,10 +284,20 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 
             // Perform restore
             var metadata = _semanticCatalog.GetValueOrDefault(resolvedBackupId);
-            long totalBytes = metadata?.SizeBytes ?? 1024 * 1024 * 100;
-            long fileCount = metadata?.FileCount ?? 500;
+            if (metadata == null)
+            {
+                return new RestoreResult
+                {
+                    Success = false,
+                    RestoreId = restoreId,
+                    StartTime = startTime,
+                    EndTime = DateTimeOffset.UtcNow,
+                    ErrorMessage = $"Backup '{resolvedBackupId}' not found in semantic catalog. Run a backup first."
+                };
+            }
 
-            await Task.Delay(200, ct);
+            long totalBytes = metadata.SizeBytes;
+            long fileCount = metadata.FileCount;
 
             progressCallback(new RestoreProgress
             {
@@ -372,13 +404,12 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 
             // Backup IDs are typically GUIDs or structured IDs
             if (Guid.TryParse(input.Replace("-", ""), out _)) return false;
-            if (Regex.IsMatch(input, @"^[a-f0-9]{32}$", RegexOptions.IgnoreCase)) return false;
+            if (GuidHashPattern.IsMatch(input)) return false;
 
-            // Check for natural language indicators
+            // Check for natural language indicators (pre-compiled patterns for performance)
             var hasSpaces = input.Contains(' ');
-            var hasCommonWords = Regex.IsMatch(input.ToLower(), @"\b(my|the|from|restore|get|find|recover)\b");
-            var hasTemporalReference = TemporalPatterns.Keys.Any(p =>
-                Regex.IsMatch(input.ToLower(), p));
+            var hasCommonWords = CommonWordsPattern.IsMatch(input);
+            var hasTemporalReference = CompiledTemporalPattern.IsMatch(input);
 
             return hasSpaces || hasCommonWords || hasTemporalReference;
         }
@@ -482,7 +513,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                 if (Regex.IsMatch(query, pattern, RegexOptions.IgnoreCase))
                 {
                     var resolved = resolver();
-                    if (resolved != DateTimeOffset.MinValue)
+                    // DateTimeOffset.UnixEpoch is the sentinel for the year-capture pattern;
+                    // callers that need the actual year should parse the match group directly.
+                    if (resolved != DateTimeOffset.UnixEpoch)
                     {
                         references.Add(new TemporalReference
                         {
@@ -490,6 +523,21 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                             ResolvedDate = resolved,
                             IsExact = pattern.Contains(@"\d")
                         });
+                    }
+                    else if (pattern.Contains(@"\d{4}"))
+                    {
+                        // Extract the actual year from the query and resolve it.
+                        var yearMatch = Regex.Match(query, @"\b(\d{4})\b");
+                        if (yearMatch.Success && int.TryParse(yearMatch.Groups[1].Value, out var year)
+                            && year >= 1970 && year <= DateTimeOffset.UtcNow.Year + 1)
+                        {
+                            references.Add(new TemporalReference
+                            {
+                                Pattern = pattern,
+                                ResolvedDate = new DateTimeOffset(year, 1, 1, 0, 0, 0, TimeSpan.Zero),
+                                IsExact = true
+                            });
+                        }
                     }
                 }
             }
@@ -777,8 +825,26 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                 .Take(20);
             metadata.Keywords.AddRange(pathParts);
 
-            metadata.SizeBytes = 1024 * 1024 * 100;
-            metadata.FileCount = 500;
+            // Measure actual file sizes from the source paths.
+            long sizeBytes = 0;
+            long fileCount = 0;
+            foreach (var source in sources)
+            {
+                if (Directory.Exists(source))
+                {
+                    var di = new DirectoryInfo(source);
+                    var files = di.GetFiles("*", SearchOption.AllDirectories);
+                    sizeBytes += files.Sum(f => f.Length);
+                    fileCount += files.Length;
+                }
+                else if (File.Exists(source))
+                {
+                    sizeBytes += new FileInfo(source).Length;
+                    fileCount++;
+                }
+            }
+            metadata.SizeBytes = sizeBytes;
+            metadata.FileCount = fileCount;
 
             return Task.FromResult(metadata);
         }
@@ -807,19 +873,23 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             }
             catch
             {
+
                 // Best effort enrichment
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             return metadata;
         }
 
         /// <summary>
-        /// Gets the date of the last occurrence of a day of week.
+        /// Gets the date of the last occurrence of a specific day of week relative to <paramref name="from"/>.
         /// </summary>
-        private static DateTimeOffset GetLastDayOfWeek(DateTimeOffset from)
+        private static DateTimeOffset GetLastDayOfWeek(DateTimeOffset from, DayOfWeek targetDay = DayOfWeek.Monday)
         {
-            // Simplified - returns last week's same day
-            return from.AddDays(-7);
+            var daysDiff = ((int)from.DayOfWeek - (int)targetDay + 7) % 7;
+            // If daysDiff == 0, today IS that day; go back a full week to get the "last" occurrence.
+            if (daysDiff == 0) daysDiff = 7;
+            return from.AddDays(-daysDiff);
         }
 
         #endregion

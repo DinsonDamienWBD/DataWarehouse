@@ -23,6 +23,7 @@ namespace DataWarehouse.SDK.VirtualDiskEngine.AdaptiveIndex;
 /// <item><description>Append-only delta chains avoid page overwrites</description></item>
 /// <item><description>Epoch-based garbage collection safely reclaims old delta chains</description></item>
 /// <item><description>Automatic consolidation when delta chains exceed a configurable threshold</description></item>
+/// <item><description>Page lookup uses <see cref="BwTreeMappingTable"/> backed by <see cref="System.Collections.Concurrent.ConcurrentDictionary{TKey,TValue}"/> which auto-rehashes at 0.75 load factor — worst-case collision chains are bounded by the runtime (Cat 13, finding 717)</description></item>
 /// <item><description>Two-phase split/merge protocol for structural modifications</description></item>
 /// </list>
 /// </para>
@@ -217,6 +218,9 @@ public sealed class BwTree<TKey, TValue> : IDisposable where TKey : IComparable<
 
     /// <summary>
     /// Performs a range query, returning all key-value pairs in [startKey, endKey) sorted order.
+    /// The caller MUST dispose the returned enumerator (e.g., use a foreach or explicit using) to
+    /// guarantee the epoch is released. Abandoning the enumerator leaks the epoch and blocks
+    /// garbage collection of all subsequent delta chains. Use <c>foreach</c> which always calls Dispose.
     /// </summary>
     /// <param name="startKey">The inclusive start key. Null means from the beginning.</param>
     /// <param name="endKey">The exclusive end key. Null means to the end.</param>

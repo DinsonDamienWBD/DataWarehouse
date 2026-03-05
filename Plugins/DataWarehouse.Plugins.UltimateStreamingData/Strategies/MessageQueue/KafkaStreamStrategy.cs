@@ -33,7 +33,8 @@ internal sealed class KafkaStreamStrategy : StreamingDataStrategyBase, IStreamin
     private readonly BoundedDictionary<string, KafkaTopicState> _topics = new BoundedDictionary<string, KafkaTopicState>(1000);
     private readonly BoundedDictionary<string, BoundedDictionary<int, List<StreamMessage>>> _partitionData = new BoundedDictionary<string, BoundedDictionary<int, List<StreamMessage>>>(1000);
     private readonly BoundedDictionary<string, BoundedDictionary<string, long>> _consumerOffsets = new BoundedDictionary<string, BoundedDictionary<string, long>>(1000);
-    private readonly BoundedDictionary<long, bool> _producerSequences = new BoundedDictionary<long, bool>(1000);
+    // Finding 4356: key is MessageId (string) not sequence number (long) for real dedup.
+    private readonly BoundedDictionary<string, bool> _producerSequences = new BoundedDictionary<string, bool>(1000);
     private long _nextSequence;
     private long _totalPublished;
     private long _totalConsumed;
@@ -127,10 +128,13 @@ internal sealed class KafkaStreamStrategy : StreamingDataStrategyBase, IStreamin
         if (!_topics.TryGetValue(streamName, out var topic))
             throw new StreamingException($"Topic '{streamName}' does not exist. Create it first.");
 
-        // Idempotent producer: check sequence deduplication
+        // Finding 4356: monotonically-incremented seq always produces a unique key so TryAdd never fails.
+        // Real Kafka idempotent producer deduplication is PID+Epoch+Sequence, but here we track
+        // the MessageId (caller-provided or auto-generated) to detect true application-level retries.
         var seq = Interlocked.Increment(ref _nextSequence);
-        if (!_producerSequences.TryAdd(seq, true))
-            throw new StreamingException("Duplicate producer sequence detected (idempotent producer violation).");
+        var dedupKey = message.MessageId ?? seq.ToString();
+        if (!_producerSequences.TryAdd(dedupKey, true))
+            throw new StreamingException($"Duplicate message detected (idempotent producer violation): MessageId='{dedupKey}'.");
 
         // Assign partition via consistent hashing on key, or round-robin if no key
         var partitionCount = topic.PartitionCount;
@@ -221,8 +225,12 @@ internal sealed class KafkaStreamStrategy : StreamingDataStrategyBase, IStreamin
             foreach (var msg in snapshot.Where(m => (m.Offset ?? 0) >= startOffset))
             {
                 ct.ThrowIfCancellationRequested();
+                var readStart = System.Diagnostics.Stopwatch.GetTimestamp();
                 Interlocked.Increment(ref _totalConsumed);
-                RecordRead(msg.Data.Length, 0.1);
+                // Finding 4355: use actual elapsed time instead of hardcoded 0.1 ms.
+                var readElapsedMs = (System.Diagnostics.Stopwatch.GetTimestamp() - readStart)
+                    * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+                RecordRead(msg.Data.Length, readElapsedMs);
 
                 // Auto-commit offset if enabled
                 if (options?.AutoCommit != false)

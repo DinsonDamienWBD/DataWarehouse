@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 
 namespace DataWarehouse.Plugins.UltimateDatabaseProtocol.Strategies.Relational;
 
@@ -117,7 +118,7 @@ public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
     private uint _connectionId;
     private string _authPluginName = "";
     private byte[] _authPluginData = [];
-    private int _sequenceId;
+    private int _sequenceId; // Accessed via Interlocked (finding 2730)
 
     /// <inheritdoc/>
     public override string StrategyId => "mysql-protocol";
@@ -282,10 +283,12 @@ public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
         var username = parameters.Username ?? "";
         var database = parameters.Database ?? "";
 
-        // Calculate packet size
+        // Calculate packet size.
+        // P2-2746: auth response length prefix is 1 byte for <=255, 3 bytes (0xFC + 2-byte LE) for >255.
+        var authLenPrefixBytes = authResponse.Length > 255 ? 3 : 1;
         var packetSize = 4 + 4 + 1 + 23 +
             Encoding.UTF8.GetByteCount(username) + 1 +
-            1 + authResponse.Length +
+            authLenPrefixBytes + authResponse.Length +
             (string.IsNullOrEmpty(database) ? 0 : Encoding.UTF8.GetByteCount(database) + 1) +
             Encoding.UTF8.GetByteCount(_authPluginName) + 1;
 
@@ -309,8 +312,18 @@ public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
         // Username
         offset += WriteNullTerminatedString(packet.AsSpan(offset), username);
 
-        // Auth response (length-encoded)
-        packet[offset++] = (byte)authResponse.Length;
+        // Auth response (length-encoded).
+        // P2-2746: if authResponse > 255 bytes use 0xFC 2-byte length encoding to avoid silent truncation.
+        if (authResponse.Length > 255)
+        {
+            packet[offset++] = 0xFC; // 2-byte length prefix
+            packet[offset++] = (byte)(authResponse.Length & 0xFF);
+            packet[offset++] = (byte)((authResponse.Length >> 8) & 0xFF);
+        }
+        else
+        {
+            packet[offset++] = (byte)authResponse.Length;
+        }
         authResponse.CopyTo(packet.AsSpan(offset));
         offset += authResponse.Length;
 
@@ -473,7 +486,7 @@ public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
         packet[0] = ComQuery;
         queryBytes.CopyTo(packet, 1);
 
-        _sequenceId = 0;
+        Interlocked.Exchange(ref _sequenceId, 0);
         await SendPacketAsync(packet, ct);
 
         // Read response
@@ -549,9 +562,16 @@ public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
                 break;
             }
 
-            if (packet[0] == 0xff) // ERR
+            if (packet[0] == 0xff) // ERR — P2-2709: return failure, not partial success
             {
-                break;
+                var errCode = ReadInt16LE(packet.AsSpan(1, 2));
+                var errMsg = Encoding.UTF8.GetString(packet.AsSpan(9)); // skip marker + 5-byte SQL state
+                return new QueryResult
+                {
+                    Success = false,
+                    ErrorMessage = errMsg,
+                    ErrorCode = errCode.ToString()
+                };
             }
 
             var row = ParseTextResultRow(packet, columns);
@@ -728,7 +748,7 @@ public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
         header[0] = (byte)(payload.Length & 0xff);
         header[1] = (byte)((payload.Length >> 8) & 0xff);
         header[2] = (byte)((payload.Length >> 16) & 0xff);
-        header[3] = (byte)_sequenceId++;
+        header[3] = (byte)Interlocked.Increment(ref _sequenceId);
 
         await SendAsync(header, ct);
         await SendAsync(payload, ct);
@@ -739,7 +759,7 @@ public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
         // Read header
         var header = await ReceiveExactAsync(4, ct);
         var length = header[0] | (header[1] << 8) | (header[2] << 16);
-        _sequenceId = header[3] + 1;
+        Interlocked.Exchange(ref _sequenceId, header[3] + 1);
 
         // Read payload
         return length > 0 ? await ReceiveExactAsync(length, ct) : [];

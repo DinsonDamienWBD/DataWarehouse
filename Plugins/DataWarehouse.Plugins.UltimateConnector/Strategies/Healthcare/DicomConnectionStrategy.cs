@@ -11,7 +11,7 @@ using Microsoft.Extensions.Logging;
 
 namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Healthcare
 {
-    public class DicomConnectionStrategy : HealthcareConnectionStrategyBase
+    public sealed class DicomConnectionStrategy : HealthcareConnectionStrategyBase
     {
         public override string StrategyId => "dicom";
         public override string DisplayName => "DICOM";
@@ -23,15 +23,31 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Healthcare
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var parts = config.ConnectionString.Split(':');
+            // P2-2132: Use ParseHostPortSafe to correctly handle IPv6 addresses like [::1]:104
+            var (host, port) = ParseHostPortSafe(config.ConnectionString ?? throw new ArgumentException("Connection string required"), 104);
             var client = new TcpClient();
-            await client.ConnectAsync(parts[0], parts.Length > 1 ? int.Parse(parts[1]) : 104, ct);
+            await client.ConnectAsync(host, port, ct);
             return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "DICOM" });
         }
 
-        protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(handle.GetConnection<TcpClient>().Connected);
+        // Finding 1919: Use live socket probe instead of stale Connected flag.
+        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        {
+            var client = handle.GetConnection<TcpClient>();
+            if (!client.Connected) return false;
+            try { await client.GetStream().WriteAsync(Array.Empty<byte>(), ct); return true; }
+            catch { return false; }
+        }
+
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<TcpClient>().Close(); return Task.CompletedTask; }
-        protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(new ConnectionHealth(handle.GetConnection<TcpClient>().Connected, "DICOM server", TimeSpan.Zero, DateTimeOffset.UtcNow));
+
+        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var isHealthy = await TestCoreAsync(handle, ct);
+            sw.Stop();
+            return new ConnectionHealth(isHealthy, isHealthy ? "DICOM server connected" : "DICOM server disconnected", sw.Elapsed, DateTimeOffset.UtcNow);
+        }
         public override Task<(bool IsValid, string[] Errors)> ValidateHl7Async(IConnectionHandle handle, string hl7Message, CancellationToken ct = default)
         {
             // DICOM uses its own protocol
@@ -54,7 +70,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Healthcare
         /// <exception cref="ArgumentException">Thrown if the data is not a valid DICOM file.</exception>
         public async Task<DicomStudy> ParseDicomFileAsync(byte[] dicomData, CancellationToken ct = default)
         {
-            await Task.CompletedTask; // Make async for consistency
+            // Finding 1921: Removed no-op await; synchronous parsing is returned as completed Task via caller awaiting.
             ct.ThrowIfCancellationRequested();
 
             if (dicomData.Length < 132)
@@ -129,7 +145,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Healthcare
                     }
                     catch
                     {
+
                         // Ignore unparseable values
+                        System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                     }
                 }
 

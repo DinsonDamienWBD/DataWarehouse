@@ -888,6 +888,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Topology
     {
         private readonly BoundedDictionary<string, TopologyNode> _nodes = new BoundedDictionary<string, TopologyNode>(1000);
         private readonly BoundedDictionary<int, List<string>> _levels = new BoundedDictionary<int, List<string>>(1000);
+        // Reverse lookup: nodeId → level; maintained in sync with _levels for O(1) GetNodeLevel (finding 3768).
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, int> _nodeLevelIndex = new();
         private readonly BoundedDictionary<string, (byte[] Data, int Level)> _dataStore = new BoundedDictionary<string, (byte[] Data, int Level)>(1000);
         private int _maxLevels = 4;
 
@@ -948,6 +950,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Topology
 
             var levelNodes = _levels.GetOrAdd(level, _ => new List<string>());
             lock (levelNodes) levelNodes.Add(node.NodeId);
+
+            // Maintain O(1) reverse lookup (finding 3768).
+            _nodeLevelIndex[node.NodeId] = level;
         }
 
         /// <summary>
@@ -963,16 +968,11 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Topology
         }
 
         /// <summary>
-        /// Gets the level of a node.
+        /// Gets the level of a node. O(1) via reverse lookup (finding 3768).
         /// </summary>
         public int GetNodeLevel(string nodeId)
         {
-            foreach (var (level, nodes) in _levels)
-            {
-                if (nodes.Contains(nodeId))
-                    return level;
-            }
-            return -1;
+            return _nodeLevelIndex.TryGetValue(nodeId, out var level) ? level : -1;
         }
 
         /// <inheritdoc/>

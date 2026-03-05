@@ -810,11 +810,31 @@ public sealed class LabelPropagationCommunityDetection : GraphAnalyticsAlgorithm
             communities[v] = labelMapping[label];
         }
 
+        // P2-2787: Compute actual modularity score for the detected communities.
+        // For unweighted graphs treat each edge weight as 1.0.
+        double totalEdges = vertices.Sum(v => adjacency[v].Count) / 2.0;
+        double modularity = 0.0;
+        if (totalEdges > 0)
+        {
+            var degree = vertices.ToDictionary(v => v, v => (double)adjacency[v].Count);
+            foreach (var v1 in vertices)
+            {
+                foreach (var v2 in adjacency[v1])
+                {
+                    if (communities[v1] == communities[v2])
+                    {
+                        modularity += 1.0 - degree[v1] * degree[v2] / (2.0 * totalEdges);
+                    }
+                }
+            }
+            modularity /= 2.0 * totalEdges;
+        }
+
         return new CommunityDetectionResult
         {
             Communities = communities,
             NumCommunities = nextId,
-            Modularity = 0, // Would need to compute
+            Modularity = modularity,
             Iterations = iteration
         };
     }

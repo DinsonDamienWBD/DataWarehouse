@@ -98,7 +98,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             var recordLength = 80; // Standard COBOL record length
             var paddedData = PadToFixedLength(ebcdicData, recordLength);
 
-            var filePath = Path.Combine(_basePath, key.Replace('/', '_'));
+            var filePath = GetSafeFilePath(key);
             await File.WriteAllBytesAsync(filePath, paddedData, ct);
 
             IncrementBytesStored(asciiData.Length);
@@ -120,7 +120,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             EnsureInitialized();
             IncrementOperationCounter(StorageOperationType.Retrieve);
 
-            var filePath = Path.Combine(_basePath, key.Replace('/', '_'));
+            var filePath = GetSafeFilePath(key);
             if (!File.Exists(filePath)) throw new FileNotFoundException($"Object '{key}' not found");
 
             var ebcdicData = await File.ReadAllBytesAsync(filePath, ct);
@@ -139,7 +139,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         protected override Task DeleteAsyncCore(string key, CancellationToken ct)
         {
             EnsureInitialized();
-            var filePath = Path.Combine(_basePath, key.Replace('/', '_'));
+            var filePath = GetSafeFilePath(key);
             if (File.Exists(filePath)) File.Delete(filePath);
             _records.TryRemove(key, out _);
             return Task.CompletedTask;
@@ -148,7 +148,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         protected override Task<bool> ExistsAsyncCore(string key, CancellationToken ct)
         {
             EnsureInitialized();
-            var filePath = Path.Combine(_basePath, key.Replace('/', '_'));
+            var filePath = GetSafeFilePath(key);
             return Task.FromResult(File.Exists(filePath));
         }
 
@@ -181,15 +181,44 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             }
         }
 
+        /// <summary>Returns a safe file path for the given key, preventing path traversal.</summary>
+        private string GetSafeFilePath(string key)
+        {
+            var safe = key.Replace('/', '_').Replace('\\', '_');
+            while (safe.Contains("..")) safe = safe.Replace("..", "__");
+            if (string.IsNullOrWhiteSpace(safe)) safe = "_empty_";
+            var full = Path.GetFullPath(Path.Combine(_basePath, safe));
+            if (!full.StartsWith(Path.GetFullPath(_basePath), StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException($"Key '{key}' resolves outside the base storage path.");
+            return full;
+        }
+
         private byte[] ConvertToEBCDIC(byte[] ascii)
         {
-            // Simplified EBCDIC conversion (production would use full EBCDIC code page)
-            return Encoding.Convert(Encoding.ASCII, Encoding.GetEncoding("IBM037"), ascii);
+            // Production EBCDIC conversion via IBM037 code page.
+            // Falls back to identity copy on stripped runtimes (NativeAOT/Wasm) that lack the CodePages provider.
+            try
+            {
+                return Encoding.Convert(Encoding.ASCII, Encoding.GetEncoding("IBM037"), ascii);
+            }
+            catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is PlatformNotSupportedException)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LegacyBridgeStrategy] IBM037 codec unavailable: {ex.GetType().Name}. Falling back to identity copy.");
+                return (byte[])ascii.Clone();
+            }
         }
 
         private byte[] ConvertFromEBCDIC(byte[] ebcdic)
         {
-            return Encoding.Convert(Encoding.GetEncoding("IBM037"), Encoding.ASCII, ebcdic);
+            try
+            {
+                return Encoding.Convert(Encoding.GetEncoding("IBM037"), Encoding.ASCII, ebcdic);
+            }
+            catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException || ex is PlatformNotSupportedException)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LegacyBridgeStrategy] IBM037 codec unavailable: {ex.GetType().Name}. Falling back to identity copy.");
+                return (byte[])ebcdic.Clone();
+            }
         }
 
         private byte[] PadToFixedLength(byte[] data, int recordLength)

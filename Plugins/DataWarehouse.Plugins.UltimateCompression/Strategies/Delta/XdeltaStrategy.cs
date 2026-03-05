@@ -138,7 +138,9 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
             if (input.Length == 0)
                 return output.ToArray();
 
-            // Build hash table for sliding window
+            // Build hash table for sliding window.
+            // Each bucket is capped at MaxBucketDepth to bound memory: older entries are dropped.
+            const int MaxBucketDepth = 8;
             var hashTable = new Dictionary<uint, List<int>>();
             int pos = 0;
 
@@ -183,8 +185,10 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
                         {
                             uint h = ComputeHash(input, pos, BlockSize);
                             if (!hashTable.ContainsKey(h))
-                                hashTable[h] = new List<int>();
-                            hashTable[h].Add(pos);
+                                hashTable[h] = new List<int>(MaxBucketDepth);
+                            var bucket = hashTable[h];
+                            if (bucket.Count >= MaxBucketDepth) bucket.RemoveAt(0);
+                            bucket.Add(pos);
                         }
                         pos++;
                     }
@@ -224,8 +228,10 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
                         {
                             uint h = ComputeHash(input, pos, BlockSize);
                             if (!hashTable.ContainsKey(h))
-                                hashTable[h] = new List<int>();
-                            hashTable[h].Add(pos);
+                                hashTable[h] = new List<int>(MaxBucketDepth);
+                            var bucket = hashTable[h];
+                            if (bucket.Count >= MaxBucketDepth) bucket.RemoveAt(0);
+                            bucket.Add(pos);
                         }
 
                         pos++;
@@ -313,6 +319,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
                         long savedPos = output.Position;
                         output.Position = copyPos + i;
                         int b = output.ReadByte();
+                        if (b < 0)
+                            throw new InvalidDataException("COPY references position beyond current output.");
                         output.Position = savedPos;
                         output.WriteByte((byte)b);
                     }

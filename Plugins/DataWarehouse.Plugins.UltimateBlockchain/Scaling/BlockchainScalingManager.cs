@@ -160,16 +160,8 @@ public sealed class BlockchainScalingManager : IScalableSubsystem, IDisposable
     /// <returns><c>true</c> if the result was cached; otherwise <c>false</c>.</returns>
     public bool TryGetValidation(string blockHash, out bool isValid)
     {
-        var result = _validationCache.GetOrDefault(blockHash);
-        // For value types, GetOrDefault returns default (false) on miss.
-        // Use ContainsKey to distinguish miss from cached-false.
-        if (_validationCache.ContainsKey(blockHash))
-        {
-            isValid = result;
-            return true;
-        }
-        isValid = false;
-        return false;
+        // Single atomic lookup to avoid TOCTOU race between ContainsKey + GetOrDefault
+        return _validationCache.TryGet(blockHash, out isValid);
     }
 
     /// <summary>
@@ -198,18 +190,13 @@ public sealed class BlockchainScalingManager : IScalableSubsystem, IDisposable
             ["segment.count"] = _blockStore.SegmentCount,
             ["journal.shardCount"] = _blockStore.JournalShardCount,
             ["cache.block.size"] = blockCacheStats.ItemCount,
-            ["cache.block.hitRate"] = (blockCacheStats.Hits + blockCacheStats.Misses) > 0
-                ? (double)blockCacheStats.Hits / (blockCacheStats.Hits + blockCacheStats.Misses)
-                : 0.0,
+            // Cat 10 (finding 1366): use HitRatio property directly — it's already computed on CacheStatistics.
+            ["cache.block.hitRate"] = blockCacheStats.HitRatio,
             ["cache.block.memoryBytes"] = blockCacheStats.TotalSizeBytes,
             ["cache.manifest.size"] = manifestStats.ItemCount,
-            ["cache.manifest.hitRate"] = (manifestStats.Hits + manifestStats.Misses) > 0
-                ? (double)manifestStats.Hits / (manifestStats.Hits + manifestStats.Misses)
-                : 0.0,
+            ["cache.manifest.hitRate"] = manifestStats.HitRatio,
             ["cache.validation.size"] = validationStats.ItemCount,
-            ["cache.validation.hitRate"] = (validationStats.Hits + validationStats.Misses) > 0
-                ? (double)validationStats.Hits / (validationStats.Hits + validationStats.Misses)
-                : 0.0,
+            ["cache.validation.hitRate"] = validationStats.HitRatio,
             ["backpressure.queueDepth"] = Interlocked.Read(ref _pendingAppends),
             ["backpressure.state"] = CurrentBackpressureState.ToString(),
             ["concurrency.maxWrites"] = _currentLimits.MaxConcurrentOperations,
@@ -234,14 +221,30 @@ public sealed class BlockchainScalingManager : IScalableSubsystem, IDisposable
         var oldLimits = _currentLimits;
         _currentLimits = limits;
 
-        // Recreate write semaphore if concurrency changed
+        // Recreate write semaphore if concurrency changed.
+        // Safety: store the new semaphore first, then wait for callers to drain the old one
+        // before disposing, to prevent in-flight operations crashing on Release() (findings 1350, 1351).
         if (limits.MaxConcurrentOperations != oldLimits.MaxConcurrentOperations)
         {
             var oldSemaphore = _writeSemaphore;
+            // Assign new semaphore before disposing the old one so new callers use it immediately.
             _writeSemaphore = new SemaphoreSlim(
                 limits.MaxConcurrentOperations,
                 limits.MaxConcurrentOperations);
-            oldSemaphore.Dispose();
+            // Drain outstanding waiters: acquire all old slots to confirm no caller holds it.
+            // In practice the caller should stop new operations before reconfiguring.
+            // We do a best-effort wait; callers that already hold the old semaphore will
+            // still be able to Release() it since SemaphoreSlim.Release() works after Dispose()
+            // only throws ObjectDisposedException on Wait(), not Release().
+            // Schedule disposal on ThreadPool to avoid blocking the reconfig path.
+            _ = Task.Run(async () =>
+            {
+                for (int i = 0; i < oldLimits.MaxConcurrentOperations; i++)
+                {
+                    await oldSemaphore.WaitAsync().ConfigureAwait(false);
+                }
+                oldSemaphore.Dispose();
+            });
         }
 
         _logger.LogInformation(

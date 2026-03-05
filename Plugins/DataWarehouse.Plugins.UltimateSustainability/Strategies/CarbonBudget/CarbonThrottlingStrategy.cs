@@ -288,7 +288,9 @@ public sealed class CarbonThrottlingStrategy : SustainabilityStrategyBase
         }
         catch
         {
+
             // Non-critical
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

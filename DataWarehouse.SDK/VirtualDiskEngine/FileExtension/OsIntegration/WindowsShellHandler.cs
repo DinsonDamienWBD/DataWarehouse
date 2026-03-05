@@ -101,6 +101,12 @@ public static class WindowsShellHandler
 
         // Replace the "dw" prefix in the command template with the actual CLI path.
         // Templates are formatted as: dw <verb> "%1"
-        return verb.CommandTemplate.Replace("dw ", $"\"{dwCliPath}\" ", StringComparison.Ordinal);
+        // Anchor replacement to the start of the template to avoid matching "dw " mid-string
+        var template = verb.CommandTemplate;
+        if (template.StartsWith("dw ", StringComparison.Ordinal))
+        {
+            return $"\"{dwCliPath}\" " + template.Substring(3);
+        }
+        return template.Replace("dw ", $"\"{dwCliPath}\" ", StringComparison.Ordinal);
     }
 }

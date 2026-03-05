@@ -503,8 +503,14 @@ public sealed class LevelDbProtocolStrategy : DatabaseProtocolStrategyBase
     private bool _createIfMissing = true;
     private bool _isOpen;
 
-    // LevelDB would typically use native bindings
-    // This is a simplified implementation using file-based storage
+    // P2-2695: LevelDB requires a native library (e.g. IronLevelDB, LevelDB.NET) for real LSM-tree
+    // behaviour including bloom filters, SSTable compaction, write-ahead log, and block cache.
+    // This implementation uses a flat-file directory store as a structural stand-in so the protocol
+    // contract is exercisable without a native dependency. Production deployments must replace this
+    // with a proper LevelDB binding.
+
+    /// <summary>LevelDB requires a native library — this filesystem stand-in is not production-ready.</summary>
+    public override bool IsProductionReady => false;
 
     /// <inheritdoc/>
     public override string StrategyId => "leveldb-native";
@@ -617,32 +623,47 @@ public sealed class LevelDbProtocolStrategy : DatabaseProtocolStrategyBase
             };
         }
 
-        var value = File.ReadAllText(filePath);
-        return new QueryResult
+        try
         {
-            Success = true,
-            RowsAffected = 1,
-            Rows =
-            [
-                new Dictionary<string, object?>
-                {
-                    ["key"] = key,
-                    ["value"] = value
-                }
-            ]
-        };
+            var value = File.ReadAllText(filePath);
+            return new QueryResult
+            {
+                Success = true,
+                RowsAffected = 1,
+                Rows =
+                [
+                    new Dictionary<string, object?>
+                    {
+                        ["key"] = key,
+                        ["value"] = value
+                    }
+                ]
+            };
+        }
+        catch (IOException ex)
+        {
+            return new QueryResult { Success = false, ErrorMessage = $"I/O error reading key '{key}': {ex.Message}" };
+        }
     }
 
     private QueryResult PutValue(string key, string value)
     {
         var filePath = GetKeyFilePath(key);
         var dir = Path.GetDirectoryName(filePath);
-        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-        {
-            Directory.CreateDirectory(dir);
-        }
 
-        File.WriteAllText(filePath, value);
+        try
+        {
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
+
+            File.WriteAllText(filePath, value);
+        }
+        catch (IOException ex)
+        {
+            return new QueryResult { Success = false, ErrorMessage = $"I/O error writing key '{key}': {ex.Message}" };
+        }
 
         return new QueryResult
         {
@@ -677,7 +698,8 @@ public sealed class LevelDbProtocolStrategy : DatabaseProtocolStrategyBase
             return new QueryResult { Success = true, RowsAffected = 0, Rows = rows };
         }
 
-        foreach (var file in Directory.GetFiles(dataDir, "*.dat").OrderBy(f => f).Take(limit))
+        foreach (var file in // P2-2717: EnumerateFiles avoids materialising the full array before OrderBy/Take.
+                Directory.EnumerateFiles(dataDir, "*.dat").OrderBy(f => f).Take(limit))
         {
             var key = Path.GetFileNameWithoutExtension(file);
             if (string.Compare(key, startKey, StringComparison.Ordinal) >= 0 &&
@@ -763,6 +785,12 @@ public sealed class RocksDbProtocolStrategy : DatabaseProtocolStrategyBase
     private bool _createIfMissing = true;
     private bool _isOpen;
 
+    /// <summary>
+    /// Transactions and compaction are not yet wired to native RocksDB APIs.
+    /// File I/O-based key-value operations are functional.
+    /// </summary>
+    public override bool IsProductionReady => false;
+
     /// <inheritdoc/>
     public override string StrategyId => "rocksdb-native";
 
@@ -779,7 +807,9 @@ public sealed class RocksDbProtocolStrategy : DatabaseProtocolStrategyBase
         MaxPacketSize = int.MaxValue,
         Capabilities = new ProtocolCapabilities
         {
-            SupportsTransactions = true, // OptimisticTransaction
+            // RocksDb transaction support is not yet wired (Begin/Commit/Rollback are no-ops).
+            // Set false to prevent callers from relying on transaction semantics. (finding 2689)
+            SupportsTransactions = false,
             SupportsPreparedStatements = false,
             SupportsCursors = true,
             SupportsStreaming = true,
@@ -875,32 +905,47 @@ public sealed class RocksDbProtocolStrategy : DatabaseProtocolStrategyBase
             };
         }
 
-        var value = File.ReadAllText(filePath);
-        return new QueryResult
+        try
         {
-            Success = true,
-            RowsAffected = 1,
-            Rows =
-            [
-                new Dictionary<string, object?>
-                {
-                    ["key"] = key,
-                    ["value"] = value
-                }
-            ]
-        };
+            var value = File.ReadAllText(filePath);
+            return new QueryResult
+            {
+                Success = true,
+                RowsAffected = 1,
+                Rows =
+                [
+                    new Dictionary<string, object?>
+                    {
+                        ["key"] = key,
+                        ["value"] = value
+                    }
+                ]
+            };
+        }
+        catch (IOException ex)
+        {
+            return new QueryResult { Success = false, ErrorMessage = $"I/O error reading key '{key}': {ex.Message}" };
+        }
     }
 
     private QueryResult PutValue(string key, string value)
     {
         var filePath = GetKeyFilePath(key);
         var dir = Path.GetDirectoryName(filePath);
-        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-        {
-            Directory.CreateDirectory(dir);
-        }
 
-        File.WriteAllText(filePath, value);
+        try
+        {
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
+
+            File.WriteAllText(filePath, value);
+        }
+        catch (IOException ex)
+        {
+            return new QueryResult { Success = false, ErrorMessage = $"I/O error writing key '{key}': {ex.Message}" };
+        }
 
         return new QueryResult
         {
@@ -913,10 +958,17 @@ public sealed class RocksDbProtocolStrategy : DatabaseProtocolStrategyBase
     {
         var filePath = GetKeyFilePath(key);
 
-        if (File.Exists(filePath))
+        try
         {
-            File.Delete(filePath);
-            return new QueryResult { Success = true, RowsAffected = 1 };
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+                return new QueryResult { Success = true, RowsAffected = 1 };
+            }
+        }
+        catch (IOException ex)
+        {
+            return new QueryResult { Success = false, ErrorMessage = $"I/O error deleting key '{key}': {ex.Message}" };
         }
 
         return new QueryResult { Success = true, RowsAffected = 0 };
@@ -968,19 +1020,27 @@ public sealed class RocksDbProtocolStrategy : DatabaseProtocolStrategyBase
             return new QueryResult { Success = true, RowsAffected = 0, Rows = rows };
         }
 
-        foreach (var file in Directory.GetFiles(dataDir, "*.dat").OrderBy(f => f).Take(limit))
+        try
         {
-            var key = Encoding.UTF8.GetString(Convert.FromHexString(Path.GetFileNameWithoutExtension(file)));
-            if (string.Compare(key, startKey, StringComparison.Ordinal) >= 0 &&
-                string.Compare(key, endKey, StringComparison.Ordinal) <= 0)
+            foreach (var file in // P2-2717: EnumerateFiles avoids materialising the full array before OrderBy/Take.
+                Directory.EnumerateFiles(dataDir, "*.dat").OrderBy(f => f).Take(limit))
             {
-                var value = File.ReadAllText(file);
-                rows.Add(new Dictionary<string, object?>
+                var key = Encoding.UTF8.GetString(Convert.FromHexString(Path.GetFileNameWithoutExtension(file)));
+                if (string.Compare(key, startKey, StringComparison.Ordinal) >= 0 &&
+                    string.Compare(key, endKey, StringComparison.Ordinal) <= 0)
                 {
-                    ["key"] = key,
-                    ["value"] = value
-                });
+                    var value = File.ReadAllText(file);
+                    rows.Add(new Dictionary<string, object?>
+                    {
+                        ["key"] = key,
+                        ["value"] = value
+                    });
+                }
             }
+        }
+        catch (IOException ex)
+        {
+            return new QueryResult { Success = false, ErrorMessage = $"I/O error scanning range: {ex.Message}" };
         }
 
         return new QueryResult
@@ -1065,6 +1125,12 @@ public sealed class BerkeleyDbProtocolStrategy : DatabaseProtocolStrategyBase
     private string _databaseType = "btree";
     private bool _isOpen;
 
+    // P2-2695: BerkeleyDB requires a native library for real B-tree/hash-tree storage.
+    // This is a filesystem stand-in. Production deployments must use a native BDB binding.
+
+    /// <summary>BerkeleyDB requires a native library — this filesystem stand-in is not production-ready.</summary>
+    public override bool IsProductionReady => false;
+
     /// <inheritdoc/>
     public override string StrategyId => "berkeleydb-native";
 
@@ -1081,7 +1147,9 @@ public sealed class BerkeleyDbProtocolStrategy : DatabaseProtocolStrategyBase
         MaxPacketSize = int.MaxValue,
         Capabilities = new ProtocolCapabilities
         {
-            SupportsTransactions = true,
+            // BerkeleyDb transaction support is not yet wired (Begin/Commit/Rollback are no-ops).
+            // Set false to prevent callers from relying on transaction semantics. (finding 2689)
+            SupportsTransactions = false,
             SupportsPreparedStatements = false,
             SupportsCursors = true,
             SupportsStreaming = true,
@@ -1165,37 +1233,72 @@ public sealed class BerkeleyDbProtocolStrategy : DatabaseProtocolStrategyBase
             return new QueryResult { Success = true, RowsAffected = 0, Rows = [] };
         }
 
-        var value = File.ReadAllText(filePath);
-        return new QueryResult
+        try
         {
-            Success = true,
-            RowsAffected = 1,
-            Rows = [new Dictionary<string, object?> { ["key"] = key, ["value"] = value }]
-        };
+            var value = File.ReadAllText(filePath);
+            return new QueryResult
+            {
+                Success = true,
+                RowsAffected = 1,
+                Rows = [new Dictionary<string, object?> { ["key"] = key, ["value"] = value }]
+            };
+        }
+        catch (IOException ex)
+        {
+            return new QueryResult { Success = false, ErrorMessage = $"I/O error reading key '{key}': {ex.Message}" };
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return new QueryResult { Success = false, ErrorMessage = $"Access denied reading key '{key}': {ex.Message}" };
+        }
     }
 
     private QueryResult PutValue(string key, string value)
     {
         var filePath = GetKeyFilePath(key);
-        var dir = Path.GetDirectoryName(filePath);
-        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-        {
-            Directory.CreateDirectory(dir);
-        }
 
-        File.WriteAllText(filePath, value);
-        return new QueryResult { Success = true, RowsAffected = 1 };
+        try
+        {
+            var dir = Path.GetDirectoryName(filePath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
+
+            File.WriteAllText(filePath, value);
+            return new QueryResult { Success = true, RowsAffected = 1 };
+        }
+        catch (IOException ex)
+        {
+            return new QueryResult { Success = false, ErrorMessage = $"I/O error writing key '{key}': {ex.Message}" };
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return new QueryResult { Success = false, ErrorMessage = $"Access denied writing key '{key}': {ex.Message}" };
+        }
     }
 
     private QueryResult DeleteValue(string key)
     {
         var filePath = GetKeyFilePath(key);
-        if (File.Exists(filePath))
+
+        try
         {
-            File.Delete(filePath);
-            return new QueryResult { Success = true, RowsAffected = 1 };
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+                return new QueryResult { Success = true, RowsAffected = 1 };
+            }
+            return new QueryResult { Success = true, RowsAffected = 0 };
         }
-        return new QueryResult { Success = true, RowsAffected = 0 };
+        catch (IOException ex)
+        {
+            return new QueryResult { Success = false, ErrorMessage = $"I/O error deleting key '{key}': {ex.Message}" };
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return new QueryResult { Success = false, ErrorMessage = $"Access denied deleting key '{key}': {ex.Message}" };
+        }
     }
 
     private QueryResult ScanAll(IReadOnlyDictionary<string, object?>? parameters)
@@ -1204,13 +1307,36 @@ public sealed class BerkeleyDbProtocolStrategy : DatabaseProtocolStrategyBase
         var rows = new List<IReadOnlyDictionary<string, object?>>();
         var dataDir = Path.Combine(_databasePath, "data");
 
-        if (Directory.Exists(dataDir))
+        if (!Directory.Exists(dataDir))
+            return new QueryResult { Success = true, RowsAffected = 0, Rows = rows };
+
+        IEnumerable<string> files;
+        try
         {
-            foreach (var file in Directory.GetFiles(dataDir, "*.dat").Take(limit))
+            // P2-2717: EnumerateFiles avoids materialising the full array upfront.
+            files = Directory.EnumerateFiles(dataDir, "*.dat");
+        }
+        catch (IOException ex)
+        {
+            return new QueryResult { Success = false, ErrorMessage = $"I/O error listing data directory: {ex.Message}" };
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return new QueryResult { Success = false, ErrorMessage = $"Access denied listing data directory: {ex.Message}" };
+        }
+
+        foreach (var file in files.Take(limit))
+        {
+            try
             {
                 var key = Encoding.UTF8.GetString(Convert.FromHexString(Path.GetFileNameWithoutExtension(file)));
                 var value = File.ReadAllText(file);
                 rows.Add(new Dictionary<string, object?> { ["key"] = key, ["value"] = value });
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or FormatException)
+            {
+                // Skip corrupted or inaccessible entries; continue scanning remaining files.
+                System.Diagnostics.Trace.TraceWarning($"[BerkeleyDb] Skipping unreadable record '{file}': {ex.Message}");
             }
         }
 

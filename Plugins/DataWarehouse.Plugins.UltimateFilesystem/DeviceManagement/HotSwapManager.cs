@@ -89,6 +89,7 @@ public sealed class HotSwapManager : IAsyncDisposable
     private readonly ILogger _logger;
 
     private readonly BoundedDictionary<string, RebuildState> _activeRebuilds = new(100);
+    private readonly object _rebuildLock = new();
 
     private volatile bool _isRunning;
     private bool _disposed;
@@ -336,7 +337,10 @@ public sealed class HotSwapManager : IAsyncDisposable
                     ProgressPercent: 0,
                     Phase: RebuildPhase.Pending);
 
-                _activeRebuilds[deviceId] = rebuildState;
+                lock (_rebuildLock)
+                {
+                    _activeRebuilds[deviceId] = rebuildState;
+                }
 
                 _logger.LogInformation(
                     "Hot-swap: rebuild triggered for pool {PoolId} after device {DeviceId} removal.",
@@ -405,8 +409,14 @@ public sealed class HotSwapManager : IAsyncDisposable
 
             if (ownerPool != null && _config.AutoTriggerRebuild)
             {
-                var activeCount = _activeRebuilds.Values.Count(r => r.Phase is RebuildPhase.Pending or RebuildPhase.Copying or RebuildPhase.Verifying);
-                if (activeCount < _config.MaxConcurrentRebuilds)
+                bool shouldRebuild;
+                lock (_rebuildLock)
+                {
+                    var activeCount = _activeRebuilds.Values.Count(r => r.Phase is RebuildPhase.Pending or RebuildPhase.Copying or RebuildPhase.Verifying);
+                    shouldRebuild = activeCount < _config.MaxConcurrentRebuilds;
+                }
+
+                if (shouldRebuild)
                 {
                     _logger.LogWarning(
                         "Hot-swap: proactive rebuild triggered for failing device {DeviceId} in pool {PoolId}.",

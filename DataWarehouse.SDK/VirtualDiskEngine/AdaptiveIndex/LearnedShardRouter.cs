@@ -206,9 +206,14 @@ public sealed class LearnedShardRouter
     {
         if (shardId >= 0 && shardId < _numShards)
         {
-            long current = Interlocked.Read(ref _shardCounts[shardId]);
-            if (current > 0)
-                Interlocked.Decrement(ref _shardCounts[shardId]);
+            // CAS loop: atomically decrement only if count is above zero.
+            // Prevents the read-check-decrement TOCTOU that could drive the count to -1.
+            long current;
+            do
+            {
+                current = Interlocked.Read(ref _shardCounts[shardId]);
+                if (current <= 0) return; // already at floor
+            } while (Interlocked.CompareExchange(ref _shardCounts[shardId], current - 1, current) != current);
         }
     }
 

@@ -185,9 +185,18 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ZeroTrust
                 return new CertificateValidationResult { IsValid = false, Issues = issues };
             }
 
-            // 4. Certificate chain validation
+            // 4. Certificate chain validation with proper revocation checking
             using var chain = new X509Chain();
-            chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck; // We'll do manual OCSP/CRL
+            // Use online revocation checking when OCSP/CRL validation is enabled
+            if (_enableOcspValidation || _enableCrlValidation)
+            {
+                chain.ChainPolicy.RevocationMode = X509RevocationMode.Online;
+                chain.ChainPolicy.RevocationFlag = X509RevocationFlag.EntireChain;
+            }
+            else
+            {
+                chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+            }
             chain.ChainPolicy.VerificationFlags = X509VerificationFlags.NoFlag;
 
             if (!chain.Build(certificate))
@@ -244,21 +253,35 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ZeroTrust
                 {
                     if (extension.Oid?.Value == "1.3.6.1.5.5.7.1.1") // AIA extension
                     {
-                        // In production, parse AIA extension to get OCSP URL
-                        // For now, simplified check
+                        // Use .NET X509Chain with online revocation to validate OCSP
+                        using var ocspChain = new X509Chain();
+                        ocspChain.ChainPolicy.RevocationMode = X509RevocationMode.Online;
+                        ocspChain.ChainPolicy.RevocationFlag = X509RevocationFlag.EndCertificateOnly;
+                        ocspChain.ChainPolicy.UrlRetrievalTimeout = TimeSpan.FromSeconds(10);
+
+                        if (ocspChain.Build(certificate))
+                        {
+                            return new RevocationCheckResult
+                            {
+                                IsValid = true,
+                                Reason = "OCSP check passed"
+                            };
+                        }
+
+                        var statusInfo = string.Join("; ", ocspChain.ChainStatus.Select(s => s.StatusInformation));
                         return new RevocationCheckResult
                         {
-                            IsValid = true,
-                            Reason = "OCSP check passed (simplified)"
+                            IsValid = false,
+                            Reason = $"OCSP check failed: {statusInfo}"
                         };
                     }
                 }
 
-                // No OCSP URL found
+                // No AIA extension - fail-closed for OCSP validation
                 return new RevocationCheckResult
                 {
-                    IsValid = true,
-                    Reason = "No OCSP URL in certificate (allowed)"
+                    IsValid = false,
+                    Reason = "No OCSP URL (AIA extension) in certificate - cannot verify revocation status"
                 };
             }
             catch (Exception ex)
@@ -285,21 +308,35 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ZeroTrust
                 {
                     if (extension.Oid?.Value == "2.5.29.31") // CRL Distribution Points
                     {
-                        // In production, parse CDP extension to get CRL URL and download/verify
-                        // For now, simplified check
+                        // Use .NET X509Chain with online revocation to validate via CRL
+                        using var crlChain = new X509Chain();
+                        crlChain.ChainPolicy.RevocationMode = X509RevocationMode.Online;
+                        crlChain.ChainPolicy.RevocationFlag = X509RevocationFlag.EndCertificateOnly;
+                        crlChain.ChainPolicy.UrlRetrievalTimeout = TimeSpan.FromSeconds(10);
+
+                        if (crlChain.Build(certificate))
+                        {
+                            return new RevocationCheckResult
+                            {
+                                IsValid = true,
+                                Reason = "CRL check passed"
+                            };
+                        }
+
+                        var statusInfo = string.Join("; ", crlChain.ChainStatus.Select(s => s.StatusInformation));
                         return new RevocationCheckResult
                         {
-                            IsValid = true,
-                            Reason = "CRL check passed (simplified)"
+                            IsValid = false,
+                            Reason = $"CRL check failed: {statusInfo}"
                         };
                     }
                 }
 
-                // No CRL URL found
+                // No CDP extension - fail-closed for CRL validation
                 return new RevocationCheckResult
                 {
-                    IsValid = true,
-                    Reason = "No CRL URL in certificate (allowed)"
+                    IsValid = false,
+                    Reason = "No CRL Distribution Point in certificate - cannot verify revocation status"
                 };
             }
             catch (Exception ex)

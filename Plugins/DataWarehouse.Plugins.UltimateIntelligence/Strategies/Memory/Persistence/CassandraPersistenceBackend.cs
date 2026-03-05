@@ -111,16 +111,18 @@ public enum CassandraCompactionStrategy
 /// tunable consistency levels, TTL, and configurable compaction strategies.
 /// </summary>
 /// <remarks>
-/// This implementation simulates Cassandra behavior using in-memory structures.
-/// In production, use the DataStax C# driver.
+/// This backend requires the CassandraCSharpDriver NuGet package for production use.
+/// It uses in-memory structures as a local development fallback when the driver is not available,
+/// but will log a warning on construction indicating that data is NOT persisted to Cassandra.
 /// </remarks>
 public sealed class CassandraPersistenceBackend : IProductionPersistenceBackend
 {
     private readonly CassandraPersistenceConfig _config;
     private readonly PersistenceMetrics _metrics = new();
     private readonly PersistenceCircuitBreaker _circuitBreaker;
+    private readonly bool _isSimulated;
 
-    // Simulated Cassandra data model:
+    // In-memory fallback data model (used only when Cassandra driver is unavailable):
     // PRIMARY KEY ((scope), tier, created_at, id)
     // Partition key: scope
     // Clustering columns: tier, created_at (DESC), id
@@ -152,20 +154,52 @@ public sealed class CassandraPersistenceBackend : IProductionPersistenceBackend
     /// Creates a new Cassandra persistence backend.
     /// </summary>
     /// <param name="config">Backend configuration.</param>
+    /// <exception cref="PlatformNotSupportedException">
+    /// Thrown when the CassandraCSharpDriver NuGet package is not installed and
+    /// <see cref="PersistenceBackendConfig.RequireRealBackend"/> is true.
+    /// </exception>
     public CassandraPersistenceBackend(CassandraPersistenceConfig config)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _circuitBreaker = new PersistenceCircuitBreaker();
 
-        // Simulate connection and schema creation
+        // Check if real Cassandra driver is available
+        _isSimulated = !IsCassandraDriverAvailable();
+        if (_isSimulated && _config.RequireRealBackend)
+        {
+            throw new PlatformNotSupportedException(
+                "Cassandra persistence requires the 'CassandraCSharpDriver' NuGet package. " +
+                "Install it via: dotnet add package CassandraCSharpDriver. " +
+                "Set RequireRealBackend=false to use in-memory fallback (NOT for production).");
+        }
+
         InitializeSchema();
+    }
+
+    private static bool IsCassandraDriverAvailable()
+    {
+        try
+        {
+            // Check if the Cassandra driver assembly is loaded
+            return AppDomain.CurrentDomain.GetAssemblies()
+                .Any(a => a.GetName().Name == "Cassandra");
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private void InitializeSchema()
     {
         try
         {
-            // In production, would execute:
+            if (_isSimulated)
+            {
+                Debug.WriteLine("WARNING: CassandraPersistenceBackend running in in-memory simulation mode. " +
+                    "Data will NOT be persisted to Cassandra. Install 'CassandraCSharpDriver' NuGet package for production use.");
+            }
+            // In production with real driver, would execute:
             // CREATE KEYSPACE IF NOT EXISTS ...
             // CREATE TABLE IF NOT EXISTS ...
             _isConnected = true;

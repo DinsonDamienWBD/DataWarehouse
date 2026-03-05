@@ -57,7 +57,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
             }
 
             var healthEndpoint = GetConfiguration(config, "HealthEndpoint", "/health");
-            var response = await client.GetAsync(healthEndpoint, ct);
+            using var response = await client.GetAsync(healthEndpoint, ct);
             response.EnsureSuccessStatusCode();
 
             var info = new Dictionary<string, object>
@@ -74,7 +74,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             var client = handle.GetConnection<HttpClient>();
-            var response = await client.GetAsync("/", ct);
+            using var response = await client.GetAsync("/", ct);
             return response.IsSuccessStatusCode;
         }
 

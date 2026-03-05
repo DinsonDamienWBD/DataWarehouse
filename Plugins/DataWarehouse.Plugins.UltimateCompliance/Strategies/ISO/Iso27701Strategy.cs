@@ -11,6 +11,12 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.ISO
     /// </summary>
     public sealed class Iso27701Strategy : ComplianceStrategyBase
     {
+        /// <summary>
+        /// Configurable data-field count threshold for the data-minimization recommendation (ISO 27701 §7.2.2).
+        /// Default of 30 is a practical heuristic; override via configuration key "DataMinimizationFieldThreshold".
+        /// </summary>
+        public int DataMinimizationFieldThreshold { get; set; } = 30;
+
         /// <inheritdoc/>
         public override string StrategyId => "iso27701";
 
@@ -23,7 +29,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.ISO
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("iso27701.check");
+            IncrementCounter("iso27701.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -83,7 +89,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.ISO
             }
 
             // Check privacy by design (6.4.2)
-            if (context.OperationType.Equals("create", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("create", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("PrivacyByDesignApplied", out var pbdObj) || pbdObj is not true)
                 {
@@ -98,17 +104,18 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.ISO
                 }
             }
 
-            // Check data minimization (7.2.2)
+            // Check data minimization (7.2.2) — threshold is configurable via DataMinimizationFieldThreshold
             if (context.Attributes.TryGetValue("DataFields", out var fieldsObj) &&
                 fieldsObj is IEnumerable<string> fields &&
-                fields.Count() > 30)
+                fields.Count() > DataMinimizationFieldThreshold)
             {
                 recommendations.Add("Review data collection scope for compliance with data minimization principles");
             }
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -124,14 +131,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.ISO
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("iso27701.initialized");
+            IncrementCounter("iso27701.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("iso27701.shutdown");
+            IncrementCounter("iso27701.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

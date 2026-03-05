@@ -13,6 +13,8 @@ public sealed class ConvergenceDetector
     private readonly int _patience;
     private readonly List<double> _lossHistory = new();
     private int _stableRounds = 0;
+    // P2-2681: Protect _lossHistory and _stableRounds from concurrent RecordLoss/HasConverged calls.
+    private readonly object _lock = new();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ConvergenceDetector"/> class.
@@ -33,21 +35,24 @@ public sealed class ConvergenceDetector
     /// <param name="loss">Loss value to record.</param>
     public void RecordLoss(double loss)
     {
-        _lossHistory.Add(loss);
-
-        // Check if loss change is below threshold
-        if (_lossHistory.Count > 1)
+        lock (_lock)
         {
-            var previousLoss = _lossHistory[^2];
-            var lossDelta = Math.Abs(previousLoss - loss);
+            _lossHistory.Add(loss);
 
-            if (lossDelta < _lossThreshold)
+            // Check if loss change is below threshold
+            if (_lossHistory.Count > 1)
             {
-                _stableRounds++;
-            }
-            else
-            {
-                _stableRounds = 0; // Reset counter if loss changed significantly
+                var previousLoss = _lossHistory[^2];
+                var lossDelta = Math.Abs(previousLoss - loss);
+
+                if (lossDelta < _lossThreshold)
+                {
+                    _stableRounds++;
+                }
+                else
+                {
+                    _stableRounds = 0; // Reset counter if loss changed significantly
+                }
             }
         }
     }
@@ -58,7 +63,7 @@ public sealed class ConvergenceDetector
     /// <returns>True if converged (loss stable for patience rounds), false otherwise.</returns>
     public bool HasConverged()
     {
-        return _stableRounds >= _patience;
+        lock (_lock) { return _stableRounds >= _patience; }
     }
 
     /// <summary>
@@ -67,7 +72,7 @@ public sealed class ConvergenceDetector
     /// <returns>Array of loss values across all rounds.</returns>
     public double[] GetLossHistory()
     {
-        return _lossHistory.ToArray();
+        lock (_lock) { return _lossHistory.ToArray(); }
     }
 
     /// <summary>

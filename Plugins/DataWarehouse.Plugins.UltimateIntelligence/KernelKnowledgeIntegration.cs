@@ -177,7 +177,7 @@ public sealed class KernelKnowledgeObjectHandler : IDisposable
     /// </summary>
     private void OnKnowledgeChanged(object? sender, KnowledgeChangedEventArgs e)
     {
-        _ = _messageBus.PublishAsync(KnowledgeEventTopic, new PluginMessage
+        _messageBus.PublishAsync(KnowledgeEventTopic, new PluginMessage
         {
             Type = KnowledgeEventTopic,
             SourcePluginId = "kernel",
@@ -189,7 +189,9 @@ public sealed class KernelKnowledgeObjectHandler : IDisposable
                 ["timestamp"] = e.Timestamp,
                 ["affectedCount"] = e.AffectedKnowledge.Count + e.RemovedKnowledgeIds.Count
             }
-        });
+        }).ContinueWith(
+            t => Debug.WriteLine($"Failed to publish knowledge change event: {t.Exception?.GetBaseException().Message}"),
+            TaskContinuationOptions.OnlyOnFaulted);
     }
 
     /// <summary>

@@ -402,24 +402,32 @@ internal sealed class WebSocketInterfaceStrategy : SdkInterface.InterfaceStrateg
     private sealed class WebSocketConnection : IDisposable
     {
         public string ConnectionId { get; }
-        public DateTimeOffset LastPingTime { get; set; }
-        private readonly List<string> _messageQueue = new();
+        // LastPingTime is read from heartbeat thread and written from request thread — guard with lock
+        private DateTimeOffset _lastPingTime;
+        private readonly object _pingLock = new();
+        public DateTimeOffset LastPingTime
+        {
+            get { lock (_pingLock) { return _lastPingTime; } }
+            set { lock (_pingLock) { _lastPingTime = value; } }
+        }
+        private readonly System.Collections.Concurrent.ConcurrentQueue<string> _messageQueue = new();
 
         public WebSocketConnection(string connectionId)
         {
             ConnectionId = connectionId;
-            LastPingTime = DateTimeOffset.UtcNow;
+            _lastPingTime = DateTimeOffset.UtcNow;
         }
 
         public void SendMessage(string message)
         {
             // In production, this would write to actual WebSocket stream
-            _messageQueue.Add(message);
+            _messageQueue.Enqueue(message);
         }
 
         public void Dispose()
         {
-            _messageQueue.Clear();
+            // Drain queue on dispose
+            while (_messageQueue.TryDequeue(out _)) { }
         }
     }
 }

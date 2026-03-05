@@ -221,7 +221,7 @@ public sealed class StorageDocumentationGenerator
         sb.AppendLine();
         sb.AppendLine("foreach (var strategy in strategies)");
         sb.AppendLine("{");
-        sb.AppendLine("    Console.WriteLine($\"{strategy[\"name\"]} - {strategy[\"category\"]}\");");
+        sb.AppendLine("    System.Diagnostics.Debug.WriteLine($\"{strategy[\"name\"]} - {strategy[\"category\"]}\");");
         sb.AppendLine("}");
         sb.AppendLine("```");
         sb.AppendLine();

@@ -3,6 +3,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -46,6 +47,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         private string _username = string.Empty;
         private string _password = string.Empty;
         private AfpAuthMethod _authMethod = AfpAuthMethod.CleartextPassword;
+        private bool _allowCleartextPassword = false;
         private int _timeoutSeconds = 30;
         private int _maxBufferSize = 64 * 1024; // 64KB
         private bool _autoReconnect = true;
@@ -113,14 +115,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             _maxBufferSize = GetConfiguration<int>("MaxBufferSize", 64 * 1024);
             _autoReconnect = GetConfiguration<bool>("AutoReconnect", true);
 
-            var authMethodStr = GetConfiguration<string>("AuthMethod", "CleartextPassword");
+            _allowCleartextPassword = GetConfiguration<bool>("AllowCleartextPassword", false);
+
+            var authMethodStr = GetConfiguration<string>("AuthMethod", "DHX2");
             _authMethod = authMethodStr.ToUpperInvariant() switch
             {
                 "CLEARTEXT" or "CLEARTEXTPASSWORD" => AfpAuthMethod.CleartextPassword,
                 "DHX" => AfpAuthMethod.DHX,
                 "DHX2" => AfpAuthMethod.DHX2,
                 "KERBEROS" => AfpAuthMethod.Kerberos,
-                _ => AfpAuthMethod.CleartextPassword
+                _ => AfpAuthMethod.DHX2
             };
 
             // Normalize base path
@@ -181,25 +185,36 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
 
         /// <summary>
         /// Ensures connection is alive and reconnects if necessary.
+        /// Reads of _tcpClient and _lastConnectionTime are taken under _connectionLock to
+        /// prevent TOCTOU races against ConnectAsync which writes those fields under the same lock.
         /// </summary>
         private async Task EnsureConnectedAsync(CancellationToken ct)
         {
-            if (_tcpClient == null || !_tcpClient.Connected || _networkStream == null)
+            // Snapshot volatile fields under lock to avoid TOCTOU.
+            await _connectionLock.WaitAsync(ct);
+            bool needsConnect;
+            bool isConnected;
+            DateTime lastConn;
+            try
             {
-                if (_autoReconnect)
-                {
-                    await ConnectAsync(ct);
-                }
-                else
-                {
-                    throw new InvalidOperationException("AFP connection is not established. Call InitializeAsync first.");
-                }
+                isConnected = _tcpClient != null && _tcpClient.Connected && _networkStream != null;
+                lastConn = _lastConnectionTime;
+                needsConnect = !isConnected || (_autoReconnect && (DateTime.UtcNow - lastConn) > _connectionTimeout);
+            }
+            finally
+            {
+                _connectionLock.Release();
             }
 
-            // Check if connection has timed out
-            if (_autoReconnect && (DateTime.UtcNow - _lastConnectionTime) > _connectionTimeout)
+            if (!needsConnect) return;
+
+            if (_autoReconnect)
             {
                 await ConnectAsync(ct);
+            }
+            else
+            {
+                throw new InvalidOperationException("AFP connection is not established. Call InitializeAsync first.");
             }
         }
 
@@ -219,7 +234,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     }
                     catch (Exception ex)
                     {
-                        System.Diagnostics.Debug.WriteLine($"[AfpStrategy.DisconnectInternalAsync] {ex.GetType().Name}: {ex.Message}");
+                        Trace.TraceWarning($"[AfpStrategy.DisconnectInternalAsync] {ex.GetType().Name}: {ex.Message}");
                         // Ignore close errors
                     }
                 }
@@ -234,7 +249,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     }
                     catch (Exception ex)
                     {
-                        System.Diagnostics.Debug.WriteLine($"[AfpStrategy.DisconnectInternalAsync] {ex.GetType().Name}: {ex.Message}");
+                        Trace.TraceWarning($"[AfpStrategy.DisconnectInternalAsync] {ex.GetType().Name}: {ex.Message}");
                         // Ignore close errors
                     }
                 }
@@ -246,7 +261,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[AfpStrategy.DisconnectInternalAsync] {ex.GetType().Name}: {ex.Message}");
+                    Trace.TraceWarning($"[AfpStrategy.DisconnectInternalAsync] {ex.GetType().Name}: {ex.Message}");
                     // Ignore logout errors
                 }
 
@@ -259,7 +274,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     }
                     catch (Exception ex)
                     {
-                        System.Diagnostics.Debug.WriteLine($"[AfpStrategy.DisconnectInternalAsync] {ex.GetType().Name}: {ex.Message}");
+                        Trace.TraceWarning($"[AfpStrategy.DisconnectInternalAsync] {ex.GetType().Name}: {ex.Message}");
                         // Ignore close errors
                     }
                 }
@@ -273,7 +288,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[AfpStrategy.DisconnectInternalAsync] {ex.GetType().Name}: {ex.Message}");
+                Trace.TraceWarning($"[AfpStrategy.DisconnectInternalAsync] {ex.GetType().Name}: {ex.Message}");
                 // Ignore disconnection errors
             }
 
@@ -434,11 +449,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             bw.Write((byte)_username.Length);
             bw.Write(Encoding.UTF8.GetBytes(_username));
 
-            // For cleartext password, append password
+            // For cleartext password, append password — refuse unless explicitly enabled by admin
             if (_authMethod == AfpAuthMethod.CleartextPassword)
             {
-                System.Diagnostics.Debug.WriteLine(
-                    "[AfpStrategy] WARNING: AFP Cleartxt Passwrd UAM transmits credentials in cleartext over TCP. " +
+                if (!_allowCleartextPassword)
+                    throw new InvalidOperationException(
+                        "AFP cleartext password authentication is disabled. " +
+                        "Set AllowCleartextPassword=true in configuration only if AFP traffic is protected by TLS/VPN, " +
+                        "or switch to AuthMethod=DHX2 or Kerberos.");
+                Trace.TraceWarning(
+                    "[AfpStrategy] AFP Cleartext Password UAM transmits credentials in cleartext over TCP. " +
                     "Use DHX2, Kerberos, or wrap AFP traffic in TLS/VPN in production environments.");
                 // Pad username to 8-byte boundary
                 var usernamePadding = (8 - (_username.Length + 1) % 8) % 8;
@@ -740,14 +760,32 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             var command = ms.ToArray();
             var response = await SendDsiCommandAsync(command, ct);
 
-            // Parse file info (simplified)
+            // Parse file info from AFP FPGetFileDirParms response
+            // AFP timestamps are seconds since 2000-01-01 (Mac epoch) as big-endian int32
+            var now = DateTime.UtcNow;
+            DateTime created = now;
+            DateTime modified = now;
+            long size = 0;
+            if (response.Length >= 8)
+            {
+                size = BinaryPrimitives.ReadInt64BigEndian(response.AsSpan(0));
+            }
+            if (response.Length >= 16)
+            {
+                // Offset 8: CreateDate (4 bytes, AFP Mac epoch = seconds since 2000-01-01)
+                var macEpoch = new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                var createSeconds = BinaryPrimitives.ReadInt32BigEndian(response.AsSpan(8));
+                var modSeconds = BinaryPrimitives.ReadInt32BigEndian(response.AsSpan(12));
+                if (createSeconds != 0) created = macEpoch.AddSeconds(createSeconds);
+                if (modSeconds != 0) modified = macEpoch.AddSeconds(modSeconds);
+            }
             return new AfpFileInfo
             {
                 Name = filename,
                 IsDirectory = false,
-                Size = response.Length >= 8 ? BinaryPrimitives.ReadInt64BigEndian(response.AsSpan(0)) : 0,
-                Created = DateTime.UtcNow,
-                Modified = DateTime.UtcNow
+                Size = size,
+                Created = created,
+                Modified = modified
             };
         }
 

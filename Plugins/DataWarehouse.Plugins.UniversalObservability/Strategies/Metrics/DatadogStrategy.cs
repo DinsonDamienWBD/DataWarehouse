@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.IO.Hashing;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -51,12 +52,17 @@ public sealed class DatadogStrategy : ObservabilityStrategyBase
     /// <param name="service">Service name for tagging.</param>
     public void Configure(string apiKey, string site = "datadoghq.com", string service = "datawarehouse")
     {
+        if (string.IsNullOrWhiteSpace(apiKey))
+            throw new ArgumentException("Datadog API key must not be empty.", nameof(apiKey));
         _apiKey = apiKey;
         _site = site;
         _service = service;
-        _httpClient.DefaultRequestHeaders.Clear();
-        _httpClient.DefaultRequestHeaders.Add("DD-API-KEY", _apiKey);
+        // Do NOT set DefaultRequestHeaders — inject per-request to avoid thread-safety issues.
     }
+
+    /// <summary>Adds the Datadog API key to the request headers (per-request, thread-safe).</summary>
+    private void AddApiKey(HttpRequestMessage request) =>
+        request.Headers.Add("DD-API-KEY", _apiKey);
 
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
@@ -90,12 +96,9 @@ public sealed class DatadogStrategy : ObservabilityStrategyBase
 
         var payload = JsonSerializer.Serialize(new { series });
         var content = new StringContent(payload, Encoding.UTF8, "application/json");
-
-        var response = await _httpClient.PostAsync(
-            $"https://api.{_site}/api/v2/series",
-            content,
-            cancellationToken);
-
+        using var req = new HttpRequestMessage(HttpMethod.Post, $"https://api.{_site}/api/v2/series") { Content = content };
+        AddApiKey(req);
+        using var response = await _httpClient.SendAsync(req, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -128,7 +131,11 @@ public sealed class DatadogStrategy : ObservabilityStrategyBase
                         SpanKind.Consumer => "queue",
                         _ => "custom"
                     },
-                    start = span.StartTime.ToUnixTimeMilliseconds() * 1_000_000,
+                    // Compute start time in nanoseconds safely to avoid long overflow.
+                    // ToUnixTimeMilliseconds() * 1_000_000 overflows for current timestamps (~1.7T ms * 1M = overflow).
+                    // Correct approach: seconds * 1_000_000_000L + (sub-second ms) * 1_000_000L
+                    start = span.StartTime.ToUnixTimeSeconds() * 1_000_000_000L
+                          + (span.StartTime.ToUnixTimeMilliseconds() % 1000L) * 1_000_000L,
                     duration = (long)span.Duration.TotalNanoseconds,
                     error = span.Status == SpanStatus.Error ? 1 : 0,
                     meta = span.Attributes?.ToDictionary(a => a.Key, a => a.Value?.ToString() ?? "")
@@ -140,12 +147,9 @@ public sealed class DatadogStrategy : ObservabilityStrategyBase
 
         var payload = JsonSerializer.Serialize(traces);
         var content = new StringContent(payload, Encoding.UTF8, "application/json");
-
-        var response = await _httpClient.PutAsync(
-            $"https://trace.agent.{_site}/v0.4/traces",
-            content,
-            cancellationToken);
-
+        using var req = new HttpRequestMessage(HttpMethod.Put, $"https://trace.agent.{_site}/v0.4/traces") { Content = content };
+        AddApiKey(req);
+        using var response = await _httpClient.SendAsync(req, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -196,12 +200,9 @@ public sealed class DatadogStrategy : ObservabilityStrategyBase
 
         var payload = JsonSerializer.Serialize(logs);
         var content = new StringContent(payload, Encoding.UTF8, "application/json");
-
-        var response = await _httpClient.PostAsync(
-            $"https://http-intake.logs.{_site}/api/v2/logs",
-            content,
-            cancellationToken);
-
+        using var req = new HttpRequestMessage(HttpMethod.Post, $"https://http-intake.logs.{_site}/api/v2/logs") { Content = content };
+        AddApiKey(req);
+        using var response = await _httpClient.SendAsync(req, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -211,8 +212,12 @@ public sealed class DatadogStrategy : ObservabilityStrategyBase
         if (ulong.TryParse(id, System.Globalization.NumberStyles.HexNumber, null, out var result))
             return result;
 
-        // Fallback: hash the string
-        return (ulong)id.GetHashCode() & 0x7FFFFFFFFFFFFFFF;
+        // Fallback: use XxHash64 for a deterministic, cross-process-stable hash.
+        // string.GetHashCode() is non-deterministic across processes (randomized per-run),
+        // which would produce inconsistent trace IDs when spans are reported by multiple processes.
+        var bytes = Encoding.UTF8.GetBytes(id);
+        var hash = XxHash64.HashToUInt64(bytes);
+        return hash & 0x7FFFFFFFFFFFFFFF; // Clear sign bit for positive ulong interpretation
     }
 
     /// <inheritdoc/>
@@ -220,9 +225,9 @@ public sealed class DatadogStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync(
-                $"https://api.{_site}/api/v1/validate",
-                cancellationToken);
+            using var validateReq = new HttpRequestMessage(HttpMethod.Get, $"https://api.{_site}/api/v1/validate");
+            AddApiKey(validateReq);
+            using var response = await _httpClient.SendAsync(validateReq, cancellationToken);
 
             return new HealthCheckResult(
                 IsHealthy: response.IsSuccessStatusCode,
@@ -248,24 +253,19 @@ public sealed class DatadogStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        // Configuration validated via Configure method
+        if (string.IsNullOrWhiteSpace(_apiKey))
+            throw new InvalidOperationException("DatadogStrategy: API key is required. Call Configure() before initialization.");
         IncrementCounter("datadog.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("datadog.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     protected override void Dispose(bool disposing)

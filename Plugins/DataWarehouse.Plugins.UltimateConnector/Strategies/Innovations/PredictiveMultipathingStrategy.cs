@@ -144,13 +144,14 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await client.PostAsync("/api/v1/multipath/sessions", content, ct);
+            using var response = await client.PostAsync("/api/v1/multipath/sessions", content, ct);
             response.EnsureSuccessStatusCode();
 
             var result = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
             var sessionId = result.GetProperty("session_id").GetString()
                 ?? throw new InvalidOperationException("Multipath endpoint did not return a session_id.");
 
+            client.DefaultRequestHeaders.Remove("X-Multipath-Session");
             client.DefaultRequestHeaders.Add("X-Multipath-Session", sessionId);
 
             var info = new Dictionary<string, object>
@@ -175,7 +176,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             var client = handle.GetConnection<HttpClient>();
             var sessionId = handle.ConnectionInfo["session_id"]?.ToString();
 
-            var response = await client.GetAsync($"/api/v1/multipath/sessions/{sessionId}/status", ct);
+            using var response = await client.GetAsync($"/api/v1/multipath/sessions/{sessionId}/status", ct);
             if (!response.IsSuccessStatusCode) return false;
 
             var status = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
@@ -205,7 +206,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             var client = handle.GetConnection<HttpClient>();
             var sessionId = handle.ConnectionInfo["session_id"]?.ToString();
 
-            var response = await client.GetAsync($"/api/v1/multipath/sessions/{sessionId}/health", ct);
+            using var response = await client.GetAsync($"/api/v1/multipath/sessions/{sessionId}/health", ct);
             sw.Stop();
 
             if (!response.IsSuccessStatusCode)
@@ -264,7 +265,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                     sw.Stop();
                     latencies[i] = sw.Elapsed.TotalMilliseconds;
 
-                    if (i == 0) result.IsReachable = response.IsSuccessStatusCode;
+                    // Finding 1951: Mark reachable if ANY probe succeeds, not just the first.
+                    if (response.IsSuccessStatusCode) result.IsReachable = true;
                 }
 
                 result.LatencyMs = latencies.Average();

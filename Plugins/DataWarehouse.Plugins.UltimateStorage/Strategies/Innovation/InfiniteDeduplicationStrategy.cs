@@ -39,6 +39,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private readonly BoundedDictionary<string, GlobalChunk> _globalChunkStore = new BoundedDictionary<string, GlobalChunk>(1000);
         private readonly BoundedDictionary<string, TenantManifest> _tenantManifests = new BoundedDictionary<string, TenantManifest>(1000);
         private readonly BoundedDictionary<string, TenantInfo> _tenants = new BoundedDictionary<string, TenantInfo>(1000);
+        // Secondary index: object key → list of manifestKeys ("{tenantId}:{key}") for O(1) retrieval.
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, System.Collections.Generic.List<string>> _keyToManifestKeys = new();
         private long _totalUniqueChunks;
         private long _totalChunkReferences;
         private long _totalBytesLogical;
@@ -114,9 +116,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Start with empty store
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -139,9 +143,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Start with empty manifests
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -164,9 +170,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Start with empty tenants
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -178,9 +186,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 var json = System.Text.Json.JsonSerializer.Serialize(_globalChunkStore.ToDictionary(kvp => kvp.Key, kvp => kvp.Value));
                 await File.WriteAllTextAsync(storePath, json, ct);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Best effort save
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -192,9 +202,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 var json = System.Text.Json.JsonSerializer.Serialize(_tenantManifests.ToDictionary(kvp => kvp.Key, kvp => kvp.Value));
                 await File.WriteAllTextAsync(manifestsPath, json, ct);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Best effort save
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -206,9 +218,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 var json = System.Text.Json.JsonSerializer.Serialize(_tenants.ToDictionary(kvp => kvp.Key, kvp => kvp.Value));
                 await File.WriteAllTextAsync(tenantsPath, json, ct);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Best effort save
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -296,11 +310,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 }
                 else
                 {
-                    // Existing chunk - increment reference count
+                    // Existing chunk - increment reference count atomically under per-chunk lock
                     if (_globalChunkStore.TryGetValue(chunkHash, out var globalChunk))
                     {
-                        globalChunk.RefCount++;
-                        globalChunk.TenantRefs.Add(tenantId);
+                        lock (globalChunk)
+                        {
+                            globalChunk.RefCount++;
+                            globalChunk.TenantRefs.Add(tenantId);
+                        }
                     }
                 }
             }
@@ -320,6 +337,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             };
 
             _tenantManifests[manifestKey] = manifest;
+
+            // Update secondary index for O(1) key lookup.
+            var manifestKeyList = _keyToManifestKeys.GetOrAdd(key, _ => new System.Collections.Generic.List<string>());
+            lock (manifestKeyList)
+            {
+                if (!manifestKeyList.Contains(manifestKey))
+                    manifestKeyList.Add(manifestKey);
+            }
 
             // Update tenant stats
             var tenant = _tenants[tenantId];
@@ -346,14 +371,20 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
             IncrementOperationCounter(StorageOperationType.Retrieve);
 
-            // Try to find manifest for any tenant (for simplicity, check all)
+            // O(1) lookup via secondary index.
             TenantManifest? manifest = null;
-            foreach (var kvp in _tenantManifests)
+            if (_keyToManifestKeys.TryGetValue(key, out var mKeys))
             {
-                if (kvp.Value.Key == key)
+                lock (mKeys)
                 {
-                    manifest = kvp.Value;
-                    break;
+                    foreach (var mk in mKeys)
+                    {
+                        if (_tenantManifests.TryGetValue(mk, out var m))
+                        {
+                            manifest = m;
+                            break;
+                        }
+                    }
                 }
             }
 
@@ -393,10 +424,19 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
             IncrementOperationCounter(StorageOperationType.Delete);
 
-            // Find and remove all tenant manifests for this key
-            var manifestsToRemove = _tenantManifests
-                .Where(kvp => kvp.Value.Key == key)
-                .ToList();
+            // Find and remove all tenant manifests for this key via O(1) secondary index.
+            var manifestsToRemove = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, TenantManifest>>();
+            if (_keyToManifestKeys.TryGetValue(key, out var mKeys))
+            {
+                lock (mKeys)
+                {
+                    foreach (var mk in mKeys)
+                    {
+                        if (_tenantManifests.TryGetValue(mk, out var m))
+                            manifestsToRemove.Add(new System.Collections.Generic.KeyValuePair<string, TenantManifest>(mk, m));
+                    }
+                }
+            }
 
             if (manifestsToRemove.Count == 0)
             {
@@ -437,6 +477,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 IncrementBytesDeleted(manifest.TotalSize);
                 _tenantManifests.TryRemove(kvp.Key, out _);
             }
+
+            // Remove from secondary index.
+            _keyToManifestKeys.TryRemove(key, out _);
         }
 
         protected override Task<bool> ExistsAsyncCore(string key, CancellationToken ct)
@@ -446,7 +489,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
             IncrementOperationCounter(StorageOperationType.Exists);
 
-            return Task.FromResult(_tenantManifests.Values.Any(m => m.Key == key));
+            // O(1) lookup via secondary index.
+            if (_keyToManifestKeys.TryGetValue(key, out var mks))
+            {
+                lock (mks)
+                {
+                    return Task.FromResult(mks.Any(mk => _tenantManifests.ContainsKey(mk)));
+                }
+            }
+            return Task.FromResult(false);
         }
 
         protected override async IAsyncEnumerable<StorageObjectMetadata> ListAsyncCore(string? prefix, [EnumeratorCancellation] CancellationToken ct)
@@ -488,7 +539,18 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
             IncrementOperationCounter(StorageOperationType.GetMetadata);
 
-            var manifest = _tenantManifests.Values.FirstOrDefault(m => m.Key == key);
+            // O(1) lookup via secondary index.
+            TenantManifest? manifest = null;
+            if (_keyToManifestKeys.TryGetValue(key, out var mksList))
+            {
+                lock (mksList)
+                {
+                    foreach (var mk in mksList)
+                    {
+                        if (_tenantManifests.TryGetValue(mk, out var m)) { manifest = m; break; }
+                    }
+                }
+            }
 
             if (manifest == null)
             {

@@ -54,6 +54,7 @@ public sealed class MimirConnectionStrategy : ObservabilityConnectionStrategyBas
 
         if (config.Properties.TryGetValue("TenantId", out var tenantId))
         {
+            httpClient.DefaultRequestHeaders.Remove("X-Scope-OrgID");
             httpClient.DefaultRequestHeaders.Add("X-Scope-OrgID", tenantId.ToString()!);
         }
 
@@ -80,7 +81,7 @@ public sealed class MimirConnectionStrategy : ObservabilityConnectionStrategyBas
         var httpClient = handle.GetConnection<HttpClient>();
         try
         {
-            var response = await httpClient.GetAsync("/ready", ct);
+            using var response = await httpClient.GetAsync("/ready", ct);
             return response.IsSuccessStatusCode;
         }
         catch
@@ -109,7 +110,7 @@ public sealed class MimirConnectionStrategy : ObservabilityConnectionStrategyBas
 
         try
         {
-            var response = await httpClient.GetAsync("/ready", ct);
+            using var response = await httpClient.GetAsync("/ready", ct);
             sw.Stop();
 
             return new ConnectionHealth(
@@ -139,7 +140,7 @@ public sealed class MimirConnectionStrategy : ObservabilityConnectionStrategyBas
         var json = JsonSerializer.Serialize(new { timeseries = metrics });
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        var response = await httpClient.PostAsync("/api/v1/push", content, ct);
+        using var response = await httpClient.PostAsync("/api/v1/push", content, ct);
         response.EnsureSuccessStatusCode();
     }
 

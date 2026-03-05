@@ -211,7 +211,13 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
             long dataStart = stream.Position;
             long dataLength = stream.Length - dataStart - 1;
             var compressedData = new byte[dataLength];
-            stream.Read(compressedData, 0, (int)dataLength);
+            int totalRead = 0;
+            while (totalRead < (int)dataLength)
+            {
+                int n = stream.Read(compressedData, totalRead, (int)dataLength - totalRead);
+                if (n == 0) throw new InvalidDataException("Huffman stream truncated: expected more compressed data.");
+                totalRead += n;
+            }
 
             int paddingBits = stream.ReadByte();
 
@@ -258,14 +264,14 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
                 var right = heap.Dequeue();
                 var rightFreq = right.Frequency;
 
+                long combinedFreq = leftFreq + rightFreq;
                 var parent = new HuffmanNode
                 {
                     Left = left,
                     Right = right,
-                    IsLeaf = false
+                    IsLeaf = false,
+                    Frequency = combinedFreq  // Stored for debugging/inspection; priority queue also uses combinedFreq
                 };
-                long combinedFreq = leftFreq + rightFreq;
-                parent.Frequency = combinedFreq;
                 heap.Enqueue(parent, combinedFreq);
             }
 

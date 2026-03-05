@@ -237,7 +237,9 @@ public sealed class GreenTieringPolicyEngine : IDisposable
         }
         catch
         {
+
             // If persistence file is corrupt, start fresh -- policies can be re-set
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 
@@ -267,7 +269,9 @@ public sealed class GreenTieringPolicyEngine : IDisposable
             }
             catch
             {
+
                 // Persistence failure is non-fatal -- policies remain in memory
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
     }

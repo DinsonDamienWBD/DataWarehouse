@@ -83,9 +83,12 @@ public sealed class AIOptimizedWorkflowStrategy : WorkflowStrategyBase
 
     private List<WorkflowTask> OptimizeExecutionOrder(WorkflowDefinition workflow)
     {
+        // Tasks with FEWER dependencies should run first (they are closer to the DAG root).
+        // Sorting ascending by Dependencies.Count ensures zero-dep tasks are scheduled immediately.
+        // Secondary sort: prefer historically faster tasks first (ascending average duration).
         return workflow.Tasks
-            .OrderByDescending(t => t.Dependencies.Count)
-            .ThenByDescending(t => _taskPerformanceHistory.GetValueOrDefault(t.TaskId, 1000))
+            .OrderBy(t => t.Dependencies.Count)
+            .ThenBy(t => _taskPerformanceHistory.GetValueOrDefault(t.TaskId, 1000))
             .ToList();
     }
 
@@ -281,16 +284,31 @@ public sealed class AnomalyDetectionWorkflowStrategy : WorkflowStrategyBase
         return null;
     }
 
+    // Welford's online algorithm state: (mean, M2 aggregate, count).
+    private readonly BoundedDictionary<string, (double Mean, double M2, long Count)> _taskWelford =
+        new BoundedDictionary<string, (double, double, long)>(1000);
+
     private void UpdateStats(string taskId, double durationMs)
     {
-        _taskStats.AddOrUpdate(taskId,
-            _ => (durationMs, 0),
+        // Welford's one-pass online algorithm for numerically stable mean and variance.
+        _taskWelford.AddOrUpdate(taskId,
+            _ => (durationMs, 0.0, 1),
             (_, old) =>
             {
-                var newMean = (old.Mean + durationMs) / 2;
-                var variance = Math.Pow(durationMs - newMean, 2) / 2;
-                return (newMean, Math.Sqrt((old.StdDev * old.StdDev + variance) / 2));
+                var count = old.Count + 1;
+                var delta = durationMs - old.Mean;
+                var newMean = old.Mean + delta / count;
+                var delta2 = durationMs - newMean;
+                var m2 = old.M2 + delta * delta2;
+                return (newMean, m2, count);
             });
+
+        // Sync the public _taskStats entry that DetectAnomalyAsync reads.
+        if (_taskWelford.TryGetValue(taskId, out var w))
+        {
+            var stdDev = w.Count > 1 ? Math.Sqrt(w.M2 / (w.Count - 1)) : 0;
+            _taskStats.AddOrUpdate(taskId, _ => (w.Mean, stdDev), (_, _) => (w.Mean, stdDev));
+        }
     }
 }
 

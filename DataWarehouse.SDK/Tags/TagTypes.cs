@@ -8,11 +8,26 @@ namespace DataWarehouse.SDK.Tags;
 /// String representation is <c>"Namespace:Name"</c>.
 /// Equality is ordinal and case-sensitive on both components.
 /// </summary>
-/// <param name="Namespace">The tag namespace (e.g., "system", "user", "ai.classification").</param>
-/// <param name="Name">The tag name within the namespace (e.g., "priority", "color").</param>
 [SdkCompatibility("5.0.0", Notes = "Phase 55: Universal tag key")]
-public sealed record TagKey(string Namespace, string Name)
+public sealed record TagKey
 {
+    /// <summary>The tag namespace (e.g., "system", "user", "ai.classification").</summary>
+    public string Namespace { get; }
+
+    /// <summary>The tag name within the namespace (e.g., "priority", "color").</summary>
+    public string Name { get; }
+
+    /// <summary>Creates a validated TagKey with non-empty namespace and name.</summary>
+    /// <param name="ns">The tag namespace.</param>
+    /// <param name="name">The tag name within the namespace.</param>
+    public TagKey(string ns, string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(ns, nameof(ns));
+        ArgumentException.ThrowIfNullOrWhiteSpace(name, nameof(name));
+        this.Namespace = ns;
+        this.Name = name;
+    }
+
     /// <summary>Returns the qualified key as <c>"Namespace:Name"</c>.</summary>
     public override string ToString() => $"{Namespace}:{Name}";
 
@@ -111,6 +126,9 @@ public sealed record Tag
 public sealed class TagCollection : IEnumerable<Tag>
 {
     private readonly IReadOnlyDictionary<TagKey, Tag> _tags;
+    // Cat 13: cache the hash code — collection is immutable, computing OrderBy on every GetHashCode is O(n log n)
+    private int _cachedHashCode;
+    private bool _hashCodeComputed;
 
     /// <summary>
     /// Initializes a new <see cref="TagCollection"/> wrapping the given dictionary.
@@ -138,11 +156,12 @@ public sealed class TagCollection : IEnumerable<Tag>
     public Tag? Get(string ns, string name) => this[new TagKey(ns, name)];
 
     /// <summary>
-    /// Returns all tags in the specified namespace (case-insensitive match).
+    /// Returns all tags in the specified namespace (ordinal case-sensitive match,
+    /// consistent with <see cref="TagKey"/> equality semantics).
     /// </summary>
     /// <param name="ns">The namespace to filter by.</param>
     public IEnumerable<Tag> GetByNamespace(string ns) =>
-        _tags.Values.Where(t => t.Key.Namespace.Equals(ns, StringComparison.OrdinalIgnoreCase));
+        _tags.Values.Where(t => t.Key.Namespace.Equals(ns, StringComparison.Ordinal));
 
     /// <summary>
     /// Returns all tags whose source matches the specified <see cref="TagSource"/> flags.
@@ -175,16 +194,21 @@ public sealed class TagCollection : IEnumerable<Tag>
         _tags.All(kvp => other._tags.TryGetValue(kvp.Key, out var otherTag) && Equals(kvp.Value, otherTag));
 
     /// <inheritdoc />
+#pragma warning disable S2328 // TagCollection._tags is effectively immutable after construction; lazy hash cache is intentional.
     public override int GetHashCode()
     {
+        if (_hashCodeComputed) return _cachedHashCode;
         var hash = new HashCode();
         foreach (var kvp in _tags.OrderBy(p => p.Key.ToString(), StringComparer.Ordinal))
         {
             hash.Add(kvp.Key);
             hash.Add(kvp.Value);
         }
-        return hash.ToHashCode();
+        _cachedHashCode = hash.ToHashCode();
+        _hashCodeComputed = true;
+        return _cachedHashCode;
     }
+#pragma warning restore S2328
 }
 
 /// <summary>

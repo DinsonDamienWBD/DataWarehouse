@@ -500,7 +500,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                     }
                     catch
                     {
+
                         // Slot is empty
+                        System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                     }
                 }
 
@@ -631,7 +633,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
             }
             catch
             {
+
                 // Ignore errors
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

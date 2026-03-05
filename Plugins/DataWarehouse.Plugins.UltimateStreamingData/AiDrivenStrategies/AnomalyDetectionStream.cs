@@ -221,9 +221,11 @@ internal sealed class AnomalyDetectionStream : StreamingDataStrategyBase
                     return mlResult;
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Fall through to statistical fallback
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 

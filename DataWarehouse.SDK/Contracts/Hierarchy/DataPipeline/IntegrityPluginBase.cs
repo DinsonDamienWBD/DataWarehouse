@@ -22,9 +22,9 @@ public abstract class IntegrityPluginBase : DataPipelinePluginBase
     /// <summary>Compute hash of a data stream.</summary>
     public abstract Task<byte[]> ComputeHashAsync(Stream data, CancellationToken ct = default);
 
-    /// <summary>Validate integrity chain between two keys.</summary>
+    /// <summary>Validate integrity chain between two keys. Defaults to false (fail-closed) — subclasses must implement real validation.</summary>
     public virtual Task<bool> ValidateChainAsync(string startKey, string endKey, CancellationToken ct = default)
-        => Task.FromResult(true);
+        => Task.FromResult(false);
 
     #region Domain Operations (Strategy-Dispatched)
 

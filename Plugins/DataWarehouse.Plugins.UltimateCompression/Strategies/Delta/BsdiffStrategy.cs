@@ -123,8 +123,6 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
 
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for Bsdiff");
-            if (input.Length == 0)
-                return CreateEmptyBlock();
 
             // Build suffix array for the input (treating it as "old" data)
             var suffixArray = BuildSuffixArray(input);
@@ -261,9 +259,14 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
                 throw new InvalidDataException("Invalid diff length.");
             int diffLen = BinaryPrimitives.ReadInt32LittleEndian(lenBuf);
 
+            if (controlLen < 0 || diffLen < 0)
+                throw new InvalidDataException("Negative control or diff length.");
+            long remaining = stream.Length - stream.Position - controlLen - diffLen;
+            if (remaining < 0)
+                throw new InvalidDataException("Insufficient data: control and diff lengths exceed stream.");
             var controlData = new byte[controlLen];
             var diffData = new byte[diffLen];
-            var extraData = new byte[stream.Length - stream.Position - controlLen - diffLen];
+            var extraData = new byte[remaining];
 
             if (stream.Read(controlData, 0, controlLen) != controlLen)
                 throw new InvalidDataException("Invalid control data.");
@@ -314,13 +317,22 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
             return result;
         }
 
+        // Maximum input size for suffix array construction to avoid O(n² log n) perf cliff.
+        // Inputs larger than this limit fall back to a linear scan in FindMatch.
+        private const int MaxSuffixArrayInput = 1 * 1024 * 1024; // 1 MB
+
         /// <summary>
         /// Builds a suffix array for fast substring searching.
         /// Simplified implementation using sorting.
+        /// NOTE: O(n² log n) worst case — only used for inputs ≤ MaxSuffixArrayInput.
         /// </summary>
         private static int[] BuildSuffixArray(byte[] data)
         {
             if (data.Length == 0)
+                return Array.Empty<int>();
+
+            // Cap to avoid catastrophic sort cost on large inputs
+            if (data.Length > MaxSuffixArrayInput)
                 return Array.Empty<int>();
 
             var suffixes = Enumerable.Range(0, data.Length).ToArray();

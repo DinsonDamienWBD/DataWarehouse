@@ -32,9 +32,14 @@ public sealed class CrossCloudCostAnalysisStrategy : MultiCloudStrategyBase
     public void RecordCost(string providerId, CostEntry entry)
     {
         var data = _costData.GetOrAdd(providerId, _ => new ProviderCostData { ProviderId = providerId });
-        data.Entries.Add(entry);
-        data.TotalCost += entry.Amount;
-        data.LastUpdated = DateTimeOffset.UtcNow;
+        // P2-3624: Serialise mutations under lock to prevent lost updates to Entries and TotalCost
+        // when concurrent RecordCost calls race on the same providerId.
+        lock (data)
+        {
+            data.Entries.Add(entry);
+            data.TotalCost += entry.Amount;
+            data.LastUpdated = DateTimeOffset.UtcNow;
+        }
     }
 
     /// <summary>Gets cost comparison across providers.</summary>

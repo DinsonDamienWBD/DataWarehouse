@@ -282,13 +282,22 @@ public sealed record AttestationDocument
     {
         try
         {
-            if (!File.Exists(binaryPath))
+            ArgumentNullException.ThrowIfNull(binaryPath);
+
+            // Sanitize path: resolve to full path and reject traversal attempts
+            string fullPath = Path.GetFullPath(binaryPath);
+            if (fullPath.Contains("..", StringComparison.Ordinal))
+            {
+                return AttestationVerificationResult.CreateInvalid("", "", "Path traversal detected in binary path.");
+            }
+
+            if (!File.Exists(fullPath))
             {
                 return AttestationVerificationResult.CreateInvalid("", "", $"File not found: {binaryPath}");
             }
 
             // Compute SHA256 hash of the file
-            byte[] fileBytes = await File.ReadAllBytesAsync(binaryPath);
+            byte[] fileBytes = await File.ReadAllBytesAsync(fullPath);
             byte[] hashBytes = SHA256.HashData(fileBytes);
             string actualHash = Convert.ToHexString(hashBytes).ToLowerInvariant();
 

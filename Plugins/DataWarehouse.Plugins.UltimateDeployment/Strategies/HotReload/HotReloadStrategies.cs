@@ -72,7 +72,7 @@ public sealed class AssemblyReloadStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
-        IncrementCounter("assembly_reload.deploy");
+        IncrementCounter("assembly_reload.rollback");
         var contextName = currentState.Metadata.TryGetValue("contextName", out var cn) ? cn?.ToString() : "";
         var previousAssemblyPath = currentState.Metadata.TryGetValue("previousAssemblyPath", out var pap) ? pap?.ToString() : "";
 
@@ -81,9 +81,22 @@ public sealed class AssemblyReloadStrategy : DeploymentStrategyBase
             throw new InvalidOperationException("No previous assembly available for rollback");
         }
 
-        // Load previous assembly
-        await LoadAssemblyAsync(contextName!, previousAssemblyPath, ct);
-        await WireNewAssemblyAsync(contextName!, Path.GetFileName(previousAssemblyPath), ct);
+        // Finding 2891: Validate previousAssemblyPath to prevent path traversal
+        var normalizedPath = Path.GetFullPath(previousAssemblyPath);
+        // Verify the path uses only safe characters and a .dll/.exe extension
+        var allowedExtensions = new[] { ".dll", ".exe" };
+        if (!allowedExtensions.Contains(Path.GetExtension(normalizedPath), StringComparer.OrdinalIgnoreCase))
+            throw new ArgumentException($"Assembly rollback path has disallowed extension: {normalizedPath}");
+        if (normalizedPath.Contains(".."))
+            throw new ArgumentException($"Assembly rollback path contains path traversal: {normalizedPath}");
+        if (!System.IO.File.Exists(normalizedPath))
+            throw new InvalidOperationException($"Previous assembly not found at: {normalizedPath}");
+
+        // Load previous assembly — check result
+        var loadResult = await LoadAssemblyAsync(contextName!, normalizedPath, ct);
+        if (!loadResult.Success)
+            throw new InvalidOperationException($"Failed to load previous assembly: {loadResult.ErrorMessage}");
+        await WireNewAssemblyAsync(contextName!, Path.GetFileName(normalizedPath), ct);
 
         return currentState with { Health = DeploymentHealth.Healthy, Version = targetVersion, ProgressPercent = 100, CompletedAt = DateTimeOffset.UtcNow };
     }
@@ -179,7 +192,7 @@ public sealed class ConfigurationReloadStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
-        IncrementCounter("configuration_reload.deploy");
+        IncrementCounter("configuration_reload.rollback");
         var configSource = currentState.Metadata.TryGetValue("configSource", out var cs) ? cs?.ToString() : "";
         var backupId = currentState.Metadata.TryGetValue("backupId", out var bi) ? bi?.ToString() : "";
 
@@ -278,12 +291,15 @@ public sealed class PluginHotSwapStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
-        IncrementCounter("plugin_hot_swap.deploy");
+        IncrementCounter("plugin_hot_swap.rollback");
         var pluginId = currentState.Metadata.TryGetValue("pluginId", out var pi) ? pi?.ToString() : "";
 
         await DeactivatePluginAsync(pluginId!, ct);
         await RestorePreviousPluginAsync(pluginId!, targetVersion, ct);
-        await LoadPluginAsync(pluginId!, ct);
+        // Finding 2890: check LoadPluginAsync result
+        var loadResult = await LoadPluginAsync(pluginId!, ct);
+        if (!loadResult.Success)
+            throw new InvalidOperationException($"Plugin rollback failed to load '{pluginId}': {loadResult.ErrorMessage}");
         await ActivatePluginAsync(pluginId!, ct);
 
         return currentState with { Health = DeploymentHealth.Healthy, Version = targetVersion, ProgressPercent = 100, CompletedAt = DateTimeOffset.UtcNow };
@@ -365,7 +381,7 @@ public sealed class ModuleFederationStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
-        IncrementCounter("module_federation.deploy");
+        IncrementCounter("module_federation.rollback");
         var remoteName = currentState.Metadata.TryGetValue("remoteName", out var rn) ? rn?.ToString() : "";
 
         await UpdateRemoteEntryAsync(remoteName!, targetVersion, ct);
@@ -454,7 +470,7 @@ public sealed class LivePatchStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
-        IncrementCounter("live_patch.deploy");
+        IncrementCounter("live_patch.rollback");
         var targetProcess = currentState.Metadata.TryGetValue("targetProcess", out var tp) ? tp?.ToString() : "";
 
         await RevertPatchAsync(targetProcess!, ct);

@@ -606,17 +606,53 @@ public class HmacSha3_256Provider : IHashProvider
     /// <inheritdoc />
     public byte[] ComputeHash(Stream data)
     {
-        using var ms = new MemoryStream(4096);
-        data.CopyTo(ms);
-        return ComputeHmac(ms.ToArray());
+        // Cat 13 (finding 2354): streaming BlockUpdate — no full-stream MemoryStream buffer.
+        return ComputeHmacStreaming(data);
     }
 
     /// <inheritdoc />
     public async Task<byte[]> ComputeHashAsync(Stream data, CancellationToken ct = default)
     {
-        using var ms = new MemoryStream(4096);
-        await data.CopyToAsync(ms, ct);
-        return ComputeHmac(ms.ToArray());
+        // Cat 13 (finding 2354): chunked async read to avoid loading entire stream into memory.
+        using var ms = new MemoryStream();
+        var buf = new byte[81920];
+        int r;
+        while ((r = await data.ReadAsync(buf, 0, buf.Length, ct).ConfigureAwait(false)) > 0)
+            ms.Write(buf, 0, r);
+        ms.Position = 0;
+        return ComputeHmacStreaming(ms);
+    }
+
+
+    private byte[] ComputeHmacStreaming(Stream message)
+    {
+        // Cat 13 (finding 2354): streaming inner hash via BlockUpdate — avoids materializing full stream.
+        byte[] keyPrime;
+        if (_key.Length > BlockSize)
+        {
+            var kd = new Sha3Digest(256);
+            kd.BlockUpdate(_key, 0, _key.Length);
+            keyPrime = new byte[HashSizeBytes];
+            kd.DoFinal(keyPrime, 0);
+        }
+        else { keyPrime = new byte[BlockSize]; Array.Copy(_key, keyPrime, _key.Length); }
+
+        var paddedKey = new byte[BlockSize];
+        Array.Copy(keyPrime, paddedKey, Math.Min(keyPrime.Length, BlockSize));
+        var iKeyPad = new byte[BlockSize]; var oKeyPad = new byte[BlockSize];
+        for (int i = 0; i < BlockSize; i++) { iKeyPad[i] = (byte)(paddedKey[i] ^ 0x36); oKeyPad[i] = (byte)(paddedKey[i] ^ 0x5c); }
+
+        var innerDigest = new Sha3Digest(256);
+        innerDigest.BlockUpdate(iKeyPad, 0, BlockSize);
+        var buf = new byte[8192]; int r;
+        while ((r = message.Read(buf, 0, buf.Length)) > 0) innerDigest.BlockUpdate(buf, 0, r);
+        var innerHash = new byte[HashSizeBytes]; innerDigest.DoFinal(innerHash, 0);
+
+        var outerDigest = new Sha3Digest(256);
+        outerDigest.BlockUpdate(oKeyPad, 0, BlockSize);
+        outerDigest.BlockUpdate(innerHash, 0, innerHash.Length);
+        var result = new byte[HashSizeBytes]; outerDigest.DoFinal(result, 0);
+        return result;
     }
 
     private byte[] ComputeHmac(byte[] message)
@@ -704,17 +740,53 @@ public class HmacSha3_384Provider : IHashProvider
     /// <inheritdoc />
     public byte[] ComputeHash(Stream data)
     {
-        using var ms = new MemoryStream(4096);
-        data.CopyTo(ms);
-        return ComputeHmac(ms.ToArray());
+        // Cat 13 (finding 2354): streaming BlockUpdate — no full-stream MemoryStream buffer.
+        return ComputeHmacStreaming(data);
     }
 
     /// <inheritdoc />
     public async Task<byte[]> ComputeHashAsync(Stream data, CancellationToken ct = default)
     {
-        using var ms = new MemoryStream(4096);
-        await data.CopyToAsync(ms, ct);
-        return ComputeHmac(ms.ToArray());
+        // Cat 13 (finding 2354): chunked async read to avoid loading entire stream into memory.
+        using var ms = new MemoryStream();
+        var buf = new byte[81920];
+        int r;
+        while ((r = await data.ReadAsync(buf, 0, buf.Length, ct).ConfigureAwait(false)) > 0)
+            ms.Write(buf, 0, r);
+        ms.Position = 0;
+        return ComputeHmacStreaming(ms);
+    }
+
+
+    private byte[] ComputeHmacStreaming(Stream message)
+    {
+        // Cat 13 (finding 2354): streaming inner hash via BlockUpdate — avoids materializing full stream.
+        byte[] keyPrime;
+        if (_key.Length > BlockSize)
+        {
+            var kd = new Sha3Digest(384);
+            kd.BlockUpdate(_key, 0, _key.Length);
+            keyPrime = new byte[HashSizeBytes];
+            kd.DoFinal(keyPrime, 0);
+        }
+        else { keyPrime = new byte[BlockSize]; Array.Copy(_key, keyPrime, _key.Length); }
+
+        var paddedKey = new byte[BlockSize];
+        Array.Copy(keyPrime, paddedKey, Math.Min(keyPrime.Length, BlockSize));
+        var iKeyPad = new byte[BlockSize]; var oKeyPad = new byte[BlockSize];
+        for (int i = 0; i < BlockSize; i++) { iKeyPad[i] = (byte)(paddedKey[i] ^ 0x36); oKeyPad[i] = (byte)(paddedKey[i] ^ 0x5c); }
+
+        var innerDigest = new Sha3Digest(384);
+        innerDigest.BlockUpdate(iKeyPad, 0, BlockSize);
+        var buf = new byte[8192]; int r;
+        while ((r = message.Read(buf, 0, buf.Length)) > 0) innerDigest.BlockUpdate(buf, 0, r);
+        var innerHash = new byte[HashSizeBytes]; innerDigest.DoFinal(innerHash, 0);
+
+        var outerDigest = new Sha3Digest(384);
+        outerDigest.BlockUpdate(oKeyPad, 0, BlockSize);
+        outerDigest.BlockUpdate(innerHash, 0, innerHash.Length);
+        var result = new byte[HashSizeBytes]; outerDigest.DoFinal(result, 0);
+        return result;
     }
 
     private byte[] ComputeHmac(byte[] message)
@@ -799,17 +871,53 @@ public class HmacSha3_512Provider : IHashProvider
     /// <inheritdoc />
     public byte[] ComputeHash(Stream data)
     {
-        using var ms = new MemoryStream(4096);
-        data.CopyTo(ms);
-        return ComputeHmac(ms.ToArray());
+        // Cat 13 (finding 2354): streaming BlockUpdate — no full-stream MemoryStream buffer.
+        return ComputeHmacStreaming(data);
     }
 
     /// <inheritdoc />
     public async Task<byte[]> ComputeHashAsync(Stream data, CancellationToken ct = default)
     {
-        using var ms = new MemoryStream(4096);
-        await data.CopyToAsync(ms, ct);
-        return ComputeHmac(ms.ToArray());
+        // Cat 13 (finding 2354): chunked async read to avoid loading entire stream into memory.
+        using var ms = new MemoryStream();
+        var buf = new byte[81920];
+        int r;
+        while ((r = await data.ReadAsync(buf, 0, buf.Length, ct).ConfigureAwait(false)) > 0)
+            ms.Write(buf, 0, r);
+        ms.Position = 0;
+        return ComputeHmacStreaming(ms);
+    }
+
+
+    private byte[] ComputeHmacStreaming(Stream message)
+    {
+        // Cat 13 (finding 2354): streaming inner hash via BlockUpdate — avoids materializing full stream.
+        byte[] keyPrime;
+        if (_key.Length > BlockSize)
+        {
+            var kd = new Sha3Digest(512);
+            kd.BlockUpdate(_key, 0, _key.Length);
+            keyPrime = new byte[HashSizeBytes];
+            kd.DoFinal(keyPrime, 0);
+        }
+        else { keyPrime = new byte[BlockSize]; Array.Copy(_key, keyPrime, _key.Length); }
+
+        var paddedKey = new byte[BlockSize];
+        Array.Copy(keyPrime, paddedKey, Math.Min(keyPrime.Length, BlockSize));
+        var iKeyPad = new byte[BlockSize]; var oKeyPad = new byte[BlockSize];
+        for (int i = 0; i < BlockSize; i++) { iKeyPad[i] = (byte)(paddedKey[i] ^ 0x36); oKeyPad[i] = (byte)(paddedKey[i] ^ 0x5c); }
+
+        var innerDigest = new Sha3Digest(512);
+        innerDigest.BlockUpdate(iKeyPad, 0, BlockSize);
+        var buf = new byte[8192]; int r;
+        while ((r = message.Read(buf, 0, buf.Length)) > 0) innerDigest.BlockUpdate(buf, 0, r);
+        var innerHash = new byte[HashSizeBytes]; innerDigest.DoFinal(innerHash, 0);
+
+        var outerDigest = new Sha3Digest(512);
+        outerDigest.BlockUpdate(oKeyPad, 0, BlockSize);
+        outerDigest.BlockUpdate(innerHash, 0, innerHash.Length);
+        var result = new byte[HashSizeBytes]; outerDigest.DoFinal(result, 0);
+        return result;
     }
 
     private byte[] ComputeHmac(byte[] message)

@@ -112,11 +112,11 @@ public sealed class MultiValueTagMergeStrategy : ITagMergeStrategy
         var mergedVersion = TagVersionVector.Merge(localVersion, remoteVersion);
         var newerTag = remote.ModifiedUtc >= local.ModifiedUtc ? remote : local;
 
+        // Use the newer timestamp (deterministic — must not use UtcNow, which breaks CRDT convergence).
         return newerTag with
         {
             Value = TagValue.List(items),
-            Version = Math.Max(local.Version, remote.Version) + 1,
-            ModifiedUtc = DateTimeOffset.UtcNow
+            Version = Math.Max(local.Version, remote.Version) + 1
         };
     }
 }
@@ -150,11 +150,11 @@ public sealed class UnionTagMergeStrategy : ITagMergeStrategy
         }
 
         var newerTag = remote.ModifiedUtc >= local.ModifiedUtc ? remote : local;
+        // Use the newer timestamp (deterministic — must not use UtcNow, which breaks CRDT convergence).
         return newerTag with
         {
             Value = TagValue.List(unionItems),
-            Version = Math.Max(local.Version, remote.Version) + 1,
-            ModifiedUtc = DateTimeOffset.UtcNow
+            Version = Math.Max(local.Version, remote.Version) + 1
         };
     }
 }

@@ -39,8 +39,9 @@ public class DeviceRegistryStrategy : DeviceManagementStrategyBase
     public override Task<DeviceRegistration> RegisterDeviceAsync(DeviceRegistrationRequest request, CancellationToken ct = default)
     {
         var deviceId = string.IsNullOrEmpty(request.DeviceId) ? Guid.NewGuid().ToString() : request.DeviceId;
-        var primaryKey = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
-        var secondaryKey = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
+        // LOW-3403: use cryptographically random 32-byte keys instead of GUID.ToByteArray()
+        var primaryKey = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        var secondaryKey = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
 
         var device = new DeviceInfo
         {
@@ -139,6 +140,7 @@ public class DeviceTwinStrategy : DeviceManagementStrategyBase
     private ContinuousSyncService? _syncService;
     private StateProjectionEngine? _projectionEngine;
     private WhatIfSimulator? _simulator;
+    private readonly object _initLock = new();
 
     public override string StrategyId => "device-twin";
     public override string StrategyName => "Device Twin";
@@ -229,7 +231,7 @@ public class DeviceTwinStrategy : DeviceManagementStrategyBase
         Dictionary<string, object> sensorData,
         CancellationToken ct = default)
     {
-        _syncService ??= new ContinuousSyncService();
+        EnsureServicesInitialized();
 
         // Ensure device is registered for sync
         if (!DeviceTwins.TryGetValue(deviceId, out var twin))
@@ -246,7 +248,7 @@ public class DeviceTwinStrategy : DeviceManagementStrategyBase
         }
 
         // Register twin if not already registered
-        if (!_syncService.GetRegisteredDevices().Contains(deviceId))
+        if (!_syncService!.GetRegisteredDevices().Contains(deviceId))
         {
             _syncService.RegisterTwin(deviceId, twin);
         }
@@ -266,10 +268,8 @@ public class DeviceTwinStrategy : DeviceManagementStrategyBase
         TimeSpan horizon,
         CancellationToken ct = default)
     {
-        _syncService ??= new ContinuousSyncService();
-        _projectionEngine ??= new StateProjectionEngine(_syncService);
-
-        return _projectionEngine.ProjectStateAsync(deviceId, horizon, ct);
+        EnsureServicesInitialized();
+        return _projectionEngine!.ProjectStateAsync(deviceId, horizon, ct);
     }
 
     /// <summary>
@@ -284,11 +284,24 @@ public class DeviceTwinStrategy : DeviceManagementStrategyBase
         Dictionary<string, object> parameterChanges,
         CancellationToken ct = default)
     {
-        _syncService ??= new ContinuousSyncService();
-        _projectionEngine ??= new StateProjectionEngine(_syncService);
-        _simulator ??= new WhatIfSimulator(_syncService, _projectionEngine);
+        EnsureServicesInitialized();
+        return _simulator!.SimulateAsync(deviceId, parameterChanges, ct);
+    }
 
-        return _simulator.SimulateAsync(deviceId, parameterChanges, ct);
+    private void EnsureServicesInitialized()
+    {
+        if (_simulator != null) return; // Fast path without lock
+        lock (_initLock)
+        {
+            if (_simulator != null) return;
+            var syncService = new ContinuousSyncService();
+            var projectionEngine = new StateProjectionEngine(syncService);
+            var simulator = new WhatIfSimulator(syncService, projectionEngine);
+            // Assign in dependency order so readers see a complete set
+            _syncService = syncService;
+            _projectionEngine = projectionEngine;
+            _simulator = simulator;
+        }
     }
 }
 
@@ -297,7 +310,9 @@ public class DeviceTwinStrategy : DeviceManagementStrategyBase
 /// </summary>
 public class FleetManagementStrategy : DeviceManagementStrategyBase
 {
-    private readonly BoundedDictionary<string, HashSet<string>> _deviceGroups = new BoundedDictionary<string, HashSet<string>>(1000);
+    // Values use ConcurrentDictionary<string,byte> as a thread-safe set.
+    private readonly BoundedDictionary<string, System.Collections.Concurrent.ConcurrentDictionary<string, byte>> _deviceGroups
+        = new BoundedDictionary<string, System.Collections.Concurrent.ConcurrentDictionary<string, byte>>(1000);
 
     public override string StrategyId => "fleet-management";
     public override string StrategyName => "Fleet Management";
@@ -317,14 +332,10 @@ public class FleetManagementStrategy : DeviceManagementStrategyBase
             Metadata = request.Metadata
         };
 
-        // Add to default group
+        // Add to default group — GetOrAdd is atomic for the ConcurrentDictionary inner set
         var groupId = request.Metadata.TryGetValue("groupId", out var gid) ? gid : "default";
-        if (!_deviceGroups.TryGetValue(groupId, out var group))
-        {
-            group = new HashSet<string>();
-            _deviceGroups[groupId] = group;
-        }
-        group.Add(deviceId);
+        var group = _deviceGroups.GetOrAdd(groupId, _ => new System.Collections.Concurrent.ConcurrentDictionary<string, byte>());
+        group.TryAdd(deviceId, 0);
 
         return Task.FromResult(new DeviceRegistration
         {
@@ -352,7 +363,7 @@ public class FleetManagementStrategy : DeviceManagementStrategyBase
         if (query.Tags != null && query.Tags.TryGetValue("groupId", out var groupId))
         {
             if (_deviceGroups.TryGetValue(groupId, out var group))
-                devices = devices.Where(d => group.Contains(d.DeviceId));
+                devices = devices.Where(d => group.ContainsKey(d.DeviceId));
         }
 
         return Task.FromResult(devices);
@@ -363,7 +374,7 @@ public class FleetManagementStrategy : DeviceManagementStrategyBase
         var targetDevices = new List<string>();
 
         if (!string.IsNullOrEmpty(request.DeviceGroupId) && _deviceGroups.TryGetValue(request.DeviceGroupId, out var group))
-            targetDevices.AddRange(group);
+            targetDevices.AddRange(group.Keys);
         else if (!string.IsNullOrEmpty(request.DeviceId))
             targetDevices.Add(request.DeviceId);
 
@@ -380,7 +391,7 @@ public class FleetManagementStrategy : DeviceManagementStrategyBase
     {
         var removed = Devices.TryRemove(deviceId, out _);
         foreach (var group in _deviceGroups.Values)
-            group.Remove(deviceId);
+            group.TryRemove(deviceId, out _);
         return Task.FromResult(removed);
     }
 
@@ -435,12 +446,13 @@ public class FirmwareOtaStrategy : DeviceManagementStrategyBase
 
     public override Task<bool> DeleteDeviceAsync(string deviceId, CancellationToken ct = default)
     {
-        return Task.FromResult(true);
+        return Task.FromResult(Devices.TryRemove(deviceId, out _));
     }
 
     public override Task<DeviceInfo?> GetDeviceAsync(string deviceId, CancellationToken ct = default)
     {
-        return Task.FromResult<DeviceInfo?>(null);
+        Devices.TryGetValue(deviceId, out var device);
+        return Task.FromResult<DeviceInfo?>(device);
     }
 }
 

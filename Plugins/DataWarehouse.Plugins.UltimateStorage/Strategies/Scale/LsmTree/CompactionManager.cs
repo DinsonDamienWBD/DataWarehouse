@@ -43,9 +43,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
                 throw new ArgumentException("No readers to compact", nameof(readers));
             }
 
-            // Create output file path
+            // Create output file path using timestamp + Guid to avoid filename collisions during rapid bursts.
             var timestamp = DateTime.UtcNow.Ticks;
-            var outputPath = System.IO.Path.Combine(outputDir, $"sstable-L{targetLevel}-{timestamp}.sst");
+            var unique = Guid.NewGuid().ToString("N")[..8];
+            var outputPath = System.IO.Path.Combine(outputDir, $"sstable-L{targetLevel}-{timestamp}-{unique}.sst");
 
             // Perform K-way merge
             var mergedEntries = await KWayMergeAsync(readers, ct);
@@ -59,6 +60,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
         /// <summary>
         /// Performs K-way merge of multiple sorted streams.
         /// Removes tombstones and keeps only the most recent value for each key.
+        /// Uses a min-heap (PriorityQueue) for O(n log k) merge instead of O(n log k * log k)
+        /// from SortedDictionary.First() + Remove.
         /// </summary>
         private async Task<List<KeyValuePair<byte[], byte[]?>>> KWayMergeAsync(
             List<SSTableReader> readers,
@@ -83,14 +86,21 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
                     }
                 }
 
-                // Priority queue implementation using sorted list (simple but not optimal for large K)
-                var heap = new SortedDictionary<byte[], (byte[] value, int enumeratorIndex)>(ByteArrayComparer.Instance);
+                // PriorityQueue: O(log k) enqueue/dequeue vs SortedDictionary.First() O(1) but Remove O(log n).
+                // PriorityQueue handles duplicate keys correctly by using (enumeratorIndex) as tiebreaker.
+                // Element: (key, value, enumeratorIndex); Priority: (key, enumeratorIndex) for stable merge.
+                var heap = new PriorityQueue<(byte[] key, byte[] value, int idx), (byte[] key, int idx)>(
+                    Comparer<(byte[] key, int idx)>.Create((a, b) =>
+                    {
+                        int c = ByteArrayComparer.Instance.Compare(a.key, b.key);
+                        return c != 0 ? c : a.idx.CompareTo(b.idx);
+                    }));
 
                 // Initialize heap with first element from each enumerator
                 for (int i = 0; i < enumerators.Count; i++)
                 {
                     var current = enumerators[i].Current;
-                    heap[current.Key] = (current.Value, i);
+                    heap.Enqueue((current.Key, current.Value, i), (current.Key, i));
                 }
 
                 byte[]? lastKey = null;
@@ -99,17 +109,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
                 {
                     ct.ThrowIfCancellationRequested();
 
-                    // Get minimum key
-                    var min = heap.First();
-                    var key = min.Key;
-                    var (value, enumeratorIndex) = min.Value;
-                    heap.Remove(key);
+                    var (key, value, enumeratorIndex) = heap.Dequeue();
 
-                    // Skip duplicate keys (keep only first occurrence = most recent)
+                    // Skip duplicate keys (keep only first occurrence = most recent from lowest reader index)
                     if (lastKey == null || !key.AsSpan().SequenceEqual(lastKey))
                     {
-                        // Skip tombstones during compaction (value == null in source means tombstone)
-                        // But we need to preserve tombstones for now, so we'll include them
                         result.Add(new KeyValuePair<byte[], byte[]?>(key, value));
                         lastKey = key;
                     }
@@ -118,7 +122,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
                     if (await enumerators[enumeratorIndex].MoveNextAsync())
                     {
                         var next = enumerators[enumeratorIndex].Current;
-                        heap[next.Key] = (next.Value, enumeratorIndex);
+                        heap.Enqueue((next.Key, next.Value, enumeratorIndex), (next.Key, enumeratorIndex));
                     }
                 }
 

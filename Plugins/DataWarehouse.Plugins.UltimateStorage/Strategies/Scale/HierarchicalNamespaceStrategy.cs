@@ -18,6 +18,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale
         public override string StrategyId => "hierarchical-namespace";
         public override string Name => "Hierarchical Namespace Strategy";
         public override StorageTier Tier => StorageTier.Warm;
+        /// <summary>
+        /// Returns false until a real hierarchical namespace engine (B+ tree or similar)
+        /// replaces the in-memory BoundedDictionary(1000) stub.
+        /// </summary>
+        public override bool IsProductionReady => false;
 
         public override StorageCapabilities Capabilities => new StorageCapabilities { SupportsMetadata = true, SupportsStreaming = true, MaxObjects = 1000000000L, ConsistencyModel = ConsistencyModel.Strong };
 

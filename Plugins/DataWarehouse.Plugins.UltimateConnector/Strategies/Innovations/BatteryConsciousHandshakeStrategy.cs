@@ -103,9 +103,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             var client = new HttpClient(handler)
             {
                 BaseAddress = new Uri(targetEndpoint),
+                // Finding 1946: Timeout.TotalSeconds may be zero or negative — clamp to at least 1s.
                 Timeout = powerState.IsOnBattery
-                    ? TimeSpan.FromSeconds(Math.Min(config.Timeout.TotalSeconds, 10))
-                    : config.Timeout
+                    ? TimeSpan.FromSeconds(Math.Clamp(config.Timeout.TotalSeconds, 1, 10))
+                    : config.Timeout.TotalSeconds > 0 ? config.Timeout : TimeSpan.FromSeconds(30)
             };
 
             var handshakePayload = new Dictionary<string, object>
@@ -125,11 +126,14 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 Encoding.UTF8,
                 "application/json");
 
+            client.DefaultRequestHeaders.Remove("X-Transfer-Mode");
             client.DefaultRequestHeaders.Add("X-Transfer-Mode", transferMode);
+            client.DefaultRequestHeaders.Remove("X-Compression");
             client.DefaultRequestHeaders.Add("X-Compression", compression);
+            client.DefaultRequestHeaders.Remove("X-Battery-Percent");
             client.DefaultRequestHeaders.Add("X-Battery-Percent", powerState.ChargePercent.ToString());
 
-            var response = await client.PostAsync("/api/v1/handshake/negotiate", content, ct);
+            using var response = await client.PostAsync("/api/v1/handshake/negotiate", content, ct);
             response.EnsureSuccessStatusCode();
 
             var info = new Dictionary<string, object>
@@ -152,7 +156,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             var client = handle.GetConnection<HttpClient>();
-            var response = await client.GetAsync("/api/v1/handshake/ping", ct);
+            using var response = await client.GetAsync("/api/v1/handshake/ping", ct);
             return response.IsSuccessStatusCode;
         }
 

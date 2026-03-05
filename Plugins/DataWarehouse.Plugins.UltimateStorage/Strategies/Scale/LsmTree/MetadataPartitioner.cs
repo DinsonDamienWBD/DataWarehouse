@@ -17,9 +17,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
         public static int GetPartition(byte[] key, int partitionCount)
         {
             if (partitionCount <= 0)
-            {
-                return 0;
-            }
+                throw new ArgumentOutOfRangeException(nameof(partitionCount), partitionCount,
+                    "partitionCount must be greater than zero.");
 
             var hashBytes = XxHash64.Hash(key);
             var hash = BinaryPrimitives.ReadUInt64LittleEndian(hashBytes);

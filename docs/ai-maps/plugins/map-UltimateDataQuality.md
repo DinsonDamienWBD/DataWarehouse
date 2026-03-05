@@ -108,7 +108,7 @@ public abstract class DataQualityStrategyBase : StrategyBase, IDataQualityStrate
     protected void RecordDuplicateResolved();
     protected void UpdateQualityScore(double newScore);
     protected void RecordFailure();
-    public bool IsHealthy();
+    public bool IsHealthy();;
     public IReadOnlyDictionary<string, long> GetCounters();;
 }
 ```
@@ -204,44 +204,365 @@ private sealed class QualityPolicy
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataQuality/Strategies/Cleansing/CleansingStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDataQuality/Strategies/PredictiveQuality/PredictiveQualityStrategies.cs
 ```csharp
-public sealed class CleansingResult
+internal sealed class QualityAnticipatorStrategy : DataQualityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataQualityCategory Category;;
+    public override DataQualityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public void RecordMetric(string metricName, double value);
+    public void SetThreshold(string metricName, double warningStdDevs = 2.0, double criticalStdDevs = 3.0);
+    public QualityPrediction? PredictIssues(string metricName);
+    public string GetTrend(string metricName, int windowSize = 10);
+}
+```
+```csharp
+internal sealed class DataDriftDetectorStrategy : DataQualityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataQualityCategory Category;;
+    public override DataQualityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public void SetBaseline(string columnName, double[] values);
+    public void UpdateCurrent(string columnName, double[] values);
+    public DriftReport? DetectDrift(string columnName);
+}
+```
+```csharp
+internal sealed class AnomalousDataFlagStrategy : DataQualityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataQualityCategory Category;;
+    public override DataQualityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public void AddValues(string columnName, double[] values);
+    public AnomalyReport? DetectAnomalies(string columnName, double zScoreThreshold = 3.0);
+}
+```
+```csharp
+internal sealed class QualityTrendAnalyzerStrategy : DataQualityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataQualityCategory Category;;
+    public override DataQualityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public void RecordDataPoint(string metricName, double value);
+    public TrendAnalysis? AnalyzeTrend(string metricName);
+    public bool GetSeasonality(string metricName, int period);
+}
+```
+```csharp
+internal sealed class RootCauseAnalyzerStrategy : DataQualityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataQualityCategory Category;;
+    public override DataQualityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public void RecordEvent(string dimension, string description, double severity, Dictionary<string, string>? attributes = null);
+    public RootCauseReport AnalyzeRootCause(string targetDimension, TimeSpan lookbackWindow);
+    public Dictionary<(string, string), double> GetCorrelationMatrix(IReadOnlyList<string> dimensions);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataQuality/Strategies/Profiling/ProfilingStrategies.cs
+```csharp
+public sealed class DataProfile
+{
+}
+    public string ProfileId { get; init; };
+    public required string SourceId { get; init; }
+    public DateTime GeneratedAt { get; init; };
+    public long TotalRecords { get; set; }
+    public double ProcessingTimeMs { get; set; }
+    public Dictionary<string, FieldProfile> FieldProfiles { get; init; };
+    public double OverallQualityScore { get; set; }
+    public List<FieldCorrelation> Correlations { get; init; };
+    public List<PatternInfo> DetectedPatterns { get; init; };
+    public Dictionary<IssueCategory, int> IssueSummary { get; init; };
+}
+```
+```csharp
+public sealed class FieldProfile
+{
+}
+    public required string FieldName { get; init; }
+    public InferredDataType InferredType { get; set; }
+    public long TotalCount { get; set; }
+    public long NullCount { get; set; }
+    public long DistinctCount { get; set; }
+    public double NullPercentage;;
+    public double CardinalityRatio;;
+    public List<ValueFrequency> TopValues { get; init; };
+    public List<ValueFrequency> BottomValues { get; init; };
+    public NumericProfile? NumericStats { get; set; }
+    public StringProfile? StringStats { get; set; }
+    public DateTimeProfile? DateTimeStats { get; set; }
+    public string? DetectedPattern { get; set; }
+    public double QualityScore { get; set; }
+    public List<string> Issues { get; init; };
+}
+```
+```csharp
+public sealed class ValueFrequency
+{
+}
+    public required object? Value { get; init; }
+    public long Count { get; init; }
+    public double Percentage { get; init; }
+}
+```
+```csharp
+public sealed class NumericProfile
+{
+}
+    public double Min { get; init; }
+    public double Max { get; init; }
+    public double Mean { get; init; }
+    public double Median { get; init; }
+    public double Mode { get; init; }
+    public double StdDev { get; init; }
+    public double Variance { get; init; }
+    public double Skewness { get; init; }
+    public double Kurtosis { get; init; }
+    public double Q1 { get; init; }
+    public double Q3 { get; init; }
+    public double IQR { get; init; }
+    public double Sum { get; init; }
+    public int ZeroCount { get; init; }
+    public int NegativeCount { get; init; }
+    public int PositiveCount { get; init; }
+    public double[] Percentiles { get; init; };
+    public Dictionary<string, int> Histogram { get; init; };
+}
+```
+```csharp
+public sealed class StringProfile
+{
+}
+    public int MinLength { get; init; }
+    public int MaxLength { get; init; }
+    public double AvgLength { get; init; }
+    public int EmptyCount { get; init; }
+    public int WhitespaceOnlyCount { get; init; }
+    public Dictionary<string, int> LengthDistribution { get; init; };
+    public Dictionary<char, int> CharacterFrequency { get; init; };
+    public bool ContainsUppercase { get; init; }
+    public bool ContainsLowercase { get; init; }
+    public bool ContainsDigits { get; init; }
+    public bool ContainsSpecialChars { get; init; }
+    public List<string> CommonPrefixes { get; init; };
+    public List<string> CommonSuffixes { get; init; };
+}
+```
+```csharp
+public sealed class DateTimeProfile
+{
+}
+    public DateTime Min { get; init; }
+    public DateTime Max { get; init; }
+    public TimeSpan Range { get; init; }
+    public DateTime? Mode { get; init; }
+    public Dictionary<DayOfWeek, int> DayOfWeekDistribution { get; init; };
+    public Dictionary<int, int> MonthDistribution { get; init; };
+    public Dictionary<int, int> YearDistribution { get; init; };
+    public Dictionary<int, int> HourDistribution { get; init; };
+    public int FutureDateCount { get; init; }
+    public int WeekendCount { get; init; }
+    public string? DetectedFormat { get; init; }
+}
+```
+```csharp
+public sealed class FieldCorrelation
+{
+}
+    public required string Field1 { get; init; }
+    public required string Field2 { get; init; }
+    public double CorrelationCoefficient { get; init; }
+    public CorrelationType Type { get; init; }
+}
+```
+```csharp
+public sealed class PatternInfo
+{
+}
+    public required string FieldName { get; init; }
+    public required string Pattern { get; init; }
+    public int MatchCount { get; init; }
+    public double MatchPercentage { get; init; }
+    public string? Description { get; init; }
+}
+```
+```csharp
+public sealed class ColumnProfilingStrategy : DataQualityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataQualityCategory Category;;
+    public override DataQualityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public async Task<DataProfile> ProfileAsync(IEnumerable<DataRecord> records, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class PatternDetectionStrategy : DataQualityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataQualityCategory Category;;
+    public override DataQualityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<List<PatternInfo>> DetectPatternsAsync(string fieldName, IEnumerable<object?> values, CancellationToken ct = default);
+    public string GeneratePatternTemplate(IEnumerable<string> sampleValues);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataQuality/Strategies/Scoring/ScoringStrategies.cs
+```csharp
+public sealed class RecordQualityScore
+{
+}
+    public required string RecordId { get; init; }
+    public double OverallScore { get; init; }
+    public QualityGrade Grade;;
+    public Dictionary<QualityDimension, double> DimensionScores { get; init; };
+    public Dictionary<string, FieldQualityScore> FieldScores { get; init; };
+    public List<string> Issues { get; init; };
+    public List<string> Recommendations { get; init; };
+}
+```
+```csharp
+public sealed class FieldQualityScore
+{
+}
+    public required string FieldName { get; init; }
+    public double Score { get; init; }
+    public Dictionary<QualityDimension, double> Dimensions { get; init; };
+    public List<string> Issues { get; init; };
+}
+```
+```csharp
+public sealed class DatasetQualityScore
+{
+}
+    public required string DatasetId { get; init; }
+    public double OverallScore { get; init; }
+    public QualityGrade Grade;;
+    public Dictionary<QualityDimension, double> DimensionScores { get; init; };
+    public int TotalRecords { get; init; }
+    public Dictionary<QualityGrade, int> RecordsByGrade { get; init; };
+    public Dictionary<string, double> FieldScores { get; init; };
+    public List<QualityIssue> TopIssues { get; init; };
+    public DateTime ScoredAt { get; init; };
+}
+```
+```csharp
+public sealed class QualityIssue
+{
+}
+    public required string Description { get; init; }
+    public string? FieldName { get; init; }
+    public QualityDimension Dimension { get; init; }
+    public int AffectedCount { get; init; }
+    public double ScoreImpact { get; init; }
+}
+```
+```csharp
+public sealed class QualityScoringConfig
+{
+}
+    public Dictionary<QualityDimension, double> DimensionWeights { get; init; };
+    public string[] RequiredFields { get; init; };
+    public string[] UniqueFields { get; init; };
+    public int TimelinessThresholdDays { get; init; };
+}
+```
+```csharp
+public sealed class DimensionScoringStrategy : DataQualityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataQualityCategory Category;;
+    public override DataQualityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public void Configure(QualityScoringConfig config);
+    public Task<RecordQualityScore> ScoreRecordAsync(DataRecord record, CancellationToken ct = default);
+    public async Task<DatasetQualityScore> ScoreDatasetAsync(IEnumerable<DataRecord> records, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class WeightedScoringStrategy : DataQualityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataQualityCategory Category;;
+    public override DataQualityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public void SetFieldWeight(string fieldName, double weight);
+    public void RegisterFieldScorer(string fieldName, Func<object?, double> scorer);
+    public Task<RecordQualityScore> ScoreAsync(DataRecord record, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataQuality/Strategies/Standardization/StandardizationStrategies.cs
+```csharp
+public sealed class StandardizationResult
 {
 }
     public required string RecordId { get; init; }
     public bool WasModified;;
     public required DataRecord OriginalRecord { get; init; }
-    public required DataRecord CleansedRecord { get; init; }
-    public List<FieldModification> Modifications { get; init; };
+    public required DataRecord StandardizedRecord { get; init; }
+    public Dictionary<string, StandardizedValue> StandardizedFields { get; init; };
     public double ProcessingTimeMs { get; init; }
 }
 ```
 ```csharp
-public sealed class FieldModification
+public sealed class StandardizedValue
 {
 }
-    public required string FieldName { get; init; }
-    public required ModificationType Type { get; init; }
     public object? OriginalValue { get; init; }
-    public object? NewValue { get; init; }
-    public string? Description { get; init; }
+    public object? StandardizedValue_ { get; init; }
+    public required string StandardType { get; init; }
 }
 ```
 ```csharp
-public sealed class CleansingRule
+public sealed class StandardFormat
 {
 }
-    public required string RuleId { get; init; }
+    public required string FormatId { get; init; }
     public required string FieldPattern { get; init; }
-    public required CleansingOperation Operation { get; init; }
+    public required StandardizationType Type { get; init; }
     public Dictionary<string, object>? Parameters { get; init; }
-    public bool Enabled { get; init; };
     public int Priority { get; init; };
 }
 ```
 ```csharp
-public sealed class BasicCleansingStrategy : DataQualityStrategyBase
+public sealed class FormatStandardizationStrategy : DataQualityStrategyBase
 {
 }
     public override string StrategyId;;
@@ -250,15 +571,13 @@ public sealed class BasicCleansingStrategy : DataQualityStrategyBase
     public override DataQualityCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public void AddRule(CleansingRule rule);;
-    public bool RemoveRule(string ruleId);;
-    public void RegisterCustomOperation(string operationId, Func<object?, Dictionary<string, object>?, object?> operation);
-    public Task<CleansingResult> CleanseAsync(DataRecord record, CancellationToken ct = default);
-    public async IAsyncEnumerable<CleansingResult> CleanseBatchAsync(IEnumerable<DataRecord> records, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default);
+    public void AddFormat(StandardFormat format);;
+    public void RegisterCustomFormatter(string formatterId, Func<object?, Dictionary<string, object>?, object?> formatter);
+    public Task<StandardizationResult> StandardizeAsync(DataRecord record, CancellationToken ct = default);
 }
 ```
 ```csharp
-public sealed class SemanticCleansingStrategy : DataQualityStrategyBase
+public sealed class CodeStandardizationStrategy : DataQualityStrategyBase
 {
 }
     public override string StrategyId;;
@@ -267,15 +586,62 @@ public sealed class SemanticCleansingStrategy : DataQualityStrategyBase
     public override DataQualityCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public void RegisterDictionary(string fieldName, Dictionary<string, string> corrections);
-    public void RegisterValidValues(string fieldName, IEnumerable<string> validValues);
-    public void RegisterAbbreviations(Dictionary<string, string> abbreviations);
     protected override Task InitializeCoreAsync(CancellationToken ct);
-    public Task<CleansingResult> CleanseAsync(DataRecord record, CancellationToken ct = default);
+    public void RegisterCodeMapping(string codeType, Dictionary<string, string> mapping);
+    public string StandardizeCode(string codeType, string value);
+    public Task<StandardizationResult> StandardizeAsync(DataRecord record, Dictionary<string, string> fieldCodeTypes, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataQuality/Strategies/Reporting/ReportingStrategies.cs
+```csharp
+public sealed class ReportConfig
+{
+}
+    public string Title { get; init; };
+    public ReportFormat Format { get; init; };
+    public bool IncludeFieldDetails { get; init; };
+    public bool IncludeTrends { get; init; };
+    public bool IncludeRecommendations { get; init; };
+    public int MaxIssues { get; init; };
+    public TimeSpan? ReportPeriod { get; init; }
 }
 ```
 ```csharp
-public sealed class NullHandlingStrategy : DataQualityStrategyBase
+public sealed class QualityReport
+{
+}
+    public string ReportId { get; init; };
+    public required string Title { get; init; }
+    public DateTime GeneratedAt { get; init; };
+    public ReportFormat Format { get; init; }
+    public required string Content { get; init; }
+    public required ReportSummary Summary { get; init; }
+}
+```
+```csharp
+public sealed class ReportSummary
+{
+}
+    public double OverallScore { get; init; }
+    public int TotalRecords { get; init; }
+    public int TotalIssues { get; init; }
+    public int CriticalIssues { get; init; }
+    public Dictionary<string, double> DimensionScores { get; init; };
+    public List<string> TopRecommendations { get; init; };
+}
+```
+```csharp
+public sealed class ReportSection
+{
+}
+    public required string Title { get; init; }
+    public required string Content { get; init; }
+    public int Order { get; init; }
+}
+```
+```csharp
+public sealed class ReportGenerationStrategy : DataQualityStrategyBase
 {
 }
     public override string StrategyId;;
@@ -284,10 +650,60 @@ public sealed class NullHandlingStrategy : DataQualityStrategyBase
     public override DataQualityCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public void SetDefault(string fieldName, object defaultValue);
-    public void SetMode(string fieldName, NullHandlingMode mode);
-    public void SetDefaultMode(NullHandlingMode mode);
-    public Task<CleansingResult> HandleNullsAsync(DataRecord record, CancellationToken ct = default);
+    public Task<QualityReport> GenerateReportAsync(Scoring.DatasetQualityScore datasetScore, ReportConfig config, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class DashboardDataStrategy : DataQualityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataQualityCategory Category;;
+    public override DataQualityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public DashboardData GenerateDashboardData(Scoring.DatasetQualityScore currentScore, List<Scoring.DatasetQualityScore>? historicalScores = null);
+}
+```
+```csharp
+public sealed class DashboardData
+{
+}
+    public DateTime GeneratedAt { get; init; }
+    public List<KpiData> Kpis { get; init; };
+    public List<ChartData> Charts { get; init; };
+    public ChartData? TrendChart { get; init; }
+}
+```
+```csharp
+public sealed class KpiData
+{
+}
+    public required string Name { get; init; }
+    public double Value { get; init; }
+    public string? Unit { get; init; }
+    public string Trend { get; init; };
+    public double? Target { get; init; }
+    public bool IsLowerBetter { get; init; }
+}
+```
+```csharp
+public sealed class ChartData
+{
+}
+    public required string Title { get; init; }
+    public required string Type { get; init; }
+    public List<string> Labels { get; init; };
+    public List<ChartDataset> Datasets { get; init; };
+}
+```
+```csharp
+public sealed class ChartDataset
+{
+}
+    public required string Label { get; init; }
+    public List<double> Data { get; init; };
 }
 ```
 
@@ -550,479 +966,44 @@ public sealed class AnomalyResult
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataQuality/Strategies/PredictiveQuality/PredictiveQualityStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDataQuality/Strategies/Cleansing/CleansingStrategies.cs
 ```csharp
-internal sealed class QualityAnticipatorStrategy : DataQualityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataQualityCategory Category;;
-    public override DataQualityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public void RecordMetric(string metricName, double value);
-    public void SetThreshold(string metricName, double warningStdDevs = 2.0, double criticalStdDevs = 3.0);
-    public QualityPrediction? PredictIssues(string metricName);
-    public string GetTrend(string metricName, int windowSize = 10);
-}
-```
-```csharp
-internal sealed class DataDriftDetectorStrategy : DataQualityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataQualityCategory Category;;
-    public override DataQualityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public void SetBaseline(string columnName, double[] values);
-    public void UpdateCurrent(string columnName, double[] values);
-    public DriftReport? DetectDrift(string columnName);
-}
-```
-```csharp
-internal sealed class AnomalousDataFlagStrategy : DataQualityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataQualityCategory Category;;
-    public override DataQualityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public void AddValues(string columnName, double[] values);
-    public AnomalyReport? DetectAnomalies(string columnName, double zScoreThreshold = 3.0);
-}
-```
-```csharp
-internal sealed class QualityTrendAnalyzerStrategy : DataQualityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataQualityCategory Category;;
-    public override DataQualityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public void RecordDataPoint(string metricName, double value);
-    public TrendAnalysis? AnalyzeTrend(string metricName);
-    public bool GetSeasonality(string metricName, int period);
-}
-```
-```csharp
-internal sealed class RootCauseAnalyzerStrategy : DataQualityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataQualityCategory Category;;
-    public override DataQualityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public void RecordEvent(string dimension, string description, double severity, Dictionary<string, string>? attributes = null);
-    public RootCauseReport AnalyzeRootCause(string targetDimension, TimeSpan lookbackWindow);
-    public Dictionary<(string, string), double> GetCorrelationMatrix(IReadOnlyList<string> dimensions);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataQuality/Strategies/Profiling/ProfilingStrategies.cs
-```csharp
-public sealed class DataProfile
-{
-}
-    public string ProfileId { get; init; };
-    public required string SourceId { get; init; }
-    public DateTime GeneratedAt { get; init; };
-    public long TotalRecords { get; set; }
-    public double ProcessingTimeMs { get; set; }
-    public Dictionary<string, FieldProfile> FieldProfiles { get; init; };
-    public double OverallQualityScore { get; set; }
-    public List<FieldCorrelation> Correlations { get; init; };
-    public List<PatternInfo> DetectedPatterns { get; init; };
-    public Dictionary<IssueCategory, int> IssueSummary { get; init; };
-}
-```
-```csharp
-public sealed class FieldProfile
-{
-}
-    public required string FieldName { get; init; }
-    public InferredDataType InferredType { get; set; }
-    public long TotalCount { get; set; }
-    public long NullCount { get; set; }
-    public long DistinctCount { get; set; }
-    public double NullPercentage;;
-    public double CardinalityRatio;;
-    public List<ValueFrequency> TopValues { get; init; };
-    public List<ValueFrequency> BottomValues { get; init; };
-    public NumericProfile? NumericStats { get; set; }
-    public StringProfile? StringStats { get; set; }
-    public DateTimeProfile? DateTimeStats { get; set; }
-    public string? DetectedPattern { get; set; }
-    public double QualityScore { get; set; }
-    public List<string> Issues { get; init; };
-}
-```
-```csharp
-public sealed class ValueFrequency
-{
-}
-    public required object? Value { get; init; }
-    public long Count { get; init; }
-    public double Percentage { get; init; }
-}
-```
-```csharp
-public sealed class NumericProfile
-{
-}
-    public double Min { get; init; }
-    public double Max { get; init; }
-    public double Mean { get; init; }
-    public double Median { get; init; }
-    public double Mode { get; init; }
-    public double StdDev { get; init; }
-    public double Variance { get; init; }
-    public double Skewness { get; init; }
-    public double Kurtosis { get; init; }
-    public double Q1 { get; init; }
-    public double Q3 { get; init; }
-    public double IQR { get; init; }
-    public double Sum { get; init; }
-    public int ZeroCount { get; init; }
-    public int NegativeCount { get; init; }
-    public int PositiveCount { get; init; }
-    public double[] Percentiles { get; init; };
-    public Dictionary<string, int> Histogram { get; init; };
-}
-```
-```csharp
-public sealed class StringProfile
-{
-}
-    public int MinLength { get; init; }
-    public int MaxLength { get; init; }
-    public double AvgLength { get; init; }
-    public int EmptyCount { get; init; }
-    public int WhitespaceOnlyCount { get; init; }
-    public Dictionary<string, int> LengthDistribution { get; init; };
-    public Dictionary<char, int> CharacterFrequency { get; init; };
-    public bool ContainsUppercase { get; init; }
-    public bool ContainsLowercase { get; init; }
-    public bool ContainsDigits { get; init; }
-    public bool ContainsSpecialChars { get; init; }
-    public List<string> CommonPrefixes { get; init; };
-    public List<string> CommonSuffixes { get; init; };
-}
-```
-```csharp
-public sealed class DateTimeProfile
-{
-}
-    public DateTime Min { get; init; }
-    public DateTime Max { get; init; }
-    public TimeSpan Range { get; init; }
-    public DateTime? Mode { get; init; }
-    public Dictionary<DayOfWeek, int> DayOfWeekDistribution { get; init; };
-    public Dictionary<int, int> MonthDistribution { get; init; };
-    public Dictionary<int, int> YearDistribution { get; init; };
-    public Dictionary<int, int> HourDistribution { get; init; };
-    public int FutureDateCount { get; init; }
-    public int WeekendCount { get; init; }
-    public string? DetectedFormat { get; init; }
-}
-```
-```csharp
-public sealed class FieldCorrelation
-{
-}
-    public required string Field1 { get; init; }
-    public required string Field2 { get; init; }
-    public double CorrelationCoefficient { get; init; }
-    public CorrelationType Type { get; init; }
-}
-```
-```csharp
-public sealed class PatternInfo
-{
-}
-    public required string FieldName { get; init; }
-    public required string Pattern { get; init; }
-    public int MatchCount { get; init; }
-    public double MatchPercentage { get; init; }
-    public string? Description { get; init; }
-}
-```
-```csharp
-public sealed class ColumnProfilingStrategy : DataQualityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataQualityCategory Category;;
-    public override DataQualityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public async Task<DataProfile> ProfileAsync(IEnumerable<DataRecord> records, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class PatternDetectionStrategy : DataQualityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataQualityCategory Category;;
-    public override DataQualityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<List<PatternInfo>> DetectPatternsAsync(string fieldName, IEnumerable<object?> values, CancellationToken ct = default);
-    public string GeneratePatternTemplate(IEnumerable<string> sampleValues);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataQuality/Strategies/Reporting/ReportingStrategies.cs
-```csharp
-public sealed class ReportConfig
-{
-}
-    public string Title { get; init; };
-    public ReportFormat Format { get; init; };
-    public bool IncludeFieldDetails { get; init; };
-    public bool IncludeTrends { get; init; };
-    public bool IncludeRecommendations { get; init; };
-    public int MaxIssues { get; init; };
-    public TimeSpan? ReportPeriod { get; init; }
-}
-```
-```csharp
-public sealed class QualityReport
-{
-}
-    public string ReportId { get; init; };
-    public required string Title { get; init; }
-    public DateTime GeneratedAt { get; init; };
-    public ReportFormat Format { get; init; }
-    public required string Content { get; init; }
-    public required ReportSummary Summary { get; init; }
-}
-```
-```csharp
-public sealed class ReportSummary
-{
-}
-    public double OverallScore { get; init; }
-    public int TotalRecords { get; init; }
-    public int TotalIssues { get; init; }
-    public int CriticalIssues { get; init; }
-    public Dictionary<string, double> DimensionScores { get; init; };
-    public List<string> TopRecommendations { get; init; };
-}
-```
-```csharp
-public sealed class ReportSection
-{
-}
-    public required string Title { get; init; }
-    public required string Content { get; init; }
-    public int Order { get; init; }
-}
-```
-```csharp
-public sealed class ReportGenerationStrategy : DataQualityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataQualityCategory Category;;
-    public override DataQualityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<QualityReport> GenerateReportAsync(Scoring.DatasetQualityScore datasetScore, ReportConfig config, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class DashboardDataStrategy : DataQualityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataQualityCategory Category;;
-    public override DataQualityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public DashboardData GenerateDashboardData(Scoring.DatasetQualityScore currentScore, List<Scoring.DatasetQualityScore>? historicalScores = null);
-}
-```
-```csharp
-public sealed class DashboardData
-{
-}
-    public DateTime GeneratedAt { get; init; }
-    public List<KpiData> Kpis { get; init; };
-    public List<ChartData> Charts { get; init; };
-    public ChartData? TrendChart { get; init; }
-}
-```
-```csharp
-public sealed class KpiData
-{
-}
-    public required string Name { get; init; }
-    public double Value { get; init; }
-    public string? Unit { get; init; }
-    public string Trend { get; init; };
-    public double? Target { get; init; }
-    public bool IsLowerBetter { get; init; }
-}
-```
-```csharp
-public sealed class ChartData
-{
-}
-    public required string Title { get; init; }
-    public required string Type { get; init; }
-    public List<string> Labels { get; init; };
-    public List<ChartDataset> Datasets { get; init; };
-}
-```
-```csharp
-public sealed class ChartDataset
-{
-}
-    public required string Label { get; init; }
-    public List<double> Data { get; init; };
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataQuality/Strategies/Scoring/ScoringStrategies.cs
-```csharp
-public sealed class RecordQualityScore
-{
-}
-    public required string RecordId { get; init; }
-    public double OverallScore { get; init; }
-    public QualityGrade Grade;;
-    public Dictionary<QualityDimension, double> DimensionScores { get; init; };
-    public Dictionary<string, FieldQualityScore> FieldScores { get; init; };
-    public List<string> Issues { get; init; };
-    public List<string> Recommendations { get; init; };
-}
-```
-```csharp
-public sealed class FieldQualityScore
-{
-}
-    public required string FieldName { get; init; }
-    public double Score { get; init; }
-    public Dictionary<QualityDimension, double> Dimensions { get; init; };
-    public List<string> Issues { get; init; };
-}
-```
-```csharp
-public sealed class DatasetQualityScore
-{
-}
-    public required string DatasetId { get; init; }
-    public double OverallScore { get; init; }
-    public QualityGrade Grade;;
-    public Dictionary<QualityDimension, double> DimensionScores { get; init; };
-    public int TotalRecords { get; init; }
-    public Dictionary<QualityGrade, int> RecordsByGrade { get; init; };
-    public Dictionary<string, double> FieldScores { get; init; };
-    public List<QualityIssue> TopIssues { get; init; };
-    public DateTime ScoredAt { get; init; };
-}
-```
-```csharp
-public sealed class QualityIssue
-{
-}
-    public required string Description { get; init; }
-    public string? FieldName { get; init; }
-    public QualityDimension Dimension { get; init; }
-    public int AffectedCount { get; init; }
-    public double ScoreImpact { get; init; }
-}
-```
-```csharp
-public sealed class QualityScoringConfig
-{
-}
-    public Dictionary<QualityDimension, double> DimensionWeights { get; init; };
-    public string[] RequiredFields { get; init; };
-    public string[] UniqueFields { get; init; };
-    public int TimelinessThresholdDays { get; init; };
-}
-```
-```csharp
-public sealed class DimensionScoringStrategy : DataQualityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataQualityCategory Category;;
-    public override DataQualityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public void Configure(QualityScoringConfig config);
-    public Task<RecordQualityScore> ScoreRecordAsync(DataRecord record, CancellationToken ct = default);
-    public async Task<DatasetQualityScore> ScoreDatasetAsync(IEnumerable<DataRecord> records, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class WeightedScoringStrategy : DataQualityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataQualityCategory Category;;
-    public override DataQualityCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public void SetFieldWeight(string fieldName, double weight);
-    public void RegisterFieldScorer(string fieldName, Func<object?, double> scorer);
-    public Task<RecordQualityScore> ScoreAsync(DataRecord record, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataQuality/Strategies/Standardization/StandardizationStrategies.cs
-```csharp
-public sealed class StandardizationResult
+public sealed class CleansingResult
 {
 }
     public required string RecordId { get; init; }
     public bool WasModified;;
     public required DataRecord OriginalRecord { get; init; }
-    public required DataRecord StandardizedRecord { get; init; }
-    public Dictionary<string, StandardizedValue> StandardizedFields { get; init; };
+    public required DataRecord CleansedRecord { get; init; }
+    public List<FieldModification> Modifications { get; init; };
     public double ProcessingTimeMs { get; init; }
 }
 ```
 ```csharp
-public sealed class StandardizedValue
+public sealed class FieldModification
 {
 }
+    public required string FieldName { get; init; }
+    public required ModificationType Type { get; init; }
     public object? OriginalValue { get; init; }
-    public object? StandardizedValue_ { get; init; }
-    public required string StandardType { get; init; }
+    public object? NewValue { get; init; }
+    public string? Description { get; init; }
 }
 ```
 ```csharp
-public sealed class StandardFormat
+public sealed class CleansingRule
 {
 }
-    public required string FormatId { get; init; }
+    public required string RuleId { get; init; }
     public required string FieldPattern { get; init; }
-    public required StandardizationType Type { get; init; }
+    public required CleansingOperation Operation { get; init; }
     public Dictionary<string, object>? Parameters { get; init; }
+    public bool Enabled { get; init; };
     public int Priority { get; init; };
 }
 ```
 ```csharp
-public sealed class FormatStandardizationStrategy : DataQualityStrategyBase
+public sealed class BasicCleansingStrategy : DataQualityStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1031,13 +1012,15 @@ public sealed class FormatStandardizationStrategy : DataQualityStrategyBase
     public override DataQualityCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public void AddFormat(StandardFormat format);;
-    public void RegisterCustomFormatter(string formatterId, Func<object?, Dictionary<string, object>?, object?> formatter);
-    public Task<StandardizationResult> StandardizeAsync(DataRecord record, CancellationToken ct = default);
+    public void AddRule(CleansingRule rule);;
+    public bool RemoveRule(string ruleId);;
+    public void RegisterCustomOperation(string operationId, Func<object?, Dictionary<string, object>?, object?> operation);
+    public Task<CleansingResult> CleanseAsync(DataRecord record, CancellationToken ct = default);
+    public async IAsyncEnumerable<CleansingResult> CleanseBatchAsync(IEnumerable<DataRecord> records, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default);
 }
 ```
 ```csharp
-public sealed class CodeStandardizationStrategy : DataQualityStrategyBase
+public sealed class SemanticCleansingStrategy : DataQualityStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1046,10 +1029,27 @@ public sealed class CodeStandardizationStrategy : DataQualityStrategyBase
     public override DataQualityCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
+    public void RegisterDictionary(string fieldName, Dictionary<string, string> corrections);
+    public void RegisterValidValues(string fieldName, IEnumerable<string> validValues);
+    public void RegisterAbbreviations(Dictionary<string, string> abbreviations);
     protected override Task InitializeCoreAsync(CancellationToken ct);
-    public void RegisterCodeMapping(string codeType, Dictionary<string, string> mapping);
-    public string StandardizeCode(string codeType, string value);
-    public Task<StandardizationResult> StandardizeAsync(DataRecord record, Dictionary<string, string> fieldCodeTypes, CancellationToken ct = default);
+    public Task<CleansingResult> CleanseAsync(DataRecord record, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class NullHandlingStrategy : DataQualityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataQualityCategory Category;;
+    public override DataQualityCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public void SetDefault(string fieldName, object defaultValue);
+    public void SetMode(string fieldName, NullHandlingMode mode);
+    public void SetDefaultMode(NullHandlingMode mode);
+    public Task<CleansingResult> HandleNullsAsync(DataRecord record, CancellationToken ct = default);
 }
 ```
 

@@ -12,7 +12,7 @@ namespace DataWarehouse.SDK.Contracts
         /// </summary>
         /// <param name="manifest"></param>
         /// <returns></returns>
-        Task IndexManifestAsync(Primitives.Manifest manifest);
+        Task IndexManifestAsync(Primitives.Manifest manifest, CancellationToken ct = default);
 
         /// <summary>
         /// Search
@@ -20,8 +20,9 @@ namespace DataWarehouse.SDK.Contracts
         /// <param name="query"></param>
         /// <param name="vector"></param>
         /// <param name="limit"></param>
+        /// <param name="ct">Cancellation token.</param>
         /// <returns></returns>
-        Task<string[]> SearchAsync(string query, float[]? vector, int limit);
+        Task<string[]> SearchAsync(string query, float[]? vector, int limit, CancellationToken ct = default);
 
         /// <summary>
         /// Required for DataVacuum and Vector Cache Rehydration
@@ -35,8 +36,9 @@ namespace DataWarehouse.SDK.Contracts
         /// </summary>
         /// <param name="id"></param>
         /// <param name="timestamp"></param>
+        /// <param name="ct">Cancellation token.</param>
         /// <returns></returns>
-        Task UpdateLastAccessAsync(string id, long timestamp);
+        Task UpdateLastAccessAsync(string id, long timestamp, CancellationToken ct = default);
 
         /// <summary>
         /// Get manifest

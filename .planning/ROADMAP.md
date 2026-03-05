@@ -1526,42 +1526,44 @@ Phase 68 (SDK Foundation)
     +---> Phase 89 (Ecosystem Compatibility) -- depends on Phase 83 (Integration Testing) + Phase 88 (Dynamic Subsystem Scaling)
     +---> Phase 90 (Device Discovery & Physical Block Device) -- depends on Phase 71 (VDE Format) + Phase 87 (VDE Scalable Internals)
     |       +---> Phase 91 (CompoundBlockDevice & Device-Level RAID) -- depends on Phase 90
-    |               +---> Phase 92 (VDE 2.0B Federation Router) -- depends on Phase 86 (Adaptive Index) + Phase 87 (VDE Scalable) + Phase 91 (CompoundBlockDevice)
-    |                       +---> Phase 93 (VDE 2.0B Shard Lifecycle) -- depends on Phase 92
+    |               +---> Phase 91.5 (VDE v2.1 Format Completion) -- depends on Phase 87 (VDE Scalable) + Phase 91 (CompoundBlockDevice)
+    |                       +---> Phase 92 (VDE 2.0B Federation Router) -- depends on Phase 86 (Adaptive Index) + Phase 91.5 (VDE v2.1 Format)
+    |                               +---> Phase 93 (VDE 2.0B Shard Lifecycle) -- depends on Phase 92
     +---> Phase 94 (Data Plugin Consolidation) -- depends on Phase 82 (Plugin Consolidation Audit) + Phase 88 (Dynamic Subsystem Scaling)
-    +---> Phase 95 (Bare-Metal-to-User E2E Testing) -- depends on ALL prior phases (68-94)
+    +---> Phase 95 (Bare-Metal-to-User E2E Testing) -- depends on ALL prior phases (68-94, 91.5)
 ```
 
 ### Phases
 
-- [ ] **Phase 68: SDK Foundation** -- PolicyEngine contracts, PluginBase extension, IntelligenceAwarePluginBase, all policy model types
-- [ ] **Phase 69: Policy Persistence** -- IPolicyPersistence + 5 implementations (InMemory, File, Database, TamperProof, Hybrid) + compliance validation + policy marketplace
-- [ ] **Phase 70: Cascade Resolution Engine** -- Full cascade algorithm, strategy defaults by category, conflict resolution, snapshot versioning, circular reference detection, compliance scoring
-- [ ] **Phase 71: VDE Format v2.0** -- DWVD v2.0 superblock, region directory, block trailer, module manifest, inode layout, WAL, creation profiles
-- [ ] **Phase 72: VDE Regions -- Foundation** -- Policy Vault, Encryption Header, Integrity Tree, Tag Index, Replication State, RAID Metadata, WORM, Compliance Vault, Streaming Append
-- [ ] **Phase 73: VDE Regions -- Operations** -- Intelligence Cache, Cross-VDE Reference, Compute Code Cache, Snapshot Table, Audit Log, Consensus Log, Compression Dictionary, Metrics Log, Anonymization Table, VDE index/metadata separation, VDE federation
-- [ ] **Phase 74: VDE Identity & Tamper Detection** -- dw:// namespace, format fingerprint, header seal, metadata chain hash, file size sentinel, tamper response levels, emergency recovery block, VDE nesting
-- [ ] **Phase 75: Authority Chain & Emergency Override** -- Emergency escalation, immutable records, 3-of-5 quorum, hardware token support, time-lock, dead man's switch
-- [ ] **Phase 76: Performance Optimization** -- MaterializedPolicyCache, BloomFilterSkipIndex, CompiledPolicyDelegate, three-tier fast path, check classification, Simulate(), policy simulation sandbox
-- [ ] **Phase 77: AI Policy Intelligence** -- Observation pipeline, hardware/workload/threat/cost/sensitivity advisors, autonomy levels, hybrid config, overhead throttling, self-modification prevention
-- [ ] **Phase 78: Online Module Addition** -- Three addition options (online/inode-claim/migration), atomic manifest update, Tier 2 fallback, user comparison, online defragmentation
-- [ ] **Phase 79: File Extension & OS Integration** -- .dwvd IANA MIME, Windows/Linux/macOS registration, content detection, import from VHD/VHDX/VMDK/QCOW2, secondary extensions
-- [ ] **Phase 80: Three-Tier Performance Verification** -- Tier 1/2/3 validation for all 19 modules, per-feature tier mapping, benchmarks
-- [ ] **Phase 81: Backward Compatibility & Migration** -- v1.0 format auto-detect, dw migrate command, v5.0 config migration, safe defaults (AI off, no multi-level without admin config)
-- [ ] **Phase 82: Plugin Consolidation Audit** -- Review 17 non-Ultimate plugins, identify merge candidates, execute merges, verify build/tests
-- [ ] **Phase 83: Integration Testing** -- PolicyEngine unit tests (~200), per-feature multi-level tests (~280), cross-feature tests (~50), AI behavior tests (~100), performance tests (~30), VDE/tamper/migration tests
-- [ ] **Phase 84: Deployment Topology & CLI Modes** -- DW-only/VDE-only/DW+VDE deployment selector, VDE Composer CLI+GUI, shell handler registration via install mode, fix CLI stubs (ServerCommands, sync-over-async), GUI mode wizard, deployment mode tests
-- [ ] **Phase 85: Competitive Edge** -- VDE-native block export for NAS/SAN protocols, native AD/Kerberos, TLA+ formal verification, OS-level security hardening, streaming SQL engine, deterministic I/O, variable-width addressing, ML pipeline integration, native Delta Lake/Iceberg operations
-- [ ] **Phase 86: Adaptive Index Engine** -- Replace B-tree with morphing ART→Bε-tree→Forest index, Bw-Tree lock-free paths, Masstree hot-path namespace, Disruptor message bus, extendible hashing inode table, native HNSW+PQ vector search, Hilbert curve engine, ALEX learned index, io_uring, trained Zstd dictionaries, SIMD hot paths, Bloofi distributed filter, Clock-SI transactions, persistent extent tree
-- [ ] **Phase 87: VDE Scalable Internals** -- Allocation groups, ARC 3-tier cache, variable-width inodes (compact/standard/extended), extent-based addressing, sub-block packing, MVCC, SQL OLTP+OLAP (columnar regions, zone maps, SIMD execution, spill-to-disk, predicate pushdown), persistent roaring bitmap tag index, per-extent encryption/compression, hierarchical checksums, extent-aware snapshots/replication, online defragmentation
-- [ ] **Phase 88: Dynamic Subsystem Scaling** -- SDK scaling contract (BoundedCache, IPersistentBackingStore, IScalingPolicy, IBackpressureAware), fix critical bugs (streaming stubs, resilience no-op, blockchain int cast), migrate all 60 plugins from unbounded ConcurrentDictionary to bounded persistent caches, runtime-reconfigurable limits for all subsystems (blockchain, AEDS, WASM, consensus, message bus, replication, streaming, ACL, resilience, catalog, governance, lineage, mesh, filesystem, backup, compression, encryption, search, database, pipeline, fabric, tamperproof, compliance)
-- [ ] **Phase 89: Ecosystem Compatibility** -- Verify existing PostgreSQL wire protocol (964-line strategy) and Parquet/Arrow/ORC strategies; fix gaps; wire PostgreSQL protocol to SQL engine; multi-language client SDKs (Python/Java/Go/Rust/JS from shared .proto); Terraform provider + Pulumi bridge; Helm chart; Jepsen distributed correctness testing; connection pooling SDK contract
-- [ ] **Phase 90: Device Discovery & Physical Block Device Management** -- DeviceDiscoveryService (NVMe, SCSI, virtio, iSCSI, NVMe-oF enumeration), PhysicalDeviceManager (SMART health, wear leveling, hot-swap, failure prediction), DevicePoolManager (tier/locality/redundancy grouping, replaces OS LVM/ZFS), IPhysicalBlockDevice interface, device topology mapping, bare-metal bootstrap without OS storage stack
-- [ ] **Phase 91: CompoundBlockDevice & Device-Level RAID** -- CompoundBlockDevice implementing IBlockDevice over device arrays, logical-to-physical block mapping with device ID, wire UltimateRAID strategies to IBlockDevice[] arrays (device-level RAID 0/1/5/6/10 + erasure coding), extent-aware allocation across devices, hot-spare management, rebuild orchestration, device failure isolation
-- [ ] **Phase 92: VDE 2.0B Federation Router & Hierarchical Shard Catalog** -- VdeFederationRouter (namespace resolution, routing table, path-embedded routing), ShardCatalog (4-level hierarchy: Root Catalog → Domain Catalogs → Index Shards → Data Shards), catalog VDE replication via Raft, bloom filter negative lookups, LRU catalog caching, transparent user experience (admins see shards, users see continuous namespace), recursive VDE 2.0B+ composition
-- [ ] **Phase 93: VDE 2.0B Shard Lifecycle** -- PlacementPolicyEngine (hot/warm/cold/frozen tiers, NVMe/SSD/HDD/tape mapping), shard split at capacity (key range bisection), shard merge on underutilization, background shard migration between tiers, cross-shard transactions, shard health monitoring, automatic rebalancing, zero-overhead guarantee at small scale (federation layer dormant until multi-VDE activated)
-- [ ] **Phase 94: Data Plugin Consolidation** -- Deduplicate triple-implemented lineage (UltimateDataLineage is authoritative, remove private stores from UltimateDataCatalog and UltimateDataLake), deduplicate triple-implemented catalog (UltimateDataCatalog is authoritative, remove private stores from UltimateDataLake and UltimateDataFabric), clarify UniversalFabric vs UltimateDataFabric naming/scope, wire all plugins to use authoritative stores via message bus, verify no data loss
-- [ ] **Phase 95: Bare-Metal-to-User End-to-End Testing** -- Full stack integration test: raw block devices → DevicePoolManager → CompoundBlockDevice → VDE 2.0A → VDE 2.0B federation → storage strategies → user-visible operations. Test at 3 scales: single-VDE (GB), multi-VDE (TB), federated (PB simulation). Verify RAID device-level + data-level dual protection. Verify zero-overhead at small scale. Verify transparent namespace at all scales.
+- [x] **Phase 68: SDK Foundation** -- PolicyEngine contracts, PluginBase extension, IntelligenceAwarePluginBase, all policy model types
+- [x] **Phase 69: Policy Persistence** -- IPolicyPersistence + 5 implementations (InMemory, File, Database, TamperProof, Hybrid) + compliance validation + policy marketplace
+- [x] **Phase 70: Cascade Resolution Engine** -- Full cascade algorithm, strategy defaults by category, conflict resolution, snapshot versioning, circular reference detection, compliance scoring
+- [x] **Phase 71: VDE Format v2.0** -- DWVD v2.0 superblock, region directory, block trailer, module manifest, inode layout, WAL, creation profiles
+- [x] **Phase 72: VDE Regions -- Foundation** -- Policy Vault, Encryption Header, Integrity Tree, Tag Index, Replication State, RAID Metadata, WORM, Compliance Vault, Streaming Append
+- [x] **Phase 73: VDE Regions -- Operations** -- Intelligence Cache, Cross-VDE Reference, Compute Code Cache, Snapshot Table, Audit Log, Consensus Log, Compression Dictionary, Metrics Log, Anonymization Table, VDE index/metadata separation, VDE federation
+- [x] **Phase 74: VDE Identity & Tamper Detection** -- dw:// namespace, format fingerprint, header seal, metadata chain hash, file size sentinel, tamper response levels, emergency recovery block, VDE nesting
+- [x] **Phase 75: Authority Chain & Emergency Override** -- Emergency escalation, immutable records, 3-of-5 quorum, hardware token support, time-lock, dead man's switch
+- [x] **Phase 76: Performance Optimization** -- MaterializedPolicyCache, BloomFilterSkipIndex, CompiledPolicyDelegate, three-tier fast path, check classification, Simulate(), policy simulation sandbox
+- [x] **Phase 77: AI Policy Intelligence** -- Observation pipeline, hardware/workload/threat/cost/sensitivity advisors, autonomy levels, hybrid config, overhead throttling, self-modification prevention
+- [x] **Phase 78: Online Module Addition** -- Three addition options (online/inode-claim/migration), atomic manifest update, Tier 2 fallback, user comparison, online defragmentation
+- [x] **Phase 79: File Extension & OS Integration** -- .dwvd IANA MIME, Windows/Linux/macOS registration, content detection, import from VHD/VHDX/VMDK/QCOW2, secondary extensions
+- [x] **Phase 80: Three-Tier Performance Verification** -- Tier 1/2/3 validation for all 19 modules, per-feature tier mapping, benchmarks
+- [x] **Phase 81: Backward Compatibility & Migration** -- v1.0 format auto-detect, dw migrate command, v5.0 config migration, safe defaults (AI off, no multi-level without admin config)
+- [x] **Phase 82: Plugin Consolidation Audit** -- Review 17 non-Ultimate plugins, identify merge candidates, execute merges, verify build/tests
+- [x] **Phase 83: Integration Testing** -- PolicyEngine unit tests (~200), per-feature multi-level tests (~280), cross-feature tests (~50), AI behavior tests (~100), performance tests (~30), VDE/tamper/migration tests
+- [x] **Phase 84: Deployment Topology & CLI Modes** -- DW-only/VDE-only/DW+VDE deployment selector, VDE Composer CLI+GUI, shell handler registration via install mode, fix CLI stubs (ServerCommands, sync-over-async), GUI mode wizard, deployment mode tests
+- [x] **Phase 85: Competitive Edge** -- VDE-native block export for NAS/SAN protocols, native AD/Kerberos, TLA+ formal verification, OS-level security hardening, streaming SQL engine, deterministic I/O, variable-width addressing, ML pipeline integration, native Delta Lake/Iceberg operations
+- [x] **Phase 86: Adaptive Index Engine** -- Replace B-tree with morphing ART→Bε-tree→Forest index, Bw-Tree lock-free paths, Masstree hot-path namespace, Disruptor message bus, extendible hashing inode table, native HNSW+PQ vector search, Hilbert curve engine, ALEX learned index, io_uring, trained Zstd dictionaries, SIMD hot paths, Bloofi distributed filter, Clock-SI transactions, persistent extent tree
+- [x] **Phase 87: VDE Scalable Internals** -- Allocation groups, ARC 3-tier cache, variable-width inodes (compact/standard/extended), extent-based addressing, sub-block packing, MVCC, SQL OLTP+OLAP (columnar regions, zone maps, SIMD execution, spill-to-disk, predicate pushdown), persistent roaring bitmap tag index, per-extent encryption/compression, hierarchical checksums, extent-aware snapshots/replication, online defragmentation
+- [x] **Phase 88: Dynamic Subsystem Scaling** -- SDK scaling contract (BoundedCache, IPersistentBackingStore, IScalingPolicy, IBackpressureAware), fix critical bugs (streaming stubs, resilience no-op, blockchain int cast), migrate all 60 plugins from unbounded ConcurrentDictionary to bounded persistent caches, runtime-reconfigurable limits for all subsystems (blockchain, AEDS, WASM, consensus, message bus, replication, streaming, ACL, resilience, catalog, governance, lineage, mesh, filesystem, backup, compression, encryption, search, database, pipeline, fabric, tamperproof, compliance)
+- [x] **Phase 89: Ecosystem Compatibility** -- Verify existing PostgreSQL wire protocol (964-line strategy) and Parquet/Arrow/ORC strategies; fix gaps; wire PostgreSQL protocol to SQL engine; multi-language client SDKs (Python/Java/Go/Rust/JS from shared .proto); Terraform provider + Pulumi bridge; Helm chart; Jepsen distributed correctness testing; connection pooling SDK contract
+- [x] **Phase 90: Device Discovery & Physical Block Device Management** -- DeviceDiscoveryService (NVMe, SCSI, virtio, iSCSI, NVMe-oF enumeration), PhysicalDeviceManager (SMART health, wear leveling, hot-swap, failure prediction), DevicePoolManager (tier/locality/redundancy grouping, replaces OS LVM/ZFS), IPhysicalBlockDevice interface, device topology mapping, bare-metal bootstrap without OS storage stack
+- [x] **Phase 91: CompoundBlockDevice & Device-Level RAID** -- CompoundBlockDevice implementing IBlockDevice over device arrays, logical-to-physical block mapping with device ID, wire UltimateRAID strategies to IBlockDevice[] arrays (device-level RAID 0/1/5/6/10 + erasure coding), extent-aware allocation across devices, hot-spare management, rebuild orchestration, device failure isolation ✓ (2026-03-02, 5/5 plans, 8/8 verified)
+- [x] **Phase 91.5: VDE v2.1 Format Completion** -- Complete all remaining VDE v2.1 format features per finalized spec (v6.0-VDE-FORMAT-v2.0-SPEC.md): format-level modules (CPSH, EKEY, WALS, DELT, ZNSM, STEX, polymorphic RAID, module registration), core VDE internals (sharded WAL, epoch Merkle, metaslab allocator, vacuum GC, GDPR tombstone, quorum-sealed writes, wear-leveling, lazy deletion), runtime features (dedup, instant clone, heat tiering, temporal queries, cold analytics, tag scans, corruption radar, integrity chain/caching, forensic recovery, portable export, A/B testing, physical custody, panic fork), operations (observability MLOG, QoS modules, OPJR online ops, disaster recovery footer), block device layer (DirectFile, Windows overlapped, IoRing, kqueue, SPDK, raw partition), bootable preamble (header, SPDK integration, stripped kernel, NativeAOT runtime, composition profiles, preamble integrity), mount providers (VdeFilesystemAdapter, WinFsp, FUSE3, macFUSE), I/O pipeline (framework, module populator/extractor, E2E integration). 53 plans in 8 waves.
+- [x] **Phase 92: VDE 2.0B Federation Router & Hierarchical Shard Catalog** ✓ (2026-03-03, 8/8 plans) -- VdeFederationRouter (namespace resolution, routing table, path-embedded routing), ShardCatalog (4-level hierarchy: Root Catalog → Domain Catalogs → Index Shards → Data Shards), catalog VDE replication via Raft, bloom filter negative lookups, LRU catalog caching, transparent user experience (admins see shards, users see continuous namespace), recursive VDE 2.0B+ composition
+- [x] **Phase 93: VDE 2.0B Shard Lifecycle** ✓ (2026-03-03, 6/6 plans) -- PlacementPolicyEngine (hot/warm/cold/frozen tiers, NVMe/SSD/HDD/tape mapping), shard split at capacity (key range bisection), shard merge on underutilization, background shard migration between tiers, cross-shard transactions, shard health monitoring, automatic rebalancing, zero-overhead guarantee at small scale (federation layer dormant until multi-VDE activated)
+- [x] **Phase 94: Data Plugin Consolidation** ✓ (2026-03-03, 5/5 plans) -- Deduplicate triple-implemented lineage (UltimateDataLineage is authoritative, remove private stores from UltimateDataCatalog and UltimateDataLake), deduplicate triple-implemented catalog (UltimateDataCatalog is authoritative, remove private stores from UltimateDataLake and UltimateDataFabric), clarify UniversalFabric vs UltimateDataFabric naming/scope, wire all plugins to use authoritative stores via message bus, verify no data loss
+- [x] **Phase 95: Bare-Metal-to-User End-to-End Testing** ✓ (2026-03-03, 5/5 plans) -- Full stack integration test: raw block devices → DevicePoolManager → CompoundBlockDevice → VDE 2.0A → VDE 2.0B federation → storage strategies → user-visible operations. Test at 3 scales: single-VDE (GB), multi-VDE (TB), federated (PB simulation). Verify RAID device-level + data-level dual protection. Verify zero-overhead at small scale. Verify transparent namespace at all scales.
 
 ### Phase Details
 
@@ -1949,7 +1951,7 @@ Plans:
   8. 128-bit block addressing compiles and is forward-compatible (VDE v2.0 format reserves address space; activation requires config flag)
   9. ML pipeline stores feature data in VDE Intelligence Cache region; model versioning tracks lineage
   10. Delta Lake/Iceberg transaction logs stored natively in VDE; time-travel queries use VDE snapshot mechanism
-**Plans**: 8 plans
+**Plans**: 4 plans
 
 Plans:
 - [ ] 85-01-PLAN.md -- VDE-native block export: zero-copy I/O path for SMB/NFS/iSCSI/FC/NVMe-oF strategies, direct VDE region reads, bypass plugin layer on hot path
@@ -1971,7 +1973,7 @@ Wave 3: 85-08 (ML pipeline + lakehouse) -- depends on Phase 71 VDE regions
 #### Phase 86: Adaptive Index Engine
 **Goal**: Build a living, self-morphing index that transparently transitions across a continuous spectrum of data structures — from direct pointers (1 object) through ART, Bε-trees, learned indexes, and distributed probabilistic routing (trillions of objects). The index morphs BOTH directions: forward as data grows, backward as data shrinks. The index itself is parallelized via striping, mirroring, sharding, and tiering — like RAID for indexes. Native io_uring and CUDA HNSW provide maximum hardware utilization.
 **Depends on**: Phase 71 (VDE Format v2.0), Phase 85 (Competitive Edge — variable-width addressing must exist)
-**Requirements**: AIE-01 through AIE-27
+**Requirements**: AIE-01 through AIE-28
 **Success Criteria** (what must be TRUE):
   1. A new VDE starts at Level 0 (direct pointer). Inserting 100 objects auto-morphs to Level 1 (sorted array). Inserting 10K auto-morphs to Level 2 (ART). Each transition is invisible to the caller — zero API changes, zero downtime.
   2. Bε-tree (Level 3) write benchmark shows ≥10x fewer I/Os than current B-tree on sequential insert of 10M keys.
@@ -1989,7 +1991,8 @@ Wave 3: 85-08 (ML pipeline + lakehouse) -- depends on Phase 71 VDE regions
   14. Extendible hashing inode table grows from 1K to 1B+ inodes without rebuild; O(1) amortized lookup.
   15. Every morph transition is WAL-journaled, copy-on-write, background, cancellable, and crash-safe.
   16. Legacy B-tree v1.0 VDEs open correctly; `dw migrate` upgrades to Bε-tree.
-**Plans**: 16 plans
+  17. CRUSH↔Federation: CRUSH placement resolves shard location in O(1) for ≥95% of routing decisions; hierarchical catalog correctly overrides CRUSH for sovereignty-pinned objects.
+**Plans**: 17 plans
 
 Plans:
 - [ ] 86-01-PLAN.md -- Morphing spectrum Levels 0-2: Direct Pointer Array, Sorted Array, ART (Node4/16/48/256, SIMD Node16, path compression); IAdaptiveIndex interface; Level selection logic
@@ -2008,6 +2011,7 @@ Plans:
 - [ ] 86-14-PLAN.md -- Hilbert curve engine + trained Zstd dictionaries: Hilbert SFC implementation (3-11x over Z-order), ZstdNet dictionary trainer, Compression Dictionary Region storage, auto-retrain
 - [ ] 86-15-PLAN.md -- SIMD acceleration: Vector256/Avx2 bloom probe, ART Node16 search, cosine/dot-product/euclidean, XxHash, bitmap scanning; runtime `Avx2.IsSupported` detection with scalar fallback; persistent extent tree checkpointing
 - [ ] 86-16-PLAN.md -- AIE integration tests + legacy compatibility: full morph spectrum test (insert → Level 6 → delete → Level 0), Index RAID tests, backward morph tests, v1.0 B-tree migration, performance benchmarks (each level vs current B-tree)
+- [ ] 86-17-PLAN.md -- CRUSH↔Federation integration: CRUSH placement algorithm at AIE Level 6 integrates with VdeFederationRouter for masterless O(1) shard routing; CRUSH is the hot path, hierarchical catalog is fallback for sovereignty overrides and pinned objects (AIE-28)
 
 Wave structure:
 ```
@@ -2016,12 +2020,13 @@ Wave 2: 86-03 (Level 4 Learned) + 86-04 (Level 5 Forest) + 86-10 (Disruptor) + 8
 Wave 3: 86-05 (Level 6 Distributed) + 86-06 (MorphAdvisor) + 86-07 (Bidirectional morph) + 86-08 (Index RAID) -- parallel, depends on Waves 1-2
 Wave 4: 86-12 (io_uring) + 86-13 (HNSW+PQ+GPU) + 86-14 (Hilbert+Zstd) + 86-15 (SIMD+extent tree) -- parallel, depends on Wave 1
 Wave 5: 86-16 (Integration tests + legacy) -- depends on ALL prior waves
+Wave 6: 86-17 (CRUSH↔Federation integration) -- depends on Wave 3 (Level 6 Distributed) + Phase 92 interface contracts
 ```
 
 #### Phase 87: VDE Scalable Internals
-**Goal**: Every VDE subsystem (allocation, caching, inodes, SQL, tags, encryption, compression, checksums, snapshots, replication) is optimized for scales from tiny (single config file) to yottabyte (trillions of objects). The on-disk format is STATIC; internals ADAPT. No feature pays overhead it doesn't need at small scale, yet every feature scales to the hardware limit at large scale.
+**Goal**: Every VDE subsystem (allocation, caching, inodes, SQL, tags, encryption, compression, checksums, snapshots, replication) is optimized for scales from tiny (single config file) to yottabyte (trillions of objects). The on-disk format is STATIC; internals ADAPT. No feature pays overhead it doesn't need at small scale, yet every feature scales to the hardware limit at large scale. Includes the 6-Level Adaptive Integrity Engine (L0 trailers → L1 hash-in-index-pointer → L2 epoch-batched Merkle → L3 learned scrubbing → L4 blockchain-anchored → L5 Merkle-CRDT [v7.0 interface only]).
 **Depends on**: Phase 71 (VDE Format v2.0), Phase 86 (Adaptive Index Engine — AIE integration for tag sub-indexes and extent tree)
-**Requirements**: VOPT-01 through VOPT-28
+**Requirements**: VOPT-01 through VOPT-90
 **Success Criteria** (what must be TRUE):
   1. Allocation groups: concurrent 8-thread write benchmark shows ≥4x throughput over single-bitmap allocator on NVMe; single-group mode for VDEs <128MB has zero overhead vs current.
   2. ARC cache L1: self-tuning cache achieves ≥20% higher hit rate than TTL-only eviction on mixed read workload; ghost lists adapt T1/T2 split within 1000 operations.
@@ -2037,7 +2042,51 @@ Wave 5: 86-16 (Integration tests + legacy) -- depends on ALL prior waves
   12. Hierarchical checksums: corruption in one block of a 1GB file detected and localized via Merkle tree binary search in ≤20 I/O operations.
   13. Extent-aware CoW snapshots: snapshot of 1TB VDE with 1M files creates ≤10MB of snapshot metadata (vs ~4GB with per-block tracking).
   14. Online defragmentation: background defrag compacts fragmented allocation groups while VDE serves normal read/write operations without downtime.
-**Plans**: 15 plans
+  15. WAL sharding: 256-thread concurrent write benchmark shows linear throughput scaling vs 2-WAL baseline.
+  16. Vacuum: dead space ratio stays below 10% under sustained MVCC write load with concurrent readers.
+  17. Metaslab: 1TB+ VDE allocation benchmark shows <5% fragmentation after 1M random-size allocations.
+  18. Crypto-ephemerality: ephemeral-key file shredded in <1ms by key deletion regardless of data volume; volatile key ring survives process restart only via TPM-sealed backend, RAM-only backend loses keys on crash (by design).
+  19. ZNS symbiosis: VDE on ZNS NVMe shows zero SSD garbage collection; write latency <20μs sustained; conventional NVMe fallback identical to pre-ZNS behavior.
+  20. WAL streaming: 128 concurrent subscribers reading WAL shards via mmap with <100ns per-event latency; subscriber cursor survives VDE remount; unauthorized subscriber rejected by Policy Engine.
+  21. Delta extents: 10-byte modification on 4KB block produces <100B delta extent; read reconstruction <1μs with AVX-512; Background Vacuum compacts delta chain depth 8→1 within one vacuum cycle.
+  22. Smart Extents: WASM predicate on 50GB scan returns only matching rows; host-side io_uring filtered read saves ≥90% memory bandwidth vs full scan; computational NVMe path detected and used when available.
+  23. Polymorphic RAID: temp file (Standard) and financial ledger (EC_4_2) coexist on same NVMe; EC parity verified on read; degraded-mode reconstruction works with 1 missing shard for EC_4_2.
+  24. 4D extents: spatial bounding box query on 1M spatiotemporal extents returns results in <10ms; Hilbert curve ordering confirmed by sequential NVMe read pattern (≥80% sequential blocks for spatially adjacent queries).
+  25. GDPR tombstone proof verifiable by independent auditor tool
+  26. Quorum-sealed writes survive 1-of-3 Byzantine node compromise
+  27. Semantic wear-leveling reduces write amplification by ≥40% on conventional NVMe
+  28. Temporal point queries return correct historical state for any valid epoch
+  29. Content-addressable dedup achieves ≥90% of theoretical dedup ratio
+  30. Instant clone of 1TB file completes in <100ms (metadata-only)
+  31. Probabilistic corruption radar detects 0.001% corruption with 99.99% confidence in <1s
+  32. Forensic necromancy recovers ≥95% of non-overwritten data from destroyed VDE
+  33. Portable export produces valid standalone .dwvd loadable by any DW engine
+  34. TPM hardware binding prevents .dwvd read on non-bound hardware within 1 mount attempt
+  35. Entropy panic fork triggers within 500ms of sustained ransomware-pattern detection
+  36. Preamble detection: VDE engine correctly identifies DWVD-BOOT signature vs legacy DWVD and mounts Block 0 from vde_offset in both cases
+  37. SPDK bare-metal I/O: SpdkBlockDevice achieves ≤1μs read latency on NVMe after vfio-pci handoff; transparent fallback to OS block device on host OS
+  38. NativeAOT DW Runtime boots to VDE mount in <3s on bare-metal NVMe
+  39. Composition profiles produce correct preamble size (server-full ≤50MB, embedded-minimal ≤10MB)
+  40. Preamble integrity: any byte-level corruption in preamble detected and rejected before execution (BLAKE3 checksum, fail-closed)
+  41. Format-native observability: VDE Health Summary field accurate after 1M mixed read/write operations; RSTA counters increment correctly per-region; Block Heat Map identifies hottest 5% of extents within 60s of skewed workload
+  42. Format-native QoS: Background (class 0) I/O yields to Realtime (class 7) I/O within 1ms; TenantId isolation prevents cross-tenant QoS escalation; deadline hints reduce tail latency P99 by ≥30% for latency-sensitive workloads
+  43. Online resize: VDE grows from 1TB to 2TB atomically with zero downtime; OPJR journal entry survives crash mid-resize and resumes correctly on remount
+  44. Online RAID migration: VDE migrates from Mirror to EC_4_2 online while serving reads/writes; no data loss; migration completes within 2x write-amplification budget
+  45. Online encryption: VDE encrypts in-place from unencrypted to AES-256-GCM without downtime; progress survives crash and resumes; encrypted and plaintext extents coexist during migration
+  46. Format-native DR: failover from Primary to Secondary completes within 5s of Primary failure; SplitBrain fencing rejects stale Primary within 1 epoch; Recovery Bookmarks allow point-in-time restore to any of 8 saved checkpoints
+  47. Backup Manifest checksum valid after 10M write operations; manifest survives single-block corruption and triggers rebuild from WAL
+  48. Recovery Point Markers enable full VDE reconstruction from a backup manifest + WAL replay to within 1 epoch of failure point
+  49. DirectFileBlockDevice achieves equivalent throughput to current file I/O path; BlockDeviceFactory selects correct implementation on Linux, Windows, macOS, FreeBSD without configuration
+  50. WindowsOverlappedBlockDevice: IOCP-based I/O achieves ≥2x throughput vs synchronous FileStream on Windows 10; IoRingBlockDevice achieves additional ≥20% improvement on Windows 11+
+  51. VDE mounts as native drive on Windows (WinFsp), Linux (FUSE3), macOS (macFUSE), FreeBSD (fusefs): read/write/readdir/stat operations match VDE inode semantics
+  52. Mounted VDE read throughput ≥80% of direct IBlockDevice throughput for sequential 1MB reads (FUSE passthrough mode on Linux 6.9+)
+  53. All 124 format-bakeable features have registered ModuleId bits and FeatureFlags; FormatConstants.DefinedModules reflects full set
+  54. InodeExtent expanded to 32B with ExpectedHash:16; old 24B extents read transparently; new writes always 32B
+  55. ModuleManifest expanded to uint64; backward-compatible with uint32 VDEs (upper 32 bits default zero)
+  56. VDE write pipeline: 7-stage write with all 33 modules active completes within 2x the latency of a raw IBlockDevice.WriteAsync for 4KB blocks; disabled modules add zero measurable latency
+  57. VDE read pipeline: 6-stage read with ARC cache hit returns within 10μs for metadata-only queries; cold read returns within 1.5x raw IBlockDevice latency
+  58. Full-stack E2E: write→read roundtrip with all 52 plugins and all 124 format features active produces byte-identical data with complete RichMetadata; background jobs do not interfere with foreground I/O (QoS enforced)
+**Plans**: 68 plans
 
 Plans:
 - [ ] 87-01-PLAN.md -- Allocation groups + descriptor table: AllocationGroup with per-group bitmap/lock/policy, AllocationGroupDescriptorTable in BMAP region, first-fit/best-fit (VOPT-01, VOPT-02)
@@ -2055,6 +2104,59 @@ Plans:
 - [ ] 87-13-PLAN.md -- Hierarchical checksums: HierarchicalChecksumTree (XxHash64 + CRC32C + Merkle root), MerkleIntegrityVerifier with binary-search corruption localization (VOPT-25)
 - [ ] 87-14-PLAN.md -- Extent-aware CoW + replication delta: ExtentAwareCowManager (extent-level refcounting), ExtentDeltaReplicator (extent-granularity delta shipping) (VOPT-26, VOPT-27)
 - [ ] 87-15-PLAN.md -- Online defragmentation: DefragmentationPolicy, OnlineDefragmenter with I/O budgeting, WAL-journaled crash safety, free extent merging (VOPT-28)
+- [ ] 87-16-PLAN.md -- Thread-affinity sharded WAL: N WAL shards for N CPU cores, per-core lock-free ring buffer mapped 1:1 to io_uring submission queues, parallel shard flush, Shard 0 commit barrier referencing all shard LSNs, multi-shard recovery replay with barrier reconciliation (VOPT-29)
+- [ ] 87-17-PLAN.md -- Epoch-batched Merkle updates: background Merkle root computation at configurable interval (default 5s) decoupled from hot write path, WAL-replay recovery for crash window, configurable batch interval SLA (VOPT-30)
+- [ ] 87-18-PLAN.md -- Hierarchical metaslab allocator: single bitmap <128MB, flat allocation groups 128MB–1TB, hierarchical metaslab trees 1TB+ (Zones → Regions → AGs), lazy bitmap loading (active zones only), size-class segregated allocators (small/medium/large extents) (VOPT-31)
+- [ ] 87-19-PLAN.md -- Vacuum and epoch-based GC: MVCC dead version reclamation via epoch-based reader tracking, configurable SLA lease timeout (default 300s), EpochExpiredException for stale readers, long-running read snapshot materialization to temp VDE, WORM object exemption, vacuum metrics (dead space ratio, reclaim rate, oldest living epoch) (VOPT-32)
+- [ ] 87-20-PLAN.md -- Cryptographic Ephemerality: EKEY inode module (EphemeralKeyID:16, TTL_Epoch:8, KeyRingSlot:4, Flags:4), volatile key ring interface (IVolatileKeyRing with RAM-only and TPM-sealed backends), TTL reaper in Background Vacuum, O(1) crypto-shred by key deletion, VOLATILE_KEYRING_ACTIVE feature flag (VOPT-33)
+- [ ] 87-21-PLAN.md -- Epoch-to-ZNS hardware symbiosis: ZNSM region type (ZnsZoneMapRegion), Epoch→Zone 1:1 mapping, ZNS detection via NVMe Identify Namespace at mount, sequential-zone allocation mode, ZNS_ZONE_RESET on dead epochs, ZNS_AWARE feature flag, fallback to standard NVMe when ZNS unavailable (VOPT-34)
+- [ ] 87-22-PLAN.md -- WAL streaming (filesystem as Kafka): WALS region type (WalSubscriberCursorTable), SubscriberCursor format (32B: SubscriberID:8, LastEpoch:8, LastSequence:8, Flags:8), mmap/Span<T> zero-copy read interface, SUBSCRIBE flag on WAL region directory entry, per-subscriber ACLs via Policy Engine authority chain, WAL_STREAMING_ACTIVE feature flag (VOPT-35)
+- [ ] 87-23-PLAN.md -- Sub-block delta extents: DELT inode module (MaxDeltaDepth:2, CurrentDepth:2, CompactionPolicy:4), DELTA extent flag type, VCDIFF/bsdiff binary patch generation on <10% block modification, delta chain read reconstruction, Background Vacuum auto-compaction when CurrentDepth > MaxDeltaDepth, DELTA_EXTENTS_ACTIVE feature flag (VOPT-36)
+- [ ] 87-24-PLAN.md -- Smart Extents (WASM predicate pushdown): CPSH inode module (WasmPredicateOffset:8, PredicateLen:4, PredicateFlags:4, InlinePredicate:32), io_uring filtered read path with WASM execution after DMA, NVMe vendor command path for computational drives, COMPUTE_PUSHDOWN_ACTIVE feature flag, integration with existing ComputeCodeCache region (VOPT-37)
+- [ ] 87-25-PLAN.md -- Polymorphic RAID (per-inode erasure coding): 3-bit RAID topology in extent Flags field (Standard/Mirror/EC_2_1/EC_4_2/EC_8_3), extended RAID inode module (Scheme:1, DataShards:1, ParityShards:1, DeviceMap:29), AVX-512 Reed-Solomon parity calculation, per-extent reconstruction path, integration with UltimateRAID plugin strategies (VOPT-38); includes radioactive parity decay policy: Background Vacuum degrades RAID level of cold extents (configurable epoch delta threshold); WORM-exempt, compliance-exempt, Policy Vault opt-in only (VOPT-60)
+- [ ] 87-26-PLAN.md -- Spatiotemporal 4D extent addressing: STEX inode module (CoordinateSystem:2, Precision:2, HilbertOrder:2), SPATIOTEMPORAL extent flag, 6×32B → 3×64B extent reinterpretation [Geohash:16][TimeStart:8][TimeEnd:8][StartBlock:8][BlockCount:4][Flags:4][ExpectedHash:16], Hilbert curve spatial clustering, io_uring bounding box query path, SPATIOTEMPORAL_ACTIVE feature flag (VOPT-39)
+- [ ] 87-27-PLAN.md -- GDPR Tombstone Engine: TombstonePass in Background Vacuum, TombstoneProofRecord struct (BLAKE3(zeros || timestamp) in ExpectedHash:16), auditor verification API, delta chain flattening before tombstoning (DELT interaction) (VOPT-40) [Home: SDK VirtualDiskEngine.Compliance + UltimateDataProtection plugin]
+- [ ] 87-28-PLAN.md -- Quorum-Sealed Write Path: allocation-free FROST verifier using Span<T> + stackalloc (NOT BouncyCastle), 2-round quorum collection with async timeout, QuorumDegradePolicy (REJECT/ACCEPT_UNSIGNED/QUEUE_FOR_SEALING), 79-byte overflow inode storage, ReplicationGeneration in signed message (VOPT-42) [Home: SDK VirtualDiskEngine.Federation + UltimateKeyManagement plugin]
+- [ ] 87-29-PLAN.md -- Semantic Wear-Leveling Allocator: TTL-hint-aware AllocationGroup policy, temperature classification (Hot/Warm/Cold/Frozen), gate (SWLV OFF when ZNS_AWARE set), background Vacuum group-level reclamation (VOPT-41) [Home: SDK VirtualDiskEngine.Allocation]
+- [ ] 87-30-PLAN.md -- Content-Addressable Extent Dedup: background dedup scanner (reads only extent pointers, not data), hash-to-extent index (in-memory or Intelligence Cache), duplicate verification read + SHARED_COW conversion, SNAP refcount management (VOPT-46); includes cross-tenant convergent encryption mode: hash-of-plaintext as encryption key enables multi-tenant dedup via identical ciphertext; server-aided MLE default with pure convergent opt-in (VOPT-59) [Home: SDK VirtualDiskEngine.Dedup + UltimateCompression plugin]
+- [ ] 87-31-PLAN.md -- Instant Clone Engine: O(metadata) clone (inode copy + SHARED_COW flag + SNAP refcount), CoW split logic on write to cloned extent, subtree clone (directory-level) (VOPT-47) [Home: SDK VirtualDiskEngine.Clone]
+- [ ] 87-32-PLAN.md -- Epoch-Gated Lazy Deletion: retention policy → epoch boundary mapping, OldestActiveEpoch advancement API, Vacuum epoch-scan reclamation (VOPT-49) [Home: SDK VirtualDiskEngine.Retention]
+- [ ] 87-33-PLAN.md -- Heat-Driven Allocation Tiering: hot/cold Data Region shards via ShardId, background migration based on HeatScore threshold, multi-device awareness (NVMe hot shard, HDD cold shard) (VOPT-51) [Home: SDK VirtualDiskEngine.Allocation + UltimateStorage plugin]
+- [ ] 87-34-PLAN.md -- Temporal Point Query Engine: epoch-indexed extent resolver, TRLR backward walk from CurrentEpoch to target, historical extent map reconstruction, API ReadAtEpoch(inodeId, epoch) → Stream (VOPT-44); includes O(log N) binary search bisection optimization: sorted epoch-to-hash index (10M epochs × 24B = 240MB) enables finding exact tampered transaction in ~23 lookups without reading data blocks (VOPT-58) [Home: SDK VirtualDiskEngine.Query]
+- [ ] 87-35-PLAN.md -- Metadata-Only Cold Analytics: Inode Table sequential scanner, TRLR region aggregate statistics, Tag Index analytics, dashboard-compatible output (counts, histograms, temporal distributions) (VOPT-45) [Home: SDK VirtualDiskEngine.Analytics + UltimateIntelligence plugin]
+- [ ] 87-36-PLAN.md -- Inline Tag Predicate Scans: fixed-offset columnar scan over InlineTagArea (128B at inode offset 308), SIMD-vectorized predicate evaluation (optional AVX-512), fallback to Tag Index B+-tree for large VDEs (VOPT-54) [Home: UltimateIntelligence plugin]
+- [ ] 87-37-PLAN.md -- Probabilistic Corruption Radar: statistical TRLR sampling engine, configurable confidence level (N samples for target probability), fast health check API HealthCheck(confidence) → (clean, corrupt, probability) (VOPT-48) [Home: SDK VirtualDiskEngine.Diagnostics]
+- [ ] 87-38-PLAN.md -- Cross-Extent Integrity Chain: 3-level hash verifier (XxHash64 → BLAKE3 → SHA-256), block-swap attack detection at INTG Level 0-1, on-demand verification API (VOPT-50) [Home: SDK VirtualDiskEngine.Integrity]
+- [ ] 87-39-PLAN.md -- Extent-Level Integrity Caching: in-memory cache ({ExtentStartBlock → (LastVerifiedEpoch, ExpectedHash)}), TRLR GenerationNumber check for cache invalidation, configurable cache size and eviction policy (VOPT-52) [Home: SDK VirtualDiskEngine.Cache]
+- [ ] 87-40-PLAN.md -- Forensic Necromancy Recovery Tool: TRLR stride-scan at 256-block intervals, GenerationNumber + BlockTypeTag based ordering, Inode Table reconstruction from INOD-tagged blocks, partial TRLR corruption tolerance (VOPT-43) [Home: SDK VirtualDiskEngine.Recovery]
+- [ ] 87-41-PLAN.md -- Self-Describing Portable Export: inode predicate selection (tag, time range, classification), minimal Superblock + Region Directory generation, data block copy with extent remapping, TRLR regeneration for exported subset, compliance passport + encryption key slot preservation, output standalone .dwvd file (VOPT-53) [Home: SDK VirtualDiskEngine.Export]
+- [ ] 87-42-PLAN.md -- Progressive Feature A/B Testing: per-inode module activation policy engine, percentage-based/tag-match/time-based activation rules, metrics collection for A/B comparison, lazy migration on read (VOPT-55) [Home: SDK VirtualDiskEngine.FeatureGates]
+- [ ] 87-43-PLAN.md -- Proof of Physical Custody (TPM Hardware Binding): TPM PCR read integration via EKEY Tpm2Provider, mount-time MerkleRootHash XOR with PCR values, in-memory ExpectedHash recomputation with hardware anchor, Policy Vault HARDWARE_BINDING_ACTIVE flag, vTPM migration support for VM environments, escrow recovery key for backup scenarios (VOPT-56) [Home: SDK VirtualDiskEngine.Security + EKEY module]
+- [ ] 87-44-PLAN.md -- Entropy-Triggered Panic Fork (Ransomware Circuit Breaker): Shannon entropy feed from UltimateCompression per-block calculations, WAL write pattern anomaly detector (sustained high-entropy burst detection), configurable threshold and consecutive-block count, Panic Fork: create immutable SNAP snapshot + freeze OldestActiveEpoch, false-positive mitigation: whitelist encrypted upload patterns, manual override and alert integration (VOPT-57) [Home: SDK VirtualDiskEngine.Protection + UltimateCompression + SNAP module]
+- [ ] 87-45-PLAN.md -- Always-Bootable Preamble: PreambleHeader struct (64B, magic DWVD-BOOT, vde_offset, kernel/spdk/runtime offsets+sizes, BLAKE3 checksum), VDE engine open-sequence detection (DWVD-BOOT vs legacy DWVD), PreambleReader/PreambleWriter, `dw preamble update` CLI command, tool compatibility layer (check both signatures), unit tests for detection logic (VOPT-61, VOPT-62) [Home: SDK VirtualDiskEngine.Format + DataWarehouse.CLI]
+- [ ] 87-46-PLAN.md -- SPDK Integration (SpdkBlockDevice): SpdkBlockDevice implementing IBlockDevice via P/Invoke to libspdk, vfio-pci controller handoff sequence, SpdkDmaAllocator for 4 KiB-aligned DMA buffers, NvmeIdentifyNamespace probe at open for ZNS and sector size, SpdkBlockDeviceFactory (auto-selects SPDK vs OS block device), integration with existing IArcCache and io_uring paths (VOPT-63) [Home: SDK VirtualDiskEngine.IO + UltimateStorage plugin]
+- [ ] 87-47-PLAN.md -- Stripped Linux kernel build pipeline: kernel config for minimal footprint (USB HID, e1000e/ixgbe NIC, framebuffer console, vfio-pci module, no SATA/SCSI/sound/wireless), reproducible build via Nix flake, compressed bzImage target <8 MB, kernel version pinning + CVE monitoring hook, CI validation that kernel boots in QEMU within 2s (VOPT-64) [Home: Build/DevOps — not a C# plugin, produces binary artifact for preamble]
+- [ ] 87-48-PLAN.md -- NativeAOT DW Runtime packaging: single-binary publish (dotnet publish -r linux-x64 -p:PublishAot=true) of DataWarehouse.Kernel + selected plugins + CLI, startup sequence reads PreambleHeader.VdeOffset and mounts VDE directly, SPDK path selection at startup (bare-metal: SpdkBlockDevice, host-OS: standard block device), binary size target <25 MB stripped, boot-to-VDE-mount latency target <3s on NVMe (VOPT-65) [Home: DataWarehouse.Kernel + DataWarehouse.CLI]
+- [ ] 87-49-PLAN.md -- Composition flag updates for preamble content: CompositionProfile preamble section (KernelDriverProfile, SpdkTransport, PluginSubset, IncludeCli, IncludeGui), PreambleComposer assembles and writes preamble from profile, `dw volume create --profile <name>` applies profile, pre-defined profiles: server-full, server-headless, embedded-minimal, airgap-readonly, VM-nopreamble-stub (VOPT-66) [Home: DataWarehouse.Kernel + DataWarehouse.CLI + UltimateStorage plugin]
+- [ ] 87-50-PLAN.md -- Preamble integrity and update: BLAKE3 checksum verification on every open (fail-closed if mismatch), Ed25519 signing of preamble (Flags bit 1), `dw preamble verify` command, `dw preamble update` replaces preamble content without touching vde_offset or any VDE blocks, preamble update is atomic (write new preamble to temp file, fsync, rename), preamble version migration for format upgrades (VOPT-67) [Home: SDK VirtualDiskEngine.Format + DataWarehouse.CLI + UltimateKeyManagement plugin]
+- [ ] 87-51-PLAN.md -- Format-native observability: VdeHealthSummary (64B at Superblock Block 0 offset 0x130: TotalReads/TotalWrites/ReadErrors/WriteErrors/LastScrubEpoch/HealthFlags), RSTA block type (per-region I/O counters, 64B per region, written on region close or epoch boundary), Block Heat Map (4B HeatScore entry per extent in IntelligenceCache, updated by ARC on cache hit/miss), OBSERVABILITY_ENHANCED feature flag, `dw health` CLI command reads all three sources (VOPT-68, VOPT-69, VOPT-70) [Home: SDK VirtualDiskEngine.Observability]
+- [ ] 87-52-PLAN.md -- Format-native QoS: QoS class 3-bit field in InodeFlags bits 5-7 (8 levels: 0=Background, 1=BestEffort, 2=Normal, 3=Elevated, 4=High, 5=Critical, 6=Urgent, 7=Realtime), TenantId 2B field in inode module area (requires QOS module bit 27 in ModuleManifest), QoS Policy records 64B in Policy Vault (type tag 0x0003: PolicyVersion:2, QosClass:1, MaxIopsPerTenant:4, MaxBytesPerSecond:8, BurstBudget:4, Flags:2, Reserved:43), I/O Deadline Hints 4-bit field in extent Flags bits 12-15 (12 tiers: 0=None, 1=10μs, 2=50μs, 3=100μs, 4=500μs, 5=1ms, 6=5ms, 7=10ms, 8=50ms, 9=100ms, 10=500ms, 11=1s), I/O scheduler reads deadline tier and QoS class to prioritize I/O submission queue ordering, QOS_ACTIVE feature flag (VOPT-71, VOPT-72, VOPT-73) [Home: SDK VirtualDiskEngine.QoS + UltimateStorage plugin]
+- [ ] 87-53-PLAN.md -- Operation Journal (OPJR) region + online resize + online RAID migration: OPJR region (magic "OPJRNL\0\0", 64B header with EntryCount:8/HeadCursor:8/TailCursor:8/Flags:8/Checksum:8), 128B OPJR entry format (OperationType:1, State:1, Flags:2, OperationId:8, StartEpoch:8, TargetEpoch:8, Progress:8, Payload:92), 10 operation types (Resize/RaidMigration/EncryptionMigration/DefragSweep/TierMigration/SnapshotCompact/KeyRotation/VacuumFull/RegionReclaim/IndexRebuild), 6-state machine (Queued→InProgress→Paused→Completed/Failed/Cancelled), online resize fields in Superblock at 0x170 (PendingTotalBlocks:8B + ResizeJournalOperationId:8B), online RAID migration per-extent state (6-state machine embedded in extent flags: Pending/HashingSource/WritingParity/VerifyingParity/CommittingSwap/Done), ONLINE_OPS_ACTIVE feature flag (VOPT-74, VOPT-75) [Home: SDK VirtualDiskEngine.OnlineOps]
+- [ ] 87-54-PLAN.md -- Online encryption + online defrag + online tier migration: online encryption fields in Superblock at 0x180 (EncryptionMigrationKeySlot:4B + EncryptionMigrationProgress:4B, progress = extents encrypted / total extents), encrypted and plaintext extents coexist during migration (inode tracks per-extent encrypted flag), online defrag as OPJR operation type (DefragSweep: reads fragmented allocation groups, rewrites extents contiguously, updates extent tree, journals each move), online tier migration (TierMigration: moves extents between NVMe/SSD/HDD tiers based on HeatScore thresholds, extent moves are OPJR-journaled for crash safety), all online operations resume from OPJR after crash (VOPT-76) [Home: SDK VirtualDiskEngine.OnlineOps]
+- [ ] 87-55-PLAN.md -- Format-native disaster recovery: Recovery Point Markers as 48B WAL records (type RPMK: Epoch:8, WalSequence:8, MetadataMerkleRoot:32), Failover State 32B in Superblock at 0x188 (FailoverRole:1, Flags:1, PeerCount:2, FailoverEpoch:8, PrimaryNodeUuid:16, LastFailoverUtcTicks:8), failover state machine (Standalone/Secondary/Promoting/Primary/Demoting), SplitBrain handling via fencing epoch (any Primary claiming older epoch is rejected), Backup Manifest 128B in Block 2 (magic "BKUPMNFT": ManifestVersion:2, BackupEpoch:8, WalSequence:8, MetadataMerkleRoot:32, DataMerkleRoot:32, BackupNodeUuid:16, BackupUtcTicks:8, Checksum:8, Reserved:6), Recovery Bookmarks 8 slots × 64B in Block 2 (BookmarkEpoch:8, WalSequence:8, Label:32, Checksum:8, Reserved:8), DR_ACTIVE feature flag, `dw dr failover`, `dw dr status`, `dw dr bookmark save/restore` CLI commands (VOPT-77, VOPT-78) [Home: SDK VirtualDiskEngine.DR]
+- [ ] 87-56-PLAN.md -- DirectFileBlockDevice + BlockDeviceFactory (P0 — all platforms): IBlockDevice interface (ReadAsync/WriteAsync/FlushAsync/GetLength/BlockSize/Dispose), IBatchBlockDevice (ReadBatchAsync/WriteBatchAsync for scatter-gather), IDirectBlockDevice (O_DIRECT/FILE_FLAG_NO_BUFFERING bypass), FileBlockDevice (buffered reference impl, all platforms), DirectFileBlockDevice (O_DIRECT on Linux/macOS, FILE_FLAG_NO_BUFFERING on Windows, AlignedMemoryAllocator for 4KB-aligned buffers), BlockDeviceFactory 7-step auto-detection cascade (SPDK→IoRing→IoUring→kqueue→IOCP→DirectFile→File), factory registered in DI container, unit + integration tests on all three OS (VOPT-79) [Home: SDK VirtualDiskEngine.IO]
+- [ ] 87-57-PLAN.md -- WindowsOverlappedBlockDevice + IoRingBlockDevice (P0/P1 — Windows): WindowsOverlappedBlockDevice (IOCP, FILE_FLAG_OVERLAPPED + FILE_FLAG_NO_BUFFERING, manual OVERLAPPED structs, completion port polling thread pool, batch coalescing), IoRingBlockDevice (Windows 11+ IoRing API via P/Invoke to ntdll IoRingCreateIoRing/IoRingPostIoCompletion, fixed-buffer registration, SQE/CQE model mirrors io_uring), both implement IBatchBlockDevice, fallback detection (IoRing unavailable → IOCP → DirectFile), benchmarks: IOCP ≥2x FileStream, IoRing ≥20% over IOCP (VOPT-80) [Home: SDK VirtualDiskEngine.IO.Windows]
+- [ ] 87-58-PLAN.md -- KqueueBlockDevice for macOS + FreeBSD (P1): KqueueBlockDevice implementing IBatchBlockDevice via kqueue + kevent (EVFILT_AIO), aio_read/aio_write POSIX AIO submission, completion via kevent batch poll, F_NOCACHE fcntl for O_DIRECT equivalent on macOS, aligned buffer requirement (4KB), fallback to DirectFileBlockDevice when kqueue unavailable, tested on macOS 14+ and FreeBSD 14+, latency target ≤5μs for 4KB reads on NVMe (VOPT-81) [Home: SDK VirtualDiskEngine.IO.Unix]
+- [ ] 87-59-PLAN.md -- SpdkBlockDevice integration (P2 — bare metal): SpdkBlockDevice implementing IBlockDevice + IBatchBlockDevice via P/Invoke to libspdk (spdk_nvme_ns_cmd_read/write, spdk_nvme_qpair), vfio-pci NVMe controller handoff sequence, SpdkDmaAllocator for 4KiB-aligned DMA buffers (spdk_dma_malloc/free), NvmeIdentifyNamespace probe at open for ZNS support and optimal sector size, SpdkBlockDeviceFactory integration (highest priority in BlockDeviceFactory cascade after bare-metal detection), zero-copy path from SPDK DMA buffer directly to caller's aligned buffer, integration tests require actual NVMe or QEMU NVMe emulation (VOPT-63, refined) [Home: SDK VirtualDiskEngine.IO.Spdk + UltimateStorage plugin]
+- [ ] 87-60-PLAN.md -- RawPartitionBlockDevice + AlignedMemoryAllocator (P2 — all platforms): RawPartitionBlockDevice for direct partition I/O bypassing filesystem entirely (Linux: open /dev/nvme0n1p1 with O_DIRECT, Windows: \\.\PhysicalDrive0 with IOCTL_DISK_GET_DRIVE_GEOMETRY, macOS: /dev/rdiskN), partition geometry detection (sector size, partition size, alignment), AlignedMemoryAllocator (native alloc with alignment guarantee: posix_memalign on Linux/macOS, _aligned_malloc on Windows), IMemoryAllocator interface for DI injection, AlignedMemoryPool for reuse of fixed-size buffers, raw partition safety: partition must contain DWVD magic before read/write proceeds (fail-closed), `dw volume mount --raw-partition /dev/nvme0n1p2` CLI (VOPT-82) [Home: SDK VirtualDiskEngine.IO + DataWarehouse.CLI]
+- [ ] 87-61-PLAN.md -- VDE Mount Provider Interface + VdeFilesystemAdapter: IVdeMountProvider interface (MountAsync/UnmountAsync/ListMounts), VdeFilesystemAdapter translating FUSE/WinFsp callbacks to VDE inode operations (Lookup→InodeTable B-tree, Read→extent resolver + IBlockDevice.ReadAsync, Write→allocator + WAL, Getattr→inode metadata, Readdir→directory extent scan), ARC cache integration for hot inodes, concurrent FUSE thread safety via IBlockDevice concurrency (VOPT-83) [Home: SDK VirtualDiskEngine.Mount]
+- [ ] 87-62-PLAN.md -- WinFspMountProvider (Windows): WinFsp.Net managed bindings integration, IFileSystemHost callbacks (Open/Close/Read/Write/GetFileInfo/SetFileInfo/ReadDirectory/Cleanup/SetDelete), drive letter + UNC path mounting, WinFsp service lifecycle, `dw mount W: volume.dwvd` CLI, auto-unmount on VDE close (VOPT-84) [Home: Plugins/DataWarehouse.Plugins.UltimateFilesystem + SDK VirtualDiskEngine.Mount.Windows]
+- [ ] 87-63-PLAN.md -- Fuse3LowLevelMountProvider (Linux/FreeBSD): P/Invoke to libfuse3 (fuse_lowlevel_ops struct), low-level inode-based API (lookup/getattr/readdir/open/read/write/release/unlink/mkdir/rmdir), fuse_session lifecycle, FUSE passthrough mode on kernel 6.9+, `dw mount /mnt/vde volume.dwvd` CLI (VOPT-85) [Home: Plugins/DataWarehouse.Plugins.UltimateFilesystem + SDK VirtualDiskEngine.Mount.Linux]
+- [ ] 87-64-PLAN.md -- MacFuseMountProvider (macOS): macFUSE 4.x via libfuse3 compatibility layer, F_NOCACHE for O_DIRECT equivalent, Spotlight metadata provider for indexed search, auto-eject on VDE close, `dw mount /Volumes/VDE volume.dwvd` CLI (VOPT-86) [Home: Plugins/DataWarehouse.Plugins.UltimateFilesystem + SDK VirtualDiskEngine.Mount.macOS]
+- [ ] 87-65-PLAN.md -- 124 Format-Bakeable Feature Module Registration: Expand ModuleId enum to bits 19-33 (CPSH through WLCK), expand ModuleManifest to uint64, register all new FeatureFlags (QOS_ACTIVE, ONLINE_OPS_ACTIVE, DR_ACTIVE, OBSERVABILITY_ENHANCED, plus 9 more), expand ExtentFlags to full 32-bit with IS_POISON/SPATIOTEMPORAL/DELTA/SHARED_COW/Dict_ID, update FormatConstants.DefinedModules (VOPT-87) [Home: SDK VirtualDiskEngine.Format]
+- [ ] 87-66-PLAN.md -- VDE I/O Pipeline Framework: IVdeWritePipeline and IVdeReadPipeline interfaces, IPipelineStage abstraction with ModuleManifest-gated execution, 7-stage write pipeline (InodeResolver → ModulePopulator → TagIndexer → DataTransformer → ExtentAllocator → IntegrityCalculator → WalBlockWriter), 6-stage read pipeline (InodeLookup → AccessControl → ExtentResolver → BlockReaderIntegrity → ModuleExtractor → PostReadUpdater), stage registration via DI container, pipeline metrics (per-stage latency, skip-rate), zero-overhead disabled modules (VOPT-88) [Home: SDK VirtualDiskEngine.Pipeline]
+- [ ] 87-67-PLAN.md -- Module Populator + Module Extractor stages: IModuleFieldWriter and IModuleFieldReader interfaces, per-module write/read handlers for all 33 modules (EKEY/QOS/REPL/CMPL/LNGE/VECQ/ANCR/MACR/WLCK/GOVN/QRST/COMP/RESL/IOTD/SRCH/STRM/XREF/AUDT/DQAL/WKFL/FDRN/MDTY/SCHM/PRIV/INTL/RLMT/HEAL/DPLY/MESH/CPSH/DELT/ZNSM/STEX), RichReadResult aggregate type, handler auto-discovery from ModuleManifest bits, batch module field serialization/deserialization (VOPT-89) [Home: SDK VirtualDiskEngine.Pipeline.Modules]
+- [ ] 87-68-PLAN.md -- Full-stack E2E pipeline integration: Kernel MessageBus phase orchestration (7 write phases, 5 read phases), plugin-to-pipeline-stage registration API, background job scheduler with 4-tier priority (Continuous/Periodic/Scheduled/LongRunning), background job coordination (prevent conflicting operations), pipeline health dashboard integration with UniversalObservability, E2E pipeline integration tests covering write→read→verify roundtrip with all 124 features active (VOPT-90) [Home: DataWarehouse.Kernel + SDK VirtualDiskEngine.Pipeline]
 
 Wave structure:
 ```
@@ -2063,6 +2165,22 @@ Wave 2: 87-04 (Extent tree) + 87-05 (Sub-block packing) + 87-06 (MVCC core) -- d
 Wave 3: 87-07 (MVCC GC+isolation) + 87-08 (SQL OLTP) + 87-09 (Columnar+zone maps) -- depends on Wave 2
 Wave 4: 87-10 (SIMD+spill+pushdown) + 87-11 (Tag index) + 87-12 (Per-extent crypto) -- depends on Wave 3
 Wave 5: 87-13 (Checksums+Merkle) + 87-14 (CoW+replication) + 87-15 (Defrag) -- depends on Wave 4
+Wave 6: 87-16 (Sharded WAL) + 87-17 (Epoch Merkle) + 87-18 (Metaslab) + 87-19 (Vacuum GC) -- parallel, depends on Wave 5
+Wave 7: 87-20 (Crypto-Ephemerality) + 87-21 (ZNS Symbiosis) + 87-22 (WAL Streaming) + 87-23 (Delta Extents) -- parallel, depends on Wave 6 (WAL shards + Vacuum must exist first)
+Wave 8: 87-24 (Smart Extents/WASM pushdown) + 87-25 (Polymorphic RAID) + 87-26 (4D Extents) -- parallel, depends on Wave 7 + ComputeCodeCache region
+Wave 9: 87-27 (GDPR Tombstone) + 87-28 (Quorum-Sealed Write) -- parallel, depends on Wave 6 (Vacuum + WAL shards must exist)
+Wave 10: 87-29 (Semantic Wear-Leveling) + 87-30 (Content-Addressable Dedup) + 87-31 (Instant Clone) + 87-32 (Epoch-Gated Deletion) + 87-33 (Heat-Driven Tiering) -- parallel, depends on Wave 6
+Wave 11: 87-34 (Temporal Point Query) + 87-35 (Metadata-Only Analytics) + 87-36 (Inline Tag Scans) -- parallel, depends on Wave 8
+Wave 12: 87-37 (Probabilistic Corruption Radar) + 87-38 (Cross-Extent Integrity Chain) + 87-39 (Extent-Level Integrity Cache) + 87-40 (Forensic Necromancy) -- parallel, depends on Wave 9
+Wave 13: 87-41 (Portable Export) + 87-42 (Progressive Feature A/B Testing) -- parallel, depends on Wave 11
+Wave 14: 87-43 (TPM Hardware Binding) + 87-44 (Ransomware Circuit Breaker) -- parallel, depends on Wave 9
+Wave 15: 87-45 (Preamble spec + detection) + 87-46 (SPDK SpdkBlockDevice) + 87-47 (Linux kernel build) + 87-48 (NativeAOT packaging) + 87-49 (Composition flags) + 87-50 (Preamble integrity) -- parallel, no intra-phase dependencies; 87-48 depends on 87-47 artifact
+Wave 16: 87-51 (Format-native observability) + 87-52 (Format-native QoS) + 87-53 (OPJR region + online resize + RAID migration) + 87-54 (Online encryption + defrag + tier migration) + 87-55 (Format-native DR) + 87-56 (DirectFileBlockDevice + BlockDeviceFactory) + 87-57 (WindowsOverlappedBlockDevice + IoRingBlockDevice) + 87-58 (KqueueBlockDevice) + 87-59 (SpdkBlockDevice refined) + 87-60 (RawPartitionBlockDevice + AlignedMemoryAllocator) -- parallel; 87-51/52/53/54/55 depend on Wave 6 (sharded WAL) + Wave 5 (Merkle checksums); 87-56 must land before 87-57/87-58/87-59/87-60 (factory cascade); 87-57/87-58/87-59/87-60 parallel after 87-56
+Wave 17: 87-61 (Mount interface + adapter) -- foundational mount infra, no platform dependencies
+Wave 18: 87-62 (WinFsp) + 87-63 (FUSE3 Linux) + 87-64 (macFUSE) -- parallel, all depend on 87-61
+Wave 19: 87-65 (Module registration) -- depends on Wave 16 (format-native features must be spec'd before registration)
+Wave 20: 87-66 (Pipeline framework) + 87-67 (Module handlers) -- parallel, depends on Wave 19 (module registration must exist)
+Wave 21: 87-68 (E2E integration) -- depends on Wave 20 + all plugin implementations
 ```
 
 #### Phase 88: Dynamic Subsystem Scaling
@@ -2201,9 +2319,106 @@ Plans:
 - [ ] 91-04-PLAN.md -- Hot-spare management: automatic failover, background rebuild, I/O continuation, rebuild progress tracking, device-aware FreeExtent
 - [ ] 91-05-PLAN.md -- Dual RAID integration tests: device-level + data-level simultaneous operation, independent failure domain verification, VDE transparency test
 
+#### Phase 91.5: VDE v2.1 Format Completion
+**Goal**: Implement all remaining VDE v2.1 format features per the finalized spec (`v6.0-VDE-FORMAT-v2.0-SPEC.md`). This phase completes the 53 unexecuted plans from Phase 87 (87-16 through 87-68), covering format-level modules, core VDE internals, runtime features, operations, block device I/O layer, bootable preamble, mount providers, and I/O pipeline integration. The spec is the **sole source of truth** for all format-level decisions — all byte offsets, bit assignments, module placements, and block types match the spec exactly.
+**Depends on**: Phase 87 (VDE Scalable Internals — core format structures), Phase 91 (CompoundBlockDevice — device-level RAID for polymorphic RAID integration)
+**Requirements**: VOPT-29 through VOPT-90 (from Phase 87 original scope)
+
+**Spec Cross-Reference Notes:**
+- All 53 plans verified against `v6.0-VDE-FORMAT-v2.0-SPEC.md` — **ALL spec-compliant**
+- 3 plans have minor description discrepancies (updated offsets/approaches in implementation):
+  - 87-36: InlineTagArea is 176B at inode offset 320 (not 128B at 308 as in original plan)
+  - 87-52: QoS is in QOS module (overflow block) + extent flags bits 6-7 (not InodeFlags bits 5-7)
+  - 87-51: Only MLOG block type is in spec (not DLOG/TLOG); implementation limited to spec-defined types
+- v7.0 reserved features (SDUP bit 25, ZKPA bit 26) are NOT included — only v6.0 features
+- All format-level features gate on ModuleManifest bits per spec; zero overhead when off
+
+**Success Criteria** (what must be TRUE):
+  1. All 9 format-level data OS features implemented: CPSH (Smart Extents), EKEY (Crypto Ephemerality), WALS (WAL Streaming), Polymorphic RAID (per-inode), DELT (Delta Extents), ZNSM (ZNS Symbiosis), STEX (4D Spatiotemporal)
+  2. ModuleManifest expanded to uint64 with all v6.0 module bits registered per spec
+  3. Thread-affinity sharded WAL with N shards for N CPU cores, per-core lock-free ring buffers
+  4. Epoch-batched Merkle, hierarchical metaslab allocator, vacuum/GC all operational
+  5. 15 format-implicit runtime features implemented (TPQR, MCDA, CAED, ICLN, PCRD, EGLD, PFAB, CEIC, HDAG, ITPS, ELIC, SPSE, NECR, PPOC, ETPF)
+  6. OPJR online operations journal, Recovery Footer (AD-67), MLOG metrics region all functional
+  7. 5 platform block devices operational: DirectFile, Windows overlapped, IoRing, kqueue, SPDK
+  8. Bootable preamble (optional, INCOMPAT_HAS_PREAMBLE bit 8): PreambleHeader, detection logic, composition profiles
+  9. 3 mount providers: WinFsp (Windows), FUSE3 low-level (Linux), macFUSE (macOS)
+  10. VDE I/O Pipeline Framework with module populator/extractor stages, full E2E integration verified
+  11. Full solution builds with 0 errors, all format byte offsets match spec exactly
+**Plans**: 53 plans in 8 waves
+
+**Wave 1 — Format-Level Modules (8 plans, spec-defined module bits):**
+- [ ] 87-20-PLAN.md -- EKEY: Cryptographic Ephemerality (bit 20), volatile key ring, TTL reaper (VOPT-33)
+- [ ] 87-21-PLAN.md -- ZNSM: Epoch-to-ZNS hardware symbiosis (bit 23), ZnsZoneMapRegion (VOPT-34)
+- [ ] 87-22-PLAN.md -- WALS: WAL streaming pub/sub (bit 21), WalSubscriberCursorTable (VOPT-35)
+- [ ] 87-23-PLAN.md -- DELT: Sub-block delta extents (bit 22), VCDIFF patching, compaction (VOPT-36)
+- [ ] 87-24-PLAN.md -- CPSH: Smart Extents WASM pushdown (bit 19), io_uring filtered reads (VOPT-37)
+- [ ] 87-25-PLAN.md -- Polymorphic RAID: per-inode erasure coding via extent flag topology bits (VOPT-38+60)
+- [ ] 87-26-PLAN.md -- STEX: Spatiotemporal 4D extent addressing (bit 24), Hilbert curve clustering (VOPT-39)
+- [ ] 87-65-PLAN.md -- Module Registration: expand ModuleManifest to uint64, register bits 19-33, update FormatConstants (VOPT-87)
+
+**Wave 2 — Core VDE Internals (8 plans, algorithms and data structures):**
+- [ ] 87-16-PLAN.md -- Thread-affinity sharded WAL: N shards, lock-free ring buffers, io_uring 1:1 mapping (VOPT-29)
+- [ ] 87-17-PLAN.md -- Epoch-batched Merkle updates: background computation, configurable interval (VOPT-30)
+- [ ] 87-18-PLAN.md -- Hierarchical metaslab allocator: zones/regions/AGs, lazy bitmap loading (VOPT-31)
+- [ ] 87-19-PLAN.md -- Vacuum and epoch-based GC: MVCC dead version reclamation, SLA lease timeout (VOPT-32)
+- [ ] 87-27-PLAN.md -- GDPR Tombstone Engine: provable erasure, BLAKE3 deletion proofs, delta flattening (VOPT-40)
+- [ ] 87-28-PLAN.md -- Quorum-Sealed Write Path: FROST threshold signatures, 79B overflow (VOPT-42)
+- [ ] 87-29-PLAN.md -- Semantic Wear-Leveling Allocator: TTL-hint grouping, ZNS gate (VOPT-41)
+- [ ] 87-32-PLAN.md -- Epoch-Gated Lazy Deletion: retention-to-epoch mapping, vacuum scan (VOPT-49)
+
+**Wave 3 — Runtime Features (14 plans, no format changes needed):**
+- [ ] 87-30-PLAN.md -- Content-Addressable Extent Dedup: ExpectedHash matching, SHARED_COW (VOPT-46+59)
+- [ ] 87-31-PLAN.md -- Instant Clone Engine: O(metadata) clone, CoW split on write (VOPT-47)
+- [ ] 87-33-PLAN.md -- Heat-Driven Allocation Tiering: hot/cold shards via ShardId, background migration (VOPT-51)
+- [ ] 87-34-PLAN.md -- Temporal Point Query Engine: epoch-indexed extent resolver, O(log N) bisection (VOPT-44+58)
+- [ ] 87-35-PLAN.md -- Metadata-Only Cold Analytics: inode/TRLR/tag sequential scanners (VOPT-45)
+- [ ] 87-36-PLAN.md -- Inline Tag Predicate Scans: fixed-offset columnar scan (176B at offset 320 per spec), SIMD (VOPT-54)
+- [ ] 87-37-PLAN.md -- Probabilistic Corruption Radar: statistical TRLR sampling (VOPT-48)
+- [ ] 87-38-PLAN.md -- Cross-Extent Integrity Chain: 3-level hash verifier (VOPT-50)
+- [ ] 87-39-PLAN.md -- Extent-Level Integrity Caching: in-memory cache with generation tracking (VOPT-52)
+- [ ] 87-40-PLAN.md -- Forensic Necromancy Recovery Tool: TRLR stride-scan reconstruction (VOPT-43)
+- [ ] 87-41-PLAN.md -- Self-Describing Portable Export: predicate selection, standalone .dwvd output (VOPT-53)
+- [ ] 87-42-PLAN.md -- Progressive Feature A/B Testing: per-inode module activation policies (VOPT-55)
+- [ ] 87-43-PLAN.md -- Proof of Physical Custody: TPM PCR + MerkleRootHash binding (VOPT-56)
+- [ ] 87-44-PLAN.md -- Entropy-Triggered Panic Fork: Shannon entropy threshold, immutable snapshot (VOPT-57)
+
+**Wave 4 — Operations, QoS, Disaster Recovery (5 plans):**
+- [ ] 87-51-PLAN.md -- Format-native observability: MLOG metrics region (spec-defined block type only) (VOPT-68-70)
+- [ ] 87-52-PLAN.md -- Format-native QoS: QOS module in overflow block + extent flags bits 6-7 per spec (VOPT-71-73)
+- [ ] 87-53-PLAN.md -- OPJR operation journal + online resize/RAID migration (VOPT-74-75)
+- [ ] 87-54-PLAN.md -- Online encryption + defrag + tier migration (VOPT-76)
+- [ ] 87-55-PLAN.md -- Format-native disaster recovery: Recovery Footer (AD-67), RCVR block type (VOPT-77-78)
+
+**Wave 5 — Block Device I/O Layer (5 plans, platform-specific backends):**
+- [ ] 87-56-PLAN.md -- DirectFileBlockDevice + BlockDeviceFactory: cross-platform file I/O (VOPT-79)
+- [ ] 87-57-PLAN.md -- WindowsOverlappedBlockDevice + IoRingBlockDevice: Windows async I/O (VOPT-80)
+- [ ] 87-58-PLAN.md -- KqueueBlockDevice: macOS/FreeBSD kqueue + POSIX AIO (VOPT-81)
+- [ ] 87-59-PLAN.md -- SpdkBlockDevice: SPDK userspace NVMe via P/Invoke (VOPT-63 refined)
+- [ ] 87-60-PLAN.md -- RawPartitionBlockDevice + AlignedMemoryAllocator: direct partition I/O (VOPT-82)
+
+**Wave 6 — Bootable Preamble (6 plans, optional INCOMPAT_HAS_PREAMBLE):**
+- [ ] 87-45-PLAN.md -- PreambleHeader struct (64B), VDE detection logic, PreambleReader/Writer (VOPT-61+62)
+- [ ] 87-46-PLAN.md -- SPDK Integration: SpdkBlockDevice via P/Invoke, DMA allocator (VOPT-63)
+- [ ] 87-47-PLAN.md -- Stripped Linux kernel build pipeline: minimal bzImage <8MB (VOPT-64) [DevOps/build artifact]
+- [ ] 87-48-PLAN.md -- NativeAOT DW Runtime packaging: single-binary publish <25MB (VOPT-65) [DevOps/build artifact]
+- [ ] 87-49-PLAN.md -- Composition flag updates: profiles (server-full, embedded-minimal, airgap-readonly) (VOPT-66)
+- [ ] 87-50-PLAN.md -- Preamble integrity and update: BLAKE3 verification, `dw preamble update` CLI (VOPT-67)
+
+**Wave 7 — VDE Mount Providers (4 plans, FUSE integration):**
+- [ ] 87-61-PLAN.md -- VDE Mount Provider + VdeFilesystemAdapter: abstract mount API (VOPT-83)
+- [ ] 87-62-PLAN.md -- WinFspMountProvider: Windows WinFsp.Net bindings, drive letter mounting (VOPT-84)
+- [ ] 87-63-PLAN.md -- Fuse3LowLevelMountProvider: Linux libfuse3 P/Invoke, low-level inode API (VOPT-85)
+- [ ] 87-64-PLAN.md -- MacFuseMountProvider: macOS macFUSE 4.x, Spotlight metadata provider (VOPT-86)
+
+**Wave 8 — I/O Pipeline + Integration (3 plans, end-to-end verification):**
+- [ ] 87-66-PLAN.md -- VDE I/O Pipeline Framework: stage chain, context propagation (VOPT-88)
+- [ ] 87-67-PLAN.md -- Module Populator + Module Extractor stages: per-module read/write dispatch (VOPT-89)
+- [ ] 87-68-PLAN.md -- Full-stack E2E pipeline integration: all waves wired, format compliance verified (VOPT-90)
+
 #### Phase 92: VDE 2.0B Federation Router & Hierarchical Shard Catalog
 **Goal**: Multiple VDE 2.0A instances are federated into a single logical namespace (VDE 2.0B). A hierarchical shard catalog (library-style: Root → Domain → Index → Data) routes operations to the correct VDE shard. Users see one continuous storage space; admins see the shard topology. The federation layer is dormant at small scale (zero overhead for single-VDE deployments).
-**Depends on**: Phase 86 (Adaptive Index Engine — morphing indexes for catalog), Phase 87 (VDE Scalable Internals — extent-based addressing, allocation groups), Phase 91 (CompoundBlockDevice — VDE sits on compound devices)
+**Depends on**: Phase 86 (Adaptive Index Engine — morphing indexes for catalog), Phase 91.5 (VDE v2.1 Format Completion — all format features, I/O pipeline, mount providers)
 **Requirements**: VFED-01 through VFED-15
 **Success Criteria** (what must be TRUE):
   1. VdeFederationRouter resolves any namespace path to (shardVdeId, inodeNumber) in ≤5 hops for cold paths, ≤1 hop for warm-cached paths
@@ -2215,17 +2430,13 @@ Plans:
   7. Transparent namespace: user operations (Store/Retrieve/Delete/List) work identically regardless of single-VDE or federated deployment
   8. Federation layer adds 0% overhead for single-VDE deployment (router stays null until multi-VDE activated by admin)
   9. Cross-shard List/Search operations fan out and merge results correctly with pagination
-**Plans**: 8 plans
+**Plans**: 4 plans
 
 Plans:
 - [ ] 92-01-PLAN.md -- VdeFederationRouter: namespace resolution, routing table, path-embedded routing algorithm, warm-cache fast path
 - [ ] 92-02-PLAN.md -- ShardCatalog Level 0-1: Root Catalog VDE (Raft-replicated 5x), Domain Catalog VDEs, catalog entry format, catalog VDE creation
-- [ ] 92-03-PLAN.md -- ShardCatalog Level 2-3: Index Shard VDEs (B-Tree + bloom filter), Data Shard VDEs (VDE 2.0A instances), shard addressing scheme
-- [ ] 92-04-PLAN.md -- Transparent namespace: Store/Retrieve/Delete/List/Search routed through federation, single-VDE passthrough (zero overhead)
-- [ ] 92-05-PLAN.md -- Cross-shard operations: fan-out List, merge-sort Search, distributed Delete, cross-shard metadata aggregation, pagination
-- [ ] 92-06-PLAN.md -- Bloom filter integration: per-index-shard bloom filters, negative lookup rejection, false-positive handling, filter persistence in shard metadata
-- [ ] 92-07-PLAN.md -- Recursive composition (VDE 2.0B+): super-federation that treats VDE 2.0B instances as routing targets, yottabyte→brontobyte scale
-- [ ] 92-08-PLAN.md -- Federation integration tests: single-VDE vs federated behavior parity, warm/cold path latency, routing correctness, namespace transparency
+- [ ] 92-03-PLAN.md -- ShardCatalog Level 2-3: Index Shard VDEs (B-Tree + bloom filter), Data Shard descriptors, ShardCatalogResolver wiring 4-level hierarchy
+- [ ] 92-04-PLAN.md -- Transparent namespace: FederatedVirtualDiskEngine facade, cross-shard fan-out merger, single-VDE passthrough (zero overhead)
 
 #### Phase 93: VDE 2.0B Shard Lifecycle
 **Goal**: Shards are living entities — they split when full, merge when underutilized, migrate between storage tiers based on access patterns, and rebalance across nodes. The placement policy engine decides where each shard lives (NVMe/SSD/HDD/tape, which datacenter, how many replicas).
@@ -2285,14 +2496,11 @@ Plans:
   6. Transparent namespace verification: user operations identical at all 3 scales (same API, same behavior, same results)
   7. Policy cascade through federation: VDE-level policy at federation root cascades correctly to all shard VDEs
   8. Bare-metal bootstrap: DW starts on raw devices without OS storage stack, initializes pools, creates VDEs, serves requests
-**Plans**: 5 plans
+**Plans**: 3 plans
 
 Plans:
 - [ ] 95-01-PLAN.md -- Single-VDE E2E test: raw device → pool → CompoundBlockDevice → VDE → CRUD operations, device failure injection, SMART health verification
 - [ ] 95-02-PLAN.md -- Multi-VDE E2E test: multiple VDEs, device-level RAID across pools, data-level RAID within VDE, cross-VDE operations via UniversalFabric
-- [ ] 95-03-PLAN.md -- Federated E2E test: 100+ shard VDEs, hierarchical catalog, fan-out List/Search, shard split/merge under load, namespace transparency
-- [ ] 95-04-PLAN.md -- Dual RAID + zero-overhead verification: simultaneous device + data failure, recovery correctness, single-VDE performance baseline comparison
-- [ ] 95-05-PLAN.md -- Bare-metal bootstrap + policy cascade: OS-free initialization, pool creation, VDE creation, federation activation, policy propagation through hierarchy
 
 ### Progress
 
@@ -2319,7 +2527,7 @@ Plans:
 | 84. Deployment Topology & CLI Modes | 0/6 | Not started | - |
 | 85. Competitive Edge | 0/8 | Not started | - |
 | 86. Adaptive Index Engine | 0/16 | Not started | - |
-| 87. VDE Scalable Internals | 0/14 | Not started | - |
+| 87. VDE Scalable Internals | 0/68 | Not started | - |
 | 88. Dynamic Subsystem Scaling | 0/14 | Not started | - |
 | 89. Ecosystem Compatibility | 0/14 | Not started | - |
 | 90. Device Discovery & Physical Block Device | 0/6 | Not started | - |
@@ -2329,7 +2537,7 @@ Plans:
 | 94. Data Plugin Consolidation | 0/5 | Not started | - |
 | 95. Bare-Metal-to-User E2E Testing | 0/5 | Not started | - |
 
-**Total v6.0:** 0/180 plans complete
+**Total v6.0:** 0/237 plans complete
 
 ### Phase 65.1: Deep Semantic Audit & PluginBase Persistence (INSERTED)
 
@@ -2390,3 +2598,559 @@ Plans:
 - [ ] 65.4-08-PLAN.md -- Migrate Pattern B inline + Pattern C inline class plugins (9 plugins)
 - [ ] 65.4-09-PLAN.md -- Hybrid-migrate UNIQUE plugins (Replication, Compute, StorageProcessing, SemanticSync)
 - [ ] 65.4-10-PLAN.md -- Full solution build verification and cleanup
+
+
+---
+
+## Milestone: v7.0 Military-Grade Production Readiness
+
+> 16 phases (96-111) | 4 stages | 11,128 consolidated findings | Approach: TDD hardening (test→red→fix→green) project-by-project through consolidated findings, then audit/profile/mutate, then system-level validation, chaos engineering, and CI/CD fortress
+
+**Milestone Goal:** Take the DataWarehouse solution to 100% military-grade production readiness. Eradicate all 11,128 consolidated audit findings via TDD methodology, validate system-level behavior under heavy load, prove resilience under chaos/adversarial conditions, and lock down the CI/CD pipeline so no future commit can degrade the hardened state.
+
+**Master Execution Plan — 4 Stages:**
+- **Stage 1: Component-Level Hardening (Phases 96-104)** — Eradicate all theoretical bugs at the class/method level via TDD loop, then audit, profile, and mutation-test
+- **Stage 2: System-Level Validation (Phases 105-106)** — Ensure components don't destroy each other under heavy load (integration profiling + soak tests)
+- **Stage 3: Chaos Engineering & Resilience (Phases 107-110)** — Prove survival under plugin faults, torn writes, resource exhaustion, message bus disruption, malicious payloads, and clock skew
+- **Stage 4: CI/CD Fortress (Phase 111)** — Lock down the pipeline so no PR can degrade the hardened state
+
+**Key references:**
+- Consolidated findings: `Metadata/production-audit-2026-03-05/CONSOLIDATED-FINDINGS.md` (11,699 lines, 11,128 findings, sorted by Project → File → Line)
+- Sources: JetBrains InspectCode (5,481), SDK comprehensive audit (4,265), Agent scans (1,253), Semantic search (110), Previous audits (19)
+- Hardening tests: `DataWarehouse.Hardening.Tests/`
+
+**Per-finding workflow (Phases 96-101):**
+```
+For each finding (project by project, file by file, line by line):
+  Step 1: Write failing test in DataWarehouse.Hardening.Tests (Coyote for concurrency, xUnit for logic/memory)
+  Step 2: Run test → confirm RED (vulnerability proven)
+  Step 3: Fix the production code
+  Step 3.5: dotnet test → confirm GREEN (full solution, not just new test)
+  → next finding
+
+After batch of findings for one project (or file group if project is large):
+  → commit
+  → dotnet test (post-commit sanity)
+  → next project/batch
+```
+
+**Commit strategy:**
+- Projects with ≤150 findings: 1 commit per project
+- Projects with 151-300 findings: 2 commits (split at file boundary)
+- Projects with 301-600 findings: 3-4 commits
+- UltimateStorage (1,243 findings): ~5 commits
+- SDK (2,499 findings): ~8-10 commits
+
+**Execution rules:**
+- Reporting format: **"Stage X - Step Y - Description"** for all agent output
+- Context clear between every phase (after reporting complete, before next phase starts)
+- Max 2-3 parallel agents within a phase to avoid rate limit kills
+- Every finding referenced by: project name, file name, finding number, CONSOLIDATED-FINDINGS.md line number
+- No finding skipped regardless of severity, type, or style
+- Processing is strictly sequential through the consolidated file — no reordering
+
+### Dependency Graph
+
+```
+STAGE 1: Component-Level Hardening
+  Phase 96 (SDK Part 1) → Phase 97 (SDK Part 2) → Phase 98 (Core Infrastructure)
+    → Phase 99 (Large Plugins A) → Phase 100 (Large Plugins B) → Phase 101 (Medium+Small+Companions)
+      → Phase 102 (Full Coyote + dotCover Audit)
+        → Phase 103 (dotTrace + dotMemory Profile)
+          → Phase 104 (Stryker Mutation Testing → 95%+)
+
+STAGE 2: System-Level Validation
+  Phase 104 → Phase 105 (Integration Profiling: full boot + 100GB payload)
+    → Phase 106 (Soak Test: 24-72hr continuous load + GC monitoring)
+
+STAGE 3: Chaos Engineering & Resilience
+  Phase 106 → Phase 107 (Plugin Fault Injection + Concurrent Lifecycle)
+    → Phase 108 (Torn-Write Recovery + Resource Exhaustion)
+      → Phase 109 (Message Bus Disruption + Federation Partition)
+        → Phase 110 (Malicious Payloads + Clock Skew)
+
+STAGE 4: CI/CD Fortress
+  Phase 110 → Phase 111 (Pipeline Lock-Down: Coyote 1000x, Gen2 Gate, Stryker Baseline)
+```
+
+### Phases
+
+- [ ] **Phase 96: Stage 1 — Hardening: SDK Part 1** — TDD loop for SDK findings 1-1249 (CONSOLIDATED-FINDINGS.md lines 876-2148)
+- [ ] **Phase 97: Stage 1 — Hardening: SDK Part 2** — TDD loop for SDK findings 1250-2499 (CONSOLIDATED-FINDINGS.md lines 2149-3440)
+- [ ] **Phase 98: Stage 1 — Hardening: Core Infrastructure** — TDD loop for AedsCore (139), Kernel (148), Plugin (195), Shared (61), TamperProof (81), Tests (126) — 750 findings
+- [ ] **Phase 99: Stage 1 — Hardening: Large Plugins A** — TDD loop for UltimateStorage (1243), UltimateIntelligence (562), UltimateConnector (542) — 2,347 findings
+- [ ] **Phase 100: Stage 1 — Hardening: Large Plugins B** — TDD loop for UltimateAccessControl (409), UltimateKeyManagement (380), UltimateRAID (380), UltimateCompliance (271), UltimateDataManagement (285) — 1,725 findings
+- [ ] **Phase 101: Stage 1 — Hardening: Medium + Small Plugins + Companions** — TDD loop for remaining 47 projects — 3,557 findings
+- [ ] **Phase 102: Stage 1 — Full Audit (Coyote + dotCover)** — Run full Coyote concurrency testing + dotCover coverage on entire hardened codebase
+- [ ] **Phase 103: Stage 1 — Profile (dotTrace + dotMemory)** — Verify fixes introduced no allocation overhead or lock contention
+- [ ] **Phase 104: Stage 1 — Mutation Testing (Stryker)** — Target 95%+ mutation score, tighten assertions until achieved
+- [ ] **Phase 105: Stage 2 — Integration Profiling** — Full kernel+plugins boot, 100GB streaming payload, cross-boundary bottleneck detection
+- [ ] **Phase 106: Stage 2 — Soak Test Harness** — Parameterized continuous load (CI: 10min, manual: 24-72hr), GC event counter gates
+- [ ] **Phase 107: Stage 3 — Chaos: Plugin Faults + Concurrent Lifecycle** — Fatal exception injection, AssemblyLoadContext unload during operations
+- [ ] **Phase 108: Stage 3 — Chaos: Torn-Write + Resource Exhaustion** — Coyote-controlled crash mid-VDE chain, ThreadPool/MemoryPool/disk-full starvation
+- [ ] **Phase 109: Stage 3 — Chaos: Message Bus + Federation Partition** — Message loss/duplication/reorder injection, network partition mid-replication
+- [ ] **Phase 110: Stage 3 — Chaos: Malicious Payloads + Clock Skew** — Zip bombs, malformed IVs, path traversal, TimeProvider manipulation
+- [ ] **Phase 111: Stage 4 — CI/CD Fortress** — audit.yml lock-down, Coyote 1000 iterations/PR, BenchmarkDotNet Gen2 gate, Stryker baseline gate
+
+### Phase Details
+
+### Phase 96: Stage 1, Steps 1-3 — Hardening: SDK Part 1
+**Goal**: Every SDK finding from #1 through #1249 has a failing test proving the vulnerability, followed by a production fix making it pass
+**Depends on**: Nothing (first phase of v7.0)
+**Requirements**: HARD-01, HARD-02, HARD-03
+**Findings scope**:
+  - Project: SDK
+  - CONSOLIDATED-FINDINGS.md lines: 876-2148
+  - Finding numbers: 1-1249
+  - Severity mix: portion of 42 critical, 462 high, 678 medium, 1317 low
+**Workflow**: For each finding line-by-line: write Coyote test (concurrency) or xUnit test (logic/memory) → confirm RED → fix production code → `dotnet test` → confirm GREEN → next
+**Commit strategy**: ~5 commits, batched by file groups at natural file boundaries
+**Success Criteria** (what must be TRUE):
+  1. Every finding #1-1249 has a corresponding test in `DataWarehouse.Hardening.Tests/SDK/`
+  2. All tests pass (GREEN) after fixes
+  3. Solution builds with 0 errors after all fixes
+  4. `dotnet test` passes after each commit (post-commit sanity check)
+**Plans**: 5 plans
+Plans:
+- [ ] 096-01-PLAN.md — Findings 1-218 (Accelerators through ColumnarRegionEngine)
+- [ ] 096-02-PLAN.md — Findings 219-467 (Post-ColumnarRegionEngine through Contracts/Spatial)
+- [ ] 096-03-PLAN.md — Findings 468-710 (Post-Contracts/Spatial through ExtentTree)
+- [ ] 096-04-PLAN.md — Findings 711-954 (FaultToleranceConfig through ICacheableStorage)
+- [ ] 096-05-PLAN.md — Findings 955-1249 (ICarbonAwareStorage through IoUringBindings)
+
+### Phase 97: Stage 1, Steps 1-3 — Hardening: SDK Part 2
+**Goal**: Every SDK finding from #1250 through #2499 has a failing test followed by a production fix
+**Depends on**: Phase 96
+**Requirements**: HARD-01, HARD-02, HARD-03
+**Findings scope**:
+  - Project: SDK
+  - CONSOLIDATED-FINDINGS.md lines: 2149-3440
+  - Finding numbers: 1250-2499
+  - Severity mix: remaining portion of SDK findings
+**Workflow**: Same TDD loop as Phase 96
+**Commit strategy**: ~5 commits, batched by file groups
+**Success Criteria** (what must be TRUE):
+  1. Every finding #1250-2499 has a corresponding test in `DataWarehouse.Hardening.Tests/SDK/`
+  2. All tests pass (GREEN) after fixes
+  3. Solution builds with 0 errors
+  4. `dotnet test` passes after each commit
+**Plans**: 5 plans
+Plans:
+- [ ] 097-01-PLAN.md — Findings 1253-1499 (IoUringBindings through OpenClInterop)
+- [ ] 097-02-PLAN.md — Findings 1500-1742 (OpenClInterop through RaftConsensusEngine)
+- [ ] 097-03-PLAN.md — Findings 1743-1974 (RaftLogEntry through StorageProcessingStrategy)
+- [ ] 097-04-PLAN.md — Findings 1975-2256 (StrategyBase through VDE/Identity)
+- [ ] 097-05-PLAN.md — Findings 2257-2499 (VDE/Identity/VdeNesting through ZoneMapIndex)
+
+### Phase 98: Stage 1, Steps 1-3 — Hardening: Core Infrastructure
+**Goal**: All core infrastructure findings have failing tests followed by production fixes
+**Depends on**: Phase 97
+**Requirements**: HARD-01, HARD-02, HARD-03
+**Findings scope**:
+  | Project | Findings | CONSOLIDATED-FINDINGS.md Lines |
+  |---------|----------|-------------------------------|
+  | AedsCore | 139 (7 crit, 35 high, 70 med, 27 low) | 113-256 |
+  | Kernel | 148 (14 crit, 28 high, 80 med, 26 low) | 479-631 |
+  | Plugin | 195 (3 crit, 96 high, 72 med, 24 low) | 650-849 |
+  | Shared | 61 (4 crit, 18 med, 39 low) | 3470-3535 |
+  | TamperProof | 81 (2 crit, 23 high, 28 med, 28 low) | 3547-3632 |
+  | Tests | 126 (2 crit, 33 high, 51 med, 40 low) | 3633-3763 |
+  | **Total** | **750** | |
+**Workflow**: Same TDD loop. Process in order: AedsCore → Kernel → Plugin → Shared → TamperProof → Tests
+**Commit strategy**: 1 commit per project (6 commits)
+**Success Criteria** (what must be TRUE):
+  1. All 750 findings have corresponding tests in `DataWarehouse.Hardening.Tests/{ProjectName}/`
+  2. All tests pass after fixes
+  3. Solution builds with 0 errors
+  4. `dotnet test` passes after each commit
+**Plans**: 6 plans
+Plans:
+- [ ] 098-01-PLAN.md — AedsCore (139 findings, lines 113-256)
+- [ ] 098-02-PLAN.md — Kernel (148 findings, lines 479-631)
+- [ ] 098-03-PLAN.md — Plugin (195 findings, lines 650-849)
+- [ ] 098-04-PLAN.md — Shared (61 findings, lines 3470-3535)
+- [ ] 098-05-PLAN.md — TamperProof (81 findings, lines 3547-3632)
+- [ ] 098-06-PLAN.md — Tests (126 findings, lines 3633-3763)
+
+### Phase 99: Stage 1, Steps 1-3 — Hardening: Large Plugins A
+**Goal**: All findings in the three largest plugins have failing tests followed by production fixes
+**Depends on**: Phase 98
+**Requirements**: HARD-01, HARD-02, HARD-03
+**Findings scope**:
+  | Project | Findings | CONSOLIDATED-FINDINGS.md Lines |
+  |---------|----------|-------------------------------|
+  | UltimateStorage | 1,243 (36 crit, 161 high, 335 med, 711 low) | 9634-10881 |
+  | UltimateIntelligence | 562 (15 crit, 95 high, 175 med, 277 low) | 7449-8015 |
+  | UltimateConnector | 542 (18 crit, 184 high, 301 med, 39 low) | 4977-5523 |
+  | **Total** | **2,347** | |
+**Workflow**: Same TDD loop. Process in order: UltimateStorage → UltimateIntelligence → UltimateConnector
+**Commit strategy**: Storage ~5 commits, Intelligence ~3 commits, Connector ~3 commits
+**Success Criteria** (what must be TRUE):
+  1. All 2,347 findings have corresponding tests
+  2. All tests pass after fixes
+  3. Solution builds with 0 errors
+  4. `dotnet test` passes after each commit
+**Plans**: 11 plans
+Plans:
+- [ ] 099-01-PLAN.md -- UltimateStorage findings 1-250
+- [ ] 099-02-PLAN.md -- UltimateStorage findings 251-500
+- [ ] 099-03-PLAN.md -- UltimateStorage findings 501-750
+- [ ] 099-04-PLAN.md -- UltimateStorage findings 751-1000
+- [ ] 099-05-PLAN.md -- UltimateStorage findings 1001-1243
+- [ ] 099-06-PLAN.md -- UltimateIntelligence findings 1-187
+- [ ] 099-07-PLAN.md -- UltimateIntelligence findings 188-374
+- [ ] 099-08-PLAN.md -- UltimateIntelligence findings 375-562
+- [ ] 099-09-PLAN.md -- UltimateConnector findings 1-180
+- [ ] 099-10-PLAN.md -- UltimateConnector findings 181-360
+- [ ] 099-11-PLAN.md -- UltimateConnector findings 361-542
+
+### Phase 100: Stage 1, Steps 1-3 — Hardening: Large Plugins B
+**Goal**: All findings in the next tier of large plugins have failing tests followed by production fixes
+**Depends on**: Phase 99
+**Requirements**: HARD-01, HARD-02, HARD-03
+**Findings scope**:
+  | Project | Findings | CONSOLIDATED-FINDINGS.md Lines |
+  |---------|----------|-------------------------------|
+  | UltimateAccessControl | 409 (25 crit, 139 high, 109 med, 136 low) | 3865-4288 |
+  | UltimateKeyManagement | 380 (14 crit, 87 high, 114 med, 165 low) | 8285-8671 |
+  | UltimateRAID | 380 (19 crit, 21 high, 229 med, 111 low) | 8803-9219 |
+  | UltimateDataManagement | 285 (2 crit, 57 high, 107 med, 119 low) | 6202-6491 |
+  | UltimateCompliance | 271 (5 crit, 75 high, 112 med, 79 low) | 4314-4589 |
+  | **Total** | **1,725** | |
+**Workflow**: Same TDD loop. Process in order: UltimateAccessControl → UltimateKeyManagement → UltimateRAID → UltimateDataManagement → UltimateCompliance
+**Commit strategy**: 1-2 commits per project (~8 commits total)
+**Success Criteria** (what must be TRUE):
+  1. All 1,725 findings have corresponding tests
+  2. All tests pass after fixes
+  3. Solution builds with 0 errors
+  4. `dotnet test` passes after each commit
+**Plans**: 10 plans
+
+Plans:
+- [ ] 100-01-PLAN.md — UltimateAccessControl findings 1-205
+- [ ] 100-02-PLAN.md — UltimateAccessControl findings 206-409
+- [ ] 100-03-PLAN.md — UltimateKeyManagement findings 1-190
+- [ ] 100-04-PLAN.md — UltimateKeyManagement findings 191-380
+- [ ] 100-05-PLAN.md — UltimateRAID findings 1-190
+- [ ] 100-06-PLAN.md — UltimateRAID findings 191-380
+- [ ] 100-07-PLAN.md — UltimateDataManagement findings 1-143
+- [ ] 100-08-PLAN.md — UltimateDataManagement findings 144-285
+- [ ] 100-09-PLAN.md — UltimateCompliance findings 1-136
+- [ ] 100-10-PLAN.md — UltimateCompliance findings 137-271
+
+### Phase 101: Stage 1, Steps 1-3 — Hardening: Medium + Small Plugins + Companions
+**Goal**: All remaining findings across 47 projects have failing tests followed by production fixes
+**Depends on**: Phase 100
+**Requirements**: HARD-01, HARD-02, HARD-03
+**Findings scope** (47 projects, processing order matches CONSOLIDATED-FINDINGS.md):
+  | Project | Findings | CONSOLIDATED-FINDINGS.md Lines |
+  |---------|----------|-------------------------------|
+  | AiArchitectureMapper | 2 | 257-263 |
+  | Benchmarks | 6 | 264-274 |
+  | CLI | 63 | 275-342 |
+  | Dashboard | 92 | 343-441 |
+  | GUI | 21 | 442-467 |
+  | HardeningTests | 6 | 468-478 |
+  | Launcher | 13 | 632-649 |
+  | PluginMarketplace | 17 | 850-871 |
+  | SemanticSync | 24 | 3441-3469 |
+  | Systemic | 6 | 3536-3546 |
+  | Transcoding.Media | 96 | 3764-3864 |
+  | UltimateBlockchain | 20 | 4289-4313 |
+  | UltimateCompression | 234 | 4590-4828 |
+  | UltimateCompute | 143 | 4829-4976 |
+  | UltimateConsensus | 61 | 5524-5589 |
+  | UltimateDatabaseProtocol | 184 | 5590-5780 |
+  | UltimateDatabaseStorage | 104 | 5781-5889 |
+  | UltimateDataCatalog | 26 | 5890-5920 |
+  | UltimateDataFormat | 58 | 5921-5983 |
+  | UltimateDataGovernance | 64 | 5984-6052 |
+  | UltimateDataIntegration | 78 | 6053-6135 |
+  | UltimateDataIntegrity | 15 | 6136-6155 |
+  | UltimateDataLake | 4 | 6156-6164 |
+  | UltimateDataLineage | 32 | 6165-6201 |
+  | UltimateDataMesh | 35 | 6492-6531 |
+  | UltimateDataPrivacy | 38 | 6532-6574 |
+  | UltimateDataProtection | 231 | 6575-6810 |
+  | UltimateDataQuality | 53 | 6811-6868 |
+  | UltimateDataTransit | 70 | 6869-6943 |
+  | UltimateDeployment | 101 | 6944-7049 |
+  | UltimateDocGen | 21 | 7050-7075 |
+  | UltimateEdgeComputing | 63 | 7076-7143 |
+  | UltimateEncryption | 180 | 7144-7342 |
+  | UltimateFilesystem | 101 | 7343-7448 |
+  | UltimateInterface | 150 | 8016-8172 |
+  | UltimateIoTIntegration | 107 | 8173-8284 |
+  | UltimateMicroservices | 35 | 8672-8711 |
+  | UltimateMultiCloud | 86 | 8712-8802 |
+  | UltimateReplication | 139 | 9220-9363 |
+  | UltimateResilience | 91 | 9364-9459 |
+  | UltimateResourceManager | 62 | 9460-9526 |
+  | UltimateRTOSBridge | 21 | 9527-9552 |
+  | UltimateSDKPorts | 27 | 9553-9584 |
+  | UltimateServerless | 44 | 9585-9633 |
+  | UltimateStorageProcessing | 149 | 10882-11035 |
+  | UltimateStreamingData | 173 | 11036-11213 |
+  | UltimateSustainability | 182 | 11214-11400 |
+  | UltimateWorkflow | 70 | 11401-11475 |
+  | UniversalFabric | 30 | 11476-11510 |
+  | UniversalObservability | 161 | 11511-11676 |
+  | Unknown | 18 | 11677-11699 |
+  | **Total** | **3,557** | |
+**Workflow**: Same TDD loop. 1 commit per project.
+**Success Criteria** (what must be TRUE):
+  1. All 3,557 findings across 47 projects have corresponding tests
+  2. All tests pass after fixes
+  3. Solution builds with 0 errors
+  4. `dotnet test` passes after each commit
+**Plans**: 10 plans
+
+Plans:
+- [ ] 101-01-PLAN.md — UltimateCompression (234) + UltimateDataProtection (231)
+- [ ] 101-02-PLAN.md — UltimateDatabaseProtocol (184) + UltimateSustainability (182)
+- [ ] 101-03-PLAN.md — UltimateEncryption (180) + UltimateStreamingData (173)
+- [ ] 101-04-PLAN.md — UniversalObservability (161) + UltimateInterface (150)
+- [ ] 101-05-PLAN.md — UltimateStorageProcessing (149) + UltimateCompute (143)
+- [ ] 101-06-PLAN.md — UltimateReplication (139) + UltimateIoTIntegration (107)
+- [ ] 101-07-PLAN.md — UltimateDatabaseStorage (104) + UltimateDeployment (101) + UltimateFilesystem (101)
+- [ ] 101-08-PLAN.md — Transcoding.Media (96) + Dashboard (92) + UltimateResilience (91) + UltimateMultiCloud (86)
+- [ ] 101-09-PLAN.md — 8 small plugins (531 findings: DataIntegration, Workflow, DataTransit, DataGovernance, CLI, EdgeComputing, ResourceManager, Consensus)
+- [ ] 101-10-PLAN.md — 24 tiny projects (488 findings: DataFormat through AiArchitectureMapper)
+
+### Phase 102: Stage 1, Step 2 — Full Audit (Coyote + dotCover)
+**Goal**: Prove all hardening tests execute the vulnerable code paths and Coyote confirms no remaining concurrency issues
+**Depends on**: Phase 101
+**Requirements**: AUDT-01, AUDT-02, AUDT-03
+**Workflow**: Run `/audit` skill (Coyote + dotCover) on entire solution
+**Success Criteria** (what must be TRUE):
+  1. Coyote finds 0 new concurrency bugs across all `DataWarehouse.Hardening.Tests`
+  2. dotCover report shows hardening tests execute the vulnerable lines identified in CONSOLIDATED-FINDINGS.md
+  3. Coverage report exported to `Metadata/dotcover-hardening-report/`
+  4. Any gaps identified → loop back with additional tests until coverage confirmed
+**Report as**: "Stage 1 - Step 2 - Coyote + dotCover Audit Results"
+**Plans**: 2 plans
+Plans:
+- [ ] 102-01-PLAN.md — Coyote concurrency testing (1000 iterations)
+- [ ] 102-02-PLAN.md — dotCover coverage analysis + gap closure
+
+### Phase 103: Stage 1, Step 4 — Profile (dotTrace + dotMemory)
+**Goal**: Verify fixes did not introduce allocation overhead, lock contention, or context-switching delays
+**Depends on**: Phase 102
+**Requirements**: PROF-01, PROF-02
+**Workflow**: Run `/profile` skill (dotTrace + dotMemory) on standard xUnit tests (NOT Coyote tests — Coyote adds intentional scheduler overhead that pollutes profiling)
+**Success Criteria** (what must be TRUE):
+  1. dotTrace shows no new hot-path lock contention introduced by fixes
+  2. dotMemory shows no new large object heap allocations on formerly zero-allocation paths
+  3. No GC pressure regression compared to pre-hardening baseline
+  4. Profile reports exported to `Metadata/profile-hardening-report/`
+**Report as**: "Stage 1 - Step 4 - Performance Profile Results"
+**Plans**: 2 plans
+Plans:
+- [ ] 103-01-PLAN.md � dotTrace performance profiling (lock contention, hot-path analysis)
+- [ ] 103-02-PLAN.md � dotMemory memory profiling (LOH allocations, GC pressure)
+
+### Phase 104: Stage 1, Step 5 — Mutation Testing (Stryker)
+**Goal**: Prove test assertions are tight enough that code mutations are caught — 95%+ mutation score
+**Depends on**: Phase 103
+**Requirements**: MUTN-01, MUTN-02
+**Workflow**: Run Stryker.NET on `DataWarehouse.Hardening.Tests`. If mutants survive, tighten test assertions and re-run until 95%+ achieved.
+**Success Criteria** (what must be TRUE):
+  1. Stryker mutation score ≥ 95% across all hardening test projects
+  2. Surviving mutants documented with justification (e.g., equivalent mutants)
+  3. Stryker report exported to `Metadata/stryker-hardening-report/`
+**Report as**: "Stage 1 - Step 5 - Stryker Mutation Score"
+**Plans**: 2 plans
+Plans:
+- [ ] 104-01-PLAN.md � Stryker initial mutation analysis run
+- [ ] 104-02-PLAN.md � Tighten assertions for surviving mutants, re-run Stryker
+
+### Phase 105: Stage 2, Step 1 — Integration Profiling
+**Goal**: Ensure components don't destroy each other when combined under a realistic 100GB workload
+**Depends on**: Phase 104
+**Requirements**: SOAK-01, SOAK-02
+**Workflow**:
+  1. Create test harness that boots entire Kernel + all plugins via AssemblyLoadContext
+  2. Stream 100GB synthetic payload (streaming generator, not 100GB on disk) through VDE pipeline
+  3. Run dotTrace on system process to find cross-boundary bottlenecks
+  4. Run dotMemory.Unit in-test assertions for memory thresholds
+**Success Criteria** (what must be TRUE):
+  1. Test harness in `DataWarehouse.Hardening.Tests/Integration/` boots Kernel + all 52 plugins successfully
+  2. 100GB streaming read/write completes without crash, deadlock, or OOM
+  3. dotTrace identifies no cross-boundary bottleneck exceeding 5% of total execution time
+  4. dotMemory confirms working set stays within bounds (no unbounded growth during streaming)
+**Report as**: "Stage 2 - Step 1 - Integration Profiling Results"
+**Plans**: 2 plans
+Plans:
+- [ ] 105-01-PLAN.md � Integration harness setup (Kernel + 52 plugins + 100GB streaming)
+- [ ] 105-02-PLAN.md � Integration profiling (cross-boundary bottleneck + memory analysis)
+
+### Phase 106: Stage 2, Step 2 — Soak Test Harness
+**Goal**: Prove the system handles sustained continuous load without slow memory leaks or GC degradation
+**Depends on**: Phase 105
+**Requirements**: SOAK-03, SOAK-04
+**Workflow**:
+  1. Write parameterized soak test harness with configurable `--duration` (CI: 10 minutes, manual: 24-72 hours)
+  2. Moderate continuous read/write load against running system
+  3. Monitor GC via `System.Diagnostics` event counters
+  4. Fail if Gen2 collection rate exceeds threshold or working set grows monotonically
+**Success Criteria** (what must be TRUE):
+  1. Soak harness in `DataWarehouse.Hardening.Tests/Soak/` with configurable duration
+  2. 10-minute CI run completes with stable GC metrics (no monotonic growth)
+  3. Gen2 collection rate < threshold (defined during implementation)
+  4. No event bus or telemetry sink memory leaks detected
+**Report as**: "Stage 2 - Step 2 - Soak Test Results"
+**Plans**: 2 plans
+Plans:
+- [ ] 106-01-PLAN.md � Soak harness implementation (configurable duration + GC monitoring)
+- [ ] 106-02-PLAN.md � Soak test execution (10-min CI run + results report)
+
+### Phase 107: Stage 3, Steps 1-2 — Chaos: Plugin Faults + Concurrent Lifecycle
+**Goal**: Prove the Kernel survives plugin failures and concurrent load/unload without corruption
+**Depends on**: Phase 106
+**Requirements**: CHAOS-01, CHAOS-02
+**Workflow**:
+  1. Inject fatal exceptions (OutOfMemoryException, StackOverflowException) inside plugin methods mid-operation
+  2. Assert Kernel catches fault, unloads plugin's AssemblyLoadContext, other plugins continue operating
+  3. Load/unload plugins via AssemblyLoadContext while read/write operations are in-flight
+  4. Assert no torn state, no orphaned message bus subscriptions, no dangling event handlers
+**Success Criteria** (what must be TRUE):
+  1. Plugin fault injection tests in `DataWarehouse.Hardening.Tests/Chaos/PluginFault/`
+  2. Kernel isolates faulted plugin without crashing — other plugins verified operational
+  3. Concurrent lifecycle tests prove no torn state across 100+ load/unload cycles with active I/O
+  4. Message bus subscription count returns to expected value after unload
+**Report as**: "Stage 3 - Steps 1-2 - Plugin Fault + Lifecycle Chaos Results"
+**Plans**: 2 plans
+Plans:
+- [ ] 107-01-PLAN.md -- Plugin fault injection
+- [ ] 107-02-PLAN.md -- Concurrent plugin lifecycle
+
+### Phase 108: Stage 3, Steps 3-4 — Chaos: Torn-Write + Resource Exhaustion
+**Goal**: Prove data integrity survives mid-write crashes and the system degrades gracefully under resource starvation
+**Depends on**: Phase 107
+**Requirements**: CHAOS-03, CHAOS-04
+**Workflow**:
+  1. Use Coyote-controlled CancellationToken injection at precise points in VDE decorator chain to simulate crash mid-write
+  2. Assert WAL or RAID parity successfully rebuilds data on next mount
+  3. Starve ThreadPool (saturate with blocking work), fill MemoryPool, simulate disk-full during VDE write
+  4. Assert graceful degradation: operations fail cleanly with appropriate exceptions, no hangs, no data corruption
+**Success Criteria** (what must be TRUE):
+  1. Torn-write tests in `DataWarehouse.Hardening.Tests/Chaos/TornWrite/`
+  2. WAL recovery verified: data matches pre-crash state after rebuild
+  3. RAID parity recovery verified where applicable
+  4. Resource exhaustion tests prove clean failure (no hang, no corruption) for ThreadPool, MemoryPool, and disk-full scenarios
+**Report as**: "Stage 3 - Steps 3-4 - Torn-Write + Resource Exhaustion Results"
+**Plans**: 2 plans
+Plans:
+- [ ] 108-01-PLAN.md -- Torn-write recovery
+- [ ] 108-02-PLAN.md -- Resource exhaustion
+
+### Phase 109: Stage 3, Steps 5-6 — Chaos: Message Bus + Federation Partition
+**Goal**: Prove message bus handles disruption without data loss and federation recovers from network partitions
+**Depends on**: Phase 108
+**Requirements**: CHAOS-05, CHAOS-06
+**Workflow**:
+  1. Inject message loss, duplication, and reordering into the message bus during active plugin operations
+  2. Assert idempotency: duplicate messages don't cause double-processing or corrupt state
+  3. Assert no data corruption from reordered or lost messages
+  4. Simulate network partition mid-replication for federated VDE and replication plugins
+  5. Assert CRDT convergence after partition heals — all replicas reach consistent state
+**Success Criteria** (what must be TRUE):
+  1. Message bus chaos tests in `DataWarehouse.Hardening.Tests/Chaos/MessageBus/`
+  2. Federation partition tests in `DataWarehouse.Hardening.Tests/Chaos/Federation/`
+  3. Idempotency verified: identical final state regardless of message duplication
+  4. CRDT convergence verified within bounded time after partition heal
+**Report as**: "Stage 3 - Steps 5-6 - Message Bus + Federation Partition Results"
+**Plans**: 2 plans
+Plans:
+- [ ] 109-01-PLAN.md -- Message bus disruption
+- [ ] 109-02-PLAN.md -- Federation partition
+
+### Phase 110: Stage 3, Steps 7-8 — Chaos: Malicious Payloads + Clock Skew
+**Goal**: Prove the system rejects hostile inputs without OOM/hang and handles time manipulation without auth bypass
+**Depends on**: Phase 109
+**Requirements**: CHAOS-07, CHAOS-08
+**Workflow**:
+  1. Feed zip bombs, highly compressed payloads, malformed encryption IVs, oversized headers, path traversal in metadata
+  2. Assert instant rejection without OutOfMemoryException, thread hang, or data corruption
+  3. Manipulate TimeProvider (or system time abstraction) during policy evaluation and token expiry
+  4. Assert no authentication bypass, no stale cache serving, no policy evaluation errors from clock skew
+**Success Criteria** (what must be TRUE):
+  1. Malicious payload tests in `DataWarehouse.Hardening.Tests/Chaos/MaliciousPayload/`
+  2. Clock skew tests in `DataWarehouse.Hardening.Tests/Chaos/ClockSkew/`
+  3. All zip bomb / malformed IV tests reject within bounded time and memory
+  4. Clock skew of ±24 hours doesn't bypass any auth, policy, or cache expiry logic
+**Report as**: "Stage 3 - Steps 7-8 - Malicious Payload + Clock Skew Results"
+**Plans**: 2 plans
+Plans:
+- [ ] 110-01-PLAN.md -- Malicious payloads
+- [ ] 110-02-PLAN.md -- Clock skew
+
+### Phase 111: Stage 4 — CI/CD Fortress
+**Goal**: Lock down the pipeline so no PR can degrade the hardened state. Leverage full JetBrains dotUltimate suite and GitHub Actions runners for expensive operations.
+**Depends on**: Phase 110
+**Requirements**: CICD-01, CICD-02, CICD-03, CICD-04
+**JetBrains dotUltimate tools integrated**:
+  - **dotCover**: code coverage reports per PR (filter +DataWarehouse.*, -Tests, -Benchmarks)
+  - **dotTrace**: profiling integration (local dev; CI uses BenchmarkDotNet for regression gates)
+  - **dotMemory**: memory profiling integration (local dev; CI uses BenchmarkDotNet Gen2 gate)
+  - **InspectCode**: static analysis gate (production-relevant severity >= WARNING)
+  - **dupFinder**: code duplication gate (discard cost >= 100)
+  - **CleanupCode**: automated code style enforcement (can auto-fix naming issues from InspectCode)
+**GitHub Actions workflow** (`.github/workflows/audit.yml` — baseline already created):
+  - Triggers: push to main/master + pull_request to main/master + workflow_dispatch
+  - Concurrency: cancel-in-progress for same ref (saves runner minutes)
+  - **Stage 1** (fast gate): Build with TreatWarningsAsErrors + dotnet test → blocks everything if fails
+  - **Stage 2a** (parallel): Coyote 1000 iterations (60min timeout) → blocks merge on any bug
+  - **Stage 2b** (parallel): InspectCode + dupFinder (30min timeout) → advisory/gate
+  - **Stage 2c** (parallel): dotCover coverage report → uploaded as PR artifact
+  - **Stage 2d** (parallel): BenchmarkDotNet → Gen2 gate on zero-alloc paths
+  - **Stage 3** (after 2a-2d): Stryker mutation testing break-at 95% (120min timeout) → blocks merge
+  - **Final**: Summary job aggregating all results with pass/fail status
+  - All stages upload artifacts (TRX, coverage HTML, stryker HTML, benchmark JSON) — 30-day retention
+  - Timeout guards on every job prevent infinite hangs on throttled runners
+**Workflow**:
+  1. Finalize audit.yml gates (baseline already created with all jobs)
+  2. Verify Coyote gate: test PR with intentional concurrency bug → blocks merge
+  3. Verify BenchmarkDotNet gate: test PR with Gen2 allocation → blocks merge
+  4. Verify Stryker gate: test PR dropping mutation score → blocks merge
+  5. Verify InspectCode + dupFinder: establish baselines, set thresholds
+  6. Verify dotCover: coverage report auto-publishes as PR artifact with threshold gate
+  7. Add branch protection rules: require `audit-summary` job to pass before merge
+**Success Criteria** (what must be TRUE):
+  1. `.github/workflows/audit.yml` on main/master with all gates active
+  2. Test PR with concurrency bug → Coyote gate blocks merge (verified)
+  3. Test PR with Gen2 allocation on zero-alloc path → performance gate blocks merge (verified)
+  4. Test PR dropping mutation score → Stryker gate blocks merge (verified)
+  5. InspectCode baseline established — new warnings above threshold block merge
+  6. dotCover coverage report auto-publishes as PR artifact
+  7. Branch protection rules require `audit-summary` job to pass
+  8. All jobs have timeout guards — no infinite hangs on throttled runners
+**Report as**: "Stage 4 - CI/CD Fortress Lock-Down Results"
+**Plans**: 3 plans
+Plans:
+- [ ] 111-01-PLAN.md -- CI/CD pipeline finalization
+- [ ] 111-02-PLAN.md -- Gate verification
+- [ ] 111-03-PLAN.md -- Final documentation
+
+### v7.0 Progress
+
+**Execution Order:** 96 → 97 → 98 → 99 → 100 → 101 → 102 → 103 → 104 → 105 → 106 → 107 → 108 → 109 → 110 → 111
+
+| Phase | Stage | Description | Plans | Status | Completed |
+|-------|-------|-------------|-------|--------|-----------|
+| 96 | 1 | Hardening: SDK Part 1 (1,249 findings) | 0/TBD | Not started | - |
+| 97 | 1 | Hardening: SDK Part 2 (1,250 findings) | 0/TBD | Not started | - |
+| 98 | 1 | Hardening: Core Infrastructure (750 findings) | 0/TBD | Not started | - |
+| 99 | 1 | Hardening: Large Plugins A (2,347 findings) | 0/TBD | Not started | - |
+| 100 | 1 | Hardening: Large Plugins B (1,725 findings) | 0/TBD | Not started | - |
+| 101 | 1 | Hardening: Medium+Small+Companions (3,557 findings) | 0/TBD | Not started | - |
+| 102 | 1 | Full Audit: Coyote + dotCover | 0/TBD | Not started | - |
+| 103 | 1 | Profile: dotTrace + dotMemory | 0/TBD | Not started | - |
+| 104 | 1 | Mutation Testing: Stryker 95%+ | 0/TBD | Not started | - |
+| 105 | 2 | Integration Profiling: 100GB payload | 0/TBD | Not started | - |
+| 106 | 2 | Soak Test: continuous load + GC | 0/TBD | Not started | - |
+| 107 | 3 | Chaos: Plugin Faults + Lifecycle | 0/2 | Planned | - |
+| 108 | 3 | Chaos: Torn-Write + Exhaustion | 0/2 | Planned | - |
+| 109 | 3 | Chaos: Message Bus + Federation | 0/2 | Planned | - |
+| 110 | 3 | Chaos: Malicious Payloads + Clock | 0/2 | Planned | - |
+| 111 | 4 | CI/CD Fortress | 0/3 | Planned | - |

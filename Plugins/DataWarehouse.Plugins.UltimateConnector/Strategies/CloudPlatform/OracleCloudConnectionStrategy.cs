@@ -18,10 +18,14 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
         public override string[] Tags => new[] { "oracle", "cloud", "object-storage", "oci", "rest-api" };
         public OracleCloudConnectionStrategy(ILogger? logger = null) : base(logger) { }
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct) { var region = GetConfiguration(config, "Region", "us-ashburn-1"); var namespace_ = GetConfiguration<string>(config, "Namespace", string.Empty); var endpoint = $"https://objectstorage.{region}.oraclecloud.com"; var httpClient = new HttpClient { BaseAddress = new Uri(endpoint), Timeout = config.Timeout }; return new DefaultConnectionHandle(httpClient, new Dictionary<string, object> { ["Region"] = region, ["Namespace"] = namespace_, ["Endpoint"] = endpoint }); }
-        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { try { var response = await handle.GetConnection<HttpClient>().GetAsync("/n/", ct); return response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable; } catch { return false; } }
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<HttpClient>()?.Dispose(); await Task.CompletedTask; }
+        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { try { var response = await handle.GetConnection<HttpClient>().GetAsync("/n/", ct); return response.IsSuccessStatusCode; } catch { return false; } }
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<HttpClient>()?.Dispose(); return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, isHealthy ? "Oracle Cloud Storage is reachable" : "Oracle Cloud Storage is not responding", sw.Elapsed, DateTimeOffset.UtcNow); }
-        protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default) => Task.FromResult((Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow.AddHours(1)));
-        protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default) => AuthenticateAsync(handle, ct);
+        protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default)
+            => throw new NotSupportedException(
+                "Oracle Cloud authentication requires OCI API Key signing (RSA private key + tenancy/user OCIDs). " +
+                "Configure TenancyOcid, UserOcid, and PrivateKeyPath and use the OCI .NET SDK for production connectivity.");
+        protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default)
+            => AuthenticateAsync(handle, ct);
     }
 }

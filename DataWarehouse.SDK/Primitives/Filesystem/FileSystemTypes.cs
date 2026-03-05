@@ -20,14 +20,16 @@ public record FileSystemEntry(
     DateTime CreatedUtc,
     DateTime ModifiedUtc,
     DateTime? AccessedUtc,
-    FileAttributes Attributes,
+    FilesystemAttributes Attributes,
     FilePermissions? Permissions = null);
 
 /// <summary>
 /// Filesystem attributes that can be applied to files and directories.
+/// Renamed from <c>FileAttributes</c> to <c>FilesystemAttributes</c> (Cat 15, finding 547)
+/// to avoid shadowing <see cref="System.IO.FileAttributes"/> in consuming code.
 /// </summary>
 [Flags]
-public enum FileAttributes
+public enum FilesystemAttributes
 {
     /// <summary>No special attributes.</summary>
     None = 0,
@@ -66,17 +68,19 @@ public enum FileAttributes
 /// <param name="OwnerName">The name of the owner (optional).</param>
 /// <param name="GroupName">The name of the group (optional).</param>
 public record FilePermissions(
-    Permission Owner,
-    Permission Group,
-    Permission Others,
+    UnixPermission Owner,
+    UnixPermission Group,
+    UnixPermission Others,
     string? OwnerName = null,
     string? GroupName = null);
 
 /// <summary>
-/// Represents individual permission flags (read, write, execute).
+/// Represents individual Unix permission flags (read, write, execute).
+/// Renamed from <c>Permission</c> to <c>UnixPermission</c> (Cat 15, finding 548)
+/// to avoid ambiguous reference with <c>DataWarehouse.SDK.Primitives.Permission</c>.
 /// </summary>
 [Flags]
-public enum Permission
+public enum UnixPermission
 {
     /// <summary>No permissions.</summary>
     None = 0,

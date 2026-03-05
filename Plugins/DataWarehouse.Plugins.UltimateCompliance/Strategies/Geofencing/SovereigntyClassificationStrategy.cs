@@ -33,6 +33,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
     public sealed class SovereigntyClassificationStrategy : ComplianceStrategyBase
     {
         private readonly BoundedDictionary<string, ClassificationCache> _classificationCache = new BoundedDictionary<string, ClassificationCache>(1000);
+        // Written only during InitializeAsync (single-threaded init); read-only afterward — safe for concurrent reads
         private readonly Dictionary<string, Regex> _piiPatterns = new();
         private readonly Dictionary<string, List<string>> _jurisdictionRegulations = new();
 
@@ -193,14 +194,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
             ComplianceContext context,
             CancellationToken cancellationToken)
         {
-        IncrementCounter("sovereignty_classification.check");
+            IncrementCounter("sovereignty_classification.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
             // Check if classification is provided
             if (string.IsNullOrEmpty(context.DataClassification) ||
-                context.DataClassification.Equals("Standard", StringComparison.OrdinalIgnoreCase) ||
-                context.DataClassification.Equals("Unknown", StringComparison.OrdinalIgnoreCase))
+                string.Equals(context.DataClassification, "Standard", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(context.DataClassification, "Unknown", StringComparison.OrdinalIgnoreCase))
             {
                 // Attempt auto-classification
                 var input = new ClassificationInput
@@ -245,9 +246,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
                 }
             }
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return new ComplianceResult
@@ -269,111 +271,111 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
             // EU patterns (GDPR)
             _piiPatterns["EU-EMAIL"] = new Regex(
                 @"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.(?:eu|de|fr|it|es|nl|be|at|se|pl|pt|gr|cz|ro|dk|fi|sk|ie|hr|bg|lt|si|lv|ee|cy|lu|mt)\b",
-                RegexOptions.Compiled | RegexOptions.IgnoreCase);
+                RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5));
 
             _piiPatterns["EU-PHONE"] = new Regex(
                 @"\+(?:32|33|34|39|43|45|46|47|48|49|351|352|353|354|356|357|358|370|371|372|386|420|421)[0-9]{6,13}",
-                RegexOptions.Compiled);
+                RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 
             _piiPatterns["EU-IBAN"] = new Regex(
                 @"\b[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}\b",
-                RegexOptions.Compiled);
+                RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 
             _piiPatterns["EU-VAT"] = new Regex(
                 @"\b(?:ATU|BE0|BG|CY|CZ|DE|DK|EE|EL|ES|FI|FR|GB|HU|IE|IT|LT|LU|LV|MT|NL|PL|PT|RO|SE|SI|SK)[0-9]{8,12}\b",
-                RegexOptions.Compiled);
+                RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 
             _piiPatterns["EU-PASSPORT"] = new Regex(
                 @"\b[A-Z]{1,2}[0-9]{6,9}\b",
-                RegexOptions.Compiled);
+                RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 
             // US patterns (CCPA, HIPAA)
             _piiPatterns["US-SSN"] = new Regex(
                 @"\b\d{3}-\d{2}-\d{4}\b",
-                RegexOptions.Compiled);
+                RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 
             _piiPatterns["US-PHONE"] = new Regex(
                 @"\b(?:\+1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b",
-                RegexOptions.Compiled);
+                RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 
             _piiPatterns["US-ZIP"] = new Regex(
                 @"\b\d{5}(?:-\d{4})?\b",
-                RegexOptions.Compiled);
+                RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 
             _piiPatterns["US-DRIVERS-LICENSE"] = new Regex(
                 @"\b[A-Z]{1,2}[0-9]{5,9}\b",
-                RegexOptions.Compiled);
+                RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 
             // China patterns (PIPL)
             _piiPatterns["CN-ID"] = new Regex(
                 @"\b[1-9]\d{5}(?:18|19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dXx]\b",
-                RegexOptions.Compiled);
+                RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 
             _piiPatterns["CN-PHONE"] = new Regex(
                 @"\+86[-.\s]?1[3-9]\d{9}",
-                RegexOptions.Compiled);
+                RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 
             _piiPatterns["CN-EMAIL"] = new Regex(
                 @"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.cn\b",
-                RegexOptions.Compiled | RegexOptions.IgnoreCase);
+                RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5));
 
             // India patterns (PDPB)
             _piiPatterns["IN-AADHAAR"] = new Regex(
                 @"\b\d{4}\s?\d{4}\s?\d{4}\b",
-                RegexOptions.Compiled);
+                RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 
             _piiPatterns["IN-PAN"] = new Regex(
                 @"\b[A-Z]{5}[0-9]{4}[A-Z]\b",
-                RegexOptions.Compiled);
+                RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 
             _piiPatterns["IN-PHONE"] = new Regex(
                 @"\+91[-.\s]?[6-9]\d{9}",
-                RegexOptions.Compiled);
+                RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 
             // Brazil patterns (LGPD)
             _piiPatterns["BR-CPF"] = new Regex(
                 @"\b\d{3}\.\d{3}\.\d{3}-\d{2}\b",
-                RegexOptions.Compiled);
+                RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 
             _piiPatterns["BR-PHONE"] = new Regex(
                 @"\+55[-.\s]?\d{2}[-.\s]?[6-9]\d{3,4}[-.\s]?\d{4}",
-                RegexOptions.Compiled);
+                RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 
             // Russia patterns
             _piiPatterns["RU-INN"] = new Regex(
-                @"\b\d{10}|\d{12}\b",
-                RegexOptions.Compiled);
+                @"\b(\d{10}|\d{12})\b",  // parentheses ensure \b anchors both alternatives
+                RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 
             _piiPatterns["RU-PHONE"] = new Regex(
                 @"\+7[-.\s]?\d{3}[-.\s]?\d{3}[-.\s]?\d{2}[-.\s]?\d{2}",
-                RegexOptions.Compiled);
+                RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 
             // Canada patterns (PIPEDA)
             _piiPatterns["CA-SIN"] = new Regex(
                 @"\b\d{3}-\d{3}-\d{3}\b",
-                RegexOptions.Compiled);
+                RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 
             _piiPatterns["CA-POSTAL"] = new Regex(
                 @"\b[A-Z]\d[A-Z]\s?\d[A-Z]\d\b",
-                RegexOptions.Compiled);
+                RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 
             // Australia patterns
             _piiPatterns["AU-TFN"] = new Regex(
                 @"\b\d{3}\s?\d{3}\s?\d{3}\b",
-                RegexOptions.Compiled);
+                RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 
             _piiPatterns["AU-ABN"] = new Regex(
                 @"\b\d{2}\s?\d{3}\s?\d{3}\s?\d{3}\b",
-                RegexOptions.Compiled);
+                RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 
             // Generic patterns
             _piiPatterns["CREDIT-CARD"] = new Regex(
                 @"\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b",
-                RegexOptions.Compiled);
+                RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 
             _piiPatterns["IP-ADDRESS"] = new Regex(
                 @"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b",
-                RegexOptions.Compiled);
+                RegexOptions.Compiled, TimeSpan.FromSeconds(5));
         }
 
         private void InitializeJurisdictionRegulations()
@@ -450,14 +452,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
             // and wait for response from GeolocationServiceStrategy
             await Task.Delay(1, cancellationToken); // Placeholder for async message bus call
 
-            // For now, return a simulated signal with lower confidence
-            return new ClassificationSignal
-            {
-                Source = ClassificationSource.SourceIP,
-                Jurisdiction = "US", // Would be actual resolved location
-                Confidence = 0.6,
-                Reason = $"Source IP {sourceIp} resolved to location"
-            };
+            // Resolution via message bus (geolocation.resolve topic) returns the actual jurisdiction;
+            // until that response arrives return null so no spurious "US" signal is injected
+            return null;
         }
 
         private SovereigntyClassification CalculateClassification(
@@ -530,13 +527,13 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
 
         private DataSensitivity DetermineSensitivity(List<ClassificationSignal> signals, string jurisdiction)
         {
-            // Check for high-sensitivity PII patterns
+            // Check for high-sensitivity PII patterns (all conditions scoped to ContentAnalysis signals)
             var hasHighSensitivityPii = signals.Any(s =>
                 s.Source == ClassificationSource.ContentAnalysis &&
-                s.Reason.Contains("SSN", StringComparison.OrdinalIgnoreCase) ||
-                s.Reason.Contains("ID", StringComparison.OrdinalIgnoreCase) ||
-                s.Reason.Contains("AADHAAR", StringComparison.OrdinalIgnoreCase) ||
-                s.Reason.Contains("CPF", StringComparison.OrdinalIgnoreCase));
+                (s.Reason.Contains("SSN", StringComparison.OrdinalIgnoreCase) ||
+                 s.Reason.Contains("ID", StringComparison.OrdinalIgnoreCase) ||
+                 s.Reason.Contains("AADHAAR", StringComparison.OrdinalIgnoreCase) ||
+                 s.Reason.Contains("CPF", StringComparison.OrdinalIgnoreCase)));
 
             if (hasHighSensitivityPii)
                 return DataSensitivity.Restricted;
@@ -555,7 +552,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
 
         private string GenerateCacheKey(ClassificationInput input)
         {
-            return $"{input.ResourceId}:{input.SourceIp}:{input.StorageLocation}:{input.UserJurisdiction}";
+            // Use length-prefixed segments to prevent key collision when values contain the separator char
+            static string Seg(string? v) => v is null ? "~" : $"{v.Length},{v}";
+            return $"{Seg(input.ResourceId)}|{Seg(input.SourceIp)}|{Seg(input.StorageLocation)}|{Seg(input.UserJurisdiction)}";
         }
 
         private sealed class ClassificationCache
@@ -567,14 +566,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("sovereignty_classification.initialized");
+            IncrementCounter("sovereignty_classification.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("sovereignty_classification.shutdown");
+            IncrementCounter("sovereignty_classification.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

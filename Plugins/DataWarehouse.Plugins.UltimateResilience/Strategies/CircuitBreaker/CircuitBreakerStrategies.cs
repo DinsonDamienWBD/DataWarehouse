@@ -28,6 +28,7 @@ public sealed class StandardCircuitBreakerStrategy : ResilienceStrategyBase
 {
     private CircuitBreakerState _state = CircuitBreakerState.Closed;
     private int _failureCount;
+    private int _halfOpenSuccessCount;
     private DateTimeOffset _lastFailureTime = DateTimeOffset.MinValue;
     private DateTimeOffset _openedAt = DateTimeOffset.MinValue;
     private readonly object _stateLock = new();
@@ -158,11 +159,12 @@ public sealed class StandardCircuitBreakerStrategy : ResilienceStrategyBase
     {
         if (_state == CircuitBreakerState.HalfOpen)
         {
-            _failureCount++;
-            if (_failureCount >= _halfOpenSuccessThreshold)
+            _halfOpenSuccessCount++;
+            if (_halfOpenSuccessCount >= _halfOpenSuccessThreshold)
             {
                 _state = CircuitBreakerState.Closed;
                 _failureCount = 0;
+                _halfOpenSuccessCount = 0;
             }
         }
         else if (_state == CircuitBreakerState.Closed)
@@ -180,6 +182,7 @@ public sealed class StandardCircuitBreakerStrategy : ResilienceStrategyBase
             _state = CircuitBreakerState.Open;
             _openedAt = DateTimeOffset.UtcNow;
             _failureCount = 0;
+            _halfOpenSuccessCount = 0;
         }
         else if (_state == CircuitBreakerState.Closed)
         {
@@ -672,17 +675,24 @@ public sealed class TimeBasedCircuitBreakerStrategy : ResilienceStrategyBase
         var currentBucket = GetBucketKey();
         var cutoff = currentBucket - _bucketsToTrack;
 
-        foreach (var key in _buckets.Keys.Where(k => k < cutoff).ToList())
+        // Avoid LINQ ToList() allocation — iterate keys and remove directly
+        foreach (var key in _buckets.Keys)
         {
-            _buckets.TryRemove(key, out _);
+            if (key < cutoff)
+                _buckets.TryRemove(key, out _);
         }
     }
 
     private void CheckFailureRate()
     {
-        var totals = _buckets.Values.Aggregate(
-            (successes: 0, failures: 0),
-            (acc, bucket) => (acc.successes + bucket.successes, acc.failures + bucket.failures));
+        // Avoid Aggregate() + ValueCollection snapshot allocation — manual fold
+        int totalSuccesses = 0, totalFailures = 0;
+        foreach (var bucket in _buckets.Values)
+        {
+            totalSuccesses += bucket.successes;
+            totalFailures += bucket.failures;
+        }
+        var totals = (successes: totalSuccesses, failures: totalFailures);
 
         var totalRequests = totals.successes + totals.failures;
         if (totalRequests < _minimumRequests) return;
@@ -735,7 +745,7 @@ public sealed class GradualRecoveryCircuitBreakerStrategy : ResilienceStrategyBa
     private int _halfOpenSuccesses;
     private int _halfOpenAttempts;
     private readonly object _stateLock = new();
-    private readonly Random _random = new();
+    private static readonly Random _random = Random.Shared;
 
     private readonly int _failureThreshold;
     private readonly TimeSpan _openDuration;

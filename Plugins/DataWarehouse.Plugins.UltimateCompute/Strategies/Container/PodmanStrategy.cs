@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using DataWarehouse.SDK.Contracts.Compute;
 
 namespace DataWarehouse.Plugins.UltimateCompute.Strategies.Container;
@@ -9,6 +10,9 @@ namespace DataWarehouse.Plugins.UltimateCompute.Strategies.Container;
 /// </summary>
 internal sealed class PodmanStrategy : ComputeRuntimeStrategyBase
 {
+    // Allowlist for container names and env var keys — prevents command injection.
+    private static readonly Regex SafeNameRegex = new(@"^[a-zA-Z0-9_.\-]+$", RegexOptions.Compiled);
+
     /// <inheritdoc/>
     public override string StrategyId => "compute.container.podman";
     /// <inheritdoc/>
@@ -57,7 +61,12 @@ internal sealed class PodmanStrategy : ComputeRuntimeStrategyBase
             if (task.Environment != null)
             {
                 foreach (var (key, value) in task.Environment)
-                    args.Append($"-e {key}={value} ");
+                {
+                    // Validate env var key to prevent command injection.
+                    if (!SafeNameRegex.IsMatch(key))
+                        throw new ArgumentException($"Environment variable key '{key}' contains invalid characters.");
+                    args.Append($"-e \"{key}={value.Replace("\"", "\\\"")}\" ");
+                }
             }
 
             args.Append($"{image} sh -c \"{codeStr.Replace("\"", "\\\"")}\"");

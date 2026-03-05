@@ -122,17 +122,30 @@ public sealed class BeTreeNode
         // Leaf entries
         if (IsLeaf)
         {
+            int serializedCount = 0;
             for (int i = 0; i < Entries.Count && offset < blockSize - 12; i++)
             {
                 var (key, value) = Entries[i];
+                if (offset + 4 + key.Length + 8 > blockSize)
+                {
+                    // Finding 699: Silent truncation causes permanent data loss.
+                    // Throw instead of dropping entries — the caller (BeTree.InsertAsync) must
+                    // split the node before serializing to ensure all entries fit.
+                    throw new InvalidOperationException(
+                        $"[BeTreeNode.Serialize] Cannot serialize entry {i}/{Entries.Count} at block {BlockNumber}: " +
+                        $"required {4 + key.Length + 8} bytes but only {blockSize - offset} bytes remain in block. " +
+                        "Node must be split before serialization.");
+                }
                 BinaryPrimitives.WriteInt32BigEndian(buffer.AsSpan(offset), key.Length);
                 offset += 4;
-                if (offset + key.Length + 8 > blockSize) break;
                 key.AsSpan().CopyTo(buffer.AsSpan(offset));
                 offset += key.Length;
                 BinaryPrimitives.WriteInt64BigEndian(buffer.AsSpan(offset), value);
                 offset += 8;
+                serializedCount++;
             }
+            // Update actual serialized count in header
+            BinaryPrimitives.WriteInt32BigEndian(buffer.AsSpan(1), serializedCount);
         }
         else
         {
@@ -212,7 +225,8 @@ public sealed class BeTreeNode
             {
                 int keyLen = BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(offset));
                 offset += 4;
-                if (offset + keyLen + 8 > data.Length) break;
+                // Guard against OOM: negative or oversized keyLen from corrupt data
+                if (keyLen < 0 || keyLen > 65536 || offset + keyLen + 8 > data.Length) break;
                 var key = data.AsSpan(offset, keyLen).ToArray();
                 offset += keyLen;
                 long value = BinaryPrimitives.ReadInt64BigEndian(data.AsSpan(offset));
@@ -263,5 +277,26 @@ public sealed class BeTreeNode
         }
 
         return node;
+    }
+
+    /// <summary>
+    /// Creates a deep clone of this node to prevent mutation visibility across concurrent readers/writers.
+    /// </summary>
+    public BeTreeNode Clone()
+    {
+        var clone = new BeTreeNode(MaxLeafEntries > 0 ? (MaxLeafEntries * 40 + 9) : 4096)
+        {
+            IsLeaf = this.IsLeaf,
+            BlockNumber = this.BlockNumber
+        };
+        foreach (var (key, value) in Entries)
+            clone.Entries.Add(((byte[])key.Clone(), value));
+        foreach (var msg in Messages)
+            clone.Messages.Add(msg);
+        foreach (var pivot in PivotKeys)
+            clone.PivotKeys.Add((byte[])pivot.Clone());
+        foreach (var child in ChildPointers)
+            clone.ChildPointers.Add(child);
+        return clone;
     }
 }

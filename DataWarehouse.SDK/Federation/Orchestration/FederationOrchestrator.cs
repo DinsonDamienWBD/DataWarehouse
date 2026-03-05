@@ -68,7 +68,7 @@ public sealed class FederationOrchestrator : IFederationOrchestrator, ITopologyP
     }
 
     /// <inheritdoc />
-    public async Task StartAsync(CancellationToken ct = default)
+    public Task StartAsync(CancellationToken ct = default)
     {
         // Subscribe to membership changes
         _membership.OnMembershipChanged += HandleMembershipChanged;
@@ -76,20 +76,30 @@ public sealed class FederationOrchestrator : IFederationOrchestrator, ITopologyP
         // Start health check loop
         _ = RunHealthCheckLoopAsync(_cts.Token);
 
-        await Task.CompletedTask;
+        return Task.CompletedTask;
     }
 
     /// <inheritdoc />
-    public async Task StopAsync(CancellationToken ct = default)
+    public Task StopAsync(CancellationToken ct = default)
     {
         _cts.Cancel();
         _membership.OnMembershipChanged -= HandleMembershipChanged;
-        await Task.CompletedTask;
+        return Task.CompletedTask;
     }
 
     /// <inheritdoc />
     public async Task RegisterNodeAsync(NodeRegistration registration, CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(registration);
+
+        // Validate required fields before inserting phantom nodes
+        if (string.IsNullOrWhiteSpace(registration.NodeId))
+            throw new ArgumentException("NodeId must not be null or empty.", nameof(registration));
+        if (string.IsNullOrWhiteSpace(registration.Address))
+            throw new ArgumentException("Address must not be null or empty.", nameof(registration));
+        if (registration.Port is <= 0 or > 65535)
+            throw new ArgumentException($"Port {registration.Port} is out of valid range 1-65535.", nameof(registration));
+
         var nodeTopology = new NodeTopology
         {
             NodeId = registration.NodeId,
@@ -101,7 +111,8 @@ public sealed class FederationOrchestrator : IFederationOrchestrator, ITopologyP
             Latitude = registration.Latitude,
             Longitude = registration.Longitude,
             TotalBytes = registration.TotalBytes,
-            FreeBytes = registration.TotalBytes,
+            // Use reported free space if provided; default to TotalBytes for fresh nodes (FreeBytes == 0).
+            FreeBytes = registration.FreeBytes > 0 ? registration.FreeBytes : registration.TotalBytes,
             HealthScore = 1.0,
             LastHeartbeat = DateTimeOffset.UtcNow
         };
@@ -115,7 +126,9 @@ public sealed class FederationOrchestrator : IFederationOrchestrator, ITopologyP
                 Command = "topology-update",
                 Payload = JsonSerializer.SerializeToUtf8Bytes(command)
             };
-            await _raft.ProposeAsync(proposal).ConfigureAwait(false);
+            await _raft.ProposeAsync(proposal, ct).ConfigureAwait(false);
+            // Update local topology immediately so the leader's routing is not stale
+            _topology.AddOrUpdateNode(nodeTopology);
         }
         else
         {
@@ -213,7 +226,6 @@ public sealed class FederationOrchestrator : IFederationOrchestrator, ITopologyP
 
         _topology.AddOrUpdateNode(updated);
 
-        await Task.CompletedTask;
     }
 
     /// <inheritdoc />
@@ -317,6 +329,7 @@ public sealed class FederationOrchestrator : IFederationOrchestrator, ITopologyP
         _cts.Cancel();
         _cts.Dispose();
         _healthCheckTimer.Dispose();
+        _topology.Dispose();
     }
 }
 

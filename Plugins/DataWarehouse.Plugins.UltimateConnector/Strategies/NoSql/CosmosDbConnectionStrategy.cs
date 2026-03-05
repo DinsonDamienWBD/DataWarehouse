@@ -159,7 +159,7 @@ public sealed class CosmosDbConnectionStrategy : DatabaseConnectionStrategyBase
 
         var client = handle.GetConnection<CosmosClient>();
         var databaseId = parameters?.GetValueOrDefault("database")?.ToString()
-            ?? GetConfiguration<string?>(null!, "Database", "default");
+            ?? handle.ConnectionInfo.GetValueOrDefault("Database")?.ToString() ?? "default";
         var containerId = parameters?.GetValueOrDefault("container")?.ToString()
             ?? parameters?.GetValueOrDefault("collection")?.ToString()
             ?? "items";
@@ -206,7 +206,7 @@ public sealed class CosmosDbConnectionStrategy : DatabaseConnectionStrategyBase
 
         // Parse command as a JSON document to upsert
         var container = client.GetContainer(databaseId, containerId);
-        var doc = JsonDocument.Parse(command);
+        using var doc = JsonDocument.Parse(command);
 
         string partitionKey;
         if (parameters?.GetValueOrDefault("partitionKey") is string pk)

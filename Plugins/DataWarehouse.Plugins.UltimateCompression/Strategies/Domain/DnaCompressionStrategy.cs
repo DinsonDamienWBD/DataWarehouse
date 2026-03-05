@@ -291,6 +291,9 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Domain
                 heap.Add(parent);
             }
 
+            // P2-1600: Guard against empty heap (all-zero frequency input).
+            if (heap.Count == 0)
+                throw new InvalidDataException("Cannot build Huffman tree from empty frequency table — input contains no DNA bases.");
             return heap.Min!;
         }
 

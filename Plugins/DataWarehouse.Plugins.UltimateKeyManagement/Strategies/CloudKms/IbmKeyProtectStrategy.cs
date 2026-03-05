@@ -26,9 +26,19 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
     /// </summary>
     public sealed class IbmKeyProtectStrategy : KeyStoreStrategyBase, IEnvelopeKeyStore
     {
-        private readonly HttpClient _httpClient;
+        // P2-3450: Shared static HttpClient to prevent socket exhaustion
+        private static readonly HttpClient _httpClient = new(new SocketsHttpHandler
+        {
+            PooledConnectionLifetime = TimeSpan.FromMinutes(15),
+            PooledConnectionIdleTimeout = TimeSpan.FromMinutes(5)
+        })
+        {
+            Timeout = TimeSpan.FromSeconds(30)
+        };
         private IbmKeyProtectConfig _config = new();
         private string? _currentKeyId;
+        // #3459: Protect token refresh with a dedicated lock to prevent concurrent refresh races.
+        private readonly SemaphoreSlim _tokenLock = new(1, 1);
         private string? _accessToken;
         private DateTime _tokenExpiry = DateTime.MinValue;
 
@@ -70,7 +80,6 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
         public IbmKeyProtectStrategy()
         {
-            _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
         }
 
         protected override async Task InitializeStorage(CancellationToken cancellationToken)
@@ -85,6 +94,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 _config.ApiKey = apiKey;
             if (Configuration.TryGetValue("DefaultKeyId", out var keyIdObj) && keyIdObj is string keyId)
                 _config.DefaultKeyId = keyId;
+            if (Configuration.TryGetValue("StoragePath", out var storagePathObj) && storagePathObj is string storagePath)
+                _config.StoragePath = storagePath;
 
             // Authenticate and get access token
             await RefreshAccessTokenAsync(cancellationToken);
@@ -117,7 +128,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 request.Headers.Add("Authorization", $"Bearer {_accessToken}");
                 request.Headers.Add("Bluemix-Instance", _config.InstanceId);
 
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -128,13 +139,72 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
         protected override async Task<byte[]> LoadKeyFromStorage(string keyId, ISecurityContext context)
         {
-            // IBM Key Protect doesn't expose key material - generate a new data key
-            // This uses the wrap endpoint with a locally generated key
-            var dataKey = new byte[32]; // 256-bit key
+            // #3454: Load persisted wrapped key or generate a new one and persist it.
+            await EnsureValidTokenAsync();
+
+            var storagePath = _config.StoragePath;
+            if (string.IsNullOrEmpty(storagePath))
+                throw new InvalidOperationException(
+                    "Key storage path not configured. Set IbmKeyProtectConfig.StoragePath to enable key persistence.");
+
+            var keyFilePath = GetIbmKeyFilePath(storagePath, keyId);
+            var kekId = string.IsNullOrEmpty(_config.DefaultKeyId) ? _currentKeyId : _config.DefaultKeyId;
+
+            if (File.Exists(keyFilePath))
+            {
+                // Load wrapped key and unwrap via IBM Key Protect
+                var wrappedKeyBase64 = await File.ReadAllTextAsync(keyFilePath);
+                var wrappedKey = Convert.FromBase64String(wrappedKeyBase64.Trim());
+
+                var unwrapPayload = new { ciphertext = Convert.ToBase64String(wrappedKey) };
+                var unwrapRequest = new HttpRequestMessage(HttpMethod.Post,
+                    $"https://{_config.Region}.kms.cloud.ibm.com/api/v2/keys/{kekId}/actions/unwrap");
+                unwrapRequest.Headers.Add("Authorization", $"Bearer {_accessToken}");
+                unwrapRequest.Headers.Add("Bluemix-Instance", _config.InstanceId);
+                unwrapRequest.Content = new StringContent(
+                    JsonSerializer.Serialize(unwrapPayload), Encoding.UTF8, "application/json");
+
+                using var unwrapResponse = await _httpClient.SendAsync(unwrapRequest);
+                unwrapResponse.EnsureSuccessStatusCode();
+
+                var unwrapJson = await unwrapResponse.Content.ReadAsStringAsync();
+                using var unwrapDoc = JsonDocument.Parse(unwrapJson);
+                var plaintext = unwrapDoc.RootElement.GetProperty("plaintext").GetString();
+                return Convert.FromBase64String(plaintext!);
+            }
+
+            // Generate new data key and wrap it
+            var dataKey = new byte[32];
             RandomNumberGenerator.Fill(dataKey);
 
-            // Store wrapped version internally (in practice, this would be persisted)
+            var wrapPayload = new { plaintext = Convert.ToBase64String(dataKey) };
+            var wrapRequest = new HttpRequestMessage(HttpMethod.Post,
+                $"https://{_config.Region}.kms.cloud.ibm.com/api/v2/keys/{kekId}/actions/wrap");
+            wrapRequest.Headers.Add("Authorization", $"Bearer {_accessToken}");
+            wrapRequest.Headers.Add("Bluemix-Instance", _config.InstanceId);
+            wrapRequest.Content = new StringContent(
+                JsonSerializer.Serialize(wrapPayload), Encoding.UTF8, "application/json");
+
+            using var wrapResponse = await _httpClient.SendAsync(wrapRequest);
+            wrapResponse.EnsureSuccessStatusCode();
+
+            var wrapJson = await wrapResponse.Content.ReadAsStringAsync();
+            using var wrapDoc = JsonDocument.Parse(wrapJson);
+            var ciphertext = wrapDoc.RootElement.GetProperty("ciphertext").GetString();
+
+            // Persist wrapped key
+            if (!Directory.Exists(storagePath))
+                Directory.CreateDirectory(storagePath);
+            await File.WriteAllTextAsync(keyFilePath, ciphertext!);
+
             return dataKey;
+        }
+
+        private static string GetIbmKeyFilePath(string storagePath, string keyId)
+        {
+            var safeId = Convert.ToHexString(SHA256.HashData(
+                Encoding.UTF8.GetBytes(keyId)));
+            return Path.Combine(storagePath, $"ibm-key-{safeId[..16]}.enc");
         }
 
         protected override async Task SaveKeyToStorage(string keyId, byte[] keyData, ISecurityContext context)
@@ -167,11 +237,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             request.Headers.Add("Bluemix-Instance", _config.InstanceId);
             request.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             var resources = doc.RootElement.GetProperty("resources");
             var newKeyId = resources[0].GetProperty("id").GetString();
 
@@ -194,11 +264,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             request.Headers.Add("Bluemix-Instance", _config.InstanceId);
             request.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             var ciphertext = doc.RootElement.GetProperty("ciphertext").GetString();
             return Convert.FromBase64String(ciphertext!);
         }
@@ -219,11 +289,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             request.Headers.Add("Bluemix-Instance", _config.InstanceId);
             request.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             var plaintext = doc.RootElement.GetProperty("plaintext").GetString();
             return Convert.FromBase64String(plaintext!);
         }
@@ -238,13 +308,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             request.Headers.Add("Authorization", $"Bearer {_accessToken}");
             request.Headers.Add("Bluemix-Instance", _config.InstanceId);
 
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
                 return Array.Empty<string>();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
 
             if (doc.RootElement.TryGetProperty("resources", out var resources))
             {
@@ -274,7 +344,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             request.Headers.Add("Authorization", $"Bearer {_accessToken}");
             request.Headers.Add("Bluemix-Instance", _config.InstanceId);
 
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
         }
 
@@ -291,13 +361,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 request.Headers.Add("Authorization", $"Bearer {_accessToken}");
                 request.Headers.Add("Bluemix-Instance", _config.InstanceId);
 
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                     return null;
 
                 var json = await response.Content.ReadAsStringAsync(cancellationToken);
-                var doc = JsonDocument.Parse(json);
+                using var doc = JsonDocument.Parse(json);
                 var resources = doc.RootElement.GetProperty("resources");
                 var keyMetadata = resources[0];
 
@@ -339,11 +409,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             };
             tokenRequest.Content = new FormUrlEncodedContent(formData);
 
-            var response = await _httpClient.SendAsync(tokenRequest, cancellationToken);
+            using var response = await _httpClient.SendAsync(tokenRequest, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
 
             _accessToken = doc.RootElement.GetProperty("access_token").GetString();
             var expiresIn = doc.RootElement.GetProperty("expires_in").GetInt32();
@@ -352,15 +422,25 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
         private async Task EnsureValidTokenAsync(CancellationToken cancellationToken = default)
         {
-            if (DateTime.UtcNow >= _tokenExpiry || string.IsNullOrEmpty(_accessToken))
+            // #3459: Double-checked lock pattern to prevent concurrent token refresh races.
+            if (!string.IsNullOrEmpty(_accessToken) && DateTime.UtcNow < _tokenExpiry)
+                return;
+
+            await _tokenLock.WaitAsync(cancellationToken);
+            try
             {
-                await RefreshAccessTokenAsync(cancellationToken);
+                if (DateTime.UtcNow >= _tokenExpiry || string.IsNullOrEmpty(_accessToken))
+                    await RefreshAccessTokenAsync(cancellationToken);
+            }
+            finally
+            {
+                _tokenLock.Release();
             }
         }
 
         public override void Dispose()
         {
-            _httpClient?.Dispose();
+            // _httpClient is shared (static) — not disposed here to prevent breaking other callers.
             base.Dispose();
         }
     }
@@ -374,5 +454,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
         public string Region { get; set; } = "us-south";
         public string ApiKey { get; set; } = string.Empty;
         public string DefaultKeyId { get; set; } = string.Empty;
+        /// <summary>
+        /// Local directory path for persisting wrapped data keys.
+        /// Required for key persistence across restarts.
+        /// </summary>
+        public string? StoragePath { get; set; }
     }
 }

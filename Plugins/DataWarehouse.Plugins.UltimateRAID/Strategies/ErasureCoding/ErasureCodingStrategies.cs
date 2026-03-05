@@ -21,6 +21,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
         private readonly byte[,] _encodingMatrix;
         private readonly Dictionary<string, byte[,]> _decodingMatrixCache;
         private readonly object _cacheLock = new();
+        // In-memory block store: "diskId:offset" → data. Makes reads return what was written.
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte[]> _diskStore = new();
 
         public ReedSolomonStrategy(int dataChunks = 8, int parityChunks = 4)
         {
@@ -382,8 +384,14 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
                     }
                 }
 
-                // Scale pivot to 1
+                // LOW-3664: Throw on singular matrix — a zero pivot after row-swap search means
+                // the generator matrix is non-invertible (degenerate configuration), and
+                // continuing would produce a garbage inverse that silently corrupts decoded data.
                 var pivot = augmented[i, i];
+                if (pivot == 0)
+                    throw new InvalidOperationException(
+                        $"Reed-Solomon matrix is singular at row {i}: cannot invert. " +
+                        "Ensure the generator matrix is constructed over GF(2^8) with distinct evaluation points.");
                 if (pivot != 0)
                 {
                     var inverse = GaloisInverse(pivot);
@@ -492,12 +500,23 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
 
         private Task<byte[]> SimulateReadFromDisk(DiskInfo disk, long offset, int length, CancellationToken ct)
         {
-            var data = new byte[length];
-            new Random((int)(offset + disk.DiskId.GetHashCode())).NextBytes(data);
-            return Task.FromResult(data);
+            var key = $"{disk.DiskId}:{offset}";
+            if (_diskStore.TryGetValue(key, out var stored))
+            {
+                // Return stored data, padded or trimmed to the requested length.
+                var result = new byte[length];
+                Buffer.BlockCopy(stored, 0, result, 0, Math.Min(stored.Length, length));
+                return Task.FromResult(result);
+            }
+            // No data written yet for this block — return zeroes (uninitialized region).
+            return Task.FromResult(new byte[length]);
         }
 
-        private Task SimulateWriteToDisk(DiskInfo disk, long offset, byte[] data, CancellationToken ct) => Task.CompletedTask;
+        private Task SimulateWriteToDisk(DiskInfo disk, long offset, byte[] data, CancellationToken ct)
+        {
+            _diskStore[$"{disk.DiskId}:{offset}"] = data;
+            return Task.CompletedTask;
+        }
     }
 
     /// <summary>
@@ -512,6 +531,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
         private readonly int _localGroups;
         private readonly int _globalParity;
         private readonly int _chunksPerGroup;
+        // In-memory block store: "diskId:offset" → data. Makes reads return what was written.
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte[]> _diskStore = new();
 
         public LocalReconstructionCodeStrategy(int dataChunks = 12, int localGroups = 3, int globalParity = 2)
         {
@@ -950,12 +971,21 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
 
         private Task<byte[]> SimulateReadFromDisk(DiskInfo disk, long offset, int length, CancellationToken ct)
         {
-            var data = new byte[length];
-            new Random((int)(offset + disk.DiskId.GetHashCode())).NextBytes(data);
-            return Task.FromResult(data);
+            var key = $"{disk.DiskId}:{offset}";
+            if (_diskStore.TryGetValue(key, out var stored))
+            {
+                var result = new byte[length];
+                Buffer.BlockCopy(stored, 0, result, 0, Math.Min(stored.Length, length));
+                return Task.FromResult(result);
+            }
+            return Task.FromResult(new byte[length]);
         }
 
-        private Task SimulateWriteToDisk(DiskInfo disk, long offset, byte[] data, CancellationToken ct) => Task.CompletedTask;
+        private Task SimulateWriteToDisk(DiskInfo disk, long offset, byte[] data, CancellationToken ct)
+        {
+            _diskStore[$"{disk.DiskId}:{offset}"] = data;
+            return Task.CompletedTask;
+        }
     }
 
     /// <summary>
@@ -968,6 +998,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
         private readonly int _dataChunks;
         private readonly int _parityChunks;
         private readonly byte[,] _encodingMatrix;
+        // In-memory block store: "diskId:offset" → data. Makes reads return what was written.
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte[]> _diskStore = new();
 
         public IsalErasureStrategy(int dataChunks = 10, int parityChunks = 4)
         {
@@ -1369,11 +1401,20 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
 
         private Task<byte[]> SimulateReadFromDisk(DiskInfo disk, long offset, int length, CancellationToken ct)
         {
-            var data = new byte[length];
-            new Random((int)(offset + disk.DiskId.GetHashCode())).NextBytes(data);
-            return Task.FromResult(data);
+            var key = $"{disk.DiskId}:{offset}";
+            if (_diskStore.TryGetValue(key, out var stored))
+            {
+                var result = new byte[length];
+                Buffer.BlockCopy(stored, 0, result, 0, Math.Min(stored.Length, length));
+                return Task.FromResult(result);
+            }
+            return Task.FromResult(new byte[length]);
         }
 
-        private Task SimulateWriteToDisk(DiskInfo disk, long offset, byte[] data, CancellationToken ct) => Task.CompletedTask;
+        private Task SimulateWriteToDisk(DiskInfo disk, long offset, byte[] data, CancellationToken ct)
+        {
+            _diskStore[$"{disk.DiskId}:{offset}"] = data;
+            return Task.CompletedTask;
+        }
     }
 }

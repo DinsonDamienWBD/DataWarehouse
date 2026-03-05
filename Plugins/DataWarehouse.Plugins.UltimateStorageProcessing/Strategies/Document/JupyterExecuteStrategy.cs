@@ -33,6 +33,19 @@ internal sealed class JupyterExecuteStrategy : StorageProcessingStrategyBase
         var kernel = CliProcessHelper.GetOption<string>(query, "kernel");
         var cellTimeout = CliProcessHelper.GetOption<int>(query, "cellTimeout");
 
+        // Allowlist format and validate kernel name to prevent command injection
+        var allowedFormats = new HashSet<string>(StringComparer.Ordinal) { "html", "pdf", "script", "notebook", "latex", "markdown", "rst", "asciidoc", "slides", "webpdf" };
+        CliProcessHelper.ValidateAllowlist(format, "format", allowedFormats);
+        if (kernel != null) CliProcessHelper.ValidateIdentifier(kernel, "kernel");
+
+        // Validate cellTimeout range
+        if (cellTimeout < 0 || cellTimeout > 86400)
+            throw new ArgumentException("'cellTimeout' must be between 0 and 86400 seconds.", nameof(cellTimeout));
+
+        // Validate source is a .ipynb file (code execution risk — must restrict to notebooks only)
+        if (!query.Source.EndsWith(".ipynb", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Source must be a .ipynb notebook file.", nameof(query.Source));
+
         var args = $"nbconvert --execute --to {format} \"{query.Source}\"";
         if (kernel != null) args += $" --ExecutePreprocessor.kernel_name={kernel}";
         if (cellTimeout > 0) args += $" --ExecutePreprocessor.timeout={cellTimeout}";

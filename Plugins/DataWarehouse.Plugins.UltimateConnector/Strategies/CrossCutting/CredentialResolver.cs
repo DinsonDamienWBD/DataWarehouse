@@ -71,10 +71,19 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
             var fromKeystore = await TryResolveFromKeystoreAsync(credentialKey, ct);
             if (fromKeystore != null)
             {
-                _logger?.LogInformation(
-                    "Credential '{Key}' resolved from keystore via message bus",
-                    credentialKey);
-                return fromKeystore;
+                if (fromKeystore.IsExpired)
+                {
+                    _logger?.LogWarning(
+                        "Credential '{Key}' from keystore is expired (expired at {ExpiresAt}), falling back",
+                        credentialKey, fromKeystore.ExpiresAt);
+                }
+                else
+                {
+                    _logger?.LogInformation(
+                        "Credential '{Key}' resolved from keystore via message bus",
+                        credentialKey);
+                    return fromKeystore;
+                }
             }
 
             if (!string.IsNullOrEmpty(config.AuthCredential))

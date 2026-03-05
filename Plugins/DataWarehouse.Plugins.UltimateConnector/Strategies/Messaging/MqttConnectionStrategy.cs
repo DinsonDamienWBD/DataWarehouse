@@ -18,13 +18,12 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
         public override ConnectionStrategyCapabilities Capabilities => new();
         public override string SemanticDescription => "Connects to MQTT broker using TCP protocol on port 1883 (or 8883 for TLS) for IoT messaging.";
         public override string[] Tags => new[] { "mqtt", "iot", "messaging", "tcp", "pubsub" };
-        private ushort _packetId = 1;
+        private int _packetId = 1;
         public MqttConnectionStrategy(ILogger? logger = null) : base(logger) { }
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var parts = config.ConnectionString.Split(':');
-            var host = parts[0];
-            var port = parts.Length > 1 ? int.Parse(parts[1]) : 1883;
+            // P2-2132: Use ParseHostPortSafe to correctly handle IPv6 addresses like [::1]:1883
+            var (host, port) = ParseHostPortSafe(config.ConnectionString ?? throw new ArgumentException("Connection string required"), 1883);
             var tcpClient = new TcpClient();
             await tcpClient.ConnectAsync(host, port, ct);
             var stream = tcpClient.GetStream();
@@ -33,13 +32,29 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
             var connectPacket = BuildMqttConnectPacket(clientId);
             await stream.WriteAsync(connectPacket, 0, connectPacket.Length, ct);
             await stream.FlushAsync(ct);
-            // Read CONNACK
+            // Read CONNACK (fixed header 0x20, remaining length 0x02, session-present, return-code)
             var ackBuffer = new byte[4];
             await stream.ReadExactlyAsync(ackBuffer, 0, 4, ct);
+            // Finding 2028: Verify CONNACK return code. 0x00 = Connection Accepted.
+            var connackReturnCode = ackBuffer[3];
+            if (connackReturnCode != 0x00)
+            {
+                tcpClient.Close();
+                var reason = connackReturnCode switch
+                {
+                    0x01 => "Unacceptable protocol version",
+                    0x02 => "Identifier rejected",
+                    0x03 => "Server unavailable",
+                    0x04 => "Bad username or password",
+                    0x05 => "Not authorized",
+                    _ => $"Unknown error code 0x{connackReturnCode:X2}"
+                };
+                throw new InvalidOperationException($"MQTT CONNACK refused: {reason}");
+            }
             return new DefaultConnectionHandle(tcpClient, new Dictionary<string, object> { ["Host"] = host, ["Port"] = port });
         }
-        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { try { return handle.GetConnection<TcpClient>()?.Connected ?? false; } catch { return false; } }
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<TcpClient>()?.Close(); await Task.CompletedTask; }
+        protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { try { return Task.FromResult(handle.GetConnection<TcpClient>()?.Connected ?? false); } catch { return Task.FromResult(false); } }
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<TcpClient>()?.Close(); return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, isHealthy ? "MQTT broker is connected" : "MQTT broker is disconnected", sw.Elapsed, DateTimeOffset.UtcNow); }
 
         public override async Task PublishAsync(IConnectionHandle handle, string topic, byte[] message, Dictionary<string, string>? headers = null, CancellationToken ct = default)
@@ -61,12 +76,16 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
                 throw new InvalidOperationException("MQTT connection is not established");
             var stream = client.GetStream();
             // Send SUBSCRIBE packet
-            var subscribePacket = BuildMqttSubscribePacket(topic, _packetId++);
+            var subscribePacket = BuildMqttSubscribePacket(topic, (ushort)Interlocked.Increment(ref _packetId));
             await stream.WriteAsync(subscribePacket, 0, subscribePacket.Length, ct);
             await stream.FlushAsync(ct);
-            // Read SUBACK
+            // Read SUBACK (fixed header 0x90, remaining length 0x03, packet ID (2 bytes), return code)
             var subackBuffer = new byte[5];
             await stream.ReadExactlyAsync(subackBuffer, 0, 5, ct);
+            // Finding 2029: Verify SUBACK return code. 0x00/0x01/0x02 = granted QoS 0/1/2; 0x80 = failure.
+            var subackReturnCode = subackBuffer[4];
+            if (subackReturnCode == 0x80)
+                throw new InvalidOperationException($"MQTT broker refused subscription to topic '{topic}' (SUBACK return code 0x80)");
             // Read PUBLISH messages
             while (!ct.IsCancellationRequested && client.Connected)
             {
@@ -89,7 +108,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
                             if (packetType == 3) // PUBLISH
                             {
                                 var topicLen = (packet[0] << 8) | packet[1];
-                                var payloadStart = 2 + topicLen;
+                                var qos = (header[0] >> 1) & 0x03;
+                                // Finding 2025: For QoS 1 and QoS 2, the variable header includes
+                                // a 2-byte Packet Identifier after the topic name.
+                                var payloadStart = 2 + topicLen + (qos > 0 ? 2 : 0);
                                 if (payloadStart < packet.Length) messageData = packet[payloadStart..];
                             }
                         }
@@ -157,8 +179,12 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
         {
             var multiplier = 1;
             var value = 0;
+            var bytesRead = 0;
             byte encodedByte;
-            do { var buffer = new byte[1]; await stream.ReadExactlyAsync(buffer, 0, 1, ct); encodedByte = buffer[0]; value += (encodedByte & 127) * multiplier; multiplier *= 128; } while ((encodedByte & 128) != 0);
+            do {
+                if (bytesRead >= 4) throw new InvalidDataException("MQTT remaining length exceeds 4-byte maximum (malformed packet)");
+                var buffer = new byte[1]; await stream.ReadExactlyAsync(buffer, 0, 1, ct); encodedByte = buffer[0]; value += (encodedByte & 127) * multiplier; multiplier *= 128; bytesRead++;
+            } while ((encodedByte & 128) != 0);
             return value;
         }
     }

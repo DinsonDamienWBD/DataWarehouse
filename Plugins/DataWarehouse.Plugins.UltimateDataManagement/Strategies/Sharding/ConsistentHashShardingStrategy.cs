@@ -19,7 +19,7 @@ public sealed class ConsistentHashShardingStrategy : ShardingStrategyBase
     private readonly BoundedDictionary<string, List<uint>> _shardToVirtualNodes = new BoundedDictionary<string, List<uint>>(1000);
     private readonly ReaderWriterLockSlim _ringLock = new();
     private readonly int _virtualNodesPerShard;
-    private readonly BoundedDictionary<string, string> _keyCache = new BoundedDictionary<string, string>(1000);
+    private BoundedDictionary<string, string> _keyCache;
     private readonly int _cacheMaxSize;
     private uint[]? _sortedRingKeys;
 
@@ -40,6 +40,8 @@ public sealed class ConsistentHashShardingStrategy : ShardingStrategyBase
 
         _virtualNodesPerShard = virtualNodesPerShard;
         _cacheMaxSize = cacheMaxSize;
+        // Align BoundedDictionary capacity with _cacheMaxSize so both controls are consistent.
+        _keyCache = new BoundedDictionary<string, string>(cacheMaxSize);
     }
 
     /// <inheritdoc/>
@@ -191,6 +193,11 @@ public sealed class ConsistentHashShardingStrategy : ShardingStrategyBase
     /// <inheritdoc/>
     protected override Task<ShardInfo> AddShardCoreAsync(string shardId, string physicalLocation, CancellationToken ct)
     {
+        // To prevent lock-ordering inversion (ShardLock -> _ringLock) we perform the two
+        // operations sequentially with no nested locking: registry update under ShardLock,
+        // ring update under _ringLock.  Both dictionaries are concurrent-safe so interleaved
+        // reads between the two phases are harmless (ring lookup falls back to null shard).
+        ShardInfo shard;
         lock (ShardLock)
         {
             if (ShardRegistry.ContainsKey(shardId))
@@ -198,35 +205,41 @@ public sealed class ConsistentHashShardingStrategy : ShardingStrategyBase
                 throw new InvalidOperationException($"Shard '{shardId}' already exists.");
             }
 
-            var shard = new ShardInfo(shardId, physicalLocation, ShardStatus.Online, 0, 0)
+            shard = new ShardInfo(shardId, physicalLocation, ShardStatus.Online, 0, 0)
             {
                 CreatedAt = DateTime.UtcNow,
                 LastModifiedAt = DateTime.UtcNow
             };
 
             ShardRegistry[shardId] = shard;
-            AddToRing(shardId);
-            _keyCache.Clear();
-
-            return Task.FromResult(shard);
         }
+
+        // Acquire _ringLock independently (no ShardLock held) to avoid lock-ordering deadlock.
+        AddToRing(shardId);
+        _keyCache.Clear();
+
+        return Task.FromResult(shard);
     }
 
     /// <inheritdoc/>
     protected override Task<bool> RemoveShardCoreAsync(string shardId, bool migrateData, CancellationToken ct)
     {
+        // Same sequential pattern: registry removal under ShardLock, ring removal under _ringLock.
+        bool removed;
         lock (ShardLock)
         {
-            if (!ShardRegistry.TryRemove(shardId, out _))
-            {
-                return Task.FromResult(false);
-            }
-
-            RemoveFromRing(shardId);
-            _keyCache.Clear();
-
-            return Task.FromResult(true);
+            removed = ShardRegistry.TryRemove(shardId, out _);
         }
+
+        if (!removed)
+        {
+            return Task.FromResult(false);
+        }
+
+        RemoveFromRing(shardId);
+        _keyCache.Clear();
+
+        return Task.FromResult(true);
     }
 
     /// <summary>

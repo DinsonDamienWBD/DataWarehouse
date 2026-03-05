@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Americas
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("pipeda.check");
+            IncrementCounter("pipeda.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -36,27 +36,28 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Americas
                 violations.Add(new ComplianceViolation { Code = "PIPEDA-003", Description = "Policies not made available to individuals", Severity = ViolationSeverity.Medium, Remediation = "Make policies and practices openly available", RegulatoryReference = "PIPEDA Principle 4.8" });
             }
 
-            if (!context.Attributes.TryGetValue("AppropiateSafeguards", out var safeguardsObj) || safeguardsObj is not true)
+            if (!context.Attributes.TryGetValue("AppropriateSafeguards", out var safeguardsObj) || safeguardsObj is not true)
             {
                 violations.Add(new ComplianceViolation { Code = "PIPEDA-004", Description = "Safeguards not proportionate to sensitivity", Severity = ViolationSeverity.High, Remediation = "Implement appropriate security safeguards", RegulatoryReference = "PIPEDA Principle 4.7" });
             }
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
-            var status = violations.Count == 0 ? ComplianceStatus.Compliant : violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant : ComplianceStatus.PartiallyCompliant;
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
+            var status = violations.Count == 0 ? ComplianceStatus.Compliant : hasHighViolations ? ComplianceStatus.NonCompliant : ComplianceStatus.PartiallyCompliant;
             return Task.FromResult(new ComplianceResult { IsCompliant = isCompliant, Framework = Framework, Status = status, Violations = violations, Recommendations = recommendations });
         }
     
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("pipeda.initialized");
+            IncrementCounter("pipeda.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("pipeda.shutdown");
+            IncrementCounter("pipeda.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

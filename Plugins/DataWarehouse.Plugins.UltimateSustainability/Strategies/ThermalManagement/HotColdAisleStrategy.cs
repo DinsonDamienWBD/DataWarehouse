@@ -82,33 +82,39 @@ public sealed class HotColdAisleStrategy : SustainabilityStrategyBase
     {
         lock (_lock)
         {
-            var coldAisles = _zones.Values.Where(z => z.Type == AisleType.Cold).ToList();
-            var hotAisles = _zones.Values.Where(z => z.Type == AisleType.Hot).ToList();
-
-            if (!coldAisles.Any() || !hotAisles.Any())
-                return new ContainmentEffectiveness { Success = false, Reason = "Insufficient zone data" };
-
-            var avgColdTemp = coldAisles.Average(z => z.CurrentTemperature);
-            var avgHotTemp = hotAisles.Average(z => z.CurrentTemperature);
-            var actualDeltaT = avgHotTemp - avgColdTemp;
-
-            // Effectiveness = actual delta-T / target delta-T
-            var effectiveness = Math.Min(100, (actualDeltaT / TargetDeltaT) * 100);
-
-            // Check for hot spots
-            var hotSpots = coldAisles.Where(z => z.CurrentTemperature > TargetColdAisleTemp + 3).ToList();
-
-            return new ContainmentEffectiveness
-            {
-                Success = true,
-                EffectivenessPercent = effectiveness,
-                AverageColdAisleTemp = avgColdTemp,
-                AverageHotAisleTemp = avgHotTemp,
-                ActualDeltaT = actualDeltaT,
-                HotSpotCount = hotSpots.Count,
-                HotSpotZones = hotSpots.Select(z => z.ZoneId).ToList()
-            };
+            return GetContainmentEffectivenessCore();
         }
+    }
+
+    /// <summary>Core logic for containment effectiveness — caller must hold <c>_lock</c>.</summary>
+    private ContainmentEffectiveness GetContainmentEffectivenessCore()
+    {
+        var coldAisles = _zones.Values.Where(z => z.Type == AisleType.Cold).ToList();
+        var hotAisles = _zones.Values.Where(z => z.Type == AisleType.Hot).ToList();
+
+        if (!coldAisles.Any() || !hotAisles.Any())
+            return new ContainmentEffectiveness { Success = false, Reason = "Insufficient zone data" };
+
+        var avgColdTemp = coldAisles.Average(z => z.CurrentTemperature);
+        var avgHotTemp = hotAisles.Average(z => z.CurrentTemperature);
+        var actualDeltaT = avgHotTemp - avgColdTemp;
+
+        // Effectiveness = actual delta-T / target delta-T
+        var effectiveness = Math.Min(100, (actualDeltaT / TargetDeltaT) * 100);
+
+        // Check for hot spots
+        var hotSpots = coldAisles.Where(z => z.CurrentTemperature > TargetColdAisleTemp + 3).ToList();
+
+        return new ContainmentEffectiveness
+        {
+            Success = true,
+            EffectivenessPercent = effectiveness,
+            AverageColdAisleTemp = avgColdTemp,
+            AverageHotAisleTemp = avgHotTemp,
+            ActualDeltaT = actualDeltaT,
+            HotSpotCount = hotSpots.Count,
+            HotSpotZones = hotSpots.Select(z => z.ZoneId).ToList()
+        };
     }
 
     /// <summary>Gets airflow recommendations.</summary>
@@ -118,7 +124,8 @@ public sealed class HotColdAisleStrategy : SustainabilityStrategyBase
 
         lock (_lock)
         {
-            var effectiveness = GetContainmentEffectiveness();
+            // Use the lock-free core to avoid re-entrant lock acquisition on _lock.
+            var effectiveness = GetContainmentEffectivenessCore();
 
             foreach (var zone in _zones.Values.Where(z => z.Type == AisleType.Cold))
             {

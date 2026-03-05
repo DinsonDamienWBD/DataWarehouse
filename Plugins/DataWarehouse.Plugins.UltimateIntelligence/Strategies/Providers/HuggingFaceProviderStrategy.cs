@@ -57,12 +57,28 @@ public sealed class HuggingFaceProviderStrategy : AIProviderStrategyBase
         Tags = new[] { "huggingface", "open-source", "mistral", "llama", "embeddings", "transformers" }
     };
 
-    private static readonly HttpClient SharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+    private static readonly HttpClient SharedHttpClient = // Cat 15 (finding 3246): AI completions routinely take 60-120s; 30s causes spurious timeouts.
+new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
     public HuggingFaceProviderStrategy() : this(SharedHttpClient) { }
 
     public HuggingFaceProviderStrategy(HttpClient httpClient)
     {
         _httpClient = httpClient;
+    }
+
+    /// <summary>
+    /// P2-3238: Sanitize model ID before using it in a URL path.
+    /// HuggingFace model IDs take the form "org/model-name" (e.g. "mistralai/Mistral-7B-Instruct-v0.1").
+    /// Allow only alphanumeric characters, hyphens, underscores, periods, and a single forward slash
+    /// (for the org/model separator). Any other character could manipulate the URL structure.
+    /// </summary>
+    private static string SanitizeModelId(string modelId)
+    {
+        if (!System.Text.RegularExpressions.Regex.IsMatch(modelId, @"^[A-Za-z0-9\-_\.]+(/[A-Za-z0-9\-_\.]+)?$"))
+            throw new ArgumentException(
+                $"[HuggingFaceProviderStrategy] Model ID '{modelId}' contains disallowed characters.",
+                nameof(modelId));
+        return modelId;
     }
 
     /// <inheritdoc/>
@@ -71,7 +87,7 @@ public sealed class HuggingFaceProviderStrategy : AIProviderStrategyBase
         return await ExecuteWithTrackingAsync(async () =>
         {
             var apiKey = GetRequiredConfig("ApiKey");
-            var model = request.Model ?? GetConfig("Model") ?? DefaultModel;
+            var model = SanitizeModelId(request.Model ?? GetConfig("Model") ?? DefaultModel);
             var endpoint = GetConfig("InferenceEndpoint") ?? $"{GetConfig("ApiBase") ?? DefaultApiBase}/models/{model}";
 
             var prompt = BuildPrompt(request);
@@ -111,7 +127,7 @@ public sealed class HuggingFaceProviderStrategy : AIProviderStrategyBase
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var apiKey = GetRequiredConfig("ApiKey");
-        var model = request.Model ?? GetConfig("Model") ?? DefaultModel;
+        var model = SanitizeModelId(request.Model ?? GetConfig("Model") ?? DefaultModel);
         var endpoint = GetConfig("InferenceEndpoint") ?? $"{GetConfig("ApiBase") ?? DefaultApiBase}/models/{model}";
 
         var prompt = BuildPrompt(request);
@@ -172,7 +188,7 @@ public sealed class HuggingFaceProviderStrategy : AIProviderStrategyBase
         return await ExecuteWithTrackingAsync(async () =>
         {
             var apiKey = GetRequiredConfig("ApiKey");
-            var model = GetConfig("EmbeddingModel") ?? DefaultEmbeddingModel;
+            var model = SanitizeModelId(GetConfig("EmbeddingModel") ?? DefaultEmbeddingModel);
             var apiBase = GetConfig("ApiBase") ?? DefaultApiBase;
 
             var payload = new { inputs = text };

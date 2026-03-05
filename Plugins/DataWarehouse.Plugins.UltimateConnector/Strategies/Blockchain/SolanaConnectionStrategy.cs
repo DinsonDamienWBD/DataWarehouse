@@ -22,7 +22,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Blockchain
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
             var client = new HttpClient { BaseAddress = new Uri(config.ConnectionString) };
-            var response = await client.PostAsync("/", new StringContent(@"{""jsonrpc"":""2.0"",""id"":1,""method"":""getHealth""}", Encoding.UTF8, "application/json"), ct);
+            using var response = await client.PostAsync("/", new StringContent(@"{""jsonrpc"":""2.0"",""id"":1,""method"":""getHealth""}", Encoding.UTF8, "application/json"), ct);
             response.EnsureSuccessStatusCode();
             return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "Solana JSON-RPC" });
         }

@@ -49,24 +49,14 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PlatformAuth
             IncrementCounter("systemd.credential.shutdown");
             return base.ShutdownAsyncCore(cancellationToken);
         }
-protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
             IncrementCounter("systemd.credential.evaluate");
-            await Task.Yield();
-
-            var hasValidIdentity = context.SubjectId.Length > 0;
-
-            return new AccessDecision
-            {
-                IsGranted = hasValidIdentity,
-                Reason = hasValidIdentity ? "Systemd Credential Strategy verified" : "Authentication failed",
-                ApplicablePolicies = new[] { "systemd-credential-policy" },
-                Metadata = new Dictionary<string, object>
-                {
-                    ["platform"] = "Linux",
-                    ["strategy_type"] = "PlatformAuth"
-                }
-            };
+            throw new NotSupportedException(
+                "Requires systemd-creds integration via the systemd-creds(1) command or sd-bus P/Invoke for real " +
+                "TPM-backed credential decryption and verification. " +
+                "This is only available on Linux with systemd 250+. " +
+                "Granting access for any non-empty SubjectId is not a valid implementation.");
         }
     }
 }

@@ -268,7 +268,13 @@ namespace DataWarehouse.Kernel
                 if (_auditLog != null)
                 {
                     _ = _auditLog.LogChangeAsync("System", "kernel.plugin.load",
-                        null, plugin.Id, $"Plugin {plugin.Name} ({plugin.Category}) registered");
+                        null, plugin.Id, $"Plugin {plugin.Name} ({plugin.Category}) registered")
+                        .ContinueWith(t =>
+                        {
+                            if (t.IsFaulted)
+                                _logger?.LogWarning(t.Exception?.InnerException,
+                                    "Failed to audit plugin load for {PluginId}", plugin.Id);
+                        }, TaskContinuationOptions.OnlyOnFaulted);
                 }
 
                 // Publish plugin loaded event
@@ -927,12 +933,13 @@ namespace DataWarehouse.Kernel
             {
                 try
                 {
-                    _ = _auditLog.LogChangeAsync("System", "kernel.lifecycle.shutdown",
-                        KernelId, null, "Kernel shutting down");
+                    await _auditLog.LogChangeAsync("System", "kernel.lifecycle.shutdown",
+                        KernelId, null, "Kernel shutting down")
+                        .WaitAsync(TimeSpan.FromSeconds(5));
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Best-effort audit during shutdown
+                    _logger?.LogWarning(ex, "Failed to audit kernel shutdown event (best-effort)");
                 }
             }
 
@@ -981,11 +988,26 @@ namespace DataWarehouse.Kernel
                 }
             }
 
-            // Wait for background jobs
+            // Wait for background jobs with timeout
             var jobs = _backgroundJobs.Values.ToArray();
             if (jobs.Length > 0)
             {
-                await Task.WhenAll(jobs).WaitAsync(TimeSpan.FromSeconds(10));
+                try
+                {
+                    await Task.WhenAll(jobs).WaitAsync(TimeSpan.FromSeconds(10));
+                }
+                catch (TimeoutException)
+                {
+                    _logger?.LogWarning(
+                        "Background jobs did not complete within 10-second shutdown timeout. " +
+                        "Forcibly continuing shutdown. {JobCount} job(s) may still be running.",
+                        jobs.Length);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex,
+                        "Error waiting for background jobs during shutdown");
+                }
             }
 
             _shutdownCts.Dispose();

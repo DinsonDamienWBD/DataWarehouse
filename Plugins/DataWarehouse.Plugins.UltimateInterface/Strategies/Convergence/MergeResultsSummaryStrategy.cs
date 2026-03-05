@@ -37,6 +37,7 @@ internal sealed class MergeResultsSummaryStrategy : SdkInterface.InterfaceStrate
     public string[] Tags => new[] { "air-gap", "convergence", "results", "summary" };
 
     // SDK contract properties
+    public override bool IsProductionReady => false;
     public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.REST;
     public override SdkInterface.InterfaceCapabilities Capabilities => new SdkInterface.InterfaceCapabilities(
         SupportsStreaming: false,

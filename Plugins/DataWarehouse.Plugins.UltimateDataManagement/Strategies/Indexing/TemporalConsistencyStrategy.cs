@@ -528,12 +528,15 @@ public sealed class TemporalConsistencyStrategy : IndexingStrategyBase
             var sequenceNumber = Interlocked.Read(ref _currentSequenceNumber);
             var snapshotId = $"snap-{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}"[..32];
 
-            // Determine visible transactions
-            var visibleTransactions = new HashSet<string>();
-            foreach (var txn in _activeTransactions.Values.Where(t => !t.IsActive))
-            {
-                visibleTransactions.Add(txn.TransactionId);
-            }
+            // P2-2446: Committed transactions are removed from _activeTransactions on commit, so the
+            // original !t.IsActive query always yielded an empty set. Snapshot isolation visibility is
+            // now enforced entirely via CommitTimestamp in the read path; VisibleTransactions is kept
+            // for diagnostic purposes and populated with currently in-progress (uncommitted) transaction
+            // IDs — the read path no longer consults this set.
+            var visibleTransactions = new HashSet<string>(
+                _activeTransactions.Values
+                    .Where(t => t.IsActive)
+                    .Select(t => t.TransactionId));
 
             var snapshot = new TemporalSnapshot
             {
@@ -616,12 +619,14 @@ public sealed class TemporalConsistencyStrategy : IndexingStrategyBase
             if (!_committedWrites.TryGetValue(objectId, out var writes))
                 return Task.FromResult<byte[]?>(null);
 
-            // Find the most recent write visible in this snapshot
+            // Find the most recent write visible in this snapshot.
+            // P2-2446: Both ReadCommitted and SnapshotIsolation use CommitTimestamp <= snapshot.Timestamp.
+            // VisibleTransactions (formerly broken — always empty) is no longer consulted because all
+            // entries in _committedWrites are already fully committed and the CommitTimestamp filter
+            // correctly implements "no future writes" semantics for both isolation levels.
             var visibleWrite = writes
                 .Where(w => w.CommitTimestamp.HasValue &&
-                           w.CommitTimestamp.Value <= snapshot.Timestamp &&
-                           (snapshot.IsolationLevel == SnapshotIsolationLevel.ReadCommitted ||
-                            snapshot.VisibleTransactions.Contains(w.TransactionId)))
+                           w.CommitTimestamp.Value <= snapshot.Timestamp)
                 .OrderByDescending(w => w.CommitTimestamp)
                 .FirstOrDefault();
 

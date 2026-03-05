@@ -74,10 +74,16 @@ public sealed class AzureEventHubConnectionStrategy : SaaSConnectionStrategyBase
     protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
     {
         var producer = handle.GetConnection<EventHubProducerClient>();
-        await producer.DisposeAsync();
-
-        if (handle is DefaultConnectionHandle dh)
-            dh.MarkDisconnected();
+        // Finding 1830: MarkDisconnected must execute even if DisposeAsync throws.
+        try
+        {
+            await producer.DisposeAsync();
+        }
+        finally
+        {
+            if (handle is DefaultConnectionHandle dh)
+                dh.MarkDisconnected();
+        }
     }
 
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)

@@ -124,13 +124,19 @@ public sealed class AwsCloudAdapterStrategy : MultiCloudStrategyBase
 
     public CloudProviderAdapter CreateAdapter(string region, string accessKey, string secretKey)
     {
+        // P2-3622: Store credentials in adapter so callers can retrieve them for auth.
         return new CloudProviderAdapter
         {
             ProviderId = "aws",
             ProviderType = CloudProviderType.AWS,
             Region = region,
             Storage = new AwsStorageAbstraction(),
-            Compute = new AwsComputeAbstraction()
+            Compute = new AwsComputeAbstraction(),
+            Credentials = new Dictionary<string, string>
+            {
+                ["accessKey"] = accessKey,
+                ["secretKey"] = secretKey
+            }
         };
     }
 }
@@ -158,13 +164,19 @@ public sealed class AzureCloudAdapterStrategy : MultiCloudStrategyBase
 
     public CloudProviderAdapter CreateAdapter(string subscriptionId, string tenantId)
     {
+        // P2-3622: Store credentials in adapter so callers can retrieve them for auth.
         return new CloudProviderAdapter
         {
             ProviderId = "azure",
             ProviderType = CloudProviderType.Azure,
             Region = "global",
             Storage = new AzureStorageAbstraction(),
-            Compute = new AzureComputeAbstraction()
+            Compute = new AzureComputeAbstraction(),
+            Credentials = new Dictionary<string, string>
+            {
+                ["subscriptionId"] = subscriptionId,
+                ["tenantId"] = tenantId
+            }
         };
     }
 }
@@ -309,6 +321,13 @@ public sealed class CloudProviderAdapter
     public required string Region { get; init; }
     public required ICloudStorageAbstraction Storage { get; init; }
     public required ICloudComputeAbstraction Compute { get; init; }
+
+    /// <summary>
+    /// Opaque credential bag passed by the caller.
+    /// Keys: "accessKey"/"secretKey" (AWS), "subscriptionId"/"tenantId" (Azure),
+    /// "projectId"/"serviceAccountJson" (GCP), etc.
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? Credentials { get; init; }
 
     public Task<object?> ExecuteOperationAsync(string operation, Dictionary<string, object> parameters, CancellationToken ct)
     {

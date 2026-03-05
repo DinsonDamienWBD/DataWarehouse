@@ -50,10 +50,10 @@ public sealed class DatabaseStorageScalingManager : IScalableSubsystem, IDisposa
 
     // ---- Configuration ----
     private volatile ScalingLimits _currentLimits;
-    private int _maxBufferBytes;
-    private int _chunkSize;
-    private int _defaultPageSize;
-    private int _healthCheckTimeoutMs;
+    private volatile int _maxBufferBytes;
+    private volatile int _chunkSize;
+    private volatile int _defaultPageSize;
+    private volatile int _healthCheckTimeoutMs;
 
     // ---- Query result cache ----
     private readonly BoundedCache<string, byte[]> _queryResultCache;
@@ -65,6 +65,7 @@ public sealed class DatabaseStorageScalingManager : IScalableSubsystem, IDisposa
     // ---- Metrics ----
     private long _streamingRetrievals;
     private long _paginatedQueries;
+    private long _streamingQueries;
     private long _healthChecksCompleted;
     private long _healthCheckFailures;
     private long _totalBytesStreamed;
@@ -74,7 +75,7 @@ public sealed class DatabaseStorageScalingManager : IScalableSubsystem, IDisposa
     private volatile BackpressureState _backpressureState = BackpressureState.Normal;
 
     // ---- Disposal ----
-    private bool _disposed;
+    private volatile bool _disposed;
 
     /// <summary>
     /// Initializes a new <see cref="DatabaseStorageScalingManager"/> with optional backing store
@@ -135,6 +136,7 @@ public sealed class DatabaseStorageScalingManager : IScalableSubsystem, IDisposa
             ["streaming.retrievals"] = Interlocked.Read(ref _streamingRetrievals),
             ["streaming.totalBytesStreamed"] = Interlocked.Read(ref _totalBytesStreamed),
             ["query.paginatedQueries"] = Interlocked.Read(ref _paginatedQueries),
+            ["query.streamingQueries"] = Interlocked.Read(ref _streamingQueries),
             ["query.activeConcurrent"] = Interlocked.Read(ref _activeConcurrentQueries),
             ["cache.size"] = _queryResultCache.Count,
             ["cache.memoryBytes"] = _queryResultCache.EstimatedMemoryBytes,
@@ -340,7 +342,8 @@ public sealed class DatabaseStorageScalingManager : IScalableSubsystem, IDisposa
         var concurrent = Interlocked.Increment(ref _activeConcurrentQueries);
         try
         {
-            Interlocked.Increment(ref _paginatedQueries);
+            // LOW-2786: Track streaming queries separately; incrementing _paginatedQueries here is misleading
+            Interlocked.Increment(ref _streamingQueries);
 
             await foreach (var item in streamingQueryExecutor(ct).WithCancellation(ct).ConfigureAwait(false))
             {
@@ -380,18 +383,31 @@ public sealed class DatabaseStorageScalingManager : IScalableSubsystem, IDisposa
 
         var results = new Dictionary<string, bool>(strategyHealthChecks.Count);
         var tasks = new List<(string Name, Task<bool> Check)>();
+        // Keep CTS instances alive until all tasks complete; dispose afterward.
+        var timeoutCtsList = new List<CancellationTokenSource>(strategyHealthChecks.Count);
 
-        foreach (var (name, healthCheck) in strategyHealthChecks)
+        try
         {
-            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            timeoutCts.CancelAfter(_healthCheckTimeoutMs);
+            foreach (var (name, healthCheck) in strategyHealthChecks)
+            {
+                var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                timeoutCts.CancelAfter(_healthCheckTimeoutMs);
+                timeoutCtsList.Add(timeoutCts);
 
-            var checkTask = ExecuteHealthCheckWithTimeoutAsync(name, healthCheck, timeoutCts.Token);
-            tasks.Add((name, checkTask));
+                var checkTask = ExecuteHealthCheckWithTimeoutAsync(name, healthCheck, timeoutCts.Token);
+                tasks.Add((name, checkTask));
+            }
+
+            // Run all health checks in parallel
+            await Task.WhenAll(tasks.Select(t => t.Check)).ConfigureAwait(false);
         }
-
-        // Run all health checks in parallel
-        await Task.WhenAll(tasks.Select(t => t.Check)).ConfigureAwait(false);
+        finally
+        {
+            foreach (var cts in timeoutCtsList)
+            {
+                cts.Dispose();
+            }
+        }
 
         foreach (var (name, checkTask) in tasks)
         {

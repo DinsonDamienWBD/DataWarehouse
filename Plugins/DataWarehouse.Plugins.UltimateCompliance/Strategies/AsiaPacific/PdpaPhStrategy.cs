@@ -7,8 +7,14 @@ using System.Threading.Tasks;
 namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.AsiaPacific
 {
     /// <summary>
-    /// Philippines Data Privacy Act compliance strategy.
+    /// Philippines Data Privacy Act (RA 10173) compliance strategy.
     /// </summary>
+    /// <remarks>
+    /// The class name <c>PdpaPhStrategy</c> uses the informal regional abbreviation "PDPA-PH"
+    /// for discoverability alongside other PDPA strategies. The official regulation is the
+    /// Data Privacy Act (DPA) and <see cref="Framework"/> returns <c>"DPA-PH"</c>.
+    /// <see cref="StrategyId"/> uses <c>"pdpa-ph"</c> for backward-compatible keying.
+    /// </remarks>
     public sealed class PdpaPhStrategy : ComplianceStrategyBase
     {
         public override string StrategyId => "pdpa-ph";
@@ -17,7 +23,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.AsiaPacific
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("pdpa_ph.check");
+            IncrementCounter("pdpa_ph.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -75,9 +81,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.AsiaPacific
                 }
             }
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -93,14 +100,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.AsiaPacific
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("pdpa_ph.initialized");
+            IncrementCounter("pdpa_ph.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("pdpa_ph.shutdown");
+            IncrementCounter("pdpa_ph.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

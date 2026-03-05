@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text.Json;
 using DataWarehouse.SDK.Utilities;
 
@@ -55,10 +56,12 @@ public sealed class DirectoryShardingStrategy : ShardingStrategyBase
     private readonly BoundedDictionary<string, DirectoryEntry> _directory = new BoundedDictionary<string, DirectoryEntry>(1000);
     private readonly BoundedDictionary<string, string> _cache = new BoundedDictionary<string, string>(1000);
     private readonly ReaderWriterLockSlim _directoryLock = new();
+    // Sorted prefix index for O(log n) prefix matching: key is the prefix string, value is shardId.
+    private readonly SortedList<string, string> _prefixIndex = new(StringComparer.Ordinal);
     private readonly int _cacheMaxSize;
     private readonly string? _persistencePath;
     private readonly Timer? _persistenceTimer;
-    private bool _isDirty;
+    private volatile bool _isDirty;
     private string _defaultShardId = "shard-default";
 
     /// <summary>
@@ -83,7 +86,7 @@ public sealed class DirectoryShardingStrategy : ShardingStrategyBase
         if (persistencePath != null && persistenceIntervalSeconds > 0)
         {
             _persistenceTimer = new Timer(
-                async _ => await PersistDirectoryAsync(),
+                async _ => { try { await PersistDirectoryAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } },
                 null,
                 TimeSpan.FromSeconds(persistenceIntervalSeconds),
                 TimeSpan.FromSeconds(persistenceIntervalSeconds));
@@ -277,6 +280,12 @@ public sealed class DirectoryShardingStrategy : ShardingStrategyBase
 
         _directory[key] = entry;
         _cache[key] = shardId;
+        // Maintain prefix index for wildcard keys (ending with '*') to enable O(log n) lookup.
+        if (key.EndsWith('*'))
+        {
+            var prefix = key[..^1];
+            lock (_prefixIndex) { _prefixIndex[prefix] = shardId; }
+        }
         _isDirty = true;
 
         return Task.FromResult(entry);
@@ -537,27 +546,26 @@ public sealed class DirectoryShardingStrategy : ShardingStrategyBase
             return entry.ShardId;
         }
 
-        // Try prefix matching (keys ending with *)
-        _directoryLock.EnterReadLock();
-        try
+        // O(log n) prefix matching via sorted prefix index.
+        // Find the largest prefix that is a prefix of 'key' using a linear scan
+        // from the last entry whose key is <= the lookup key.
+        lock (_prefixIndex)
         {
-            foreach (var kvp in _directory)
+            // Walk from the end of sorted prefixes down to find the longest matching prefix.
+            var prefixKeys = _prefixIndex.Keys;
+            // Start from the position just before where 'key' would be inserted.
+            int probe = prefixKeys.Count - 1;
+            while (probe >= 0 && StringComparer.Ordinal.Compare(prefixKeys[probe], key) > 0)
+                probe--;
+            while (probe >= 0)
             {
-                if (kvp.Key.EndsWith('*'))
+                var prefix = prefixKeys[probe];
+                if (key.StartsWith(prefix, StringComparison.Ordinal))
                 {
-                    var prefix = kvp.Key[..^1];
-                    if (key.StartsWith(prefix, StringComparison.Ordinal))
-                    {
-                        kvp.Value.LastAccessedAt = DateTime.UtcNow;
-                        kvp.Value.AccessCount++;
-                        return kvp.Value.ShardId;
-                    }
+                    return _prefixIndex.Values[probe];
                 }
+                probe--;
             }
-        }
-        finally
-        {
-            _directoryLock.ExitReadLock();
         }
 
         // Return default shard

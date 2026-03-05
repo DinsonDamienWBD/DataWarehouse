@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 
 namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Healthcare
 {
-    public class Hl7v2ConnectionStrategy : HealthcareConnectionStrategyBase
+    public sealed class Hl7v2ConnectionStrategy : HealthcareConnectionStrategyBase
     {
         public override string StrategyId => "hl7v2";
         public override string DisplayName => "HL7 v2.x";
@@ -21,15 +21,31 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Healthcare
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var parts = config.ConnectionString.Split(':');
+            // P2-2132: Use ParseHostPortSafe to correctly handle IPv6 addresses like [::1]:2575
+            var (host, port) = ParseHostPortSafe(config.ConnectionString ?? throw new ArgumentException("Connection string required"), 2575);
             var client = new TcpClient();
-            await client.ConnectAsync(parts[0], parts.Length > 1 ? int.Parse(parts[1]) : 2575, ct);
+            await client.ConnectAsync(host, port, ct);
             return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "HL7 v2.x/MLLP" });
         }
 
-        protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(handle.GetConnection<TcpClient>().Connected);
+        // Finding 1919: Use live socket probe instead of stale Connected flag.
+        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        {
+            var client = handle.GetConnection<TcpClient>();
+            if (!client.Connected) return false;
+            try { await client.GetStream().WriteAsync(Array.Empty<byte>(), ct); return true; }
+            catch { return false; }
+        }
+
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<TcpClient>().Close(); return Task.CompletedTask; }
-        protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(new ConnectionHealth(handle.GetConnection<TcpClient>().Connected, "HL7 server", TimeSpan.Zero, DateTimeOffset.UtcNow));
+
+        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var isHealthy = await TestCoreAsync(handle, ct);
+            sw.Stop();
+            return new ConnectionHealth(isHealthy, isHealthy ? "HL7 server connected" : "HL7 server disconnected", sw.Elapsed, DateTimeOffset.UtcNow);
+        }
         public override Task<(bool IsValid, string[] Errors)> ValidateHl7Async(IConnectionHandle handle, string hl7Message, CancellationToken ct = default)
         {
             var errors = new List<string>();
@@ -84,7 +100,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Healthcare
         /// <exception cref="ArgumentException">Thrown if the message is invalid or missing the MSH segment.</exception>
         public async Task<Hl7ParsedMessage> ParseHl7MessageAsync(string hl7Message, CancellationToken ct = default)
         {
-            await Task.CompletedTask; // Make async for consistency
+            // Finding 1921: Removed no-op await; synchronous parsing is returned as completed Task via caller awaiting.
             ct.ThrowIfCancellationRequested();
 
             if (string.IsNullOrWhiteSpace(hl7Message))

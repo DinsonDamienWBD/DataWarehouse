@@ -336,13 +336,13 @@ public sealed class LoadBalancingManager
 {
     private readonly BoundedDictionary<string, NodeMetrics> _nodeMetrics = new BoundedDictionary<string, NodeMetrics>(1000);
     private readonly BoundedDictionary<string, LoadBalancingConfig> _containerConfigs = new BoundedDictionary<string, LoadBalancingConfig>(1000);
-    private LoadBalancingConfig _defaultConfig;
+    private volatile LoadBalancingConfig _defaultConfig;
     private readonly object _lock = new();
 
     // Metrics for intelligent mode selection
     private long _totalRequests;
     private long _requestsLastMinute;
-    private DateTime _lastMetricsReset = DateTime.UtcNow;
+    private long _lastMetricsResetTicks = DateTime.UtcNow.Ticks;
 
     public LoadBalancingManager(LoadBalancingConfig? defaultConfig = null)
     {
@@ -395,11 +395,15 @@ public sealed class LoadBalancingManager
                 return existing;
             });
 
-        // Reset minute counter periodically
-        if ((DateTime.UtcNow - _lastMetricsReset).TotalMinutes >= 1)
+        // Reset minute counter periodically (atomic via Interlocked on long ticks)
+        var lastResetTicks = Interlocked.Read(ref _lastMetricsResetTicks);
+        if ((DateTime.UtcNow - new DateTime(lastResetTicks, DateTimeKind.Utc)).TotalMinutes >= 1)
         {
-            Interlocked.Exchange(ref _requestsLastMinute, 0);
-            _lastMetricsReset = DateTime.UtcNow;
+            var nowTicks = DateTime.UtcNow.Ticks;
+            if (Interlocked.CompareExchange(ref _lastMetricsResetTicks, nowTicks, lastResetTicks) == lastResetTicks)
+            {
+                Interlocked.Exchange(ref _requestsLastMinute, 0);
+            }
         }
     }
 
@@ -429,7 +433,10 @@ public sealed class LoadBalancingManager
             return config.Mode;
         }
 
-        var activeNodes = _nodeMetrics.Count(n => n.Value.Health == NodeHealthStatus.Healthy);
+        // Use a single pass to count healthy nodes instead of O(n) LINQ Count+predicate
+        var activeNodes = 0;
+        foreach (var kv in _nodeMetrics)
+            if (kv.Value.Health == NodeHealthStatus.Healthy) activeNodes++;
         var requestRate = _requestsLastMinute;
 
         // Decision matrix for intelligent mode selection
@@ -470,22 +477,32 @@ public sealed class LoadBalancingManager
             return config.Algorithm;
         }
 
-        var healthyNodes = _nodeMetrics.Values.Where(n => n.Health == NodeHealthStatus.Healthy).ToList();
-        if (healthyNodes.Count == 0)
+        // Single pass over metrics to extract all needed values — avoids four O(n) LINQ passes
+        long totalLoad = 0, maxLoad = 0, healthyCount = 0;
+        double minLatency = double.MaxValue, maxLatency = 0;
+        int latencyCount = 0;
+        foreach (var m in _nodeMetrics.Values)
+        {
+            if (m.Health != NodeHealthStatus.Healthy) continue;
+            healthyCount++;
+            totalLoad += m.RequestCount;
+            if (m.RequestCount > maxLoad) maxLoad = m.RequestCount;
+            if (m.AverageLatencyMs > 0)
+            {
+                if (m.AverageLatencyMs < minLatency) minLatency = m.AverageLatencyMs;
+                if (m.AverageLatencyMs > maxLatency) maxLatency = m.AverageLatencyMs;
+                latencyCount++;
+            }
+        }
+
+        if (healthyCount == 0)
         {
             return LoadBalancingAlgorithm.RoundRobin;
         }
 
-        // Check for load imbalance
-        var avgLoad = healthyNodes.Average(n => n.RequestCount);
-        var maxLoad = healthyNodes.Max(n => n.RequestCount);
+        var avgLoad = healthyCount > 0 ? (double)totalLoad / healthyCount : 0;
         var imbalanceRatio = avgLoad > 0 ? maxLoad / avgLoad : 1;
-
-        // Check latency variance
-        var latencies = healthyNodes.Where(n => n.AverageLatencyMs > 0).Select(n => n.AverageLatencyMs).ToList();
-        var latencyVariance = latencies.Count > 1
-            ? latencies.Max() - latencies.Min()
-            : 0;
+        var latencyVariance = latencyCount > 1 ? maxLatency - minLatency : 0;
 
         return (imbalanceRatio, latencyVariance, config.Tier) switch
         {

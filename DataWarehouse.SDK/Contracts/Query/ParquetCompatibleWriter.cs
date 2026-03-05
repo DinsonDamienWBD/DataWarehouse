@@ -450,13 +450,21 @@ public static class ParquetCompatibleReader
     private static readonly byte[] Magic = "PAR1"u8.ToArray();
 
     /// <summary>Read all batches from a Parquet-compatible stream.</summary>
+    /// <remarks>
+    /// Currently uses synchronous I/O internally. On network or slow streams this will
+    /// block a thread-pool thread. Wrap the call in <c>Task.Run</c> for non-seekable streams.
+    /// </remarks>
     public static async IAsyncEnumerable<ColumnarBatch> ReadFromStream(Stream input)
     {
         var metadata = ReadMetadata(input);
 
         foreach (var rowGroup in metadata.RowGroups)
         {
-            yield return await Task.FromResult(ReadRowGroup(input, metadata.Schema, rowGroup));
+            // Offload synchronous row-group read to avoid blocking the calling context on
+            // non-memory streams. For MemoryStream the overhead is negligible.
+            var batch = await Task.Run(() => ReadRowGroup(input, metadata.Schema, rowGroup))
+                .ConfigureAwait(false);
+            yield return batch;
         }
     }
 
@@ -479,8 +487,12 @@ public static class ParquetCompatibleReader
         if (version != 1)
             throw new InvalidDataException($"Unsupported Parquet footer version: {version}");
 
-        // Read schema
+        // Read schema — guard against malformed/hostile files causing multi-GB allocations
+        const int MaxColumns = 65536;
+        const int MaxRowGroups = 1048576; // 1M row groups max
         int numColumns = reader.ReadInt32();
+        if (numColumns < 0 || numColumns > MaxColumns)
+            throw new InvalidDataException($"Invalid numColumns in Parquet footer: {numColumns} (max {MaxColumns}).");
         var schemas = new List<ParquetColumnSchema>(numColumns);
         for (int i = 0; i < numColumns; i++)
         {
@@ -499,8 +511,10 @@ public static class ParquetCompatibleReader
             });
         }
 
-        // Read row groups
+        // Read row groups — guard against hostile numRowGroups
         int numRowGroups = reader.ReadInt32();
+        if (numRowGroups < 0 || numRowGroups > MaxRowGroups)
+            throw new InvalidDataException($"Invalid numRowGroups in Parquet footer: {numRowGroups} (max {MaxRowGroups}).");
         var rowGroups = new List<ParquetRowGroupMetadata>(numRowGroups);
         for (int rg = 0; rg < numRowGroups; rg++)
         {

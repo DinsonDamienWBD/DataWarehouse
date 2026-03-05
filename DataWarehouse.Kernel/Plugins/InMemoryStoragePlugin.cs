@@ -27,7 +27,8 @@ namespace DataWarehouse.Kernel.Plugins
         private readonly InMemoryStorageConfig _config;
         private readonly List<Action<EvictionEvent>> _evictionCallbacks = new();
         private long _currentSizeBytes;
-        private DateTime _lastMemoryCheck = DateTime.UtcNow;
+        // Cat 2 (finding 965): use long ticks with Interlocked for thread-safe timestamp access
+        private long _lastMemoryCheckTicks = DateTime.UtcNow.Ticks;
 
         public override string Id => "datawarehouse.kernel.storage.inmemory";
         public override string Name => "In-Memory Storage";
@@ -418,11 +419,9 @@ namespace DataWarehouse.Kernel.Plugins
 
         private StoredBlob? GetLruItem()
         {
-            // Find the least recently used item
+            // Cat 13 (finding 964): use MinBy (O(n)) instead of OrderBy+FirstOrDefault (O(n log n))
             return _storage.Values
-                .OrderBy(b => b.LastAccessedAt)
-                .ThenBy(b => b.AccessCount)
-                .FirstOrDefault();
+                .MinBy(b => (b.LastAccessedAt.Ticks, b.AccessCount));
         }
 
         private EvictionReason DetermineEvictionReason()
@@ -466,11 +465,12 @@ namespace DataWarehouse.Kernel.Plugins
 
         private void CheckSystemMemoryPressure()
         {
-            // Check system memory every 10 seconds
-            if ((DateTime.UtcNow - _lastMemoryCheck).TotalSeconds < 10)
+            // Check system memory every 10 seconds (Cat 2 finding 965: use atomic long ticks)
+            var now = DateTime.UtcNow.Ticks;
+            var last = Interlocked.Read(ref _lastMemoryCheckTicks);
+            if (now - last < TimeSpan.TicksPerSecond * 10)
                 return;
-
-            _lastMemoryCheck = DateTime.UtcNow;
+            Interlocked.Exchange(ref _lastMemoryCheckTicks, now);
 
             try
             {

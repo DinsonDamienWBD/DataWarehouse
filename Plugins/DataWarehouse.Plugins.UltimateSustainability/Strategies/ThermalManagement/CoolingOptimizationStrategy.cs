@@ -57,9 +57,52 @@ public sealed class CoolingOptimizationStrategy : SustainabilityStrategyBase
 
     private void DiscoverFans()
     {
-        // Discover from /sys/class/hwmon on Linux
-        _fanZones["cpu"] = new FanZone { Name = "cpu", MaxRpm = 2500, CurrentRpm = 1000, CurrentPercent = 40 };
-        _fanZones["case"] = new FanZone { Name = "case", MaxRpm = 1500, CurrentRpm = 600, CurrentPercent = 40 };
+        // Discover fan zones from /sys/class/hwmon on Linux
+        if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Linux))
+        {
+            try
+            {
+                var hwmonBase = "/sys/class/hwmon";
+                if (Directory.Exists(hwmonBase))
+                {
+                    foreach (var hwmonDir in Directory.GetDirectories(hwmonBase))
+                    {
+                        // Look for fan inputs (fan1_input, fan2_input, ...)
+                        foreach (var file in Directory.GetFiles(hwmonDir, "fan*_input"))
+                        {
+                            var fanNum = Path.GetFileNameWithoutExtension(file).Replace("fan", "").Replace("_input", "");
+                            var pwmPath = Path.Combine(hwmonDir, $"pwm{fanNum}");
+                            if (!File.Exists(pwmPath)) continue;
+
+                            var maxRpmPath = Path.Combine(hwmonDir, $"fan{fanNum}_max");
+                            int maxRpm = 3000;
+                            if (File.Exists(maxRpmPath) && int.TryParse(File.ReadAllText(maxRpmPath).Trim(), out var mr))
+                                maxRpm = mr;
+
+                            int currentRpm = 0;
+                            if (int.TryParse(File.ReadAllText(file).Trim(), out var cr))
+                                currentRpm = cr;
+
+                            var name = $"hwmon-fan{fanNum}";
+                            _fanZones[name] = new FanZone
+                            {
+                                Name = name,
+                                SysFsPath = pwmPath,
+                                MaxRpm = maxRpm,
+                                CurrentRpm = currentRpm,
+                                CurrentPercent = maxRpm > 0 ? (int)(100.0 * currentRpm / maxRpm) : 0
+                            };
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Cooling] Fan discovery failed: {ex.Message}");
+            }
+        }
+
+        // If no fans discovered, register none — don't pretend to manage hardware we can't reach
     }
 
     private void OptimizeCooling()
@@ -90,8 +133,41 @@ public sealed class CoolingOptimizationStrategy : SustainabilityStrategyBase
 
     private async Task ApplyProfileAsync(CoolingProfile profile)
     {
-        await Task.Delay(1);
-        // Would write to fan control sysfs or IPMI
+        // Target PWM duty cycle (0-255 for sysfs pwm interface)
+        var targetPwm = profile switch
+        {
+            CoolingProfile.Silent      => 77,  // ~30%
+            CoolingProfile.Balanced    => 128, // ~50%
+            CoolingProfile.Performance => 204, // ~80%
+            CoolingProfile.Maximum     => 255, // 100%
+            _                          => 128
+        };
+
+        if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Linux))
+        {
+            foreach (var fan in _fanZones.Values)
+            {
+                if (string.IsNullOrEmpty(fan.SysFsPath)) continue;
+
+                try
+                {
+                    // Enable manual PWM control (pwm_enable = 1)
+                    var enablePath = fan.SysFsPath + "_enable";
+                    if (File.Exists(enablePath))
+                        await File.WriteAllTextAsync(enablePath, "1");
+
+                    // Write target duty cycle
+                    if (File.Exists(fan.SysFsPath))
+                        await File.WriteAllTextAsync(fan.SysFsPath, targetPwm.ToString());
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[Cooling] Failed to set PWM for {fan.Name}: {ex.Message}");
+                }
+            }
+        }
+        // On non-Linux platforms, internal state tracks the profile but no kernel interface is available.
+        await Task.CompletedTask;
     }
 
     private void UpdateRecommendations()
@@ -121,6 +197,8 @@ public enum CoolingProfile { Silent, Balanced, Performance, Maximum }
 public sealed class FanZone
 {
     public required string Name { get; init; }
+    /// <summary>Path to the sysfs PWM control file (e.g. /sys/class/hwmon/hwmon0/pwm1).</summary>
+    public string? SysFsPath { get; init; }
     public int MaxRpm { get; init; }
     public int CurrentRpm { get; set; }
     public int CurrentPercent { get; set; }

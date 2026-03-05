@@ -23,9 +23,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var parts = config.ConnectionString.Split(':');
+            // P2-2132: Use ParseHostPortSafe to correctly handle IPv6 addresses like [::1]:8888
+            var (host, port) = ParseHostPortSafe(config.ConnectionString ?? throw new ArgumentException("Connection string required"), 8888);
             var client = new TcpClient();
-            await client.ConnectAsync(parts[0], parts.Length > 1 ? int.Parse(parts[1]) : 8888, ct);
+            await client.ConnectAsync(host, port, ct);
             return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "Zigbee/TCP" });
         }
 

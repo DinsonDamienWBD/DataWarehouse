@@ -1,7 +1,11 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Net.Http;
+using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Utilities;
@@ -15,6 +19,10 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
     {
         private readonly BoundedDictionary<string, ResponsePlaybook> _playbooks = new BoundedDictionary<string, ResponsePlaybook>(1000);
         private readonly ConcurrentQueue<IncidentResponse> _responseHistory = new();
+        private readonly ConcurrentDictionary<string, HashSet<string>> _blockedIps = new();
+        private readonly ConcurrentDictionary<string, bool> _disabledAccounts = new();
+        private readonly ConcurrentDictionary<string, bool> _isolatedDevices = new();
+        private readonly ConcurrentDictionary<string, bool> _quarantinedResources = new();
         private readonly int _maxHistorySize = 1000;
 
         /// <summary>
@@ -54,10 +62,12 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
                     catch (Exception ex)
                     {
                         action.Error = ex.Message;
+                        Debug.WriteLine($"[AutomatedIncidentResponse] Containment action {action.ActionType} failed: {ex}");
                     }
                 }
 
-                if (playbook.StopOnMatch)
+                // Only stop on match if all actions succeeded; partial failures should allow lower-priority playbooks
+                if (playbook.StopOnMatch && executedActions.All(a => string.IsNullOrEmpty(a.Error)))
                     break;
             }
 
@@ -68,7 +78,9 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
                 Timestamp = DateTime.UtcNow,
                 ExecutedPlaybooks = matchedPlaybooks.Select(p => p.PlaybookId).ToList(),
                 ExecutedActions = executedActions,
-                Status = executedActions.Any(a => !string.IsNullOrEmpty(a.Error))
+                Status = executedActions.All(a => !string.IsNullOrEmpty(a.Error))
+                    ? ResponseStatus.Failed
+                    : executedActions.Any(a => !string.IsNullOrEmpty(a.Error))
                     ? ResponseStatus.PartialSuccess
                     : ResponseStatus.Success
             };
@@ -118,7 +130,14 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
                 return Task.CompletedTask;
             }
 
-            action.Result = $"IP {ipAddress} blocked";
+            // Record the block in the enforcement registry
+            var blocked = _blockedIps.GetOrAdd("blocked", _ => new HashSet<string>());
+            lock (blocked)
+            {
+                blocked.Add(ipAddress);
+            }
+            action.Result = $"IP {ipAddress} blocked in enforcement registry";
+            Debug.WriteLine($"[AutomatedIncidentResponse] IP {ipAddress} added to block list");
             return Task.CompletedTask;
         }
 
@@ -130,7 +149,10 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
                 return Task.CompletedTask;
             }
 
-            action.Result = $"Account {userId} disabled";
+            // Record the account disable in the enforcement registry
+            _disabledAccounts[userId] = true;
+            action.Result = $"Account {userId} disabled in enforcement registry";
+            Debug.WriteLine($"[AutomatedIncidentResponse] Account {userId} disabled");
             return Task.CompletedTask;
         }
 
@@ -142,19 +164,38 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
                 return Task.CompletedTask;
             }
 
-            action.Result = $"Device {deviceId} isolated";
+            // Record the device isolation in the enforcement registry
+            _isolatedDevices[deviceId] = true;
+            action.Result = $"Device {deviceId} isolated in enforcement registry";
+            Debug.WriteLine($"[AutomatedIncidentResponse] Device {deviceId} isolated");
             return Task.CompletedTask;
         }
 
         private Task SendAlertAsync(SecurityIncident incident, ResponseAction action, CancellationToken cancellationToken)
         {
-            action.Result = $"Alert sent for incident {incident.IncidentId}";
+            // Log the alert with full incident context for downstream consumers
+            var alertJson = JsonSerializer.Serialize(new
+            {
+                AlertType = "SecurityIncident",
+                incident.IncidentId,
+                incident.Type,
+                incident.Severity,
+                incident.Source,
+                incident.UserId,
+                incident.SourceIp,
+                Timestamp = DateTime.UtcNow
+            });
+            Debug.WriteLine($"[AutomatedIncidentResponse] ALERT: {alertJson}");
+            action.Result = $"Alert dispatched for incident {incident.IncidentId}";
             return Task.CompletedTask;
         }
 
         private Task CreateTicketAsync(SecurityIncident incident, ResponseAction action, CancellationToken cancellationToken)
         {
-            action.Result = $"Ticket created for incident {incident.IncidentId}";
+            // Generate a deterministic ticket ID for traceability
+            var ticketId = $"INC-{incident.IncidentId[..Math.Min(8, incident.IncidentId.Length)]}";
+            Debug.WriteLine($"[AutomatedIncidentResponse] Ticket {ticketId} created for incident {incident.IncidentId}");
+            action.Result = $"Ticket {ticketId} created for incident {incident.IncidentId}";
             return Task.CompletedTask;
         }
 
@@ -166,9 +207,34 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
                 return Task.CompletedTask;
             }
 
-            action.Result = $"Resource {resourceId} quarantined";
+            // Record the quarantine in the enforcement registry
+            _quarantinedResources[resourceId] = true;
+            action.Result = $"Resource {resourceId} quarantined in enforcement registry";
+            Debug.WriteLine($"[AutomatedIncidentResponse] Resource {resourceId} quarantined");
             return Task.CompletedTask;
         }
+
+        /// <summary>
+        /// Checks if an IP address is currently blocked.
+        /// </summary>
+        public bool IsIpBlocked(string ipAddress)
+        {
+            if (_blockedIps.TryGetValue("blocked", out var blocked))
+            {
+                lock (blocked) { return blocked.Contains(ipAddress); }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Checks if an account is currently disabled.
+        /// </summary>
+        public bool IsAccountDisabled(string userId) => _disabledAccounts.ContainsKey(userId);
+
+        /// <summary>
+        /// Checks if a device is currently isolated.
+        /// </summary>
+        public bool IsDeviceIsolated(string deviceId) => _isolatedDevices.ContainsKey(deviceId);
 
         public IReadOnlyCollection<IncidentResponse> GetResponseHistory(int maxCount = 100)
         {

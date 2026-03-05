@@ -32,6 +32,9 @@ internal sealed class HaskellWasmLanguageStrategy : WasmLanguageStrategyBase
     public override string StrategyId => "compute.wasm.lang.haskell";
 
     /// <inheritdoc/>
+    protected override string[] GetToolchainBinaryNames() => new[] { "wasm-ghc", "ghc" };
+
+    /// <inheritdoc/>
     public override string StrategyName => "Haskell WASM Language";
 
     /// <inheritdoc/>

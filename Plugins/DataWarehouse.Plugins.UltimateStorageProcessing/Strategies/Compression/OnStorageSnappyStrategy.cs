@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.IO.Compression;
 using System.Runtime.CompilerServices;
 using DataWarehouse.SDK.Contracts.StorageProcessing;
 
@@ -33,67 +32,16 @@ internal sealed class OnStorageSnappyStrategy : StorageProcessingStrategyBase
     };
 
     /// <inheritdoc/>
-    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default)
+    public override Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default)
     {
-        ValidateQuery(query);
-        var sw = Stopwatch.StartNew();
-        var sourcePath = query.Source;
-        var mode = GetOption<string>(query, "mode") ?? "compress";
-
-        if (!File.Exists(sourcePath))
-            return MakeError("Source file not found", sourcePath, sw);
-
-        var originalSize = new FileInfo(sourcePath).Length;
-        var outputPath = mode == "decompress"
-            ? (sourcePath.EndsWith(".snappy", StringComparison.OrdinalIgnoreCase) ? sourcePath[..^7] : sourcePath + ".decompressed")
-            : sourcePath + ".snappy";
-
-        // Snappy prioritizes speed; use fastest deflate as comparable speed-oriented compression
-        await using (var input = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read, SnappyBlockSize, true))
-        await using (var output = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.None, SnappyBlockSize, true))
-        {
-            if (mode == "decompress")
-            {
-                await using var decompressor = new DeflateStream(input, CompressionMode.Decompress);
-                await decompressor.CopyToAsync(output, SnappyBlockSize, ct);
-            }
-            else
-            {
-                // Write snappy framing format stream identifier
-                var streamId = "sNaPpY"u8.ToArray();
-                await output.WriteAsync(streamId, ct);
-
-                await using var compressor = new DeflateStream(output, CompressionLevel.Fastest, leaveOpen: true);
-                var buffer = new byte[SnappyBlockSize];
-                int bytesRead;
-                long totalRead = 0;
-                while ((bytesRead = await input.ReadAsync(buffer, ct)) > 0)
-                {
-                    await compressor.WriteAsync(buffer.AsMemory(0, bytesRead), ct);
-                    totalRead += bytesRead;
-                }
-            }
-        }
-
-        var resultSize = new FileInfo(outputPath).Length;
-        var ratio = originalSize > 0 ? (double)resultSize / originalSize : 1.0;
-        sw.Stop();
-
-        return new ProcessingResult
-        {
-            Data = new Dictionary<string, object?>
-            {
-                ["sourcePath"] = sourcePath, ["outputPath"] = outputPath,
-                ["originalSize"] = originalSize, ["resultSize"] = resultSize,
-                ["compressionRatio"] = Math.Round(ratio, 4),
-                ["mode"] = mode, ["blockSize"] = SnappyBlockSize, ["algorithm"] = "snappy"
-            },
-            Metadata = new ProcessingMetadata
-            {
-                RowsProcessed = 1, RowsReturned = 1, BytesProcessed = originalSize,
-                ProcessingTimeMs = sw.Elapsed.TotalMilliseconds
-            }
-        };
+        // Snappy compression is not available in .NET BCL. A production implementation
+        // requires a native Snappy library (e.g. Snappier or IronSnappy NuGet package).
+        // Previous implementation silently wrote invalid Snappy files: "sNaPpY" framing header
+        // followed by raw Deflate data, which no standard Snappy reader can process.
+        throw new NotSupportedException(
+            "Snappy compression requires a native Snappy library (e.g. Snappier or IronSnappy). " +
+            "Add the package reference and implement using SnappyStream. " +
+            "The previous implementation produced invalid Snappy files (Deflate data with forged magic bytes).");
     }
 
     /// <inheritdoc/>

@@ -80,8 +80,7 @@ public sealed class AwsSnsConnectionStrategy : SaaSConnectionStrategyBase
             await client.ListTopicsAsync(new ListTopicsRequest(), ct);
             return true;
         }
-        catch (AmazonSimpleNotificationServiceException) { return true; }
-        catch { return false; }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Health check failed: {ex.Message}"); return false; }
     }
 
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)

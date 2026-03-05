@@ -49,24 +49,13 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PlatformAuth
             IncrementCounter("entra.id.shutdown");
             return base.ShutdownAsyncCore(cancellationToken);
         }
-protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
             IncrementCounter("entra.id.evaluate");
-            await Task.Yield();
-
-            var hasValidIdentity = context.SubjectId.Length > 0;
-
-            return new AccessDecision
-            {
-                IsGranted = hasValidIdentity,
-                Reason = hasValidIdentity ? "Entra ID Strategy verified" : "Authentication failed",
-                ApplicablePolicies = new[] { "entra-id-policy" },
-                Metadata = new Dictionary<string, object>
-                {
-                    ["platform"] = "Azure",
-                    ["strategy_type"] = "PlatformAuth"
-                }
-            };
+            throw new NotSupportedException(
+                "Requires MSAL/JWT validation (Microsoft.Identity.Client NuGet package) for real Azure AD/Entra ID " +
+                "token acquisition, JWT signature verification against OIDC discovery keys, and claims validation. " +
+                "Granting access for any non-empty SubjectId is not a valid implementation.");
         }
     }
 }

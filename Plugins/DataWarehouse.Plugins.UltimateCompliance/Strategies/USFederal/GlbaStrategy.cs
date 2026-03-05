@@ -24,7 +24,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("glba.check");
+            IncrementCounter("glba.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -33,9 +33,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
             CheckPretextingProtection(context, violations, recommendations);
             CheckOptOutRights(context, violations, recommendations);
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -50,8 +51,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckSafeguardsRule(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.DataClassification.Equals("financial", StringComparison.OrdinalIgnoreCase) ||
-                context.DataSubjectCategories.Contains("customer-financial-info", StringComparer.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("financial", StringComparison.OrdinalIgnoreCase) ||
+                (context.DataSubjectCategories != null && context.DataSubjectCategories.Contains("customer-financial-info", StringComparer.OrdinalIgnoreCase)))
             {
                 if (!context.Attributes.TryGetValue("InformationSecurityProgram", out var ispObj) || ispObj is not true)
                 {
@@ -93,7 +94,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckPrivacyNotices(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.OperationType.Equals("customer-onboarding", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("customer-onboarding", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("InitialPrivacyNotice", out var initialObj) || initialObj is not true)
                 {
@@ -138,7 +139,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
                 });
             }
 
-            if (context.OperationType.Equals("information-request", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("information-request", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("CallerIdentityVerified", out var verifyObj) || verifyObj is not true)
                 {
@@ -149,7 +150,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckOptOutRights(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.OperationType.Equals("third-party-sharing", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("third-party-sharing", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("OptOutNotice", out var noticeObj) || noticeObj is not true)
                 {
@@ -180,14 +181,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("glba.initialized");
+            IncrementCounter("glba.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("glba.shutdown");
+            IncrementCounter("glba.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

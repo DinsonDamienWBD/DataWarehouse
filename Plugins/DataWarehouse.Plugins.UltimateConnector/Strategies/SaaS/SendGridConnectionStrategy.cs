@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
     /// </summary>
     public class SendGridConnectionStrategy : SaaSConnectionStrategyBase
     {
-        private string _apiKey = "";
+        private volatile string _apiKey = "";
 
         public override string StrategyId => "sendgrid";
         public override string DisplayName => "SendGrid";
@@ -53,16 +53,13 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             try
             {
                 var response = await handle.GetConnection<HttpClient>().GetAsync("/v3/user/profile", ct);
-                return response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable;
+                return response.IsSuccessStatusCode;
             }
             catch { return false; }
         }
 
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
-        {
-            handle.GetConnection<HttpClient>()?.Dispose();
-            await Task.CompletedTask;
-        }
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) {
+            handle.GetConnection<HttpClient>()?.Dispose(); return Task.CompletedTask; }
 
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
@@ -108,7 +105,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
 
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await client.PostAsync("/v3/mail/send", content, ct);
+            using var response = await client.PostAsync("/v3/mail/send", content, ct);
 
             return new SendGridResult
             {
@@ -151,7 +148,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
 
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await client.PostAsync("/v3/mail/send", content, ct);
+            using var response = await client.PostAsync("/v3/mail/send", content, ct);
 
             return new SendGridResult
             {
@@ -185,7 +182,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
 
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await client.PostAsync("/v3/mail/send", content, ct);
+            using var response = await client.PostAsync("/v3/mail/send", content, ct);
 
             return new SendGridResult
             {
@@ -202,7 +199,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             string generations = "dynamic", CancellationToken ct = default)
         {
             var client = handle.GetConnection<HttpClient>();
-            var response = await client.GetAsync($"/v3/templates?generations={generations}&page_size=50", ct);
+            using var response = await client.GetAsync($"/v3/templates?generations={generations}&page_size=50", ct);
+            response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)

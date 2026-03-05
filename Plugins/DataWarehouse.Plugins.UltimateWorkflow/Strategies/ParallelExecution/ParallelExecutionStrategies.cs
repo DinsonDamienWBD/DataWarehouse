@@ -284,6 +284,11 @@ public sealed class DataflowParallelStrategy : WorkflowStrategyBase
 
         var taskDict = workflow.Tasks.ToDictionary(t => t.TaskId);
 
+        // Build downstream adjacency list once so each executor doesn't O(n) scan workflow.Tasks.
+        var downstreamOf = workflow.Tasks.ToDictionary(
+            t => t.TaskId,
+            t => workflow.Tasks.Where(other => other.Dependencies.Contains(t.TaskId)).ToList());
+
         var executors = workflow.Tasks.Select(async task =>
         {
             foreach (var dep in task.Dependencies)
@@ -295,15 +300,17 @@ public sealed class DataflowParallelStrategy : WorkflowStrategyBase
             var result = await ExecuteTaskAsync(task, context, cancellationToken);
             context.TaskResults[task.TaskId] = result;
 
-            foreach (var downstream in workflow.Tasks.Where(t => t.Dependencies.Contains(task.TaskId)))
+            // Write output to all downstream task channels, then complete this channel.
+            // TryComplete() is called AFTER writes so readers can always drain the written value.
+            foreach (var downstream in downstreamOf[task.TaskId])
                 await channels[task.TaskId].Writer.WriteAsync(result.Output, cancellationToken);
 
             channels[task.TaskId].Writer.TryComplete();
             return result;
         }).ToArray();
 
-        foreach (var task in workflow.Tasks.Where(t => t.Dependencies.Count == 0))
-            channels[task.TaskId].Writer.TryComplete();
+        // Do NOT pre-complete root-task channels here — the executor above already completes them
+        // after writing any output. Pre-completing would race with WriteAsync and cause ChannelClosedException.
 
         await Task.WhenAll(executors);
 
@@ -439,27 +446,40 @@ public sealed class SpeculativeParallelStrategy : WorkflowStrategyBase
         };
 
         var completed = new BoundedDictionary<string, TaskResult>(1000);
-        var speculativeTasks = new BoundedDictionary<string, CancellationTokenSource>(1000);
+        // Track CancellationTokenSource instances so they can be disposed after use.
+        var speculativeCts = new List<CancellationTokenSource>();
 
-        foreach (var task in workflow.GetTopologicalOrder())
+        try
         {
-            if (task.Dependencies.All(d => completed.ContainsKey(d)))
+            var speculativeTasks = new BoundedDictionary<string, CancellationTokenSource>(1000);
+
+            foreach (var task in workflow.GetTopologicalOrder())
             {
-                var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                speculativeTasks[task.TaskId] = cts;
-
-                var result = await ExecuteTaskAsync(task, context, cts.Token);
-                context.TaskResults[task.TaskId] = result;
-                completed[task.TaskId] = result;
-
-                foreach (var spec in speculativeTasks.Where(kv =>
-                    kv.Key != task.TaskId && !completed.ContainsKey(kv.Key)))
+                if (task.Dependencies.All(d => completed.ContainsKey(d)))
                 {
-                    var specTask = workflow.Tasks.Find(t => t.TaskId == spec.Key);
-                    if (specTask?.Condition != null && !specTask.Condition(context))
-                        spec.Value.Cancel();
+                    var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    speculativeCts.Add(cts);
+                    speculativeTasks[task.TaskId] = cts;
+
+                    var result = await ExecuteTaskAsync(task, context, cts.Token);
+                    context.TaskResults[task.TaskId] = result;
+                    completed[task.TaskId] = result;
+
+                    foreach (var spec in speculativeTasks.Where(kv =>
+                        kv.Key != task.TaskId && !completed.ContainsKey(kv.Key)))
+                    {
+                        var specTask = workflow.Tasks.Find(t => t.TaskId == spec.Key);
+                        if (specTask?.Condition != null && !specTask.Condition(context))
+                            spec.Value.Cancel();
+                    }
                 }
             }
+        }
+        finally
+        {
+            // Dispose all CancellationTokenSource instances created during execution.
+            foreach (var cts in speculativeCts)
+                cts.Dispose();
         }
 
         return new WorkflowResult

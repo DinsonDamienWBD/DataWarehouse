@@ -50,13 +50,36 @@ public sealed class PinMapping
     /// </summary>
     /// <param name="physicalPin">Physical pin number on the board header.</param>
     /// <returns>Logical GPIO number for the specified physical pin.</returns>
-    /// <exception cref="ArgumentException">Thrown if the physical pin number is invalid for this board.</exception>
+    /// <exception cref="ArgumentException">
+    /// Thrown if the physical pin number is not in this board's mapping.
+    /// For boards with partial mappings (BeagleBone Black, Jetson Nano), use
+    /// <see cref="TryGetLogicalPin"/> to check availability before calling (finding P2-278).
+    /// </exception>
     public int GetLogicalPin(int physicalPin)
     {
         if (_physicalToLogical.TryGetValue(physicalPin, out var logical))
             return logical;
-        throw new ArgumentException($"Invalid physical pin {physicalPin} for board {BoardName}", nameof(physicalPin));
+        throw new ArgumentException(
+            $"Physical pin {physicalPin} is not mapped for board '{BoardName}'. " +
+            $"Mapped pins: [{string.Join(", ", _physicalToLogical.Keys)}]. " +
+            "Use TryGetLogicalPin to check before calling.",
+            nameof(physicalPin));
     }
+
+    /// <summary>
+    /// Attempts to translate a physical pin number to a logical (BCM) GPIO number.
+    /// Returns false for unmapped pins on partial mappings such as BeagleBone Black and Jetson Nano.
+    /// </summary>
+    /// <param name="physicalPin">Physical pin number on the board header.</param>
+    /// <param name="logicalPin">Logical GPIO number, or 0 if the pin is not mapped.</param>
+    /// <returns>True if the pin is mapped; false if not available for this board.</returns>
+    public bool TryGetLogicalPin(int physicalPin, out int logicalPin)
+        => _physicalToLogical.TryGetValue(physicalPin, out logicalPin);
+
+    /// <summary>
+    /// Gets the total number of pins in this mapping.
+    /// </summary>
+    public int MappedPinCount => _physicalToLogical.Count;
 
     /// <summary>
     /// Gets the Raspberry Pi 4 pin mapping (40-pin header, BCM numbering).

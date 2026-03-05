@@ -104,9 +104,28 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Kdf
         {
             return await Task.Run(() =>
             {
-                // plaintext is the password, key is the salt (or generate if empty)
+                // plaintext is the password, key is the salt (or generate if empty).
+                // Finding #2993: silently replacing a non-empty but short salt with a random
+                // one means callers relying on deterministic derivation get a different key
+                // each time without any error. Fail-closed instead: if the caller supplies a
+                // salt (key.Length > 0), it must be at least 16 bytes.
                 var password = plaintext;
-                var salt = key.Length >= 16 ? key : GenerateSalt(16);
+                byte[] salt;
+                if (key.Length == 0)
+                {
+                    salt = GenerateSalt(16);
+                }
+                else if (key.Length < 16)
+                {
+                    throw new ArgumentException(
+                        $"Argon2id salt (key parameter) is too short: minimum 16 bytes required, " +
+                        $"received {key.Length} bytes. Pass an empty key to auto-generate a random salt.",
+                        nameof(key));
+                }
+                else
+                {
+                    salt = key;
+                }
 
                 using var argon2 = new Argon2id(password);
                 argon2.Salt = salt;
@@ -171,7 +190,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Kdf
                     throw new CryptographicException("Password verification failed");
                 }
 
-                return ciphertext; // Return password if verification succeeds
+                return computedHash; // Return the derived key, not the raw password
             }, cancellationToken);
         }
 
@@ -253,8 +272,26 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Kdf
         {
             return await Task.Run(() =>
             {
+                // Finding #2993: silently replacing a non-empty but short salt with a random
+                // one means callers relying on deterministic derivation get a different key
+                // each time without any error. Fail-closed instead.
                 var password = plaintext;
-                var salt = key.Length >= 16 ? key : RandomNumberGenerator.GetBytes(16);
+                byte[] salt;
+                if (key.Length == 0)
+                {
+                    salt = RandomNumberGenerator.GetBytes(16);
+                }
+                else if (key.Length < 16)
+                {
+                    throw new ArgumentException(
+                        $"Argon2i salt (key parameter) is too short: minimum 16 bytes required, " +
+                        $"received {key.Length} bytes. Pass an empty key to auto-generate a random salt.",
+                        nameof(key));
+                }
+                else
+                {
+                    salt = key;
+                }
 
                 using var argon2 = new Argon2i(password);
                 argon2.Salt = salt;
@@ -311,7 +348,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Kdf
                     throw new CryptographicException("Password verification failed");
                 }
 
-                return ciphertext;
+                return computedHash; // Return the derived key, not the raw password
             }, cancellationToken);
         }
 
@@ -385,8 +422,26 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Kdf
         {
             return await Task.Run(() =>
             {
+                // Finding #2993: silently replacing a non-empty but short salt with a random
+                // one means callers relying on deterministic derivation get a different key
+                // each time without any error. Fail-closed instead.
                 var password = plaintext;
-                var salt = key.Length >= 16 ? key : RandomNumberGenerator.GetBytes(16);
+                byte[] salt;
+                if (key.Length == 0)
+                {
+                    salt = RandomNumberGenerator.GetBytes(16);
+                }
+                else if (key.Length < 16)
+                {
+                    throw new ArgumentException(
+                        $"Argon2d salt (key parameter) is too short: minimum 16 bytes required, " +
+                        $"received {key.Length} bytes. Pass an empty key to auto-generate a random salt.",
+                        nameof(key));
+                }
+                else
+                {
+                    salt = key;
+                }
 
                 using var argon2 = new Argon2d(password);
                 argon2.Salt = salt;
@@ -443,7 +498,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Kdf
                     throw new CryptographicException("Password verification failed");
                 }
 
-                return ciphertext;
+                return computedHash; // Return the derived key, not the raw password
             }, cancellationToken);
         }
 
@@ -592,7 +647,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Kdf
         public override CipherInfo CipherInfo => new()
         {
             AlgorithmName = "bcrypt-KDF",
-            KeySizeBits = 184, // bcrypt produces 23 bytes (184 bits) + 16 byte salt
+            KeySizeBits = 192, // bcrypt produces 24 bytes (192 bits) + 16 byte salt — LOW-3008: was 184 / "23 bytes", both wrong
             BlockSizeBytes = 0,
             IvSizeBytes = 16, // Salt size
             TagSizeBytes = 0,
@@ -736,6 +791,11 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Kdf
             byte[]? associatedData,
             CancellationToken cancellationToken)
         {
+            // P2-3006: reject empty IKM — empty input key material produces deterministic
+            // attacker-predictable output from HKDF.
+            if (plaintext == null || plaintext.Length == 0)
+                throw new ArgumentException("Input key material (IKM) must be non-empty for HKDF.", nameof(plaintext));
+
             // plaintext = input key material
             // key = salt
             // associatedData = info
@@ -958,21 +1018,32 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Kdf
             byte[]? associatedData,
             CancellationToken cancellationToken)
         {
-            var password = plaintext;
-            var salt = key.Length >= 32 ? key : RandomNumberGenerator.GetBytes(32);
+            // P2-3006: reject empty/null password — empty password produces deterministic
+            // attacker-predictable PBKDF2 output.
+            if (plaintext == null || plaintext.Length == 0)
+                throw new ArgumentException("Password must be non-empty for PBKDF2 derivation.", nameof(plaintext));
 
-            var derivedKey = Rfc2898DeriveBytes.Pbkdf2(
-                password,
-                salt,
-                _iterations,
-                HashAlgorithmName.SHA256,
-                32);
+            // Run the 600K-iteration PBKDF2 on a thread-pool thread to avoid stalling the
+            // calling thread (which may be an ASP.NET request thread or I/O completion port).
+            // Argon2 already does this; we match the pattern for consistency (#2996).
+            return Task.Run(() =>
+            {
+                var password = plaintext;
+                var salt = key.Length >= 32 ? key : RandomNumberGenerator.GetBytes(32);
 
-            var result = new byte[salt.Length + derivedKey.Length];
-            Buffer.BlockCopy(salt, 0, result, 0, salt.Length);
-            Buffer.BlockCopy(derivedKey, 0, result, salt.Length, derivedKey.Length);
+                var derivedKey = Rfc2898DeriveBytes.Pbkdf2(
+                    password,
+                    salt,
+                    _iterations,
+                    HashAlgorithmName.SHA256,
+                    32);
 
-            return Task.FromResult(result);
+                var result = new byte[salt.Length + derivedKey.Length];
+                Buffer.BlockCopy(salt, 0, result, 0, salt.Length);
+                Buffer.BlockCopy(derivedKey, 0, result, salt.Length, derivedKey.Length);
+
+                return result;
+            }, cancellationToken);
         }
 
         protected override Task<byte[]> DecryptCoreAsync(
@@ -1067,21 +1138,27 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Kdf
             byte[]? associatedData,
             CancellationToken cancellationToken)
         {
-            var password = plaintext;
-            var salt = key.Length >= 64 ? key : RandomNumberGenerator.GetBytes(64);
+            // Run the 210K-iteration PBKDF2 on a thread-pool thread to avoid stalling the
+            // calling thread (which may be an ASP.NET request thread or I/O completion port).
+            // Matches the pattern used by Pbkdf2Sha256Strategy (#2996).
+            return Task.Run(() =>
+            {
+                var password = plaintext;
+                var salt = key.Length >= 64 ? key : RandomNumberGenerator.GetBytes(64);
 
-            var derivedKey = Rfc2898DeriveBytes.Pbkdf2(
-                password,
-                salt,
-                _iterations,
-                HashAlgorithmName.SHA512,
-                64);
+                var derivedKey = Rfc2898DeriveBytes.Pbkdf2(
+                    password,
+                    salt,
+                    _iterations,
+                    HashAlgorithmName.SHA512,
+                    64);
 
-            var result = new byte[salt.Length + derivedKey.Length];
-            Buffer.BlockCopy(salt, 0, result, 0, salt.Length);
-            Buffer.BlockCopy(derivedKey, 0, result, salt.Length, derivedKey.Length);
+                var result = new byte[salt.Length + derivedKey.Length];
+                Buffer.BlockCopy(salt, 0, result, 0, salt.Length);
+                Buffer.BlockCopy(derivedKey, 0, result, salt.Length, derivedKey.Length);
 
-            return Task.FromResult(result);
+                return result;
+            }, cancellationToken);
         }
 
         protected override Task<byte[]> DecryptCoreAsync(

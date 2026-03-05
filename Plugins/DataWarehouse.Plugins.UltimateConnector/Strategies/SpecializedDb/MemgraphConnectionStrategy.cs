@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
 {
     public class MemgraphConnectionStrategy : DatabaseConnectionStrategyBase
     {
-        private TcpClient? _tcpClient;
+        private volatile TcpClient? _tcpClient;
 
         public override string StrategyId => "memgraph";
         public override string DisplayName => "Memgraph";
@@ -37,8 +37,14 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             var client = handle.GetConnection<TcpClient>();
-            await Task.Delay(5, ct);
-            return client.Connected;
+            if (!client.Connected)
+                return false;
+            try
+            {
+                await client.GetStream().WriteAsync(Array.Empty<byte>(), 0, 0, ct).ConfigureAwait(false);
+                return true;
+            }
+            catch { return false; }
         }
 
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
@@ -54,36 +60,47 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
 
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
+            // P2-2180: Measure actual latency with Stopwatch instead of hardcoded value.
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             var isHealthy = await TestCoreAsync(handle, ct);
-            return new ConnectionHealth(isHealthy, isHealthy ? "Memgraph healthy" : "Memgraph unhealthy", TimeSpan.FromMilliseconds(4), DateTimeOffset.UtcNow);
+            sw.Stop();
+            return new ConnectionHealth(isHealthy, isHealthy ? "Memgraph healthy" : "Memgraph unhealthy", sw.Elapsed, DateTimeOffset.UtcNow);
         }
 
-        public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
+        public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            await Task.Delay(5, ct);
-            return new List<Dictionary<string, object?>> { new() { ["n.id"] = 1, ["n.name"] = "Node1" } };
+            // Memgraph uses the Bolt binary protocol (port 7687). Full Bolt framing requires
+            // the Neo4j.Driver or Memgraph-specific client library. This connector establishes
+            // TCP connectivity; integrate a Bolt-capable library for query execution.
+            throw new InvalidOperationException(
+                "Memgraph query execution requires a Bolt protocol driver (e.g., Neo4j.Driver or " +
+                "the Memgraph .NET client). This connector provides TCP connectivity only. " +
+                "Register the Bolt driver via the MessageBus 'bolt.query' topic or integrate directly.");
         }
 
-        public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
+        public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            await Task.Delay(5, ct);
-            return 1;
+            throw new InvalidOperationException(
+                "Memgraph non-query execution requires a Bolt protocol driver. " +
+                "This connector provides TCP connectivity only.");
         }
 
-        public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
+        public override Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
         {
-            await Task.Delay(5, ct);
-            return new List<DataSchema>
-            {
-                new DataSchema("Person", new[] { new DataSchemaField("id", "Integer", false, null, null), new DataSchemaField("name", "String", true, null, null) }, new[] { "id" }, new Dictionary<string, object> { ["type"] = "node_label" })
-            };
+            throw new InvalidOperationException(
+                "Memgraph schema discovery requires a Bolt protocol driver. " +
+                "This connector provides TCP connectivity only.");
         }
 
         private (string host, int port) ParseHostPort(string connectionString, int defaultPort)
         {
-            var clean = connectionString.Replace("bolt://", "").Split('/')[0];
-            var parts = clean.Split(':');
-            return (parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : defaultPort);
+            // P2-2132: Use Uri parsing to correctly handle IPv6 addresses like bolt://[::1]:PORT/
+            var uriString = connectionString.StartsWith("bolt://", StringComparison.OrdinalIgnoreCase) ||
+                            connectionString.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+                ? connectionString : "bolt://" + connectionString;
+            if (Uri.TryCreate(uriString, UriKind.Absolute, out var uri) && !string.IsNullOrEmpty(uri.Host) && uri.Port > 0)
+                return (uri.Host, uri.Port);
+            return ParseHostPortSafe(connectionString, defaultPort);
         }
     }
 }

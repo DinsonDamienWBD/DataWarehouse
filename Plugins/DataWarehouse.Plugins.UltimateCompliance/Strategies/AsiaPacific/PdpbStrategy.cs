@@ -23,7 +23,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.AsiaPacific
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("pdpb.check");
+            IncrementCounter("pdpb.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -54,7 +54,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.AsiaPacific
             }
 
             // Check children's data (Section 9)
-            if (context.DataSubjectCategories.Contains("children", StringComparer.OrdinalIgnoreCase))
+            if (context.DataSubjectCategories != null && context.DataSubjectCategories.Contains("children", StringComparer.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("VerifiableParentalConsent", out var parentalObj) || parentalObj is not true)
                 {
@@ -104,9 +104,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.AsiaPacific
 
             recommendations.Add("Appoint Data Protection Officer if processing significant volumes of personal data");
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -122,14 +123,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.AsiaPacific
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("pdpb.initialized");
+            IncrementCounter("pdpb.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("pdpb.shutdown");
+            IncrementCounter("pdpb.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

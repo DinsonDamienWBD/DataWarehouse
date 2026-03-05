@@ -145,36 +145,43 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
         /// </summary>
         public void AddRoleForUser(string userId, string role)
         {
-            if (!_roleAssignments.ContainsKey(userId))
+            // Atomic add using GetOrAdd + lock for thread-safe list mutation
+            var roles = _roleAssignments.GetOrAdd(userId, _ => new List<string>());
+            lock (roles)
             {
-                _roleAssignments[userId] = new List<string>();
-            }
-
-            if (!_roleAssignments[userId].Contains(role))
-            {
-                _roleAssignments[userId].Add(role);
+                if (!roles.Contains(role))
+                {
+                    roles.Add(role);
+                }
             }
         }
 
         /// <summary>
-        /// Gets all roles for a user (including inherited roles if enabled).
+        /// Gets all roles for a user (including inherited roles with deep resolution).
         /// </summary>
         private List<string> GetRolesForUser(string userId)
         {
             var roles = new HashSet<string>();
+            var queue = new Queue<string>();
+            queue.Enqueue(userId);
 
-            if (_roleAssignments.TryGetValue(userId, out var directRoles))
+            while (queue.Count > 0)
             {
-                foreach (var role in directRoles)
+                var current = queue.Dequeue();
+                if (_roleAssignments.TryGetValue(current, out var directRoles))
                 {
-                    roles.Add(role);
-
-                    // Add inherited roles if enabled
-                    if (_enableInheritance && _roleAssignments.TryGetValue(role, out var inheritedRoles))
+                    List<string> snapshot;
+                    lock (directRoles)
                     {
-                        foreach (var inherited in inheritedRoles)
+                        snapshot = new List<string>(directRoles);
+                    }
+
+                    foreach (var role in snapshot)
+                    {
+                        if (roles.Add(role) && _enableInheritance)
                         {
-                            roles.Add(inherited);
+                            // Enqueue for deep resolution (prevents infinite loop via HashSet check)
+                            queue.Enqueue(role);
                         }
                     }
                 }

@@ -213,36 +213,20 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
 
         private async Task<bool> TriggerModbusAlertAsync(CancellationToken cancellationToken)
         {
-            try
-            {
-                // Modbus implementation would require third-party library (e.g., NModbus)
-                // For now, log that Modbus would be triggered
-                _logger.LogInformation("Modbus alert triggered (requires NModbus library for full implementation)");
-                await Task.CompletedTask;
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to trigger Modbus alert");
-                return false;
-            }
+            // Modbus requires NModbus library - fail-closed without it
+            _logger.LogWarning("Modbus alert NOT sent: NModbus library required for real Modbus communication. " +
+                               "Install NModbus and configure ModbusAddress/ModbusRegister.");
+            await Task.CompletedTask;
+            return false;
         }
 
         private async Task<bool> TriggerOpcUaAlertAsync(CancellationToken cancellationToken)
         {
-            try
-            {
-                // OPC-UA implementation would require third-party library (e.g., OPCFoundation.NetStandard.Opc.Ua)
-                // For now, log that OPC-UA would be triggered
-                _logger.LogInformation("OPC-UA alert triggered (requires OPC Foundation library for full implementation)");
-                await Task.CompletedTask;
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to trigger OPC-UA alert");
-                return false;
-            }
+            // OPC-UA requires OPCFoundation library - fail-closed without it
+            _logger.LogWarning("OPC-UA alert NOT sent: OPCFoundation.NetStandard.Opc.Ua library required. " +
+                               "Install OPC Foundation SDK and configure OpcUaEndpoint/OpcUaNodeId.");
+            await Task.CompletedTask;
+            return false;
         }
 
         private sealed class HardwareAvailability

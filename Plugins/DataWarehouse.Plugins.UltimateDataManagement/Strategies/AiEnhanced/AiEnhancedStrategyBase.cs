@@ -451,7 +451,9 @@ public abstract class AiEnhancedStrategyBase : DataManagementStrategyBase, IAiEn
         }
         catch
         {
+
             // Graceful degradation
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

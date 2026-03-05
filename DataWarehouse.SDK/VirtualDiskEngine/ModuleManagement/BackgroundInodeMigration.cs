@@ -162,7 +162,7 @@ public sealed class BackgroundInodeMigration
                     return await CompleteSwapAsync(superblock, newManifest, newLayout,
                         newTableStartBlock, newTableBlockCount,
                         inodeStartBlock, inodeBlockCount,
-                        totalInodes, checkpoint, migrationId, sw, ct);
+                        totalInodes, checkpoint, migrationId, module, sw, ct);
                 }
             }
             else
@@ -181,7 +181,8 @@ public sealed class BackgroundInodeMigration
             var bitmapRegion = await FindBitmapRegionAsync(ct);
             var scanner = new FreeSpaceScanner(_vdeStream, _blockSize,
                 bitmapRegion.StartBlock, bitmapRegion.BlockCount);
-            var freeRange = scanner.FindContiguousFreeBlocks(newBlocksNeeded);
+            // P2-866: Use async overload to avoid blocking thread-pool on network-backed streams.
+            var freeRange = await scanner.FindContiguousFreeBlocksAsync(newBlocksNeeded, ct).ConfigureAwait(false);
 
             if (!freeRange.HasValue)
                 return MigrationResult.Failed(
@@ -279,7 +280,7 @@ public sealed class BackgroundInodeMigration
         return await CompleteSwapAsync(superblock, newManifest, newLayout,
             newTableStartBlock, newTableBlockCount,
             inodeStartBlock, inodeBlockCount,
-            totalInodes, checkpoint, migrationId, sw, ct);
+            totalInodes, checkpoint, migrationId, module, sw, ct);
     }
 
     /// <summary>
@@ -373,7 +374,7 @@ public sealed class BackgroundInodeMigration
         long newTableStartBlock, long newTableBlockCount,
         long oldTableStartBlock, long oldTableBlockCount,
         long totalInodes, MigrationCheckpoint checkpoint, Guid migrationId,
-        Stopwatch sw, CancellationToken ct)
+        ModuleId targetModule, Stopwatch sw, CancellationToken ct)
     {
         ReportProgress(totalInodes, totalInodes, MigrationPhase.SwappingRegions);
 
@@ -381,7 +382,7 @@ public sealed class BackgroundInodeMigration
         await checkpoint.SaveAsync(new CheckpointData
         {
             MigrationId = migrationId,
-            TargetModule = ModuleId.Security, // placeholder; actual module in manifest diff
+            TargetModule = targetModule,
             OriginalManifest = superblock.ModuleManifest,
             TargetManifest = newManifest,
             TotalInodes = totalInodes,

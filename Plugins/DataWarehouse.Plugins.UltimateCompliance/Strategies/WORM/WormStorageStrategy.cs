@@ -18,15 +18,15 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.WORM
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("worm_storage.check");
+            IncrementCounter("worm_storage.check");
             var violations = new List<ComplianceViolation>();
 
             // Check 1: Verify write-once constraint
             if (context.OperationType.Contains("update", StringComparison.OrdinalIgnoreCase) ||
                 context.OperationType.Contains("modify", StringComparison.OrdinalIgnoreCase))
             {
-                if (!context.Attributes.TryGetValue("IsWormProtected", out var wormProtected) ||
-                    (wormProtected is bool isProtected && isProtected))
+                if (context.Attributes.TryGetValue("IsWormProtected", out var wormProtected) &&
+                    wormProtected is bool isProtected && isProtected)
                 {
                     violations.Add(new ComplianceViolation
                     {
@@ -170,14 +170,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.WORM
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("worm_storage.initialized");
+            IncrementCounter("worm_storage.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("worm_storage.shutdown");
+            IncrementCounter("worm_storage.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

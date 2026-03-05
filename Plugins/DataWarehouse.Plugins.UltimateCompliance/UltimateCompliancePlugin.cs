@@ -94,6 +94,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance
         /// </summary>
         public void RegisterStrategy(IComplianceStrategy strategy)
         {
+            ArgumentNullException.ThrowIfNull(strategy);
             _strategies[strategy.StrategyId] = strategy;
         }
 
@@ -105,6 +106,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance
             string strategyId,
             CancellationToken cancellationToken = default)
         {
+            // P2-1580: validate context so NRE is not propagated into strategy internals
+            ArgumentNullException.ThrowIfNull(context);
+
             var strategy = GetStrategy(strategyId)
                 ?? throw new ArgumentException($"Compliance strategy '{strategyId}' not found");
 
@@ -451,7 +455,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance
                 }
                 catch
                 {
+
                     // Skip strategies that fail to initialize
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
         }

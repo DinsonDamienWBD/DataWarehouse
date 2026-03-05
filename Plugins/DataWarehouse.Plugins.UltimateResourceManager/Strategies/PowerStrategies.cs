@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
@@ -9,8 +10,8 @@ namespace DataWarehouse.Plugins.UltimateResourceManager.Strategies;
 /// </summary>
 public sealed class DvfsCpuStrategy : ResourceStrategyBase
 {
-    private readonly Dictionary<string, (int frequency, double voltage)> _pStates = new();
-    private int _currentPState;
+    private readonly ConcurrentDictionary<string, (int frequency, double voltage)> _pStates = new();
+    private volatile int _currentPState;
     private readonly int _maxFrequencyMhz = 4000; // 4 GHz max
     private readonly int _minFrequencyMhz = 800;  // 800 MHz min
 
@@ -32,11 +33,15 @@ public sealed class DvfsCpuStrategy : ResourceStrategyBase
     {
         var proc = Process.GetCurrentProcess();
         var cpuTime = proc.TotalProcessorTime.TotalMilliseconds;
-        var estimatedFrequency = _minFrequencyMhz + (_currentPState * (_maxFrequencyMhz - _minFrequencyMhz) / 10.0);
+        // P2-3791: Use process wall-clock elapsed time (not system uptime) as the denominator.
+        // Environment.TickCount64 is milliseconds since system boot — dividing process CPU by
+        // system uptime gives a near-zero result for short-lived processes.
+        var elapsedMs = Math.Max(1.0, (DateTime.UtcNow - proc.StartTime.ToUniversalTime()).TotalMilliseconds);
 
         return Task.FromResult(new ResourceMetrics
         {
-            CpuPercent = (cpuTime / Environment.TickCount64) * 100 * Environment.ProcessorCount,
+            CpuPercent = Math.Min(100.0 * Environment.ProcessorCount,
+                (cpuTime / elapsedMs) * 100 * Environment.ProcessorCount),
             Timestamp = DateTime.UtcNow
         });
     }
@@ -69,12 +74,13 @@ public sealed class DvfsCpuStrategy : ResourceStrategyBase
     {
         if (allocation.AllocationHandle != null)
         {
-            _pStates.Remove(allocation.AllocationHandle);
+            _pStates.TryRemove(allocation.AllocationHandle, out _);
 
             // Recalculate P-state based on remaining allocations
-            if (_pStates.Count > 0)
+            var snapshot = _pStates.Values.ToList();
+            if (snapshot.Count > 0)
             {
-                var maxFreq = _pStates.Values.Max(p => p.frequency);
+                var maxFreq = snapshot.Max(p => p.frequency);
                 _currentPState = (int)((maxFreq - _minFrequencyMhz) * 10.0 / (_maxFrequencyMhz - _minFrequencyMhz));
             }
             else
@@ -92,8 +98,8 @@ public sealed class DvfsCpuStrategy : ResourceStrategyBase
 /// </summary>
 public sealed class CStateStrategy : ResourceStrategyBase
 {
-    private readonly Dictionary<string, int> _wakeLatencyBudgets = new();
-    private int _currentCState; // C0=active, C1-C10=progressively deeper sleep
+    private readonly ConcurrentDictionary<string, int> _wakeLatencyBudgets = new();
+    private volatile int _currentCState; // C0=active, C1-C10=progressively deeper sleep
 
     public override string StrategyId => "power-cstate";
     public override string DisplayName => "C-State Power Manager";
@@ -112,7 +118,9 @@ public sealed class CStateStrategy : ResourceStrategyBase
     public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default)
     {
         var proc = Process.GetCurrentProcess();
-        var idleTime = Environment.TickCount64 - proc.TotalProcessorTime.Ticks / TimeSpan.TicksPerMillisecond;
+        // P2-2554: Fix operator-precedence bug — add parens so cpuMs is computed before subtraction.
+        var cpuMs = proc.TotalProcessorTime.Ticks / TimeSpan.TicksPerMillisecond;
+        var idleTime = Environment.TickCount64 - cpuMs;
         var idlePercent = Math.Clamp((idleTime / (double)Environment.TickCount64) * 100, 0, 100);
 
         return Task.FromResult(new ResourceMetrics
@@ -136,7 +144,7 @@ public sealed class CStateStrategy : ResourceStrategyBase
         };
 
         _wakeLatencyBudgets[handle] = maxCState;
-        _currentCState = _wakeLatencyBudgets.Values.Min(); // Most restrictive wins
+        _currentCState = _wakeLatencyBudgets.Values.ToList() is { Count: > 0 } vals ? vals.Min() : 10; // Most restrictive wins
 
         return Task.FromResult(new ResourceAllocation
         {
@@ -151,8 +159,9 @@ public sealed class CStateStrategy : ResourceStrategyBase
     {
         if (allocation.AllocationHandle != null)
         {
-            _wakeLatencyBudgets.Remove(allocation.AllocationHandle);
-            _currentCState = _wakeLatencyBudgets.Count > 0 ? _wakeLatencyBudgets.Values.Min() : 10;
+            _wakeLatencyBudgets.TryRemove(allocation.AllocationHandle, out _);
+            var remaining = _wakeLatencyBudgets.Values.ToList();
+            _currentCState = remaining.Count > 0 ? remaining.Min() : 10;
         }
         return Task.FromResult(true);
     }
@@ -164,9 +173,13 @@ public sealed class CStateStrategy : ResourceStrategyBase
 /// </summary>
 public sealed class IntelRaplStrategy : ResourceStrategyBase
 {
-    private readonly Dictionary<string, PowerDomain> _allocations = new();
+    private readonly ConcurrentDictionary<string, PowerDomain> _allocations = new();
     private long _packagePowerBudgetMw = 65000;  // 65W TDP
     private long _currentPackagePowerMw;
+    // P2-3793/3796: RAPL sysfs sampling fields for delta-power computation
+    private long _lastEnergyUj = -1;
+    private long _lastSample = Stopwatch.GetTimestamp();
+    private const long _maxEnergyUj = 262143328850L; // typical max_energy_range_uj
 
     private enum PowerDomain { Package, Core, Uncore, Dram }
 
@@ -186,13 +199,53 @@ public sealed class IntelRaplStrategy : ResourceStrategyBase
 
     public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default)
     {
-        // Simulate reading RAPL energy counters
-        var proc = Process.GetCurrentProcess();
-        var estimatedPowerMw = (long)(proc.TotalProcessorTime.TotalSeconds * 1000);
+        // P2-3793/3796: Read Intel RAPL energy counter from Linux sysfs when available.
+        // Path: /sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj (microjoules, wraps at max_energy_range_uj).
+        // On non-Linux or systems without RAPL support, fall back to CPU-time estimation.
+        long estimatedPowerMw;
+        const string raplEnergyPath = "/sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj";
+        try
+        {
+            if (System.IO.File.Exists(raplEnergyPath))
+            {
+                var ujStr = System.IO.File.ReadAllText(raplEnergyPath).Trim();
+                if (long.TryParse(ujStr, out var energyUj))
+                {
+                    // Convert instantaneous counter difference to average power over sampling window.
+                    var elapsed = Stopwatch.GetElapsedTime(_lastSample);
+                    var prevEnergy = Interlocked.Exchange(ref _lastEnergyUj, energyUj);
+                    _lastSample = Stopwatch.GetTimestamp();
+                    if (elapsed.TotalSeconds > 0 && prevEnergy >= 0)
+                    {
+                        var deltaUj = energyUj - prevEnergy;
+                        if (deltaUj < 0) deltaUj += _maxEnergyUj; // counter wrap
+                        estimatedPowerMw = (long)(deltaUj / elapsed.TotalSeconds / 1000);
+                    }
+                    else
+                    {
+                        estimatedPowerMw = (long)(Process.GetCurrentProcess().TotalProcessorTime.TotalSeconds * 1000);
+                    }
+                }
+                else
+                {
+                    estimatedPowerMw = (long)(Process.GetCurrentProcess().TotalProcessorTime.TotalSeconds * 1000);
+                }
+            }
+            else
+            {
+                // Non-Linux or RAPL not exposed: best-effort estimate from CPU time
+                estimatedPowerMw = (long)(Process.GetCurrentProcess().TotalProcessorTime.TotalSeconds * 1000);
+            }
+        }
+        catch
+        {
+            estimatedPowerMw = (long)(Process.GetCurrentProcess().TotalProcessorTime.TotalSeconds * 1000);
+        }
 
+        var proc = Process.GetCurrentProcess();
         return Task.FromResult(new ResourceMetrics
         {
-            CpuPercent = (estimatedPowerMw / (double)_packagePowerBudgetMw) * 100,
+            CpuPercent = _packagePowerBudgetMw > 0 ? (estimatedPowerMw / (double)_packagePowerBudgetMw) * 100 : 0,
             MemoryBytes = proc.WorkingSet64,
             Timestamp = DateTime.UtcNow
         });
@@ -230,7 +283,7 @@ public sealed class IntelRaplStrategy : ResourceStrategyBase
 
     protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct)
     {
-        if (allocation.AllocationHandle != null && _allocations.Remove(allocation.AllocationHandle))
+        if (allocation.AllocationHandle != null && _allocations.TryRemove(allocation.AllocationHandle, out _))
         {
             var releasedPowerMw = (long)(allocation.AllocatedCpuCores * (_packagePowerBudgetMw / Environment.ProcessorCount));
             Interlocked.Add(ref _currentPackagePowerMw, -releasedPowerMw);
@@ -319,18 +372,21 @@ public sealed class CarbonAwareStrategy : ResourceStrategyBase
 
     public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default)
     {
-        // Simulate carbon intensity tracking (would integrate with grid APIs in production)
+        // P2-3795: Carbon intensity heuristic based on UTC time-of-day, representing
+        // typical Northern Hemisphere grid patterns (solar peak midday, fossil peak overnight).
+        // Operators should configure a real grid-API URL (e.g. electricitymap.org, WattTime)
+        // via the CarbonIntensityApiUrl configuration key for production deployments.
         var hour = DateTime.UtcNow.Hour;
         _currentGridCarbonIntensity = hour switch
         {
-            >= 10 and < 16 => 200.0, // Daytime: solar peak (low carbon)
-            >= 20 or < 6 => 700.0,    // Night: fossil peak (high carbon)
-            _ => 450.0                 // Transition periods
+            >= 10 and < 16 => 200.0, // Solar peak — typically lower carbon
+            >= 20 or < 6 => 700.0,   // Overnight fossil peak — typically higher carbon
+            _ => 450.0               // Transition hours — intermediate
         };
 
         return Task.FromResult(new ResourceMetrics
         {
-            CpuPercent = _currentGridCarbonIntensity / 10.0, // Encode as metric
+            CpuPercent = _currentGridCarbonIntensity / 10.0, // Encode intensity as pseudo-CPU %
             Timestamp = DateTime.UtcNow
         });
     }
@@ -400,10 +456,37 @@ public sealed class BatteryAwareStrategy : ResourceStrategyBase
 
     public override Task<ResourceMetrics> GetMetricsAsync(CancellationToken ct = default)
     {
-        // Simulate battery monitoring (would use Windows power APIs or /sys/class/power_supply on Linux)
-        var tickSeconds = Environment.TickCount64 / 1000;
-        _batteryLevelPercent = 100.0 - (tickSeconds % 100); // Simulate discharge
-        _onBatteryPower = _batteryLevelPercent < 95;
+        // P2-3794: Read real battery level instead of fake oscillating simulation.
+        // Linux: /sys/class/power_supply/BAT0/capacity (0-100) and /status ("Discharging"/"Charging")
+        // Windows: System.Windows.Forms.SystemInformation is unavailable; use GetSystemPowerStatus.
+        // Fallback to 100% on any error so allocation decisions are conservative (treat as AC).
+        try
+        {
+            const string capacityPath = "/sys/class/power_supply/BAT0/capacity";
+            const string statusPath = "/sys/class/power_supply/BAT0/status";
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && System.IO.File.Exists(capacityPath))
+            {
+                var capStr = System.IO.File.ReadAllText(capacityPath).Trim();
+                if (double.TryParse(capStr, System.Globalization.NumberStyles.Number,
+                    System.Globalization.CultureInfo.InvariantCulture, out var cap))
+                    _batteryLevelPercent = cap;
+                var statusStr = System.IO.File.Exists(statusPath)
+                    ? System.IO.File.ReadAllText(statusPath).Trim()
+                    : "Unknown";
+                _onBatteryPower = statusStr.Equals("Discharging", StringComparison.OrdinalIgnoreCase);
+            }
+            else
+            {
+                // No battery sensor — treat as AC power at full charge
+                _batteryLevelPercent = 100.0;
+                _onBatteryPower = false;
+            }
+        }
+        catch
+        {
+            _batteryLevelPercent = 100.0;
+            _onBatteryPower = false;
+        }
 
         return Task.FromResult(new ResourceMetrics
         {

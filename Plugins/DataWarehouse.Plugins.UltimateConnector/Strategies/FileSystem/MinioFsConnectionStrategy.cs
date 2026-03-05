@@ -22,7 +22,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
             var client = new HttpClient { BaseAddress = new Uri(config.ConnectionString) };
-            var response = await client.GetAsync("/minio/health/live", ct);
+            using var response = await client.GetAsync("/minio/health/live", ct);
             response.EnsureSuccessStatusCode();
             return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "MinIO S3" });
         }

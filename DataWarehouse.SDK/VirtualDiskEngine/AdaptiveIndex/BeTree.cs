@@ -137,8 +137,10 @@ public sealed class BeTree : IAdaptiveIndex, IAsyncDisposable
                 Interlocked.Increment(ref _count);
                 await _wal.FlushAsync(ct).ConfigureAwait(false);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[BeTree.InsertAsync] WAL transaction error, rolling back: {ex.Message}");
+                // WAL will discard uncommitted entries on next recovery
                 throw;
             }
         }
@@ -218,10 +220,16 @@ public sealed class BeTree : IAdaptiveIndex, IAsyncDisposable
         _lock.EnterWriteLock();
         try
         {
+            // Check if key exists before issuing update
+            var existing = await LookupInternalAsync(key, ct).ConfigureAwait(false);
+            if (existing == null)
+                return false;
+
             var txn = await _wal.BeginTransactionAsync(ct).ConfigureAwait(false);
             var root = await ReadNodeAsync(_rootBlockNumber, ct).ConfigureAwait(false);
             var timestamp = Interlocked.Increment(ref _nextTimestamp);
-            var message = new BeTreeMessage(BeTreeMessageType.Upsert, key, newValue, timestamp);
+            // Cat 15 (finding 712): use Update message type — key already verified to exist above
+            var message = new BeTreeMessage(BeTreeMessageType.Update, key, newValue, timestamp);
 
             if (root.IsLeaf)
             {
@@ -764,7 +772,8 @@ public sealed class BeTree : IAdaptiveIndex, IAsyncDisposable
     {
         if (_nodeCache.TryGetValue(blockNumber, out var cached))
         {
-            return cached;
+            // Return a clone to prevent concurrent read/write mutation visibility
+            return cached.Clone();
         }
 
         var buffer = ArrayPool<byte>.Shared.Rent(_blockSize);

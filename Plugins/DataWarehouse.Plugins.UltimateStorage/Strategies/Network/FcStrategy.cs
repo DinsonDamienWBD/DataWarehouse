@@ -60,9 +60,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         private TimeSpan _fabricLoginTimeout = TimeSpan.FromSeconds(30);
         private TimeSpan _ioTimeout = TimeSpan.FromSeconds(60);
 
-        // Connection state
-        private bool _isFabricConnected = false;
-        private DateTime _lastFabricLogin = DateTime.MinValue;
+        // Connection state — volatile so reads outside lock see the latest value written inside lock
+        private volatile bool _isFabricConnected = false;
+        private DateTime _lastFabricLogin = DateTime.MinValue; // reads/writes always under _connectionLock
         private readonly Dictionary<string, MultipathState> _multipathStates = new();
         private HttpClient? _fabricApiClient;
 
@@ -227,7 +227,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 }
             }
 
-            // Initialize HTTP client for fabric management API
+            // Initialize HTTP client for fabric management API — dispose prior instance on re-init.
+            _fabricApiClient?.Dispose();
             _fabricApiClient = new HttpClient
             {
                 BaseAddress = new Uri($"https://{_fabricSwitchAddress}:{_fabricManagementPort}"),
@@ -659,11 +660,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 IncrementOperationCounter(StorageOperationType.Exists);
                 return lunMapping != null;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is FileNotFoundException || ex is KeyNotFoundException)
             {
-                System.Diagnostics.Debug.WriteLine($"[FcStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
+                // Object truly does not exist.
                 IncrementOperationCounter(StorageOperationType.Exists);
                 return false;
+            }
+            catch (Exception)
+            {
+                // Auth failure, transport error, etc. — rethrow so callers are not misled.
+                throw;
             }
         }
 
@@ -1261,7 +1267,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 }
                 catch
                 {
+
                     // Ignore logout errors
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
 

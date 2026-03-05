@@ -85,7 +85,7 @@ public sealed class VdeComposerTests : IDisposable
             ProfileType = VdeProfileType.Custom,
             Name = "SecurityOnly",
             Description = "Test",
-            ModuleManifest = manifest.Value,
+            ModuleManifest = (uint)manifest.Value, // cast ulong to uint for VdeCreationProfile (on-disk compat)
             ModuleConfigLevels = new Dictionary<ModuleId, byte> { [ModuleId.Security] = 1 },
             BlockSize = FormatConstants.DefaultBlockSize,
             TotalBlocks = 1024,
@@ -100,15 +100,16 @@ public sealed class VdeComposerTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateVde_AllModules_HasAll19Active()
+    public async Task CreateVde_AllModules_Has19Active()
     {
         var path = CreateTempVdePath();
         var profile = VdeCreationProfile.MaxSecurity(1024);
 
         await VdeCreator.CreateVdeAsync(path, profile);
 
+        // MaxSecurity manifest covers bits 0-18 (original 19 modules)
         var activeModules = ModuleRegistry.GetActiveModules(profile.ModuleManifest);
-        Assert.Equal(FormatConstants.DefinedModules, activeModules.Count);
+        Assert.Equal(19, activeModules.Count);
     }
 
     [Fact]
@@ -125,7 +126,7 @@ public sealed class VdeComposerTests : IDisposable
         var path = CreateTempVdePath();
         var profile = VdeCreationProfile.Custom(
             totalBlocks: 1024,
-            manifest: ModuleManifestField.FromModules(ModuleId.Security).Value,
+            manifest: (uint)ModuleManifestField.FromModules(ModuleId.Security).Value,
             configLevels: new Dictionary<ModuleId, byte> { [ModuleId.Security] = 1 },
             blockSize: 8192);
 
@@ -196,7 +197,7 @@ public sealed class VdeComposerTests : IDisposable
     {
         var profile = VdeCreationProfile.Custom(
             1024,
-            ModuleManifestField.FromModules(ModuleId.Security).Value,
+            (uint)ModuleManifestField.FromModules(ModuleId.Security).Value,
             new Dictionary<ModuleId, byte> { [ModuleId.Security] = 1 });
 
         Assert.Equal(VdeProfileType.Custom, profile.ProfileType);
@@ -215,11 +216,11 @@ public sealed class VdeComposerTests : IDisposable
     }
 
     [Fact]
-    public void ListModules_Returns19Modules()
+    public void ListModules_Returns39Modules()
     {
         var values = Enum.GetValues<ModuleId>();
         Assert.Equal(FormatConstants.DefinedModules, values.Length);
-        Assert.Equal(19, values.Length);
+        Assert.Equal(39, values.Length);
     }
 
     [Fact]
@@ -262,11 +263,12 @@ public sealed class VdeComposerTests : IDisposable
     [Fact]
     public void CalculateLayout_StandardProfile_HasExpectedRegions()
     {
-        var profile = VdeCreationProfile.Standard(1024);
+        // Use 8192 blocks to ensure data blocks remain after metadata (inode table min=1024 blocks)
+        var profile = VdeCreationProfile.Standard(8192);
         var layout = VdeCreator.CalculateLayout(profile);
 
         Assert.Equal(4096, layout.BlockSize);
-        Assert.Equal(1024, layout.TotalBlocks);
+        Assert.Equal(8192, layout.TotalBlocks);
         Assert.True(layout.MetadataBlocks > 0);
         Assert.True(layout.DataBlocks > 0);
         Assert.True(layout.OverheadPercent > 0);

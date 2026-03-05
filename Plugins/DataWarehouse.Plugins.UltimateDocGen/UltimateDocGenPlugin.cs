@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
@@ -47,9 +48,49 @@ public sealed class DocGenResult
 
 public abstract class DocGenStrategyBase
 {
+    /// <summary>Maximum allowed length for OperationId to prevent embedding extremely long strings in output.</summary>
+    private const int MaxOperationIdLength = 256;
+
+    /// <summary>Maximum allowed length for SourceType.</summary>
+    private const int MaxSourceTypeLength = 512;
+
     public abstract DocGenCharacteristics Characteristics { get; }
     public string StrategyId => Characteristics.StrategyName.Replace(" ", "");
     public abstract Task<DocGenResult> GenerateAsync(DocGenRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Validates request fields that are embedded into generated output.
+    /// Cat 15 (finding 2909): OperationId and SourceType have unbounded length — a 1 MB OperationId
+    /// would be embedded verbatim into HTML/Markdown output.
+    /// </summary>
+    /// <exception cref="ArgumentException">Thrown when OperationId or SourceType exceeds allowed length.</exception>
+    protected static void ValidateRequest(DocGenRequest request)
+    {
+        if (request.OperationId != null && request.OperationId.Length > MaxOperationIdLength)
+            throw new ArgumentException(
+                $"OperationId exceeds maximum length of {MaxOperationIdLength} characters " +
+                $"(got {request.OperationId.Length}).", nameof(request));
+        if (request.SourceType != null && request.SourceType.Length > MaxSourceTypeLength)
+            throw new ArgumentException(
+                $"SourceType exceeds maximum length of {MaxSourceTypeLength} characters " +
+                $"(got {request.SourceType.Length}).", nameof(request));
+    }
+
+    /// <summary>
+    /// Extracts a source title hint from <see cref="DocGenRequest.Source"/>.
+    /// Cat 14 (finding 2908): strategies should use the Source object to influence output
+    /// when it contains a recognizable string/type name, rather than ignoring it entirely.
+    /// Returns null if Source is null or not a recognizable type.
+    /// </summary>
+    protected static string? ExtractSourceTitle(DocGenRequest request)
+    {
+        return request.Source switch
+        {
+            string s when !string.IsNullOrWhiteSpace(s) => s,
+            Type t => t.FullName ?? t.Name,
+            _ => request.Source?.GetType().Name
+        };
+    }
 
     protected string FormatAsMarkdown(string title, List<(string Name, string Type, string Description)> items)
     {
@@ -99,9 +140,13 @@ public sealed class OpenApiDocStrategy : DocGenStrategyBase
 
     public override Task<DocGenResult> GenerateAsync(DocGenRequest request, CancellationToken ct = default)
     {
+        ValidateRequest(request);
         var startTime = System.Diagnostics.Stopwatch.StartNew();
         var sourceType = request.SourceType ?? "api";
-        var title = request.Options.GetValueOrDefault("title")?.ToString() ?? "API Documentation";
+        // Cat 14 (finding 2908): use Source to derive a context-aware title when available.
+        var sourceHint = ExtractSourceTitle(request);
+        var title = request.Options.GetValueOrDefault("title")?.ToString()
+            ?? (sourceHint != null ? $"API Documentation — {sourceHint}" : "API Documentation");
         var version = request.Options.GetValueOrDefault("version")?.ToString() ?? "1.0.0";
         var basePath = request.Options.GetValueOrDefault("basePath")?.ToString() ?? "/api/v1";
 
@@ -405,11 +450,12 @@ public sealed class HtmlOutputStrategy : DocGenStrategyBase
         sb.AppendLine("  </style>");
         sb.AppendLine("</head>");
         sb.AppendLine("<body>");
-        sb.AppendLine($"  <h1>{title}</h1>");
-        sb.AppendLine($"  <p class=\"meta\">Generated at {DateTime.UtcNow:u} | Theme: {theme} | Operation: {request.OperationId}</p>");
+        // P2-2902: HTML-encode all user-supplied strings before embedding in HTML to prevent XSS.
+        sb.AppendLine($"  <h1>{WebUtility.HtmlEncode(title)}</h1>");
+        sb.AppendLine($"  <p class=\"meta\">Generated at {DateTime.UtcNow:u} | Theme: {WebUtility.HtmlEncode(theme)} | Operation: {WebUtility.HtmlEncode(request.OperationId)}</p>");
         sb.AppendLine("  <nav><strong>Navigation:</strong> <a href=\"#overview\">Overview</a> <a href=\"#details\">Details</a></nav>");
         sb.AppendLine("  <h2 id=\"overview\">Overview</h2>");
-        sb.AppendLine($"  <p>Documentation for <code>{request.SourceType}</code> content.</p>");
+        sb.AppendLine($"  <p>Documentation for <code>{WebUtility.HtmlEncode(request.SourceType?.ToString() ?? string.Empty)}</code> content.</p>");
         sb.AppendLine("  <h2 id=\"details\">Details</h2>");
         sb.AppendLine("  <p><em>Content sections are populated from the source schema/API definition.</em></p>");
         sb.AppendLine("</body></html>");
@@ -488,12 +534,15 @@ public sealed class InteractiveDocStrategy : DocGenStrategyBase
         var startTime = System.Diagnostics.Stopwatch.StartNew();
         var title = request.Options.GetValueOrDefault("title")?.ToString() ?? "Interactive API Explorer";
         var apiBaseUrl = request.Options.GetValueOrDefault("apiBaseUrl")?.ToString() ?? "/api/v1";
+        // P2-2902: HTML-encode user-supplied values before embedding in HTML attributes/text.
+        var safeTitle = WebUtility.HtmlEncode(title);
+        var safeApiBaseUrl = WebUtility.HtmlEncode(apiBaseUrl);
 
         var sb = new StringBuilder();
         sb.AppendLine("<!DOCTYPE html>");
         sb.AppendLine("<html lang=\"en\">");
         sb.AppendLine("<head>");
-        sb.AppendLine($"  <meta charset=\"UTF-8\"><title>{title}</title>");
+        sb.AppendLine($"  <meta charset=\"UTF-8\"><title>{safeTitle}</title>");
         sb.AppendLine("  <style>");
         sb.AppendLine("    body { font-family: -apple-system, sans-serif; max-width: 1200px; margin: 0 auto; padding: 2rem; }");
         sb.AppendLine("    .endpoint { border: 1px solid #ddd; border-radius: 4px; margin: 1em 0; padding: 1em; }");
@@ -505,14 +554,15 @@ public sealed class InteractiveDocStrategy : DocGenStrategyBase
         sb.AppendLine("  </style>");
         sb.AppendLine("</head>");
         sb.AppendLine("<body>");
-        sb.AppendLine($"  <h1>{title}</h1>");
-        sb.AppendLine($"  <p>Base URL: <code>{apiBaseUrl}</code></p>");
+        sb.AppendLine($"  <h1>{safeTitle}</h1>");
+        sb.AppendLine($"  <p>Base URL: <code>{safeApiBaseUrl}</code></p>");
         sb.AppendLine("  <div id=\"playground\">");
         sb.AppendLine("    <h2>Try It Out</h2>");
         sb.AppendLine("    <div class=\"endpoint\">");
         sb.AppendLine("      <label><strong>Method:</strong></label>");
         sb.AppendLine("      <select id=\"method\"><option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option></select>");
-        sb.AppendLine($"      <label><strong>URL:</strong></label><input type=\"text\" id=\"url\" value=\"{apiBaseUrl}/\" style=\"width:60%\">");
+        // P2-2902: Use safeApiBaseUrl (already HTML-encoded) in attribute value to prevent XSS.
+        sb.AppendLine($"      <label><strong>URL:</strong></label><input type=\"text\" id=\"url\" value=\"{safeApiBaseUrl}/\" style=\"width:60%\">");
         sb.AppendLine("      <br><br><label><strong>Body:</strong></label><textarea id=\"body\" placeholder=\"{}\"></textarea>");
         sb.AppendLine("      <br><button onclick=\"sendRequest()\">Send Request</button>");
         sb.AppendLine("    </div>");

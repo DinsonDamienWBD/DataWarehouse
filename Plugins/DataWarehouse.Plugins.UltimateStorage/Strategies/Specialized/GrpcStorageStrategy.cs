@@ -162,7 +162,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
 
                 if (!_validateCertificate)
                 {
-                    // Explicit opt-in bypass for development/testing only
+                    // SECURITY WARNING: TLS certificate validation is DISABLED.
+                    // This should only be used in isolated development/test environments.
+                    // Disabling certificate validation exposes all gRPC traffic to MITM attacks.
+                    System.Diagnostics.Trace.TraceWarning(
+                        "[GrpcStorageStrategy] TLS certificate validation is DISABLED (ValidateCertificate=false). " +
+                        "All gRPC traffic is vulnerable to man-in-the-middle attacks. " +
+                        "Enable certificate validation in production.");
                     handler.SslOptions.RemoteCertificateValidationCallback = (sender, certificate, chain, errors) => true;
                 }
                 // When _validateCertificate is true (default), no callback is set,

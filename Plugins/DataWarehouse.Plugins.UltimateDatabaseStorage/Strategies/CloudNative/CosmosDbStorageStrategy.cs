@@ -62,7 +62,8 @@ public sealed class CosmosDbStorageStrategy : DatabaseStorageStrategyBase
             ?? throw new InvalidOperationException("Cosmos DB PrimaryKey is required");
         _databaseName = GetConfiguration("DatabaseName", "DataWarehouse");
         _containerName = GetConfiguration("ContainerName", "Storage");
-        _consistencyLevel = Enum.Parse<ConsistencyLevel>(GetConfiguration("ConsistencyLevel", "Session"));
+        // LOW-2789: ignoreCase:true prevents case-mismatch exceptions from user config values
+        _consistencyLevel = Enum.Parse<ConsistencyLevel>(GetConfiguration("ConsistencyLevel", "Session"), ignoreCase: true);
         _throughput = GetConfiguration("Throughput", 400);
         _useServerlessMode = GetConfiguration("UseServerlessMode", false);
 

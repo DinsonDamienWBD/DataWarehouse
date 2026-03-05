@@ -40,6 +40,11 @@ internal sealed class SevStrategy : ComputeRuntimeStrategyBase
             // Verify platform supports SEV
             var platformResult = await RunProcessAsync("sevctl", "export --full", timeout: TimeSpan.FromSeconds(10), cancellationToken: cancellationToken);
 
+            // P2-1680: abort if SEV is not available — continuing without SEV would run the guest unprotected
+            if (platformResult.ExitCode != 0)
+                throw new InvalidOperationException(
+                    $"SEV platform check failed (exit {platformResult.ExitCode}) — SEV may not be available on this host: {platformResult.StandardError}");
+
             var sevMode = "sev-snp";
             if (task.Metadata?.TryGetValue("sev_mode", out var m) == true && m is string ms)
                 sevMode = ms;
@@ -53,6 +58,11 @@ internal sealed class SevStrategy : ComputeRuntimeStrategyBase
                 // Measure the enclave image
                 var measureResult = await RunProcessAsync("sevctl", $"measurement build --api {sevMode} --firmware \"{codePath}\"",
                     timeout: TimeSpan.FromSeconds(30), cancellationToken: cancellationToken);
+
+                // P2-1681: abort if measurement fails — launching with an unverified image is a security violation
+                if (measureResult.ExitCode != 0)
+                    throw new InvalidOperationException(
+                        $"SEV launch measurement failed (exit {measureResult.ExitCode}) — enclave image may be untrusted: {measureResult.StandardError}");
 
                 // Launch the guest with SEV-encrypted memory
                 var qemuArgs = new StringBuilder();

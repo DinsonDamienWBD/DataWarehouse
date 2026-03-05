@@ -130,7 +130,7 @@ internal sealed class Av1CodecStrategy : MediaStrategyBase
         Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
     {
         IncrementCounter("av1.encode");
-        var outputStream = new MemoryStream(1024 * 1024);
+        // Finding 1107: removed unused 1 MB MemoryStream — ExecuteOrPackageAsync creates its own.
         var sourceBytes = await ReadStreamFullyAsync(inputStream, cancellationToken).ConfigureAwait(false);
 
         var encoder = ResolveEncoder(options.VideoCodec);

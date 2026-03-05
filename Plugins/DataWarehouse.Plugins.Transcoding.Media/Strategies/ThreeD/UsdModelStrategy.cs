@@ -266,12 +266,15 @@ internal sealed class UsdModelStrategy : MediaStrategyBase
                          trimmed.Contains("Skeleton", StringComparison.Ordinal))
                     info.HasSkeleton = true;
             }
-            else if (trimmed.Contains("variantSet", StringComparison.Ordinal))
+            // Cat 2 (finding 1092): use StartsWith to avoid counting keywords in comments or string values.
+            else if (trimmed.StartsWith("variantSet ", StringComparison.Ordinal) ||
+                     trimmed.StartsWith("variantSet{", StringComparison.Ordinal) ||
+                     trimmed.StartsWith("variantSets", StringComparison.Ordinal))
             {
                 info.VariantSetCount++;
             }
-            else if (trimmed.Contains("subLayers", StringComparison.OrdinalIgnoreCase) ||
-                     trimmed.Contains("sublayer", StringComparison.OrdinalIgnoreCase))
+            else if (trimmed.StartsWith("subLayers", StringComparison.OrdinalIgnoreCase) ||
+                     trimmed.StartsWith("sublayer ", StringComparison.OrdinalIgnoreCase))
             {
                 info.SublayerCount++;
             }

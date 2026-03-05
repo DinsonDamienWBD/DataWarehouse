@@ -18,6 +18,8 @@ namespace DataWarehouse.Kernel
     {
         private readonly BoundedDictionary<string, IPlugin> _plugins = new BoundedDictionary<string, IPlugin>(1000);
         private readonly BoundedDictionary<PluginCategory, List<IPlugin>> _byCategory = new BoundedDictionary<PluginCategory, List<IPlugin>>(1000);
+        // Cache of metadata retrieved at registration time to avoid sync-over-async at selection time.
+        private readonly BoundedDictionary<string, Dictionary<string, object>> _pluginMetadataCache = new BoundedDictionary<string, Dictionary<string, object>>(1000);
         private readonly object _categoryLock = new();
         private OperatingMode _operatingMode = OperatingMode.Workstation;
 
@@ -60,6 +62,16 @@ namespace DataWarehouse.Kernel
                 list.RemoveAll(p => p.Id == plugin.Id);
                 list.Add(plugin);
             }
+        }
+
+        /// <summary>
+        /// Register a plugin with pre-fetched metadata. Avoids sync-over-async in GetPlugin.
+        /// </summary>
+        public void Register(IPlugin plugin, Dictionary<string, object>? metadata)
+        {
+            Register(plugin);
+            if (metadata != null)
+                _pluginMetadataCache[plugin.Id] = metadata;
         }
 
         /// <summary>
@@ -207,13 +219,14 @@ namespace DataWarehouse.Kernel
 
         /// <summary>
         /// Select the best plugin based on operating mode and quality.
+        /// Uses cached metadata (populated at registration time) to avoid sync-over-async.
         /// </summary>
         private T SelectBestPlugin<T>(List<T> candidates) where T : class, IPlugin
         {
             // If any plugin explicitly declares operating mode preference, prefer it
             var modePreferred = candidates.FirstOrDefault(p =>
             {
-                var metadata = Task.Run(() => GetPluginMetadataAsync(p)).GetAwaiter().GetResult();
+                var metadata = GetCachedMetadata(p);
                 if (metadata.TryGetValue("PreferredMode", out var mode))
                 {
                     return mode.ToString()?.Equals(_operatingMode.ToString(), StringComparison.OrdinalIgnoreCase) == true;
@@ -226,7 +239,7 @@ namespace DataWarehouse.Kernel
             // Otherwise select by quality level
             var ordered = candidates.OrderByDescending(p =>
             {
-                var metadata = Task.Run(() => GetPluginMetadataAsync(p)).GetAwaiter().GetResult();
+                var metadata = GetCachedMetadata(p);
                 if (metadata.TryGetValue("QualityLevel", out var ql) && ql is int quality)
                 {
                     return quality;
@@ -237,23 +250,12 @@ namespace DataWarehouse.Kernel
             return ordered.First();
         }
 
-        private async Task<Dictionary<string, object>> GetPluginMetadataAsync(IPlugin plugin)
+        /// <summary>Returns cached metadata for a plugin, or an empty dictionary if not cached.</summary>
+        private Dictionary<string, object> GetCachedMetadata(IPlugin plugin)
         {
-            try
-            {
-                var response = await plugin.OnHandshakeAsync(new HandshakeRequest
-                {
-                    KernelId = "registry",
-                    ProtocolVersion = "1.0",
-                    Timestamp = DateTime.UtcNow
-                });
-
-                return response.Metadata ?? new Dictionary<string, object>();
-            }
-            catch
-            {
-                return new Dictionary<string, object>();
-            }
+            return _pluginMetadataCache.TryGetValue(plugin.Id, out var cached)
+                ? cached
+                : new Dictionary<string, object>();
         }
 
     }

@@ -107,7 +107,11 @@ internal sealed class GoogleAssistantChannelStrategy : SdkInterface.InterfaceStr
         // Route to NLP for intent parsing via message bus
         if (IsIntelligenceAvailable)
         {
-            // In production, this would send to "nlp.intent.parse" topic
+            await MessageBus!.SendAsync("nlp.intent.parse", new DataWarehouse.SDK.Utilities.PluginMessage
+            {
+                Type = "nlp.intent.parse",
+                Payload = new System.Collections.Generic.Dictionary<string, object> { ["handler"] = handlerName, ["parameters"] = parameters }
+            }, cancellationToken).ConfigureAwait(false);
         }
 
         // Build response based on handler

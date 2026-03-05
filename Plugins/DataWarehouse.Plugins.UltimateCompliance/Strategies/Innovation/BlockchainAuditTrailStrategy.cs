@@ -18,7 +18,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("blockchain_audit_trail.check");
+            IncrementCounter("blockchain_audit_trail.check");
             var violations = new List<ComplianceViolation>();
 
             // Check 1: Verify blockchain anchor
@@ -114,10 +114,11 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
                 });
             }
 
-            var isCompliant = violations.Count == 0;
-            var status = isCompliant ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity == ViolationSeverity.Critical) ? ComplianceStatus.NonCompliant :
+            var status = violations.Count == 0 ? ComplianceStatus.Compliant :
+                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
+            // isCompliant derived from status for consistency
+            var isCompliant = status == ComplianceStatus.Compliant;
 
             return Task.FromResult(new ComplianceResult
             {
@@ -129,12 +130,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
             });
         }
 
-        private T GetConfigValue<T>(string key, T defaultValue)
-        {
-            if (Configuration.TryGetValue(key, out var value) && value is T typedValue)
-                return typedValue;
-            return defaultValue;
-        }
+        // LOW-1459: GetConfigValue<T> is now on ComplianceStrategyBase — removed duplicate.
 
         private static List<string> GenerateRecommendations(List<ComplianceViolation> violations)
         {
@@ -158,14 +154,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("blockchain_audit_trail.initialized");
+            IncrementCounter("blockchain_audit_trail.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("blockchain_audit_trail.shutdown");
+            IncrementCounter("blockchain_audit_trail.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

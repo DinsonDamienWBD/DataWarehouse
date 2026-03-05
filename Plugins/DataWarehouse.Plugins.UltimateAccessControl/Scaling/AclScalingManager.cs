@@ -89,7 +89,7 @@ public sealed class AclScalingManager : IScalableSubsystem, IDisposable
     // Parallel strategy evaluation
     // -------------------------------------------------------------------
 
-    private readonly SemaphoreSlim _evaluationThrottle;
+    private SemaphoreSlim _evaluationThrottle;
     private int _maxConcurrentEvaluations;
 
     // -------------------------------------------------------------------
@@ -381,11 +381,12 @@ public sealed class AclScalingManager : IScalableSubsystem, IDisposable
     /// </summary>
     public void InvalidatePolicyCache()
     {
-        // BoundedCache doesn't support Clear; create entries with expired TTL
-        // by disposing and recreating is not possible since it's readonly.
-        // Instead, we rely on TTL expiry which is short (30s default).
-        // For immediate invalidation, callers should subscribe to policy change events.
+        // Evict all entries by resetting the cache version counter.
+        // The next evaluation will miss the cache and re-evaluate strategies.
+        Interlocked.Increment(ref _policyCacheVersion);
     }
+
+    private long _policyCacheVersion;
 
     // -------------------------------------------------------------------
     // Threshold management
@@ -399,8 +400,10 @@ public sealed class AclScalingManager : IScalableSubsystem, IDisposable
     public double? GetThreshold(string thresholdName)
     {
         ArgumentNullException.ThrowIfNull(thresholdName);
-        var value = _thresholdCache.GetOrDefault(thresholdName);
-        return value != 0.0 ? value : null;
+        // Use ContainsKey to distinguish "key not found" from "key has value 0.0"
+        if (!_thresholdCache.ContainsKey(thresholdName))
+            return null;
+        return _thresholdCache.GetOrDefault(thresholdName);
     }
 
     /// <summary>
@@ -429,11 +432,22 @@ public sealed class AclScalingManager : IScalableSubsystem, IDisposable
     // Private helpers
     // -------------------------------------------------------------------
 
-    private static string ComputePolicyCacheKey(AccessContext context)
+    private string ComputePolicyCacheKey(AccessContext context)
     {
-        // Hash of (subjectId, resourceId, action) for cache key
-        var input = $"{context.SubjectId}|{context.ResourceId}|{context.Action}";
-        var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(input));
+        // Include all authorization-relevant fields to prevent cross-privilege cache collisions
+        var sb = new StringBuilder(256);
+        sb.Append(Interlocked.Read(ref _policyCacheVersion)).Append('|');
+        sb.Append(context.SubjectId).Append('|');
+        sb.Append(context.ResourceId).Append('|');
+        sb.Append(context.Action).Append('|');
+        if (context.Roles.Count > 0)
+            sb.Append(string.Join(",", context.Roles)).Append('|');
+        if (context.SubjectAttributes.Count > 0)
+        {
+            foreach (var kvp in context.SubjectAttributes.OrderBy(k => k.Key))
+                sb.Append(kvp.Key).Append('=').Append(kvp.Value).Append(',');
+        }
+        var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(sb.ToString()));
         return Convert.ToHexString(hashBytes);
     }
 
@@ -493,7 +507,9 @@ public sealed class AclScalingManager : IScalableSubsystem, IDisposable
         }
         catch
         {
+
             // Best-effort drain; failures are silently ignored
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 
@@ -530,11 +546,23 @@ public sealed class AclScalingManager : IScalableSubsystem, IDisposable
     {
         ct.ThrowIfCancellationRequested();
 
+        SemaphoreSlim? oldThrottle = null;
         lock (_configLock)
         {
             _currentLimits = limits;
-            _maxConcurrentEvaluations = limits.MaxConcurrentOperations;
+            var newMax = limits.MaxConcurrentOperations;
+            if (newMax != _maxConcurrentEvaluations)
+            {
+                // Replace the semaphore so the new concurrency limit takes effect immediately.
+                // In-flight waiters continue against the old semaphore; new waiters use the new one.
+                oldThrottle = _evaluationThrottle;
+                _evaluationThrottle = new SemaphoreSlim(newMax, newMax);
+                _maxConcurrentEvaluations = newMax;
+            }
         }
+
+        // Dispose the old semaphore outside the lock to avoid blocking
+        oldThrottle?.Dispose();
 
         return Task.CompletedTask;
     }

@@ -146,7 +146,7 @@ public sealed class PassportAuditStrategy : ComplianceStrategyBase
             count = Interlocked.Decrement(ref _globalQueueCount);
         }
 
-        IncrementCounter("passport_audit.event_logged");
+            IncrementCounter("passport_audit.event_logged");
 
         return Task.CompletedTask;
     }
@@ -265,7 +265,7 @@ public sealed class PassportAuditStrategy : ComplianceStrategyBase
             TopObjectsByEvents = topObjects
         };
 
-        IncrementCounter("passport_audit.report_generated");
+            IncrementCounter("passport_audit.report_generated");
 
         return Task.FromResult(report);
     }
@@ -398,7 +398,7 @@ public sealed class PassportAuditStrategy : ComplianceStrategyBase
         ComplianceContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        IncrementCounter("passport_audit.compliance_check");
+            IncrementCounter("passport_audit.compliance_check");
 
         var resourceId = context.ResourceId ?? string.Empty;
         var hasTrail = !string.IsNullOrEmpty(resourceId) &&

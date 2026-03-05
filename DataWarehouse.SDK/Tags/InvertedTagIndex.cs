@@ -41,7 +41,7 @@ public sealed class InvertedTagIndex : ITagIndex, IDisposable
     /// </summary>
     private readonly ReaderWriterLockSlim[] _locks;
 
-    private volatile bool _disposed;
+    private int _disposed; // 0=not disposed, 1=disposed (atomic via Interlocked)
 
     /// <summary>
     /// Initializes a new <see cref="InvertedTagIndex"/> with the specified shard count.
@@ -146,6 +146,13 @@ public sealed class InvertedTagIndex : ITagIndex, IDisposable
     public Task<TagIndexResult> QueryAsync(TagIndexQuery query, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(query);
+        if (query.Skip < 0)
+            throw new ArgumentOutOfRangeException(nameof(query), "Skip must be non-negative.");
+        // Guard against pathological Skip values that would silently return empty results
+        // while TotalCount reports a large number (misleading pagination).
+        const int MaxAllowedSkip = 10_000_000; // 10M rows is the practical ceiling
+        if (query.Skip > MaxAllowedSkip)
+            throw new ArgumentOutOfRangeException(nameof(query), $"Skip ({query.Skip}) exceeds the maximum allowed value ({MaxAllowedSkip}).");
 
         var sw = Stopwatch.StartNew();
 
@@ -202,11 +209,16 @@ public sealed class InvertedTagIndex : ITagIndex, IDisposable
         }
         else
         {
-            resultKeys = candidates
-                .OrderBy(k => k, StringComparer.Ordinal)
-                .Skip(query.Skip)
-                .Take(effectiveTake)
-                .ToList();
+            // Sort to a temporary array, then slice — avoids multiple LINQ enumerator allocations.
+            // For small take values relative to N, a full sort is still O(N log N), but this path
+            // eliminates per-element LINQ overhead and keeps a single allocation.
+            var sorted = candidates.ToArray();
+            Array.Sort(sorted, StringComparer.Ordinal);
+            int skip = Math.Min(query.Skip, sorted.Length);
+            int take = Math.Min(effectiveTake, sorted.Length - skip);
+            resultKeys = take > 0
+                ? new ArraySegment<string>(sorted, skip, take).ToArray()
+                : Array.Empty<string>();
         }
 
         sw.Stop();
@@ -343,8 +355,7 @@ public sealed class InvertedTagIndex : ITagIndex, IDisposable
     /// <inheritdoc />
     public void Dispose()
     {
-        if (_disposed) return;
-        _disposed = true;
+        if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0) return;
 
         for (int i = 0; i < _shardCount; i++)
         {
@@ -461,7 +472,11 @@ public sealed class InvertedTagIndex : ITagIndex, IDisposable
     }
 
     /// <summary>
-    /// Collects all object keys across all shards (used for NotExists).
+    /// Collects all object keys across all shards (used for NotExists filter).
+    /// NOTE (P2-666): NotExists requires scanning all shards because inverted indexes track
+    /// "which objects have this tag", not "which objects exist". For deployments with millions
+    /// of objects, consider maintaining a forward index (objectId → tags) alongside this
+    /// inverted index to make NotExists O(1) per tag.
     /// </summary>
     private void CollectAllObjectKeys(HashSet<string> results)
     {

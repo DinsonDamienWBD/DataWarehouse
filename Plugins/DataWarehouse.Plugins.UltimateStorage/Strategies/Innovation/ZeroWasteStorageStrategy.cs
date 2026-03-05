@@ -83,6 +83,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 _enableInlineMetadata = GetConfiguration("EnableInlineMetadata", true);
                 _enableBitPacking = GetConfiguration("EnableBitPacking", true);
 
+                // Validate BlockStorePath resolves within or alongside BasePath to prevent directory traversal.
+                var fullBlockStorePath = Path.GetFullPath(_blockStorePath);
+                var fullBasePath = Path.GetFullPath(basePath);
+                // Allow the store file itself to be in basePath or any subfolder of basePath.
+                if (!fullBlockStorePath.StartsWith(fullBasePath, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException($"BlockStorePath '{_blockStorePath}' resolves outside the base storage directory '{basePath}'.");
+                _blockStorePath = fullBlockStorePath;
+
                 Directory.CreateDirectory(Path.GetDirectoryName(_blockStorePath)!);
 
                 // Open or create block device
@@ -126,9 +134,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Start with empty index
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -151,9 +161,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Start with empty allocations
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -165,9 +177,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 var json = System.Text.Json.JsonSerializer.Serialize(_blockIndex.ToDictionary(kvp => kvp.Key, kvp => kvp.Value));
                 await File.WriteAllTextAsync(indexPath, json, ct);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Best effort save
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -179,9 +193,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 var json = System.Text.Json.JsonSerializer.Serialize(_allocations.ToDictionary(kvp => kvp.Key, kvp => kvp.Value));
                 await File.WriteAllTextAsync(allocPath, json, ct);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Best effort save
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -627,6 +643,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             if (metadataLength <= 0 || metadataLength > 10000)
             {
                 // Invalid or no metadata
+                return encoded;
+            }
+
+            // Validate that encoded buffer is large enough before indexing
+            int requiredBits = 32 + metadataLength * 8;
+            if (encoded.Length < requiredBits)
+            {
+                // Malformed data — insufficient bits for declared metadata length
                 return encoded;
             }
 

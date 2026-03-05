@@ -125,6 +125,9 @@ public sealed class SovereigntyMeshOrchestratorStrategy : ComplianceStrategyBase
             _lifecycleManager = new PassportLifecycleStrategy();
             await _lifecycleManager.InitializeAsync(new Dictionary<string, object>(Configuration), cancellationToken);
 
+            // Full memory barrier ensures all sub-strategy writes above are visible to other threads
+            // before _meshInitialized (volatile) is set — completes the double-checked lock pattern
+            System.Threading.Thread.MemoryBarrier();
             _meshInitialized = true;
             IncrementCounter("sovereignty_mesh.initialized");
         }
@@ -146,7 +149,7 @@ public sealed class SovereigntyMeshOrchestratorStrategy : ComplianceStrategyBase
     {
         EnsureMeshInitialized();
         ct.ThrowIfCancellationRequested();
-        IncrementCounter("sovereignty_mesh.issue_passport");
+            IncrementCounter("sovereignty_mesh.issue_passport");
 
         // Build compliance context from object and regulations
         var context = new ComplianceContext
@@ -171,7 +174,7 @@ public sealed class SovereigntyMeshOrchestratorStrategy : ComplianceStrategyBase
     {
         EnsureMeshInitialized();
         ct.ThrowIfCancellationRequested();
-        IncrementCounter("sovereignty_mesh.verify_passport");
+            IncrementCounter("sovereignty_mesh.verify_passport");
 
         // Look up passport from lifecycle registry first, then issuance cache
         var registryEntry = _lifecycleManager.GetRegistryEntry(passportId);
@@ -183,32 +186,27 @@ public sealed class SovereigntyMeshOrchestratorStrategy : ComplianceStrategyBase
             passport = _passportIssuance.GetCachedPassport(registryEntry.ObjectId);
         }
 
-        // Also try direct passport ID lookup across all cached passports
+        // If passport not found or ID mismatch, return not-found result
         if (passport == null || passport.PassportId != passportId)
         {
-            // The passport is not in the issuance cache by objectId, or the IDs don't match
-            // Return a not-found result
-            if (passport == null || passport.PassportId != passportId)
+            return new PassportVerificationResult
             {
-                return new PassportVerificationResult
+                IsValid = false,
+                Passport = new CompliancePassport
                 {
-                    IsValid = false,
-                    Passport = new CompliancePassport
-                    {
-                        PassportId = passportId,
-                        ObjectId = registryEntry?.ObjectId ?? "unknown",
-                        Status = PassportStatus.PendingReview,
-                        Scope = PassportScope.Object,
-                        Entries = Array.Empty<PassportEntry>(),
-                        EvidenceChain = Array.Empty<EvidenceLink>(),
-                        IssuedAt = DateTimeOffset.UtcNow,
-                        ExpiresAt = DateTimeOffset.UtcNow,
-                        IssuerId = "unknown"
-                    },
-                    FailureReasons = new[] { "Passport not found" },
-                    VerifiedAt = DateTimeOffset.UtcNow
-                };
-            }
+                    PassportId = passportId,
+                    ObjectId = registryEntry?.ObjectId ?? "unknown",
+                    Status = PassportStatus.PendingReview,
+                    Scope = PassportScope.Object,
+                    Entries = Array.Empty<PassportEntry>(),
+                    EvidenceChain = Array.Empty<EvidenceLink>(),
+                    IssuedAt = DateTimeOffset.UtcNow,
+                    ExpiresAt = DateTimeOffset.UtcNow,
+                    IssuerId = "unknown"
+                },
+                FailureReasons = new[] { "Passport not found" },
+                VerifiedAt = DateTimeOffset.UtcNow
+            };
         }
 
         // Verify via the verification API
@@ -224,7 +222,7 @@ public sealed class SovereigntyMeshOrchestratorStrategy : ComplianceStrategyBase
     {
         EnsureMeshInitialized();
         ct.ThrowIfCancellationRequested();
-        IncrementCounter("sovereignty_mesh.check_sovereignty");
+            IncrementCounter("sovereignty_mesh.check_sovereignty");
 
         // 1. Look up zones for source and destination
         var sourceZones = await _zoneRegistry.GetZonesForJurisdictionAsync(sourceLocation, ct);
@@ -328,7 +326,7 @@ public sealed class SovereigntyMeshOrchestratorStrategy : ComplianceStrategyBase
     {
         EnsureMeshInitialized();
         ct.ThrowIfCancellationRequested();
-        IncrementCounter("sovereignty_mesh.check_and_issue");
+            IncrementCounter("sovereignty_mesh.check_and_issue");
 
         // Issue passport if not exists
         var passport = _passportIssuance.GetCachedPassport(objectId);
@@ -355,7 +353,7 @@ public sealed class SovereigntyMeshOrchestratorStrategy : ComplianceStrategyBase
     {
         EnsureMeshInitialized();
         ct.ThrowIfCancellationRequested();
-        IncrementCounter("sovereignty_mesh.generate_zk_proof");
+            IncrementCounter("sovereignty_mesh.generate_zk_proof");
 
         // Find the passport
         var registryEntry = _lifecycleManager.GetRegistryEntry(passportId);
@@ -384,7 +382,7 @@ public sealed class SovereigntyMeshOrchestratorStrategy : ComplianceStrategyBase
     {
         EnsureMeshInitialized();
         ct.ThrowIfCancellationRequested();
-        IncrementCounter("sovereignty_mesh.verify_zk_proof");
+            IncrementCounter("sovereignty_mesh.verify_zk_proof");
 
         return await _zkVerification.VerifyProofAsync(proof, ct);
     }
@@ -398,7 +396,7 @@ public sealed class SovereigntyMeshOrchestratorStrategy : ComplianceStrategyBase
     {
         EnsureMeshInitialized();
         ct.ThrowIfCancellationRequested();
-        IncrementCounter("sovereignty_mesh.get_status");
+            IncrementCounter("sovereignty_mesh.get_status");
 
         var allZones = await _zoneRegistry.GetAllZonesAsync(ct);
         var totalZones = allZones.Count;
@@ -452,7 +450,7 @@ public sealed class SovereigntyMeshOrchestratorStrategy : ComplianceStrategyBase
         CancellationToken cancellationToken)
     {
         EnsureMeshInitialized();
-        IncrementCounter("sovereignty_mesh.check");
+            IncrementCounter("sovereignty_mesh.check");
 
         var violations = new List<ComplianceViolation>();
         var recommendations = new List<string>();

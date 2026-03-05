@@ -96,7 +96,7 @@ public class Http2DataPlanePlugin : DataPlaneTransportPluginBase
         var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", config.AuthToken);
 
-        var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+        using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
         response.EnsureSuccessStatusCode();
 
         var contentLength = response.Content.Headers.ContentLength ?? 0;
@@ -129,7 +129,7 @@ public class Http2DataPlanePlugin : DataPlaneTransportPluginBase
         var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", config.AuthToken);
 
-        var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+        using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
         response.EnsureSuccessStatusCode();
 
         var contentLength = response.Content.Headers.ContentLength ?? 0;
@@ -187,7 +187,7 @@ public class Http2DataPlanePlugin : DataPlaneTransportPluginBase
         };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", config.AuthToken);
 
-        var response = await _httpClient.SendAsync(request, cts.Token);
+        using var response = await _httpClient.SendAsync(request, cts.Token);
         response.EnsureSuccessStatusCode();
 
         var responseContent = await response.Content.ReadAsStringAsync(cts.Token);
@@ -219,7 +219,7 @@ public class Http2DataPlanePlugin : DataPlaneTransportPluginBase
             var request = new HttpRequestMessage(HttpMethod.Head, url);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", config.AuthToken);
 
-            var response = await _httpClient.SendAsync(request, cts.Token);
+            using var response = await _httpClient.SendAsync(request, cts.Token);
             return response.IsSuccessStatusCode;
         }
         catch (HttpRequestException ex)
@@ -245,7 +245,7 @@ public class Http2DataPlanePlugin : DataPlaneTransportPluginBase
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", config.AuthToken);
 
-            var response = await _httpClient.SendAsync(request, cts.Token);
+            using var response = await _httpClient.SendAsync(request, cts.Token);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(cts.Token);
@@ -298,7 +298,7 @@ internal class ProgressReportingStream : Stream
     private readonly long _totalBytes;
     private readonly IProgress<TransferProgress> _progress;
     private readonly ILogger _logger;
-    private long _bytesTransferred;
+    private long _bytesTransferred; // Interlocked.Add used for thread-safe increments
     private readonly DateTime _startTime;
 
     public ProgressReportingStream(
@@ -330,7 +330,7 @@ internal class ProgressReportingStream : Stream
 
         if (bytesRead > 0)
         {
-            _bytesTransferred += bytesRead;
+            Interlocked.Add(ref _bytesTransferred, bytesRead);
             ReportProgress();
         }
 
@@ -343,7 +343,7 @@ internal class ProgressReportingStream : Stream
 
         if (bytesRead > 0)
         {
-            _bytesTransferred += bytesRead;
+            Interlocked.Add(ref _bytesTransferred, bytesRead);
             ReportProgress();
         }
 
@@ -355,19 +355,20 @@ internal class ProgressReportingStream : Stream
         if (_totalBytes == 0)
             return;
 
+        var transferred = Interlocked.Read(ref _bytesTransferred);
         var elapsed = DateTime.UtcNow - _startTime;
         var bytesPerSecond = elapsed.TotalSeconds > 0
-            ? _bytesTransferred / elapsed.TotalSeconds
+            ? transferred / elapsed.TotalSeconds
             : 0;
 
-        var percentComplete = (_bytesTransferred * 100.0) / _totalBytes;
-        var remainingBytes = _totalBytes - _bytesTransferred;
+        var percentComplete = (transferred * 100.0) / _totalBytes;
+        var remainingBytes = _totalBytes - transferred;
         var estimatedRemaining = bytesPerSecond > 0
             ? TimeSpan.FromSeconds(remainingBytes / bytesPerSecond)
             : TimeSpan.Zero;
 
         var progress = new TransferProgress(
-            BytesTransferred: _bytesTransferred,
+            BytesTransferred: transferred,
             TotalBytes: _totalBytes,
             PercentComplete: percentComplete,
             BytesPerSecond: bytesPerSecond,

@@ -91,9 +91,9 @@ public static class FormatConstants
 
     // ── Modules ────────────────────────────────────────────────────────
 
-    /// <summary>Maximum number of module slots in the module registry.</summary>
-    public const int MaxModules = 32;
+    /// <summary>Maximum number of module slots in the module registry (64-bit manifest supports 64 slots).</summary>
+    public const int MaxModules = 64;
 
-    /// <summary>Number of modules defined in the current specification.</summary>
-    public const int DefinedModules = 19;
+    /// <summary>Number of modules defined in the current specification (v2.1: bits 0-38).</summary>
+    public const int DefinedModules = 39;
 }

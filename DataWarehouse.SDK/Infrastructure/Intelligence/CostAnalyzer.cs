@@ -226,7 +226,10 @@ public sealed class CostAnalyzer : IAiAdvisor
         private readonly string _algorithmId;
         private readonly ConcurrentQueue<(DateTimeOffset Timestamp, double DurationMs)> _samples = new();
         private long _operationCount;
-        private double _durationSum;
+        // Store duration sum as long microseconds for Interlocked.Add atomicity
+        private long _durationSumUs;
+        // LOW-489: Track oldest retained sample time to avoid O(n) ToArray() in GetOperationsPerHour.
+        private long _oldestSampleTicks;
 
         public AlgorithmTracker(string algorithmId)
         {
@@ -237,20 +240,29 @@ public sealed class CostAnalyzer : IAiAdvisor
         {
             _samples.Enqueue((timestamp, durationMs));
             Interlocked.Increment(ref _operationCount);
-            // Non-atomic add is acceptable for advisory metrics
-            _durationSum += durationMs;
+            // Atomically accumulate duration — store as microseconds (long) for Interlocked.Add
+            Interlocked.Add(ref _durationSumUs, (long)(durationMs * 1000));
+
+            // LOW-489: Record first sample time (compare-exchange so only first write wins).
+            Interlocked.CompareExchange(ref _oldestSampleTicks, timestamp.Ticks, 0L);
 
             // Bound memory: keep last 10000 samples
             while (_samples.Count > 10000)
             {
-                _samples.TryDequeue(out _);
+                if (_samples.TryDequeue(out var evicted))
+                {
+                    // Update oldest time to the next sample if available.
+                    if (_samples.TryPeek(out var next))
+                        Interlocked.Exchange(ref _oldestSampleTicks, next.Timestamp.Ticks);
+                }
             }
         }
 
         public AlgorithmCost ToAlgorithmCost(double cpuCostPerSecondUsd)
         {
             long ops = Volatile.Read(ref _operationCount);
-            double avgMs = ops > 0 ? _durationSum / ops : 0.0;
+            double totalMs = Interlocked.Read(ref _durationSumUs) / 1000.0;
+            double avgMs = ops > 0 ? totalMs / ops : 0.0;
             double cpuSecondsPerOp = avgMs / 1000.0;
             double cloudCostPerOp = cpuSecondsPerOp * cpuCostPerSecondUsd;
 
@@ -264,12 +276,13 @@ public sealed class CostAnalyzer : IAiAdvisor
 
         public double GetOperationsPerHour(DateTimeOffset now)
         {
-            var samples = _samples.ToArray();
-            if (samples.Length < 2) return 0;
-
-            DateTimeOffset oldest = samples[0].Timestamp;
-            double hours = (now - oldest).TotalHours;
-            return hours > 0 ? samples.Length / hours : 0;
+            // LOW-489: avoid O(n) ToArray() — use tracked oldest sample time and queue count.
+            long count = _samples.Count;
+            if (count < 2) return 0;
+            long oldestTicks = Interlocked.Read(ref _oldestSampleTicks);
+            if (oldestTicks == 0L) return 0;
+            double hours = (now - new DateTimeOffset(oldestTicks, TimeSpan.Zero)).TotalHours;
+            return hours > 0 ? count / hours : 0;
         }
     }
 }

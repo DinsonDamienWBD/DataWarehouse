@@ -53,8 +53,11 @@ public sealed class PrestoStorageStrategy : DatabaseStorageStrategyBase
     protected override async Task InitializeCoreAsync(CancellationToken ct)
     {
         _catalog = GetConfiguration("Catalog", "memory");
+        ValidateSqlIdentifier(_catalog, nameof(_catalog));
         _schema = GetConfiguration("Schema", "default");
+        ValidateSqlIdentifier(_schema, nameof(_schema));
         _tableName = GetConfiguration("TableName", "storage");
+        ValidateSqlIdentifier(_tableName, nameof(_tableName));
 
         var connectionString = GetConnectionString();
         _httpClient = new HttpClient
@@ -64,7 +67,9 @@ public sealed class PrestoStorageStrategy : DatabaseStorageStrategyBase
         };
 
         var user = GetConfiguration("User", "datawarehouse");
+        _httpClient.DefaultRequestHeaders.Remove("X-Presto-User");
         _httpClient.DefaultRequestHeaders.Add("X-Presto-User", user);
+        _httpClient.DefaultRequestHeaders.Remove("X-Trino-User");
         _httpClient.DefaultRequestHeaders.Add("X-Trino-User", user);
 
         await EnsureSchemaCoreAsync(ct);
@@ -98,19 +103,28 @@ public sealed class PrestoStorageStrategy : DatabaseStorageStrategyBase
             )", ct);
     }
 
+    /// <summary>
+    /// Escapes a string value for safe inclusion in Presto/Trino SQL literals.
+    /// Replaces single quotes with doubled single quotes.
+    /// </summary>
+    private static string EscapeSqlString(string value)
+    {
+        return value.Replace("'", "''");
+    }
+
     protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct)
     {
         var now = DateTime.UtcNow;
         var etag = GenerateETag(data);
         var contentType = GetContentType(key);
         var dataBase64 = Convert.ToBase64String(data);
-        var metadataJson = metadata != null ? JsonSerializer.Serialize(metadata, JsonOptions).Replace("'", "''") : "";
+        var metadataJson = metadata != null ? JsonSerializer.Serialize(metadata, JsonOptions) : "";
 
         await ExecuteQueryAsync($@"
             INSERT INTO {_catalog}.{_schema}.{_tableName}
             (key, data, size, content_type, etag, metadata, created_at, modified_at)
-            VALUES ('{key}', '{dataBase64}', {data.LongLength}, '{contentType ?? ""}',
-                    '{etag}', '{metadataJson}', TIMESTAMP '{now:yyyy-MM-dd HH:mm:ss.fff}',
+            VALUES ('{EscapeSqlString(key)}', '{EscapeSqlString(dataBase64)}', {data.LongLength}, '{EscapeSqlString(contentType ?? "")}',
+                    '{EscapeSqlString(etag)}', '{EscapeSqlString(metadataJson)}', TIMESTAMP '{now:yyyy-MM-dd HH:mm:ss.fff}',
                     TIMESTAMP '{now:yyyy-MM-dd HH:mm:ss.fff}')", ct);
 
         return new StorageObjectMetadata
@@ -130,7 +144,7 @@ public sealed class PrestoStorageStrategy : DatabaseStorageStrategyBase
     {
         var results = await ExecuteQueryAsync($@"
             SELECT data FROM {_catalog}.{_schema}.{_tableName}
-            WHERE key = '{key}'
+            WHERE key = '{EscapeSqlString(key)}'
             ORDER BY modified_at DESC
             LIMIT 1", ct);
 
@@ -151,7 +165,7 @@ public sealed class PrestoStorageStrategy : DatabaseStorageStrategyBase
 
         await ExecuteQueryAsync($@"
             DELETE FROM {_catalog}.{_schema}.{_tableName}
-            WHERE key = '{key}'", ct);
+            WHERE key = '{EscapeSqlString(key)}'", ct);
 
         return size;
     }
@@ -160,7 +174,7 @@ public sealed class PrestoStorageStrategy : DatabaseStorageStrategyBase
     {
         var results = await ExecuteQueryAsync($@"
             SELECT 1 FROM {_catalog}.{_schema}.{_tableName}
-            WHERE key = '{key}'
+            WHERE key = '{EscapeSqlString(key)}'
             LIMIT 1", ct);
 
         return results.Any();
@@ -168,7 +182,7 @@ public sealed class PrestoStorageStrategy : DatabaseStorageStrategyBase
 
     protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct)
     {
-        var whereClause = string.IsNullOrEmpty(prefix) ? "" : $"WHERE key LIKE '{prefix}%'";
+        var whereClause = string.IsNullOrEmpty(prefix) ? "" : $"WHERE key LIKE '{EscapeSqlString(prefix)}%'";
 
         var results = await ExecuteQueryAsync($@"
             SELECT key, size, content_type, etag, metadata, created_at, modified_at
@@ -211,7 +225,7 @@ public sealed class PrestoStorageStrategy : DatabaseStorageStrategyBase
         var results = await ExecuteQueryAsync($@"
             SELECT size, content_type, etag, metadata, created_at, modified_at
             FROM {_catalog}.{_schema}.{_tableName}
-            WHERE key = '{key}'
+            WHERE key = '{EscapeSqlString(key)}'
             ORDER BY modified_at DESC
             LIMIT 1", ct);
 
@@ -259,7 +273,9 @@ public sealed class PrestoStorageStrategy : DatabaseStorageStrategyBase
         var results = new List<List<object?>>();
 
         var content = new StringContent(sql, Encoding.UTF8, "text/plain");
-        _httpClient!.DefaultRequestHeaders.Add("X-Presto-Catalog", _catalog);
+        _httpClient!.DefaultRequestHeaders.Remove("X-Presto-Catalog");
+        _httpClient.DefaultRequestHeaders.Add("X-Presto-Catalog", _catalog);
+        _httpClient.DefaultRequestHeaders.Remove("X-Presto-Schema");
         _httpClient.DefaultRequestHeaders.Add("X-Presto-Schema", _schema);
 
         var response = await _httpClient.PostAsync("/v1/statement", content, ct);

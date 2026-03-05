@@ -105,7 +105,7 @@ public sealed class UptimeRobotStrategy : ObservabilityStrategyBase
 
             var content = new FormUrlEncodedContent(parameters);
 
-            var response = await _httpClient.PostAsync("https://api.uptimerobot.com/v2/newMonitor", content, ct);
+            using var response = await _httpClient.PostAsync("https://api.uptimerobot.com/v2/newMonitor", content, ct);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(ct);
@@ -144,7 +144,7 @@ public sealed class UptimeRobotStrategy : ObservabilityStrategyBase
 
             var content = new FormUrlEncodedContent(parameters);
 
-            var response = await _httpClient.PostAsync("https://api.uptimerobot.com/v2/getMonitors", content, ct);
+            using var response = await _httpClient.PostAsync("https://api.uptimerobot.com/v2/getMonitors", content, ct);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(ct);
@@ -179,7 +179,7 @@ public sealed class UptimeRobotStrategy : ObservabilityStrategyBase
 
             var content = new FormUrlEncodedContent(parameters);
 
-            var response = await _httpClient.PostAsync("https://api.uptimerobot.com/v2/getAccountDetails", content, ct);
+            using var response = await _httpClient.PostAsync("https://api.uptimerobot.com/v2/getAccountDetails", content, ct);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(ct);
@@ -216,7 +216,7 @@ public sealed class UptimeRobotStrategy : ObservabilityStrategyBase
 
             var content = new FormUrlEncodedContent(parameters);
 
-            var response = await _httpClient.PostAsync("https://api.uptimerobot.com/v2/deleteMonitor", content, ct);
+            using var response = await _httpClient.PostAsync("https://api.uptimerobot.com/v2/deleteMonitor", content, ct);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(ct);
@@ -267,21 +267,16 @@ public sealed class UptimeRobotStrategy : ObservabilityStrategyBase
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("uptime_robot.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     protected override void Dispose(bool disposing)
     {
+                _apiKey = string.Empty;
         if (disposing)
         {
             _httpClient.Dispose();

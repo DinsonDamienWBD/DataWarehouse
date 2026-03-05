@@ -33,7 +33,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
     {
         private readonly IPolicyPersistence _inner;
         private readonly ConcurrentQueue<AuditBlock> _auditChain = new();
-        private string _lastHash = "GENESIS";
+        private volatile string _lastHash = "GENESIS";
         private long _sequenceNumber;
         private readonly object _chainLock = new();
 

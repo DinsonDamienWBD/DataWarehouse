@@ -67,10 +67,13 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Advanced
             if (string.IsNullOrWhiteSpace(challengeContext))
                 throw new ArgumentException("Challenge context cannot be null or empty", nameof(challengeContext));
 
+            // Make a local copy of the private key so we don't zero the caller's buffer
+            var localKey = new byte[privateKey.Length];
+            Array.Copy(privateKey, localKey, privateKey.Length);
             try
             {
                 using var ecdsa = ECDsa.Create();
-                ecdsa.ImportPkcs8PrivateKey(privateKey, out _);
+                ecdsa.ImportPkcs8PrivateKey(localKey, out _);
 
                 var timestamp = DateTimeOffset.UtcNow;
                 var message = BuildMessage(challengeContext, timestamp);
@@ -101,8 +104,9 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Advanced
             }
             finally
             {
-                // Zero out the private key from memory (CRYPTO-01 compliance)
-                CryptographicOperations.ZeroMemory(privateKey);
+                // Zero out the local copy from memory (CRYPTO-01 compliance)
+                // Caller retains ownership of their buffer
+                CryptographicOperations.ZeroMemory(localKey);
             }
         }
 
@@ -271,23 +275,36 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Advanced
             if (data == null || data.Length == 0)
                 throw new ArgumentException("Data cannot be null or empty", nameof(data));
 
+            // Sanity bound: a valid proof cannot exceed 64 KB
+            const int MaxProofBytes = 65536;
+            if (data.Length > MaxProofBytes)
+                throw new ArgumentException($"Proof data too large ({data.Length} bytes); maximum is {MaxProofBytes} bytes.", nameof(data));
+
             using var ms = new MemoryStream(data);
             using var reader = new BinaryReader(ms);
 
-            // Read public key
+            // Read public key — P-256 SubjectPublicKeyInfo is ~91 bytes; allow up to 4 KB
             var publicKeyLength = reader.ReadInt32();
+            if (publicKeyLength < 0 || publicKeyLength > 4096)
+                throw new InvalidDataException($"Invalid public key length {publicKeyLength}.");
             var publicKey = reader.ReadBytes(publicKeyLength);
 
-            // Read commitment
+            // Read commitment — EC point or hash; allow up to 1 KB
             var commitmentLength = reader.ReadInt32();
+            if (commitmentLength < 0 || commitmentLength > 1024)
+                throw new InvalidDataException($"Invalid commitment length {commitmentLength}.");
             var commitment = reader.ReadBytes(commitmentLength);
 
-            // Read response
+            // Read response — scalar or hash; allow up to 1 KB
             var responseLength = reader.ReadInt32();
+            if (responseLength < 0 || responseLength > 1024)
+                throw new InvalidDataException($"Invalid response length {responseLength}.");
             var response = reader.ReadBytes(responseLength);
 
-            // Read challenge context
+            // Read challenge context — URL/path-style string; allow up to 8 KB
             var contextLength = reader.ReadInt32();
+            if (contextLength < 0 || contextLength > 8192)
+                throw new InvalidDataException($"Invalid challenge context length {contextLength}.");
             var contextBytes = reader.ReadBytes(contextLength);
             var context = Encoding.UTF8.GetString(contextBytes);
 

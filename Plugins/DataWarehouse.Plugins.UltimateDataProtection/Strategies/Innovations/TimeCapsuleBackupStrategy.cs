@@ -45,6 +45,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
         public override string StrategyId => "time-capsule";
 
         /// <inheritdoc/>
+        public override bool IsProductionReady => false;
+
+        /// <inheritdoc/>
         public override string StrategyName => "Time Capsule Backup";
 
         /// <inheritdoc/>
@@ -340,7 +343,15 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                     var witnessValid = await VerifyTimeWitnessAsync(metadata.WitnessId, ct);
                     if (!witnessValid)
                     {
-                        // Warning only - continue with restore
+                        // Witness verification failed: surface as a warning in progress.
+                        progressCallback(new RestoreProgress
+                        {
+                            RestoreId = restoreId,
+                            Phase = "Verifying Time Witness",
+                            PercentComplete = 25,
+                            Warning = $"Time-witness '{metadata.WitnessId}' could not be verified. " +
+                                      "Restore will continue but temporal authenticity is unconfirmed."
+                        });
                     }
                 }
 
@@ -355,7 +366,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                     });
 
                     // Time-lock puzzle is automatically solved after unlock date
-                    await SolveTimeLockPuzzleAsync(request.BackupId, ct);
+                    await VerifyTimeLockExpiryAsync(request.BackupId, ct);
                 }
 
                 // Phase 6: Decrypt and restore
@@ -721,19 +732,47 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 
         private byte[] EncryptKeyWithPuzzle(byte[] key, byte[] puzzleNonce)
         {
-            // XOR key with puzzle nonce as simple example
-            // In production, use proper time-lock encryption
-            var result = new byte[key.Length];
-            for (int i = 0; i < key.Length; i++)
-            {
-                result[i] = (byte)(key[i] ^ puzzleNonce[i % puzzleNonce.Length]);
-            }
+            // Derive a 256-bit AES key from the puzzle nonce using SHA-256 so the
+            // key share is properly protected rather than trivially XOR-reversible.
+            // A production time-lock implementation would use RSA sequential-squaring
+            // or a VDF; this provides real confidentiality in the interim.
+            using var sha256 = System.Security.Cryptography.SHA256.Create();
+            var aesKey = sha256.ComputeHash(puzzleNonce);
+
+            using var aes = System.Security.Cryptography.Aes.Create();
+            aes.Key = aesKey;
+            aes.GenerateIV();
+
+            using var encryptor = aes.CreateEncryptor();
+            var encrypted = encryptor.TransformFinalBlock(key, 0, key.Length);
+
+            // Prepend IV so DecryptKeyWithPuzzle can recover it
+            var result = new byte[aes.IV.Length + encrypted.Length];
+            aes.IV.CopyTo(result, 0);
+            encrypted.CopyTo(result, aes.IV.Length);
             return result;
         }
 
-        private Task SolveTimeLockPuzzleAsync(string backupId, CancellationToken ct)
+        /// <summary>
+        /// Verifies time-lock expiry via the registered time-witness service.
+        /// NOTE: This method currently checks the local system clock and the registered
+        /// time-witness metadata rather than solving an RSA sequential-squaring VDF puzzle.
+        /// A production VDF implementation requires a library such as libtlock or vdf-competition.
+        /// </summary>
+        private Task VerifyTimeLockExpiryAsync(string backupId, CancellationToken ct)
         {
-            // In production, solve the puzzle or verify with time service
+            if (!_backups.TryGetValue(backupId, out var metadata))
+            {
+                throw new InvalidOperationException($"Backup '{backupId}' not found.");
+            }
+
+            if (metadata.UnlockDate.HasValue && DateTimeOffset.UtcNow < metadata.UnlockDate.Value)
+            {
+                throw new InvalidOperationException(
+                    $"Time-lock has not expired. Unlock date: {metadata.UnlockDate.Value:O}. " +
+                    $"Current time: {DateTimeOffset.UtcNow:O}.");
+            }
+
             return Task.CompletedTask;
         }
 
@@ -757,6 +796,8 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             });
         }
 
+        private readonly object _destructLock = new();
+
         /// <summary>
         /// Timer callback to check and destroy expired backups.
         /// </summary>
@@ -764,36 +805,53 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
         {
             var now = DateTimeOffset.UtcNow;
 
-            foreach (var kvp in _backups)
+            // Snapshot keys first; avoid mutating _backups while iterating.
+            var keysToCheck = _backups.Keys.ToArray();
+
+            foreach (var key in keysToCheck)
             {
-                var metadata = kvp.Value;
-
-                // Skip if already destroyed or under legal hold
-                if (metadata.Status == TimeCapsuleStatus.Destroyed)
+                if (!_backups.TryGetValue(key, out var metadata))
                     continue;
 
-                if (_legalHolds.ContainsKey(kvp.Key))
-                    continue;
-
-                // Check if destruct date has passed
-                if (metadata.SelfDestructEnabled &&
-                    metadata.DestructDate.HasValue &&
-                    now >= metadata.DestructDate.Value)
+                // Serialize destruction decisions under a lock to prevent concurrent
+                // CheckAndDestroy invocations from double-destroying the same backup.
+                lock (_destructLock)
                 {
-                    DestroyBackup(kvp.Key, metadata);
+                    // Re-check inside the lock after acquiring it
+                    if (!_backups.TryGetValue(key, out metadata))
+                        continue;
+
+                    if (metadata.Status == TimeCapsuleStatus.Destroyed)
+                        continue;
+
+                    if (_legalHolds.ContainsKey(key))
+                        continue;
+
+                    if (metadata.SelfDestructEnabled &&
+                        metadata.DestructDate.HasValue &&
+                        now >= metadata.DestructDate.Value)
+                    {
+                        DestroyBackup(key, metadata);
+                    }
                 }
             }
         }
 
         private void DestroyBackup(string backupId, TimeCapsuleMetadata metadata)
         {
+            // Wipe the key derivation salt to deny key reconstruction
+            if (metadata.KeyDerivationSalt.Length > 0)
+            {
+                System.Security.Cryptography.CryptographicOperations.ZeroMemory(metadata.KeyDerivationSalt);
+                metadata.KeyDerivationSalt = Array.Empty<byte>();
+            }
+
+            // Remove the backup entry from the in-process store so no further access is possible
+            _backups.TryRemove(backupId, out _);
+
+            // Record destruction timestamp in the local snapshot for audit purposes
             metadata.Status = TimeCapsuleStatus.Destroyed;
             metadata.DestroyedAt = DateTimeOffset.UtcNow;
-
-            // In production, securely wipe the backup data
-            // - Overwrite with random data
-            // - Delete encryption keys
-            // - Remove from storage
         }
 
         #endregion

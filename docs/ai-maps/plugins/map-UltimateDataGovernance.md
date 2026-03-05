@@ -40,9 +40,10 @@ public abstract class DataGovernanceStrategyBase : StrategyBase, IDataGovernance
     public abstract DataGovernanceCapabilities Capabilities { get; }
     public abstract string SemanticDescription { get; }
     public abstract string[] Tags { get; }
-    protected override async Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     public HealthStatus GetHealth();
+    public async Task<HealthStatus> GetHealthAsync(CancellationToken ct = default);
     public IReadOnlyDictionary<string, long> GetCounters();;
 }
 ```
@@ -136,222 +137,6 @@ public sealed record DataClassification
     public required string Level { get; init; }
     public string[] Tags { get; init; };
     public DateTimeOffset ClassifiedAt { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/DefaultPipelineDefinition.cs
-```csharp
-public static class DefaultPipelineDefinition
-{
-}
-    public static MoonshotPipelineDefinition IngestToLifecycle { get; };
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/MoonshotOrchestrator.cs
-```csharp
-public sealed class MoonshotOrchestrator : IMoonshotOrchestrator
-{
-}
-    public const string TopicStageCompleted = "moonshot.pipeline.stage.completed";
-    public const string TopicPipelineCompleted = "moonshot.pipeline.completed";
-    public MoonshotOrchestrator(IMoonshotRegistry registry, MoonshotConfiguration configuration, ILogger<MoonshotOrchestrator> logger);
-    public void RegisterStage(IMoonshotPipelineStage stage);
-    public IReadOnlyList<MoonshotId> GetRegisteredStages();
-    public Task<MoonshotPipelineResult> ExecuteDefaultPipelineAsync(MoonshotPipelineContext context, CancellationToken ct);
-    public async Task<MoonshotPipelineResult> ExecutePipelineAsync(MoonshotPipelineContext context, MoonshotPipelineDefinition pipeline, CancellationToken ct);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/MoonshotPipelineStages.cs
-```csharp
-public static class MoonshotBusTopics
-{
-}
-    public const string ConsciousnessScore = "consciousness.score";
-    public const string TagsAutoAttach = "tags.auto.attach";
-    public const string CompliancePassportIssue = "compliance.passport.issue";
-    public const string SovereigntyZoneCheck = "sovereignty.zone.check";
-    public const string StoragePlacementCompute = "storage.placement.compute";
-    public const string TamperproofTimelockApply = "tamperproof.timelock.apply";
-    public const string SemanticSyncClassify = "semanticsync.classify";
-    public const string ChaosVaccinationRegister = "chaos.vaccination.register";
-    public const string CarbonLifecycleAssign = "carbon.lifecycle.assign";
-    public const string FabricNamespaceRegister = "fabric.namespace.register";
-}
-```
-```csharp
-public static class MoonshotContextKeys
-{
-}
-    public const string ConsciousnessScore = "ConsciousnessScore";
-    public const string AttachedTags = "AttachedTags";
-    public const string CompliancePassport = "CompliancePassport";
-    public const string SovereigntyDecision = "SovereigntyDecision";
-    public const string PlacementDecision = "PlacementDecision";
-    public const string TimeLockResult = "TimeLockResult";
-    public const string SyncFidelityLevel = "SyncFidelityLevel";
-    public const string VaccinationRegistered = "VaccinationRegistered";
-    public const string LifecycleTier = "LifecycleTier";
-    public const string DwAddress = "DwAddress";
-}
-```
-```csharp
-public sealed class DataConsciousnessStage : IMoonshotPipelineStage
-{
-}
-    public MoonshotId Id;;
-    public Task<bool> CanExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);;
-    public async Task<MoonshotStageResult> ExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);
-}
-```
-```csharp
-public sealed class UniversalTagsStage : IMoonshotPipelineStage
-{
-}
-    public MoonshotId Id;;
-    public Task<bool> CanExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);;
-    public async Task<MoonshotStageResult> ExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);
-}
-```
-```csharp
-public sealed class CompliancePassportsStage : IMoonshotPipelineStage
-{
-}
-    public MoonshotId Id;;
-    public Task<bool> CanExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);;
-    public async Task<MoonshotStageResult> ExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);
-}
-```
-```csharp
-public sealed class SovereigntyMeshStage : IMoonshotPipelineStage
-{
-}
-    public MoonshotId Id;;
-    public Task<bool> CanExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);
-    public async Task<MoonshotStageResult> ExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);
-}
-```
-```csharp
-public sealed class ZeroGravityStorageStage : IMoonshotPipelineStage
-{
-}
-    public MoonshotId Id;;
-    public Task<bool> CanExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);;
-    public async Task<MoonshotStageResult> ExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);
-}
-```
-```csharp
-public sealed class CryptoTimeLocksStage : IMoonshotPipelineStage
-{
-}
-    public MoonshotId Id;;
-    public Task<bool> CanExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);;
-    public async Task<MoonshotStageResult> ExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);
-}
-```
-```csharp
-public sealed class SemanticSyncStage : IMoonshotPipelineStage
-{
-}
-    public MoonshotId Id;;
-    public Task<bool> CanExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);;
-    public async Task<MoonshotStageResult> ExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);
-}
-```
-```csharp
-public sealed class ChaosVaccinationStage : IMoonshotPipelineStage
-{
-}
-    public MoonshotId Id;;
-    public Task<bool> CanExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);;
-    public async Task<MoonshotStageResult> ExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);
-}
-```
-```csharp
-public sealed class CarbonAwareLifecycleStage : IMoonshotPipelineStage
-{
-}
-    public MoonshotId Id;;
-    public Task<bool> CanExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);;
-    public async Task<MoonshotStageResult> ExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);
-}
-```
-```csharp
-public sealed class UniversalFabricStage : IMoonshotPipelineStage
-{
-}
-    public MoonshotId Id;;
-    public Task<bool> CanExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);;
-    public async Task<MoonshotStageResult> ExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/MoonshotRegistryImpl.cs
-```csharp
-public sealed class MoonshotRegistryImpl : IMoonshotRegistry
-{
-}
-    public event EventHandler<MoonshotStatusChangedEventArgs>? StatusChanged;
-    public void Register(MoonshotRegistration registration);
-    public MoonshotRegistration? Get(MoonshotId id);
-    public IReadOnlyList<MoonshotRegistration> GetAll();
-    public MoonshotStatus GetStatus(MoonshotId id);
-    public void UpdateStatus(MoonshotId id, MoonshotStatus status);
-    public void UpdateHealthReport(MoonshotId id, MoonshotHealthReport report);
-    public IReadOnlyList<MoonshotRegistration> GetByStatus(MoonshotStatus status);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Scaling/GovernanceScalingManager.cs
-```csharp
-[SdkCompatibility("6.0.0", Notes = "Phase 88-08: Governance scaling with TTL cache, stale-while-revalidate, parallel evaluation")]
-public sealed class GovernanceScalingManager : IScalableSubsystem, IDisposable
-{
-}
-    public const int DefaultMaxPolicies = 50_000;
-    public const int DefaultMaxOwnerships = 100_000;
-    public const int DefaultMaxClassifications = 100_000;
-    public static readonly TimeSpan DefaultTtl = TimeSpan.FromMinutes(15);
-    public GovernanceScalingManager(IPersistentBackingStore? backingStore = null, ScalingLimits? initialLimits = null, TimeSpan? ttl = null, int? maxConcurrentEvaluations = null);
-    public async Task PutPolicyAsync(string policyId, byte[] data, CancellationToken ct = default);
-    public async Task<byte[]?> GetPolicyAsync(string policyId, CancellationToken ct = default);
-    public async Task PutOwnershipAsync(string ownerId, byte[] data, CancellationToken ct = default);
-    public async Task<byte[]?> GetOwnershipAsync(string ownerId, CancellationToken ct = default);
-    public async Task PutClassificationAsync(string classificationId, byte[] data, CancellationToken ct = default);
-    public async Task<byte[]?> GetClassificationAsync(string classificationId, CancellationToken ct = default);
-    public async Task<TResult[]> EvaluateInParallelAsync<TResult>(IReadOnlyList<Func<CancellationToken, Task<TResult>>> evaluations, CancellationToken ct = default);
-    public int MaxConcurrentEvaluations;;
-    public IReadOnlyDictionary<string, object> GetScalingMetrics();
-    public Task ReconfigureLimitsAsync(ScalingLimits limits, CancellationToken ct = default);
-    public ScalingLimits CurrentLimits
-{
-    get
-    {
-        lock (_configLock)
-        {
-            return _currentLimits;
-        }
-    }
-}
-    public BackpressureState CurrentBackpressureState
-{
-    get
-    {
-        int totalEntries = _policies.Count + _ownerships.Count + _classifications.Count;
-        int maxCapacity = DefaultMaxPolicies + DefaultMaxOwnerships + DefaultMaxClassifications;
-        if (maxCapacity == 0)
-            return BackpressureState.Normal;
-        double utilization = (double)totalEntries / maxCapacity;
-        return utilization switch
-        {
-            >= 0.85 => BackpressureState.Critical,
-            >= 0.50 => BackpressureState.Warning,
-            _ => BackpressureState.Normal
-        };
-    }
-}
-    public void Dispose();
 }
 ```
 
@@ -511,229 +296,225 @@ public sealed record SlaViolation
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/CrossMoonshot/ChaosImmunityWiring.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/MoonshotPipelineStages.cs
 ```csharp
-public sealed class ChaosImmunityWiring
+public static class MoonshotBusTopics
 {
 }
-    public ChaosImmunityWiring(IMessageBus messageBus, MoonshotConfiguration config, ILogger logger);
-    public Task RegisterAsync(CancellationToken ct);
-    public Task UnregisterAsync();
+    public const string ConsciousnessScore = "consciousness.score";
+    public const string TagsAutoAttach = "tags.auto.attach";
+    public const string CompliancePassportIssue = "compliance.passport.issue";
+    public const string SovereigntyZoneCheck = "sovereignty.zone.check";
+    public const string StoragePlacementCompute = "storage.placement.compute";
+    public const string TamperproofTimelockApply = "tamperproof.timelock.apply";
+    public const string SemanticSyncClassify = "semanticsync.classify";
+    public const string ChaosVaccinationRegister = "chaos.vaccination.register";
+    public const string CarbonLifecycleAssign = "carbon.lifecycle.assign";
+    public const string FabricNamespaceRegister = "fabric.namespace.register";
+}
+```
+```csharp
+public static class MoonshotContextKeys
+{
+}
+    public const string ConsciousnessScore = "ConsciousnessScore";
+    public const string AttachedTags = "AttachedTags";
+    public const string CompliancePassport = "CompliancePassport";
+    public const string SovereigntyDecision = "SovereigntyDecision";
+    public const string PlacementDecision = "PlacementDecision";
+    public const string TimeLockResult = "TimeLockResult";
+    public const string SyncFidelityLevel = "SyncFidelityLevel";
+    public const string VaccinationRegistered = "VaccinationRegistered";
+    public const string LifecycleTier = "LifecycleTier";
+    public const string DwAddress = "DwAddress";
+}
+```
+```csharp
+public sealed class DataConsciousnessStage : IMoonshotPipelineStage
+{
+}
+    public MoonshotId Id;;
+    public Task<bool> CanExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);;
+    public async Task<MoonshotStageResult> ExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);
+}
+```
+```csharp
+public sealed class UniversalTagsStage : IMoonshotPipelineStage
+{
+}
+    public MoonshotId Id;;
+    public Task<bool> CanExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);;
+    public async Task<MoonshotStageResult> ExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);
+}
+```
+```csharp
+public sealed class CompliancePassportsStage : IMoonshotPipelineStage
+{
+}
+    public MoonshotId Id;;
+    public Task<bool> CanExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);;
+    public async Task<MoonshotStageResult> ExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);
+}
+```
+```csharp
+public sealed class SovereigntyMeshStage : IMoonshotPipelineStage
+{
+}
+    public MoonshotId Id;;
+    public Task<bool> CanExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);
+    public async Task<MoonshotStageResult> ExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);
+}
+```
+```csharp
+public sealed class ZeroGravityStorageStage : IMoonshotPipelineStage
+{
+}
+    public MoonshotId Id;;
+    public Task<bool> CanExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);;
+    public async Task<MoonshotStageResult> ExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);
+}
+```
+```csharp
+public sealed class CryptoTimeLocksStage : IMoonshotPipelineStage
+{
+}
+    public MoonshotId Id;;
+    public Task<bool> CanExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);;
+    public async Task<MoonshotStageResult> ExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);
+}
+```
+```csharp
+public sealed class SemanticSyncStage : IMoonshotPipelineStage
+{
+}
+    public MoonshotId Id;;
+    public Task<bool> CanExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);;
+    public async Task<MoonshotStageResult> ExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);
+}
+```
+```csharp
+public sealed class ChaosVaccinationStage : IMoonshotPipelineStage
+{
+}
+    public MoonshotId Id;;
+    public Task<bool> CanExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);;
+    public async Task<MoonshotStageResult> ExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);
+}
+```
+```csharp
+public sealed class CarbonAwareLifecycleStage : IMoonshotPipelineStage
+{
+}
+    public MoonshotId Id;;
+    public Task<bool> CanExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);;
+    public async Task<MoonshotStageResult> ExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);
+}
+```
+```csharp
+public sealed class UniversalFabricStage : IMoonshotPipelineStage
+{
+}
+    public MoonshotId Id;;
+    public Task<bool> CanExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);;
+    public async Task<MoonshotStageResult> ExecuteAsync(MoonshotPipelineContext context, CancellationToken ct);
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/CrossMoonshot/ComplianceSovereigntyWiring.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/MoonshotOrchestrator.cs
 ```csharp
-public sealed class ComplianceSovereigntyWiring
+public sealed class MoonshotOrchestrator : IMoonshotOrchestrator
 {
 }
-    public ComplianceSovereigntyWiring(IMessageBus messageBus, MoonshotConfiguration config, ILogger logger);
-    public Task RegisterAsync(CancellationToken ct);
-    public Task UnregisterAsync();
+    public const string TopicStageCompleted = "moonshot.pipeline.stage.completed";
+    public const string TopicPipelineCompleted = "moonshot.pipeline.completed";
+    public MoonshotOrchestrator(IMoonshotRegistry registry, MoonshotConfiguration configuration, ILogger<MoonshotOrchestrator> logger);
+    public void RegisterStage(IMoonshotPipelineStage stage);
+    public IReadOnlyList<MoonshotId> GetRegisteredStages();
+    public Task<MoonshotPipelineResult> ExecuteDefaultPipelineAsync(MoonshotPipelineContext context, CancellationToken ct);
+    public async Task<MoonshotPipelineResult> ExecutePipelineAsync(MoonshotPipelineContext context, MoonshotPipelineDefinition pipeline, CancellationToken ct);
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/CrossMoonshot/CrossMoonshotWiringRegistrar.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/DefaultPipelineDefinition.cs
 ```csharp
-public sealed class CrossMoonshotWiringRegistrar
+public static class DefaultPipelineDefinition
 {
 }
-    public CrossMoonshotWiringRegistrar(IMessageBus messageBus, MoonshotConfiguration config, ILoggerFactory loggerFactory);
-    public async Task RegisterAllAsync(CancellationToken ct);
-    public async Task UnregisterAllAsync();
-    public IReadOnlyList<string> GetActiveWirings();
+    public static MoonshotPipelineDefinition IngestToLifecycle { get; };
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/CrossMoonshot/FabricPlacementWiring.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/MoonshotRegistryImpl.cs
 ```csharp
-public sealed class FabricPlacementWiring
+public sealed class MoonshotRegistryImpl : IMoonshotRegistry
 {
 }
-    public FabricPlacementWiring(IMessageBus messageBus, MoonshotConfiguration config, ILogger logger);
-    public Task RegisterAsync(CancellationToken ct);
-    public Task UnregisterAsync();
+    public event EventHandler<MoonshotStatusChangedEventArgs>? StatusChanged;
+    public void Register(MoonshotRegistration registration);
+    public MoonshotRegistration? Get(MoonshotId id);
+    public IReadOnlyList<MoonshotRegistration> GetAll();
+    public MoonshotStatus GetStatus(MoonshotId id);
+    public void UpdateStatus(MoonshotId id, MoonshotStatus status);
+    public void UpdateHealthReport(MoonshotId id, MoonshotHealthReport report);
+    public IReadOnlyList<MoonshotRegistration> GetByStatus(MoonshotStatus status);
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/CrossMoonshot/PlacementCarbonWiring.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Scaling/GovernanceScalingManager.cs
 ```csharp
-public sealed class PlacementCarbonWiring
+[SdkCompatibility("6.0.0", Notes = "Phase 88-08: Governance scaling with TTL cache, stale-while-revalidate, parallel evaluation")]
+public sealed class GovernanceScalingManager : IScalableSubsystem, IDisposable
 {
 }
-    public PlacementCarbonWiring(IMessageBus messageBus, MoonshotConfiguration config, ILogger logger);
-    public Task RegisterAsync(CancellationToken ct);
-    public Task UnregisterAsync();
+    public const int DefaultMaxPolicies = 50_000;
+    public const int DefaultMaxOwnerships = 100_000;
+    public const int DefaultMaxClassifications = 100_000;
+    public static readonly TimeSpan DefaultTtl = TimeSpan.FromMinutes(15);
+    public GovernanceScalingManager(IPersistentBackingStore? backingStore = null, ScalingLimits? initialLimits = null, TimeSpan? ttl = null, int? maxConcurrentEvaluations = null);
+    public async Task PutPolicyAsync(string policyId, byte[] data, CancellationToken ct = default);
+    public async Task<byte[]?> GetPolicyAsync(string policyId, CancellationToken ct = default);
+    public async Task PutOwnershipAsync(string ownerId, byte[] data, CancellationToken ct = default);
+    public async Task<byte[]?> GetOwnershipAsync(string ownerId, CancellationToken ct = default);
+    public async Task PutClassificationAsync(string classificationId, byte[] data, CancellationToken ct = default);
+    public async Task<byte[]?> GetClassificationAsync(string classificationId, CancellationToken ct = default);
+    public async Task<TResult[]> EvaluateInParallelAsync<TResult>(IReadOnlyList<Func<CancellationToken, Task<TResult>>> evaluations, CancellationToken ct = default);
+    public int MaxConcurrentEvaluations;;
+    public IReadOnlyDictionary<string, object> GetScalingMetrics();
+    public Task ReconfigureLimitsAsync(ScalingLimits limits, CancellationToken ct = default);
+    public ScalingLimits CurrentLimits
+{
+    get
+    {
+        lock (_configLock)
+        {
+            return _currentLimits;
+        }
+    }
+}
+    public BackpressureState CurrentBackpressureState
+{
+    get
+    {
+        int totalEntries = _policies.Count + _ownerships.Count + _classifications.Count;
+        int maxCapacity = DefaultMaxPolicies + DefaultMaxOwnerships + DefaultMaxClassifications;
+        if (maxCapacity == 0)
+            return BackpressureState.Normal;
+        double utilization = (double)totalEntries / maxCapacity;
+        return utilization switch
+        {
+            >= 0.85 => BackpressureState.Critical,
+            >= 0.50 => BackpressureState.Warning,
+            _ => BackpressureState.Normal
+        };
+    }
+}
+    public void Dispose();
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/CrossMoonshot/SyncConsciousnessWiring.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Strategies/DataStewardship/DataStewardshipStrategies.cs
 ```csharp
-public sealed class SyncConsciousnessWiring
-{
-}
-    public SyncConsciousnessWiring(IMessageBus messageBus, MoonshotConfiguration config, ILogger logger);
-    public Task RegisterAsync(CancellationToken ct);
-    public Task UnregisterAsync();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/CrossMoonshot/TagConsciousnessWiring.cs
-```csharp
-public sealed class TagConsciousnessWiring
-{
-}
-    public TagConsciousnessWiring(IMessageBus messageBus, MoonshotConfiguration config, ILogger logger);
-    public Task RegisterAsync(CancellationToken ct);
-    public Task UnregisterAsync();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/CrossMoonshot/TimeLockComplianceWiring.cs
-```csharp
-public sealed class TimeLockComplianceWiring
-{
-}
-    public TimeLockComplianceWiring(IMessageBus messageBus, MoonshotConfiguration config, ILogger logger);
-    public Task RegisterAsync(CancellationToken ct);
-    public Task UnregisterAsync();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/HealthProbes/CarbonHealthProbe.cs
-```csharp
-public sealed class CarbonHealthProbe : IMoonshotHealthProbe
-{
-}
-    public MoonshotId MoonshotId;;
-    public TimeSpan HealthCheckInterval;;
-    public CarbonHealthProbe(IMessageBus messageBus, MoonshotConfiguration config, ILogger<CarbonHealthProbe> logger);
-    public async Task<MoonshotHealthReport> CheckHealthAsync(CancellationToken ct);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/HealthProbes/ChaosHealthProbe.cs
-```csharp
-public sealed class ChaosHealthProbe : IMoonshotHealthProbe
-{
-}
-    public MoonshotId MoonshotId;;
-    public TimeSpan HealthCheckInterval;;
-    public ChaosHealthProbe(IMessageBus messageBus, MoonshotConfiguration config, ILogger<ChaosHealthProbe> logger);
-    public async Task<MoonshotHealthReport> CheckHealthAsync(CancellationToken ct);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/HealthProbes/ComplianceHealthProbe.cs
-```csharp
-public sealed class ComplianceHealthProbe : IMoonshotHealthProbe
-{
-}
-    public MoonshotId MoonshotId;;
-    public TimeSpan HealthCheckInterval;;
-    public ComplianceHealthProbe(IMessageBus messageBus, MoonshotConfiguration config, ILogger<ComplianceHealthProbe> logger);
-    public async Task<MoonshotHealthReport> CheckHealthAsync(CancellationToken ct);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/HealthProbes/ConsciousnessHealthProbe.cs
-```csharp
-public sealed class ConsciousnessHealthProbe : IMoonshotHealthProbe
-{
-}
-    public MoonshotId MoonshotId;;
-    public TimeSpan HealthCheckInterval;;
-    public ConsciousnessHealthProbe(IMessageBus messageBus, MoonshotConfiguration config, ILogger<ConsciousnessHealthProbe> logger);
-    public async Task<MoonshotHealthReport> CheckHealthAsync(CancellationToken ct);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/HealthProbes/FabricHealthProbe.cs
-```csharp
-public sealed class FabricHealthProbe : IMoonshotHealthProbe
-{
-}
-    public MoonshotId MoonshotId;;
-    public TimeSpan HealthCheckInterval;;
-    public FabricHealthProbe(IMessageBus messageBus, MoonshotConfiguration config, ILogger<FabricHealthProbe> logger);
-    public async Task<MoonshotHealthReport> CheckHealthAsync(CancellationToken ct);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/HealthProbes/MoonshotHealthAggregator.cs
-```csharp
-public sealed class MoonshotHealthAggregator
-{
-}
-    public MoonshotHealthAggregator(IEnumerable<IMoonshotHealthProbe> probes, IMoonshotRegistry registry, ILogger<MoonshotHealthAggregator> logger);
-    public async Task<IReadOnlyList<MoonshotHealthReport>> CheckAllAsync(CancellationToken ct);
-    public async Task RunPeriodicHealthChecksAsync(CancellationToken ct);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/HealthProbes/PlacementHealthProbe.cs
-```csharp
-public sealed class PlacementHealthProbe : IMoonshotHealthProbe
-{
-}
-    public MoonshotId MoonshotId;;
-    public TimeSpan HealthCheckInterval;;
-    public PlacementHealthProbe(IMessageBus messageBus, MoonshotConfiguration config, ILogger<PlacementHealthProbe> logger);
-    public async Task<MoonshotHealthReport> CheckHealthAsync(CancellationToken ct);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/HealthProbes/SemanticSyncHealthProbe.cs
-```csharp
-public sealed class SemanticSyncHealthProbe : IMoonshotHealthProbe
-{
-}
-    public MoonshotId MoonshotId;;
-    public TimeSpan HealthCheckInterval;;
-    public SemanticSyncHealthProbe(IMessageBus messageBus, MoonshotConfiguration config, ILogger<SemanticSyncHealthProbe> logger);
-    public async Task<MoonshotHealthReport> CheckHealthAsync(CancellationToken ct);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/HealthProbes/SovereigntyHealthProbe.cs
-```csharp
-public sealed class SovereigntyHealthProbe : IMoonshotHealthProbe
-{
-}
-    public MoonshotId MoonshotId;;
-    public TimeSpan HealthCheckInterval;;
-    public SovereigntyHealthProbe(IMessageBus messageBus, MoonshotConfiguration config, ILogger<SovereigntyHealthProbe> logger);
-    public async Task<MoonshotHealthReport> CheckHealthAsync(CancellationToken ct);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/HealthProbes/TagsHealthProbe.cs
-```csharp
-public sealed class TagsHealthProbe : IMoonshotHealthProbe
-{
-}
-    public MoonshotId MoonshotId;;
-    public TimeSpan HealthCheckInterval;;
-    public TagsHealthProbe(IMessageBus messageBus, MoonshotConfiguration config, ILogger<TagsHealthProbe> logger);
-    public async Task<MoonshotHealthReport> CheckHealthAsync(CancellationToken ct);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/HealthProbes/TimeLockHealthProbe.cs
-```csharp
-public sealed class TimeLockHealthProbe : IMoonshotHealthProbe
-{
-}
-    public MoonshotId MoonshotId;;
-    public TimeSpan HealthCheckInterval;;
-    public TimeLockHealthProbe(IMessageBus messageBus, MoonshotConfiguration config, ILogger<TimeLockHealthProbe> logger);
-    public async Task<MoonshotHealthReport> CheckHealthAsync(CancellationToken ct);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Strategies/AuditReporting/AuditReportingStrategies.cs
-```csharp
-public sealed class AuditTrailCaptureStrategy : DataGovernanceStrategyBase
+public sealed class StewardRoleDefinitionStrategy : DataGovernanceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -745,7 +526,7 @@ public sealed class AuditTrailCaptureStrategy : DataGovernanceStrategyBase
 }
 ```
 ```csharp
-public sealed class AuditReportGenerationStrategy : DataGovernanceStrategyBase
+public sealed class StewardWorkflowStrategy : DataGovernanceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -757,7 +538,7 @@ public sealed class AuditReportGenerationStrategy : DataGovernanceStrategyBase
 }
 ```
 ```csharp
-public sealed class GovernanceDashboardStrategy : DataGovernanceStrategyBase
+public sealed class StewardCertificationStrategy : DataGovernanceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -769,7 +550,7 @@ public sealed class GovernanceDashboardStrategy : DataGovernanceStrategyBase
 }
 ```
 ```csharp
-public sealed class ComplianceMetricsStrategy : DataGovernanceStrategyBase
+public sealed class StewardQualityMetricsStrategy : DataGovernanceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -781,7 +562,7 @@ public sealed class ComplianceMetricsStrategy : DataGovernanceStrategyBase
 }
 ```
 ```csharp
-public sealed class ViolationTrackingStrategy : DataGovernanceStrategyBase
+public sealed class StewardCollaborationStrategy : DataGovernanceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -793,7 +574,7 @@ public sealed class ViolationTrackingStrategy : DataGovernanceStrategyBase
 }
 ```
 ```csharp
-public sealed class AuditLogSearchStrategy : DataGovernanceStrategyBase
+public sealed class StewardTaskManagementStrategy : DataGovernanceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -805,7 +586,7 @@ public sealed class AuditLogSearchStrategy : DataGovernanceStrategyBase
 }
 ```
 ```csharp
-public sealed class AuditRetentionStrategy : DataGovernanceStrategyBase
+public sealed class StewardEscalationStrategy : DataGovernanceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -817,19 +598,7 @@ public sealed class AuditRetentionStrategy : DataGovernanceStrategyBase
 }
 ```
 ```csharp
-public sealed class AuditAlertingStrategy : DataGovernanceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override GovernanceCategory Category;;
-    public override DataGovernanceCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class ExecutiveReportingStrategy : DataGovernanceStrategyBase
+public sealed class StewardReportingStrategy : DataGovernanceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1085,101 +854,36 @@ public sealed class OwnershipVacancyDetectionStrategy : DataGovernanceStrategyBa
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Strategies/DataStewardship/DataStewardshipStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Strategies/IntelligentGovernance/IngestPipelineConsciousnessStrategy.cs
 ```csharp
-public sealed class StewardRoleDefinitionStrategy : DataGovernanceStrategyBase
+public sealed class ConsciousnessScoreStore
 {
 }
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override GovernanceCategory Category;;
-    public override DataGovernanceCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
+    public int Count;;
+    public void StoreScore(ConsciousnessScore score);
+    public ConsciousnessScore? GetScore(string objectId);
+    public IReadOnlyList<ConsciousnessScore> GetScoresByGrade(ConsciousnessGrade grade);
+    public IReadOnlyList<ConsciousnessScore> GetScoresByAction(ConsciousnessAction action);
+    public IReadOnlyList<ConsciousnessScore> GetScoresBelow(double threshold);
+    public IReadOnlyList<ConsciousnessScore> GetScoresAbove(double threshold);
+    public IReadOnlyList<ConsciousnessScore> GetAllScores();
+    public bool RemoveScore(string objectId);
+    public ConsciousnessStatistics GetStatistics();
 }
 ```
 ```csharp
-public sealed class StewardWorkflowStrategy : DataGovernanceStrategyBase
+public sealed class IngestPipelineConsciousnessStrategy : ConsciousnessStrategyBase
 {
 }
+    public new IMessageBus? MessageBus { get => base.MessageBus; set => base.ConfigureIntelligence(value); }
     public override string StrategyId;;
     public override string DisplayName;;
-    public override GovernanceCategory Category;;
-    public override DataGovernanceCapabilities Capabilities;;
+    public override ConsciousnessCategory Category;;
+    public override ConsciousnessCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-}
-```
-```csharp
-public sealed class StewardCertificationStrategy : DataGovernanceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override GovernanceCategory Category;;
-    public override DataGovernanceCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class StewardQualityMetricsStrategy : DataGovernanceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override GovernanceCategory Category;;
-    public override DataGovernanceCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class StewardCollaborationStrategy : DataGovernanceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override GovernanceCategory Category;;
-    public override DataGovernanceCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class StewardTaskManagementStrategy : DataGovernanceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override GovernanceCategory Category;;
-    public override DataGovernanceCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class StewardEscalationStrategy : DataGovernanceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override GovernanceCategory Category;;
-    public override DataGovernanceCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class StewardReportingStrategy : DataGovernanceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override GovernanceCategory Category;;
-    public override DataGovernanceCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
+    public IngestPipelineConsciousnessStrategy(ConsciousnessScoringEngine engine, ConsciousnessScoreStore store, ConsciousnessScoringConfig? config = null);
+    public async Task<ConsciousnessScore> ScoreOnIngestAsync(string objectId, byte[] data, Dictionary<string, object> metadata, CancellationToken ct = default);
 }
 ```
 
@@ -1256,6 +960,154 @@ public sealed class AutoArchiveOrchestrator : ConsciousnessStrategyBase
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Strategies/IntelligentGovernance/ConsciousnessScoringEngine.cs
+```csharp
+public sealed class ConsciousnessScoringEngine : ConsciousnessStrategyBase, IConsciousnessScorer
+{
+// P2-2274: IncrementCounter(string, long) is now provided by StrategyBase — uses AddOrUpdate
+// with the full amount instead of O(n) loop. Local override removed.
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ConsciousnessCategory Category;;
+    public override ConsciousnessCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public ConsciousnessScoringEngine(IValueScorer valueScorer, ILiabilityScorer liabilityScorer, ConsciousnessScoringConfig? config = null);
+    public async Task<ConsciousnessScore> ScoreAsync(string objectId, byte[] data, IReadOnlyDictionary<string, object> metadata, CancellationToken ct = default);
+    public async Task<IReadOnlyList<ConsciousnessScore>> ScoreBatchAsync(IReadOnlyList<(string objectId, byte[] data, Dictionary<string, object> metadata)> batch, CancellationToken ct = default);
+    public static ConsciousnessScoringEngine CreateDefault(ConsciousnessScoringConfig? config = null);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Strategies/IntelligentGovernance/LiabilityScoringStrategies.cs
+```csharp
+internal static class LiabilityScanConstants
+{
+}
+    internal const int MaxScanBytes = 1_048_576;
+    internal static readonly Regex EmailPattern = new(@"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
+    internal static readonly Regex SsnPattern = new(@"\b\d{3}-\d{2}-\d{4}\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
+    internal static readonly Regex PhonePattern = new(@"(?:\+\d{1,3}[\s\-]?)?\(?\d{2,4}\)?[\s\-]?\d{3,4}[\s\-]?\d{3,4}\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
+    internal static readonly Regex CreditCardPattern = new(@"\b(?:\d[\s\-]?){13,19}\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
+    internal static readonly Regex PassportPattern = new(@"\b[A-Z]{1,2}\d{6,9}\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
+    internal static readonly Regex DobPattern = new(@"\b(?:0[1-9]|1[0-2])[/\-](?:0[1-9]|[12]\d|3[01])[/\-](?:19|20)\d{2}\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
+    internal static readonly Regex IcdCodePattern = new(@"\b[A-Z]\d{2}(?:\.\d{1,4})?\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
+    internal static readonly Regex MedicationPattern = new(@"\b\w+(?:mab|nib|ide|ine|pril|sartan|statin|olol|azole|mycin|cillin|floxacin)\b", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5));
+    internal static readonly Regex PatientIdPattern = new(@"\bPAT[\-_]?\d{6,10}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5));
+    internal static readonly Regex DiagnosisKeywordPattern = new(@"\b(?:diagnosis|diagnosed|prognosis|symptom|condition|disorder|disease|syndrome|carcinoma|tumor|fracture|infection)\b", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5));
+    internal static readonly Regex CvvPattern = new(@"(?:cvv2?|cvc2?|security\s+code|card\s+verification)[^\d]{0,15}\b(\d{3,4})\b" + @"|\b(?!(?:19|20)\d{2}\b)\d{3,4}(?<!\d{5})\b", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5));
+    internal static readonly Regex ExpiryDatePattern = new(@"\b(?:0[1-9]|1[0-2])[/\-]\d{2}\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
+    internal static bool PassesLuhnCheck(string digits);
+    internal static string ExtractText(byte[] data);
+}
+```
+```csharp
+public sealed class PIILiabilityStrategy : ConsciousnessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ConsciousnessCategory Category;;
+    public override ConsciousnessCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<(double Score, List<string> DetectedTypes, List<string> Factors)> ScoreAsync(byte[] data, IReadOnlyDictionary<string, object> metadata, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class PHILiabilityStrategy : ConsciousnessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ConsciousnessCategory Category;;
+    public override ConsciousnessCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<(double Score, List<string> Factors)> ScoreAsync(byte[] data, IReadOnlyDictionary<string, object> metadata, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class PCILiabilityStrategy : ConsciousnessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ConsciousnessCategory Category;;
+    public override ConsciousnessCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<(double Score, List<string> Factors)> ScoreAsync(byte[] data, IReadOnlyDictionary<string, object> metadata, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class ClassificationLiabilityStrategy : ConsciousnessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ConsciousnessCategory Category;;
+    public override ConsciousnessCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<(double Score, List<string> Factors)> ScoreAsync(IReadOnlyDictionary<string, object> metadata, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class RetentionLiabilityStrategy : ConsciousnessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ConsciousnessCategory Category;;
+    public override ConsciousnessCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<(double Score, List<string> Factors)> ScoreAsync(IReadOnlyDictionary<string, object> metadata, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class RegulatoryExposureLiabilityStrategy : ConsciousnessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ConsciousnessCategory Category;;
+    public override ConsciousnessCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<(double Score, List<string> ApplicableRegulations, List<string> Factors)> ScoreAsync(IReadOnlyDictionary<string, object> metadata, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class BreachRiskLiabilityStrategy : ConsciousnessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ConsciousnessCategory Category;;
+    public override ConsciousnessCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<(double Score, List<string> Factors)> ScoreAsync(IReadOnlyDictionary<string, object> metadata, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class CompositeLiabilityScoringStrategy : ConsciousnessStrategyBase, ILiabilityScorer
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ConsciousnessCategory Category;;
+    public override ConsciousnessCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public void Configure(ConsciousnessScoringConfig? config);
+    public async Task<LiabilityScore> ScoreLiabilityAsync(string objectId, byte[] data, IReadOnlyDictionary<string, object> metadata, CancellationToken ct = default);
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Strategies/IntelligentGovernance/AutoPurgeStrategies.cs
 ```csharp
 public sealed class ToxicDataPurgeStrategy : ConsciousnessStrategyBase
@@ -1322,57 +1174,6 @@ public sealed class AutoPurgeOrchestrator : ConsciousnessStrategyBase
     public Task<PurgeDecision> EvaluateAsync(ConsciousnessScore score, Dictionary<string, object> metadata, CancellationToken ct = default);
     public PurgeDecision? GetDecision(string objectId);;
     public IReadOnlyDictionary<string, PurgeDecision> GetAllDecisions();;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Strategies/IntelligentGovernance/ConsciousnessScoringEngine.cs
-```csharp
-public sealed class ConsciousnessScoringEngine : ConsciousnessStrategyBase, IConsciousnessScorer
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ConsciousnessCategory Category;;
-    public override ConsciousnessCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public ConsciousnessScoringEngine(IValueScorer valueScorer, ILiabilityScorer liabilityScorer, ConsciousnessScoringConfig? config = null);
-    public async Task<ConsciousnessScore> ScoreAsync(string objectId, byte[] data, Dictionary<string, object> metadata, CancellationToken ct = default);
-    public async Task<IReadOnlyList<ConsciousnessScore>> ScoreBatchAsync(IReadOnlyList<(string objectId, byte[] data, Dictionary<string, object> metadata)> batch, CancellationToken ct = default);
-    public static ConsciousnessScoringEngine CreateDefault(ConsciousnessScoringConfig? config = null);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Strategies/IntelligentGovernance/IngestPipelineConsciousnessStrategy.cs
-```csharp
-public sealed class ConsciousnessScoreStore
-{
-}
-    public int Count;;
-    public void StoreScore(ConsciousnessScore score);
-    public ConsciousnessScore? GetScore(string objectId);
-    public IReadOnlyList<ConsciousnessScore> GetScoresByGrade(ConsciousnessGrade grade);
-    public IReadOnlyList<ConsciousnessScore> GetScoresByAction(ConsciousnessAction action);
-    public IReadOnlyList<ConsciousnessScore> GetScoresBelow(double threshold);
-    public IReadOnlyList<ConsciousnessScore> GetScoresAbove(double threshold);
-    public IReadOnlyList<ConsciousnessScore> GetAllScores();
-    public bool RemoveScore(string objectId);
-    public ConsciousnessStatistics GetStatistics();
-}
-```
-```csharp
-public sealed class IngestPipelineConsciousnessStrategy : ConsciousnessStrategyBase
-{
-}
-    public new IMessageBus? MessageBus { get => base.MessageBus; set => base.ConfigureIntelligence(value); }
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ConsciousnessCategory Category;;
-    public override ConsciousnessCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public IngestPipelineConsciousnessStrategy(ConsciousnessScoringEngine engine, ConsciousnessScoreStore store, ConsciousnessScoringConfig? config = null);
-    public async Task<ConsciousnessScore> ScoreOnIngestAsync(string objectId, byte[] data, Dictionary<string, object> metadata, CancellationToken ct = default);
 }
 ```
 
@@ -1458,134 +1259,6 @@ public sealed class RetentionOptimizerStrategy : DataGovernanceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Strategies/IntelligentGovernance/LiabilityScoringStrategies.cs
-```csharp
-internal static class LiabilityScanConstants
-{
-}
-    internal const int MaxScanBytes = 1_048_576;
-    internal static readonly Regex EmailPattern = new(@"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
-    internal static readonly Regex SsnPattern = new(@"\b\d{3}-\d{2}-\d{4}\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
-    internal static readonly Regex PhonePattern = new(@"(?:\+\d{1,3}[\s\-]?)?\(?\d{2,4}\)?[\s\-]?\d{3,4}[\s\-]?\d{3,4}\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
-    internal static readonly Regex CreditCardPattern = new(@"\b(?:\d[\s\-]?){13,19}\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
-    internal static readonly Regex PassportPattern = new(@"\b[A-Z]{1,2}\d{6,9}\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
-    internal static readonly Regex DobPattern = new(@"\b(?:0[1-9]|1[0-2])[/\-](?:0[1-9]|[12]\d|3[01])[/\-](?:19|20)\d{2}\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
-    internal static readonly Regex IcdCodePattern = new(@"\b[A-Z]\d{2}(?:\.\d{1,4})?\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
-    internal static readonly Regex MedicationPattern = new(@"\b\w+(?:mab|nib|ide|ine|pril|sartan|statin|olol|azole|mycin|cillin|floxacin)\b", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5));
-    internal static readonly Regex PatientIdPattern = new(@"\bPAT[\-_]?\d{6,10}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5));
-    internal static readonly Regex DiagnosisKeywordPattern = new(@"\b(?:diagnosis|diagnosed|prognosis|symptom|condition|disorder|disease|syndrome|carcinoma|tumor|fracture|infection)\b", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5));
-    internal static readonly Regex CvvPattern = new(@"\b\d{3,4}\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
-    internal static readonly Regex ExpiryDatePattern = new(@"\b(?:0[1-9]|1[0-2])[/\-]\d{2}\b", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
-    internal static bool PassesLuhnCheck(string digits);
-    internal static string ExtractText(byte[] data);
-}
-```
-```csharp
-public sealed class PIILiabilityStrategy : ConsciousnessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ConsciousnessCategory Category;;
-    public override ConsciousnessCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<(double Score, List<string> DetectedTypes, List<string> Factors)> ScoreAsync(byte[] data, Dictionary<string, object> metadata, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class PHILiabilityStrategy : ConsciousnessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ConsciousnessCategory Category;;
-    public override ConsciousnessCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<(double Score, List<string> Factors)> ScoreAsync(byte[] data, Dictionary<string, object> metadata, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class PCILiabilityStrategy : ConsciousnessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ConsciousnessCategory Category;;
-    public override ConsciousnessCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<(double Score, List<string> Factors)> ScoreAsync(byte[] data, Dictionary<string, object> metadata, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class ClassificationLiabilityStrategy : ConsciousnessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ConsciousnessCategory Category;;
-    public override ConsciousnessCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<(double Score, List<string> Factors)> ScoreAsync(Dictionary<string, object> metadata, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class RetentionLiabilityStrategy : ConsciousnessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ConsciousnessCategory Category;;
-    public override ConsciousnessCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<(double Score, List<string> Factors)> ScoreAsync(Dictionary<string, object> metadata, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class RegulatoryExposureLiabilityStrategy : ConsciousnessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ConsciousnessCategory Category;;
-    public override ConsciousnessCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<(double Score, List<string> ApplicableRegulations, List<string> Factors)> ScoreAsync(Dictionary<string, object> metadata, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class BreachRiskLiabilityStrategy : ConsciousnessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ConsciousnessCategory Category;;
-    public override ConsciousnessCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<(double Score, List<string> Factors)> ScoreAsync(Dictionary<string, object> metadata, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class CompositeLiabilityScoringStrategy : ConsciousnessStrategyBase, ILiabilityScorer
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ConsciousnessCategory Category;;
-    public override ConsciousnessCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public void Configure(ConsciousnessScoringConfig? config);
-    public async Task<LiabilityScore> ScoreLiabilityAsync(string objectId, byte[] data, Dictionary<string, object> metadata, CancellationToken ct = default);
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Strategies/IntelligentGovernance/ValueScoringStrategies.cs
 ```csharp
 public sealed class AccessFrequencyValueStrategy : ConsciousnessStrategyBase
@@ -1597,7 +1270,7 @@ public sealed class AccessFrequencyValueStrategy : ConsciousnessStrategyBase
     public override ConsciousnessCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public double Score(Dictionary<string, object> metadata);
+    public double Score(IReadOnlyDictionary<string, object> metadata);
 }
 ```
 ```csharp
@@ -1610,7 +1283,7 @@ public sealed class LineageDepthValueStrategy : ConsciousnessStrategyBase
     public override ConsciousnessCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public double Score(Dictionary<string, object> metadata);
+    public double Score(IReadOnlyDictionary<string, object> metadata);
 }
 ```
 ```csharp
@@ -1623,7 +1296,7 @@ public sealed class UniquenessValueStrategy : ConsciousnessStrategyBase
     public override ConsciousnessCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public double Score(Dictionary<string, object> metadata);
+    public double Score(IReadOnlyDictionary<string, object> metadata);
 }
 ```
 ```csharp
@@ -1636,7 +1309,7 @@ public sealed class FreshnessValueStrategy : ConsciousnessStrategyBase
     public override ConsciousnessCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public double Score(Dictionary<string, object> metadata);
+    public double Score(IReadOnlyDictionary<string, object> metadata);
 }
 ```
 ```csharp
@@ -1649,7 +1322,7 @@ public sealed class BusinessCriticalityValueStrategy : ConsciousnessStrategyBase
     public override ConsciousnessCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public double Score(Dictionary<string, object> metadata);
+    public double Score(IReadOnlyDictionary<string, object> metadata);
 }
 ```
 ```csharp
@@ -1662,7 +1335,7 @@ public sealed class ComplianceValueStrategy : ConsciousnessStrategyBase
     public override ConsciousnessCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public double Score(Dictionary<string, object> metadata);
+    public double Score(IReadOnlyDictionary<string, object> metadata);
 }
 ```
 ```csharp
@@ -1676,7 +1349,7 @@ public sealed class CompositeValueScoringStrategy : ConsciousnessStrategyBase, I
     public override string SemanticDescription;;
     public override string[] Tags;;
     public void Configure(ConsciousnessScoringConfig config);
-    public Task<ValueScore> ScoreValueAsync(string objectId, byte[] data, Dictionary<string, object> metadata, CancellationToken ct = default);
+    public Task<ValueScore> ScoreValueAsync(string objectId, byte[] data, IReadOnlyDictionary<string, object> metadata, CancellationToken ct = default);
 }
 ```
 
@@ -1775,162 +1448,6 @@ public sealed class CrossPlatformLineageStrategy : DataGovernanceStrategyBase
     public override DataGovernanceCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Strategies/PolicyManagement/PolicyDashboardDataLayer.cs
-```csharp
-public sealed class PolicyDashboardDataLayer : DataGovernanceStrategyBase
-{
-#endregion
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override GovernanceCategory Category;;
-    public override DataGovernanceCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public PolicyDashboardItem CreatePolicy(string name, string description, string category, Dictionary<string, object> rules, string createdBy);
-    public PolicyDashboardItem? UpdatePolicy(string policyId, string? name = null, string? description = null, Dictionary<string, object>? rules = null, string? updatedBy = null);
-    public PolicyDashboardItem? GetPolicy(string policyId);;
-    public IReadOnlyList<PolicyDashboardItem> ListPolicies(PolicyStatus? status = null, string? category = null, string? createdBy = null, int skip = 0, int take = 100);
-    public bool DeletePolicy(string policyId);
-    public IReadOnlyList<PolicyVersionRecord> GetVersionHistory(string policyId);;
-    public PolicyDashboardItem? RestoreVersion(string policyId, int targetVersion, string restoredBy);
-    public PolicyApprovalWorkflow SubmitForApproval(string policyId, string submittedBy, string[] approverIds);
-    public PolicyApprovalWorkflow? RecordApproval(string workflowId, string approverId, ApprovalDecision decision, string? comment = null);
-    public IReadOnlyList<PolicyApprovalWorkflow> GetWorkflows(string? policyId = null);;
-    public PolicyTestResult TestPolicy(string policyId, Dictionary<string, object> testData);
-    public ComplianceGap RecordComplianceGap(string policyId, string resourceId, string gapDescription, ComplianceGapSeverity severity);
-    public IReadOnlyList<ComplianceGap> GetComplianceGaps(string? policyId = null, ComplianceGapSeverity? severity = null, ComplianceGapStatus? status = null);
-    public ComplianceGapSummary GetComplianceGapSummary();
-    public void RecordEffectiveness(string policyId, double complianceRate, int totalEvaluations, int violations, int exceptions);
-    public PolicyEffectivenessMetric? GetEffectiveness(string policyId);;
-    public EffectivenessAggregation GetAggregatedEffectiveness();
-}
-```
-```csharp
-public sealed record PolicyDashboardItem
-{
-}
-    public required string PolicyId { get; init; }
-    public required string Name { get; init; }
-    public string? Description { get; init; }
-    public required string Category { get; init; }
-    public Dictionary<string, object> Rules { get; init; };
-    public PolicyStatus Status { get; init; }
-    public required string CreatedBy { get; init; }
-    public string? UpdatedBy { get; init; }
-    public DateTimeOffset CreatedAt { get; init; }
-    public DateTimeOffset? UpdatedAt { get; init; }
-    public int Version { get; init; }
-    public double EffectivenessScore { get; init; }
-}
-```
-```csharp
-public sealed record PolicyVersionRecord
-{
-}
-    public required string PolicyId { get; init; }
-    public int Version { get; init; }
-    public required string Name { get; init; }
-    public string? Description { get; init; }
-    public Dictionary<string, object> Rules { get; init; };
-    public PolicyStatus Status { get; init; }
-    public required string Author { get; init; }
-    public required string Action { get; init; }
-    public DateTimeOffset Timestamp { get; init; }
-}
-```
-```csharp
-public sealed record PolicyApprovalWorkflow
-{
-}
-    public required string WorkflowId { get; init; }
-    public required string PolicyId { get; init; }
-    public int PolicyVersion { get; init; }
-    public required string SubmittedBy { get; init; }
-    public DateTimeOffset SubmittedAt { get; init; }
-    public List<ApproverStatus> Approvers { get; init; };
-    public WorkflowStatus Status { get; init; }
-}
-```
-```csharp
-public sealed record ApproverStatus
-{
-}
-    public required string ApproverId { get; init; }
-    public ApprovalDecision Status { get; init; }
-    public string? Comment { get; init; }
-    public DateTimeOffset? DecidedAt { get; init; }
-}
-```
-```csharp
-public sealed record PolicyTestResult
-{
-}
-    public required string PolicyId { get; init; }
-    public bool Passed { get; init; }
-    public string? Error { get; init; }
-    public List<string> Violations { get; init; };
-    public List<string> Passes { get; init; };
-    public DateTimeOffset TestedAt { get; init; }
-    public int TestDataSize { get; init; }
-}
-```
-```csharp
-public sealed record ComplianceGap
-{
-}
-    public required string GapId { get; init; }
-    public required string PolicyId { get; init; }
-    public required string ResourceId { get; init; }
-    public required string Description { get; init; }
-    public ComplianceGapSeverity Severity { get; init; }
-    public ComplianceGapStatus Status { get; init; }
-    public DateTimeOffset DetectedAt { get; init; }
-    public DateTimeOffset? ResolvedAt { get; init; }
-}
-```
-```csharp
-public sealed record ComplianceGapSummary
-{
-}
-    public int TotalGaps { get; init; }
-    public int OpenGaps { get; init; }
-    public int CriticalGaps { get; init; }
-    public int HighGaps { get; init; }
-    public int MediumGaps { get; init; }
-    public int LowGaps { get; init; }
-    public Dictionary<string, int> GapsByPolicy { get; init; };
-    public DateTimeOffset GeneratedAt { get; init; }
-}
-```
-```csharp
-public sealed record PolicyEffectivenessMetric
-{
-}
-    public required string PolicyId { get; init; }
-    public double ComplianceRate { get; init; }
-    public int TotalEvaluations { get; init; }
-    public int Violations { get; init; }
-    public int Exceptions { get; init; }
-    public double EffectivenessScore { get; init; }
-    public DateTimeOffset MeasuredAt { get; init; }
-}
-```
-```csharp
-public sealed record EffectivenessAggregation
-{
-}
-    public int TotalPolicies { get; init; }
-    public double AverageComplianceRate { get; init; }
-    public double AverageEffectivenessScore { get; init; }
-    public int TotalViolations { get; init; }
-    public int TotalEvaluations { get; init; }
-    public List<PolicyEffectivenessMetric> TopPerformers { get; init; };
-    public List<PolicyEffectivenessMetric> BottomPerformers { get; init; };
-    public DateTimeOffset GeneratedAt { get; init; }
 }
 ```
 
@@ -2098,6 +1615,370 @@ public sealed class PolicyExceptionManagementStrategy : DataGovernanceStrategyBa
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Strategies/PolicyManagement/PolicyDashboardDataLayer.cs
+```csharp
+public sealed class PolicyDashboardDataLayer : DataGovernanceStrategyBase
+{
+#endregion
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override GovernanceCategory Category;;
+    public override DataGovernanceCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public PolicyDashboardItem CreatePolicy(string name, string description, string category, Dictionary<string, object> rules, string createdBy);
+    public PolicyDashboardItem? UpdatePolicy(string policyId, string? name = null, string? description = null, Dictionary<string, object>? rules = null, string? updatedBy = null);
+    public PolicyDashboardItem? GetPolicy(string policyId);;
+    public IReadOnlyList<PolicyDashboardItem> ListPolicies(PolicyStatus? status = null, string? category = null, string? createdBy = null, int skip = 0, int take = 100);
+    public bool DeletePolicy(string policyId);
+    public IReadOnlyList<PolicyVersionRecord> GetVersionHistory(string policyId);
+    public PolicyDashboardItem? RestoreVersion(string policyId, int targetVersion, string restoredBy);
+    public PolicyApprovalWorkflow SubmitForApproval(string policyId, string submittedBy, string[] approverIds);
+    public PolicyApprovalWorkflow? RecordApproval(string workflowId, string approverId, ApprovalDecision decision, string? comment = null);
+    public IReadOnlyList<PolicyApprovalWorkflow> GetWorkflows(string? policyId = null);;
+    public PolicyTestResult TestPolicy(string policyId, Dictionary<string, object> testData);
+    public ComplianceGap RecordComplianceGap(string policyId, string resourceId, string gapDescription, ComplianceGapSeverity severity);
+    public IReadOnlyList<ComplianceGap> GetComplianceGaps(string? policyId = null, ComplianceGapSeverity? severity = null, ComplianceGapStatus? status = null);
+    public ComplianceGapSummary GetComplianceGapSummary();
+    public void RecordEffectiveness(string policyId, double complianceRate, int totalEvaluations, int violations, int exceptions);
+    public PolicyEffectivenessMetric? GetEffectiveness(string policyId);;
+    public EffectivenessAggregation GetAggregatedEffectiveness();
+}
+```
+```csharp
+public sealed record PolicyDashboardItem
+{
+}
+    public required string PolicyId { get; init; }
+    public required string Name { get; init; }
+    public string? Description { get; init; }
+    public required string Category { get; init; }
+    public Dictionary<string, object> Rules { get; init; };
+    public PolicyStatus Status { get; init; }
+    public required string CreatedBy { get; init; }
+    public string? UpdatedBy { get; init; }
+    public DateTimeOffset CreatedAt { get; init; }
+    public DateTimeOffset? UpdatedAt { get; init; }
+    public int Version { get; init; }
+    public double EffectivenessScore { get; init; }
+}
+```
+```csharp
+public sealed record PolicyVersionRecord
+{
+}
+    public required string PolicyId { get; init; }
+    public int Version { get; init; }
+    public required string Name { get; init; }
+    public string? Description { get; init; }
+    public Dictionary<string, object> Rules { get; init; };
+    public PolicyStatus Status { get; init; }
+    public required string Author { get; init; }
+    public required string Action { get; init; }
+    public DateTimeOffset Timestamp { get; init; }
+}
+```
+```csharp
+public sealed record PolicyApprovalWorkflow
+{
+}
+    public required string WorkflowId { get; init; }
+    public required string PolicyId { get; init; }
+    public int PolicyVersion { get; init; }
+    public required string SubmittedBy { get; init; }
+    public DateTimeOffset SubmittedAt { get; init; }
+    public List<ApproverStatus> Approvers { get; init; };
+    public WorkflowStatus Status { get; init; }
+}
+```
+```csharp
+public sealed record ApproverStatus
+{
+}
+    public required string ApproverId { get; init; }
+    public ApprovalDecision Status { get; init; }
+    public string? Comment { get; init; }
+    public DateTimeOffset? DecidedAt { get; init; }
+}
+```
+```csharp
+public sealed record PolicyTestResult
+{
+}
+    public required string PolicyId { get; init; }
+    public bool Passed { get; init; }
+    public string? Error { get; init; }
+    public List<string> Violations { get; init; };
+    public List<string> Passes { get; init; };
+    public DateTimeOffset TestedAt { get; init; }
+    public int TestDataSize { get; init; }
+}
+```
+```csharp
+public sealed record ComplianceGap
+{
+}
+    public required string GapId { get; init; }
+    public required string PolicyId { get; init; }
+    public required string ResourceId { get; init; }
+    public required string Description { get; init; }
+    public ComplianceGapSeverity Severity { get; init; }
+    public ComplianceGapStatus Status { get; init; }
+    public DateTimeOffset DetectedAt { get; init; }
+    public DateTimeOffset? ResolvedAt { get; init; }
+}
+```
+```csharp
+public sealed record ComplianceGapSummary
+{
+}
+    public int TotalGaps { get; init; }
+    public int OpenGaps { get; init; }
+    public int CriticalGaps { get; init; }
+    public int HighGaps { get; init; }
+    public int MediumGaps { get; init; }
+    public int LowGaps { get; init; }
+    public Dictionary<string, int> GapsByPolicy { get; init; };
+    public DateTimeOffset GeneratedAt { get; init; }
+}
+```
+```csharp
+public sealed record PolicyEffectivenessMetric
+{
+}
+    public required string PolicyId { get; init; }
+    public double ComplianceRate { get; init; }
+    public int TotalEvaluations { get; init; }
+    public int Violations { get; init; }
+    public int Exceptions { get; init; }
+    public double EffectivenessScore { get; init; }
+    public DateTimeOffset MeasuredAt { get; init; }
+}
+```
+```csharp
+public sealed record EffectivenessAggregation
+{
+}
+    public int TotalPolicies { get; init; }
+    public double AverageComplianceRate { get; init; }
+    public double AverageEffectivenessScore { get; init; }
+    public int TotalViolations { get; init; }
+    public int TotalEvaluations { get; init; }
+    public List<PolicyEffectivenessMetric> TopPerformers { get; init; };
+    public List<PolicyEffectivenessMetric> BottomPerformers { get; init; };
+    public DateTimeOffset GeneratedAt { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Strategies/AuditReporting/AuditReportingStrategies.cs
+```csharp
+public sealed class AuditTrailCaptureStrategy : DataGovernanceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override GovernanceCategory Category;;
+    public override DataGovernanceCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class AuditReportGenerationStrategy : DataGovernanceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override GovernanceCategory Category;;
+    public override DataGovernanceCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class GovernanceDashboardStrategy : DataGovernanceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override GovernanceCategory Category;;
+    public override DataGovernanceCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class ComplianceMetricsStrategy : DataGovernanceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override GovernanceCategory Category;;
+    public override DataGovernanceCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class ViolationTrackingStrategy : DataGovernanceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override GovernanceCategory Category;;
+    public override DataGovernanceCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class AuditLogSearchStrategy : DataGovernanceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override GovernanceCategory Category;;
+    public override DataGovernanceCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class AuditRetentionStrategy : DataGovernanceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override GovernanceCategory Category;;
+    public override DataGovernanceCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class AuditAlertingStrategy : DataGovernanceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override GovernanceCategory Category;;
+    public override DataGovernanceCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class ExecutiveReportingStrategy : DataGovernanceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override GovernanceCategory Category;;
+    public override DataGovernanceCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Strategies/RetentionManagement/RetentionManagementStrategies.cs
+```csharp
+public sealed class RetentionPolicyDefinitionStrategy : DataGovernanceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override GovernanceCategory Category;;
+    public override DataGovernanceCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class AutomatedArchivalStrategy : DataGovernanceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override GovernanceCategory Category;;
+    public override DataGovernanceCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class AutomatedDeletionStrategy : DataGovernanceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override GovernanceCategory Category;;
+    public override DataGovernanceCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class LegalHoldStrategy : DataGovernanceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override GovernanceCategory Category;;
+    public override DataGovernanceCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class RetentionComplianceStrategy : DataGovernanceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override GovernanceCategory Category;;
+    public override DataGovernanceCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class RetentionReportingStrategy : DataGovernanceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override GovernanceCategory Category;;
+    public override DataGovernanceCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class DataDispositionStrategy : DataGovernanceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override GovernanceCategory Category;;
+    public override DataGovernanceCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class RetentionExceptionStrategy : DataGovernanceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override GovernanceCategory Category;;
+    public override DataGovernanceCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Strategies/RegulatoryCompliance/RegulatoryComplianceStrategies.cs
 ```csharp
 public sealed class GDPRComplianceStrategy : DataGovernanceStrategyBase
@@ -2220,100 +2101,222 @@ public sealed class ConsentManagementStrategy : DataGovernanceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Strategies/RetentionManagement/RetentionManagementStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/CrossMoonshot/FabricPlacementWiring.cs
 ```csharp
-public sealed class RetentionPolicyDefinitionStrategy : DataGovernanceStrategyBase
+public sealed class FabricPlacementWiring
 {
 }
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override GovernanceCategory Category;;
-    public override DataGovernanceCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
+    public FabricPlacementWiring(IMessageBus messageBus, MoonshotConfiguration config, ILogger logger);
+    public Task RegisterAsync(CancellationToken ct);
+    public Task UnregisterAsync();
 }
 ```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/CrossMoonshot/SyncConsciousnessWiring.cs
 ```csharp
-public sealed class AutomatedArchivalStrategy : DataGovernanceStrategyBase
+public sealed class SyncConsciousnessWiring
 {
 }
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override GovernanceCategory Category;;
-    public override DataGovernanceCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
+    public SyncConsciousnessWiring(IMessageBus messageBus, MoonshotConfiguration config, ILogger logger);
+    public Task RegisterAsync(CancellationToken ct);
+    public Task UnregisterAsync();
 }
 ```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/CrossMoonshot/ChaosImmunityWiring.cs
 ```csharp
-public sealed class AutomatedDeletionStrategy : DataGovernanceStrategyBase
+public sealed class ChaosImmunityWiring
 {
 }
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override GovernanceCategory Category;;
-    public override DataGovernanceCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
+    public ChaosImmunityWiring(IMessageBus messageBus, MoonshotConfiguration config, ILogger logger);
+    public Task RegisterAsync(CancellationToken ct);
+    public Task UnregisterAsync();
 }
 ```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/CrossMoonshot/CrossMoonshotWiringRegistrar.cs
 ```csharp
-public sealed class LegalHoldStrategy : DataGovernanceStrategyBase
+public sealed class CrossMoonshotWiringRegistrar
 {
 }
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override GovernanceCategory Category;;
-    public override DataGovernanceCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
+    public CrossMoonshotWiringRegistrar(IMessageBus messageBus, MoonshotConfiguration config, ILoggerFactory loggerFactory);
+    public async Task RegisterAllAsync(CancellationToken ct);
+    public async Task UnregisterAllAsync();
+    public IReadOnlyList<string> GetActiveWirings();
 }
 ```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/CrossMoonshot/TimeLockComplianceWiring.cs
 ```csharp
-public sealed class RetentionComplianceStrategy : DataGovernanceStrategyBase
+public sealed class TimeLockComplianceWiring
 {
 }
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override GovernanceCategory Category;;
-    public override DataGovernanceCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
+    public TimeLockComplianceWiring(IMessageBus messageBus, MoonshotConfiguration config, ILogger logger);
+    public Task RegisterAsync(CancellationToken ct);
+    public Task UnregisterAsync();
 }
 ```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/CrossMoonshot/TagConsciousnessWiring.cs
 ```csharp
-public sealed class RetentionReportingStrategy : DataGovernanceStrategyBase
+public sealed class TagConsciousnessWiring
 {
 }
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override GovernanceCategory Category;;
-    public override DataGovernanceCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
+    public TagConsciousnessWiring(IMessageBus messageBus, MoonshotConfiguration config, ILogger logger);
+    public Task RegisterAsync(CancellationToken ct);
+    public Task UnregisterAsync();
 }
 ```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/CrossMoonshot/ComplianceSovereigntyWiring.cs
 ```csharp
-public sealed class DataDispositionStrategy : DataGovernanceStrategyBase
+public sealed class ComplianceSovereigntyWiring
 {
 }
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override GovernanceCategory Category;;
-    public override DataGovernanceCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
+    public ComplianceSovereigntyWiring(IMessageBus messageBus, MoonshotConfiguration config, ILogger logger);
+    public Task RegisterAsync(CancellationToken ct);
+    public Task UnregisterAsync();
 }
 ```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/CrossMoonshot/PlacementCarbonWiring.cs
 ```csharp
-public sealed class RetentionExceptionStrategy : DataGovernanceStrategyBase
+public sealed class PlacementCarbonWiring
 {
 }
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override GovernanceCategory Category;;
-    public override DataGovernanceCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
+    public PlacementCarbonWiring(IMessageBus messageBus, MoonshotConfiguration config, ILogger logger);
+    public Task RegisterAsync(CancellationToken ct);
+    public Task UnregisterAsync();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/HealthProbes/TagsHealthProbe.cs
+```csharp
+public sealed class TagsHealthProbe : IMoonshotHealthProbe
+{
+}
+    public MoonshotId MoonshotId;;
+    public TimeSpan HealthCheckInterval;;
+    public TagsHealthProbe(IMessageBus messageBus, MoonshotConfiguration config, ILogger<TagsHealthProbe> logger);
+    public async Task<MoonshotHealthReport> CheckHealthAsync(CancellationToken ct);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/HealthProbes/PlacementHealthProbe.cs
+```csharp
+public sealed class PlacementHealthProbe : IMoonshotHealthProbe
+{
+}
+    public MoonshotId MoonshotId;;
+    public TimeSpan HealthCheckInterval;;
+    public PlacementHealthProbe(IMessageBus messageBus, MoonshotConfiguration config, ILogger<PlacementHealthProbe> logger);
+    public async Task<MoonshotHealthReport> CheckHealthAsync(CancellationToken ct);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/HealthProbes/ChaosHealthProbe.cs
+```csharp
+public sealed class ChaosHealthProbe : IMoonshotHealthProbe
+{
+}
+    public MoonshotId MoonshotId;;
+    public TimeSpan HealthCheckInterval;;
+    public ChaosHealthProbe(IMessageBus messageBus, MoonshotConfiguration config, ILogger<ChaosHealthProbe> logger);
+    public async Task<MoonshotHealthReport> CheckHealthAsync(CancellationToken ct);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/HealthProbes/ConsciousnessHealthProbe.cs
+```csharp
+public sealed class ConsciousnessHealthProbe : IMoonshotHealthProbe
+{
+}
+    public MoonshotId MoonshotId;;
+    public TimeSpan HealthCheckInterval;;
+    public ConsciousnessHealthProbe(IMessageBus messageBus, MoonshotConfiguration config, ILogger<ConsciousnessHealthProbe> logger);
+    public async Task<MoonshotHealthReport> CheckHealthAsync(CancellationToken ct);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/HealthProbes/ComplianceHealthProbe.cs
+```csharp
+public sealed class ComplianceHealthProbe : IMoonshotHealthProbe
+{
+}
+    public MoonshotId MoonshotId;;
+    public TimeSpan HealthCheckInterval;;
+    public ComplianceHealthProbe(IMessageBus messageBus, MoonshotConfiguration config, ILogger<ComplianceHealthProbe> logger);
+    public async Task<MoonshotHealthReport> CheckHealthAsync(CancellationToken ct);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/HealthProbes/SovereigntyHealthProbe.cs
+```csharp
+public sealed class SovereigntyHealthProbe : IMoonshotHealthProbe
+{
+}
+    public MoonshotId MoonshotId;;
+    public TimeSpan HealthCheckInterval;;
+    public SovereigntyHealthProbe(IMessageBus messageBus, MoonshotConfiguration config, ILogger<SovereigntyHealthProbe> logger);
+    public async Task<MoonshotHealthReport> CheckHealthAsync(CancellationToken ct);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/HealthProbes/CarbonHealthProbe.cs
+```csharp
+public sealed class CarbonHealthProbe : IMoonshotHealthProbe
+{
+}
+    public MoonshotId MoonshotId;;
+    public TimeSpan HealthCheckInterval;;
+    public CarbonHealthProbe(IMessageBus messageBus, MoonshotConfiguration config, ILogger<CarbonHealthProbe> logger);
+    public async Task<MoonshotHealthReport> CheckHealthAsync(CancellationToken ct);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/HealthProbes/MoonshotHealthAggregator.cs
+```csharp
+public sealed class MoonshotHealthAggregator
+{
+}
+    public MoonshotHealthAggregator(IEnumerable<IMoonshotHealthProbe> probes, IMoonshotRegistry registry, ILogger<MoonshotHealthAggregator> logger);
+    public async Task<IReadOnlyList<MoonshotHealthReport>> CheckAllAsync(CancellationToken ct);
+    public async Task RunPeriodicHealthChecksAsync(CancellationToken ct);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/HealthProbes/SemanticSyncHealthProbe.cs
+```csharp
+public sealed class SemanticSyncHealthProbe : IMoonshotHealthProbe
+{
+}
+    public MoonshotId MoonshotId;;
+    public TimeSpan HealthCheckInterval;;
+    public SemanticSyncHealthProbe(IMessageBus messageBus, MoonshotConfiguration config, ILogger<SemanticSyncHealthProbe> logger);
+    public async Task<MoonshotHealthReport> CheckHealthAsync(CancellationToken ct);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/HealthProbes/TimeLockHealthProbe.cs
+```csharp
+public sealed class TimeLockHealthProbe : IMoonshotHealthProbe
+{
+}
+    public MoonshotId MoonshotId;;
+    public TimeSpan HealthCheckInterval;;
+    public TimeLockHealthProbe(IMessageBus messageBus, MoonshotConfiguration config, ILogger<TimeLockHealthProbe> logger);
+    public async Task<MoonshotHealthReport> CheckHealthAsync(CancellationToken ct);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Moonshots/HealthProbes/FabricHealthProbe.cs
+```csharp
+public sealed class FabricHealthProbe : IMoonshotHealthProbe
+{
+}
+    public MoonshotId MoonshotId;;
+    public TimeSpan HealthCheckInterval;;
+    public FabricHealthProbe(IMessageBus messageBus, MoonshotConfiguration config, ILogger<FabricHealthProbe> logger);
+    public async Task<MoonshotHealthReport> CheckHealthAsync(CancellationToken ct);
 }
 ```

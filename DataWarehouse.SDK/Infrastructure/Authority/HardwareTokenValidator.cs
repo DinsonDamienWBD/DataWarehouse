@@ -118,6 +118,17 @@ namespace DataWarehouse.SDK.Infrastructure.Authority
         /// actual cloud verification is performed by the deployment-specific strategy.
         /// </para>
         /// </summary>
+        /// <summary>
+        /// Validates YubiKey OTP format: confirms the OTP is 44 modhex characters with a valid public ID.
+        /// <para>
+        /// This validator performs structural validation only. Full cryptographic validation
+        /// (AES-128 decryption of the OTP payload, counter verification, session token check)
+        /// requires a call to the Yubico Validation Service (YVS) or a locally deployed KSM.
+        /// Production deployments must provide an IHardwareTokenCryptoValidator implementation
+        /// that calls the YVS API endpoint (https://api.yubico.com/wsapi/2.0/verify) or equivalent.
+        /// LOW-432: structural pre-check only.
+        /// </para>
+        /// </summary>
         private static PolicyTokenValidationResult ValidateYubiKeyOtp(string responseData)
         {
             // YubiKey OTP is exactly 44 characters of modhex (cbdefghijklnrtuv)

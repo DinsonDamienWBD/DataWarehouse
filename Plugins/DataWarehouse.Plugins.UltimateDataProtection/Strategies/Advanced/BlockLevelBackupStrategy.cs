@@ -34,6 +34,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
         public override string StrategyId => "block-level";
 
         /// <inheritdoc/>
+        public override bool IsProductionReady => false;
+
+        /// <inheritdoc/>
         public override string StrategyName => "Block-Level Backup";
 
         /// <inheritdoc/>
@@ -508,14 +511,16 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
             var blocks = new List<BlockMetadata>();
             var blockCount = (int)Math.Ceiling((double)file.Size / blockSize);
 
+            // P2-2554: Create SHA256 once per file, not once per block.
+            using var sha256 = SHA256.Create();
             for (int i = 0; i < blockCount; i++)
             {
                 var size = (int)Math.Min(blockSize, file.Size - (i * blockSize));
                 var blockData = new byte[size];
 
-                // Simulate reading block and computing hash
-                using var sha256 = SHA256.Create();
+                // Compute hash for this block using the shared SHA256 instance.
                 var hash = Convert.ToHexString(sha256.ComputeHash(blockData));
+                sha256.Initialize(); // Reset state for next block.
 
                 blocks.Add(new BlockMetadata
                 {

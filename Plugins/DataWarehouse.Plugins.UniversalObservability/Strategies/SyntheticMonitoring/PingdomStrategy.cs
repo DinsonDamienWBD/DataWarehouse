@@ -45,6 +45,7 @@ public sealed class PingdomStrategy : ObservabilityStrategyBase
     public void Configure(string apiToken)
     {
         _apiToken = apiToken;
+        _httpClient.DefaultRequestHeaders.Remove("Authorization");
         _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiToken}");
     }
 
@@ -105,7 +106,7 @@ public sealed class PingdomStrategy : ObservabilityStrategyBase
 
             var content = new FormUrlEncodedContent(parameters);
 
-            var response = await _httpClient.PostAsync("https://api.pingdom.com/api/3.1/checks", content, ct);
+            using var response = await _httpClient.PostAsync("https://api.pingdom.com/api/3.1/checks", content, ct);
             response.EnsureSuccessStatusCode();
 
             var jsonResponse = await response.Content.ReadAsStringAsync(ct);
@@ -137,7 +138,7 @@ public sealed class PingdomStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync($"https://api.pingdom.com/api/3.1/checks/{checkId}", ct);
+            using var response = await _httpClient.GetAsync($"https://api.pingdom.com/api/3.1/checks/{checkId}", ct);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(ct);
@@ -157,7 +158,7 @@ public sealed class PingdomStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync("https://api.pingdom.com/api/3.1/checks", ct);
+            using var response = await _httpClient.GetAsync("https://api.pingdom.com/api/3.1/checks", ct);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(ct);
@@ -176,11 +177,14 @@ public sealed class PingdomStrategy : ObservabilityStrategyBase
         }
     }
 
-    private async Task TriggerAlertAsync(string message, CancellationToken ct)
+    private Task TriggerAlertAsync(string message, CancellationToken ct)
     {
-        // Pingdom handles alerts automatically based on check configurations
-        // This is a no-op placeholder for custom alert logic
-        await Task.CompletedTask;
+        // Pingdom handles alerts automatically based on check configurations.
+        // The Pingdom API v3.1 does not expose a manual alert-trigger endpoint;
+        // alerts fire when checks breach their configured thresholds on Pingdom's side.
+        // Log the condition locally so operators can act if needed.
+        System.Diagnostics.Trace.TraceWarning("[Pingdom] Alert condition: {0}", message);
+        return Task.CompletedTask;
     }
 
     /// <inheritdoc/>
@@ -188,7 +192,7 @@ public sealed class PingdomStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync("https://api.pingdom.com/api/3.1/checks", cancellationToken);
+            using var response = await _httpClient.GetAsync("https://api.pingdom.com/api/3.1/checks", cancellationToken);
 
             return new HealthCheckResult(
                 IsHealthy: response.IsSuccessStatusCode,
@@ -219,17 +223,11 @@ public sealed class PingdomStrategy : ObservabilityStrategyBase
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("pingdom.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     protected override void Dispose(bool disposing)

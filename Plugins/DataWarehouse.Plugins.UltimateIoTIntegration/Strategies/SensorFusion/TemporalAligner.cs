@@ -172,7 +172,12 @@ public sealed class TemporalAligner
         double t = totalDuration > 1e-10 ? targetOffset / totalDuration : 0.5;
         t = Math.Max(0.0, Math.Min(1.0, t)); // Clamp to [0, 1]
 
-        // Interpolate values
+        // Validate dimension match before interpolation — mismatched lengths cause IndexOutOfRange
+        if (before.Value.Length != after.Value.Length)
+            throw new InvalidOperationException(
+                $"Cannot interpolate between readings with mismatched dimensions: " +
+                $"before={before.Value.Length}, after={after.Value.Length}.");
+
         int valueDim = before.Value.Length;
         var interpolatedValue = new double[valueDim];
 

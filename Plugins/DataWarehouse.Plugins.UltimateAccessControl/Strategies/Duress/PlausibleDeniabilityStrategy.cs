@@ -79,6 +79,13 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
                 ? pathObj?.ToString()
                 : null;
 
+            // Validate path to prevent path traversal (finding 1209)
+            if (volumePath != null && (volumePath.Contains("..") || volumePath.IndexOfAny(Path.GetInvalidPathChars()) >= 0))
+            {
+                _logger.LogWarning("Rejected volume_path with invalid/traversal characters for {SubjectId}", context.SubjectId);
+                volumePath = null;
+            }
+
             if (isDuress && volumePath != null)
             {
                 _logger.LogWarning("Duress detected, mounting decoy volume for {SubjectId}", context.SubjectId);
@@ -115,9 +122,13 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
         private async Task<string> GetDecoyVolumePathAsync(string realVolumePath, CancellationToken cancellationToken)
         {
             // Check if decoy volume exists
+            // Path.GetDirectoryName returns null for root paths; fall back to current dir to avoid empty-string Path.Combine
+            var dir = Path.GetDirectoryName(realVolumePath);
             var decoyPath = Configuration.TryGetValue("DecoyVolumePath", out var pathObj)
                 ? pathObj?.ToString()
-                : Path.Combine(Path.GetDirectoryName(realVolumePath) ?? "", "decoy_" + Path.GetFileName(realVolumePath));
+                : string.IsNullOrEmpty(dir)
+                    ? Path.Combine(Path.GetTempPath(), "decoy_" + Path.GetFileName(realVolumePath))
+                    : Path.Combine(dir, "decoy_" + Path.GetFileName(realVolumePath));
 
             if (decoyPath != null && !File.Exists(decoyPath))
             {

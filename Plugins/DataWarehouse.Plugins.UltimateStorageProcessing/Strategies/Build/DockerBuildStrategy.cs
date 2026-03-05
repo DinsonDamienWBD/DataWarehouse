@@ -35,12 +35,16 @@ internal sealed class DockerBuildStrategy : StorageProcessingStrategyBase
         var noCache = CliProcessHelper.GetOption<bool>(query, "noCache");
         var useBuildx = CliProcessHelper.GetOption<bool>(query, "buildx");
 
+        // Validate user-supplied values before interpolation into CLI args
+        CliProcessHelper.ValidateNoShellMetachars(tag, "tag");
+        if (platform != null) CliProcessHelper.ValidateNoShellMetachars(platform, "platform");
+
         var context = Directory.Exists(query.Source) ? query.Source : Path.GetDirectoryName(query.Source) ?? ".";
         var dockerfile = File.Exists(query.Source) ? query.Source : Path.Combine(context, "Dockerfile");
 
         var command = useBuildx ? "buildx build" : "build";
-        var args = $"{command} -f \"{dockerfile}\" -t {tag}";
-        if (platform != null) args += $" --platform {platform}";
+        var args = $"{command} -f \"{dockerfile}\" -t \"{tag}\"";
+        if (platform != null) args += $" --platform \"{platform}\"";
         if (noCache) args += " --no-cache";
         args += $" \"{context}\"";
 

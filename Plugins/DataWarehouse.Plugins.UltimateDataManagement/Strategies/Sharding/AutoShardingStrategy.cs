@@ -500,11 +500,13 @@ public sealed class AutoShardingStrategy : ShardingStrategyBase
         }
         catch (OperationCanceledException)
         {
-            // Expected when cancellation requested
+            // Expected when cancellation requested — do not log noise.
         }
-        catch
+        catch (Exception ex)
         {
-            // Log but don't throw from monitoring
+            // P2-2459: Log split/merge failures so operators can diagnose shard imbalance.
+            System.Diagnostics.Trace.TraceWarning(
+                $"[AutoShardingStrategy] Shard split/merge operation failed: {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -525,7 +527,7 @@ public sealed class AutoShardingStrategy : ShardingStrategyBase
     /// </summary>
     private async Task<IReadOnlyList<ShardInfo>> ExecuteSplitAsync(ShardInfo sourceShard, CancellationToken ct)
     {
-        var operationId = $"split-{Guid.NewGuid():N}".Substring(0, 20);
+        var operationId = $"split-{Guid.NewGuid():N}";
         var record = new AutoShardingOperationRecord
         {
             OperationId = operationId,
@@ -542,15 +544,18 @@ public sealed class AutoShardingStrategy : ShardingStrategyBase
             await UpdateShardStatusAsync(sourceShard.ShardId, ShardStatus.Splitting, ct);
 
             // Create two new shards
-            var newShard1Id = $"auto-shard-{_nextShardIndex++:D4}";
-            var newShard2Id = $"auto-shard-{_nextShardIndex++:D4}";
+            // P2-2463: use Interlocked.Increment to atomically advance _nextShardIndex.
+            var idx1 = Interlocked.Increment(ref _nextShardIndex) - 1;
+            var idx2 = Interlocked.Increment(ref _nextShardIndex) - 1;
+            var newShard1Id = $"auto-shard-{idx1:D4}";
+            var newShard2Id = $"auto-shard-{idx2:D4}";
 
             var halfObjects = sourceShard.ObjectCount / 2;
             var halfSize = sourceShard.SizeBytes / 2;
 
             var newShard1 = new ShardInfo(
                 newShard1Id,
-                $"node-{_nextShardIndex % 4}/db-auto",
+                $"node-{idx1 % 4}/db-auto",
                 ShardStatus.Online,
                 halfObjects,
                 halfSize)
@@ -561,7 +566,7 @@ public sealed class AutoShardingStrategy : ShardingStrategyBase
 
             var newShard2 = new ShardInfo(
                 newShard2Id,
-                $"node-{(_nextShardIndex + 1) % 4}/db-auto",
+                $"node-{idx2 % 4}/db-auto",
                 ShardStatus.Online,
                 halfObjects,
                 halfSize)
@@ -609,7 +614,7 @@ public sealed class AutoShardingStrategy : ShardingStrategyBase
     /// </summary>
     private async Task<ShardInfo> ExecuteMergeAsync(ShardInfo shard1, ShardInfo shard2, CancellationToken ct)
     {
-        var operationId = $"merge-{Guid.NewGuid():N}".Substring(0, 20);
+        var operationId = $"merge-{Guid.NewGuid():N}";
         var record = new AutoShardingOperationRecord
         {
             OperationId = operationId,
@@ -627,10 +632,12 @@ public sealed class AutoShardingStrategy : ShardingStrategyBase
             await UpdateShardStatusAsync(shard2.ShardId, ShardStatus.Merging, ct);
 
             // Create merged shard
-            var mergedShardId = $"auto-shard-{_nextShardIndex++:D4}";
+            // P2-2463: use Interlocked.Increment to atomically advance _nextShardIndex.
+            var mergedIdx = Interlocked.Increment(ref _nextShardIndex) - 1;
+            var mergedShardId = $"auto-shard-{mergedIdx:D4}";
             var mergedShard = new ShardInfo(
                 mergedShardId,
-                $"node-{_nextShardIndex % 4}/db-auto",
+                $"node-{mergedIdx % 4}/db-auto",
                 ShardStatus.Online,
                 shard1.ObjectCount + shard2.ObjectCount,
                 shard1.SizeBytes + shard2.SizeBytes)

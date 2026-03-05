@@ -494,7 +494,23 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
                     if (Enum.TryParse<IntelligenceStrategyCategory>(catName, true, out var category))
                     {
                         var strategies = GetStrategiesByCategory(category);
-                        // Note: Reply mechanism would need to be handled by caller
+                        // Finding 3236: Publish the computed result back to the bus.
+                        if (!string.IsNullOrEmpty(message.CorrelationId) && MessageBus != null)
+                        {
+                            var replyPayload = new Dictionary<string, object>
+                            {
+                                ["strategies"] = strategies.Select(s => s.StrategyId).ToList(),
+                                ["category"] = catName
+                            };
+                            var reply = new PluginMessage
+                            {
+                                Type = $"intelligence.ultimate.list.response.{message.CorrelationId}",
+                                SourcePluginId = Id,
+                                CorrelationId = message.CorrelationId,
+                                Payload = replyPayload
+                            };
+                            _ = MessageBus.PublishAsync(reply.Type, reply);
+                        }
                     }
                 }
                 break;
@@ -539,7 +555,23 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
                 {
                     var strategy = GetStrategy(statsId);
                     var stats = strategy?.GetStatistics();
-                    // Note: Reply mechanism would need to be handled by caller
+                    // Finding 3236: Publish the computed stats back to the bus.
+                    if (stats != null && !string.IsNullOrEmpty(message.CorrelationId) && MessageBus != null)
+                    {
+                        var replyPayload = new Dictionary<string, object>
+                        {
+                            ["strategyId"] = statsId,
+                            ["stats"] = stats
+                        };
+                        var reply = new PluginMessage
+                        {
+                            Type = $"intelligence.ultimate.stats.response.{message.CorrelationId}",
+                            SourcePluginId = Id,
+                            CorrelationId = message.CorrelationId,
+                            Payload = replyPayload
+                        };
+                        _ = MessageBus.PublishAsync(reply.Type, reply);
+                    }
                 }
                 break;
 
@@ -643,7 +675,18 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
 
             var memoryId = await _tieredMemoryStrategy.StoreWithTierAsync(content, tier, scope, metadata);
 
-            // Response would be sent via message bus reply mechanism
+            // Finding 3236: Publish the memory ID back to the caller.
+            if (!string.IsNullOrEmpty(message.CorrelationId) && MessageBus != null)
+            {
+                var reply = new PluginMessage
+                {
+                    Type = $"{MemoryTopics.Store}.response.{message.CorrelationId}",
+                    SourcePluginId = Id,
+                    CorrelationId = message.CorrelationId,
+                    Payload = new Dictionary<string, object> { ["memoryId"] = memoryId }
+                };
+                _ = MessageBus.PublishAsync(reply.Type, reply);
+            }
         }
         catch
         {
@@ -672,7 +715,18 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
 
             var results = await _tieredMemoryStrategy.RecallWithTierAsync(query, minTier, scope, topK);
 
-            // Response would be sent via message bus reply mechanism
+            // Finding 3236: Publish recall results back to the caller.
+            if (!string.IsNullOrEmpty(message.CorrelationId) && MessageBus != null)
+            {
+                var reply = new PluginMessage
+                {
+                    Type = $"{MemoryTopics.Recall}.response.{message.CorrelationId}",
+                    SourcePluginId = Id,
+                    CorrelationId = message.CorrelationId,
+                    Payload = new Dictionary<string, object> { ["results"] = results }
+                };
+                _ = MessageBus.PublishAsync(reply.Type, reply);
+            }
         }
         catch
         {

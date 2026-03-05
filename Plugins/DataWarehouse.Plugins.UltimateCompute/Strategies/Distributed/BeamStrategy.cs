@@ -9,6 +9,12 @@ namespace DataWarehouse.Plugins.UltimateCompute.Strategies.Distributed;
 /// </summary>
 internal sealed class BeamStrategy : ComputeRuntimeStrategyBase
 {
+    // Allowed Beam runner identifiers — used to prevent shell metacharacter injection via beam_runner metadata.
+    private static readonly HashSet<string> AllowedRunners = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "DirectRunner", "FlinkRunner", "SparkRunner", "DataflowRunner",
+        "SamzaRunner", "NemoRunner", "PrismRunner", "TwisterRunner"
+    };
     /// <inheritdoc/>
     public override string StrategyId => "compute.distributed.beam";
     /// <inheritdoc/>
@@ -39,15 +45,23 @@ internal sealed class BeamStrategy : ComputeRuntimeStrategyBase
             {
                 await File.WriteAllBytesAsync(codePath, task.Code.ToArray(), cancellationToken);
 
+                // Validate runner against the known safe set to prevent shell metacharacter injection.
                 var runner = "DirectRunner";
                 if (task.Metadata?.TryGetValue("beam_runner", out var r) == true && r is string rs)
+                {
+                    if (!AllowedRunners.Contains(rs))
+                        throw new ArgumentException(
+                            $"Unknown Beam runner '{rs}'. Allowed: {string.Join(", ", AllowedRunners)}");
                     runner = rs;
+                }
 
                 var args = new StringBuilder();
 
                 if (isPython)
                 {
-                    args.Append($"-m apache_beam.runners.{runner.ToLowerInvariant()} ");
+                    // P2-1682: Beam Python pipelines are executed directly as scripts, not via -m.
+                    // The -m flag with apache_beam.runners.* is incorrect — those modules are not
+                    // runnable entry points. The correct invocation is: python3 pipeline.py --runner=...
                     args.Append($"\"{codePath}\" ");
                     args.Append($"--runner={runner} ");
                 }

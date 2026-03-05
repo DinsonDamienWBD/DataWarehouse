@@ -23,11 +23,19 @@ public sealed class PolicyCompatibilityGate : IPolicyEngine
 {
     private readonly IPolicyEngine _inner;
 
+    // P2-499: Use volatile backing field to ensure cross-thread visibility when Enable/Disable
+    // are called from a different thread than the callers of GetEffectiveContext.
+    private volatile bool _isMultiLevelEnabled;
+
     /// <summary>
     /// Gets whether multi-level cascade resolution is enabled.
     /// When false (default), all resolution is clamped to VDE level only.
     /// </summary>
-    public bool IsMultiLevelEnabled { get; private set; }
+    public bool IsMultiLevelEnabled
+    {
+        get => _isMultiLevelEnabled;
+        private set => _isMultiLevelEnabled = value;
+    }
 
     /// <summary>
     /// Initializes a new instance of <see cref="PolicyCompatibilityGate"/>.

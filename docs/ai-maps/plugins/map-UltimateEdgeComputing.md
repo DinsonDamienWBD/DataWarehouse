@@ -36,11 +36,12 @@ public sealed class UltimateEdgeComputingPlugin : OrchestrationPluginBase, EC.IE
 }
 ```
 ```csharp
-internal sealed class EdgeNodeManagerImpl : EC.IEdgeNodeManager
+internal sealed class EdgeNodeManagerImpl : EC.IEdgeNodeManager, IDisposable
 {
 }
     public event EventHandler<EC.EdgeNodeStatusChangedEventArgs>? NodeStatusChanged;
     public EdgeNodeManagerImpl(IMessageBus? messageBus);
+    public void Dispose();
     public async Task<EC.EdgeNodeRegistration> RegisterNodeAsync(EC.EdgeNodeInfo node, CancellationToken ct = default);
     public async Task<bool> DeregisterNodeAsync(string nodeId, CancellationToken ct = default);
     public Task<EC.EdgeNodeInfo?> GetNodeAsync(string nodeId, CancellationToken ct = default);;
@@ -122,9 +123,9 @@ internal sealed class EdgeSecurityManagerImpl : EC.IEdgeSecurityManager
     public EdgeSecurityManagerImpl(IMessageBus? messageBus);;
     public async Task<EC.AuthenticationResult> AuthenticateNodeAsync(string nodeId, EC.EdgeCredentials credentials, CancellationToken ct = default);
     public Task<EC.AuthorizationResult> AuthorizeOperationAsync(string nodeId, string operationId, string resourceId, CancellationToken ct = default);;
-    public async Task<EC.EncryptionResult> EncryptAsync(string nodeId, ReadOnlyMemory<byte> data, EC.EncryptionOptions options, CancellationToken ct = default);
-    public async Task<ReadOnlyMemory<byte>> DecryptAsync(string nodeId, ReadOnlyMemory<byte> encryptedData, EC.DecryptionOptions options, CancellationToken ct = default);
-    public Task<EC.CertificateResult> ManageCertificateAsync(string nodeId, EC.CertificateOperation operation, CancellationToken ct = default);;
+    public Task<EC.EncryptionResult> EncryptAsync(string nodeId, ReadOnlyMemory<byte> data, EC.EncryptionOptions options, CancellationToken ct = default);
+    public Task<ReadOnlyMemory<byte>> DecryptAsync(string nodeId, ReadOnlyMemory<byte> encryptedData, EC.DecryptionOptions options, CancellationToken ct = default);
+    public Task<EC.CertificateResult> ManageCertificateAsync(string nodeId, EC.CertificateOperation operation, CancellationToken ct = default);
     public Task<EC.SecureTunnel> CreateSecureTunnelAsync(string nodeId, EC.TunnelConfig config, CancellationToken ct = default);;
     public async IAsyncEnumerable<EC.SecurityAuditEntry> GetSecurityAuditAsync(string nodeId, EC.AuditQuery query, [EnumeratorCancellation] CancellationToken ct = default);
     public Task<EC.PolicyEnforcementResult> EnforcePolicyAsync(string nodeId, EC.SecurityPolicy policy, CancellationToken ct = default);
@@ -136,7 +137,7 @@ internal sealed class EdgeResourceManagerImpl : EC.IEdgeResourceManager
 }
     public event EventHandler<EC.ResourceThresholdEventArgs>? ResourceThresholdExceeded;
     public EdgeResourceManagerImpl(IMessageBus? messageBus);;
-    public Task<EC.ResourceUsage> GetResourceUsageAsync(string nodeId, CancellationToken ct = default);;
+    public Task<EC.ResourceUsage> GetResourceUsageAsync(string nodeId, CancellationToken ct = default);
     public Task<EC.ResourceAllocation> AllocateResourcesAsync(string nodeId, EC.ResourceRequest request, CancellationToken ct = default);
     public Task<bool> ReleaseResourcesAsync(string nodeId, string allocationId, CancellationToken ct = default);;
     public Task<bool> SetResourceLimitsAsync(string nodeId, EC.ResourceLimits limits, CancellationToken ct = default);
@@ -525,36 +526,6 @@ public sealed class GridBalancingResult
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateEdgeComputing/Strategies/FederatedLearning/ConvergenceDetector.cs
-```csharp
-public sealed class ConvergenceDetector
-{
-}
-    public ConvergenceDetector(double lossThreshold = 0.001, int patience = 5);
-    public void RecordLoss(double loss);
-    public bool HasConverged();
-    public double[] GetLossHistory();
-    public int GetStableRounds();
-    public void Reset();
-    public double GetCurrentLoss();
-    public double GetImprovementRate();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateEdgeComputing/Strategies/FederatedLearning/DifferentialPrivacyIntegration.cs
-```csharp
-public sealed class DifferentialPrivacyIntegration
-{
-}
-    public DifferentialPrivacyIntegration(double initialBudget = 10.0);
-    public GradientUpdate AddNoise(GradientUpdate update, PrivacyConfig config);
-    public double RemainingBudget();
-    public void ConsumeRound(double epsilon = 1.0);
-    public void ResetBudget(double newBudget);
-    public bool HasSufficientBudget(double requiredEpsilon);
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateEdgeComputing/Strategies/FederatedLearning/FederatedLearningOrchestrator.cs
 ```csharp
 public sealed class FederatedLearningOrchestrator
@@ -600,5 +571,35 @@ public sealed class ModelDistributor
     public Task<ModelWeights?> GetLatestWeightsAsync(string nodeId, CancellationToken ct = default);
     public void ClearNodeWeights(string nodeId);
     public void ClearAllWeights();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateEdgeComputing/Strategies/FederatedLearning/DifferentialPrivacyIntegration.cs
+```csharp
+public sealed class DifferentialPrivacyIntegration
+{
+}
+    public DifferentialPrivacyIntegration(double initialBudget = 10.0);
+    public GradientUpdate AddNoise(GradientUpdate update, PrivacyConfig config);
+    public double RemainingBudget();
+    public void ConsumeRound(double epsilon = 1.0);
+    public void ResetBudget(double newBudget);
+    public bool HasSufficientBudget(double requiredEpsilon);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateEdgeComputing/Strategies/FederatedLearning/ConvergenceDetector.cs
+```csharp
+public sealed class ConvergenceDetector
+{
+}
+    public ConvergenceDetector(double lossThreshold = 0.001, int patience = 5);
+    public void RecordLoss(double loss);
+    public bool HasConverged();
+    public double[] GetLossHistory();
+    public int GetStableRounds();
+    public void Reset();
+    public double GetCurrentLoss();
+    public double GetImprovementRate();
 }
 ```

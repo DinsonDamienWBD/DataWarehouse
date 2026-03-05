@@ -32,9 +32,14 @@ public sealed class ZoneEnforcerStrategy : ComplianceStrategyBase, IZoneEnforcer
     private readonly DeclarativeZoneRegistry _registry;
 
     private readonly BoundedDictionary<string, CachedEnforcementResult> _enforcementCache = new BoundedDictionary<string, CachedEnforcementResult>(1000);
-    private readonly BoundedDictionary<string, List<EnforcementAuditEntry>> _auditTrail = new BoundedDictionary<string, List<EnforcementAuditEntry>>(1000);
+    // P2-1551: Use Queue<T> so Dequeue() is O(1) instead of List.RemoveAt(0) O(n).
+    private readonly BoundedDictionary<string, Queue<EnforcementAuditEntry>> _auditTrail = new BoundedDictionary<string, Queue<EnforcementAuditEntry>>(1000);
 
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
+
+    // P2-1550: Time-based eviction trigger — avoids O(n) full scan on every 50th write.
+    private DateTimeOffset _lastCacheEviction = DateTimeOffset.MinValue;
+    private static readonly TimeSpan EvictionInterval = TimeSpan.FromMinutes(5);
 
     /// <inheritdoc/>
     public override string StrategyId => "sovereignty-zone-enforcer";
@@ -69,14 +74,15 @@ public sealed class ZoneEnforcerStrategy : ComplianceStrategyBase, IZoneEnforcer
         CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        IncrementCounter("zone_enforcer.enforce");
+            IncrementCounter("zone_enforcer.enforce");
 
+        // LOW-1556: Use ArgumentException for whitespace violations (not ArgumentNullException).
         if (string.IsNullOrWhiteSpace(objectId))
-            throw new ArgumentNullException(nameof(objectId));
+            throw new ArgumentException("objectId must not be null or whitespace.", nameof(objectId));
         if (string.IsNullOrWhiteSpace(sourceZoneId))
-            throw new ArgumentNullException(nameof(sourceZoneId));
+            throw new ArgumentException("sourceZoneId must not be null or whitespace.", nameof(sourceZoneId));
         if (string.IsNullOrWhiteSpace(destinationZoneId))
-            throw new ArgumentNullException(nameof(destinationZoneId));
+            throw new ArgumentException("destinationZoneId must not be null or whitespace.", nameof(destinationZoneId));
 
         // 1. Same zone => always allow (intra-zone movement)
         if (string.Equals(sourceZoneId, destinationZoneId, StringComparison.OrdinalIgnoreCase))
@@ -204,7 +210,7 @@ public sealed class ZoneEnforcerStrategy : ComplianceStrategyBase, IZoneEnforcer
     public async Task<IReadOnlyList<ISovereigntyZone>> GetZonesForJurisdictionAsync(string jurisdictionCode, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        IncrementCounter("zone_enforcer.get_zones_for_jurisdiction");
+            IncrementCounter("zone_enforcer.get_zones_for_jurisdiction");
         var zones = await _registry.GetZonesForJurisdictionAsync(jurisdictionCode, ct);
         return zones.Cast<ISovereigntyZone>().ToList();
     }
@@ -213,7 +219,7 @@ public sealed class ZoneEnforcerStrategy : ComplianceStrategyBase, IZoneEnforcer
     public async Task<ISovereigntyZone?> GetZoneAsync(string zoneId, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        IncrementCounter("zone_enforcer.get_zone");
+            IncrementCounter("zone_enforcer.get_zone");
         return await _registry.GetZoneAsync(zoneId, ct);
     }
 
@@ -221,7 +227,7 @@ public sealed class ZoneEnforcerStrategy : ComplianceStrategyBase, IZoneEnforcer
     public async Task RegisterZoneAsync(ISovereigntyZone zone, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        IncrementCounter("zone_enforcer.register_zone");
+            IncrementCounter("zone_enforcer.register_zone");
 
         if (zone is SovereigntyZone concreteZone)
         {
@@ -229,14 +235,7 @@ public sealed class ZoneEnforcerStrategy : ComplianceStrategyBase, IZoneEnforcer
         }
         else
         {
-            // Wrap the interface into the concrete type via builder
-            var built = new SovereigntyZoneBuilder()
-                .WithId(zone.ZoneId)
-                .WithName(zone.Name)
-                .InJurisdictions(zone.Jurisdictions.ToArray())
-                .Build();
-
-            // Copy regulations and rules via reflection-free approach: rebuild fully
+            // LOW-1554: First builder chain was dead code (built but unused). Build only once with full configuration.
             var builder = new SovereigntyZoneBuilder()
                 .WithId(zone.ZoneId)
                 .WithName(zone.Name)
@@ -258,7 +257,7 @@ public sealed class ZoneEnforcerStrategy : ComplianceStrategyBase, IZoneEnforcer
     public async Task DeactivateZoneAsync(string zoneId, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        IncrementCounter("zone_enforcer.deactivate_zone");
+            IncrementCounter("zone_enforcer.deactivate_zone");
         await _registry.DeactivateZoneAsync(zoneId, ct);
 
         // Invalidate any cached results involving this zone
@@ -274,12 +273,14 @@ public sealed class ZoneEnforcerStrategy : ComplianceStrategyBase, IZoneEnforcer
     /// </summary>
     /// <param name="objectId">Identifier of the data object.</param>
     /// <returns>Audit entries for the object, ordered most recent first.</returns>
-    public IReadOnlyList<EnforcementAuditEntry> GetEnforcementAuditAsync(string objectId)
+    /// <remarks>Renamed from GetEnforcementAuditAsync — method is synchronous and should not have Async suffix.</remarks>
+    public IReadOnlyList<EnforcementAuditEntry> GetEnforcementAudit(string objectId)
     {
         if (_auditTrail.TryGetValue(objectId, out var entries))
         {
             lock (entries)
             {
+                // P2-1551: Queue<T> — enumerate as IEnumerable (no ToList needed before OrderBy)
                 return entries.OrderByDescending(e => e.Timestamp).ToList();
             }
         }
@@ -295,7 +296,7 @@ public sealed class ZoneEnforcerStrategy : ComplianceStrategyBase, IZoneEnforcer
     protected override async Task<ComplianceResult> CheckComplianceCoreAsync(
         ComplianceContext context, CancellationToken cancellationToken)
     {
-        IncrementCounter("zone_enforcer.check");
+            IncrementCounter("zone_enforcer.check");
 
         var sourceLocation = context.SourceLocation;
         var destLocation = context.DestinationLocation;
@@ -358,14 +359,15 @@ public sealed class ZoneEnforcerStrategy : ComplianceStrategyBase, IZoneEnforcer
             }
         }
 
-        var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+        var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+        var isCompliant = !hasHighViolations;
 
         return new ComplianceResult
         {
             IsCompliant = isCompliant,
             Framework = Framework,
             Status = violations.Count == 0 ? ComplianceStatus.Compliant
-                : violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant
+                : hasHighViolations ? ComplianceStatus.NonCompliant
                 : ComplianceStatus.PartiallyCompliant,
             Violations = violations,
             Recommendations = recommendations,
@@ -381,14 +383,14 @@ public sealed class ZoneEnforcerStrategy : ComplianceStrategyBase, IZoneEnforcer
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("zone_enforcer.initialized");
+            IncrementCounter("zone_enforcer.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("zone_enforcer.shutdown");
+            IncrementCounter("zone_enforcer.shutdown");
         _enforcementCache.Clear();
         return base.ShutdownAsyncCore(cancellationToken);
     }
@@ -466,9 +468,12 @@ public sealed class ZoneEnforcerStrategy : ComplianceStrategyBase, IZoneEnforcer
     {
         _enforcementCache[cacheKey] = new CachedEnforcementResult(result, DateTimeOffset.UtcNow.Add(CacheTtl));
 
-        // Opportunistic eviction of expired entries (every 50 cache writes)
-        if (_enforcementCache.Count % 50 == 0)
+        // P2-1550: Time-based eviction — avoid O(n) full scan on every 50th write.
+        // BoundedDictionary handles LRU capacity eviction; this scan handles TTL expiry.
+        var now = DateTimeOffset.UtcNow;
+        if (now - _lastCacheEviction >= EvictionInterval)
         {
+            _lastCacheEviction = now;
             EvictExpiredCacheEntries();
         }
     }
@@ -510,15 +515,15 @@ public sealed class ZoneEnforcerStrategy : ComplianceStrategyBase, IZoneEnforcer
             Details = details
         };
 
-        var trail = _auditTrail.GetOrAdd(objectId, _ => new List<EnforcementAuditEntry>());
+        var trail = _auditTrail.GetOrAdd(objectId, _ => new Queue<EnforcementAuditEntry>());
         lock (trail)
         {
-            trail.Add(entry);
+            trail.Enqueue(entry);
 
-            // Retain last 500 entries per object
+            // P2-1551: Retain last 500 entries per object — Dequeue() is O(1) vs List.RemoveAt(0) O(n).
             if (trail.Count > 500)
             {
-                trail.RemoveAt(0);
+                trail.Dequeue();
             }
         }
     }

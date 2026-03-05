@@ -107,6 +107,16 @@ public sealed record TaskResult
 
     public static TaskResult Failed(string error, TimeSpan? duration = null) =>
         new() { Success = false, Error = error, Duration = duration ?? TimeSpan.Zero };
+
+    /// <summary>
+    /// Returns a result indicating the task had no handler registered.
+    /// Callers can distinguish this from an execution failure by checking <see cref="IsNoHandlerError"/>.
+    /// </summary>
+    public static TaskResult NoHandler() =>
+        new() { Success = false, Error = "No handler defined for task", IsNoHandlerError = true };
+
+    /// <summary>True when the failure is specifically because no handler was registered for the task.</summary>
+    public bool IsNoHandlerError { get; init; }
 }
 
 /// <summary>
@@ -180,18 +190,24 @@ public sealed class WorkflowDefinition
     /// </summary>
     public bool ValidateDag()
     {
-        var visited = new HashSet<string>();
-        var recursionStack = new HashSet<string>();
+        // Pre-build index for O(1) task lookup — avoids O(n) Tasks.Find per HasCycle call.
+        var taskIndex = Tasks.ToDictionary(t => t.TaskId);
+        var visited = new HashSet<string>(Tasks.Count);
+        var recursionStack = new HashSet<string>(Tasks.Count);
 
         foreach (var task in Tasks)
         {
-            if (HasCycle(task.TaskId, visited, recursionStack))
+            if (HasCycle(task.TaskId, taskIndex, visited, recursionStack))
                 return false;
         }
         return true;
     }
 
-    private bool HasCycle(string taskId, HashSet<string> visited, HashSet<string> recursionStack)
+    private static bool HasCycle(
+        string taskId,
+        Dictionary<string, WorkflowTask> taskIndex,
+        HashSet<string> visited,
+        HashSet<string> recursionStack)
     {
         if (recursionStack.Contains(taskId)) return true;
         if (visited.Contains(taskId)) return false;
@@ -199,12 +215,11 @@ public sealed class WorkflowDefinition
         visited.Add(taskId);
         recursionStack.Add(taskId);
 
-        var task = Tasks.Find(t => t.TaskId == taskId);
-        if (task != null)
+        if (taskIndex.TryGetValue(taskId, out var task))
         {
             foreach (var dep in task.Dependencies)
             {
-                if (HasCycle(dep, visited, recursionStack))
+                if (HasCycle(dep, taskIndex, visited, recursionStack))
                     return true;
             }
         }
@@ -214,20 +229,32 @@ public sealed class WorkflowDefinition
     }
 
     /// <summary>
-    /// Gets tasks in topological order.
+    /// Gets tasks in topological order (Kahn's algorithm — O(V+E)).
     /// </summary>
     public IEnumerable<WorkflowTask> GetTopologicalOrder()
     {
         var inDegree = Tasks.ToDictionary(t => t.TaskId, t => t.Dependencies.Count);
+
+        // Pre-build reverse adjacency list to avoid O(n) Tasks.Where per dequeue.
+        var dependents = Tasks.ToDictionary(t => t.TaskId, _ => new List<WorkflowTask>());
+        foreach (var task in Tasks)
+        {
+            foreach (var dep in task.Dependencies)
+            {
+                if (dependents.TryGetValue(dep, out var list))
+                    list.Add(task);
+            }
+        }
+
         var queue = new Queue<WorkflowTask>(Tasks.Where(t => t.Dependencies.Count == 0));
-        var result = new List<WorkflowTask>();
+        var result = new List<WorkflowTask>(Tasks.Count);
 
         while (queue.Count > 0)
         {
             var task = queue.Dequeue();
             result.Add(task);
 
-            foreach (var dependent in Tasks.Where(t => t.Dependencies.Contains(task.TaskId)))
+            foreach (var dependent in dependents[task.TaskId])
             {
                 inDegree[dependent.TaskId]--;
                 if (inDegree[dependent.TaskId] == 0)
@@ -417,7 +444,8 @@ public abstract class WorkflowStrategyBase
         CancellationToken cancellationToken)
     {
         if (task.Handler == null)
-            return TaskResult.Failed("No handler defined for task");
+            // Finding 4522: use dedicated factory so callers can distinguish missing handler from execution failure.
+            return TaskResult.NoHandler();
 
         if (task.Condition != null && !task.Condition(context))
             return new TaskResult { Success = true, Output = null, Duration = TimeSpan.Zero };

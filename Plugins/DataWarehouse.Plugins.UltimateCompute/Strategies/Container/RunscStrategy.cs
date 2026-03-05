@@ -72,7 +72,8 @@ internal sealed class RunscStrategy : ComputeRuntimeStrategyBase
                 await File.WriteAllTextAsync(Path.Combine(bundleDir, "config.json"),
                     JsonSerializer.Serialize(spec, new JsonSerializerOptions { WriteIndented = true }), cancellationToken);
 
-                var containerId = $"dw-runsc-{task.Id[..Math.Min(10, task.Id.Length)]}";
+                // Use full GUID to avoid ID collisions from sequential UUIDs with a shared prefix
+                var containerId = $"dw-runsc-{Guid.NewGuid():N}";
                 var timeout = GetEffectiveTimeout(task);
                 var result = await RunProcessAsync("runsc", $"--rootless --network=none run --bundle \"{bundleDir}\" {containerId}",
                     stdin: task.InputData.Length > 0 ? task.GetInputDataAsString() : null,

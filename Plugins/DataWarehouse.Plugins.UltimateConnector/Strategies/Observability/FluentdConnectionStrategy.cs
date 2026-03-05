@@ -28,7 +28,7 @@ public sealed class FluentdConnectionStrategy : ObservabilityConnectionStrategyB
     {
         var parts = config.ConnectionString?.Split(':') ?? ["localhost", "24224"];
         var host = parts.Length > 0 ? parts[0] : "localhost";
-        var port = parts.Length > 1 ? int.Parse(parts[1]) : 24224;
+        var port = parts.Length > 1 && int.TryParse(parts[1], out var p24224) ? p24224 : 24224;
 
         var tcpClient = new TcpClient();
         await tcpClient.ConnectAsync(host, port, ct);

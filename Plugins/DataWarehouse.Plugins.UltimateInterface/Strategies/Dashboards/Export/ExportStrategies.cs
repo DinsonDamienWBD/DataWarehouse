@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts.Dashboards;
@@ -9,8 +10,10 @@ namespace DataWarehouse.Plugins.UltimateInterface.Dashboards.Strategies.Export;
 /// </summary>
 public sealed class PdfGenerationStrategy : DashboardStrategyBase
 {
-    private readonly Dictionary<string, Dashboard> _dashboards = new();
+    // P2-3295: ConcurrentDictionary for thread-safe concurrent CRUD operations
+    private readonly ConcurrentDictionary<string, Dashboard> _dashboards = new();
 
+    public override bool IsProductionReady => false;
     public override string StrategyId => "pdf-export";
     public override string StrategyName => "PDF Generation";
     public override string VendorName => "DataWarehouse";
@@ -61,7 +64,7 @@ public sealed class PdfGenerationStrategy : DashboardStrategyBase
 
     protected override Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct)
     {
-        _dashboards.Remove(dashboardId);
+        _dashboards.TryRemove(dashboardId, out _);
         return Task.CompletedTask;
     }
 
@@ -134,8 +137,10 @@ public sealed record PdfExportOptions
 /// </summary>
 public sealed class ImageExportStrategy : DashboardStrategyBase
 {
-    private readonly Dictionary<string, Dashboard> _dashboards = new();
+    // P2-3295: ConcurrentDictionary for thread-safe concurrent CRUD operations
+    private readonly ConcurrentDictionary<string, Dashboard> _dashboards = new();
 
+    public override bool IsProductionReady => false;
     public override string StrategyId => "image-export";
     public override string StrategyName => "Image Export";
     public override string VendorName => "DataWarehouse";
@@ -186,7 +191,7 @@ public sealed class ImageExportStrategy : DashboardStrategyBase
 
     protected override Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct)
     {
-        _dashboards.Remove(dashboardId);
+        _dashboards.TryRemove(dashboardId, out _);
         return Task.CompletedTask;
     }
 
@@ -251,8 +256,9 @@ public sealed record ImageExportOptions
 /// </summary>
 public sealed class ScheduledReportsStrategy : DashboardStrategyBase
 {
-    private readonly Dictionary<string, Dashboard> _dashboards = new();
-    private readonly Dictionary<string, List<ScheduledReport>> _schedules = new();
+    // P2-3295/3296: ConcurrentDictionary for thread-safe concurrent CRUD and schedule mutations
+    private readonly ConcurrentDictionary<string, Dashboard> _dashboards = new();
+    private readonly ConcurrentDictionary<string, List<ScheduledReport>> _schedules = new();
 
     public override string StrategyId => "scheduled-reports";
     public override string StrategyName => "Scheduled Reports";
@@ -286,7 +292,7 @@ public sealed class ScheduledReportsStrategy : DashboardStrategyBase
         var id = GenerateId();
         var created = dashboard with { Id = id, CreatedAt = DateTimeOffset.UtcNow };
         _dashboards[id] = created;
-        _schedules[id] = new List<ScheduledReport>();
+        _schedules.TryAdd(id, new List<ScheduledReport>());
         return Task.FromResult(created);
     }
 
@@ -305,8 +311,8 @@ public sealed class ScheduledReportsStrategy : DashboardStrategyBase
 
     protected override Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct)
     {
-        _dashboards.Remove(dashboardId);
-        _schedules.Remove(dashboardId);
+        _dashboards.TryRemove(dashboardId, out _);
+        _schedules.TryRemove(dashboardId, out _);
         return Task.CompletedTask;
     }
 
@@ -333,7 +339,9 @@ public sealed class ScheduledReportsStrategy : DashboardStrategyBase
             Enabled = true
         };
 
-        _schedules[dashboardId].Add(schedule);
+        // P2-3296: lock on the list to prevent concurrent Add/RemoveAll races
+        var scheduleList = _schedules.GetOrAdd(dashboardId, _ => new List<ScheduledReport>());
+        lock (scheduleList) { scheduleList.Add(schedule); }
         return schedule;
     }
 
@@ -352,7 +360,7 @@ public sealed class ScheduledReportsStrategy : DashboardStrategyBase
     {
         if (_schedules.TryGetValue(dashboardId, out var schedules))
         {
-            schedules.RemoveAll(s => s.Id == scheduleId);
+            lock (schedules) { schedules.RemoveAll(s => s.Id == scheduleId); }
         }
     }
 
@@ -364,7 +372,10 @@ public sealed class ScheduledReportsStrategy : DashboardStrategyBase
         if (!_dashboards.TryGetValue(dashboardId, out var dashboard))
             throw new KeyNotFoundException($"Dashboard {dashboardId} not found");
 
-        var schedule = _schedules[dashboardId].FirstOrDefault(s => s.Id == scheduleId);
+        ScheduledReport? schedule;
+        if (!_schedules.TryGetValue(dashboardId, out var sList))
+            throw new KeyNotFoundException($"Schedule {scheduleId} not found");
+        lock (sList) { schedule = sList.FirstOrDefault(s => s.Id == scheduleId); }
         if (schedule == null)
             throw new KeyNotFoundException($"Schedule {scheduleId} not found");
 
@@ -389,10 +400,25 @@ public sealed class ScheduledReportsStrategy : DashboardStrategyBase
         {
             ScheduleFrequency.Hourly => now.AddHours(1),
             ScheduleFrequency.Daily => now.Date.AddDays(1).Add(config.TimeOfDay),
-            ScheduleFrequency.Weekly => now.Date.AddDays((7 - (int)now.DayOfWeek + (int)config.DayOfWeek) % 7 + 7).Add(config.TimeOfDay),
+            // LOW-3310: If today is the target day and target time hasn't passed, run today.
+            // Otherwise advance to next occurrence of the target weekday.
+            ScheduleFrequency.Weekly => WeeklyNextRun(now, config),
             ScheduleFrequency.Monthly => new DateTimeOffset(now.Year, now.Month, 1, 0, 0, 0, now.Offset).AddMonths(1).AddDays(config.DayOfMonth - 1).Add(config.TimeOfDay),
             _ => now.AddDays(1)
         };
+    }
+
+    private static DateTimeOffset WeeklyNextRun(DateTimeOffset now, ScheduleConfig config)
+    {
+        var daysUntilTarget = ((int)config.DayOfWeek - (int)now.DayOfWeek + 7) % 7;
+        if (daysUntilTarget == 0 && now.TimeOfDay < config.TimeOfDay)
+        {
+            // Today is the target day and the time hasn't passed — run today
+            return now.Date.Add(config.TimeOfDay);
+        }
+        // Advance to next occurrence (at least 1 day out when daysUntilTarget == 0)
+        var daysToAdd = daysUntilTarget == 0 ? 7 : daysUntilTarget;
+        return now.Date.AddDays(daysToAdd).Add(config.TimeOfDay);
     }
 }
 
@@ -401,8 +427,10 @@ public sealed class ScheduledReportsStrategy : DashboardStrategyBase
 /// </summary>
 public sealed class EmailDeliveryStrategy : DashboardStrategyBase
 {
-    private readonly Dictionary<string, Dashboard> _dashboards = new();
+    // P2-3295: ConcurrentDictionary for thread-safe concurrent CRUD operations
+    private readonly ConcurrentDictionary<string, Dashboard> _dashboards = new();
 
+    public override bool IsProductionReady => false;
     public override string StrategyId => "email-delivery";
     public override string StrategyName => "Email Delivery";
     public override string VendorName => "DataWarehouse";
@@ -454,7 +482,7 @@ public sealed class EmailDeliveryStrategy : DashboardStrategyBase
 
     protected override Task DeleteDashboardCoreAsync(string dashboardId, CancellationToken ct)
     {
-        _dashboards.Remove(dashboardId);
+        _dashboards.TryRemove(dashboardId, out _);
         return Task.CompletedTask;
     }
 

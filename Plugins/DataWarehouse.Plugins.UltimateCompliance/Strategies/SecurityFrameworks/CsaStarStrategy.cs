@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.SecurityFrameworks
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("csa_star.check");
+            IncrementCounter("csa_star.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -64,9 +64,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.SecurityFrameworks
 
             recommendations.Add("Consider STAR Level 2 certification for independent assessment");
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -82,14 +83,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.SecurityFrameworks
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("csa_star.initialized");
+            IncrementCounter("csa_star.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("csa_star.shutdown");
+            IncrementCounter("csa_star.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

@@ -29,6 +29,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 
         /// <inheritdoc/>
         public override string StrategyId => "air-gapped";
+        public override bool IsProductionReady => false;
 
         /// <inheritdoc/>
         public override string StrategyName => "Air-Gapped Backup";
@@ -511,9 +512,16 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 
         private byte[] DeriveEncryptionKey(string keyMaterial)
         {
-            // In production, use PBKDF2 or similar
-            using var sha256 = SHA256.Create();
-            return sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(keyMaterial));
+            // P2-2555: Use PBKDF2 with a fixed salt (backup context) and 100K iterations instead of
+            // raw SHA-256 with no salt. A fixed salt provides a unique key-space domain without
+            // requiring caller-supplied salt storage; 100K iterations provides brute-force resistance.
+            var salt = System.Text.Encoding.UTF8.GetBytes("AirGappedBackup_v1_KeyDerivation");
+            return System.Security.Cryptography.Rfc2898DeriveBytes.Pbkdf2(
+                System.Text.Encoding.UTF8.GetBytes(keyMaterial),
+                salt,
+                100_000,
+                System.Security.Cryptography.HashAlgorithmName.SHA256,
+                32);
         }
 
         private async Task<byte[]> EncryptBackupDataAsync(byte[] data, byte[] key, CancellationToken ct)
@@ -541,11 +549,13 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 
         private async Task<string> CreatePackageSignatureAsync(byte[] data, CancellationToken ct)
         {
-            // In production, use RSA or Ed25519 signature
+            // Computes a SHA-256 integrity hash of the package data.
+            // For a real digital signature, publish an asymmetric signing key via the key-management plugin
+            // and use RSA-PSS or Ed25519 via the SDK crypto contract.
             using var sha256 = SHA256.Create();
             var hash = sha256.ComputeHash(data);
             await Task.CompletedTask;
-            return Convert.ToBase64String(hash);
+            return "sha256:" + Convert.ToBase64String(hash);
         }
 
         private PackageManifest CreatePackageManifest(AirGappedPackage package, List<FileInfo> files)

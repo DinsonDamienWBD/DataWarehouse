@@ -537,8 +537,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[LinodeObjectStorageStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
+                // P2-4140: Re-throw auth and network errors so callers see real failures instead
+                // of a misleading false (object-not-found) result for auth/connectivity problems.
+                if (ex is AmazonS3Exception s3ex &&
+                    (s3ex.StatusCode == System.Net.HttpStatusCode.Forbidden ||
+                     s3ex.StatusCode == System.Net.HttpStatusCode.Unauthorized))
+                    throw;
                 IncrementOperationCounter(StorageOperationType.Exists);
+
                 return false;
             }
         }
@@ -726,7 +732,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
         public string GetDirectUrl(string key)
         {
             ValidateKey(key);
-            return $"https://{_bucket}.{_endpoint}/{key}";
+            return $"https://{_bucket}.{_endpoint}/{Uri.EscapeDataString(key)}";
         }
 
         /// <summary>

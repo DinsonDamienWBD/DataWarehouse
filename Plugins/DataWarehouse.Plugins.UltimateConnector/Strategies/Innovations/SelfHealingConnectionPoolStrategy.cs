@@ -105,7 +105,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 .Select(async i =>
                 {
                     var sw = Stopwatch.StartNew();
-                    var response = await client.GetAsync("/health", ct);
+                    using var response = await client.GetAsync("/health", ct);
                     sw.Stop();
                     return (Index: i, Latency: sw.Elapsed, Success: response.IsSuccessStatusCode);
                 });
@@ -171,7 +171,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             }
 
             var sw = Stopwatch.StartNew();
-            var response = await client.GetAsync("/health", ct);
+            using var response = await client.GetAsync("/health", ct);
             sw.Stop();
 
             if (metrics != null)
@@ -237,7 +237,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             {
                 metrics.ConsecutiveFailures = 0;
                 if (metrics.CircuitState == CircuitState.HalfOpen)
+                {
                     metrics.CircuitState = CircuitState.Closed;
+                    // Finding 1972: Increment on actual recovery, not on degradation detection.
+                    metrics.TotalHealedConnections++;
+                }
             }
             else
             {
@@ -250,10 +254,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 }
             }
 
-            if (metrics.EmaLatencyMs > metrics.DegradationThresholdMs && metrics.EnablePredictiveScaling)
-            {
-                metrics.TotalHealedConnections++;
-            }
+            // Finding 1972: TotalHealedConnections should increment on actual recovery (HalfOpen→Closed),
+            // not on degradation detection. Moved increment to the circuit recovery path above.
+            // (Increment is now inside the success branch when CircuitState transitions from HalfOpen to Closed.)
         }
 
         /// <summary>
@@ -267,7 +270,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 try
                 {
                     var sw = Stopwatch.StartNew();
-                    var response = await client.GetAsync("/health");
+                    using var response = await client.GetAsync("/health");
                     sw.Stop();
 
                     if (_poolMetrics.TryGetValue(connectionId, out var metrics))
@@ -302,6 +305,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
 
         private class PoolMetrics
         {
+            public readonly object SyncRoot = new();
             public int PoolSize { get; set; }
             public int ActiveConnections { get; set; }
             public double DegradationThresholdMs { get; set; }

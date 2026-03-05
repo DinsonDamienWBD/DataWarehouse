@@ -108,18 +108,24 @@ namespace DataWarehouse.SDK.Infrastructure.InMemory
         }
 
         /// <inheritdoc />
-        public CircuitBreakerStatistics GetStatistics() => new()
+        public CircuitBreakerStatistics GetStatistics()
         {
-            Name = Name,
-            CurrentState = State,
-            TotalRequests = Interlocked.Read(ref _totalRequests),
-            SuccessfulRequests = Interlocked.Read(ref _successfulRequests),
-            FailedRequests = Interlocked.Read(ref _failedRequests),
-            RejectedRequests = Interlocked.Read(ref _rejectedRequests),
-            LastFailureAt = _lastFailureTime == default ? null : _lastFailureTime,
-            LastSuccessAt = _lastSuccessAt,
-            TimeInCurrentState = DateTimeOffset.UtcNow - _stateChangedAt
-        };
+            lock (_lock)
+            {
+                return new CircuitBreakerStatistics
+                {
+                    Name = Name,
+                    CurrentState = State,
+                    TotalRequests = Interlocked.Read(ref _totalRequests),
+                    SuccessfulRequests = Interlocked.Read(ref _successfulRequests),
+                    FailedRequests = Interlocked.Read(ref _failedRequests),
+                    RejectedRequests = Interlocked.Read(ref _rejectedRequests),
+                    LastFailureAt = _lastFailureTime == default ? null : _lastFailureTime,
+                    LastSuccessAt = _lastSuccessAt,
+                    TimeInCurrentState = DateTimeOffset.UtcNow - _stateChangedAt
+                };
+            }
+        }
 
         private void EnsureNotOpen()
         {

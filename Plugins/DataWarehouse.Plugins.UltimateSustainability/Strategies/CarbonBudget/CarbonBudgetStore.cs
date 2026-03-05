@@ -16,6 +16,7 @@ public sealed class CarbonBudgetStore : IDisposable, IAsyncDisposable
 {
     private readonly BoundedDictionary<string, MutableBudgetEntry> _budgets = new BoundedDictionary<string, MutableBudgetEntry>(1000);
     private readonly SemaphoreSlim _fileLock = new(1, 1);
+    private readonly object _timerLock = new();
     private readonly string _filePath;
     private Timer? _debounceSaveTimer;
     private volatile bool _dirty;
@@ -174,9 +175,11 @@ public sealed class CarbonBudgetStore : IDisposable, IAsyncDisposable
                 }
             }
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
+
             // Corrupted file -- start fresh. The file will be overwritten on next save.
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
         finally
         {
@@ -280,12 +283,23 @@ public sealed class CarbonBudgetStore : IDisposable, IAsyncDisposable
         _debounceSaveTimer?.Dispose();
         _debounceSaveTimer = null;
 
-        // Final save if dirty — Dispose() is synchronous; use Task.Run to avoid
-        // deadlocks on synchronization-context-bound threads. Prefer DisposeAsync()
-        // for callers that can await.
+        // Final save if dirty — fire-and-forget via Task.Run so we don't block or deadlock.
+        // Callers that need guaranteed persistence should use DisposeAsync() instead.
+        // We intentionally do NOT block here to prevent ThreadPool starvation or
+        // ASP.NET synchronization context deadlocks (#4413).
         if (_dirty)
         {
-            Task.Run(() => SaveAsync(CancellationToken.None)).ConfigureAwait(false).GetAwaiter().GetResult();
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await SaveAsync(CancellationToken.None).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[CarbonBudgetStore] Background save on Dispose failed: {ex.Message}");
+                }
+            });
         }
 
         _fileLock.Dispose();
@@ -294,13 +308,17 @@ public sealed class CarbonBudgetStore : IDisposable, IAsyncDisposable
     private void MarkDirty()
     {
         _dirty = true;
-        // Debounce save: schedule save in 5 seconds, reset timer if already pending
-        _debounceSaveTimer?.Dispose();
-        _debounceSaveTimer = new Timer(
-            _ => _ = SaveAsync(CancellationToken.None),
-            null,
-            TimeSpan.FromSeconds(5),
-            Timeout.InfiniteTimeSpan);
+        // Debounce save: schedule save in 5 seconds, reset timer if already pending.
+        // Lock prevents concurrent MarkDirty() calls from racing on Dispose+Create.
+        lock (_timerLock)
+        {
+            _debounceSaveTimer?.Dispose();
+            _debounceSaveTimer = new Timer(
+                _ => _ = SaveAsync(CancellationToken.None),
+                null,
+                TimeSpan.FromSeconds(5),
+                Timeout.InfiniteTimeSpan);
+        }
     }
 
     #region Internal Mutable Entry

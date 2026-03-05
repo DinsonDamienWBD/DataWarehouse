@@ -95,7 +95,8 @@ public sealed class RealTimePricingArbitrageStrategy : MultiCloudStrategyBase
     }
 
     protected override string? GetCurrentState() =>
-        $"Prices tracked: {_currentPricing.Count}, Opportunities: {_opportunities.Count(o => o.Value.ExpiresAt > DateTimeOffset.UtcNow)}";
+        // Avoid O(n) Count(predicate) on every status call — report total opportunities instead.
+        $"Prices tracked: {_currentPricing.Count}, Opportunities: {_opportunities.Count}";
 }
 
 /// <summary>

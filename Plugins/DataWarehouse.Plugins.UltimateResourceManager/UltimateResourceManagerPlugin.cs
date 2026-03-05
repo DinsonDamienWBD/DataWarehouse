@@ -237,7 +237,9 @@ public sealed class UltimateResourceManagerPlugin : InfrastructurePluginBase, ID
 
         if (allocation.Success && allocation.AllocationHandle != null)
         {
-            _activeAllocations[allocation.AllocationHandle] = allocation;
+            // Cat 12 (finding 3801): store RequesterId alongside allocation so preemption can find
+            // the correct quota entry (quotas are keyed by requesterId, not by the GUID RequestId).
+            _activeAllocations[allocation.AllocationHandle] = allocation with { RequesterId = requesterId };
             Interlocked.Increment(ref _totalAllocations);
             IncrementUsageStats(strategyId);
         }
@@ -317,7 +319,9 @@ public sealed class UltimateResourceManagerPlugin : InfrastructurePluginBase, ID
             }
             catch
             {
+
                 // Skip strategies that fail to report metrics
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
@@ -452,11 +456,16 @@ public sealed class UltimateResourceManagerPlugin : InfrastructurePluginBase, ID
 
         var priority = message.Payload.TryGetValue("priority", out var pri) && pri is int p ? p : 100;
 
-        // Find and preempt lower priority allocations
+        // Find and preempt lower priority allocations.
+        // Cat 12 (finding 3801): use RequesterId (not RequestId/GUID) to look up quotas — quotas are keyed by requesterId.
         var preempted = 0;
         foreach (var kvp in _activeAllocations.ToArray())
         {
-            if (_quotas.TryGetValue(kvp.Value.RequestId, out var quota) && quota.Priority < priority)
+            var alloc = kvp.Value;
+            var requesterId = alloc.RequesterId;
+            if (requesterId != null &&
+                _quotas.TryGetValue(requesterId, out var quota) &&
+                quota.Priority < priority)
             {
                 if (_activeAllocations.TryRemove(kvp.Key, out _))
                 {
@@ -473,10 +482,82 @@ public sealed class UltimateResourceManagerPlugin : InfrastructurePluginBase, ID
 
     private Task HandleReserveAsync(PluginMessage message)
     {
-        // Reserve resources for future use (placeholder implementation)
+        // Extract resource type from payload
+        if (!message.Payload.TryGetValue("resourceType", out var rtObj) || rtObj is not string resourceType ||
+            string.IsNullOrWhiteSpace(resourceType))
+        {
+            message.Payload["success"] = false;
+            message.Payload["error"] = "Missing or invalid 'resourceType' parameter. Supported: cpu, memory, io, gpu, network.";
+            return Task.CompletedTask;
+        }
+
+        // Validate resource type
+        var supportedTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            { "cpu", "memory", "io", "gpu", "network" };
+        if (!supportedTypes.Contains(resourceType))
+        {
+            message.Payload["success"] = false;
+            message.Payload["error"] = $"Unsupported resource type '{resourceType}'. Supported: cpu, memory, io, gpu, network.";
+            return Task.CompletedTask;
+        }
+
+        // Extract requested amount
+        var amount = message.Payload.TryGetValue("amount", out var amtObj) && amtObj is long amt ? amt
+            : message.Payload.TryGetValue("amount", out var amtObj2) && amtObj2 is int amtI ? (long)amtI : 0L;
+        if (amount <= 0)
+        {
+            message.Payload["success"] = false;
+            message.Payload["error"] = "Missing or invalid 'amount' parameter. Must be a positive integer.";
+            return Task.CompletedTask;
+        }
+
+        // Check quota compliance if quotaId provided
+        if (message.Payload.TryGetValue("quotaId", out var qObj) && qObj is string quotaId &&
+            !string.IsNullOrWhiteSpace(quotaId))
+        {
+            if (!_quotas.TryGetValue(quotaId, out var quota))
+            {
+                message.Payload["success"] = false;
+                message.Payload["error"] = $"Quota '{quotaId}' not found.";
+                return Task.CompletedTask;
+            }
+
+            // Verify the reservation fits within quota limits
+            var exceedsQuota = resourceType.ToLowerInvariant() switch
+            {
+                "cpu" => quota.MaxCpuCores > 0 && amount > (long)(quota.MaxCpuCores * 1000),
+                "memory" => quota.MaxMemoryBytes > 0 && amount > quota.MaxMemoryBytes,
+                "io" => quota.MaxIops > 0 && amount > quota.MaxIops,
+                "gpu" => quota.MaxGpuPercent > 0 && amount > (long)quota.MaxGpuPercent,
+                "network" => quota.MaxNetworkBandwidth > 0 && amount > quota.MaxNetworkBandwidth,
+                _ => false
+            };
+
+            if (exceedsQuota)
+            {
+                message.Payload["success"] = false;
+                message.Payload["error"] = $"Reservation of {amount} {resourceType} exceeds quota '{quotaId}' limits.";
+                return Task.CompletedTask;
+            }
+        }
+
+        // Track the reservation as an active allocation
         var reservationId = Guid.NewGuid().ToString("N");
+        var requesterId = message.Payload.TryGetValue("requesterId", out var rObj) && rObj is string rid ? rid : message.SourcePluginId;
+
+        _activeAllocations[reservationId] = new ResourceAllocation
+        {
+            RequestId = requesterId,
+            Success = true,
+            AllocationHandle = reservationId,
+            AllocatedAt = DateTime.UtcNow
+        };
+
         message.Payload["success"] = true;
         message.Payload["reservationId"] = reservationId;
+        message.Payload["resourceType"] = resourceType;
+        message.Payload["amount"] = amount;
+        message.Payload["reservedAt"] = DateTimeOffset.UtcNow;
         return Task.CompletedTask;
     }
 

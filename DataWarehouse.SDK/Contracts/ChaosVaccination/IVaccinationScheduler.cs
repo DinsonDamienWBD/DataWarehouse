@@ -104,6 +104,23 @@ namespace DataWarehouse.SDK.Contracts.ChaosVaccination
         /// Null means the schedule can execute at any time.
         /// </summary>
         public TimeWindow[]? TimeWindows { get; init; }
+
+        /// <summary>
+        /// Validates mutual exclusion between CronExpression and IntervalMs and returns any errors.
+        /// Exactly one of these must be set for a valid schedule.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown if both CronExpression and IntervalMs are null, or both are set simultaneously.
+        /// </exception>
+        public void Validate()
+        {
+            if (CronExpression == null && IntervalMs == null)
+                throw new InvalidOperationException(
+                    $"VaccinationSchedule '{Id}': either CronExpression or IntervalMs must be set.");
+            if (CronExpression != null && IntervalMs != null)
+                throw new InvalidOperationException(
+                    $"VaccinationSchedule '{Id}': CronExpression and IntervalMs are mutually exclusive; set only one.");
+        }
     }
 
     /// <summary>
@@ -155,5 +172,21 @@ namespace DataWarehouse.SDK.Contracts.ChaosVaccination
         /// The IANA time zone identifier for this window (e.g., "America/New_York").
         /// </summary>
         public required string TimeZone { get; init; }
+
+        /// <summary>
+        /// Validates the time window values.
+        /// </summary>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// Thrown if StartHour or EndHour are outside the 0-23 range.
+        /// </exception>
+        public void Validate()
+        {
+            if (StartHour < 0 || StartHour > 23)
+                throw new ArgumentOutOfRangeException(nameof(StartHour),
+                    StartHour, "StartHour must be in range 0-23.");
+            if (EndHour < 0 || EndHour > 23)
+                throw new ArgumentOutOfRangeException(nameof(EndHour),
+                    EndHour, "EndHour must be in range 0-23.");
+        }
     }
 }

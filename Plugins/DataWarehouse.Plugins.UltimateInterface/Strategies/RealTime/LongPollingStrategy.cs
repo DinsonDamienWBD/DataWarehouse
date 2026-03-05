@@ -143,9 +143,11 @@ internal sealed class LongPollingStrategy : SdkInterface.InterfaceStrategyBase, 
                     }
                 }
 
-                // No new data within timeout
+                // P2-3366: Return 304 only when client provided If-None-Match (conditional request).
+                // Return 204 (No Content) for unconditional polls that timed out.
+                int timeoutStatusCode = string.IsNullOrEmpty(ifNoneMatch) ? 204 : 304;
                 return new SdkInterface.InterfaceResponse(
-                    StatusCode: 304, // Not Modified (if If-None-Match was provided) or 204 (No Content)
+                    StatusCode: timeoutStatusCode,
                     Headers: new Dictionary<string, string>
                     {
                         ["Cache-Control"] = "no-cache"

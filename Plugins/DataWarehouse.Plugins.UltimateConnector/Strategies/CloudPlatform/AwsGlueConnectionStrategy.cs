@@ -49,8 +49,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
             var httpClient = handle.GetConnection<HttpClient>();
             try
             {
-                var response = await httpClient.PostAsync("/", new StringContent("{}", System.Text.Encoding.UTF8, "application/x-amz-json-1.1"), ct);
-                return response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable;
+                using var response = await httpClient.PostAsync("/", new StringContent("{}", System.Text.Encoding.UTF8, "application/x-amz-json-1.1"), ct);
+                return response.IsSuccessStatusCode;
             }
             catch
             {
@@ -58,11 +58,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
             }
         }
 
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
-            var httpClient = handle.GetConnection<HttpClient>();
-            httpClient?.Dispose();
-            await Task.CompletedTask;
+            handle.GetConnection<HttpClient>()?.Dispose();
+            return Task.CompletedTask;
         }
 
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)

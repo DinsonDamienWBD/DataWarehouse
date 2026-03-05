@@ -29,7 +29,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("fisma.check");
+            IncrementCounter("fisma.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -39,9 +39,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
             CheckIncidentResponse(context, violations, recommendations);
             CheckRiskAssessment(context, violations, recommendations);
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -100,10 +101,19 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
                 });
             }
 
-            if (context.Attributes.TryGetValue("AtoExpirationDate", out var expiryObj) &&
-                expiryObj is DateTime expiryDate)
+            // LOW-1558: Accept both DateTime and DateTimeOffset to avoid timezone-dependent comparison.
+            if (context.Attributes.TryGetValue("AtoExpirationDate", out var expiryObj))
             {
-                var daysUntilExpiry = (expiryDate - DateTime.UtcNow).TotalDays;
+                var expiryOffset = expiryObj switch
+                {
+                    DateTimeOffset dto => dto,
+                    DateTime dt => new DateTimeOffset(dt.Kind == DateTimeKind.Unspecified
+                        ? DateTime.SpecifyKind(dt, DateTimeKind.Utc) : dt),
+                    _ => (DateTimeOffset?)null
+                };
+                if (expiryOffset == null) return;
+                var expiryDate = expiryOffset.Value;
+                var daysUntilExpiry = (expiryDate - DateTimeOffset.UtcNow).TotalDays;
                 if (daysUntilExpiry < 0)
                 {
                     violations.Add(new ComplianceViolation
@@ -168,7 +178,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
                 });
             }
 
-            if (context.OperationType.Equals("security-incident", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("security-incident", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("UsCertNotified", out var certObj) || certObj is not true)
                 {
@@ -200,14 +210,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("fisma.initialized");
+            IncrementCounter("fisma.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("fisma.shutdown");
+            IncrementCounter("fisma.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

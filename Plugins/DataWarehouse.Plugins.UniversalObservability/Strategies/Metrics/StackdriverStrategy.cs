@@ -28,8 +28,9 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
     private int _flushIntervalSeconds = 10;
     private int _circuitBreakerFailures = 0;
     private const int CircuitBreakerThreshold = 5;
-    private bool _circuitOpen = false;
-    private DateTimeOffset _circuitOpenedAt = DateTimeOffset.MinValue;
+    private volatile bool _circuitOpen = false;
+    private long _circuitOpenedAtTicks = DateTimeOffset.MinValue.UtcTicks;
+    private readonly object _circuitLock = new();
     private int _exportIntervalMs = 60000; // Default 60 seconds
 
     /// <inheritdoc/>
@@ -67,9 +68,12 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
         _projectId = projectId;
         _accessToken = accessToken;
         _metricPrefix = metricPrefix;
-        _httpClient.DefaultRequestHeaders.Clear();
-        _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_accessToken}");
+        // Do NOT set DefaultRequestHeaders — inject per-request to avoid thread-safety issues.
     }
+
+    /// <summary>Adds the Bearer authorization token to the request headers (per-request, thread-safe).</summary>
+    private void AddAuthToken(HttpRequestMessage request) =>
+        request.Headers.Add("Authorization", $"Bearer {_accessToken}");
 
     /// <inheritdoc/>
     protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
@@ -95,9 +99,10 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
         {
             try
             {
-                var response = await _httpClient.GetAsync(
-                    $"https://monitoring.googleapis.com/v3/projects/{_projectId}/monitoredResourceDescriptors?pageSize=1",
-                    cancellationToken);
+                using var validateReq = new HttpRequestMessage(HttpMethod.Get,
+                    $"https://monitoring.googleapis.com/v3/projects/{_projectId}/monitoredResourceDescriptors?pageSize=1");
+                AddAuthToken(validateReq);
+                using var response = await _httpClient.SendAsync(validateReq, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -131,9 +136,11 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
             if (_logsBatch.Count > 0)
                 await FlushLogsAsync(cts.Token);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
+
             // Shutdown timeout exceeded, abandon remaining data
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
         finally
         {
@@ -148,7 +155,7 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
 
     private async Task FlushBatchesAsync(CancellationToken ct)
     {
-        if (_circuitOpen && DateTimeOffset.UtcNow - _circuitOpenedAt < TimeSpan.FromMinutes(1))
+        if (_circuitOpen && DateTimeOffset.UtcNow.UtcTicks - Interlocked.Read(ref _circuitOpenedAtTicks) < TimeSpan.FromMinutes(1).Ticks)
             return; // Circuit open, skip flush
 
         await _flushLock.WaitAsync(ct);
@@ -180,9 +187,10 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
                 var payload = new { timeSeries = batch };
                 var json = JsonSerializer.Serialize(payload);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync(
-                    $"https://monitoring.googleapis.com/v3/projects/{_projectId}/timeSeries",
-                    content, ct);
+                using var request = new HttpRequestMessage(HttpMethod.Post,
+                    $"https://monitoring.googleapis.com/v3/projects/{_projectId}/timeSeries") { Content = content };
+                AddAuthToken(request);
+                using var response = await _httpClient.SendAsync(request, ct);
                 response.EnsureSuccessStatusCode();
             }, ct);
 
@@ -208,9 +216,10 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
             var payload = new { entries = batch };
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await _httpClient.PostAsync(
-                $"https://logging.googleapis.com/v2/entries:write",
-                content, ct);
+            using var request = new HttpRequestMessage(HttpMethod.Post,
+                "https://logging.googleapis.com/v2/entries:write") { Content = content };
+            AddAuthToken(request);
+            using var response = await _httpClient.SendAsync(request, ct);
             response.EnsureSuccessStatusCode();
         }, ct);
     }
@@ -225,8 +234,11 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
             try
             {
                 await action();
-                _circuitBreakerFailures = 0; // Reset on success
-                _circuitOpen = false;
+                lock (_circuitLock)
+                {
+                    _circuitBreakerFailures = 0; // Reset on success
+                    _circuitOpen = false;
+                }
                 return;
             }
             catch (HttpRequestException ex) when (attempt < maxRetries - 1)
@@ -263,11 +275,14 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
             }
             catch (Exception)
             {
-                _circuitBreakerFailures++;
-                if (_circuitBreakerFailures >= CircuitBreakerThreshold)
+                lock (_circuitLock)
                 {
-                    _circuitOpen = true;
-                    _circuitOpenedAt = DateTimeOffset.UtcNow;
+                    _circuitBreakerFailures++;
+                    if (_circuitBreakerFailures >= CircuitBreakerThreshold)
+                    {
+                        _circuitOpen = true;
+                        Interlocked.Exchange(ref _circuitOpenedAtTicks, DateTimeOffset.UtcNow.UtcTicks);
+                    }
                 }
                 throw;
             }
@@ -277,7 +292,7 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
-        if (_circuitOpen && DateTimeOffset.UtcNow - _circuitOpenedAt < TimeSpan.FromMinutes(1))
+        if (_circuitOpen && DateTimeOffset.UtcNow.UtcTicks - Interlocked.Read(ref _circuitOpenedAtTicks) < TimeSpan.FromMinutes(1).Ticks)
             return; // Circuit open, drop metrics
 
         foreach (var metric in metrics)
@@ -302,14 +317,19 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
                 _ => "GAUGE"
             };
 
+            // For CUMULATIVE metrics, startTime must precede endTime and represent the start of the
+            // cumulative measurement window.  Using AddMinutes(-1) is arbitrary and wrong — use 1
+            // second before the sample timestamp as the minimum valid Cloud Monitoring window.
+            var counterStartTime = metric.Type == MetricType.Counter
+                ? (metric.Timestamp - TimeSpan.FromSeconds(1)).ToString("o")
+                : (string?)null;
+
             var point = new
             {
                 interval = new
                 {
                     endTime = metric.Timestamp.ToString("o"),
-                    startTime = metric.Type == MetricType.Counter
-                        ? metric.Timestamp.AddMinutes(-1).ToString("o")
-                        : null
+                    startTime = counterStartTime
                 },
                 value = new Dictionary<string, object>
                 {
@@ -390,19 +410,17 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
         var payload = new { spans = traceSpans };
         var json = JsonSerializer.Serialize(payload);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-        var response = await _httpClient.PostAsync(
-            $"https://cloudtrace.googleapis.com/v2/projects/{_projectId}/traces:batchWrite",
-            content,
-            cancellationToken);
-
+        using var traceReq = new HttpRequestMessage(HttpMethod.Post,
+            $"https://cloudtrace.googleapis.com/v2/projects/{_projectId}/traces:batchWrite") { Content = content };
+        AddAuthToken(traceReq);
+        using var response = await _httpClient.SendAsync(traceReq, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
     /// <inheritdoc/>
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken)
     {
-        if (_circuitOpen && DateTimeOffset.UtcNow - _circuitOpenedAt < TimeSpan.FromMinutes(1))
+        if (_circuitOpen && DateTimeOffset.UtcNow.UtcTicks - Interlocked.Read(ref _circuitOpenedAtTicks) < TimeSpan.FromMinutes(1).Ticks)
             return; // Circuit open, drop logs
 
         foreach (var entry in logEntries)
@@ -454,9 +472,10 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
         {
             try
             {
-                var response = await _httpClient.GetAsync(
-                    $"https://monitoring.googleapis.com/v3/projects/{_projectId}/monitoredResourceDescriptors?pageSize=1",
-                    ct);
+                using var healthReq = new HttpRequestMessage(HttpMethod.Get,
+                    $"https://monitoring.googleapis.com/v3/projects/{_projectId}/monitoredResourceDescriptors?pageSize=1");
+                AddAuthToken(healthReq);
+                using var response = await _httpClient.SendAsync(healthReq, ct);
 
                 return new DataWarehouse.SDK.Contracts.StrategyHealthCheckResult(
                     IsHealthy: response.IsSuccessStatusCode,
@@ -494,15 +513,26 @@ public sealed class StackdriverStrategy : ObservabilityStrategyBase
         {
             _flushTimer?.Stop();
             _flushTimer?.Dispose();
-            _flushLock.Wait();
-            try
+            // Finding 4652: avoid sync-over-async deadlock by running flush on the thread-pool
+            // rather than calling GetAwaiter().GetResult() on the calling (potentially UI/sync) thread.
+            if (_flushLock.Wait(TimeSpan.FromSeconds(5)))
             {
-                Task.Run(() => FlushMetricsAsync(CancellationToken.None)).Wait(TimeSpan.FromSeconds(5));
-                Task.Run(() => FlushLogsAsync(CancellationToken.None)).Wait(TimeSpan.FromSeconds(5));
-            }
-            finally
-            {
-                _flushLock.Release();
+                try
+                {
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
+                    // Task.Run offloads to the thread-pool, avoiding SynchronizationContext deadlocks.
+                    var flushTask = Task.Run(async () =>
+                    {
+                        try { await FlushMetricsAsync(cts.Token).ConfigureAwait(false); } catch { /* Best-effort */ }
+                        try { await FlushLogsAsync(cts.Token).ConfigureAwait(false); } catch { /* Best-effort */ }
+                    }, cts.Token);
+                    flushTask.Wait(4000);
+                }
+                catch { /* Dispose must not throw */ }
+                finally
+                {
+                    _flushLock.Release();
+                }
             }
             _flushLock.Dispose();
             _httpClient.Dispose();

@@ -174,11 +174,20 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
                 throw new InvalidOperationException("ObjectLockRetentionMode must be GOVERNANCE or COMPLIANCE");
             }
 
-            // Validate endpoint format
-            if (!_endpoint.Contains("wasabisys.com") && !_endpoint.Contains("localhost"))
+            // Validate endpoint format — use URI.Host to prevent bypass via "evil.com/wasabisys.com".
+            if (!string.IsNullOrEmpty(_endpoint))
             {
-                throw new InvalidOperationException(
-                    $"Invalid Wasabi endpoint '{_endpoint}'. Expected format: s3.{{region}}.wasabisys.com");
+                if (!Uri.TryCreate(_endpoint.Contains("://") ? _endpoint : "https://" + _endpoint, UriKind.Absolute, out var endpointUri))
+                    throw new InvalidOperationException($"Invalid Wasabi endpoint URI: '{_endpoint}'");
+
+                var host = endpointUri.Host;
+                if (!host.Equals("localhost", StringComparison.OrdinalIgnoreCase) &&
+                    !host.EndsWith(".wasabisys.com", StringComparison.OrdinalIgnoreCase) &&
+                    !host.Equals("wasabisys.com", StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException(
+                        $"Invalid Wasabi endpoint '{_endpoint}'. Expected format: s3.{{region}}.wasabisys.com");
+                }
             }
 
             // Create AWS S3 client configured for Wasabi
@@ -568,8 +577,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[WasabiStrategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
+                // P2-4140: Re-throw auth and network errors so callers see real failures instead
+                // of a misleading false (object-not-found) result for auth/connectivity problems.
+                if (ex is AmazonS3Exception s3ex &&
+                    (s3ex.StatusCode == System.Net.HttpStatusCode.Forbidden ||
+                     s3ex.StatusCode == System.Net.HttpStatusCode.Unauthorized))
+                    throw;
                 IncrementOperationCounter(StorageOperationType.Exists);
+
                 return false;
             }
         }

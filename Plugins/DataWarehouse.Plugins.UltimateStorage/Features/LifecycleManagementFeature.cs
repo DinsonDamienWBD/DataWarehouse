@@ -30,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         private readonly BoundedDictionary<string, LifecyclePolicy> _policies = new BoundedDictionary<string, LifecyclePolicy>(1000);
         private readonly BoundedDictionary<string, ObjectLifecycleState> _objectStates = new BoundedDictionary<string, ObjectLifecycleState>(1000);
         private readonly BoundedDictionary<string, LegalHold> _legalHolds = new BoundedDictionary<string, LegalHold>(1000);
-        private readonly List<LifecycleEvent> _auditTrail = new();
+        private readonly Queue<LifecycleEvent> _auditTrail = new();
         private readonly Timer _lifecycleTimer;
         private readonly object _auditLock = new();
         private bool _disposed;
@@ -45,6 +45,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         private long _totalDeletedObjects;
         private long _totalTransitions;
         private long _totalLegalHolds;
+        private long _totalDeletionFailures;
 
         /// <summary>
         /// Initializes a new instance of the LifecycleManagementFeature.
@@ -59,7 +60,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
             // Start background lifecycle evaluation
             _lifecycleTimer = new Timer(
-                callback: async _ => await EvaluateLifecyclePoliciesAsync(),
+                callback: async _ => { try { await EvaluateLifecyclePoliciesAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } },
                 state: null,
                 dueTime: _evaluationInterval,
                 period: _evaluationInterval);
@@ -79,6 +80,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         /// Gets the total number of tier transitions.
         /// </summary>
         public long TotalTransitions => Interlocked.Read(ref _totalTransitions);
+
+        /// <summary>
+        /// Gets the total number of deletion failures (observable via monitoring).
+        /// </summary>
+        public long TotalDeletionFailures => Interlocked.Read(ref _totalDeletionFailures);
 
         /// <summary>
         /// Gets or sets whether lifecycle management is enabled.
@@ -512,7 +518,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[LifecycleManagementFeature] Object deletion failed for {state.Key}: {ex.Message}");
+                Interlocked.Increment(ref _totalDeletionFailures);
+                System.Diagnostics.Debug.WriteLine($"[LifecycleManagementFeature] Object deletion failed for '{state.Key}' on backend '{state.BackendId}': {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -548,8 +555,17 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 // Write to target
                 await targetBackend.StoreAsync(state.Key, data, metadataDict, ct);
 
-                // Delete from source
-                await sourceBackend.DeleteAsync(state.Key, ct);
+                // Delete from source — if this fails, roll back the target write to avoid duplication
+                try
+                {
+                    await sourceBackend.DeleteAsync(state.Key, ct);
+                }
+                catch (Exception deleteEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[LifecycleManagementFeature] Source delete failed for {state.Key}, rolling back target write: {deleteEx.Message}");
+                    try { await targetBackend.DeleteAsync(state.Key, ct); } catch { /* best-effort rollback */ }
+                    throw new InvalidOperationException($"Transition aborted: source delete failed for '{state.Key}'", deleteEx);
+                }
 
                 // Update state
                 state.BackendId = targetBackend.StrategyId;
@@ -576,12 +592,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         {
             lock (_auditLock)
             {
-                _auditTrail.Add(lifecycleEvent);
+                _auditTrail.Enqueue(lifecycleEvent);
 
-                // Trim audit trail if it exceeds max size
-                if (_auditTrail.Count > _maxAuditTrailSize)
+                // Trim audit trail to max size using O(1) Dequeue instead of O(n) RemoveRange
+                while (_auditTrail.Count > _maxAuditTrailSize)
                 {
-                    _auditTrail.RemoveRange(0, _auditTrail.Count - _maxAuditTrailSize);
+                    _auditTrail.Dequeue();
                 }
             }
         }

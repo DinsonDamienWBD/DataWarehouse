@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.SecurityFrameworks
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("bsi_c5.check");
+            IncrementCounter("bsi_c5.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -71,9 +71,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.SecurityFrameworks
 
             recommendations.Add("Obtain BSI C5 Type 2 audit report for German cloud service compliance");
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -89,14 +90,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.SecurityFrameworks
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("bsi_c5.initialized");
+            IncrementCounter("bsi_c5.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("bsi_c5.shutdown");
+            IncrementCounter("bsi_c5.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

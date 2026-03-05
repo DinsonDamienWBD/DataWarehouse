@@ -429,7 +429,9 @@ public sealed class ChatCapabilityHandler : IDisposable
         if (!string.IsNullOrEmpty(request.ConversationId))
         {
             var conversation = _conversationManager.GetOrCreate(request.ConversationId);
-            conversation.AddUserMessage(messages.Last().Content ?? string.Empty);
+            // P2-3058: Guard against empty message list before calling .Last().
+            var lastUserContent = messages.Count > 0 ? messages.Last().Content ?? string.Empty : string.Empty;
+            conversation.AddUserMessage(lastUserContent);
             conversation.AddAssistantMessage(aiResponse.Content);
         }
 
@@ -603,7 +605,9 @@ public sealed class ChatCapabilityHandler : IDisposable
         if (!string.IsNullOrEmpty(request.ConversationId))
         {
             var conversation = _conversationManager.GetOrCreate(request.ConversationId);
-            conversation.AddUserMessage(messages.Last().Content ?? string.Empty);
+            // P2-3058: Guard against empty message list before calling .Last().
+            var lastUserContent = messages.Count > 0 ? messages.Last().Content ?? string.Empty : string.Empty;
+            conversation.AddUserMessage(lastUserContent);
             conversation.AddAssistantMessage(fullContent.ToString());
         }
     }
@@ -680,21 +684,22 @@ public sealed class ConversationManager : IDisposable
         var conversation = _conversations.GetOrAdd(conversationId, id => new Conversation(id));
         conversation.Touch();
 
-        // Enforce max conversations
-        while (_conversations.Count > _maxConversations)
+        // Enforce max conversations — evict LRU entry without full O(n) sort.
+        // Take one snapshot pass only when over capacity; stable approximation under concurrency.
+        if (_conversations.Count > _maxConversations)
         {
-            var oldest = _conversations
-                .OrderBy(kvp => kvp.Value.LastAccessedAt)
-                .FirstOrDefault();
-
-            if (!string.IsNullOrEmpty(oldest.Key))
+            string? oldestKey = null;
+            DateTimeOffset oldestTime = DateTimeOffset.MaxValue;
+            foreach (var kvp in _conversations)
             {
-                _conversations.TryRemove(oldest.Key, out _);
+                if (kvp.Value.LastAccessedAt < oldestTime)
+                {
+                    oldestTime = kvp.Value.LastAccessedAt;
+                    oldestKey = kvp.Key;
+                }
             }
-            else
-            {
-                break;
-            }
+            if (oldestKey != null)
+                _conversations.TryRemove(oldestKey, out _);
         }
 
         return conversation;
@@ -1074,8 +1079,9 @@ public sealed class StreamingHandler
             Temperature = 0.7f
         };
 
-        // SDK interface doesn't support streaming, so we simulate it
-        // In a real implementation, you'd use provider-specific streaming APIs
+        // SDK CompleteAsync does not expose a true streaming API; we return the full response as
+        // a single chunk. Callers requiring token-by-token streaming must use a provider-specific
+        // client that supports SSE/chunked transfer outside this abstraction layer.
         var response = await provider.CompleteAsync(request, ct);
 
         if (!response.Success)
@@ -1084,16 +1090,7 @@ public sealed class StreamingHandler
             yield break;
         }
 
-        // Simulate streaming by chunking the response
-        const int chunkSize = 20; // characters per chunk
-        var content = response.Content;
-
-        for (int i = 0; i < content.Length; i += chunkSize)
-        {
-            var chunk = content.Substring(i, Math.Min(chunkSize, content.Length - i));
-            yield return chunk;
-            await Task.Delay(10, ct); // Simulate network delay
-        }
+        yield return response.Content;
     }
 
     /// <summary>

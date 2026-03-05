@@ -419,7 +419,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("dynamic_reconfiguration.check");
+            IncrementCounter("dynamic_reconfiguration.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -475,9 +475,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
                 recommendations.Add($"{impactfulChanges.Count} pending changes have high compliance impact. Review carefully before applying.");
             }
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -621,9 +622,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
                 {
                     listener.OnLocationChange(notification);
                 }
-                catch
+                catch (OperationCanceledException)
+                {
+                    throw; // Propagate cancellation; do not swallow
+                }
+                catch (Exception ex)
                 {
                     // Log but don't fail on listener errors
+                    System.Diagnostics.Debug.WriteLine($"[Warning] Listener OnLocationChange failed: {ex.Message}");
                 }
             }
         }
@@ -636,14 +642,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("dynamic_reconfiguration.initialized");
+            IncrementCounter("dynamic_reconfiguration.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("dynamic_reconfiguration.shutdown");
+            IncrementCounter("dynamic_reconfiguration.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

@@ -110,6 +110,9 @@ public static class BulkLoader
         ArgumentNullException.ThrowIfNull(device);
         ArgumentNullException.ThrowIfNull(allocator);
 
+        // NOTE (P2-837): B-tree bulk loading requires full materialization because the leaf-level
+        // construction pass requires total entry count to calculate leaf-node packing. For very large
+        // datasets, callers should chunk the load or use incremental insertion instead.
         var materialized = new List<(byte[] Key, long Value)>();
         byte[]? previousKey = null;
 

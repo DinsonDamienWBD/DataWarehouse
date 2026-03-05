@@ -581,7 +581,9 @@ public sealed class GhgProtocolReportingStrategy : SustainabilityStrategyBase
             }
             catch
             {
+
                 // Measurement ingestion failure should not disrupt the bus
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             return Task.CompletedTask;
@@ -607,7 +609,9 @@ public sealed class GhgProtocolReportingStrategy : SustainabilityStrategyBase
             }
             catch
             {
+
                 // Non-critical
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             return Task.CompletedTask;

@@ -29,20 +29,18 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
         public override string Framework => "Multi-Framework";
 
         /// <inheritdoc/>
-        public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
+        public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
         {
-            base.InitializeAsync(configuration, cancellationToken);
+            await base.InitializeAsync(configuration, cancellationToken);
 
             // Load compliance rules from configuration
             if (configuration.TryGetValue("ComplianceRules", out var rulesObj) && rulesObj is List<ComplianceRule> rules)
             {
                 foreach (var rule in rules)
                 {
-                    if (!_rulesByFramework.ContainsKey(rule.Framework))
-                    {
-                        _rulesByFramework[rule.Framework] = new List<ComplianceRule>();
-                    }
-                    _rulesByFramework[rule.Framework].Add(rule);
+                    // AddOrUpdate is atomic; avoids TOCTOU between ContainsKey and indexer write
+                    var ruleList = _rulesByFramework.GetOrAdd(rule.Framework, _ => new List<ComplianceRule>());
+                    lock (ruleList) { ruleList.Add(rule); }
                 }
             }
 
@@ -54,7 +52,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
                     ? interval : 300; // Default 5 minutes
 
                 _continuousCheckTimer = new Timer(
-                    async _ => await RunContinuousChecksAsync(cancellationToken),
+                    async _ => { try { await RunContinuousChecksAsync(cancellationToken); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } },
                     null,
                     TimeSpan.FromSeconds(intervalSeconds),
                     TimeSpan.FromSeconds(intervalSeconds)
@@ -67,13 +65,12 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
                 LoadDefaultRules();
             }
 
-            return Task.CompletedTask;
         }
 
         /// <inheritdoc/>
         protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("automated_compliance_checking.check");
+            IncrementCounter("automated_compliance_checking.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
             var checkedFrameworks = new HashSet<string>();
@@ -120,9 +117,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
                 Timestamp = DateTime.UtcNow
             };
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return new ComplianceResult
@@ -350,15 +348,28 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("automated_compliance_checking.initialized");
+            IncrementCounter("automated_compliance_checking.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("automated_compliance_checking.shutdown");
+            IncrementCounter("automated_compliance_checking.shutdown");
+            _continuousCheckTimer?.Dispose();
+            _continuousCheckTimer = null;
         return base.ShutdownAsyncCore(cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _continuousCheckTimer?.Dispose();
+            _continuousCheckTimer = null;
+        }
+        base.Dispose(disposing);
     }
 }
 

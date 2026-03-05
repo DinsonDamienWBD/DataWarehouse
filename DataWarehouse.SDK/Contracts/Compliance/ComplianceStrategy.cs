@@ -262,7 +262,7 @@ namespace DataWarehouse.SDK.Contracts.Compliance
         /// <summary>
         /// Gets the timestamp when this violation was detected.
         /// </summary>
-        public DateTime DetectedAt { get; init; } = DateTime.UtcNow;
+        public DateTimeOffset DetectedAt { get; init; } = DateTimeOffset.UtcNow;
 
         /// <summary>
         /// Gets the deadline for remediation based on severity.
@@ -365,7 +365,7 @@ namespace DataWarehouse.SDK.Contracts.Compliance
         /// <summary>
         /// Gets the timestamp when this assessment was performed.
         /// </summary>
-        public DateTime AssessmentTime { get; init; } = DateTime.UtcNow;
+        public DateTimeOffset AssessmentTime { get; init; } = DateTimeOffset.UtcNow;
 
         /// <summary>
         /// Gets the next assessment due date.
@@ -769,15 +769,15 @@ namespace DataWarehouse.SDK.Contracts.Compliance
         {
             lock (_statsLock)
             {
-                var totalAssessments = Interlocked.Read(ref _totalAssessments);
+                var totalAssessments = _totalAssessments;
 
                 return new ComplianceStatistics
                 {
                     TotalAssessments = totalAssessments,
-                    CompliantCount = Interlocked.Read(ref _compliantCount),
-                    NonCompliantCount = Interlocked.Read(ref _nonCompliantCount),
-                    TotalViolations = Interlocked.Read(ref _totalViolations),
-                    ErrorCount = Interlocked.Read(ref _errorCount),
+                    CompliantCount = _compliantCount,
+                    NonCompliantCount = _nonCompliantCount,
+                    TotalViolations = _totalViolations,
+                    ErrorCount = _errorCount,
                     AverageAssessmentTimeMs = totalAssessments > 0 ? _totalAssessmentTimeMs / totalAssessments : 0,
                     AverageComplianceScore = totalAssessments > 0 ? _totalComplianceScore / totalAssessments : 0,
                     AssessmentsByFramework = new Dictionary<ComplianceFramework, long>(_assessmentsByFramework),
@@ -793,11 +793,11 @@ namespace DataWarehouse.SDK.Contracts.Compliance
         {
             lock (_statsLock)
             {
-                Interlocked.Exchange(ref _totalAssessments, 0);
-                Interlocked.Exchange(ref _compliantCount, 0);
-                Interlocked.Exchange(ref _nonCompliantCount, 0);
-                Interlocked.Exchange(ref _totalViolations, 0);
-                Interlocked.Exchange(ref _errorCount, 0);
+                _totalAssessments = 0;
+                _compliantCount = 0;
+                _nonCompliantCount = 0;
+                _totalViolations = 0;
+                _errorCount = 0;
                 _totalAssessmentTimeMs = 0;
                 _totalComplianceScore = 0;
                 _lastUpdateTime = DateTime.UtcNow;
@@ -945,24 +945,24 @@ namespace DataWarehouse.SDK.Contracts.Compliance
         {
             lock (_statsLock)
             {
-                Interlocked.Increment(ref _totalAssessments);
+                _totalAssessments++;
                 _totalAssessmentTimeMs += assessmentTimeMs;
                 _totalComplianceScore += result.ComplianceScore;
                 _lastUpdateTime = DateTime.UtcNow;
 
                 if (result.IsCompliant)
                 {
-                    Interlocked.Increment(ref _compliantCount);
+                    _compliantCount++;
                 }
                 else
                 {
-                    Interlocked.Increment(ref _nonCompliantCount);
+                    _nonCompliantCount++;
                 }
 
                 _assessmentsByFramework[framework]++;
 
                 // Update violation counters
-                Interlocked.Add(ref _totalViolations, result.Violations.Count);
+                _totalViolations += result.Violations.Count;
                 foreach (var violation in result.Violations)
                 {
                     _violationsBySeverity[violation.Severity]++;
@@ -975,7 +975,10 @@ namespace DataWarehouse.SDK.Contracts.Compliance
         /// </summary>
         private void IncrementErrorCount()
         {
-            Interlocked.Increment(ref _errorCount);
+            lock (_statsLock)
+            {
+                _errorCount++;
+            }
         }
     }
 }

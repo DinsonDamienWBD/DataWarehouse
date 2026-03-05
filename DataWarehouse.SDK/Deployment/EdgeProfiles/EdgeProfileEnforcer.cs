@@ -149,14 +149,11 @@ public sealed class EdgeProfileEnforcer
         {
             // Use existing Phase 32 KernelInfrastructure for plugin management
             // This is a placeholder -- actual implementation would call KernelInfrastructure.DisablePluginsExcept
-            _logger.LogInformation(
-                "Plugin filtering enabled. Allowed plugins: {AllowedPlugins}. " +
-                "In production, this would call KernelInfrastructure.DisablePluginsExcept.",
+            _logger.LogWarning(
+                "Plugin filtering requested for edge profile with allowed plugins: {AllowedPlugins}. " +
+                "Plugin filtering requires KernelInfrastructure integration. " +
+                "All plugins will load until kernel integration is configured.",
                 string.Join(", ", allowedPlugins));
-
-            // Actual call (when KernelInfrastructure is available):
-            // var kernel = GetKernelInstance(); // Via DI or static accessor
-            // kernel.DisablePluginsExcept(allowedPlugins);
         }
         catch (Exception ex)
         {
@@ -166,69 +163,33 @@ public sealed class EdgeProfileEnforcer
 
     private void ConfigureFlashOptimization()
     {
-        _logger.LogInformation(
-            "Flash storage optimization enabled. Configuring: " +
-            "- Larger block cache (reduce small writes) " +
-            "- WAL sync mode = Periodic (every 5s, not every write) " +
-            "- Direct I/O (bypass OS page cache)");
-
-        // In production, this would configure the VDE storage layer:
-        // - VDE block cache: 32MB instead of 8MB (fewer flushes)
-        // - WAL sync mode: Periodic (every 5s) instead of FSync (every write)
-        // - I/O mode: O_DIRECT on Linux (bypass OS page cache, reduce double-buffering)
-
-        _logger.LogDebug(
-            "Flash optimization reduces write amplification by 50%+, extending SD card/eMMC lifespan.");
+        _logger.LogWarning(
+            "Flash storage optimization requested but VDE storage layer integration not configured. " +
+            "Recommended settings: block cache=32MB, WAL sync=Periodic(5s), I/O=O_DIRECT. " +
+            "Configure via VDE StorageConfiguration to reduce write amplification on flash devices.");
     }
 
     private void ConfigureOfflineResilience()
     {
-        _logger.LogInformation(
-            "Offline resilience enabled. Configuring: " +
-            "- Local buffer size: 100MB " +
-            "- Retry interval: 30s " +
-            "- Offline mode threshold: 3 consecutive network failures");
-
-        // In production, this would configure the network layer:
-        // - Local write buffer: 100MB (buffer writes when network down)
-        // - Retry policy: Exponential backoff with 30s initial interval
-        // - Offline detection: 3 consecutive failures -> enter offline mode
-
-        _logger.LogDebug(
-            "Offline resilience prevents data loss during network interruptions (common for edge/WiFi).");
+        _logger.LogWarning(
+            "Offline resilience requested but network layer integration not configured. " +
+            "Recommended settings: buffer=100MB, retry=30s exponential backoff, offline threshold=3 failures. " +
+            "Edge devices may lose writes during network interruptions until configured.");
     }
 
     private void ConfigureConnectionLimit(int maxConnections)
     {
-        _logger.LogInformation(
-            "Connection limit configured: {MaxConnections} concurrent connections. " +
-            "In production, this would use SemaphoreSlim to cap network listeners.",
+        _logger.LogWarning(
+            "Connection limit of {MaxConnections} requested but network listener integration not configured. " +
+            "Connection limits will not be enforced until SemaphoreSlim guards are wired to network listeners.",
             maxConnections);
-
-        // In production, this would apply to all network listeners:
-        // - REST API server
-        // - Cluster communication
-        // - Client connections
-        // Using SemaphoreSlim(maxConnections, maxConnections) to enforce
-
-        _logger.LogDebug("Connection limits prevent resource exhaustion on constrained edge devices.");
     }
 
     private void ConfigureBandwidthThrottle(long bytesPerSec)
     {
-        _logger.LogInformation(
-            "Bandwidth throttling configured: {BandwidthMBps} MB/s ceiling. " +
-            "Using token bucket algorithm for smooth throttling.",
+        _logger.LogWarning(
+            "Bandwidth throttle of {BandwidthMBps} MB/s requested but token bucket integration not configured. " +
+            "Outbound traffic will not be rate-limited. Cellular/WiFi links may be saturated.",
             bytesPerSec / 1024 / 1024);
-
-        // In production, this would implement token bucket algorithm:
-        // - Bucket capacity: bytesPerSec
-        // - Refill rate: bytesPerSec per second
-        // - Apply to all outbound network traffic
-        // - Smooth throttling (no hard cutoffs, gradual slowdown)
-
-        _logger.LogDebug(
-            "Bandwidth throttling prevents saturating limited connections (WiFi, cellular). " +
-            "Token bucket algorithm provides smooth rate limiting without hard cutoffs.");
     }
 }

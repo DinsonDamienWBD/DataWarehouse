@@ -105,23 +105,23 @@ public sealed class LevelDbStorageStrategy : DatabaseStorageStrategyBase
             ModifiedAt = now
         };
 
-        // Check if exists to preserve created timestamp
-        var existingMetadataBytes = _db!.Get(Encoding.UTF8.GetBytes($"meta:{key}"));
-        if (existingMetadataBytes != null)
-        {
-            var existingMetadata = JsonSerializer.Deserialize<MetadataDocument>(existingMetadataBytes, JsonOptions);
-            if (existingMetadata != null)
-            {
-                metadataDoc.CreatedAt = existingMetadata.CreatedAt;
-            }
-        }
-
-        var metadataJson = JsonSerializer.SerializeToUtf8Bytes(metadataDoc, JsonOptions);
         var dataKey = Encoding.UTF8.GetBytes($"data:{key}");
         var metaKey = Encoding.UTF8.GetBytes($"meta:{key}");
 
         lock (_lock)
         {
+            // Read existing metadata inside the lock to avoid TOCTOU with concurrent stores.
+            var existingMetadataBytes = _db!.Get(metaKey);
+            if (existingMetadataBytes != null)
+            {
+                var existingMetadata = JsonSerializer.Deserialize<MetadataDocument>(existingMetadataBytes, JsonOptions);
+                if (existingMetadata != null)
+                {
+                    metadataDoc.CreatedAt = existingMetadata.CreatedAt;
+                }
+            }
+
+            var metadataJson = JsonSerializer.SerializeToUtf8Bytes(metadataDoc, JsonOptions);
             using var batch = new WriteBatch();
             batch.Put(dataKey, data);
             batch.Put(metaKey, metadataJson);
@@ -210,12 +210,17 @@ public sealed class LevelDbStorageStrategy : DatabaseStorageStrategyBase
 
             var key = currentKey.Substring(5); // Remove "meta:" prefix
 
+            // P2-2812: When a prefix filter is set, break as soon as the iterator has
+            // advanced past keys that could match the prefix. LevelDB stores keys in sorted
+            // order, so once a key is lexicographically greater than the prefix's successor
+            // (prefix + '\xFF') there can be no more matches.
             if (!string.IsNullOrEmpty(prefix) && !key.StartsWith(prefix, StringComparison.Ordinal))
             {
-                if (string.Compare(key, prefix, StringComparison.Ordinal) > 0 && !key.StartsWith(prefix, StringComparison.Ordinal))
-                {
+                // If key is already past the prefix range, stop iterating.
+                if (string.Compare(key, prefix, StringComparison.Ordinal) > 0)
                     break;
-                }
+
+                // Key is before the prefix range; skip forward.
                 iterator.Next();
                 continue;
             }

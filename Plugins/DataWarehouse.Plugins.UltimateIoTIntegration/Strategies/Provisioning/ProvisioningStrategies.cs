@@ -1,5 +1,6 @@
 using System;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Utilities;
@@ -120,15 +121,26 @@ public class X509ProvisioningStrategy : ProvisioningStrategyBase
     {
         var deviceId = string.IsNullOrEmpty(request.DeviceId) ? Guid.NewGuid().ToString() : request.DeviceId;
 
-        // Generate self-signed certificate (simulated)
-        var certificate = $"-----BEGIN CERTIFICATE-----\nMIIB...{Convert.ToBase64String(Guid.NewGuid().ToByteArray())}...\n-----END CERTIFICATE-----";
+        // Generate real self-signed X.509 certificate
+        using var rsa = RSA.Create(2048);
+        var subjectName = new X500DistinguishedName($"CN={deviceId},O=DataWarehouse IoT,OU=Provisioning");
+        var certRequest = new CertificateRequest(subjectName, rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        certRequest.CertificateExtensions.Add(
+            new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature | X509KeyUsageFlags.KeyEncipherment, critical: true));
+        certRequest.CertificateExtensions.Add(
+            new X509BasicConstraintsExtension(certificateAuthority: false, hasPathLengthConstraint: false, pathLengthConstraint: 0, critical: true));
+
+        var notBefore = DateTimeOffset.UtcNow;
+        var notAfter = DateTimeOffset.UtcNow.AddYears(2);
+        using var cert = certRequest.CreateSelfSigned(notBefore, notAfter);
+        var certificatePem = cert.ExportCertificatePem();
 
         Credentials[deviceId] = new DeviceCredentials
         {
             DeviceId = deviceId,
             Type = CredentialType.X509Certificate,
-            Certificate = certificate,
-            ExpiresAt = DateTimeOffset.UtcNow.AddYears(2)
+            Certificate = certificatePem,
+            ExpiresAt = notAfter
         };
 
         return Task.FromResult(new ProvisioningResult
@@ -143,16 +155,28 @@ public class X509ProvisioningStrategy : ProvisioningStrategyBase
 
     public override Task<DeviceCredentials> GenerateCredentialsAsync(string deviceId, CredentialType credentialType, CancellationToken ct = default)
     {
-        var certificate = $"-----BEGIN CERTIFICATE-----\nMIIB...{Convert.ToBase64String(Guid.NewGuid().ToByteArray())}...\n-----END CERTIFICATE-----";
-        var privateKey = $"-----BEGIN PRIVATE KEY-----\nMIIE...{Convert.ToBase64String(Guid.NewGuid().ToByteArray())}...\n-----END PRIVATE KEY-----";
+        // Generate real self-signed X.509 certificate with exportable private key
+        using var rsa = RSA.Create(2048);
+        var subjectName = new X500DistinguishedName($"CN={deviceId},O=DataWarehouse IoT,OU=Provisioning");
+        var certRequest = new CertificateRequest(subjectName, rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        certRequest.CertificateExtensions.Add(
+            new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature | X509KeyUsageFlags.KeyEncipherment, critical: true));
+        certRequest.CertificateExtensions.Add(
+            new X509BasicConstraintsExtension(certificateAuthority: false, hasPathLengthConstraint: false, pathLengthConstraint: 0, critical: true));
+
+        var notBefore = DateTimeOffset.UtcNow;
+        var notAfter = DateTimeOffset.UtcNow.AddYears(2);
+        using var cert = certRequest.CreateSelfSigned(notBefore, notAfter);
+        var certificatePem = cert.ExportCertificatePem();
+        var privateKeyPem = rsa.ExportRSAPrivateKeyPem();
 
         var credentials = new DeviceCredentials
         {
             DeviceId = deviceId,
             Type = CredentialType.X509Certificate,
-            Certificate = certificate,
-            PrivateKey = privateKey,
-            ExpiresAt = DateTimeOffset.UtcNow.AddYears(2)
+            Certificate = certificatePem,
+            PrivateKey = privateKeyPem,
+            ExpiresAt = notAfter
         };
 
         Credentials[deviceId] = credentials;

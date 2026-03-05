@@ -326,7 +326,8 @@ public sealed class DataExpirationStrategy : LifecycleStrategyBase
     private readonly BoundedDictionary<string, ExpirationPolicy> _policies = new BoundedDictionary<string, ExpirationPolicy>(1000);
     private readonly BoundedDictionary<string, ExpirationTracker> _trackers = new BoundedDictionary<string, ExpirationTracker>(1000);
     private readonly ConcurrentQueue<ExpirationEvent> _eventQueue = new();
-    private readonly List<Action<ExpirationEvent>> _eventHandlers = new();
+    // ImmutableList-style copy-on-write: readers get a snapshot, writers replace the array reference.
+    private volatile Action<ExpirationEvent>[] _eventHandlers = [];
     private readonly SemaphoreSlim _processLock = new(1, 1);
     private CancellationTokenSource? _processorCts;
     private Task? _processorTask;
@@ -408,9 +409,11 @@ public sealed class DataExpirationStrategy : LifecycleStrategyBase
             {
                 await _processorTask;
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException ex)
             {
+
                 // Expected
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -756,7 +759,13 @@ public sealed class DataExpirationStrategy : LifecycleStrategyBase
     public void SubscribeToEvents(Action<ExpirationEvent> handler)
     {
         ArgumentNullException.ThrowIfNull(handler);
-        _eventHandlers.Add(handler);
+        // Copy-on-write: atomically append handler to the snapshot so readers never see partial state.
+        Action<ExpirationEvent>[] current, updated;
+        do
+        {
+            current = _eventHandlers;
+            updated = [..current, handler];
+        } while (!ReferenceEquals(Interlocked.CompareExchange(ref _eventHandlers!, updated, current), current));
     }
 
     /// <summary>
@@ -831,9 +840,16 @@ public sealed class DataExpirationStrategy : LifecycleStrategyBase
                         {
                             handler(evt);
                         }
-                        catch
+                        catch (OperationCanceledException)
                         {
-                            // Log and continue
+                            throw;
+                        }
+                        catch (Exception handlerEx)
+                        {
+                            // Log handler failure and continue so one bad handler cannot
+                            // prevent remaining handlers from receiving the event.
+                            System.Diagnostics.Debug.WriteLine(
+                                $"[DataExpirationStrategy] Event handler error: {handlerEx.GetType().Name}: {handlerEx.Message}");
                         }
                     }
                 }
@@ -842,9 +858,12 @@ public sealed class DataExpirationStrategy : LifecycleStrategyBase
             {
                 break;
             }
-            catch
+            catch (Exception ex)
             {
-                // Log and continue
+                // Log the exception details so failures are visible. Continue looping so
+                // transient errors do not permanently halt expiration processing.
+                System.Diagnostics.Debug.WriteLine(
+                    $"[DataExpirationStrategy] Background processor error: {ex.GetType().Name}: {ex.Message}");
             }
         }
     }
@@ -993,12 +1012,14 @@ public sealed class DataExpirationStrategy : LifecycleStrategyBase
         }
         catch (Exception ex)
         {
+            // P2-2442: Success=false distinguishes this from a successful expiration.
+            // ErrorMessage includes exception type so callers can diagnose.
             return new ExpirationResult
             {
                 ObjectId = tracker.ObjectId,
-                ActionTaken = ExpirationEventType.Expired,
+                ActionTaken = ExpirationEventType.Expired, // Indicates expiration was attempted but action failed
                 Success = false,
-                ErrorMessage = ex.Message
+                ErrorMessage = $"[{ex.GetType().Name}] {ex.Message}"
             };
         }
     }

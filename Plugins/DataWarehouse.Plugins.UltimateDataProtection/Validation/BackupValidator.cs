@@ -193,37 +193,103 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Validation
             };
         }
 
-        private Task<ValidationResult> VerifyChecksumsAsync(string strategyId, string backupId, CancellationToken ct)
+        private async Task<ValidationResult> VerifyChecksumsAsync(string strategyId, string backupId, CancellationToken ct)
         {
-            // Simulated checksum verification
-            return Task.FromResult(new ValidationResult
+            var strategy = _registry.GetRequiredStrategy(strategyId);
+            var backupInfo = await strategy.GetBackupInfoAsync(backupId, ct);
+            if (backupInfo == null)
             {
-                IsValid = true,
-                ChecksPerformed = new[] { "SHA256", "BlockChecksum" }
-            });
+                return new ValidationResult
+                {
+                    IsValid = false,
+                    Errors = new[] { new ValidationIssue { Severity = ValidationSeverity.Error, Code = "BACKUP_NOT_FOUND", Message = $"Backup '{backupId}' not found in catalog" } },
+                    ChecksPerformed = new[] { "SHA256" }
+                };
+            }
+            // Delegate checksum verification to the strategy's built-in validate
+            var result = await strategy.ValidateBackupAsync(backupId, ct);
+            return new ValidationResult
+            {
+                IsValid = result.IsValid,
+                Errors = result.Errors,
+                Warnings = result.Warnings,
+                ChecksPerformed = result.ChecksPerformed.Count > 0 ? result.ChecksPerformed : new[] { "SHA256", "BlockChecksum" }
+            };
         }
 
-        private Task<ValidationResult> PerformTestRestoreAsync(string strategyId, string backupId, string? testPath, CancellationToken ct)
+        private async Task<ValidationResult> PerformTestRestoreAsync(string strategyId, string backupId, string? testPath, CancellationToken ct)
         {
-            // Simulated test restore
-            return Task.FromResult(new ValidationResult
+            var warnings = new List<ValidationIssue>();
+            if (testPath == null)
             {
-                IsValid = true,
-                ChecksPerformed = new[] { "DryRunRestore" },
-                Warnings = testPath == null
-                    ? new[] { new ValidationIssue { Severity = ValidationSeverity.Warning, Code = "NO_TEST_PATH", Message = "No test path specified, limited validation performed" } }
-                    : Array.Empty<ValidationIssue>()
-            });
+                warnings.Add(new ValidationIssue { Severity = ValidationSeverity.Warning, Code = "NO_TEST_PATH", Message = "No test path specified; restore validation skipped" });
+                return new ValidationResult
+                {
+                    IsValid = true,
+                    Warnings = warnings,
+                    ChecksPerformed = new[] { "DryRunRestore" }
+                };
+            }
+            // Perform a real test restore via strategy
+            var strategy = _registry.GetRequiredStrategy(strategyId);
+            var restoreRequest = new RestoreRequest
+            {
+                BackupId = backupId,
+                TargetPath = testPath
+            };
+            var restoreResult = await strategy.RestoreAsync(restoreRequest, ct);
+            return new ValidationResult
+            {
+                IsValid = restoreResult.Success,
+                Errors = restoreResult.Success ? Array.Empty<ValidationIssue>() : new[] { new ValidationIssue { Severity = ValidationSeverity.Error, Code = "RESTORE_FAILED", Message = restoreResult.ErrorMessage ?? "Test restore failed" } },
+                Warnings = warnings,
+                ChecksPerformed = new[] { "DryRunRestore" }
+            };
         }
 
-        private Task<ValidationResult> VerifyChainIntegrityAsync(string strategyId, string backupId, CancellationToken ct)
+        private async Task<ValidationResult> VerifyChainIntegrityAsync(string strategyId, string backupId, CancellationToken ct)
         {
-            // Simulated chain verification
-            return Task.FromResult(new ValidationResult
+            var strategy = _registry.GetRequiredStrategy(strategyId);
+            var backupInfo = await strategy.GetBackupInfoAsync(backupId, ct);
+            if (backupInfo == null)
             {
-                IsValid = true,
-                ChecksPerformed = new[] { "ChainSequence", "ParentLink" }
-            });
+                return new ValidationResult
+                {
+                    IsValid = false,
+                    Errors = new[] { new ValidationIssue { Severity = ValidationSeverity.Error, Code = "BACKUP_NOT_FOUND", Message = $"Backup '{backupId}' not found in catalog" } },
+                    ChecksPerformed = new[] { "ChainSequence" }
+                };
+            }
+
+            var errors = new List<ValidationIssue>();
+            var checksPerformed = new List<string> { "ChainSequence", "ParentLink" };
+
+            // Walk the chain and verify each parent exists and is valid
+            var currentId = backupInfo.ParentBackupId;
+            var depth = 0;
+            while (!string.IsNullOrEmpty(currentId) && depth < 1000)
+            {
+                ct.ThrowIfCancellationRequested();
+                var parentInfo = await strategy.GetBackupInfoAsync(currentId, ct);
+                if (parentInfo == null)
+                {
+                    errors.Add(new ValidationIssue { Severity = ValidationSeverity.Error, Code = "CHAIN_BROKEN", Message = $"Chain broken: parent backup '{currentId}' not found" });
+                    break;
+                }
+                if (parentInfo.IsValid == false)
+                {
+                    errors.Add(new ValidationIssue { Severity = ValidationSeverity.Error, Code = "PARENT_INVALID", Message = $"Parent backup '{currentId}' is marked invalid" });
+                }
+                currentId = parentInfo.ParentBackupId;
+                depth++;
+            }
+
+            return new ValidationResult
+            {
+                IsValid = errors.Count == 0,
+                Errors = errors,
+                ChecksPerformed = checksPerformed
+            };
         }
 
         private static TimeSpan EstimateRecoveryTime(BackupCatalogEntry backup)

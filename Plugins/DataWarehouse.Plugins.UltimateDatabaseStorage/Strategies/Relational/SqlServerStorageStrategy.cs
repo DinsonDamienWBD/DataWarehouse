@@ -50,7 +50,9 @@ public sealed class SqlServerStorageStrategy : DatabaseStorageStrategyBase
     protected override async Task InitializeCoreAsync(CancellationToken ct)
     {
         _tableName = GetConfiguration("TableName", "DataWarehouseStorage");
+        ValidateSqlIdentifier(_tableName, nameof(_tableName));
         _schemaName = GetConfiguration("SchemaName", "dbo");
+        ValidateSqlIdentifier(_schemaName, nameof(_schemaName));
         _maxPoolSize = GetConfiguration("MaxPoolSize", 100);
         _minPoolSize = GetConfiguration("MinPoolSize", 5);
 
@@ -378,17 +380,12 @@ public sealed class SqlServerStorageStrategy : DatabaseStorageStrategyBase
             _transaction = transaction;
         }
 
+        // P2-2836: Use async commit/rollback variants to avoid blocking thread pool threads.
         public Task CommitAsync(CancellationToken ct = default)
-        {
-            _transaction.Commit();
-            return Task.CompletedTask;
-        }
+            => _transaction.CommitAsync(ct);
 
         public Task RollbackAsync(CancellationToken ct = default)
-        {
-            _transaction.Rollback();
-            return Task.CompletedTask;
-        }
+            => _transaction.RollbackAsync(ct);
 
         public ValueTask DisposeAsync()
         {

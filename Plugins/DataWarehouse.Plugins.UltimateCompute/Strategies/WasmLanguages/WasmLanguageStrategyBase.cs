@@ -105,6 +105,9 @@ internal abstract class WasmLanguageStrategyBase : ComputeRuntimeStrategyBase
                 args.Append("run --wasi ");
 
                 var maxMem = GetMaxMemoryBytes(task, 256 * 1024 * 1024);
+                // NOTE: wasmtime ≥ v14 uses --wasm-memory-reservation; older versions use --max-memory.
+                // If this flag is silently ignored (wasmtime exits 0 despite unknown flag), memory
+                // limits will not be enforced. Verify your installed wasmtime version matches this flag.
                 args.Append($"--max-memory {maxMem} ");
 
                 if (task.ResourceLimits?.AllowFileSystemAccess == true &&
@@ -144,16 +147,81 @@ internal abstract class WasmLanguageStrategyBase : ComputeRuntimeStrategyBase
     }
 
     /// <summary>
-    /// Verifies the WASM language pipeline by creating a compute task with the sample WASM bytes,
-    /// executing it via wasmtime, and comparing the actual output against the expected output.
+    /// Verifies the WASM language pipeline by creating a compute task with the pre-compiled sample WASM bytes,
+    /// executing them via wasmtime, and comparing the actual output against the expected output.
     /// </summary>
+    /// <remarks>
+    /// Cat 15 (finding 1747): This verifies that wasmtime can execute pre-compiled WASM artifacts produced
+    /// by the language toolchain. ToolchainAvailable=true means "wasmtime executed the sample successfully".
+    /// It does NOT verify that the upstream compiler (Javy, TeaVM, CPython, etc.) is installed.
+    /// Compile-time toolchain presence is a build/deploy concern, not a runtime execution concern.
+    /// Override <see cref="VerifyLanguageAsync"/> in a subclass to add compiler presence checks if needed.
+    /// </remarks>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>
-    /// A <see cref="WasmLanguageVerificationResult"/> indicating whether the toolchain is available,
-    /// compilation was successful (sample bytes are valid WASM), and execution produced the expected output.
+    /// A <see cref="WasmLanguageVerificationResult"/> indicating whether wasmtime is available (ToolchainAvailable),
+    /// the sample bytes are valid WASM (CompilationSuccessful), and execution produced expected output.
     /// </returns>
+    /// <summary>
+    /// Returns the names of upstream compiler/toolchain binaries required for this language (e.g., "javy", "teavm", "python3").
+    /// Override in subclasses to verify that the language-specific toolchain (not just wasmtime) is present.
+    /// Returns an empty array by default (wasmtime-only check suffices for Tier 1 languages compiled ahead-of-time).
+    /// </summary>
+    protected virtual string[] GetToolchainBinaryNames() => Array.Empty<string>();
+
+    /// <summary>
+    /// Checks whether all toolchain binaries returned by <see cref="GetToolchainBinaryNames"/> are accessible on PATH.
+    /// Returns the first missing binary name, or null if all are present.
+    /// </summary>
+    protected string? FindMissingToolchain()
+    {
+        foreach (var binary in GetToolchainBinaryNames())
+        {
+            try
+            {
+                // Use 'where' on Windows, 'which' on Unix
+                var check = System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
+                    System.Runtime.InteropServices.OSPlatform.Windows)
+                    ? "where" : "which";
+                using var proc = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(check, binary)
+                {
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                });
+                proc?.WaitForExit(3000);
+                if (proc?.ExitCode != 0)
+                    return binary;
+            }
+            catch
+            {
+                return binary; // Cannot run 'which'/'where' — assume missing
+            }
+        }
+        return null; // all present
+    }
+
     public async Task<WasmLanguageVerificationResult> VerifyLanguageAsync(CancellationToken cancellationToken = default)
     {
+        // Cat 15 (finding 2918): check language-specific toolchain first, before testing wasmtime execution.
+        var missingToolchain = FindMissingToolchain();
+        if (missingToolchain != null)
+        {
+            return new WasmLanguageVerificationResult(
+                Language: LanguageInfo.Language,
+                ToolchainAvailable: false,
+                CompilationSuccessful: false,
+                ExecutionSuccessful: false,
+                ActualOutput: null,
+                ExpectedOutput: ExpectedSampleOutput,
+                ExecutionTime: null,
+                BinarySizeBytes: 0,
+                ErrorMessage: $"Language toolchain '{missingToolchain}' not found on PATH. " +
+                    $"Install {string.Join(", ", GetToolchainBinaryNames())} to enable {LanguageInfo.Language} WASM compilation."
+            );
+        }
+
         var sampleBytes = GetSampleWasmBytes().ToArray();
 
         // Validate WASM magic number
@@ -199,10 +267,12 @@ internal abstract class WasmLanguageStrategyBase : ComputeRuntimeStrategyBase
         }
         catch (Exception ex)
         {
+            // P2-1757: CompilationSuccessful must be false when an exception occurred —
+            // wasmtime unavailable or compilation failure is not a successful compilation.
             return new WasmLanguageVerificationResult(
                 Language: LanguageInfo.Language,
                 ToolchainAvailable: false,
-                CompilationSuccessful: true,
+                CompilationSuccessful: false,
                 ExecutionSuccessful: false,
                 ActualOutput: null,
                 ExpectedOutput: ExpectedSampleOutput,

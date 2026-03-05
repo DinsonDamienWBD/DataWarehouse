@@ -454,7 +454,7 @@ public sealed class AlexLearnedIndex : IAdaptiveIndex, IAsyncDisposable
 
         if (rate < DeactivationThreshold)
         {
-            _consecutiveLowHitWindows++;
+            Interlocked.Increment(ref _consecutiveLowHitWindows);
             if (_consecutiveLowHitWindows >= DeactivationWindowCount)
             {
                 // ALEX is not beneficial; deactivate and recommend Level 3
@@ -463,7 +463,7 @@ public sealed class AlexLearnedIndex : IAdaptiveIndex, IAsyncDisposable
         }
         else
         {
-            _consecutiveLowHitWindows = 0;
+            Interlocked.Exchange(ref _consecutiveLowHitWindows, 0);
         }
 
         if (rate < RetrainThreshold && IsActive)
@@ -495,7 +495,7 @@ public sealed class AlexLearnedIndex : IAdaptiveIndex, IAsyncDisposable
         Interlocked.Exchange(ref _hitCount, 0);
         Interlocked.Exchange(ref _missCount, 0);
         Interlocked.Exchange(ref _operationsSinceLastCheck, 0);
-        _consecutiveLowHitWindows = 0;
+        Interlocked.Exchange(ref _consecutiveLowHitWindows, 0);
     }
 
     /// <inheritdoc />

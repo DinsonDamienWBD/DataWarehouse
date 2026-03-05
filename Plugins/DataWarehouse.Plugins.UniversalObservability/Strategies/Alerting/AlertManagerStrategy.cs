@@ -50,7 +50,7 @@ public sealed class AlertManagerStrategy : ObservabilityStrategyBase
 
         var json = JsonSerializer.Serialize(alertData);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{_url}/api/v2/alerts", content, ct);
+        using var response = await _httpClient.PostAsync($"{_url}/api/v2/alerts", content, ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -66,7 +66,8 @@ public sealed class AlertManagerStrategy : ObservabilityStrategyBase
         if (inhibited.HasValue) query.Add($"inhibited={inhibited.Value.ToString().ToLowerInvariant()}");
 
         var queryString = query.Count > 0 ? "?" + string.Join("&", query) : "";
-        var response = await _httpClient.GetAsync($"{_url}/api/v2/alerts{queryString}", ct);
+        using var response = await _httpClient.GetAsync($"{_url}/api/v2/alerts{queryString}", ct);
+ response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(ct);
     }
 
@@ -87,7 +88,7 @@ public sealed class AlertManagerStrategy : ObservabilityStrategyBase
 
         var json = JsonSerializer.Serialize(silence);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{_url}/api/v2/silences", content, ct);
+        using var response = await _httpClient.PostAsync($"{_url}/api/v2/silences", content, ct);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(ct);
     }
@@ -97,7 +98,8 @@ public sealed class AlertManagerStrategy : ObservabilityStrategyBase
     /// </summary>
     public async Task<string> GetStatusAsync(CancellationToken ct = default)
     {
-        var response = await _httpClient.GetAsync($"{_url}/api/v2/status", ct);
+        using var response = await _httpClient.GetAsync($"{_url}/api/v2/status", ct);
+ response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(ct);
     }
 
@@ -126,7 +128,7 @@ public sealed class AlertManagerStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{_url}/-/healthy", ct);
+            using var response = await _httpClient.GetAsync($"{_url}/-/healthy", ct);
             return new HealthCheckResult(response.IsSuccessStatusCode,
                 response.IsSuccessStatusCode ? "AlertManager is healthy" : "AlertManager unhealthy",
                 new Dictionary<string, object> { ["url"] = _url });
@@ -146,17 +148,11 @@ public sealed class AlertManagerStrategy : ObservabilityStrategyBase
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("alert_manager.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     protected override void Dispose(bool disposing) { if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }

@@ -90,7 +90,8 @@ internal sealed class DashStreamingStrategy : MediaStrategyBase
             {
                 var segmentDir = Path.GetTempPath();
 
-                var isAccessible = Directory.Exists(segmentDir) || true;
+                // Removed spurious `|| true` that made the health check always pass (finding 1069).
+                var isAccessible = Directory.Exists(segmentDir);
 
                 if (!isAccessible)
                 {
@@ -124,9 +125,8 @@ internal sealed class DashStreamingStrategy : MediaStrategyBase
     /// </summary>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        // Cancel active segment generation
-        // Flush MPD manifest
-        // Clean up temporary segment files
+        // Cat 15 (finding 1089): DashStreamingStrategy is stateless — no per-instance buffers, segments,
+        // or manifests require cleanup here. Each Transcode call is self-contained and releases its own streams.
         return Task.CompletedTask;
     }
 
@@ -361,9 +361,10 @@ internal sealed class DashStreamingStrategy : MediaStrategyBase
     private static string BuildFfmpegArguments(
         Resolution resolution, int bitrateKbps, TranscodeOptions options)
     {
-        var codec = options.VideoCodec ?? "libx264";
+        // LOW-1091: Sanitize codec names before interpolation to prevent FFmpeg argument injection.
+        var codec = SanitizeCodecName(options.VideoCodec ?? "libx264");
         var frameRate = options.FrameRate ?? 30.0;
-        var audioCodec = options.AudioCodec ?? "aac";
+        var audioCodec = SanitizeCodecName(options.AudioCodec ?? "aac");
 
         return $"-i pipe:0 -c:v {codec} -b:v {bitrateKbps}k " +
                $"-s {resolution.Width}x{resolution.Height} -r {frameRate.ToString("F2", CultureInfo.InvariantCulture)} " +
@@ -373,6 +374,16 @@ internal sealed class DashStreamingStrategy : MediaStrategyBase
                $"-media_seg_name seg_$RepresentationID$_$Number$.m4s " +
                $"-use_timeline 1 -use_template 1 " +
                $"pipe:1";
+    }
+
+    /// <summary>
+    /// Sanitizes a codec name to contain only alphanumeric characters, underscores, and hyphens.
+    /// Prevents FFmpeg argument injection when codec names are user-controlled.
+    /// </summary>
+    private static string SanitizeCodecName(string codec)
+    {
+        var sanitized = System.Text.RegularExpressions.Regex.Replace(codec, @"[^a-zA-Z0-9_\-]", string.Empty);
+        return sanitized.Length > 0 ? sanitized : "copy";
     }
 
     /// <summary>

@@ -58,6 +58,10 @@ internal sealed class SelfEmulatingComputeStrategy : ComputeRuntimeStrategyBase
         "lifecycle, and sandboxed viewer execution.";
 
     /// <inheritdoc/>
+    // Viewer bundling and sandboxed WASM execution are not yet fully implemented — format detection and envelope creation are production-ready but viewer runtime dispatch is stubbed.
+    public override bool IsProductionReady => false;
+
+    /// <inheritdoc/>
     public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default)
     {
         ValidateTask(task);
@@ -92,7 +96,9 @@ internal sealed class SelfEmulatingComputeStrategy : ComputeRuntimeStrategyBase
             sb.AppendLine($"[SelfEmulating] Bundle created: {output.Length} bytes");
             sb.AppendLine($"[SelfEmulating] Execution completed successfully");
 
-            await Task.CompletedTask;
+            // NOTE: Viewer runtime dispatch (actual WASM execution) is not yet implemented.
+            // The envelope above contains metadata + data for the self-emulating format,
+            // but the WASM viewer is not launched. IsProductionReady = false reflects this.
             return (output, sb.ToString());
         }, cancellationToken);
     }

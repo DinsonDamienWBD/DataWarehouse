@@ -25,6 +25,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         private readonly BoundedDictionary<string, QuotaProfile> _quotaProfiles = new BoundedDictionary<string, QuotaProfile>(1000);
         private readonly BoundedDictionary<string, BackendUsage> _backendUsage = new BoundedDictionary<string, BackendUsage>(1000);
         private readonly BoundedDictionary<string, List<QuotaViolation>> _violationHistory = new BoundedDictionary<string, List<QuotaViolation>>(1000);
+        // Per-tenant aggregate byte counter for O(1) GetTotalUsage on the write hot path
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, long> _tenantTotalUsage = new(StringComparer.Ordinal);
         private bool _disposed;
 
         // Configuration
@@ -287,6 +289,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
             Interlocked.Add(ref usage.BytesStored, bytesWritten);
             usage.LastUpdated = DateTime.UtcNow;
+
+            // Update O(1) per-tenant aggregate counter
+            _tenantTotalUsage.AddOrUpdate(tenantId, bytesWritten, (_, existing) => Math.Max(0, existing + bytesWritten));
         }
 
         /// <summary>
@@ -309,6 +314,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 Interlocked.Add(ref usage.BytesStored, -bytesDeleted);
                 usage.LastUpdated = DateTime.UtcNow;
             }
+
+            // Update O(1) per-tenant aggregate counter
+            _tenantTotalUsage.AddOrUpdate(tenantId, 0L, (_, existing) => Math.Max(0, existing - bytesDeleted));
         }
 
         /// <summary>
@@ -320,6 +328,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
 
+            // Use O(1) cached aggregate counter maintained by RecordUsage/RecordDeletion.
+            // Falls back to full scan if the counter isn't populated (e.g., direct BytesStored mutations).
+            if (_tenantTotalUsage.TryGetValue(tenantId, out var cached))
+                return cached;
+
+            // Fallback: compute from per-backend entries (O(n) over all keys)
             return _backendUsage.Values
                 .Where(u => u.TenantId == tenantId)
                 .Sum(u => Math.Max(0, Interlocked.Read(ref u.BytesStored)));

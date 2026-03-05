@@ -155,6 +155,12 @@ public sealed record TagVersionVector
         ArgumentNullException.ThrowIfNull(data);
         var dict = JsonSerializer.Deserialize<Dictionary<string, long>>(data)
                    ?? new Dictionary<string, long>();
+        // Validate non-negative counters to prevent corrupt/malicious data from breaking Dominates comparison
+        foreach (var (node, counter) in dict)
+        {
+            if (counter < 0)
+                throw new FormatException($"Version vector counter for node '{node}' is negative ({counter}). Counters must be non-negative.");
+        }
         return new TagVersionVector(dict);
     }
 

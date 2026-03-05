@@ -23,15 +23,34 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var parts = config.ConnectionString.Split(':');
+            if (string.IsNullOrWhiteSpace(config.ConnectionString))
+                throw new ArgumentException("ConnectionString must be in 'host' or 'host:port' format for TN5250.", nameof(config));
+            var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':');
+            var host = parts[0];
+            if (string.IsNullOrWhiteSpace(host))
+                throw new ArgumentException("Host portion of ConnectionString is empty for TN5250.", nameof(config));
+            var port = parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : 23;
             var client = new TcpClient();
-            await client.ConnectAsync(parts[0], parts.Length > 1 ? int.Parse(parts[1]) : 23, ct);
-            return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "TN5250" });
+            await client.ConnectAsync(host, port, ct);
+            return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "TN5250", ["host"] = host, ["port"] = port });
         }
 
-        protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(handle.GetConnection<TcpClient>().Connected);
+        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        {
+            var info = handle.ConnectionInfo;
+            var host = info.GetValueOrDefault("host")?.ToString() ?? "";
+            if (!int.TryParse(info.GetValueOrDefault("port")?.ToString(), out var port)) port = 23;
+            try { using var probe = new TcpClient(); await probe.ConnectAsync(host, port, ct); return true; }
+            catch { return false; }
+        }
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<TcpClient>().Close(); return Task.CompletedTask; }
-        protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(new ConnectionHealth(handle.GetConnection<TcpClient>().Connected, "TN5250 AS/400", TimeSpan.Zero, DateTimeOffset.UtcNow));
+        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var isHealthy = await TestCoreAsync(handle, ct);
+            sw.Stop();
+            return new ConnectionHealth(isHealthy, isHealthy ? "TN5250 AS/400 reachable" : "TN5250 AS/400 unreachable", sw.Elapsed, DateTimeOffset.UtcNow);
+        }
         public override async Task<string> EmulateProtocolAsync(IConnectionHandle handle, string protocolCommand, CancellationToken ct = default)
         {
             var client = handle.GetConnection<TcpClient>();

@@ -36,6 +36,11 @@ namespace DataWarehouse.SDK.Connectors
         private long _totalLatencyTicks;
         private long _successfulConnections;
 
+        // P2-2158: Cache health-check results for HealthCacheTtl to avoid high-frequency
+        // full round-trips when callers poll rapidly. Cache is keyed by ConnectionId.
+        private static readonly TimeSpan HealthCacheTtl = TimeSpan.FromSeconds(10);
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (DateTimeOffset Expiry, ConnectionHealth Health)> _healthCache = new();
+
         /// <inheritdoc/>
         public override abstract string StrategyId { get; }
 
@@ -269,11 +274,19 @@ namespace DataWarehouse.SDK.Connectors
         {
             ArgumentNullException.ThrowIfNull(handle);
 
+            // P2-2158: Return a cached result if it has not yet expired to avoid
+            // one full network round-trip per caller per poll interval.
+            var cacheKey = handle.ConnectionId;
+            var now = DateTimeOffset.UtcNow;
+            if (_healthCache.TryGetValue(cacheKey, out var cached) && cached.Expiry > now)
+                return cached.Health;
+
             var sw = Stopwatch.StartNew();
             try
             {
                 var health = await GetHealthCoreAsync(handle, ct);
                 sw.Stop();
+                _healthCache[cacheKey] = (now.Add(HealthCacheTtl), health);
                 return health;
             }
             catch (Exception ex)
@@ -283,11 +296,14 @@ namespace DataWarehouse.SDK.Connectors
                     "Health check failed for strategy {StrategyId}, connection {ConnectionId}",
                     StrategyId, handle.ConnectionId);
 
-                return new ConnectionHealth(
+                var unhealthy = new ConnectionHealth(
                     IsHealthy: false,
                     StatusMessage: $"Health check failed: {ex.Message}",
                     Latency: sw.Elapsed,
                     CheckedAt: DateTimeOffset.UtcNow);
+                // Cache failures for a shorter period so errors resolve promptly.
+                _healthCache[cacheKey] = (now.AddSeconds(2), unhealthy);
+                return unhealthy;
             }
         }
 
@@ -393,6 +409,42 @@ namespace DataWarehouse.SDK.Connectors
             {
                 return defaultValue;
             }
+        }
+
+        /// <summary>
+        /// Parses a connection string of the form <c>host:port</c> or <c>[::1]:port</c> (IPv6)
+        /// into separate host and port components, correctly handling IPv6 bracket notation.
+        /// </summary>
+        /// <param name="connectionString">The raw connection string (e.g. "myhost:5432" or "[::1]:5432").</param>
+        /// <param name="defaultPort">Port to use when the connection string does not include one.</param>
+        /// <returns>A tuple of (host, port).</returns>
+        /// <remarks>
+        /// P2-2132: A naive <c>Split(':')</c> breaks for IPv6 addresses which contain colons.
+        /// This helper uses <see cref="Uri.TryCreate"/> with a dummy scheme to correctly extract
+        /// the host and port fields from both IPv4 and IPv6 connection strings.
+        /// Subclass implementations named <c>ParseHostPort</c> continue to work unchanged.
+        /// </remarks>
+        protected static (string host, int port) ParseHostPortSafe(string connectionString, int defaultPort)
+        {
+            // Try Uri-based parsing first (handles IPv6 "[::1]:port" and plain "host:port")
+            if (Uri.TryCreate("tcp://" + connectionString, UriKind.Absolute, out var uri)
+                && !string.IsNullOrEmpty(uri.Host)
+                && uri.Port > 0)
+            {
+                return (uri.Host, uri.Port);
+            }
+
+            // Fallback: simple split for bare "host:port" strings that Uri cannot handle
+            var colonIdx = connectionString.LastIndexOf(':');
+            if (colonIdx > 0
+                && int.TryParse(connectionString.AsSpan(colonIdx + 1), out var parsedPort)
+                && parsedPort > 0)
+            {
+                return (connectionString[..colonIdx], parsedPort);
+            }
+
+            // No port found — use entire string as host with the default port
+            return (connectionString, defaultPort);
         }
 
         // ========================================

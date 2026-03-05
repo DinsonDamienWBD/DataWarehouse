@@ -477,28 +477,20 @@ public class PipelineMigrationEngine : IPipelineMigrationEngine
     /// 1. Look up the plugin by stage.PluginId
     /// 2. Call a reverse transformation method (decrypt, decompress, etc.)
     /// </summary>
-    private async Task<Stream> ReverseStageAsync(
+    private Task<Stream> ReverseStageAsync(
         Stream input,
         PipelineStageSnapshot stage,
         CancellationToken ct)
     {
-        // In a real implementation, we would:
-        // 1. Get the plugin from _kernelContext.GetPlugin<IDataTransformation>() by stage.PluginId
-        // 2. Call a reverse method like plugin.ReverseTransformAsync(input, stage.Parameters)
-        //
-        // For now, we'll use the orchestrator's read pipeline which should handle reversal
-        // This is a simplified implementation that assumes the orchestrator can reverse stages
-
-        _logger?.LogDebug(
-            "Reversing stage {StageType} (plugin: {PluginId}, strategy: {StrategyName})",
-            stage.StageType, stage.PluginId, stage.StrategyName);
-
-        // Since we don't have direct access to individual plugin reverse methods,
-        // we'll return the input as-is. The caller should use the orchestrator's
-        // ExecuteReadPipelineAsync with the appropriate context.
-        //
-        // In a full implementation, each plugin would implement a Reverse method.
-        return await Task.FromResult(input);
+        // Pipeline stage reversal requires each plugin to expose a reverse transform
+        // (e.g., decrypt, decompress). This cannot be implemented generically without
+        // plugin-specific reverse method contracts. Callers should use
+        // ExecuteReadPipelineAsync with the appropriate context instead of
+        // reversing stages individually.
+        throw new NotSupportedException(
+            $"Pipeline stage reversal is not supported for stage type '{stage.StageType}' " +
+            $"(plugin: {stage.PluginId}, strategy: {stage.StrategyName}). " +
+            "Use ExecuteReadPipelineAsync with the pipeline context to read data back through the pipeline.");
     }
 }
 

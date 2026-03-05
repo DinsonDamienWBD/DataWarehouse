@@ -728,12 +728,14 @@ internal sealed class BloomFilter
     private IEnumerable<int> GetHashes(string item)
     {
         var sha = SHA256.HashData(Encoding.UTF8.GetBytes(item));
-        var hash1 = BitConverter.ToInt32(sha, 0);
-        var hash2 = BitConverter.ToInt32(sha, 4);
+        // Finding 3153: Use unsigned arithmetic to avoid Math.Abs(int.MinValue) overflow
+        // which returns int.MinValue (negative), causing IndexOutOfRangeException on % _bitCount.
+        var hash1 = BitConverter.ToUInt32(sha, 0);
+        var hash2 = BitConverter.ToUInt32(sha, 4);
 
         for (int i = 0; i < _hashCount; i++)
         {
-            yield return Math.Abs(hash1 + i * hash2);
+            yield return (int)((hash1 + (uint)i * hash2) % (uint)_bits.Length);
         }
     }
 }

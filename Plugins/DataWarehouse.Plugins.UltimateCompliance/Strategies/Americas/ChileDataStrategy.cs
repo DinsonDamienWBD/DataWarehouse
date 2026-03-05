@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Americas
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("chile_data.check");
+            IncrementCounter("chile_data.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -26,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Americas
                 violations.Add(new ComplianceViolation { Code = "CL-001", Description = "Consent not obtained", Severity = ViolationSeverity.High, Remediation = "Obtain consent for personal data processing", RegulatoryReference = "Law 19.628 Art. 4" });
             }
 
-            if (context.OperationType.Equals("access-request", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("access-request", StringComparison.OrdinalIgnoreCase))
             {
                 if (context.Attributes.TryGetValue("ResponseDays", out var daysObj) && daysObj is int days && days > 10)
                 {
@@ -39,22 +39,23 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Americas
                 recommendations.Add("Consider registering with Chilean Data Protection Agency");
             }
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
-            var status = violations.Count == 0 ? ComplianceStatus.Compliant : violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant : ComplianceStatus.PartiallyCompliant;
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
+            var status = violations.Count == 0 ? ComplianceStatus.Compliant : hasHighViolations ? ComplianceStatus.NonCompliant : ComplianceStatus.PartiallyCompliant;
             return Task.FromResult(new ComplianceResult { IsCompliant = isCompliant, Framework = Framework, Status = status, Violations = violations, Recommendations = recommendations });
         }
     
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("chile_data.initialized");
+            IncrementCounter("chile_data.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("chile_data.shutdown");
+            IncrementCounter("chile_data.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

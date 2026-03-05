@@ -191,21 +191,30 @@ public sealed record GeoRestriction(
     IReadOnlySet<string> Countries)
 {
     /// <summary>
-    /// Creates a geo-restriction that allows access only from specified countries.
+    /// Creates a geo-restriction that allows access only from specified countries (allowlist).
     /// </summary>
-    public static GeoRestriction Whitelist(params string[] countryCodes)
-        => new(GeoRestrictionType.Whitelist, new HashSet<string>(countryCodes));
+    public static GeoRestriction Allowlist(params string[] countryCodes)
+        => new(GeoRestrictionType.Allowlist, new HashSet<string>(countryCodes));
 
     /// <summary>
-    /// Creates a geo-restriction that blocks access from specified countries.
+    /// Creates a geo-restriction that blocks access from specified countries (denylist).
     /// </summary>
-    public static GeoRestriction Blacklist(params string[] countryCodes)
-        => new(GeoRestrictionType.Blacklist, new HashSet<string>(countryCodes));
+    public static GeoRestriction Denylist(params string[] countryCodes)
+        => new(GeoRestrictionType.Denylist, new HashSet<string>(countryCodes));
 
     /// <summary>
     /// No geographic restrictions (content available worldwide).
     /// </summary>
     public static GeoRestriction None => new(GeoRestrictionType.None, new HashSet<string>());
+
+    // Backward-compatible aliases
+    /// <summary>Obsolete: use <see cref="Allowlist"/> instead.</summary>
+    [Obsolete("Use Allowlist instead. Whitelist/Blacklist terminology is deprecated.")]
+    public static GeoRestriction Whitelist(params string[] countryCodes) => Allowlist(countryCodes);
+
+    /// <summary>Obsolete: use <see cref="Denylist"/> instead.</summary>
+    [Obsolete("Use Denylist instead. Whitelist/Blacklist terminology is deprecated.")]
+    public static GeoRestriction Blacklist(params string[] countryCodes) => Denylist(countryCodes);
 }
 
 /// <summary>
@@ -219,14 +228,14 @@ public enum GeoRestrictionType
     None = 0,
 
     /// <summary>
-    /// Allow access only from specified countries (whitelist).
+    /// Allow access only from specified countries.
     /// </summary>
-    Whitelist = 1,
+    Allowlist = 1,
 
     /// <summary>
-    /// Block access from specified countries (blacklist).
+    /// Block access from specified countries.
     /// </summary>
-    Blacklist = 2
+    Denylist = 2
 }
 
 /// <summary>

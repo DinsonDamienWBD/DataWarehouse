@@ -30,13 +30,26 @@ internal sealed class LatexRenderStrategy : StorageProcessingStrategyBase
     public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default)
     {
         ValidateQuery(query);
-        var engine = CliProcessHelper.GetOption<string>(query, "engine") ?? "pdflatex";
+        // Allowlist engine to prevent command injection via user-supplied engine option.
+        var rawEngine = CliProcessHelper.GetOption<string>(query, "engine") ?? "pdflatex";
+        var engine = rawEngine switch
+        {
+            "pdflatex" or "xelatex" or "lualatex" or "latex" => rawEngine,
+            _ => throw new ArgumentException(
+                $"Unknown LaTeX engine '{rawEngine}'. Allowed values: pdflatex, xelatex, lualatex, latex.")
+        };
         var passes = Math.Clamp(CliProcessHelper.GetOption<int>(query, "passes"), 0, 5);
         if (passes == 0) passes = 2; // default: two passes for references
 
         var sw = Stopwatch.StartNew();
-        var workDir = Path.GetDirectoryName(query.Source);
-        var fileName = Path.GetFileName(query.Source);
+        var workDir = Path.GetDirectoryName(query.Source)
+            ?? throw new ArgumentException("query.Source must be an absolute path.", nameof(query));
+        var rawFileName = Path.GetFileName(query.Source);
+        // Prevent embedded-quote injection in the filename argument.
+        if (rawFileName.Contains('"') || rawFileName.Contains('\''))
+            throw new ArgumentException(
+                $"Source filename '{rawFileName}' contains quote characters which are not allowed.");
+        var fileName = rawFileName;
 
         CliOutput? lastResult = null;
         for (var i = 0; i < passes; i++)

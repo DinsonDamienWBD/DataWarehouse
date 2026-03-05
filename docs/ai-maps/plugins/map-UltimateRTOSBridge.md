@@ -150,127 +150,6 @@ public sealed class UltimateRTOSBridgePlugin : StreamingPluginBase, IDisposable
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateRTOSBridge/Strategies/DeterministicIoStrategies.cs
-```csharp
-public sealed class DeterministicIoStrategy : RtosStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override RtosCapabilities Capabilities;;
-    public override async Task<RtosOperationResult> ExecuteAsync(RtosOperationContext context, CancellationToken ct = default);
-}
-```
-```csharp
-private class IoChannel
-{
-}
-    public ConcurrentQueue<byte[]> Buffer { get; };
-    public SemaphoreSlim DataReady { get; };
-    public long ReadCount { get; set; }
-    public long WriteCount { get; set; }
-    public long DeadlineMissCount { get; set; }
-    public long MinLatencyMicroseconds { get; set; };
-    public long MaxLatencyMicroseconds { get; set; }
-    public List<long> LatencySamples { get; };
-    public object LatencyLock { get; };
-}
-```
-```csharp
-private record ScheduledOperation
-{
-}
-    public required RtosOperationContext Context { get; init; }
-    public DateTimeOffset ScheduledAt { get; init; }
-}
-```
-```csharp
-public sealed class SafetyCertificationStrategy : RtosStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override RtosCapabilities Capabilities;;
-    public override async Task<RtosOperationResult> ExecuteAsync(RtosOperationContext context, CancellationToken ct = default);
-}
-```
-```csharp
-private class SafetyContext
-{
-}
-    public required string ResourcePath { get; init; }
-    public SafetyIntegrityLevel CurrentSil { get; set; };
-    public double DiagnosticCoveragePercent { get; set; };
-    public double SafeFailureFractionPercent { get; set; };
-    public DateTimeOffset? LastVerificationTime { get; set; }
-}
-```
-```csharp
-private record SafetyViolation
-{
-}
-    public DateTimeOffset Timestamp { get; init; }
-    public required string ResourcePath { get; init; }
-    public SafetyIntegrityLevel RequestedSil { get; init; }
-    public required string Message { get; init; }
-}
-```
-```csharp
-public sealed class WatchdogIntegrationStrategy : RtosStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override RtosCapabilities Capabilities;;
-    public override async Task<RtosOperationResult> ExecuteAsync(RtosOperationContext context, CancellationToken ct = default);
-}
-```
-```csharp
-private class WatchdogContext
-{
-}
-    public required string ResourcePath { get; init; }
-    public bool IsEnabled { get; set; }
-    public int TimeoutMs { get; set; };
-    public bool IsExpired { get; set; }
-    public long KickCount { get; set; }
-    public long ExpiryCount { get; set; }
-    public DateTimeOffset? LastKickTime { get; set; }
-    public DateTimeOffset? LastRecoveryTime { get; set; }
-    public string RecoveryAction { get; set; };
-}
-```
-```csharp
-public sealed class PriorityInversionPreventionStrategy : RtosStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override RtosCapabilities Capabilities;;
-    public override async Task<RtosOperationResult> ExecuteAsync(RtosOperationContext context, CancellationToken ct = default);
-}
-```
-```csharp
-private class ResourceLock
-{
-}
-    public required string ResourcePath { get; init; }
-    public SemaphoreSlim Semaphore { get; };
-    public int? HolderTaskId { get; set; }
-    public int? InheritedPriority { get; set; }
-    public long AcquisitionCount { get; set; }
-}
-```
-```csharp
-private class TaskInfo
-{
-}
-    public int TaskId { get; init; }
-    public int BasePriority { get; init; }
-    public int EffectivePriority { get; set; }
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateRTOSBridge/Strategies/RtosProtocolAdapters.cs
 ```csharp
 public sealed class VxWorksProtocolAdapter : RtosStrategyBase
@@ -286,8 +165,20 @@ public sealed class VxWorksProtocolAdapter : RtosStrategyBase
 private class VxWorksQueue
 {
 }
+    public const int MaxDepth = 4096;
     public ConcurrentQueue<byte[]> Messages { get; };
     public SemaphoreSlim MessageAvailable { get; };
+}
+```
+```csharp
+private class VxWorksWatchdog
+{
+}
+    public required string ResourcePath { get; init; }
+    public bool IsExpired { get; set; }
+    public DateTimeOffset? LastKickTime { get; set; }
+    public long KickCount;;
+    public void IncrementKickCount();;
 }
 ```
 ```csharp
@@ -405,5 +296,131 @@ private class LynxQueue
 }
     public ConcurrentQueue<byte[]> Messages { get; };
     public SemaphoreSlim Ready { get; };
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateRTOSBridge/Strategies/DeterministicIoStrategies.cs
+```csharp
+public sealed class DeterministicIoStrategy : RtosStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override RtosCapabilities Capabilities;;
+    public override async Task<RtosOperationResult> ExecuteAsync(RtosOperationContext context, CancellationToken ct = default);
+}
+```
+```csharp
+private class IoChannel
+{
+}
+    public ConcurrentQueue<byte[]> Buffer { get; };
+    public SemaphoreSlim DataReady { get; };
+    public long ReadCount;;
+    public long WriteCount;;
+    public long DeadlineMissCount;;
+    public void IncrementReadCount();;
+    public void IncrementWriteCount();;
+    public void IncrementDeadlineMissCount();;
+    public long MinLatencyMicroseconds { get; set; };
+    public long MaxLatencyMicroseconds { get; set; }
+    public List<long> LatencySamples { get; };
+    public object LatencyLock { get; };
+}
+```
+```csharp
+private record ScheduledOperation
+{
+}
+    public required RtosOperationContext Context { get; init; }
+    public DateTimeOffset ScheduledAt { get; init; }
+}
+```
+```csharp
+public sealed class SafetyCertificationStrategy : RtosStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override RtosCapabilities Capabilities;;
+    public override async Task<RtosOperationResult> ExecuteAsync(RtosOperationContext context, CancellationToken ct = default);
+}
+```
+```csharp
+private class SafetyContext
+{
+}
+    public required string ResourcePath { get; init; }
+    public SafetyIntegrityLevel CurrentSil { get; set; };
+    public double DiagnosticCoveragePercent { get; set; };
+    public double SafeFailureFractionPercent { get; set; };
+    public DateTimeOffset? LastVerificationTime { get; set; }
+}
+```
+```csharp
+private record SafetyViolation
+{
+}
+    public DateTimeOffset Timestamp { get; init; }
+    public required string ResourcePath { get; init; }
+    public SafetyIntegrityLevel RequestedSil { get; init; }
+    public required string Message { get; init; }
+}
+```
+```csharp
+public sealed class WatchdogIntegrationStrategy : RtosStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override RtosCapabilities Capabilities;;
+    public override async Task<RtosOperationResult> ExecuteAsync(RtosOperationContext context, CancellationToken ct = default);
+}
+```
+```csharp
+private class WatchdogContext
+{
+}
+    public required string ResourcePath { get; init; }
+    public bool IsEnabled { get; set; }
+    public int TimeoutMs { get; set; };
+    public bool IsExpired { get; set; }
+    public long KickCount;;
+    public long ExpiryCount;;
+    public void IncrementKickCount();;
+    public void IncrementExpiryCount();;
+    public DateTimeOffset? LastKickTime { get; set; }
+    public DateTimeOffset? LastRecoveryTime { get; set; }
+    public string RecoveryAction { get; set; };
+}
+```
+```csharp
+public sealed class PriorityInversionPreventionStrategy : RtosStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override RtosCapabilities Capabilities;;
+    public override async Task<RtosOperationResult> ExecuteAsync(RtosOperationContext context, CancellationToken ct = default);
+}
+```
+```csharp
+private class ResourceLock
+{
+}
+    public required string ResourcePath { get; init; }
+    public SemaphoreSlim Semaphore { get; };
+    public int? HolderTaskId { get; set; }
+    public int? InheritedPriority { get; set; }
+    public long AcquisitionCount { get; set; }
+}
+```
+```csharp
+private class TaskInfo
+{
+}
+    public int TaskId { get; init; }
+    public int BasePriority { get; init; }
+    public int EffectivePriority { get; set; }
 }
 ```

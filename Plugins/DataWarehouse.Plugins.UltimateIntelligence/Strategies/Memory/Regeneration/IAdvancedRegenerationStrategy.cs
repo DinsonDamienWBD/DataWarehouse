@@ -272,8 +272,16 @@ public abstract class RegenerationStrategyBase : StrategyBase, IAdvancedRegenera
             Interlocked.Increment(ref _successfulRegenerations);
         }
 
-        // Thread-safe accumulation (approximate)
-        Interlocked.Exchange(ref _cumulativeAccuracy, _cumulativeAccuracy + accuracy);
+        // Finding 3219: Interlocked.Exchange is non-atomic for read-modify-write accumulation.
+        // Use CompareExchange loop for a true lock-free atomic add on a double field.
+        double current;
+        double updated;
+        do
+        {
+            current = Volatile.Read(ref _cumulativeAccuracy);
+            updated = current + accuracy;
+        }
+        while (Interlocked.CompareExchange(ref _cumulativeAccuracy, updated, current) != current);
 
         // Update per-format statistics
         var stats = _statisticsByFormat.GetOrAdd(format, _ => new RegenerationStatistics { StrategyId = StrategyId });

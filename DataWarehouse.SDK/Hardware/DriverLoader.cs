@@ -71,7 +71,7 @@ namespace DataWarehouse.SDK.Hardware
         private readonly BoundedDictionary<string, PluginAssemblyLoadContext> _contexts = new BoundedDictionary<string, PluginAssemblyLoadContext>(1000);
         private readonly SemaphoreSlim _loadLock = new(1, 1);
         private FileSystemWatcher? _directoryWatcher;
-        private bool _disposed;
+        private volatile bool _disposed;
 
         /// <inheritdoc/>
         public event EventHandler<DriverEventArgs>? OnDriverLoaded;
@@ -101,48 +101,46 @@ namespace DataWarehouse.SDK.Hardware
         }
 
         /// <inheritdoc/>
-        public async Task<IReadOnlyList<DriverInfo>> ScanAsync(string assemblyPath, CancellationToken cancellationToken = default)
+        public Task<IReadOnlyList<DriverInfo>> ScanAsync(string assemblyPath, CancellationToken cancellationToken = default)
         {
             if (assemblyPath == null)
                 throw new ArgumentNullException(nameof(assemblyPath));
             if (!File.Exists(assemblyPath))
                 throw new FileNotFoundException($"Assembly not found: {assemblyPath}", assemblyPath);
 
-            var results = new List<DriverInfo>();
-
-            // Use a temporary collectible context for scanning to avoid locking the file
-            var tempContextId = $"scan-{Guid.NewGuid()}";
-            var tempContext = new PluginAssemblyLoadContext(tempContextId, assemblyPath);
-
-            try
+            // Run assembly loading on a thread-pool thread to avoid blocking the caller's thread
+            return Task.Run<IReadOnlyList<DriverInfo>>(() =>
             {
-                var assembly = tempContext.LoadFromAssemblyPath(assemblyPath);
-
-                foreach (var type in GetTypesWithAttribute(assembly))
+                var results = new List<DriverInfo>();
+                var tempContextId = $"scan-{Guid.NewGuid()}";
+                var tempContext = new PluginAssemblyLoadContext(tempContextId, assemblyPath);
+                try
                 {
-                    var attribute = type.GetCustomAttribute<StorageDriverAttribute>();
-                    if (attribute != null)
+                    var assembly = tempContext.LoadFromAssemblyPath(assemblyPath);
+                    foreach (var type in GetTypesWithAttribute(assembly))
                     {
-                        results.Add(new DriverInfo
+                        var attribute = type.GetCustomAttribute<StorageDriverAttribute>();
+                        if (attribute != null)
                         {
-                            AssemblyPath = assemblyPath,
-                            TypeName = type.FullName ?? type.Name,
-                            Name = attribute.Name,
-                            Description = attribute.Description,
-                            Version = attribute.Version,
-                            SupportedDevices = attribute.SupportedDevices,
-                            AutoLoad = attribute.AutoLoad
-                        });
+                            results.Add(new DriverInfo
+                            {
+                                AssemblyPath = assemblyPath,
+                                TypeName = type.FullName ?? type.Name,
+                                Name = attribute.Name,
+                                Description = attribute.Description,
+                                Version = attribute.Version,
+                                SupportedDevices = attribute.SupportedDevices,
+                                AutoLoad = attribute.AutoLoad
+                            });
+                        }
                     }
+                    return results.AsReadOnly();
                 }
-
-                return results.AsReadOnly();
-            }
-            finally
-            {
-                // Unload the temporary context
-                tempContext.Unload();
-            }
+                finally
+                {
+                    tempContext.Unload();
+                }
+            }, cancellationToken);
         }
 
         /// <inheritdoc/>
@@ -345,22 +343,18 @@ namespace DataWarehouse.SDK.Hardware
                 _directoryWatcher = null;
             }
 
-            // Unload all drivers
+            // Unload all drivers - force unload contexts directly to avoid sync-over-async deadlock
             var handles = _loadedDrivers.Values.ToList();
             foreach (var handle in handles)
             {
                 try
                 {
-                    // Use synchronous wait with grace period
-                    var unloadTask = UnloadAsync(handle);
-                    if (!unloadTask.Wait(_options.UnloadGracePeriod))
+                    if (_contexts.TryRemove(handle.Id, out var context))
                     {
-                        // Force unload if grace period exceeded
-                        if (_contexts.TryRemove(handle.Id, out var context))
-                        {
-                            context.Unload();
-                        }
+                        context.Unload();
                     }
+                    _loadedDrivers.TryRemove(handle.Id, out _);
+                    handle.IsLoaded = false;
                 }
                 catch
                 {
@@ -390,8 +384,14 @@ namespace DataWarehouse.SDK.Hardware
                 NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite
             };
 
-            _directoryWatcher.Created += async (sender, e) => await OnDriverFileCreated(e.FullPath);
-            _directoryWatcher.Deleted += async (sender, e) => await OnDriverFileDeleted(e.FullPath);
+            _directoryWatcher.Created += (sender, e) => OnDriverFileCreated(e.FullPath)
+                .ContinueWith(t => System.Diagnostics.Trace.TraceError(
+                    $"[DriverLoader] FileCreated handler failed: {t.Exception?.InnerException?.Message}"),
+                    TaskContinuationOptions.OnlyOnFaulted);
+            _directoryWatcher.Deleted += (sender, e) => OnDriverFileDeleted(e.FullPath)
+                .ContinueWith(t => System.Diagnostics.Trace.TraceError(
+                    $"[DriverLoader] FileDeleted handler failed: {t.Exception?.InnerException?.Message}"),
+                    TaskContinuationOptions.OnlyOnFaulted);
 
             _directoryWatcher.EnableRaisingEvents = true;
         }

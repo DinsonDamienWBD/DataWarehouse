@@ -675,7 +675,7 @@ namespace DataWarehouse.SDK.Contracts.Compute
         public abstract PipelineComputeCapabilities Capabilities { get; }
 
         /// <inheritdoc/>
-        public virtual async Task<ThroughputEstimate> EstimateThroughputAsync(
+        public virtual Task<ThroughputEstimate> EstimateThroughputAsync(
             DataVelocity velocity,
             ComputeResources available,
             CancellationToken ct = default)
@@ -686,7 +686,7 @@ namespace DataWarehouse.SDK.Contracts.Compute
                 throw new ArgumentNullException(nameof(available));
 
             // Default estimation logic - override for more sophisticated strategies
-            var estimatedCapacity = EstimateCapacityCoreAsync(available, ct);
+            var estimatedCapacity = EstimateCapacityCore(available);
             var canKeepUp = estimatedCapacity >= velocity.BytesPerSecond;
             var headroom = estimatedCapacity > 0 ? Math.Max(0, 1.0 - (velocity.BytesPerSecond / estimatedCapacity)) : 0.0;
 
@@ -698,28 +698,38 @@ namespace DataWarehouse.SDK.Contracts.Compute
                 _ => AdaptiveRouteDecision.EmergencyPassthrough
             };
 
-            return new ThroughputEstimate
+            return Task.FromResult(new ThroughputEstimate
             {
                 EstimatedCapacityBytesPerSecond = estimatedCapacity,
                 Confidence = 0.8, // Default confidence
                 CanKeepUp = canKeepUp,
                 HeadroomFraction = headroom,
                 RecommendedDecision = decision
-            };
+            });
         }
 
         /// <summary>
         /// Estimates processing capacity based on available resources.
         /// Override in derived classes for strategy-specific estimation.
         /// </summary>
-        protected virtual double EstimateCapacityCoreAsync(ComputeResources available, CancellationToken ct)
+        protected virtual double EstimateCapacityCore(ComputeResources available)
         {
             // Simple estimation based on CPU and memory
-            var cpuFactor = available.AvailableCpuCores * (1.0 - Capabilities.ComputeIntensity);
-            var memoryFactor = available.AvailableMemoryBytes / (Capabilities.MemoryPerGb * 1024 * 1024 * 1024);
+            var intensity = Math.Clamp(Capabilities.ComputeIntensity, 0.0, 1.0);
+            var cpuFactor = available.AvailableCpuCores * (1.0 - intensity);
+
+            double memoryFactor;
+            if (Capabilities.MemoryPerGb <= 0)
+            {
+                memoryFactor = cpuFactor; // fall back to cpu-only estimate
+            }
+            else
+            {
+                memoryFactor = available.AvailableMemoryBytes / (Capabilities.MemoryPerGb * 1024.0 * 1024.0 * 1024.0);
+            }
 
             // Estimate: 100 MB/s per core at low intensity, reduced by compute intensity
-            return Math.Min(cpuFactor * 100_000_000, memoryFactor * 100_000_000);
+            return Math.Max(0, Math.Min(cpuFactor * 100_000_000, memoryFactor * 100_000_000));
         }
 
         /// <inheritdoc/>

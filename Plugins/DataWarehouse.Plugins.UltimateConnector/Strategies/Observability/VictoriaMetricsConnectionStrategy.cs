@@ -74,7 +74,7 @@ public sealed class VictoriaMetricsConnectionStrategy : ObservabilityConnectionS
         var httpClient = handle.GetConnection<HttpClient>();
         try
         {
-            var response = await httpClient.GetAsync("/health", ct);
+            using var response = await httpClient.GetAsync("/health", ct);
             return response.IsSuccessStatusCode;
         }
         catch
@@ -103,7 +103,7 @@ public sealed class VictoriaMetricsConnectionStrategy : ObservabilityConnectionS
 
         try
         {
-            var response = await httpClient.GetAsync("/health", ct);
+            using var response = await httpClient.GetAsync("/health", ct);
             sw.Stop();
 
             return new ConnectionHealth(
@@ -133,7 +133,7 @@ public sealed class VictoriaMetricsConnectionStrategy : ObservabilityConnectionS
         var json = JsonSerializer.Serialize(new { series = metrics });
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        var response = await httpClient.PostAsync("/api/v1/import/prometheus", content, ct);
+        using var response = await httpClient.PostAsync("/api/v1/import/prometheus", content, ct);
         response.EnsureSuccessStatusCode();
     }
 

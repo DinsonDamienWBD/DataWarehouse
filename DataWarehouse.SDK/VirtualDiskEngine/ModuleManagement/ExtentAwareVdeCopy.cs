@@ -177,7 +177,8 @@ public sealed class ExtentAwareVdeCopy
         var metadataBlocks = CollectMetadataBlockRanges(destRegionDir);
 
         // Step 5: Copy allocated data blocks (skipping metadata and unallocated)
-        var allocatedBitmap = ReadBitmapFlags(scanner, totalBlocks);
+        // P2-866: Use async overload to avoid blocking thread-pool on network-backed streams.
+        var allocatedBitmap = await ReadBitmapFlagsAsync(scanner, totalBlocks, ct).ConfigureAwait(false);
         long blocksCopied = 0;
         long blocksSkipped = 0;
         long opsCompleted = 0;
@@ -278,7 +279,8 @@ public sealed class ExtentAwareVdeCopy
         var scanner = new FreeSpaceScanner(_sourceStream, _blockSize,
             bitmapPointer.StartBlock, bitmapPointer.BlockCount);
 
-        long freeBlocks = scanner.GetTotalFreeBlocks();
+        // P2-866: Use async overload to avoid blocking thread-pool on network-backed streams.
+        long freeBlocks = await scanner.GetTotalFreeBlocksAsync(ct).ConfigureAwait(false);
         return totalBlocks - freeBlocks;
     }
 
@@ -298,14 +300,15 @@ public sealed class ExtentAwareVdeCopy
 
     /// <summary>
     /// Reads the allocation bitmap into a bool array indicating per-block allocation status.
+    /// Async to avoid blocking thread-pool on network-backed streams (P2-866).
     /// </summary>
-    private bool[] ReadBitmapFlags(FreeSpaceScanner scanner, long totalBlocks)
+    private async Task<bool[]> ReadBitmapFlagsAsync(FreeSpaceScanner scanner, long totalBlocks, CancellationToken ct)
     {
         // Start with all blocks allocated, then mark free ranges
         var flags = new bool[totalBlocks];
         Array.Fill(flags, true);
 
-        var freeRanges = scanner.FindAllFreeRanges(1);
+        var freeRanges = await scanner.FindAllFreeRangesAsync(1, ct).ConfigureAwait(false);
         foreach (var range in freeRanges)
         {
             for (long i = 0; i < range.BlockCount && range.StartBlock + i < totalBlocks; i++)

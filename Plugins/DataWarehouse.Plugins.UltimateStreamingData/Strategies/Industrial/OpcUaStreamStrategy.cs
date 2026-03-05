@@ -235,13 +235,20 @@ internal sealed class OpcUaStreamStrategy : StreamingDataStrategyBase
     public override string[] Tags => ["opc-ua", "industrial", "scada", "plc", "automation", "iec-62541"];
 
     /// <summary>
-    /// Establishes a session with an OPC UA server.
+    /// Registers an OPC UA session configuration and allocates session state for subsequent operations.
     /// </summary>
+    /// <remarks>
+    /// Finding 4387: this method validates the endpoint URL and security configuration but does not
+    /// open a TCP channel, perform the OPC UA Hello/Acknowledge handshake, or negotiate certificates.
+    /// The security mode advertised by <paramref name="config"/> (e.g. <c>SignAndEncrypt</c>) is
+    /// stored for reference only — actual TLS/certificate negotiation requires an OPC UA stack
+    /// such as UA-.NET Standard. The session ID returned here is used as an in-process correlation
+    /// key for subscriptions, node reads, and writes provided by this strategy.
+    /// </remarks>
     /// <param name="config">Session connection parameters.</param>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns>A session identifier for subsequent operations.</returns>
+    /// <returns>A session identifier for subsequent in-process operations.</returns>
     /// <exception cref="ArgumentNullException">Thrown when config or EndpointUrl is null.</exception>
-    /// <exception cref="InvalidOperationException">Thrown when connection fails.</exception>
     public Task<string> ConnectSessionAsync(OpcUaSessionConfig config, CancellationToken ct = default)
     {
         ThrowIfNotInitialized();
@@ -438,8 +445,12 @@ internal sealed class OpcUaStreamStrategy : StreamingDataStrategyBase
     }
 
     /// <summary>
-    /// Simulates incoming data notifications for a subscription (used for internal data generation).
-    /// In production, this would be driven by the OPC UA server's publish responses.
+    /// Enqueues incoming data notifications for a subscription.
+    /// In a live deployment this method is called by the OPC UA transport layer when the
+    /// server sends a Publish response containing monitored-item notifications.
+    /// Callers that integrate a real OPC UA SDK (e.g. UA-.NETStandard) should wire the
+    /// SDK's notification callback to this method rather than polling.
+    /// In unit-test and simulation scenarios the caller may inject data values directly.
     /// </summary>
     /// <param name="subscriptionId">The subscription identifier.</param>
     /// <param name="values">Data values to enqueue.</param>

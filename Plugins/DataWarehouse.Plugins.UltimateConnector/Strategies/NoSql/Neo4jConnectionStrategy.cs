@@ -15,7 +15,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
     /// </summary>
     public class Neo4jConnectionStrategy : DatabaseConnectionStrategyBase
     {
-        private HttpClient? _httpClient;
+        private volatile HttpClient? _httpClient;
         private TcpClient? _tcpClient;
 
         public override string StrategyId => "neo4j";
@@ -42,9 +42,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
         {
             var (host, port) = ParseHostPort(config.ConnectionString, 7474);
 
-            // Check bolt port (7687) via TCP
+            // Check bolt port — configurable, default 7687
+            var boltPort = config.Properties.TryGetValue("BoltPort", out var bp) && bp != null
+                && int.TryParse(bp.ToString(), out var bpInt) ? bpInt : 7687;
             _tcpClient = new TcpClient();
-            await _tcpClient.ConnectAsync(host, 7687, ct);
+            await _tcpClient.ConnectAsync(host, boltPort, ct);
 
             // Use HTTP REST API
             _httpClient = new HttpClient
@@ -60,7 +62,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
                     Convert.ToBase64String(authBytes));
             }
 
-            var response = await _httpClient.GetAsync("/db/data/", ct);
+            using var response = await _httpClient.GetAsync("/db/data/", ct);
             response.EnsureSuccessStatusCode();
 
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object>
@@ -76,27 +78,27 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
             if (_httpClient == null) return false;
             try
             {
-                var response = await _httpClient.GetAsync("/db/data/", ct);
+                using var response = await _httpClient.GetAsync("/db/data/", ct);
                 return response.IsSuccessStatusCode;
             }
             catch { return false; /* Connection validation - failure acceptable */ }
         }
 
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
-        {
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) {
             _httpClient?.Dispose();
             _tcpClient?.Close();
             _tcpClient?.Dispose();
             _httpClient = null;
-            _tcpClient = null;
-            await Task.CompletedTask;
-        }
+            _tcpClient = null; return Task.CompletedTask; }
 
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
+            // P2-2180: Measure actual latency with Stopwatch instead of hardcoded value.
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             var isHealthy = await TestCoreAsync(handle, ct);
+            sw.Stop();
             return new ConnectionHealth(isHealthy, isHealthy ? "Neo4j healthy" : "Neo4j unhealthy",
-                TimeSpan.FromMilliseconds(8), DateTimeOffset.UtcNow);
+                sw.Elapsed, DateTimeOffset.UtcNow);
         }
 
         /// <summary>
@@ -134,7 +136,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
 
                 var json = System.Text.Json.JsonSerializer.Serialize(requestBody);
                 var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync("/db/neo4j/tx/commit", content, ct);
+                using var response = await _httpClient.PostAsync("/db/neo4j/tx/commit", content, ct);
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -229,7 +231,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
 
                 var json = System.Text.Json.JsonSerializer.Serialize(requestBody);
                 var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync("/db/neo4j/tx/commit", content, ct);
+                using var response = await _httpClient.PostAsync("/db/neo4j/tx/commit", content, ct);
 
                 if (!response.IsSuccessStatusCode)
                     return -1;

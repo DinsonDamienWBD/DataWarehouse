@@ -20,7 +20,7 @@ namespace DataWarehouse.SDK.Contracts
     public abstract class StrategyBase : IStrategy
     {
         private bool _disposed;
-        protected bool _initialized;
+        protected volatile bool _initialized;
         private readonly object _lifecycleLock = new();
         private readonly BoundedDictionary<string, long> _counters = new BoundedDictionary<string, long>(1000);
         private readonly SemaphoreSlim _healthCacheLock = new(1, 1);
@@ -92,9 +92,17 @@ namespace DataWarehouse.SDK.Contracts
             lock (_lifecycleLock)
             {
                 if (_initialized) return;
+                _initialized = true;
             }
-            await InitializeAsyncCore(cancellationToken).ConfigureAwait(false);
-            _initialized = true;
+            try
+            {
+                await InitializeAsyncCore(cancellationToken).ConfigureAwait(false);
+            }
+            catch
+            {
+                lock (_lifecycleLock) { _initialized = false; }
+                throw;
+            }
         }
 
         /// <summary>
@@ -234,6 +242,20 @@ namespace DataWarehouse.SDK.Contracts
         protected void IncrementCounter(string name)
         {
             _counters.AddOrUpdate(name, 1, (_, current) => Interlocked.Increment(ref current));
+        }
+
+        /// <summary>
+        /// Increments a named counter by <paramref name="amount"/> in a single atomic operation.
+        /// Prefer this overload over calling <see cref="IncrementCounter(string)"/> in a loop.
+        /// Thread-safe.
+        /// </summary>
+        /// <param name="name">The counter name.</param>
+        /// <param name="amount">The amount to add (must be &gt;= 0).</param>
+        protected void IncrementCounter(string name, long amount)
+        {
+            if (amount <= 0) return;
+            // P2-2274: Use AddOrUpdate with the full amount to avoid O(n) loop over Interlocked.Increment.
+            _counters.AddOrUpdate(name, amount, (_, current) => current + amount);
         }
 
         /// <summary>

@@ -76,6 +76,10 @@ public sealed class RightSizingStrategy : SustainabilityStrategyBase
             if (resource.LastSeen - resource.FirstSeen < minObservation)
                 continue;
 
+            // Finding 4455: guard against empty sample lists before calling Average/Max.
+            if (resource.CpuSamples.Count == 0 || resource.MemorySamples.Count == 0)
+                continue;
+
             var avgCpu = resource.CpuSamples.Average();
             var avgMemory = resource.MemorySamples.Average();
             var maxCpu = resource.CpuSamples.Max();

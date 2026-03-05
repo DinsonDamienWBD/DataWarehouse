@@ -24,7 +24,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("ear.check");
+            IncrementCounter("ear.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -33,9 +33,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
             CheckScreeningRequirements(context, violations, recommendations);
             CheckRecordkeeping(context, violations, recommendations);
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -50,8 +51,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckEcccClassification(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.DataClassification.Equals("ear", StringComparison.OrdinalIgnoreCase) ||
-                context.DataSubjectCategories.Contains("dual-use", StringComparer.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("ear", StringComparison.OrdinalIgnoreCase) ||
+                (context.DataSubjectCategories != null && context.DataSubjectCategories.Contains("dual-use", StringComparer.OrdinalIgnoreCase)))
             {
                 if (!context.Attributes.TryGetValue("EcccNumber", out var ecccObj) ||
                     ecccObj is not string eccn ||
@@ -106,8 +107,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckScreeningRequirements(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.OperationType.Equals("export", StringComparison.OrdinalIgnoreCase) ||
-                context.OperationType.Equals("deemed-export", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("export", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(context.OperationType, "deemed-export", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("DeniedPartiesScreening", out var screeningObj) || screeningObj is not true)
                 {
@@ -149,7 +150,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckRecordkeeping(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.OperationType.Equals("export", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("export", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("ExportRecordMaintained", out var recordObj) || recordObj is not true)
                 {
@@ -168,14 +169,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("ear.initialized");
+            IncrementCounter("ear.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("ear.shutdown");
+            IncrementCounter("ear.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

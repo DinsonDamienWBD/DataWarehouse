@@ -141,7 +141,9 @@ internal sealed class SummaryGenerator
             catch (OperationCanceledException) { throw; }
             catch
             {
+
                 // Fall through to best-effort return
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
@@ -187,7 +189,9 @@ internal sealed class SummaryGenerator
         catch (OperationCanceledException) { throw; }
         catch
         {
+
             // Fall through to extraction fallback
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         // AI call failed, use extraction fallback

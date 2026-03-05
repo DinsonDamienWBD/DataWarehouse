@@ -39,8 +39,8 @@ namespace DataWarehouse.SDK.Infrastructure.Policy.Performance
 
         private readonly IPolicyEngine _liveEngine;
         private readonly IPolicyStore _liveStore;
-        private InMemoryPolicyStore? _sandboxStore;
-        private PolicyResolutionEngine? _sandboxEngine;
+        private volatile InMemoryPolicyStore? _sandboxStore;
+        private volatile PolicyResolutionEngine? _sandboxEngine;
         private readonly SemaphoreSlim _initLock = new(1, 1);
         private bool _disposed;
 

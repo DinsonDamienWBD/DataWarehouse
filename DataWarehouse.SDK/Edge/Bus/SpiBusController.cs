@@ -28,7 +28,7 @@ namespace DataWarehouse.SDK.Edge.Bus;
 [SdkCompatibility("3.0.0", Notes = "Phase 36: SPI wrapper using System.Device.Spi (EDGE-01)")]
 public sealed class SpiBusController : ISpiBusController
 {
-    private bool _disposed;
+    private volatile bool _disposed;
 
     /// <inheritdoc/>
     public ISpiDevice OpenDevice(int busId, int chipSelect, int clockFrequency, SpiMode mode)
@@ -93,7 +93,7 @@ public sealed class SpiBusController : ISpiBusController
     private sealed class SpiDeviceWrapper : ISpiDevice
     {
         private readonly SpiDevice _device;
-        private bool _disposed;
+        private volatile bool _disposed;
 
         public SpiDeviceWrapper(SpiDevice device)
         {

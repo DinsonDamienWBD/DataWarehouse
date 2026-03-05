@@ -70,8 +70,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Services
                 };
             }
 
-            // Record in deduplication cache
-            _deduplicationCache[deduplicationKey] = DateTime.UtcNow;
+            // Record in deduplication cache atomically (TryAdd prevents TOCTOU race)
+            _deduplicationCache.TryAdd(deduplicationKey, DateTime.UtcNow);
             CleanupDeduplicationCache();
 
             var sequence = Interlocked.Increment(ref _alertSequence);
@@ -93,6 +93,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Services
                 catch (Exception ex)
                 {
                     failures.Add($"{channel}: {ex.Message}");
+                    // Log channel delivery failure so Critical/Emergency failures are not invisible
+                    System.Diagnostics.Debug.WriteLine($"[ComplianceAlertService] Channel delivery failed: channel={channel}, alert={alert.AlertId}, severity={alert.Severity}, error={ex.Message}");
                 }
             }
 
@@ -108,10 +110,12 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Services
             };
             _alertHistory[alert.AlertId] = record;
 
-            // Schedule escalation for critical/emergency alerts
+            // Schedule escalation for critical/emergency alerts (observe exceptions via ContinueWith)
             if (alert.Severity >= ComplianceAlertSeverity.Critical)
             {
-                _ = ScheduleEscalationAsync(alert, cancellationToken);
+                _ = ScheduleEscalationAsync(alert, cancellationToken)
+                    .ContinueWith(t => System.Diagnostics.Debug.WriteLine($"[Warning] Escalation task faulted: {t.Exception?.GetBaseException().Message}"),
+                        TaskContinuationOptions.OnlyOnFaulted);
             }
 
             // Publish alert event
@@ -292,9 +296,11 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Services
                     await SendAlertAsync(escalatedAlert, cancellationToken);
                 }
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException ex)
             {
+
                 // Escalation cancelled - expected during shutdown
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 

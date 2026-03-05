@@ -25,6 +25,8 @@ public sealed class EntityRelationshipIndex : ContextIndexBase
     private readonly BoundedDictionary<string, ContentEntry> _content = new BoundedDictionary<string, ContentEntry>(1000);
     private readonly BoundedDictionary<string, HashSet<string>> _outgoingEdges = new BoundedDictionary<string, HashSet<string>>(1000);
     private readonly BoundedDictionary<string, HashSet<string>> _incomingEdges = new BoundedDictionary<string, HashSet<string>>(1000);
+    // Finding 3144: HashSet inner values are not thread-safe; all inner-HashSet mutations go through this lock.
+    private readonly object _setMutationLock = new();
 
     private static readonly Regex EntityPattern = new(@"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b", RegexOptions.Compiled);
     private static readonly string[] CommonRelationships = { "related_to", "part_of", "contains", "references", "similar_to", "depends_on" };
@@ -580,8 +582,14 @@ public sealed class EntityRelationshipIndex : ContextIndexBase
             };
         }
 
-        _entityToContent[entityId].Add(contentId);
-        _contentToEntities[contentId].Add(entityId);
+        // Finding 3144: Inner HashSet<string> values are not thread-safe; guard all mutations.
+        lock (_setMutationLock)
+        {
+            if (_entityToContent.TryGetValue(entityId, out var entitySet))
+                entitySet.Add(contentId);
+            if (_contentToEntities.TryGetValue(contentId, out var contentSet))
+                contentSet.Add(entityId);
+        }
     }
 
     private async Task InferRelationships(List<string> entityNames, string contentId, CancellationToken ct)

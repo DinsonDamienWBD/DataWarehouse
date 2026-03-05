@@ -476,6 +476,12 @@ public sealed class CompressionDictionaryRegion
     public const ushort CurrentVersion = 1;
 
     /// <summary>
+    /// Maximum dictionary size allowed when reading from an untrusted block device (16 MiB).
+    /// Limits blast radius from corrupt on-disk dictSize values (finding 765).
+    /// </summary>
+    public const uint MaxDictionarySize = 16 * 1024 * 1024;
+
+    /// <summary>
     /// Stores a trained dictionary to the VDE block device at the specified region.
     /// </summary>
     /// <param name="dictionary">Dictionary bytes to store.</param>
@@ -580,6 +586,11 @@ public sealed class CompressionDictionaryRegion
         }
 
         uint dictSize = BitConverter.ToUInt32(firstBlock, dictSizeOffset);
+        // Cat 14 (finding 765): dictSize is read from an untrusted block device.  Casting a uint > Int32.MaxValue
+        // to int produces a negative value, causing negative allocations downstream.  Reject implausible sizes.
+        if (dictSize > MaxDictionarySize)
+            throw new InvalidDataException(
+                $"VDE trained-dictionary region at block {regionStart}: dictSize {dictSize} exceeds maximum {MaxDictionarySize}.");
         int fullPayloadSize = totalPayloadSize + (int)dictSize;
         int totalDataSize = fullPayloadSize + 8; // + XxHash64
 
@@ -706,7 +717,14 @@ public sealed class DictionaryRetrainer : IDisposable
     private readonly ConcurrentQueue<byte[]> _sampleBuffer;
     private readonly Timer _checkTimer;
     private volatile TrainedZstdCompressor _currentCompressor;
-    private double _baselineRatio;
+    private long _baselineRatioBits; // stored as BitConverter.DoubleToInt64Bits for atomic read/write
+
+    /// <summary>Thread-safe baseline ratio accessor using Interlocked on double bits.</summary>
+    private double BaselineRatio
+    {
+        get => BitConverter.Int64BitsToDouble(Interlocked.Read(ref _baselineRatioBits));
+        set => Interlocked.Exchange(ref _baselineRatioBits, BitConverter.DoubleToInt64Bits(value));
+    }
     private int _sampleCount;
     private int _retrainInProgress;
 
@@ -719,12 +737,23 @@ public sealed class DictionaryRetrainer : IDisposable
     /// <summary>
     /// Gets the number of retraining events that have occurred.
     /// </summary>
-    public int RetrainCount { get; private set; }
+    public int RetrainCount
+    {
+        get => Volatile.Read(ref _retrainCount);
+        private set => Volatile.Write(ref _retrainCount, value);
+    }
+    private int _retrainCount;
 
     /// <summary>
     /// Gets the timestamp of the last retraining event.
     /// </summary>
-    public DateTimeOffset LastRetrainTime { get; private set; }
+    public DateTimeOffset LastRetrainTime
+    {
+        get { lock (_retrainTimeLock) return _lastRetrainTime; }
+        private set { lock (_retrainTimeLock) _lastRetrainTime = value; }
+    }
+    private DateTimeOffset _lastRetrainTime;
+    private readonly object _retrainTimeLock = new();
 
     /// <summary>
     /// Raised when a dictionary retraining completes.
@@ -748,7 +777,7 @@ public sealed class DictionaryRetrainer : IDisposable
         _trainer = new ZstdDictionaryTrainer();
         _policy = policy ?? new AutoRetrainPolicy();
         _sampleBuffer = new ConcurrentQueue<byte[]>();
-        _baselineRatio = initialCompressor.CompressionRatio;
+        BaselineRatio = initialCompressor.CompressionRatio;
         _compressionLevel = compressionLevel;
 
         // Start periodic check timer
@@ -810,7 +839,7 @@ public sealed class DictionaryRetrainer : IDisposable
             double currentRatio = _currentCompressor.CompressionRatio;
 
             // Check if degradation threshold is exceeded
-            if (!_trainer.ShouldRetrain(currentRatio, _baselineRatio, _policy.DegradationThreshold))
+            if (!_trainer.ShouldRetrain(currentRatio, BaselineRatio, _policy.DegradationThreshold))
                 return false;
 
             // Check if we have enough samples
@@ -844,7 +873,7 @@ public sealed class DictionaryRetrainer : IDisposable
             _currentCompressor = newCompressor;
 
             // Update baseline to the new dictionary's expected ratio
-            _baselineRatio = currentRatio * 0.9; // Expect ~10% improvement from retrain
+            BaselineRatio = currentRatio * 0.9; // Expect ~10% improvement from retrain
 
             RetrainCount++;
             LastRetrainTime = DateTimeOffset.UtcNow;
@@ -868,5 +897,6 @@ public sealed class DictionaryRetrainer : IDisposable
     public void Dispose()
     {
         _checkTimer.Dispose();
+        _currentCompressor?.Dispose();
     }
 }

@@ -10,13 +10,12 @@ namespace DataWarehouse.Plugins.UltimateResilience.Strategies.Bulkhead;
 /// <summary>
 /// Thread pool isolation bulkhead strategy.
 /// </summary>
-public sealed class ThreadPoolBulkheadStrategy : ResilienceStrategyBase, IDisposable
+public sealed class ThreadPoolBulkheadStrategy : ResilienceStrategyBase
 {
     private readonly SemaphoreSlim _executionSemaphore;
     private readonly SemaphoreSlim _queueSemaphore;
     private int _activeExecutions;
     private int _queuedItems;
-    private bool _disposed;
 
     private readonly int _maxParallelism;
     private readonly int _maxQueueLength;
@@ -37,12 +36,14 @@ public sealed class ThreadPoolBulkheadStrategy : ResilienceStrategyBase, IDispos
     }
 
     /// <summary>Releases semaphore resources.</summary>
-    public new void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        _disposed = true;
-        _executionSemaphore.Dispose();
-        _queueSemaphore.Dispose();
+        if (disposing)
+        {
+            _executionSemaphore.Dispose();
+            _queueSemaphore.Dispose();
+        }
+        base.Dispose(disposing);
     }
 
     public override string StrategyId => "bulkhead-thread-pool";
@@ -166,11 +167,10 @@ public sealed class ThreadPoolBulkheadStrategy : ResilienceStrategyBase, IDispos
 /// <summary>
 /// Semaphore-based bulkhead strategy for simple concurrency limiting.
 /// </summary>
-public sealed class SemaphoreBulkheadStrategy : ResilienceStrategyBase, IDisposable
+public sealed class SemaphoreBulkheadStrategy : ResilienceStrategyBase
 {
     private readonly SemaphoreSlim _semaphore;
     private int _activeExecutions;
-    private bool _disposed;
 
     private readonly int _maxParallelism;
     private readonly TimeSpan _waitTimeout;
@@ -190,11 +190,13 @@ public sealed class SemaphoreBulkheadStrategy : ResilienceStrategyBase, IDisposa
     }
 
     /// <summary>Releases semaphore resources.</summary>
-    public new void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        _disposed = true;
-        _semaphore.Dispose();
+        if (disposing)
+        {
+            _semaphore.Dispose();
+        }
+        base.Dispose(disposing);
     }
 
     public override string StrategyId => "bulkhead-semaphore";
@@ -341,12 +343,8 @@ public sealed class PartitionBulkheadStrategy : ResilienceStrategyBase
     public void ConfigurePartition(string partitionKey, int maxParallelism)
     {
         _partitionSizes[partitionKey] = maxParallelism;
-
-        // Update existing semaphore if it exists
-        if (_partitions.TryGetValue(partitionKey, out var existing))
-        {
-            // Can't resize SemaphoreSlim, so we leave it - new config applies on next creation
-        }
+        // LOW-3742: Removed dead TryGetValue block — SemaphoreSlim cannot be resized.
+        // New config applies on next partition creation (GetOrAdd in GetOrCreatePartition).
     }
 
     /// <summary>
@@ -598,14 +596,10 @@ public sealed class AdaptiveBulkheadStrategy : ResilienceStrategyBase
         _currentCapacity = baseCapacity;
         _targetLatency = targetLatency;
         _adaptationInterval = adaptationInterval;
-        _semaphore = new SemaphoreSlim(maxCapacity, maxCapacity);
+        // Initialize semaphore at base capacity directly — avoid blocking Wait() calls
+        // in the constructor which can block the thread pool if called from an async context.
+        _semaphore = new SemaphoreSlim(baseCapacity, maxCapacity);
         _lastAdaptation = DateTimeOffset.UtcNow;
-
-        // Initially restrict to base capacity
-        for (int i = 0; i < maxCapacity - baseCapacity; i++)
-        {
-            _semaphore.Wait();
-        }
     }
 
     public override string StrategyId => "bulkhead-adaptive";
@@ -697,9 +691,13 @@ public sealed class AdaptiveBulkheadStrategy : ResilienceStrategyBase
     {
         var startTime = DateTimeOffset.UtcNow;
 
+        int snapshotCapacity;
         lock (_adaptLock)
         {
             Adapt();
+            // LOW-3739: Capture _currentCapacity inside the lock so the reject message
+            // reflects the post-Adapt value rather than a potentially stale read.
+            snapshotCapacity = _currentCapacity;
         }
 
         if (!await _semaphore.WaitAsync(TimeSpan.Zero, cancellationToken))
@@ -707,10 +705,10 @@ public sealed class AdaptiveBulkheadStrategy : ResilienceStrategyBase
             return new ResilienceResult<T>
             {
                 Success = false,
-                Exception = new BulkheadRejectedException($"Adaptive bulkhead is full (capacity: {_currentCapacity})"),
+                Exception = new BulkheadRejectedException($"Adaptive bulkhead is full (capacity: {snapshotCapacity})"),
                 Attempts = 0,
                 TotalDuration = TimeSpan.Zero,
-                Metadata = { ["currentCapacity"] = _currentCapacity }
+                Metadata = { ["currentCapacity"] = snapshotCapacity }
             };
         }
 

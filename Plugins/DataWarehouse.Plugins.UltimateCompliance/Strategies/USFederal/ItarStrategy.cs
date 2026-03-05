@@ -12,6 +12,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
     /// </summary>
     public sealed class ItarStrategy : ComplianceStrategyBase
     {
+        // LOW-1557: ITAR restricted country lists change via regulation; the default set covers
+        // the 22 CFR Part 126.1 embargoed countries as of the strategy's last review date.
+        // Override via configuration key "RestrictedCountries" (comma-separated ISO-2 codes).
         private readonly HashSet<string> _restrictedCountries = new(StringComparer.OrdinalIgnoreCase)
         {
             "CN", "RU", "IR", "KP", "SY", "CU", "VE"
@@ -29,7 +32,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("itar.check");
+            IncrementCounter("itar.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -38,9 +41,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
             CheckForeignPersonAccess(context, violations, recommendations);
             CheckRegistrationRequirement(context, violations, recommendations);
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -55,8 +59,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckExportLicense(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.DataClassification.Equals("itar", StringComparison.OrdinalIgnoreCase) ||
-                context.DataSubjectCategories.Contains("defense-article", StringComparer.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("itar", StringComparison.OrdinalIgnoreCase) ||
+                (context.DataSubjectCategories != null && context.DataSubjectCategories.Contains("defense-article", StringComparer.OrdinalIgnoreCase)))
             {
                 if (!string.IsNullOrEmpty(context.DestinationLocation) &&
                     !context.DestinationLocation.Equals("US", StringComparison.OrdinalIgnoreCase))
@@ -90,7 +94,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckTechnicalData(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.DataSubjectCategories.Contains("technical-data", StringComparer.OrdinalIgnoreCase))
+            if (context.DataSubjectCategories != null && context.DataSubjectCategories.Contains("technical-data", StringComparer.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("UsmlCategory", out var categoryObj) ||
                     categoryObj is not string category ||
@@ -171,16 +175,29 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
         }
     
     /// <inheritdoc/>
+    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
+    {
+        // LOW-1557: Allow operators to supply an up-to-date restricted country list.
+        if (configuration.TryGetValue("RestrictedCountries", out var listObj) && listObj is string codes && !string.IsNullOrEmpty(codes))
+        {
+            _restrictedCountries.Clear();
+            foreach (var code in codes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                _restrictedCountries.Add(code);
+        }
+        return base.InitializeAsync(configuration, cancellationToken);
+    }
+
+    /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("itar.initialized");
+            IncrementCounter("itar.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("itar.shutdown");
+            IncrementCounter("itar.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

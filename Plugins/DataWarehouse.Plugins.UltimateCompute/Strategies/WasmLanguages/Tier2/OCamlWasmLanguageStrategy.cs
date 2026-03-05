@@ -31,6 +31,9 @@ internal sealed class OCamlWasmLanguageStrategy : WasmLanguageStrategyBase
     public override string StrategyId => "compute.wasm.lang.ocaml";
 
     /// <inheritdoc/>
+    protected override string[] GetToolchainBinaryNames() => new[] { "ocamlopt" };
+
+    /// <inheritdoc/>
     public override string StrategyName => "OCaml WASM Language";
 
     /// <inheritdoc/>

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -34,6 +35,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
         private readonly BoundedDictionary<string, FederatedSession> _sessions = new BoundedDictionary<string, FederatedSession>(1000);
         private readonly BoundedDictionary<string, IdentityMapping> _identityMappings = new BoundedDictionary<string, IdentityMapping>(1000);
         private readonly BoundedDictionary<string, TokenCache> _tokenCache = new BoundedDictionary<string, TokenCache>(1000);
+        private readonly ConcurrentDictionary<string, SemaphoreSlim> _tokenValidationLocks = new();
         private readonly BoundedDictionary<string, ClaimsTransformation> _claimsTransformations = new BoundedDictionary<string, ClaimsTransformation>(1000);
         private readonly HttpClient _httpClient;
 
@@ -201,7 +203,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
                 };
             }
 
-            // Check token cache
+            // Check token cache (fast path — no lock needed for valid hits)
             var cacheKey = ComputeTokenCacheKey(token);
             if (_tokenCache.TryGetValue(cacheKey, out var cached) &&
                 cached.ExpiresAt > DateTime.UtcNow)
@@ -209,42 +211,61 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
                 return cached.ValidationResult;
             }
 
+            // Serialize concurrent validation for the same cache key to prevent duplicate
+            // IdP round-trips (finding 1170: token refresh race on concurrent misses).
+            var keyLock = _tokenValidationLocks.GetOrAdd(cacheKey, _ => new SemaphoreSlim(1, 1));
+            await keyLock.WaitAsync(cancellationToken).ConfigureAwait(false);
             TokenValidationResult result;
-
             try
             {
-                result = idp.Protocol switch
+                // Re-check inside the lock — a previous waiter may have populated the cache.
+                if (_tokenCache.TryGetValue(cacheKey, out cached) &&
+                    cached.ExpiresAt > DateTime.UtcNow)
                 {
-                    FederationProtocol.OIDC => await ValidateOidcTokenAsync(token, idp, cancellationToken),
-                    FederationProtocol.OAuth2 => await ValidateOAuth2TokenAsync(token, idp, cancellationToken),
-                    FederationProtocol.SAML2 => ValidateSamlToken(token, idp),
-                    FederationProtocol.WsFederation => ValidateWsFederationToken(token, idp),
-                    _ => new TokenValidationResult
+                    return cached.ValidationResult;
+                }
+
+                try
+                {
+                    result = idp.Protocol switch
+                    {
+                        FederationProtocol.OIDC => await ValidateOidcTokenAsync(token, idp, cancellationToken),
+                        FederationProtocol.OAuth2 => await ValidateOAuth2TokenAsync(token, idp, cancellationToken),
+                        FederationProtocol.SAML2 => ValidateSamlToken(token, idp),
+                        FederationProtocol.WsFederation => ValidateWsFederationToken(token, idp),
+                        _ => new TokenValidationResult
+                        {
+                            IsValid = false,
+                            Error = "Unsupported federation protocol",
+                            ErrorCode = TokenValidationError.UnsupportedProtocol
+                        }
+                    };
+                }
+                catch (Exception ex)
+                {
+                    result = new TokenValidationResult
                     {
                         IsValid = false,
-                        Error = "Unsupported federation protocol",
-                        ErrorCode = TokenValidationError.UnsupportedProtocol
-                    }
-                };
-            }
-            catch (Exception ex)
-            {
-                result = new TokenValidationResult
-                {
-                    IsValid = false,
-                    Error = $"Token validation failed: {ex.Message}",
-                    ErrorCode = TokenValidationError.ValidationFailed
-                };
-            }
+                        Error = $"Token validation failed: {ex.Message}",
+                        ErrorCode = TokenValidationError.ValidationFailed
+                    };
+                }
 
-            // Cache the result
-            if (result.IsValid)
-            {
-                _tokenCache[cacheKey] = new TokenCache
+                // Cache the result
+                if (result.IsValid)
                 {
-                    ValidationResult = result,
-                    ExpiresAt = DateTime.UtcNow.Add(_tokenCacheDuration)
-                };
+                    _tokenCache[cacheKey] = new TokenCache
+                    {
+                        ValidationResult = result,
+                        ExpiresAt = DateTime.UtcNow.Add(_tokenCacheDuration)
+                    };
+                }
+            }
+            finally
+            {
+                keyLock.Release();
+                // Clean up the per-key lock after use to prevent unbounded growth.
+                _tokenValidationLocks.TryRemove(cacheKey, out _);
             }
 
             return result;
@@ -463,18 +484,55 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
                 var samlBytes = Convert.FromBase64String(token);
                 var samlXml = Encoding.UTF8.GetString(samlBytes);
 
-                // Parse SAML assertion (simplified - production would use a proper SAML library)
-                // This is a placeholder for SAML validation logic
+                // Parse SAML assertion - extract NameID and Issuer from SAML XML
+                if (!samlXml.Contains("<saml", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new TokenValidationResult
+                    {
+                        IsValid = false,
+                        Error = "Invalid SAML assertion: not valid SAML XML",
+                        ErrorCode = TokenValidationError.ValidationFailed
+                    };
+                }
+
+                // Extract NameID from SAML assertion
+                var nameIdMatch = System.Text.RegularExpressions.Regex.Match(samlXml, @"<saml[^:]*:NameID[^>]*>([^<]+)</");
+                var issuerMatch = System.Text.RegularExpressions.Regex.Match(samlXml, @"<saml[^:]*:Issuer[^>]*>([^<]+)</");
+
+                var subjectId = nameIdMatch.Success ? nameIdMatch.Groups[1].Value : null;
+                var assertionIssuer = issuerMatch.Success ? issuerMatch.Groups[1].Value : null;
+
+                if (string.IsNullOrEmpty(subjectId))
+                {
+                    return new TokenValidationResult
+                    {
+                        IsValid = false,
+                        Error = "SAML assertion missing NameID element",
+                        ErrorCode = TokenValidationError.ValidationFailed
+                    };
+                }
+
+                // Validate issuer matches configured IdP
+                if (!string.IsNullOrEmpty(idp.Issuer) && assertionIssuer != idp.Issuer)
+                {
+                    return new TokenValidationResult
+                    {
+                        IsValid = false,
+                        Error = $"SAML issuer mismatch: expected '{idp.Issuer}', got '{assertionIssuer}'",
+                        ErrorCode = TokenValidationError.InvalidIssuer
+                    };
+                }
+
                 var claims = new List<FederatedClaim>
                 {
-                    new() { Type = ClaimTypes.NameIdentifier, Value = "saml-subject", Issuer = idp.Issuer ?? idp.Id }
+                    new() { Type = ClaimTypes.NameIdentifier, Value = subjectId, Issuer = assertionIssuer ?? idp.Id }
                 };
 
                 return new TokenValidationResult
                 {
                     IsValid = true,
                     IdpId = idp.Id,
-                    SubjectId = "saml-subject",
+                    SubjectId = subjectId,
                     Claims = claims.AsReadOnly(),
                     TokenType = TokenType.SamlAssertion
                 };
@@ -492,20 +550,72 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
 
         private TokenValidationResult ValidateWsFederationToken(string token, IdentityProvider idp)
         {
-            // WS-Federation token validation (simplified)
-            return new TokenValidationResult
+            // WS-Federation tokens are typically SAML assertions wrapped in WS-Trust envelope
+            // Validate the token is not empty and has expected structure
+            if (string.IsNullOrWhiteSpace(token))
             {
-                IsValid = true,
-                IdpId = idp.Id,
-                SubjectId = "ws-fed-subject",
-                Claims = new List<FederatedClaim>().AsReadOnly(),
-                TokenType = TokenType.WsFederation
-            };
+                return new TokenValidationResult
+                {
+                    IsValid = false,
+                    Error = "Empty WS-Federation token",
+                    ErrorCode = TokenValidationError.ValidationFailed
+                };
+            }
+
+            try
+            {
+                var tokenBytes = Convert.FromBase64String(token);
+                var tokenXml = Encoding.UTF8.GetString(tokenBytes);
+
+                // Validate it contains WS-Trust/SAML elements
+                if (!tokenXml.Contains("RequestSecurityTokenResponse", StringComparison.OrdinalIgnoreCase) &&
+                    !tokenXml.Contains("saml", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new TokenValidationResult
+                    {
+                        IsValid = false,
+                        Error = "Invalid WS-Federation token format: missing expected XML elements",
+                        ErrorCode = TokenValidationError.ValidationFailed
+                    };
+                }
+
+                // Extract subject from inner SAML assertion
+                var nameIdMatch = System.Text.RegularExpressions.Regex.Match(tokenXml, @"<saml[^:]*:NameID[^>]*>([^<]+)</");
+                var subjectId = nameIdMatch.Success ? nameIdMatch.Groups[1].Value : null;
+
+                if (string.IsNullOrEmpty(subjectId))
+                {
+                    return new TokenValidationResult
+                    {
+                        IsValid = false,
+                        Error = "WS-Federation token missing subject identifier",
+                        ErrorCode = TokenValidationError.ValidationFailed
+                    };
+                }
+
+                return new TokenValidationResult
+                {
+                    IsValid = true,
+                    IdpId = idp.Id,
+                    SubjectId = subjectId,
+                    Claims = new List<FederatedClaim>().AsReadOnly(),
+                    TokenType = TokenType.WsFederation
+                };
+            }
+            catch (Exception ex)
+            {
+                return new TokenValidationResult
+                {
+                    IsValid = false,
+                    Error = $"WS-Federation token validation failed: {ex.Message}",
+                    ErrorCode = TokenValidationError.ValidationFailed
+                };
+            }
         }
 
         private async Task<OidcDiscoveryDocument> FetchOidcDiscoveryAsync(string metadataUrl, CancellationToken cancellationToken)
         {
-            var response = await _httpClient.GetAsync(metadataUrl, cancellationToken);
+            using var response = await _httpClient.GetAsync(metadataUrl, cancellationToken);
             response.EnsureSuccessStatusCode();
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
             return JsonSerializer.Deserialize<OidcDiscoveryDocument>(content) ?? new OidcDiscoveryDocument();
@@ -528,7 +638,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
                 ["client_secret"] = idp.ClientSecret ?? ""
             });
 
-            var response = await _httpClient.PostAsync(idp.TokenIntrospectionEndpoint, content, cancellationToken);
+            using var response = await _httpClient.PostAsync(idp.TokenIntrospectionEndpoint, content, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);

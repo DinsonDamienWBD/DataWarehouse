@@ -13,7 +13,7 @@ public sealed class ServiceManager : IDisposable, IAsyncDisposable
     private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
     private readonly List<string> _startOrder = new();
     private ServiceManagerState _state = ServiceManagerState.Stopped;
-    private bool _disposed;
+    private volatile bool _disposed;
 
     /// <summary>
     /// Event raised when a service's health changes.
@@ -172,7 +172,7 @@ public sealed class ServiceManager : IDisposable, IAsyncDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        await _lifecycleLock.WaitAsync();
+        await _lifecycleLock.WaitAsync(TimeSpan.FromSeconds(30));
         try
         {
             if (_state == ServiceManagerState.Stopped)
@@ -233,7 +233,7 @@ public sealed class ServiceManager : IDisposable, IAsyncDisposable
         if (!_services.TryGetValue(serviceId, out var managed))
             throw new InvalidOperationException($"Service '{serviceId}' not found");
 
-        await _lifecycleLock.WaitAsync();
+        await _lifecycleLock.WaitAsync(TimeSpan.FromSeconds(30));
         try
         {
             await StopServiceInternalAsync(managed);

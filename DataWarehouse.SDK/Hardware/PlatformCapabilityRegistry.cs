@@ -147,8 +147,8 @@ namespace DataWarehouse.SDK.Hardware
             if (IsCacheStale())
             {
                 _ = RefreshAsync()
-                    .ContinueWith(t => System.Diagnostics.Debug.WriteLine(
-                        $"[PlatformCapabilityRegistry] Refresh failed: {t.Exception?.InnerException?.Message}"),
+                    .ContinueWith(t => System.Diagnostics.Trace.TraceError(
+                        $"[PlatformCapabilityRegistry] Background refresh failed: {t.Exception?.InnerException?.Message}"),
                         TaskContinuationOptions.OnlyOnFaulted);
             }
 
@@ -179,20 +179,24 @@ namespace DataWarehouse.SDK.Hardware
             if (IsCacheStale())
             {
                 _ = RefreshAsync()
-                    .ContinueWith(t => System.Diagnostics.Debug.WriteLine(
-                        $"[PlatformCapabilityRegistry] Refresh failed: {t.Exception?.InnerException?.Message}"),
+                    .ContinueWith(t => System.Diagnostics.Trace.TraceError(
+                        $"[PlatformCapabilityRegistry] Background refresh failed: {t.Exception?.InnerException?.Message}"),
                         TaskContinuationOptions.OnlyOnFaulted);
             }
 
+            // Snapshot the list under the lock to minimize lock-hold duration;
+            // LINQ filtering and allocation are performed outside the lock.
+            IReadOnlyList<HardwareDevice> snapshot;
             _cacheLock.EnterReadLock();
             try
             {
-                return _devices.Where(d => d.Type.HasFlag(typeFilter)).ToList().AsReadOnly();
+                snapshot = _devices;
             }
             finally
             {
                 _cacheLock.ExitReadLock();
             }
+            return snapshot.Where(d => d.Type.HasFlag(typeFilter)).ToList().AsReadOnly();
         }
 
         /// <inheritdoc/>
@@ -211,8 +215,8 @@ namespace DataWarehouse.SDK.Hardware
             if (IsCacheStale())
             {
                 _ = RefreshAsync()
-                    .ContinueWith(t => System.Diagnostics.Debug.WriteLine(
-                        $"[PlatformCapabilityRegistry] Refresh failed: {t.Exception?.InnerException?.Message}"),
+                    .ContinueWith(t => System.Diagnostics.Trace.TraceError(
+                        $"[PlatformCapabilityRegistry] Background refresh failed: {t.Exception?.InnerException?.Message}"),
                         TaskContinuationOptions.OnlyOnFaulted);
             }
 
@@ -243,8 +247,8 @@ namespace DataWarehouse.SDK.Hardware
             if (IsCacheStale())
             {
                 _ = RefreshAsync()
-                    .ContinueWith(t => System.Diagnostics.Debug.WriteLine(
-                        $"[PlatformCapabilityRegistry] Refresh failed: {t.Exception?.InnerException?.Message}"),
+                    .ContinueWith(t => System.Diagnostics.Trace.TraceError(
+                        $"[PlatformCapabilityRegistry] Background refresh failed: {t.Exception?.InnerException?.Message}"),
                         TaskContinuationOptions.OnlyOnFaulted);
             }
 
@@ -275,20 +279,23 @@ namespace DataWarehouse.SDK.Hardware
             if (IsCacheStale())
             {
                 _ = RefreshAsync()
-                    .ContinueWith(t => System.Diagnostics.Debug.WriteLine(
-                        $"[PlatformCapabilityRegistry] Refresh failed: {t.Exception?.InnerException?.Message}"),
+                    .ContinueWith(t => System.Diagnostics.Trace.TraceError(
+                        $"[PlatformCapabilityRegistry] Background refresh failed: {t.Exception?.InnerException?.Message}"),
                         TaskContinuationOptions.OnlyOnFaulted);
             }
 
+            // Snapshot first, then count outside the lock.
+            IReadOnlyList<HardwareDevice> snapshot2;
             _cacheLock.EnterReadLock();
             try
             {
-                return _devices.Count(d => d.Type.HasFlag(typeFilter));
+                snapshot2 = _devices;
             }
             finally
             {
                 _cacheLock.ExitReadLock();
             }
+            return snapshot2.Count(d => d.Type.HasFlag(typeFilter));
         }
 
         /// <inheritdoc/>

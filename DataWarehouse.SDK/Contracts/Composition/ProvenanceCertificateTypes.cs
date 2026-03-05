@@ -154,16 +154,22 @@ namespace DataWarehouse.SDK.Contracts.Composition
                 var current = Chain[i];
                 var next = Chain[i + 1];
 
-                // Check hash chain continuity
-                if (current.AfterHash != null && next.BeforeHash != null)
+                // Check hash chain continuity — both hashes must be present; a null AfterHash
+                // is not a valid link and must be treated as a broken chain to prevent bypass.
+                if (current.AfterHash == null || next.BeforeHash == null)
                 {
-                    if (current.AfterHash != next.BeforeHash)
-                    {
-                        return CertificateVerificationResult.CreateInvalid(
-                            chainLength,
-                            i,
-                            $"Hash chain broken between entry {i} and {i + 1}: AfterHash does not match BeforeHash");
-                    }
+                    return CertificateVerificationResult.CreateInvalid(
+                        chainLength,
+                        i,
+                        $"Hash chain broken between entry {i} and {i + 1}: AfterHash or BeforeHash is null");
+                }
+
+                if (current.AfterHash != next.BeforeHash)
+                {
+                    return CertificateVerificationResult.CreateInvalid(
+                        chainLength,
+                        i,
+                        $"Hash chain broken between entry {i} and {i + 1}: AfterHash does not match BeforeHash");
                 }
             }
 
@@ -183,23 +189,59 @@ namespace DataWarehouse.SDK.Contracts.Composition
         /// <summary>
         /// Computes SHA256 hash of the certificate chain for tamper detection.
         /// Uses canonical JSON serialization for consistency.
+        /// Note: property order is stable because CertificateEntry is a record with fixed
+        /// declared property order; dictionary fields within entries are sorted explicitly.
         /// </summary>
         private static string ComputeCertificateHash(IReadOnlyList<CertificateEntry> chain)
         {
-            // Serialize to canonical JSON (sorted keys, no whitespace)
+            // Serialize to canonical JSON (no whitespace, camelCase).
+            // CertificateEntry is a record — System.Text.Json emits properties in declaration
+            // order, which is deterministic. Any Dictionary<string,*> fields in entries must
+            // be sorted before serialization to ensure canonical form.
             var options = new JsonSerializerOptions
             {
                 WriteIndented = false,
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase
             };
 
-            var json = JsonSerializer.Serialize(chain, options);
-            var bytes = Encoding.UTF8.GetBytes(json);
+            // Produce a canonical representation by converting to sorted JsonNode tree
+            var rawJson = JsonSerializer.Serialize(chain, options);
+            var node = System.Text.Json.Nodes.JsonNode.Parse(rawJson);
+            var canonicalJson = SortJsonNode(node)?.ToJsonString() ?? rawJson;
+            var bytes = Encoding.UTF8.GetBytes(canonicalJson);
 
             using var sha256 = SHA256.Create();
             var hashBytes = sha256.ComputeHash(bytes);
 
             return Convert.ToHexString(hashBytes).ToLowerInvariant();
+        }
+
+        /// <summary>
+        /// Recursively sorts all object keys alphabetically to produce canonical JSON.
+        /// </summary>
+        private static System.Text.Json.Nodes.JsonNode? SortJsonNode(System.Text.Json.Nodes.JsonNode? node)
+        {
+            if (node is System.Text.Json.Nodes.JsonObject obj)
+            {
+                var sorted = new System.Text.Json.Nodes.JsonObject();
+                foreach (var key in obj.Select(kv => kv.Key).OrderBy(k => k, StringComparer.Ordinal))
+                {
+                    sorted[key] = SortJsonNode(obj[key]?.DeepClone());
+                }
+                return sorted;
+            }
+
+            if (node is System.Text.Json.Nodes.JsonArray arr)
+            {
+                var sortedArr = new System.Text.Json.Nodes.JsonArray();
+                foreach (var item in arr)
+                {
+                    sortedArr.Add(SortJsonNode(item?.DeepClone()));
+                }
+                return sortedArr;
+            }
+
+            return node?.DeepClone();
         }
     }
 

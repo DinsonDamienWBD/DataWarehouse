@@ -298,9 +298,14 @@ public sealed class JinaEmbeddingProvider : EmbeddingProviderBase
             var result = await GetEmbeddingAsync("test", ct);
             return result.Length > 0;
         }
-        catch
+        catch (OperationCanceledException)
         {
-            Debug.WriteLine($"Caught exception in JinaEmbeddingProvider.cs");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // P2-3121: Surface connectivity failures via Trace so they are visible in production.
+            Trace.TraceWarning($"[JinaEmbeddingProvider] ValidateConnectionAsync failed: {ex.GetType().Name}: {ex.Message}");
             return false;
         }
     }

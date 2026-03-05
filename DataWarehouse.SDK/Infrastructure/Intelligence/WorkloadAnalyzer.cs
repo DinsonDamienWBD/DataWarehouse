@@ -92,9 +92,9 @@ public sealed class WorkloadAnalyzer : IAiAdvisor
     private int _dailyWriteIndex;
     private int _dailyCount;
 
-    // Session burst tracking
+    // Session burst tracking (accessed via Interlocked for thread safety)
     private int _burstCount;
-    private DateTimeOffset _lastBurstAt;
+    private long _lastBurstAtTicks; // stores DateTimeOffset.UtcNow.Ticks via Interlocked
 
     /// <summary>Number of 1-minute buckets (24 hours).</summary>
     private const int MinuteBucketCount = 1440;
@@ -127,7 +127,7 @@ public sealed class WorkloadAnalyzer : IAiAdvisor
         _dailyCount = 0;
 
         _burstCount = 0;
-        _lastBurstAt = DateTimeOffset.MinValue;
+        _lastBurstAtTicks = DateTimeOffset.MinValue.Ticks;
 
         _currentProfile = new WorkloadProfile(
             ObservationsPerSecond: 0,
@@ -204,8 +204,8 @@ public sealed class WorkloadAnalyzer : IAiAdvisor
 
         if (isBurst)
         {
-            _burstCount++;
-            _lastBurstAt = now;
+            Interlocked.Increment(ref _burstCount);
+            Interlocked.Exchange(ref _lastBurstAtTicks, now.Ticks);
         }
 
         // Classify time of day and seasonal trend
@@ -218,8 +218,8 @@ public sealed class WorkloadAnalyzer : IAiAdvisor
             TimeOfDay: timeOfDay,
             Season: season,
             IsBurstDetected: isBurst,
-            LastBurstAt: _lastBurstAt,
-            BurstCount: _burstCount
+            LastBurstAt: new DateTimeOffset(Interlocked.Read(ref _lastBurstAtTicks), TimeSpan.Zero),
+            BurstCount: Interlocked.CompareExchange(ref _burstCount, 0, 0)
         );
 
         return Task.CompletedTask;

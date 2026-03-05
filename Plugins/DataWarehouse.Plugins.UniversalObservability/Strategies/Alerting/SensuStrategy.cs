@@ -52,10 +52,14 @@ public sealed class SensuStrategy : ObservabilityStrategyBase
         _apiKey = apiKey;
         _namespace = sensuNamespace;
 
-        if (!string.IsNullOrEmpty(apiKey))
-        {
-            _httpClient.DefaultRequestHeaders.Add("Authorization", $"Key {apiKey}");
-        }
+        // Do NOT set DefaultRequestHeaders — inject per-request to avoid thread-safety issues.
+    }
+
+    /// <summary>Adds the Sensu API key to the request headers (per-request, thread-safe).</summary>
+    private void AddApiKey(HttpRequestMessage request)
+    {
+        if (!string.IsNullOrEmpty(_apiKey))
+            request.Headers.Add("Authorization", $"Key {_apiKey}");
     }
 
     /// <inheritdoc/>
@@ -161,24 +165,41 @@ public sealed class SensuStrategy : ObservabilityStrategyBase
         await SendEventsAsync(new[] { sensuEvent }, ct);
     }
 
+    // P2-4573: Send each event independently so a failure on event N does not abandon N+1…end.
+    // Collect per-event results; log a warning summary if any failed.
     private async Task SendEventsAsync(IEnumerable<object> events, CancellationToken ct)
     {
-        try
+        var eventList = events.ToList();
+        var url = $"{_apiUrl}/api/core/v2/namespaces/{_namespace}/events";
+        var failed = 0;
+
+        foreach (var evt in eventList)
         {
-            foreach (var evt in events)
+            try
             {
                 var json = JsonSerializer.Serialize(evt);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
-                var url = $"{_apiUrl}/api/core/v2/namespaces/{_namespace}/events";
-
-                var response = await _httpClient.PostAsync(url, content, ct);
-                response.EnsureSuccessStatusCode();
+                using var sensuRequest = new HttpRequestMessage(HttpMethod.Post, url) { Content = content };
+                AddApiKey(sensuRequest);
+                using var response = await _httpClient.SendAsync(sensuRequest, ct);
+                if (!response.IsSuccessStatusCode)
+                {
+                    failed++;
+                    System.Diagnostics.Trace.TraceWarning(
+                        "[Sensu] Event POST returned {0} — event not delivered.", (int)response.StatusCode);
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                failed++;
+                System.Diagnostics.Trace.TraceWarning(
+                    "[Sensu] Event POST failed: {0}", ex.Message);
             }
         }
-        catch (HttpRequestException)
-        {
-            // Sensu backend unavailable - events lost
-        }
+
+        if (failed > 0)
+            System.Diagnostics.Trace.TraceWarning(
+                "[Sensu] {0}/{1} events failed to deliver.", failed, eventList.Count);
     }
 
     private static int DetermineStatus(MetricValue metric)
@@ -202,7 +223,9 @@ public sealed class SensuStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{_apiUrl}/health", cancellationToken);
+            using var healthRequest = new HttpRequestMessage(HttpMethod.Get, $"{_apiUrl}/health");
+            AddApiKey(healthRequest);
+            using var response = await _httpClient.SendAsync(healthRequest, cancellationToken);
 
             return new HealthCheckResult(
                 IsHealthy: response.IsSuccessStatusCode,
@@ -236,21 +259,16 @@ public sealed class SensuStrategy : ObservabilityStrategyBase
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("sensu.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     protected override void Dispose(bool disposing)
     {
+                _apiKey = string.Empty;
         if (disposing)
         {
             _httpClient.Dispose();

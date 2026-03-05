@@ -60,11 +60,14 @@ internal sealed class ProcessExecutionStrategy : ComputeRuntimeStrategyBase
             var maxMem = GetMaxMemoryBytes(task, 1024L * 1024 * 1024); // 1 GB default
 
             // Create temp script file for complex commands
+            // Use Path.GetTempFileName() then move to avoid orphaned zero-byte .tmp file
             string? scriptFile = null;
             if (codeStr.Contains('\n') || codeStr.Length > 8000)
             {
                 var ext = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? ".cmd" : ".sh";
-                scriptFile = Path.GetTempFileName() + ext;
+                var tmpBase = Path.GetTempFileName();
+                scriptFile = Path.ChangeExtension(tmpBase, ext);
+                File.Move(tmpBase, scriptFile); // rename removes orphaned .tmp file
                 await File.WriteAllTextAsync(scriptFile, codeStr, cancellationToken);
 
                 if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -117,6 +120,10 @@ internal sealed class ProcessExecutionStrategy : ComputeRuntimeStrategyBase
 internal sealed class ServerlessExecutionStrategy : ComputeRuntimeStrategyBase
 {
     /// <inheritdoc/>
+    // Local in-process execution path is a simplified stub; AWS Lambda and Azure Functions paths are production-ready.
+    public override bool IsProductionReady => false;
+
+    /// <inheritdoc/>
     public override string StrategyId => "compute.serverless.function";
     /// <inheritdoc/>
     public override string StrategyName => "Serverless Function Execution";
@@ -158,12 +165,19 @@ internal sealed class ServerlessExecutionStrategy : ComputeRuntimeStrategyBase
     {
         // AWS Lambda invocation via CLI (aws lambda invoke)
         var functionName = task.EntryPoint ?? task.Metadata?["function_name"]?.ToString() ?? throw new ArgumentException("Lambda function name required");
-        var payload = task.GetInputDataAsString();
+        // P2-1688: validate function name — Lambda names are [a-zA-Z0-9_-]{1,64} or ARNs.
+        // Reject names with spaces or shell metacharacters to prevent CLI injection.
+        if (functionName.IndexOfAny([' ', '\t', '\n', '\r', '"', '\'', '`', '$', '&', '|', ';', '<', '>']) >= 0)
+            throw new ArgumentException($"Lambda function name contains invalid characters: {functionName}");
 
+        // Write payload to a temp file and pass via --payload fileb:// to prevent shell injection
+        // and to handle large payloads or binary data that cannot be safely embedded in args.
+        var payloadFile = Path.GetTempFileName();
         var outputFile = Path.GetTempFileName();
         try
         {
-            var args = $"lambda invoke --function-name {functionName} --payload \"{payload.Replace("\"", "\\\"")}\" \"{outputFile}\"";
+            await File.WriteAllBytesAsync(payloadFile, task.InputData.ToArray(), ct);
+            var args = $"lambda invoke --function-name \"{functionName}\" --payload fileb://\"{payloadFile}\" \"{outputFile}\"";
             var result = await RunProcessAsync("aws", args,
                 timeout: GetEffectiveTimeout(task),
                 cancellationToken: ct);
@@ -173,16 +187,20 @@ internal sealed class ServerlessExecutionStrategy : ComputeRuntimeStrategyBase
         }
         finally
         {
+            try { File.Delete(payloadFile); } catch { /* cleanup */ }
             try { File.Delete(outputFile); } catch { /* cleanup */ }
         }
     }
+
+    // Shared HttpClient instance — avoids socket exhaustion from per-request instantiation.
+    private static readonly HttpClient SharedAzureHttpClient = new();
 
     private async Task<(byte[] output, string? logs)> ExecuteAzureFunctionAsync(ComputeTask task, CancellationToken ct)
     {
         // Azure Functions invocation via HTTP trigger
         var functionUrl = task.EntryPoint ?? task.Metadata?["function_url"]?.ToString() ?? throw new ArgumentException("Azure Function URL required");
 
-        using var httpClient = new HttpClient();
+        var httpClient = SharedAzureHttpClient;
         using var request = new HttpRequestMessage(HttpMethod.Post, functionUrl);
 
         if (task.InputData.Length > 0)
@@ -191,7 +209,7 @@ internal sealed class ServerlessExecutionStrategy : ComputeRuntimeStrategyBase
         if (task.Metadata?.TryGetValue("function_key", out var key) == true)
             request.Headers.Add("x-functions-key", key?.ToString());
 
-        var response = await httpClient.SendAsync(request, ct);
+        using var response = await httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
 
         var output = await response.Content.ReadAsByteArrayAsync(ct);
@@ -255,7 +273,9 @@ internal sealed class ScriptExecutionStrategy : ComputeRuntimeStrategyBase
     private async Task<(byte[] output, string? logs)> ExecuteCSharpScriptAsync(string code, ComputeTask task, TimeSpan timeout, CancellationToken ct)
     {
         // C# scripting via dotnet-script or csi
-        var scriptFile = Path.GetTempFileName() + ".csx";
+        var _tmpBase1 = Path.GetTempFileName();
+        var scriptFile = Path.ChangeExtension(_tmpBase1, ".csx");
+        File.Move(_tmpBase1, scriptFile);
         try
         {
             // Inject variables from task environment
@@ -283,7 +303,9 @@ internal sealed class ScriptExecutionStrategy : ComputeRuntimeStrategyBase
 
     private async Task<(byte[] output, string? logs)> ExecuteJavaScriptAsync(string code, ComputeTask task, TimeSpan timeout, CancellationToken ct)
     {
-        var scriptFile = Path.GetTempFileName() + ".js";
+        var _tmpBase2 = Path.GetTempFileName();
+        var scriptFile = Path.ChangeExtension(_tmpBase2, ".js");
+        File.Move(_tmpBase2, scriptFile);
         try
         {
             await File.WriteAllTextAsync(scriptFile, code, ct);
@@ -303,7 +325,9 @@ internal sealed class ScriptExecutionStrategy : ComputeRuntimeStrategyBase
 
     private async Task<(byte[] output, string? logs)> ExecutePythonScriptAsync(string code, ComputeTask task, TimeSpan timeout, CancellationToken ct)
     {
-        var scriptFile = Path.GetTempFileName() + ".py";
+        var _tmpBase3 = Path.GetTempFileName();
+        var scriptFile = Path.ChangeExtension(_tmpBase3, ".py");
+        File.Move(_tmpBase3, scriptFile);
         try
         {
             await File.WriteAllTextAsync(scriptFile, code, ct);
@@ -592,7 +616,11 @@ internal sealed class GpuComputeAbstractionStrategy : ComputeRuntimeStrategyBase
                 }
             }
 
-            return (EncodeOutput("GPU compute completed"), "GPU: generic execution");
+            // Non-CUDA GPU paths: OpenCL and HLSL/GLSL require language-specific runtimes.
+            // Both are unsupported without additional tooling; surface a clear error instead of a silent stub.
+            throw new NotSupportedException(
+                $"GPU language '{language}' is not yet supported. Only 'cuda' is implemented. " +
+                "For OpenCL, install the 'clang' + 'OpenCL' SDK. For HLSL/GLSL, use DirectX/Vulkan toolchains.");
         }, cancellationToken);
     }
 }

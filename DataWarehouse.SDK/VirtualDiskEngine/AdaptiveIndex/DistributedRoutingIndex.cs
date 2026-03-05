@@ -428,19 +428,42 @@ public sealed class DistributedRoutingIndex : IAdaptiveIndex, IDisposable
 
     /// <summary>
     /// Merges pre-sorted results from multiple shards into a single sorted sequence.
-    /// Uses a k-way merge with index tracking.
+    /// Uses a heap-based k-way merge for O(n log k) performance instead of O(n log n)
+    /// naive collect-and-sort (Cat 13, finding 734).
     /// </summary>
     private static List<(byte[] Key, long Value)> MergeSortResults(List<(byte[] Key, long Value)>[] shardResults)
     {
-        var merged = new List<(byte[] Key, long Value)>();
+        // Remove empty shards
+        var active = Array.FindAll(shardResults, s => s.Count > 0);
+        if (active.Length == 0) return new List<(byte[], long)>();
 
-        // Simple approach: collect all, sort
-        foreach (var shard in shardResults)
+        // Min-heap of (currentEntry, shardIndex, positionWithinShard)
+        // PriorityQueue<TElement, TPriority>
+        var heap = new PriorityQueue<(int ShardIdx, int Pos), (byte[] Key, long Value)>(
+            active.Length,
+            Comparer<(byte[] Key, long Value)>.Create((x, y) => CompareKeys(x.Key, y.Key)));
+
+        for (int i = 0; i < active.Length; i++)
         {
-            merged.AddRange(shard);
+            heap.Enqueue((i, 0), active[i][0]);
         }
 
-        merged.Sort((a, b) => CompareKeys(a.Key, b.Key));
+        int totalCount = 0;
+        foreach (var s in active) totalCount += s.Count;
+        var merged = new List<(byte[] Key, long Value)>(totalCount);
+
+        while (heap.Count > 0)
+        {
+            heap.TryDequeue(out var pos, out var entry);
+            merged.Add(entry);
+
+            int nextPos = pos.Pos + 1;
+            if (nextPos < active[pos.ShardIdx].Count)
+            {
+                heap.Enqueue((pos.ShardIdx, nextPos), active[pos.ShardIdx][nextPos]);
+            }
+        }
+
         return merged;
     }
 

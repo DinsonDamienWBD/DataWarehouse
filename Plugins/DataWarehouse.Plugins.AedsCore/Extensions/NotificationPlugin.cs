@@ -52,7 +52,7 @@ public sealed class NotificationPlugin : PlatformPluginBase
         {
             case NotificationTier.Silent:
                 // Log only
-                Console.WriteLine($"[Silent] Manifest {manifest.ManifestId}: {manifest.Payload.Name}");
+                System.Diagnostics.Debug.WriteLine($"[Silent] Manifest {manifest.ManifestId}: {manifest.Payload.Name}");
                 break;
 
             case NotificationTier.Toast:
@@ -94,21 +94,28 @@ public sealed class NotificationPlugin : PlatformPluginBase
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
             // Windows toast notification
-            Console.WriteLine($"[Toast/Windows] {title}: {message}");
+            System.Diagnostics.Debug.WriteLine($"[Toast/Windows] {title}: {message}");
             await Task.Delay(100, ct); // Simulate notification display
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {
-            // Linux: notify-send
+            // Linux: notify-send — pass title and message as separate argv entries (no shell quoting).
+            // ProcessStartInfo.ArgumentList prevents shell injection; each entry is passed verbatim.
             try
             {
-                var process = Process.Start(new ProcessStartInfo
+                // Sanitize: strip control characters that could corrupt the notification.
+                var safeTitle = SanitizeForNotification(title);
+                var safeMessage = SanitizeForNotification(message);
+                var psi = new ProcessStartInfo
                 {
                     FileName = "notify-send",
-                    Arguments = $"\"{title}\" \"{message}\"",
                     RedirectStandardOutput = true,
+                    RedirectStandardError = true,
                     UseShellExecute = false
-                });
+                };
+                psi.ArgumentList.Add(safeTitle);
+                psi.ArgumentList.Add(safeMessage);
+                var process = Process.Start(psi);
                 if (process != null)
                 {
                     await process.WaitForExitAsync(ct);
@@ -116,21 +123,29 @@ public sealed class NotificationPlugin : PlatformPluginBase
             }
             catch
             {
-                Console.WriteLine($"[Toast/Linux] {title}: {message}");
+                System.Diagnostics.Debug.WriteLine($"[Toast/Linux] {title}: {message}");
             }
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
         {
-            // macOS: osascript
+            // macOS: osascript — build the AppleScript string safely without interpolating user data
+            // into the shell command. We use ArgumentList to avoid shell interpretation.
             try
             {
-                var process = Process.Start(new ProcessStartInfo
+                // Sanitize: replace double-quotes and backslashes to prevent AppleScript injection.
+                var safeTitle = SanitizeForAppleScript(title);
+                var safeMessage = SanitizeForAppleScript(message);
+                var appleScript = $"display notification \"{safeMessage}\" with title \"{safeTitle}\"";
+                var psi = new ProcessStartInfo
                 {
                     FileName = "osascript",
-                    Arguments = $"-e 'display notification \"{message}\" with title \"{title}\"'",
                     RedirectStandardOutput = true,
+                    RedirectStandardError = true,
                     UseShellExecute = false
-                });
+                };
+                psi.ArgumentList.Add("-e");
+                psi.ArgumentList.Add(appleScript);
+                var process = Process.Start(psi);
                 if (process != null)
                 {
                     await process.WaitForExitAsync(ct);
@@ -138,23 +153,37 @@ public sealed class NotificationPlugin : PlatformPluginBase
             }
             catch
             {
-                Console.WriteLine($"[Toast/macOS] {title}: {message}");
+                System.Diagnostics.Debug.WriteLine($"[Toast/macOS] {title}: {message}");
             }
         }
         else
         {
             // Fallback: console
-            Console.WriteLine($"[Toast] {title}: {message}");
+            System.Diagnostics.Debug.WriteLine($"[Toast] {title}: {message}");
             Console.Beep();
         }
     }
 
+    /// <summary>
+    /// Removes characters that could be misinterpreted by notification daemons.
+    /// Strips ASCII control characters (0x00-0x1F, 0x7F).
+    /// </summary>
+    private static string SanitizeForNotification(string input)
+        => new string(input.Where(c => c >= 0x20 && c != 0x7F).ToArray());
+
+    /// <summary>
+    /// Escapes characters that have meaning inside an AppleScript double-quoted string.
+    /// Replaces backslash then double-quote so they are literal in the resulting string.
+    /// </summary>
+    private static string SanitizeForAppleScript(string input)
+        => SanitizeForNotification(input).Replace("\\", "\\\\").Replace("\"", "\\\"");
+
     private async Task ShowModalAsync(string title, string message, CancellationToken ct)
     {
         // Modal requires persistent UI - for CLI, use console prompt
-        Console.WriteLine($"[Modal] {title}");
-        Console.WriteLine($"Message: {message}");
-        Console.WriteLine("Press ENTER to acknowledge...");
+        System.Diagnostics.Debug.WriteLine($"[Modal] {title}");
+        System.Diagnostics.Debug.WriteLine($"Message: {message}");
+        System.Diagnostics.Debug.WriteLine("Press ENTER to acknowledge...");
         await Task.Delay(100, ct);
         // In GUI, this would show an actual modal dialog
     }

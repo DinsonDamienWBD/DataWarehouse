@@ -95,7 +95,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 SslOptions = new SslClientAuthenticationOptions
                 {
                     RemoteCertificateValidationCallback = (sender, cert, chain, errors) =>
-                        errors == SslPolicyErrors.None,
+                        errors == SslPolicyErrors.None && chain?.ChainElements.Count > 0 && chain?.ChainElements.Count > 0,
                     EnabledSslProtocols = System.Security.Authentication.SslProtocols.Tls13
                 }
             };
@@ -143,7 +143,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
 
             var derivedSessionKey = DeriveSessionKey(classicalKeyMaterial, sessionNonce, serverPublicKey);
 
+            client.DefaultRequestHeaders.Remove("X-PQC-Session");
             client.DefaultRequestHeaders.Add("X-PQC-Session", sessionId);
+            client.DefaultRequestHeaders.Remove("X-PQC-Algorithm");
             client.DefaultRequestHeaders.Add("X-PQC-Algorithm", negotiatedKem);
 
             if (!string.IsNullOrEmpty(config.AuthCredential))
@@ -174,7 +176,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             var client = handle.GetConnection<HttpClient>();
-            var response = await client.GetAsync("/api/v1/pqc/session-status", ct);
+            using var response = await client.GetAsync("/api/v1/pqc/session-status", ct);
             if (!response.IsSuccessStatusCode) return false;
 
             var status = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
@@ -202,7 +204,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             var sw = Stopwatch.StartNew();
             var client = handle.GetConnection<HttpClient>();
 
-            var response = await client.GetAsync("/api/v1/pqc/health", ct);
+            using var response = await client.GetAsync("/api/v1/pqc/health", ct);
             sw.Stop();
 
             if (!response.IsSuccessStatusCode)

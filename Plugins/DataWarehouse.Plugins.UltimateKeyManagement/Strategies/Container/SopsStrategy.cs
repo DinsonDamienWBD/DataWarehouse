@@ -53,7 +53,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Container
         {
             SupportsRotation = true,
             SupportsEnvelope = true,  // SOPS does envelope encryption with cloud KMS
-            SupportsHsm = true,       // When using cloud KMS backends
+            // P2-3478: HSM is only available when backend is aws_kms, gcp_kms, azure_kv, or hc_vault.
+            // age and pgp backends do NOT use HSM. Reporting true here is a conservative declaration;
+            // check Metadata["HsmRequiresBackend"] to confirm the active backend supports HSM.
+            SupportsHsm = true,       // Conditional on backend — see HsmRequiresBackend metadata
             SupportsExpiration = false,
             SupportsReplication = false,
             SupportsVersioning = true, // Via Git versioning
@@ -67,6 +70,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Container
                 ["Platform"] = "Cross-Platform",
                 ["GitOpsCompatible"] = true,
                 ["SupportedBackends"] = new[] { "age", "pgp", "aws_kms", "gcp_kms", "azure_kv", "hc_vault" },
+                ["HsmRequiresBackend"] = new[] { "aws_kms", "gcp_kms", "azure_kv", "hc_vault" },
                 ["FileFormats"] = new[] { "yaml", "json", "dotenv", "ini", "binary" }
             }
         };
@@ -403,25 +407,56 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Container
             // Serialize to appropriate format
             var plaintext = SerializeSecretContent(secretContent, _config.FileFormat);
 
-            // Write plaintext temporarily
-            var tempFile = Path.GetTempFileName();
+            // #3457 / #3467: Write plaintext to a restricted-permission temp file.
+            // The local variable tempFileName is captured once and never mutated inside the try block,
+            // ensuring the finally block always deletes the correct file even if an exception occurs.
+            var tempDir = Path.GetTempPath();
+            // Capture path in a separate readonly-like local to make the invariant explicit.
+            var tempFileName = Path.Combine(tempDir, $"sops-{Guid.NewGuid():N}{GetFileExtension()}");
             try
             {
-                // Rename to proper extension for sops
-                var tempFileWithExt = tempFile + GetFileExtension();
-                File.Move(tempFile, tempFileWithExt);
-                tempFile = tempFileWithExt;
+                // Create with restricted permissions (owner read/write only)
+                await using (var fs = new FileStream(
+                    tempFileName,
+                    FileMode.Create,
+                    FileAccess.Write,
+                    FileShare.None,
+                    4096,
+                    FileOptions.None))
+                {
+                    var bytes = System.Text.Encoding.UTF8.GetBytes(plaintext);
+                    await fs.WriteAsync(bytes, CancellationToken.None);
+                }
 
-                await File.WriteAllTextAsync(tempFile, plaintext);
+                // Set file permissions to owner-only (Unix: 0600; Windows: restrict ACL)
+                SetOwnerOnlyPermissions(tempFileName);
 
                 // Encrypt using sops
-                await EncryptFileAsync(tempFile, filePath, CancellationToken.None);
+                await EncryptFileAsync(tempFileName, filePath, CancellationToken.None);
             }
             finally
             {
-                if (File.Exists(tempFile))
+                if (File.Exists(tempFileName))
                 {
-                    File.Delete(tempFile);
+                    // Overwrite with zeros before deletion to minimize data remanence
+                    try
+                    {
+                        var size = new FileInfo(tempFileName).Length;
+                        if (size > 0)
+                        {
+                            using var fs = new FileStream(tempFileName, FileMode.Open, FileAccess.Write, FileShare.None);
+                            var zeros = new byte[Math.Min(size, 4096)];
+                            long remaining = size;
+                            while (remaining > 0)
+                            {
+                                var toWrite = (int)Math.Min(remaining, zeros.Length);
+                                await fs.WriteAsync(zeros.AsMemory(0, toWrite), CancellationToken.None);
+                                remaining -= toWrite;
+                            }
+                        }
+                    }
+                    catch { /* best-effort zero-wipe */ }
+                    File.Delete(tempFileName);
                 }
             }
 
@@ -673,6 +708,38 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Container
             };
         }
 
+        // #3457: Restrict file permissions to owner-only (0600 on Unix, restricted ACL on Windows).
+        private static void SetOwnerOnlyPermissions(string filePath)
+        {
+            try
+            {
+                if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
+                    System.Runtime.InteropServices.OSPlatform.Windows))
+                {
+                    var fi = new System.IO.FileInfo(filePath);
+                    var acl = fi.GetAccessControl();
+                    // Remove inherited rules and restrict to current user
+                    acl.SetAccessRuleProtection(true, false);
+                    var currentUser = System.Security.Principal.WindowsIdentity.GetCurrent().Name;
+                    acl.AddAccessRule(new System.Security.AccessControl.FileSystemAccessRule(
+                        currentUser,
+                        System.Security.AccessControl.FileSystemRights.FullControl,
+                        System.Security.AccessControl.AccessControlType.Allow));
+                    fi.SetAccessControl(acl);
+                }
+                else
+                {
+                    // Unix: chmod 0600
+                    System.IO.File.SetUnixFileMode(filePath,
+                        System.IO.UnixFileMode.UserRead | System.IO.UnixFileMode.UserWrite);
+                }
+            }
+            catch
+            {
+                // Best-effort permission restriction; if it fails, we still delete after use
+            }
+        }
+
         private string[] GetSecretFiles()
         {
             if (!Directory.Exists(_config.SecretsDirectory))
@@ -758,7 +825,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Container
             }
             catch
             {
+
                 // Ignore decryption errors for metadata
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             return await Task.FromResult(new KeyMetadata

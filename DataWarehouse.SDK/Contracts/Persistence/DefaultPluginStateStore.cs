@@ -119,6 +119,7 @@ namespace DataWarehouse.SDK.Contracts.Persistence
             {
                 await _messageBus.PublishAndWaitAsync(TopicWrite, message, ct);
             }
+            catch (OperationCanceledException) { throw; }
             catch (Exception) when (_backingStore != null)
             {
                 await _backingStore.WriteAsync(path, data, ct);

@@ -244,8 +244,11 @@ public readonly record struct VdeCreationProfile
 
     private static Dictionary<ModuleId, byte> BuildAllModulesMaxConfig()
     {
-        var config = new Dictionary<ModuleId, byte>(FormatConstants.DefinedModules);
-        for (int i = 0; i < FormatConstants.DefinedModules; i++)
+        // Configure only the 19 modules active in the MaxSecurity manifest (bits 0-18).
+        // New v2.1 modules (bits 19-38) are opt-in via custom profiles.
+        const int legacyModuleCount = 19;
+        var config = new Dictionary<ModuleId, byte>(legacyModuleCount);
+        for (int i = 0; i < legacyModuleCount; i++)
         {
             config[(ModuleId)i] = 0xF;
         }

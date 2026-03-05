@@ -204,9 +204,8 @@ internal sealed class MqttStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
             messages.AddRange(retained.Where(m => !m.IsExpired()));
         }
 
-        // Get any queued messages for this subscription
-        messages.AddRange(subscription.QueuedMessages);
-        subscription.QueuedMessages.Clear();
+        // Get any queued messages for this subscription (atomic dequeue)
+        messages.AddRange(subscription.DequeueAll());
 
         // Notify DataWarehouse via message bus
         if (IsIntelligenceAvailable && MessageBus != null)
@@ -317,7 +316,7 @@ internal sealed class MqttStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
             var deliveryQoS = Math.Min(message.QoS, subscription.QoS);
             var deliveryMessage = message with { QoS = deliveryQoS };
 
-            subscription.QueuedMessages.Add(deliveryMessage);
+            subscription.EnqueueMessage(deliveryMessage);
         }
 
         await Task.CompletedTask;
@@ -334,7 +333,11 @@ internal sealed class MqttStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
         while (subIndex < subParts.Length && msgIndex < msgParts.Length)
         {
             if (subParts[subIndex] == "#")
-                return true; // Multi-level wildcard matches rest
+            {
+                // P2-3323: # must be the last segment per MQTT spec (multi-level wildcard).
+                // Return true only when # is the final subscription token.
+                return subIndex == subParts.Length - 1;
+            }
 
             if (subParts[subIndex] != "+" && subParts[subIndex] != msgParts[msgIndex])
                 return false;
@@ -342,6 +345,10 @@ internal sealed class MqttStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
             subIndex++;
             msgIndex++;
         }
+
+        // Handle trailing # reached after consuming all key parts
+        if (subIndex < subParts.Length && subParts[subIndex] == "#")
+            return subIndex == subParts.Length - 1;
 
         return subIndex == subParts.Length && msgIndex == msgParts.Length;
     }
@@ -393,7 +400,10 @@ internal sealed class MqttSubscription
     public required string Topic { get; init; }
     public int QoS { get; set; }
     public DateTimeOffset SubscribedAt { get; init; }
-    public List<MqttMessage> QueuedMessages { get; } = new();
+    private readonly object _queuedLock = new();
+    private readonly List<MqttMessage> _queuedMessages = new();
+    public void EnqueueMessage(MqttMessage message) { lock (_queuedLock) { _queuedMessages.Add(message); } }
+    public List<MqttMessage> DequeueAll() { lock (_queuedLock) { var msgs = _queuedMessages.ToList(); _queuedMessages.Clear(); return msgs; } }
 }
 
 /// <summary>

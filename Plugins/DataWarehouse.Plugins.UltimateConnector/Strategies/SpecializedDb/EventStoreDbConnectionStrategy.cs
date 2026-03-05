@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
 {
     public class EventStoreDbConnectionStrategy : DatabaseConnectionStrategyBase
     {
-        private HttpClient? _httpClient;
+        private volatile HttpClient? _httpClient;
         public override string StrategyId => "eventstoredb";
         public override string DisplayName => "EventStoreDB";
         public override string SemanticDescription => "Event-native database built for event sourcing with strong consistency guarantees";
@@ -26,13 +26,20 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
                 var authBytes = System.Text.Encoding.UTF8.GetBytes($"{config.AuthSecondary ?? "admin"}:{config.AuthCredential}");
                 _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", Convert.ToBase64String(authBytes));
             }
-            var response = await _httpClient.GetAsync("/stats", ct);
+            using var response = await _httpClient.GetAsync("/stats", ct);
             response.EnsureSuccessStatusCode();
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object> { ["host"] = host, ["port"] = port });
         }
-        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { if (_httpClient == null) return false; try { var response = await _httpClient.GetAsync("/stats", ct); return response.IsSuccessStatusCode; } catch { return false; } }
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { _httpClient?.Dispose(); _httpClient = null; await Task.CompletedTask; }
-        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var isHealthy = await TestCoreAsync(handle, ct); return new ConnectionHealth(isHealthy, isHealthy ? "EventStoreDB healthy" : "EventStoreDB unhealthy", TimeSpan.FromMilliseconds(7), DateTimeOffset.UtcNow); }
+        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { if (_httpClient == null) return false; try { using var response = await _httpClient.GetAsync("/stats", ct); return response.IsSuccessStatusCode; } catch { return false; } }
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { _httpClient?.Dispose(); _httpClient = null; return Task.CompletedTask; }
+        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        {
+            // P2-2180: Measure actual latency with Stopwatch instead of hardcoded value.
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var isHealthy = await TestCoreAsync(handle, ct);
+            sw.Stop();
+            return new ConnectionHealth(isHealthy, isHealthy ? "EventStoreDB healthy" : "EventStoreDB unhealthy", sw.Elapsed, DateTimeOffset.UtcNow);
+        }
         public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
             if (_httpClient == null) return new List<Dictionary<string, object?>>();
@@ -40,7 +47,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             {
                 // Query is expected to be a stream name; fetch events from the stream
                 var streamName = query.Trim();
-                var response = await _httpClient.GetAsync($"/streams/{Uri.EscapeDataString(streamName)}?embed=body", ct);
+                using var response = await _httpClient.GetAsync($"/streams/{Uri.EscapeDataString(streamName)}?embed=body", ct);
                 if (!response.IsSuccessStatusCode) return new List<Dictionary<string, object?>>();
                 var json = await response.Content.ReadAsStringAsync(ct);
                 using var doc = System.Text.Json.JsonDocument.Parse(json);
@@ -75,7 +82,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
                 var eventId = Guid.NewGuid().ToString();
                 var body = $"[{{\"eventId\":\"{eventId}\",\"eventType\":\"{eventType}\",\"data\":{eventData}}}]";
                 var content = new StringContent(body, System.Text.Encoding.UTF8, "application/vnd.eventstore.events+json");
-                var response = await _httpClient.PostAsync($"/streams/{Uri.EscapeDataString(streamName)}", content, ct);
+                using var response = await _httpClient.PostAsync($"/streams/{Uri.EscapeDataString(streamName)}", content, ct);
                 return response.IsSuccessStatusCode ? 1 : 0;
             }
             catch { return 0; /* Operation failed - return zero */ }
@@ -85,7 +92,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             if (_httpClient == null) return new List<DataSchema>();
             try
             {
-                var response = await _httpClient.GetAsync("/streams", ct);
+                using var response = await _httpClient.GetAsync("/streams", ct);
                 if (!response.IsSuccessStatusCode) return new List<DataSchema>();
                 var json = await response.Content.ReadAsStringAsync(ct);
                 using var doc = System.Text.Json.JsonDocument.Parse(json);
@@ -102,6 +109,15 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             }
             catch { return new List<DataSchema>(); /* Schema query failed - return empty */ }
         }
-        private (string host, int port) ParseHostPort(string connectionString, int defaultPort) { var clean = connectionString.Replace("http://", "").Split('/')[0]; var parts = clean.Split(':'); return (parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : defaultPort); }
+        private (string host, int port) ParseHostPort(string connectionString, int defaultPort)
+        {
+            // P2-2132: Use Uri parsing to correctly handle IPv6 addresses like http://[::1]:PORT/
+            var uriString = connectionString.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                            connectionString.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+                ? connectionString : "http://" + connectionString;
+            if (Uri.TryCreate(uriString, UriKind.Absolute, out var uri) && !string.IsNullOrEmpty(uri.Host) && uri.Port > 0)
+                return (uri.Host, uri.Port);
+            return ParseHostPortSafe(connectionString, defaultPort);
+        }
     }
 }

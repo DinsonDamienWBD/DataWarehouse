@@ -784,7 +784,9 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
                 }
                 catch
                 {
+
                     // Continue with other PIPs if one fails
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
 

@@ -419,7 +419,10 @@ public abstract class TieringStrategyBase : DataManagementStrategyBase, ITiering
             sw.Stop();
             Interlocked.Increment(ref _failedMoves);
             RecordFailure();
-            return TierMoveResult.Failed(objectId, StorageTier.Hot, targetTier, ex.Message);
+            // P2-2503: Source tier is unknown when exception thrown before MoveCoreAsync completes.
+            // Use targetTier as a placeholder for sourceTier rather than hardcoding StorageTier.Hot,
+            // which would incorrectly imply the object was in the Hot tier before the failed move.
+            return TierMoveResult.Failed(objectId, targetTier, targetTier, ex.Message);
         }
     }
 

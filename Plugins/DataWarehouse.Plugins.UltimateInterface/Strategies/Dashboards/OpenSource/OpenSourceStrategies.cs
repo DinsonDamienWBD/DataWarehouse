@@ -36,8 +36,10 @@ public sealed class RedashStrategy : DashboardStrategyBase
         EnsureConfigured();
         var startTime = DateTimeOffset.UtcNow;
         // Redash uses queries to fetch data, not push
-        var query = $"INSERT INTO {targetId} VALUES " + string.Join(", ", data.Select(r =>
-            "(" + string.Join(", ", r.Values.Select(v => v is string s ? $"'{s}'" : v?.ToString() ?? "NULL")) + ")"));
+        // P2-3297: Quote identifier to prevent SQL injection via caller-supplied targetId.
+        var safeTable = "\"" + targetId.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
+        var query = $"INSERT INTO {safeTable} VALUES " + string.Join(", ", data.Select(r =>
+            "(" + string.Join(", ", r.Values.Select(v => v is string s ? $"'{s.Replace("'", "''", StringComparison.Ordinal)}'" : v?.ToString() ?? "NULL")) + ")"));
         var payload = new { query = query, data_source_id = int.TryParse(Config!.ProjectId, out var id) ? id : 1 };
         var response = await SendAuthenticatedRequestAsync(HttpMethod.Post, "/api/queries", CreateJsonContent(payload), ct);
         var duration = (DateTimeOffset.UtcNow - startTime).TotalMilliseconds;
@@ -101,6 +103,8 @@ public sealed class RedashStrategy : DashboardStrategyBase
 public sealed class ApacheSupersetStrategy : DashboardStrategyBase
 {
     private string? _accessToken;
+    // P2-3300: serialize token fetch to prevent concurrent auth races on _accessToken.
+    private readonly System.Threading.SemaphoreSlim _authLock = new(1, 1);
 
     public override string StrategyId => "apache-superset";
     public override string StrategyName => "Apache Superset";
@@ -130,8 +134,10 @@ public sealed class ApacheSupersetStrategy : DashboardStrategyBase
         EnsureConfigured();
         await EnsureAuthenticatedAsync(ct);
         var startTime = DateTimeOffset.UtcNow;
-        var sql = $"INSERT INTO {targetId} VALUES " + string.Join(", ", data.Select(r =>
-            "(" + string.Join(", ", r.Values.Select(v => v is string s ? $"'{s}'" : v?.ToString() ?? "NULL")) + ")"));
+        // P2-3298: Quote identifier to prevent SQL injection via caller-supplied targetId.
+        var safeTable = "\"" + targetId.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
+        var sql = $"INSERT INTO {safeTable} VALUES " + string.Join(", ", data.Select(r =>
+            "(" + string.Join(", ", r.Values.Select(v => v is string s ? $"'{s.Replace("'", "''", StringComparison.Ordinal)}'" : v?.ToString() ?? "NULL")) + ")"));
         var payload = new { database_id = int.TryParse(Config!.ProjectId, out var id) ? id : 1, sql = sql };
         var response = await SendAuthenticatedRequestAsync(HttpMethod.Post, "/api/v1/sqllab/execute/", CreateJsonContent(payload), ct);
         var duration = (DateTimeOffset.UtcNow - startTime).TotalMilliseconds;
@@ -200,15 +206,27 @@ public sealed class ApacheSupersetStrategy : DashboardStrategyBase
 
     private async Task EnsureAuthenticatedAsync(CancellationToken ct)
     {
+        // Fast-path: already authenticated.
         if (!string.IsNullOrEmpty(_accessToken)) return;
-        if (Config?.AuthType != AuthenticationType.Basic || string.IsNullOrEmpty(Config.Username)) return;
 
-        using var client = new HttpClient { BaseAddress = new Uri(Config.BaseUrl) };
-        var loginPayload = new { username = Config.Username, password = Config.Password, provider = "db" };
-        var response = await client.PostAsync("/api/v1/security/login", CreateJsonContent(loginPayload), ct);
-        response.EnsureSuccessStatusCode();
-        var result = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
-        _accessToken = result.GetProperty("access_token").GetString();
+        // P2-3300: serialize login to prevent concurrent callers from racing on _accessToken.
+        await _authLock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            if (!string.IsNullOrEmpty(_accessToken)) return; // re-check inside lock
+            if (Config?.AuthType != AuthenticationType.Basic || string.IsNullOrEmpty(Config.Username)) return;
+
+            var client = GetHttpClient();
+            var loginPayload = new { username = Config.Username, password = Config.Password, provider = "db" };
+            using var response = await client.PostAsync("/api/v1/security/login", CreateJsonContent(loginPayload), ct);
+            response.EnsureSuccessStatusCode();
+            var result = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
+            _accessToken = result.GetProperty("access_token").GetString();
+        }
+        finally
+        {
+            _authLock.Release();
+        }
     }
 
     protected override Task ApplyAuthenticationAsync(HttpRequestMessage request, CancellationToken ct)

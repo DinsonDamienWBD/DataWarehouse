@@ -235,9 +235,9 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.Discovery
         /// </summary>
         public void Dispose()
         {
-            // Call async dispose and block (safer than GetAwaiter().GetResult())
-            DisposeAsync().AsTask().Wait();
-            _joinLock.Dispose();
+            // Avoid deadlock under SynchronizationContext by offloading to thread pool
+            // DisposeAsync already disposes _joinLock, so no double-dispose here
+            Task.Run(async () => await DisposeAsync().ConfigureAwait(false)).GetAwaiter().GetResult();
         }
     }
 

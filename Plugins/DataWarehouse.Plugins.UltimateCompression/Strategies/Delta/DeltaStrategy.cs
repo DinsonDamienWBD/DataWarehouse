@@ -53,7 +53,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
             DecompressionSpeed = 10,
             CompressionMemoryUsage = 4L * 1024 * 1024,
             DecompressionMemoryUsage = 4L * 1024 * 1024,
-            SupportsStreaming = true,
+            SupportsStreaming = false, // Header length placeholder is never back-patched in streaming mode
             SupportsParallelCompression = false,
             SupportsParallelDecompression = false,
             SupportsRandomAccess = false,
@@ -248,6 +248,12 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
 
             public override void Write(byte[] buffer, int offset, int count)
             {
+                // LOW-1604: Validate Stream.Write contract parameters.
+                ArgumentNullException.ThrowIfNull(buffer);
+                ArgumentOutOfRangeException.ThrowIfNegative(offset);
+                ArgumentOutOfRangeException.ThrowIfNegative(count);
+                if (offset + count > buffer.Length) throw new ArgumentException("offset + count exceeds buffer length.");
+
                 if (!_headerWritten)
                 {
                     _output.Write(Magic, 0, 4);

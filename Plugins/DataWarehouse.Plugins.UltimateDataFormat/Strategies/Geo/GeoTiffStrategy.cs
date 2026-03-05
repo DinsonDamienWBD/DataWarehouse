@@ -14,6 +14,11 @@ public sealed class GeoTiffStrategy : DataFormatStrategyBase
 
     public override string DisplayName => "GeoTIFF";
 
+    // Findings 2228/2230: ParseAsync/SerializeAsync always fail and schema extraction is
+    // hardcoded because BitMiracle.LibTiff.NET + GeoTIFF support are not referenced.
+    // Mark not production-ready so the plugin host does not route live data here.
+    public override bool IsProductionReady => false;
+
     /// <summary>Production hardening: initialization with counter tracking.</summary>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken) { IncrementCounter("geotiff.init"); return base.InitializeAsyncCore(cancellationToken); }
     /// <summary>Production hardening: graceful shutdown.</summary>

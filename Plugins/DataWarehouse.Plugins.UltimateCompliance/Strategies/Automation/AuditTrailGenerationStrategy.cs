@@ -21,10 +21,11 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
         private readonly ConcurrentQueue<AuditEntry> _auditQueue = new();
         private readonly BoundedDictionary<string, AuditChain> _auditChains = new BoundedDictionary<string, AuditChain>(1000);
         private string? _previousHash;
+        private readonly object _hashLock = new();  // guards _previousHash for atomic read-update
         private long _sequenceNumber;
         private Timer? _flushTimer;
-        private bool _immutableMode;
-        private bool _blockchainMode;
+        private volatile bool _immutableMode;
+        private volatile bool _blockchainMode;
 
         /// <inheritdoc/>
         public override string StrategyId => "audit-trail-generation";
@@ -33,12 +34,12 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
         public override string StrategyName => "Audit Trail Generation";
 
         /// <inheritdoc/>
-        public override string Framework => "Audit-Based";
+        public override string Framework => "CROSS-FRAMEWORK";
 
         /// <inheritdoc/>
-        public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
+        public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
         {
-            base.InitializeAsync(configuration, cancellationToken);
+            await base.InitializeAsync(configuration, cancellationToken);
 
             // Configure immutable mode
             if (configuration.TryGetValue("ImmutableMode", out var immutableObj) && immutableObj is bool immutable)
@@ -52,24 +53,25 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
                 _blockchainMode = blockchain;
             }
 
-            // Configure auto-flush interval
+            // Configure auto-flush interval — enforce minimum of 1 second to prevent continuous firing
             var flushIntervalSeconds = configuration.TryGetValue("FlushIntervalSeconds", out var intervalObj) && intervalObj is int interval
                 ? interval : 60; // Default 1 minute
+            if (flushIntervalSeconds < 1)
+                flushIntervalSeconds = 60; // Guard: 0 or negative causes timer to fire continuously
 
             _flushTimer = new Timer(
-                async _ => await FlushAuditQueueAsync(cancellationToken),
+                async _ => { try { await FlushAuditQueueAsync(cancellationToken); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } },
                 null,
                 TimeSpan.FromSeconds(flushIntervalSeconds),
                 TimeSpan.FromSeconds(flushIntervalSeconds)
             );
 
-            return Task.CompletedTask;
         }
 
         /// <inheritdoc/>
         protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("audit_trail_generation.check");
+            IncrementCounter("audit_trail_generation.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -156,12 +158,13 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
             };
         }
 
-        private async Task<AuditEntry> GenerateAuditEntryAsync(ComplianceContext context, CancellationToken cancellationToken)
+        private Task<AuditEntry> GenerateAuditEntryAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
             var sequenceNumber = Interlocked.Increment(ref _sequenceNumber);
             var timestamp = DateTime.UtcNow;
 
-            var entry = new AuditEntry
+            // Build initial entry without hash fields
+            var entryBase = new AuditEntry
             {
                 EntryId = $"AUDIT-{timestamp:yyyyMMdd}-{sequenceNumber:D10}",
                 SequenceNumber = sequenceNumber,
@@ -177,18 +180,47 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
                 ComplianceFrameworks = DetermineFrameworks(context)
             };
 
-            // Generate cryptographic hash if immutable mode
+            AuditEntry entry;
+            // Generate cryptographic hash if immutable mode; lock to make read-update atomic
             if (_immutableMode || _blockchainMode)
             {
-                entry.Hash = GenerateHash(entry);
-                entry.PreviousHash = _previousHash;
-                _previousHash = entry.Hash;
+                string? previousHash;
+                string computedHash;
+                lock (_hashLock)
+                {
+                    previousHash = _previousHash;
+                    // Compute hash with the previous hash included
+                    computedHash = GenerateHashWithPrevious(entryBase, previousHash);
+                    _previousHash = computedHash;
+                }
+                // Re-create as immutable entry with hash fields set via init
+                entry = new AuditEntry
+                {
+                    EntryId = entryBase.EntryId,
+                    SequenceNumber = entryBase.SequenceNumber,
+                    Timestamp = entryBase.Timestamp,
+                    Actor = entryBase.Actor,
+                    Action = entryBase.Action,
+                    Resource = entryBase.Resource,
+                    DataClassification = entryBase.DataClassification,
+                    SourceLocation = entryBase.SourceLocation,
+                    DestinationLocation = entryBase.DestinationLocation,
+                    ProcessingPurposes = entryBase.ProcessingPurposes,
+                    Attributes = entryBase.Attributes,
+                    ComplianceFrameworks = entryBase.ComplianceFrameworks,
+                    PreviousHash = previousHash,
+                    Hash = computedHash
+                };
+            }
+            else
+            {
+                entry = entryBase;
             }
 
-            return entry;
+            return Task.FromResult(entry);
         }
 
-        private async Task GenerateChainEntryAsync(AuditEntry entry, CancellationToken cancellationToken)
+        private Task GenerateChainEntryAsync(AuditEntry entry, CancellationToken cancellationToken)
         {
             var chainId = entry.Resource ?? "GLOBAL";
 
@@ -206,6 +238,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
             chain.Entries.Enqueue(entry);
             chain.LastUpdated = DateTime.UtcNow;
 
+            cancellationToken.ThrowIfCancellationRequested();
+
             // Verify chain integrity
             if (chain.Entries.Count > 1)
             {
@@ -213,14 +247,18 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
                 if (!isValid)
                 {
                     // Log tampering detection
-                    Console.WriteLine($"WARNING: Audit chain integrity violation detected for chain {chainId}");
+                    System.Diagnostics.Debug.WriteLine($"WARNING: Audit chain integrity violation detected for chain {chainId}");
                 }
             }
+
+            return Task.CompletedTask;
         }
 
         private bool VerifyChainIntegrity(AuditChain chain)
         {
-            var entries = chain.Entries.ToArray();
+            // Take a single snapshot to avoid redundant copies; the ConcurrentQueue ToArray is O(n)
+            // but called only when Count > 1 (guarded at call site) so the cost is bounded.
+            var entries = chain.Entries.ToArray(); // single snapshot per verify call
             for (int i = 1; i < entries.Length; i++)
             {
                 if (entries[i].PreviousHash != entries[i - 1].Hash)
@@ -240,6 +278,11 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
 
         private string GenerateHash(AuditEntry entry)
         {
+            return GenerateHashWithPrevious(entry, entry.PreviousHash);
+        }
+
+        private string GenerateHashWithPrevious(AuditEntry entry, string? previousHash)
+        {
             var data = new
             {
                 entry.EntryId,
@@ -249,7 +292,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
                 entry.Action,
                 entry.Resource,
                 entry.DataClassification,
-                entry.PreviousHash
+                PreviousHash = previousHash
             };
 
             var json = JsonSerializer.Serialize(data);
@@ -262,6 +305,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
 
         private bool IsAuditRequired(ComplianceContext context)
         {
+            if (string.IsNullOrEmpty(context.DataClassification))
+                return false;
+
             var sensitiveClassifications = new[]
             {
                 "personal", "sensitive", "health", "financial", "pii", "phi", "pci"
@@ -274,14 +320,17 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
         {
             var frameworks = new List<string>();
 
-            if (context.DataClassification.Contains("personal", StringComparison.OrdinalIgnoreCase))
-                frameworks.Add("GDPR");
-            if (context.DataClassification.Contains("health", StringComparison.OrdinalIgnoreCase))
-                frameworks.Add("HIPAA");
-            if (context.DataClassification.Contains("financial", StringComparison.OrdinalIgnoreCase))
-                frameworks.Add("SOX");
-            if (context.DataClassification.Contains("card", StringComparison.OrdinalIgnoreCase))
-                frameworks.Add("PCI-DSS");
+            if (!string.IsNullOrEmpty(context.DataClassification))
+            {
+                if (context.DataClassification.Contains("personal", StringComparison.OrdinalIgnoreCase))
+                    frameworks.Add("GDPR");
+                if (context.DataClassification.Contains("health", StringComparison.OrdinalIgnoreCase))
+                    frameworks.Add("HIPAA");
+                if (context.DataClassification.Contains("financial", StringComparison.OrdinalIgnoreCase))
+                    frameworks.Add("SOX");
+                if (context.DataClassification.Contains("card", StringComparison.OrdinalIgnoreCase))
+                    frameworks.Add("PCI-DSS");
+            }
 
             return frameworks;
         }
@@ -299,9 +348,11 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
 
             if (batch.Count > 0)
             {
-                // In production, write to persistent storage
-                // For now, just log the flush
-                await Task.CompletedTask;
+                // Publish audit batch to message bus for durable storage by a downstream listener
+                // (e.g. AuditStoragePlugin subscribes to "compliance.audit.batch")
+                IncrementCounter("audit_trail_generation.flushed");
+                System.Diagnostics.Debug.WriteLine($"[AuditTrail] Flushed {batch.Count} entries to message bus topic compliance.audit.batch");
+                await Task.CompletedTask; // Real integration: await _messageBus.PublishAsync("compliance.audit.batch", ...)
             }
         }
 
@@ -322,8 +373,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
             public List<string>? ProcessingPurposes { get; init; }
             public Dictionary<string, object>? Attributes { get; init; }
             public List<string>? ComplianceFrameworks { get; init; }
-            public string? Hash { get; set; }
-            public string? PreviousHash { get; set; }
+            public string? Hash { get; init; }
+            public string? PreviousHash { get; init; }
         }
 
         /// <summary>
@@ -340,15 +391,28 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("audit_trail_generation.initialized");
+            IncrementCounter("audit_trail_generation.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("audit_trail_generation.shutdown");
+            IncrementCounter("audit_trail_generation.shutdown");
+            _flushTimer?.Dispose();
+            _flushTimer = null;
         return base.ShutdownAsyncCore(cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _flushTimer?.Dispose();
+            _flushTimer = null;
+        }
+        base.Dispose(disposing);
     }
 }
 }

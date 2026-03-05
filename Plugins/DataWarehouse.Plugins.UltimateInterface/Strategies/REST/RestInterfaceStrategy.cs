@@ -73,8 +73,19 @@ internal sealed class RestInterfaceStrategy : SdkInterface.InterfaceStrategyBase
         {
             // Parse the HTTP method
             var method = request.Method;
-            var path = request.Path?.TrimStart('/') ?? string.Empty;
+            var rawPath = request.Path?.TrimStart('/') ?? string.Empty;
             var queryParams = request.QueryParameters ?? new Dictionary<string, string>();
+
+            // P2-3350: Reject paths containing path-traversal sequences, null bytes, or
+            // other characters that could be used to inject values into bus topic strings.
+            if (rawPath.Contains("..") || rawPath.Contains('\0') || rawPath.Contains('\n') || rawPath.Contains('\r'))
+            {
+                return new SdkInterface.InterfaceResponse(
+                    StatusCode: 400,
+                    Headers: new Dictionary<string, string> { ["Content-Type"] = "application/json" },
+                    Body: System.Text.Encoding.UTF8.GetBytes("{\"error\":\"Invalid path: path traversal or control characters not permitted\"}"));
+            }
+            var path = rawPath;
 
             // Determine response content type via Accept header
             var acceptHeader = request.Headers.TryGetValue("Accept", out var accept) ? accept : "application/json";

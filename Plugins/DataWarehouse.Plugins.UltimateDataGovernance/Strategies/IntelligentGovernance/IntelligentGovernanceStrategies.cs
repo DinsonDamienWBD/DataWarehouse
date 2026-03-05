@@ -373,10 +373,16 @@ public sealed class ComplianceGapDetectorStrategy : DataGovernanceStrategyBase
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(requirements);
 
+        var boundedRequirements = new BoundedDictionary<string, Requirement>(1000);
+        foreach (var kvp in requirements)
+        {
+            boundedRequirements[kvp.Key] = kvp.Value;
+        }
+
         _frameworks[frameworkId] = new FrameworkRequirements(
             frameworkId,
             name,
-            new BoundedDictionary<string, Requirement>(1000));
+            boundedRequirements);
     }
 
     /// <summary>
@@ -607,7 +613,7 @@ public sealed class SensitivityClassifierStrategy : DataGovernanceStrategyBase
         _rules.AddOrUpdate(
             sensitivityLevel,
             _ => new List<ClassificationRule> { rule },
-            (_, existing) => { existing.Add(rule); return existing; });
+            (_, existing) => { lock (existing) { existing.Add(rule); } return existing; });
     }
 
     /// <summary>

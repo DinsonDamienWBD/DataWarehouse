@@ -92,10 +92,11 @@ public sealed class DeadlineScheduler : IDisposable
     // Dedicated processing thread
     private readonly Thread _processingThread;
     private readonly CancellationTokenSource _shutdownCts = new();
+    private int _disposed; // 0=not disposed, 1=disposed (Interlocked)
 
     // Pre-allocated latency tracking (circular buffer, no List, no allocation)
     private readonly long[] _latencyHistoryUs = new long[LatencyHistorySize];
-    private int _latencyWriteIndex;
+    private volatile int _latencyWriteIndex;
     private int _latencyCount;
 
     // Counters (Interlocked for thread safety)
@@ -193,7 +194,7 @@ public sealed class DeadlineScheduler : IDisposable
     /// </summary>
     public void Dispose()
     {
-        if (_shutdownCts.IsCancellationRequested) return;
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
 
         _shutdownCts.Cancel();
 
@@ -294,7 +295,9 @@ public sealed class DeadlineScheduler : IDisposable
         try
         {
             // Execute the I/O operation synchronously on the dedicated thread
-            operation.Execute(buffer).AsTask().GetAwaiter().GetResult();
+            var vt = operation.Execute(buffer);
+            if (!vt.IsCompleted)
+                vt.AsTask().GetAwaiter().GetResult();
             sw.Stop();
 
             var latencyUs = sw.Elapsed.TotalMicroseconds;

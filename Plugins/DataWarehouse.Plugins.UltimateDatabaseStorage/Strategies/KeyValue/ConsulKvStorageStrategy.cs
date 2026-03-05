@@ -157,7 +157,14 @@ public sealed class ConsulKvStorageStrategy : DatabaseStorageStrategyBase
             new(metadataKey, KVTxnVerb.Delete)
         };
 
-        await _client!.KV.Txn(txn, ct);
+        var txnResult = await _client!.KV.Txn(txn, ct);
+        if (!txnResult.Response.Success)
+        {
+            var errors = txnResult.Response.Errors != null
+                ? string.Join("; ", txnResult.Response.Errors.Select(e => $"op[{e.OpIndex}]: {e.What}"))
+                : "unknown error";
+            throw new InvalidOperationException($"Consul transaction failed while deleting key '{key}': {errors}");
+        }
 
         return size;
     }
@@ -337,9 +344,12 @@ public sealed class ConsulKvStorageStrategy : DatabaseStorageStrategyBase
             _lock = lockHandle;
         }
 
-        public async Task ReleaseAsync(CancellationToken ct = default)
+        public Task ReleaseAsync(CancellationToken ct = default)
         {
-            await Task.Run(() => _lock.Release(), ct);
+            // LOW-2816: _lock.Release() is synchronous; no Task.Run wrapper needed
+            // P2-LOW-2816: non-async Task method avoids CS4014 warning
+            _lock.Release();
+            return Task.CompletedTask;
         }
 
         public async ValueTask DisposeAsync()

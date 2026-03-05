@@ -61,6 +61,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
         private int _maxRetries = 3;
         private int _retryDelayMs = 1000;
 
+        // Cached volume UUID — fetched once and reused to avoid duplicate API calls under concurrency.
+        private string? _cachedVolumeUuid;
+        private readonly SemaphoreSlim _uuidLock = new(1, 1);
+
         public override string StrategyId => "netapp-ontap";
         public override string Name => "NetApp ONTAP Storage";
         public override StorageTier Tier => StorageTier.Warm;
@@ -498,7 +502,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             var response = await SendWithRetryAsync(request, ct);
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(json);
+            using var jsonDoc = JsonDocument.Parse(json);
 
             if (jsonDoc.RootElement.TryGetProperty("records", out var records))
             {
@@ -538,7 +542,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             var response = await SendWithRetryAsync(request, ct);
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(json);
+            using var jsonDoc = JsonDocument.Parse(json);
 
             if (jsonDoc.RootElement.TryGetProperty("Contents", out var contents))
             {
@@ -594,7 +598,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             var response = await SendWithRetryAsync(request, ct);
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(json);
+            using var jsonDoc = JsonDocument.Parse(json);
 
             var size = jsonDoc.RootElement.TryGetProperty("size", out var sizeElement) ? sizeElement.GetInt64() : 0L;
             var modified = jsonDoc.RootElement.TryGetProperty("modified_time", out var modElement)
@@ -677,7 +681,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                 if (response.IsSuccessStatusCode)
                 {
                     var json = await response.Content.ReadAsStringAsync(ct);
-                    var jsonDoc = JsonDocument.Parse(json);
+                    using var jsonDoc = JsonDocument.Parse(json);
 
                     var clusterName = jsonDoc.RootElement.TryGetProperty("name", out var nameElement)
                         ? nameElement.GetString() ?? "Unknown"
@@ -740,28 +744,47 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
         #region ONTAP-Specific Operations
 
         /// <summary>
-        /// Retrieves the UUID of the configured volume.
+        /// Retrieves the UUID of the configured volume, caching the result so that concurrent
+        /// callers do not all issue simultaneous GET requests before the first response returns.
         /// </summary>
         private async Task<string> GetVolumeUuidAsync(CancellationToken ct)
         {
-            // API: GET /api/storage/volumes?name={volume}&svm.name={svm}
-            var request = new HttpRequestMessage(HttpMethod.Get,
-                $"/api/storage/volumes?name={Uri.EscapeDataString(_volume)}&svm.name={Uri.EscapeDataString(_svm)}");
+            // Fast path: return cached value if available.
+            var cached = Volatile.Read(ref _cachedVolumeUuid);
+            if (cached != null) return cached;
 
-            var response = await SendWithRetryAsync(request, ct);
-            var json = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(json);
-
-            if (jsonDoc.RootElement.TryGetProperty("records", out var records) && records.GetArrayLength() > 0)
+            // Slow path: acquire lock, re-check, then fetch.
+            await _uuidLock.WaitAsync(ct);
+            try
             {
-                var firstRecord = records[0];
-                if (firstRecord.TryGetProperty("uuid", out var uuidElement))
-                {
-                    return uuidElement.GetString() ?? throw new InvalidOperationException("Volume UUID not found");
-                }
-            }
+                if (_cachedVolumeUuid != null) return _cachedVolumeUuid;
 
-            throw new InvalidOperationException($"Volume '{_volume}' not found in SVM '{_svm}'");
+                // API: GET /api/storage/volumes?name={volume}&svm.name={svm}
+                var request = new HttpRequestMessage(HttpMethod.Get,
+                    $"/api/storage/volumes?name={Uri.EscapeDataString(_volume)}&svm.name={Uri.EscapeDataString(_svm)}");
+
+                var response = await SendWithRetryAsync(request, ct);
+                var json = await response.Content.ReadAsStringAsync(ct);
+                using var jsonDoc = JsonDocument.Parse(json);
+
+                if (jsonDoc.RootElement.TryGetProperty("records", out var records) && records.GetArrayLength() > 0)
+                {
+                    var firstRecord = records[0];
+                    if (firstRecord.TryGetProperty("uuid", out var uuidElement))
+                    {
+                        var uuid = uuidElement.GetString()
+                            ?? throw new InvalidOperationException("Volume UUID not found");
+                        Volatile.Write(ref _cachedVolumeUuid, uuid);
+                        return uuid;
+                    }
+                }
+
+                throw new InvalidOperationException($"Volume '{_volume}' not found in SVM '{_svm}'");
+            }
+            finally
+            {
+                _uuidLock.Release();
+            }
         }
 
         /// <summary>
@@ -774,7 +797,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             var response = await SendWithRetryAsync(request, ct);
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(json);
+            using var jsonDoc = JsonDocument.Parse(json);
 
             if (jsonDoc.RootElement.TryGetProperty("space", out var spaceElement))
             {
@@ -807,7 +830,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
 
             var response = await SendWithRetryAsync(request, ct);
             var json = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(json);
+            using var jsonDoc = JsonDocument.Parse(json);
 
             if (jsonDoc.RootElement.TryGetProperty("uuid", out var uuidElement))
             {
@@ -829,7 +852,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             var response = await SendWithRetryAsync(request, ct);
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(json);
+            using var jsonDoc = JsonDocument.Parse(json);
 
             var snapshots = new List<SnapshotInfo>();
 
@@ -877,7 +900,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             var response = await SendWithRetryAsync(request, ct);
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(json);
+            using var jsonDoc = JsonDocument.Parse(json);
 
             if (jsonDoc.RootElement.TryGetProperty("records", out var records) && records.GetArrayLength() > 0)
             {

@@ -56,7 +56,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
                 ["StorageType"] = "GitCrypt",
                 ["Backend"] = "git-crypt CLI",
                 ["Platform"] = "Cross-Platform",
-                ["EncryptionType"] = "AES-256-CTR",
+                // P2-3476: git-crypt uses AES-256-CBC (OPENSSL_CIPHER "aes-256-cbc" in OpenSSL mode)
+                // or AES-256-GCM in newer releases depending on backend. Report as AES-256-CBC
+                // (the most common default) rather than the incorrect CTR mode.
+                ["EncryptionType"] = "AES-256-CBC",
                 ["KeySharing"] = "GPG",
                 ["IdealFor"] = "Git-based CI/CD, Team collaboration, Secret versioning"
             }
@@ -208,7 +211,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
             _currentKeyId = keyId;
 
             // Stage the file for commit (but don't commit - leave that to the user)
-            await ExecuteGitAsync($"add \"{keyFilePath}\"");
+            // #3464: Pass CancellationToken.None so callers can cancel via the parent operation.
+            await ExecuteGitAsync($"add \"{keyFilePath}\"", CancellationToken.None);
         }
 
         public override async Task<IReadOnlyList<string>> ListKeysAsync(ISecurityContext context, CancellationToken cancellationToken = default)
@@ -317,7 +321,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
 
             // If status returns successfully and doesn't show "encrypted" for our key files,
             // the repository is unlocked
-            return result.ExitCode == 0 && !result.Output?.Contains("encrypted:") == true;
+            // P2-3468: fix operator precedence — !nullable.Contains() evaluates to bool?, not bool.
+            // Null output from a successful exit code means no "encrypted:" lines: repository is unlocked.
+            return result.ExitCode == 0 && result.Output?.Contains("encrypted:") != true;
         }
 
         private async Task InitializeGitCryptAsync(CancellationToken cancellationToken)

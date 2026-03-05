@@ -220,12 +220,14 @@ public sealed class RollbarStrategy : ObservabilityStrategyBase
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync("https://api.rollbar.com/api/1/item/", content, ct);
+            using var response = await _httpClient.PostAsync("https://api.rollbar.com/api/1/item/", content, ct);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Rollbar unavailable
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -243,14 +245,46 @@ public sealed class RollbarStrategy : ObservabilityStrategyBase
         };
     }
 
+    /// <summary>
+    /// Parses a .NET stack trace string into Rollbar frames.
+    /// Extracts file path, line number, and method name from each "at ... in file:line N" frame.
+    /// </summary>
     private static object[] ParseStackTrace(string stackTrace)
     {
+        if (string.IsNullOrEmpty(stackTrace))
+            return Array.Empty<object>();
+
         var lines = stackTrace.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-        return lines.Select((line, index) => new
+        return lines.Select(line =>
         {
-            filename = "unknown",
-            lineno = index + 1,
-            method = line.Trim()
+            line = line.Trim();
+            string filename = "unknown";
+            int lineno = 0;
+            string method = line;
+
+            // .NET stack frame: "   at Namespace.Class.Method(...) in /path/file.cs:line 42"
+            var inIdx = line.LastIndexOf(" in ", StringComparison.Ordinal);
+            if (inIdx >= 0)
+            {
+                method = line[..inIdx].TrimStart().TrimStart("at ".ToCharArray()).Trim();
+                var fileAndLine = line[(inIdx + 4)..];
+                var lineColonIdx = fileAndLine.LastIndexOf(":line ", StringComparison.Ordinal);
+                if (lineColonIdx >= 0)
+                {
+                    filename = fileAndLine[..lineColonIdx];
+                    int.TryParse(fileAndLine[(lineColonIdx + 6)..], out lineno);
+                }
+                else
+                {
+                    filename = fileAndLine;
+                }
+            }
+            else if (line.StartsWith("at ", StringComparison.Ordinal))
+            {
+                method = line[3..].Trim();
+            }
+
+            return (object)new { filename, lineno, method };
         }).ToArray();
     }
 
@@ -282,17 +316,11 @@ public sealed class RollbarStrategy : ObservabilityStrategyBase
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("rollbar.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     protected override void Dispose(bool disposing)

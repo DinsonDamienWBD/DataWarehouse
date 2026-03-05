@@ -329,6 +329,21 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                         DataSizeBytes = dataSizeBytes,
                         Cost = cost
                     });
+
+                    // Prune history older than 90 days and cap total entries at 100,000
+                    // to prevent unbounded memory growth on long-running processes
+                    const int MaxHistoryEntries = 100_000;
+                    if (_costHistory.Count > MaxHistoryEntries)
+                    {
+                        var cutoff = DateTime.UtcNow.AddDays(-90);
+                        var removeCount = _costHistory.Count - MaxHistoryEntries;
+                        // Remove oldest entries (list is append-only so oldest are at start)
+                        _costHistory.RemoveRange(0, Math.Min(removeCount, _costHistory.Count));
+                        // Also drop any remaining entries older than 90 days
+                        var oldIdx = _costHistory.FindIndex(e => e.Timestamp >= cutoff);
+                        if (oldIdx > 0)
+                            _costHistory.RemoveRange(0, oldIdx);
+                    }
                 }
             }
         }

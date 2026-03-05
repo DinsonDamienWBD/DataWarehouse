@@ -49,24 +49,13 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PlatformAuth
             IncrementCounter("ssh.key.auth.shutdown");
             return base.ShutdownAsyncCore(cancellationToken);
         }
-protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
             IncrementCounter("ssh.key.auth.evaluate");
-            await Task.Yield();
-
-            var hasValidIdentity = context.SubjectId.Length > 0;
-
-            return new AccessDecision
-            {
-                IsGranted = hasValidIdentity,
-                Reason = hasValidIdentity ? "SSH Key Auth Strategy verified" : "Authentication failed",
-                ApplicablePolicies = new[] { "ssh-key-auth-policy" },
-                Metadata = new Dictionary<string, object>
-                {
-                    ["key_type"] = "ed25519",
-                    ["strategy_type"] = "PlatformAuth"
-                }
-            };
+            throw new NotSupportedException(
+                "Requires SSH key verification using Ed25519/ECDSA/RSA signature validation against an authorized_keys store. " +
+                "Use the SSH.NET NuGet package or System.Security.Cryptography for actual key parsing and signature verification. " +
+                "Granting access for any non-empty SubjectId is not a valid implementation.");
         }
     }
 }

@@ -18,7 +18,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
     public class GitHubConnectionStrategy : SaaSConnectionStrategyBase
     {
         private string _personalAccessToken = "";
-        private int _rateLimitRemaining = 5000;
+        private volatile int _rateLimitRemaining = 5000;
         private DateTimeOffset _rateLimitReset = DateTimeOffset.UtcNow;
 
         public override string StrategyId => "github";
@@ -42,6 +42,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
 
             httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("DataWarehouse/1.0");
             httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+            httpClient.DefaultRequestHeaders.Remove("X-GitHub-Api-Version");
             httpClient.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
 
             if (!string.IsNullOrEmpty(_personalAccessToken))
@@ -59,16 +60,13 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             {
                 var response = await handle.GetConnection<HttpClient>().GetAsync("/user", ct);
                 UpdateRateLimits(response);
-                return response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable;
+                return response.IsSuccessStatusCode;
             }
             catch { return false; }
         }
 
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
-        {
-            handle.GetConnection<HttpClient>()?.Dispose();
-            await Task.CompletedTask;
-        }
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) {
+            handle.GetConnection<HttpClient>()?.Dispose(); return Task.CompletedTask; }
 
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
@@ -94,6 +92,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
         public async Task<GitHubListResult<GitHubRepo>> ListRepositoriesAsync(IConnectionHandle handle,
             string? org = null, int perPage = 30, int page = 1, CancellationToken ct = default)
         {
+            // Finding 2159: Clamp perPage to GitHub maximum of 100; validate page is positive.
+            perPage = Math.Clamp(perPage, 1, 100);
+            if (page < 1) page = 1;
+
             var client = handle.GetConnection<HttpClient>();
             await CheckRateLimitAsync(ct);
 
@@ -101,8 +103,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                 ? $"/orgs/{org}/repos?per_page={perPage}&page={page}"
                 : $"/user/repos?per_page={perPage}&page={page}";
 
-            var response = await client.GetAsync(url, ct);
+            using var response = await client.GetAsync(url, ct);
             UpdateRateLimits(response);
+            response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
@@ -129,8 +132,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             if (assignees != null) payload["assignees"] = assignees;
 
             var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-            var response = await client.PostAsync($"/repos/{owner}/{repo}/issues", content, ct);
+            using var response = await client.PostAsync($"/repos/{owner}/{repo}/issues", content, ct);
             UpdateRateLimits(response);
+            response.EnsureSuccessStatusCode();
             var responseJson = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
@@ -164,8 +168,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             if (body != null) payload["body"] = body;
 
             var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-            var response = await client.PostAsync($"/repos/{owner}/{repo}/pulls", content, ct);
+            using var response = await client.PostAsync($"/repos/{owner}/{repo}/pulls", content, ct);
             UpdateRateLimits(response);
+            response.EnsureSuccessStatusCode();
             var responseJson = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
@@ -186,6 +191,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
         public async Task<GitHubWebhookResult> CreateWebhookAsync(IConnectionHandle handle, string owner,
             string repo, string payloadUrl, string[] events, string secret, CancellationToken ct = default)
         {
+            // Finding 2160: Require a minimum-entropy webhook secret (GitHub recommends >= 20 chars).
+            if (string.IsNullOrWhiteSpace(secret) || secret.Length < 20)
+                throw new ArgumentException(
+                    "Webhook secret must be at least 20 characters to provide adequate HMAC security.", nameof(secret));
+
             var client = handle.GetConnection<HttpClient>();
             await CheckRateLimitAsync(ct);
 
@@ -204,8 +214,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             };
 
             var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-            var response = await client.PostAsync($"/repos/{owner}/{repo}/hooks", content, ct);
+            using var response = await client.PostAsync($"/repos/{owner}/{repo}/hooks", content, ct);
             UpdateRateLimits(response);
+            response.EnsureSuccessStatusCode();
             var responseJson = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
@@ -231,7 +242,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
         private void UpdateRateLimits(HttpResponseMessage response)
         {
             if (response.Headers.TryGetValues("X-RateLimit-Remaining", out var remaining))
-                int.TryParse(System.Linq.Enumerable.FirstOrDefault(remaining), out _rateLimitRemaining);
+            { if (int.TryParse(System.Linq.Enumerable.FirstOrDefault(remaining), out var remainingVal)) _rateLimitRemaining = remainingVal; }
             if (response.Headers.TryGetValues("X-RateLimit-Reset", out var reset))
             {
                 if (long.TryParse(System.Linq.Enumerable.FirstOrDefault(reset), out var resetEpoch))
@@ -254,11 +265,15 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
     {
         public long Id { get; init; }
         public string Name { get; init; } = "";
-        public string Full_Name { get; init; } = "";
+        // Finding 2166: Use PascalCase with JsonPropertyName to follow C# conventions.
+        [System.Text.Json.Serialization.JsonPropertyName("full_name")]
+        public string FullName { get; init; } = "";
         public bool Private { get; init; }
         public string? Description { get; init; }
-        public string Html_Url { get; init; } = "";
-        public string Default_Branch { get; init; } = "main";
+        [System.Text.Json.Serialization.JsonPropertyName("html_url")]
+        public string HtmlUrl { get; init; } = "";
+        [System.Text.Json.Serialization.JsonPropertyName("default_branch")]
+        public string DefaultBranch { get; init; } = "main";
     }
 
     public sealed record GitHubListResult<T>

@@ -362,12 +362,19 @@ public static class SimdOperations
 
     /// <summary>
     /// Computes XXH64 hash of the given data with a seed value.
-    /// For data &gt;= 32 bytes, uses 4 parallel accumulators for throughput.
+    /// For data &gt;= 32 bytes, uses 4 parallel scalar accumulators for throughput.
     /// For data &lt; 32 bytes, uses the standard scalar XXH64 finalization path.
     /// </summary>
     /// <param name="data">Data to hash.</param>
     /// <param name="seed">Hash seed for producing different hash values from the same input.</param>
     /// <returns>64-bit hash value.</returns>
+    /// <remarks>
+    /// <b>Implementation note (Cat 15, finding 764):</b> The "Simd" suffix indicates the method
+    /// follows the XXH64 multi-accumulator algorithm (4 parallel lanes) which is structurally
+    /// equivalent to the SIMD variant, but uses scalar arithmetic. True SIMD via
+    /// <see cref="System.Runtime.Intrinsics.Vector256{T}"/> would require AVX2 and adds
+    /// platform-specific code paths; the scalar version provides portable, predictable throughput.
+    /// </remarks>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static ulong XxHash64Simd(ReadOnlySpan<byte> data, ulong seed)
     {

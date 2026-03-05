@@ -162,6 +162,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
 
         private async Task<StorageObjectMetadata> StoreSinglePartAsync(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct)
         {
+            // Capture size BEFORE the upload — Position advances to end after PutObject reads the stream.
+            long size = data.CanSeek ? data.Length - data.Position : 0L;
+
             var request = new PutObjectRequest
             {
                 NamespaceName = _namespaceName,
@@ -191,13 +194,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
 
             // Execute request
             var response = await _client!.PutObject(request);
-
-            // Get object size
-            long size = 0;
-            if (data.CanSeek)
-            {
-                size = data.Length;
-            }
 
             // Update statistics
             IncrementBytesStored(size);
@@ -384,14 +380,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
 
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex.Message?.Contains("404") == true
+                                        || ex.Message?.Contains("NotFound") == true
+                                        || ex.GetType().Name.Contains("NotFoundException")
+                                        || ex.GetType().Name.Contains("NoSuchKey"))
             {
-                // Check if it's a 404 not found error
-                if (ex.Message?.Contains("404") == true || ex.Message?.Contains("NotFound") == true)
-                {
-                    IncrementOperationCounter(StorageOperationType.Exists);
-                    return false;
-                }
+                // Definitively "object not found" — return false.
+                IncrementOperationCounter(StorageOperationType.Exists);
                 return false;
             }
         }

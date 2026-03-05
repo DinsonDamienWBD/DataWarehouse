@@ -109,6 +109,29 @@ public sealed class OtpStrategy : EncryptionStrategyBase
         }
     }
 
+    /// <summary>
+    /// Generates an OTP key of the specified byte length.
+    /// OTP requires a key exactly equal in length to the plaintext — callers must pass the
+    /// plaintext length here. Calling the parameterless base <see cref="GenerateKey()"/>
+    /// throws <see cref="NotSupportedException"/> because the required length is unknown.
+    /// </summary>
+    /// <param name="plaintextLengthBytes">Length in bytes of the plaintext to be encrypted.</param>
+    public byte[] GenerateKey(int plaintextLengthBytes)
+    {
+        if (plaintextLengthBytes <= 0)
+            throw new ArgumentOutOfRangeException(nameof(plaintextLengthBytes), "OTP key length must be > 0.");
+        return RandomNumberGenerator.GetBytes(plaintextLengthBytes);
+    }
+
+    /// <inheritdoc/>
+    /// <exception cref="NotSupportedException">
+    /// OTP key length must match the plaintext. Use <see cref="GenerateKey(int)"/> instead.
+    /// </exception>
+    public override byte[] GenerateKey() =>
+        throw new NotSupportedException(
+            "OTP requires a key exactly equal in length to the plaintext. " +
+            "Use GenerateKey(plaintextLengthBytes) to generate an appropriately sized key.");
+
     /// <inheritdoc/>
     protected override Task<byte[]> EncryptCoreAsync(
         byte[] plaintext,

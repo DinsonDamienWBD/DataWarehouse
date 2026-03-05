@@ -40,8 +40,12 @@ internal sealed class OnStorageBrotliStrategy : StorageProcessingStrategyBase
         var sw = Stopwatch.StartNew();
         var sourcePath = query.Source;
         var mode = GetOption<string>(query, "mode") ?? "compress";
-        var quality = Math.Clamp(GetOption<int>(query, "quality"), 0, MaxQuality);
-        if (quality == 0) quality = DefaultQuality;
+        // Use DefaultQuality only when quality is not explicitly set (option not present in query).
+        // If quality IS set but is 0, respect the user's choice (fastest/no-op level).
+        var rawQuality = GetOption<int?>(query, "quality");
+        var quality = rawQuality.HasValue
+            ? Math.Clamp(rawQuality.Value, 0, MaxQuality)
+            : DefaultQuality;
 
         if (!File.Exists(sourcePath))
             return MakeResult(new Dictionary<string, object?> { ["error"] = "Source file not found" }, 0, sw);

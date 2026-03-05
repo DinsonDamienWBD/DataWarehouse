@@ -124,11 +124,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                     return result;
                 }
 
-                // Get source metadata
-                var sourceMetadata = await sourceBackend.GetMetadataAsync(key, ct);
-                result.BytesTotal = sourceMetadata.Size;
-
-                // Check if object exists in source
+                // Check if object exists in source before calling GetMetadataAsync
+                // (GetMetadataAsync would throw on non-existent objects)
                 if (!await sourceBackend.ExistsAsync(key, ct))
                 {
                     result.Success = false;
@@ -136,18 +133,22 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                     return result;
                 }
 
-                // Stream data from source to target
-                using var sourceStream = await sourceBackend.RetrieveAsync(key, ct);
+                // Get source metadata
+                var sourceMetadata = await sourceBackend.GetMetadataAsync(key, ct);
+                result.BytesTotal = sourceMetadata.Size;
 
-                // If using streaming, wrap in progress tracking stream
-                Stream migrationStream = sourceStream;
-                if (options.TrackProgress)
-                {
-                    migrationStream = new ProgressTrackingStream(
+                // Stream data from source to target.
+                // When progress tracking is enabled, ProgressTrackingStream takes ownership
+                // of the sourceStream and will dispose it; we use a single outer using to
+                // ensure disposal in both branches without double-disposing the inner stream.
+                var sourceStream = await sourceBackend.RetrieveAsync(key, ct);
+                Stream migrationStream = options.TrackProgress
+                    ? new ProgressTrackingStream(
                         sourceStream,
                         sourceMetadata.Size,
-                        bytesRead => result.BytesMigrated = bytesRead);
-                }
+                        bytesRead => result.BytesMigrated = bytesRead)
+                    : sourceStream;
+                using var ownedMigrationStream = migrationStream;
 
                 // Convert readonly dictionary to mutable
                 var metadataDict = sourceMetadata.CustomMetadata != null
@@ -157,7 +158,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 // Write to target backend
                 var targetMetadata = await targetBackend.StoreAsync(
                     key,
-                    migrationStream,
+                    ownedMigrationStream,
                     metadataDict,
                     ct);
 
@@ -239,6 +240,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
             ArgumentNullException.ThrowIfNull(keys);
+            // Finding 3867: validate source and target backends BEFORE adding job to _activeJobs
+            // so failed-validation jobs are never visible via GetActiveJobs().
+            ArgumentException.ThrowIfNullOrWhiteSpace(sourceBackendId);
+            ArgumentException.ThrowIfNullOrWhiteSpace(targetBackendId);
+            if (_registry.Get(sourceBackendId) == null)
+                throw new ArgumentException($"Source backend '{sourceBackendId}' not found in registry.", nameof(sourceBackendId));
+            if (_registry.Get(targetBackendId) == null)
+                throw new ArgumentException($"Target backend '{targetBackendId}' not found in registry.", nameof(targetBackendId));
 
             options ??= MigrationOptions.Default;
 
@@ -250,7 +259,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 StartTime = DateTime.UtcNow
             };
 
-            // Create migration job
+            // Create migration job — validation already passed; safe to add to active jobs
             var jobId = Guid.NewGuid().ToString("N");
             var job = new MigrationJob
             {
@@ -389,11 +398,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                     return false;
                 }
 
-                // Compare ETags if available
+                // Compare ETags if available; ETags are opaque hash strings — use Ordinal comparison
+                // to avoid false positives from case-insensitive folding on hex digest strings.
                 if (!string.IsNullOrEmpty(sourceMetadata.ETag) &&
                     !string.IsNullOrEmpty(targetMetadata.ETag))
                 {
-                    return sourceMetadata.ETag.Equals(targetMetadata.ETag, StringComparison.OrdinalIgnoreCase);
+                    return sourceMetadata.ETag.Equals(targetMetadata.ETag, StringComparison.Ordinal);
                 }
 
                 // Fallback: byte-by-byte comparison (expensive)
@@ -425,17 +435,21 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 Key = result.Key
             });
 
-            history.Migrations.Add(new MigrationHistoryEntry
+            // Migrations list is shared across concurrent MigrateAsync calls; lock required.
+            lock (history.Migrations)
             {
-                SourceBackend = result.SourceBackend,
-                TargetBackend = result.TargetBackend,
-                Timestamp = result.StartTime,
-                BytesMigrated = result.BytesMigrated,
-                Success = result.Success,
-                Duration = result.EndTime.HasValue
-                    ? result.EndTime.Value - result.StartTime
-                    : TimeSpan.Zero
-            });
+                history.Migrations.Add(new MigrationHistoryEntry
+                {
+                    SourceBackend = result.SourceBackend,
+                    TargetBackend = result.TargetBackend,
+                    Timestamp = result.StartTime,
+                    BytesMigrated = result.BytesMigrated,
+                    Success = result.Success,
+                    Duration = result.EndTime.HasValue
+                        ? result.EndTime.Value - result.StartTime
+                        : TimeSpan.Zero
+                });
+            }
         }
 
         #endregion

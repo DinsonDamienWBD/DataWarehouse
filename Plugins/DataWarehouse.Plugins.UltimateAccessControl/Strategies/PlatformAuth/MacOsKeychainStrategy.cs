@@ -49,24 +49,13 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PlatformAuth
             IncrementCounter("macos.keychain.shutdown");
             return base.ShutdownAsyncCore(cancellationToken);
         }
-protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
             IncrementCounter("macos.keychain.evaluate");
-            await Task.Yield();
-
-            var hasValidIdentity = context.SubjectId.Length > 0;
-
-            return new AccessDecision
-            {
-                IsGranted = hasValidIdentity,
-                Reason = hasValidIdentity ? "macOS Keychain Strategy verified" : "Authentication failed",
-                ApplicablePolicies = new[] { "macos-keychain-policy" },
-                Metadata = new Dictionary<string, object>
-                {
-                    ["platform"] = "macOS",
-                    ["strategy_type"] = "PlatformAuth"
-                }
-            };
+            throw new NotSupportedException(
+                "Requires the macOS Security framework via P/Invoke (Security.framework) for real Keychain item lookup, " +
+                "LocalAuthentication biometric prompts, and certificate chain verification. " +
+                "This is only available on macOS. Granting access for any non-empty SubjectId is not a valid implementation.");
         }
     }
 }

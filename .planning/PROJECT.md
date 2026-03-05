@@ -2,7 +2,7 @@
 
 ## What This Is
 
-An AI-native, plugin-based data warehouse SDK built in C#/.NET 10. The project uses a microkernel architecture with 60 active plugins, message bus communication, and the strategy pattern throughout. It provides comprehensive data management capabilities including storage, security, compression, RAID, compliance, compute, interfaces, media processing, data governance, and edge distribution.
+An AI-native, plugin-based data warehouse SDK built in C#/.NET 10 with a composable Virtual Disk Engine (VDE). The project uses a microkernel architecture with 52 active plugins (3,036 strategies), message bus communication, and the strategy pattern throughout. It provides comprehensive data management from bare-metal block devices through intelligent policy-driven storage, security, compression, dual-level RAID, federated multi-VDE namespaces, compliance, compute, interfaces, media processing, data governance, and edge distribution.
 
 ## Core Value
 
@@ -10,11 +10,12 @@ Every feature listed in the task tracker is fully production-ready — no placeh
 
 ## Current State
 
-**v1.0 Production Readiness — SHIPPED (2026-02-11)**
+**v6.0 Intelligent Policy Engine & Composable VDE — SHIPPED (2026-03-03)**
 
-- 863 commits | 1,110,244 LOC C# | 60 active plugins | 2,488 .cs files
-- 1,039 tests passing (0 failures) | 16 build warnings (NuGet-only)
-- 21 phases completed across 116 execution plans in 30 days
+- 2,891 commits | 3,787 .cs files | 52 plugins | 3,036 strategies
+- Build: 0 errors, 0 warnings
+- 6 milestones shipped (v1.0 through v6.0) across 95 phases, 662+ plans
+- v6.0: 29 phases, 230 plans, 2,654 files changed (+264,989 / -24,669 lines)
 
 See `.planning/MILESTONES.md` for full accomplishment list.
 
@@ -67,30 +68,48 @@ See `.planning/MILESTONES.md` for full accomplishment list.
 - ✓ Build health (warnings 1,201→16, 121 null! fixed, 37 TODOs resolved)
 - ✓ Plugin cleanup (88 deprecated dirs removed, 60 active plugins)
 
-### Active (v2.0 — SDK Hardening & Distributed Infrastructure)
+### Validated (v6.0)
 
-- [ ] Refactor plugin base class hierarchy (PluginBase → IntelligentPluginBase → feature-specific bases)
-- [ ] Refactor strategy base class hierarchy (unified multi-tier StrategyBase)
-- [ ] Add auto-scaling, load balancing, P2P, auto-sync, auto-tier, auto-governance SDK contracts
-- [ ] Verify and enforce plugin/kernel decoupling (SDK-only deps, message bus only)
-- [ ] Update all Ultimate plugins to new base class hierarchy
-- [ ] Update all standalone plugins to new base class hierarchy
-- [ ] Fix DataWarehouse.CLI System.CommandLine deprecation
-- [ ] Memory safety: IDisposable on PluginBase, secure memory wiping, bounded collections
-- [ ] Cryptographic hygiene: constant-time comparisons, key rotation contracts, algorithm agility
-- [ ] Input validation at all SDK boundaries with ReDoS protection
-- [ ] Resilience contracts: circuit breakers, timeouts, bulkhead isolation in SDK
-- [ ] Observability contracts: ActivitySource, health checks, resource metering per plugin
-- [ ] API contract safety: immutable DTOs, strong typing, versioned interfaces
-- [ ] Static analysis: TreatWarningsAsErrors, Roslyn analyzers, banned API checks
-- [ ] Supply chain security: vulnerability audit, dependency pinning, SBOM
-- [ ] Comprehensive test suite for all new/refactored base classes
+- ✓ Intelligent PolicyEngine with cascade resolution, 5 persistence backends, compliance scoring — v6.0
+- ✓ AI policy intelligence with 5 advisors, autonomy levels, overhead throttling — v6.0
+- ✓ Authority chain with 3-of-5 quorum, emergency escalation, hardware tokens — v6.0
+- ✓ DWVD v2.0/v2.1 format: superblock, 18+ regions, 26 module bits, variable-width inodes — v6.0
+- ✓ VDE scalable internals: allocation groups, ARC cache, MVCC, SQL OLTP+OLAP, extent trees — v6.0
+- ✓ Adaptive index engine: 7-level morphing, Bw-Tree, HNSW vector search, io_uring, SIMD — v6.0
+- ✓ CompoundBlockDevice with device-level RAID 0/1/5/6/10, hot spare management — v6.0
+- ✓ VDE 2.0B federation router with hierarchical shard catalog, zero-overhead passthrough — v6.0
+- ✓ Shard lifecycle: placement tiers, split/merge, CoW migration, 2PC + saga transactions — v6.0
+- ✓ Block device layer: DirectFile, IoRing, SPDK, raw partition, bootable preamble — v6.0
+- ✓ Dynamic subsystem scaling: bounded persistent caches for 23 subsystems — v6.0
+- ✓ Ecosystem: PostgreSQL wire, Parquet/Arrow/ORC, client SDKs, Terraform, Helm — v6.0
+- ✓ Production audit: 4,656 findings all fixed, plugin consolidation to 52 — v6.0
+- ✓ E2E testing: 34 tests covering raw devices to federation at GB/TB/PB scales — v6.0
+
+### Active (v7.0)
+
+- [ ] Fix all 4,444 remaining audit findings (1,751 P1 + 1,863 P2 + 830 LOW) — sequential top-to-bottom
+- [ ] Contract test generation for all 3,036 strategies against their base class contracts
+- [ ] Integration path tests — message bus, pipeline, VDE decorator chain, federation
+- [ ] Companion project tests — CLI, GUI, Dashboard, Launcher, Shared
+- [ ] Negative/adversarial tests and fuzz harnesses
+- [ ] Performance baselines with regression gates (real DW benchmarks, not generic .NET)
+- [ ] Cross-cutting hostile runtime analysis — thread safety, CancellationToken, config validation, memory leaks
+- [ ] Fix all findings from hostile analysis
+
+### Active (v7.1)
+
+- [ ] CLI sync to v6.0 architecture (missing: PolicyEngine, Federation, Authority, Shards, DeviceRAID, AIAdvisor)
+- [ ] GUI sync to v6.0 architecture (missing: PolicyEngine, AuthorityChain, ShardLifecycle, AIAdvisor)
+- [ ] Dashboard sync to v6.0 architecture (missing: Policy, Federation, Authority, Shards, RAID, AI, VDE controllers)
+- [ ] Launcher sync to v6.0 architecture (federation-aware topology, policy-based startup, CRDT sync)
+- [ ] Shared library alignment with current SDK contracts
 
 ### Out of Scope
 
-- Creating new plugins beyond what's in SDK_REFACTOR_PLAN.md
-- Deployment/CI/CD pipeline setup
-- UI/Dashboard changes (SDK-only milestone)
+- v8.0+ reserved features: SDUP (Semantic Dedup), ZKPA (zk-SNARK Compliance), Ghost Enclaves
+- New plugins beyond what exists in current 52-plugin set
+- New SDK features or architectural changes (v7.0 is hardening only)
+- UI/UX redesign (v7.1 syncs existing architecture, not new design)
 
 ## Constraints
 
@@ -105,10 +124,16 @@ See `.planning/MILESTONES.md` for full accomplishment list.
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | Verify before implementing | Many tasks already done but TODO.md out of sync | Saved ~60% effort |
-| Mark completions in TODO.md | Source of truth is Metadata/TODO.md | All tasks synced |
 | Production-ready only | Rule 13 — no simulations, mocks, stubs, or placeholders | 100% compliant |
-| Strategy pattern throughout | Consistent extensibility model | 140+ base classes |
+| Strategy pattern throughout | Consistent extensibility model | 3,036 strategies |
 | Message bus communication | Plugin isolation, no direct references | Zero cross-plugin imports |
+| Dual-level RAID architecture | Device-level + data-level protection independent | CompoundBlockDevice + PolymorphicRaidModule |
+| VDE decorator chain | Composable I/O pipeline via IBlockDevice wrapping | Cache→Integrity→Compression→Dedup→Encryption→WAL→RAID→File |
+| Hierarchical shard catalog | Scale from single-VDE to PB federation transparently | 4-level: Root→Domain→Index→Data |
+| Zero-overhead single-VDE passthrough | No performance penalty when federation not needed | FederatedVirtualDiskEngine.CreateSingleVde |
+| Cascade policy resolution | 5 strategies cover all policy inheritance patterns | Inherit, Override, Merge, MostRestrictive, LeastRestrictive |
+| VDE immutables | BlockSize and VolumeUuid locked at creation | Everything else mutable or grow-only |
+| WASM over eBPF for Smart Extents | User directive for portability | WASM compute pushdown in extents |
 
 ## Completed Milestones
 
@@ -117,44 +142,33 @@ See `.planning/MILESTONES.md` for full accomplishment list.
 - **v3.0** (2026-02-17): Universal Platform — 10 phases, 64 plans
 - **v4.0-v4.4** (2026-02-18): Feature Verification & Hardening — 10 phases, ~50 plans, 5 fix rounds
 - **v4.5** (2026-02-19): Certification Authority — NOT CERTIFIED (50 pentest findings, security 38/100)
-- **v5.0** (IN PROGRESS): 10 Differentiators + Universal Tags + Security Wiring + Feature Gaps — Phases 52-65 COMPLETE, 66-67 remaining
+- **v5.0** (2026-02-22): Differentiators & Security Wiring — 16 phases, ~146 plans, certified conditional (92/100 security)
+- **v6.0** (2026-03-03): Intelligent Policy Engine & Composable VDE — 29 phases, 230 plans, 8 days
 
 See `.planning/MILESTONES.md` for full history.
 
-## Current Milestone: v6.0 — Intelligent Policy Engine & Composable VDE
+## Current Milestone: v7.0 Production Hardening, Full Test Coverage & Hostile Analysis
 
-**Goal:** Transform every applicable feature (94+ across 8 categories) into a multi-level, cascade-aware, AI-tunable policy with performance optimization. Implement composable DWVD v2.0 format with runtime VDE composition. Consolidate non-Ultimate plugins.
+**Goal:** Fix every known audit finding, build comprehensive test coverage (~50,000+ tests), perform hostile runtime analysis, and fix all findings — achieving true production readiness with zero known issues.
 
 **Target features:**
-- Multi-level policy hierarchy (Block → Chunk → Object → Container → VDE) with cascade resolution
-- Operational profiles (Speed/Balanced/Standard/Strict/Paranoid) with per-feature intensity sliders
-- Performance optimization (MaterializedPolicyCache, BloomFilterSkipIndex, CompiledPolicyDelegate)
-- AI-driven policy intelligence (auto-tuning, anomaly-based adjustment, predictive optimization)
-- Composable DWVD v2.0 format (19 modules, runtime VDE composition, three-tier performance model)
-- dw:// namespace integration with Ed25519-signed authority
-- External tamper detection with configurable response levels
-- .dwvd file extension with OS registration (Windows/Linux/macOS)
-- Plugin consolidation audit (17 non-Ultimate plugins reviewed for merge or standalone justification)
-- Authority chain: Admin → AI Emergency → Super Admin Quorum (3-of-5 multi-key)
+- Sequential top-to-bottom fix of all 4,444 audit findings with explicit disposition ledger
+- Auto-generated contract tests for 3,036 strategies (base class contract compliance)
+- Integration tests for message bus, pipeline, VDE chain, federation
+- Companion project test coverage (CLI, GUI, Dashboard, Launcher, Shared — currently 0%)
+- Adversarial/fuzz testing (corrupt data, resource exhaustion, concurrency stress)
+- Real DataWarehouse performance benchmarks replacing generic .NET benchmarks
+- Cross-cutting hostile analysis: thread safety, CancellationToken, config validation, memory leaks, deadlocks
+- All hostile analysis findings fixed with failing-test-first methodology
 
-**Design documents:**
-- `.planning/v6.0-DESIGN-DISCUSSION.md` — 12 architectural decisions
-- `.planning/v6.0-VDE-FORMAT-v2.0-SPEC.md` — 1,760-line format specification
-- `.planning/v6.0-FEATURE-STORAGE-REQUIREMENTS.md` — 23-category storage requirements catalog
+**Key reference:**
+- Audit findings: `Metadata/SDK-AUDIT-FINDINGS.md` (6,900 lines, 4,647 findings, 203 P0 fixed)
+- Fix tracking: `Metadata/audit-fix-ledger-*.md` (created during execution)
 
-**Key decisions (see design discussion for full details):**
-1. Policy at Plugin level, not Strategy level
-2. AI integration through IntelligenceAwarePluginBase (UltimateIntelligence excluded)
-3. Quorum failsafe enables AI management of ALL policies
-4. Pluggable persistence (not TamperProof-mandatory)
-5. Custom VDE format (not VHDX/VMDK)
-6. Policy data embedded in VDE with cryptographic binding
-7. VDE-level policy outside user capacity
-8. Composable VDE — spec is max envelope, user selects modules
-9. dw:// namespace embedded in VDE
-10. External tamper detection with 5 response levels
-11. File extension `.dwvd` with full OS integration
-12. Plugin consolidation audit as late v6.0 phase
+**Design documents (from v6.0):**
+- `.planning/v6.0-DESIGN-DISCUSSION.md` — 41 architectural decisions
+- `.planning/v6.0-VDE-FORMAT-v2.0-SPEC.md` — VDE v2.1 format specification
+- `.planning/ADAPTIVE-SCALING-ANALYSIS.md` — 97 features x 6 scale levels
 
 ---
-*Last updated: 2026-02-20 — v6.0 milestone started*
+*Last updated: 2026-03-03 after v7.0 milestone start*

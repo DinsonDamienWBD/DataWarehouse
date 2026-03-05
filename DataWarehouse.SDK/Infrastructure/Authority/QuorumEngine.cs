@@ -19,7 +19,7 @@ namespace DataWarehouse.SDK.Infrastructure.Authority
     /// </para>
     /// </summary>
     [SdkCompatibility("6.0.0", Notes = "Phase 75: Quorum System (AUTH-04, AUTH-05, AUTH-07)")]
-    public sealed class QuorumEngine : IQuorumService
+    public sealed class QuorumEngine : IQuorumService, IDisposable
     {
         private readonly IAuthorityResolver _authorityResolver;
         private readonly QuorumConfiguration _config;
@@ -80,8 +80,10 @@ namespace DataWarehouse.SDK.Infrastructure.Authority
                 ActionParameters = parameters
             };
 
-            _requests[request.RequestId] = request;
+            // Insert lock before request to avoid TOCTOU: another thread finding the request
+            // before the lock entry exists, then crashing in GetRequestLock.
             _requestLocks[request.RequestId] = new SemaphoreSlim(1, 1);
+            _requests[request.RequestId] = request;
 
             return request;
         }
@@ -321,6 +323,17 @@ namespace DataWarehouse.SDK.Infrastructure.Authority
             }
 
             return false;
+        }
+
+        /// <inheritdoc/>
+        public void Dispose()
+        {
+            // Dispose all per-request semaphores to release OS handles
+            foreach (var kvp in _requestLocks)
+            {
+                kvp.Value.Dispose();
+            }
+            _requestLocks.Clear();
         }
     }
 }

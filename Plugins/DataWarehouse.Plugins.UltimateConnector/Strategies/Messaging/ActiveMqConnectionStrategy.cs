@@ -22,9 +22,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
         public ActiveMqConnectionStrategy(ILogger? logger = null) : base(logger) { }
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var parts = config.ConnectionString.Split(':');
-            var host = parts[0];
-            var port = parts.Length > 1 ? int.Parse(parts[1]) : 61616;
+            // P2-2132: Use ParseHostPortSafe to correctly handle IPv6 addresses like [::1]:61616
+            var (host, port) = ParseHostPortSafe(config.ConnectionString ?? throw new ArgumentException("Connection string required"), 61616);
             var tcpClient = new TcpClient();
             await tcpClient.ConnectAsync(host, port, ct);
             var stream = tcpClient.GetStream();
@@ -34,8 +33,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
             await stream.FlushAsync(ct);
             return new DefaultConnectionHandle(tcpClient, new Dictionary<string, object> { ["Host"] = host, ["Port"] = port });
         }
-        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { try { return handle.GetConnection<TcpClient>()?.Connected ?? false; } catch { return false; } }
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<TcpClient>()?.Close(); await Task.CompletedTask; }
+        protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { try { return Task.FromResult(handle.GetConnection<TcpClient>()?.Connected ?? false); } catch { return Task.FromResult(false); } }
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<TcpClient>()?.Close(); return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, isHealthy ? "ActiveMQ is connected" : "ActiveMQ is disconnected", sw.Elapsed, DateTimeOffset.UtcNow); }
 
         public override async Task PublishAsync(IConnectionHandle handle, string topic, byte[] message, Dictionary<string, string>? headers = null, CancellationToken ct = default)
@@ -167,11 +166,12 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
 
         private static byte[] ExtractMessageBody(byte[] payload)
         {
-            // Simplified extraction - real impl would parse full OpenWire format
-            if (payload.Length < 10) return payload;
-            // Skip header bytes and extract body
-            var bodyStart = Math.Min(20, payload.Length - 1);
-            return payload[bodyStart..];
+            // Full OpenWire frame parsing is not feasible without the ActiveMQ client library.
+            // The magic offset=20 approach silently returns garbage body bytes.
+            // Callers should use Apache.NMS.ActiveMQ (NuGet) for production message consumption.
+            throw new NotSupportedException(
+                "OpenWire binary frame parsing requires the Apache.NMS.ActiveMQ NuGet package. " +
+                "This raw TCP subscriber cannot reliably extract message body bytes without the full OpenWire codec.");
         }
     }
 }

@@ -76,7 +76,15 @@ public abstract class PlatformPluginBase : FeaturePluginBase
         return ExecuteWithStrategyAsync<TStrategy, Dictionary<string, object>>(
             strategyId,
             identity,
-            _ => Task.FromResult(new Dictionary<string, object>(operation)),
+            strategy =>
+            {
+                var result = new Dictionary<string, object>(operation)
+                {
+                    ["_resolvedStrategy"] = strategy.StrategyId,
+                    ["_strategyName"] = strategy.Name
+                };
+                return Task.FromResult(result);
+            },
             ct);
     }
 

@@ -117,6 +117,10 @@ public abstract class TabularModelStrategyBase : IntelligenceStrategyBase
 /// </summary>
 public sealed class TabPfnStrategy : TabularModelStrategyBase
 {
+    // Finding 3233: Methods return hardcoded stub results — not production-ready.
+    /// <inheritdoc/>
+    public override bool IsProductionReady => false;
+
     /// <inheritdoc/>
     public override string StrategyId => "tabular-tabpfn";
 
@@ -269,6 +273,10 @@ public sealed class TabPfnStrategy : TabularModelStrategyBase
 /// </summary>
 public sealed class TabNetStrategy : TabularModelStrategyBase
 {
+    // Finding 3233: Methods return hardcoded stub results — not production-ready.
+    /// <inheritdoc/>
+    public override bool IsProductionReady => false;
+
     /// <inheritdoc/>
     public override string StrategyId => "tabular-tabnet";
 
@@ -398,6 +406,10 @@ public sealed class TabNetStrategy : TabularModelStrategyBase
 /// </summary>
 public sealed class SaintStrategy : TabularModelStrategyBase
 {
+    // Finding 3233: Methods return hardcoded stub results — not production-ready.
+    /// <inheritdoc/>
+    public override bool IsProductionReady => false;
+
     /// <inheritdoc/>
     public override string StrategyId => "tabular-saint";
 
@@ -526,6 +538,10 @@ public sealed class SaintStrategy : TabularModelStrategyBase
 /// </summary>
 public sealed class TabTransformerStrategy : TabularModelStrategyBase
 {
+    // Finding 3233: Methods return hardcoded stub results — not production-ready.
+    /// <inheritdoc/>
+    public override bool IsProductionReady => false;
+
     /// <inheritdoc/>
     public override string StrategyId => "tabular-tabtransformer";
 
@@ -653,6 +669,10 @@ public sealed class TabTransformerStrategy : TabularModelStrategyBase
 /// </summary>
 public sealed class AutoMlTabularStrategy : TabularModelStrategyBase
 {
+    // Finding 3233: Methods return hardcoded stub results — not production-ready.
+    /// <inheritdoc/>
+    public override bool IsProductionReady => false;
+
     /// <inheritdoc/>
     public override string StrategyId => "tabular-automl";
 
@@ -790,6 +810,10 @@ public sealed class AutoMlTabularStrategy : TabularModelStrategyBase
 /// </summary>
 public sealed class XgBoostLlmStrategy : TabularModelStrategyBase
 {
+    // Finding 3233: Methods return hardcoded stub results — not production-ready.
+    /// <inheritdoc/>
+    public override bool IsProductionReady => false;
+
     /// <inheritdoc/>
     public override string StrategyId => "tabular-xgboost-llm";
 

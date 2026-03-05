@@ -232,7 +232,7 @@ public sealed class UltimateSDKPortsPlugin : PlatformPluginBase, IDisposable
 
     #region Public API
 
-    public IReadOnlyCollection<string> GetRegisteredStrategies() => _registry.RegisteredStrategies;
+    public IReadOnlyCollection<string> GetRegisteredStrategies() => _registry.RegisteredStrategies.ToList();
     public SDKPortStrategyBase? GetStrategy(string name) => _registry.Get(name);
 
     public void SetActiveStrategy(string strategyName)

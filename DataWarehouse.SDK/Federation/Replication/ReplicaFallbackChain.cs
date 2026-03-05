@@ -2,6 +2,7 @@ using DataWarehouse.SDK.Federation.Topology;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DataWarehouse.SDK.Federation.Replication;
@@ -38,15 +39,16 @@ internal static class ReplicaFallbackChain
         string failedNodeId,
         IReadOnlyList<string> allReplicas,
         NodeTopology self,
-        ITopologyProvider topologyProvider)
+        ITopologyProvider topologyProvider,
+        CancellationToken ct = default)
     {
         var replicas = allReplicas.Where(id => id != failedNodeId).ToList();
 
-        // Score replicas by proximity
+        // Score replicas by proximity (finding P2-330: pass ct so topology fetch is cancellable)
         var scored = new List<(string NodeId, double Score)>();
         foreach (var replicaId in replicas)
         {
-            var topology = await topologyProvider.GetNodeTopologyAsync(replicaId);
+            var topology = await topologyProvider.GetNodeTopologyAsync(replicaId, ct).ConfigureAwait(false);
             if (topology == null) continue;
 
             var score = ProximityCalculator.CalculateProximityScore(self, topology, RoutingPolicy.LatencyOptimized);

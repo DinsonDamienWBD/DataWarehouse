@@ -254,26 +254,6 @@ protected override async Task<AccessDecision> EvaluateAccessCoreAsync(
                 // Get or create user cards list
                 var userCards = _userCards.GetOrAdd(userId, _ => new List<RegisteredCard>());
 
-                // Check card limit
-                if (userCards.Count >= MaxCardsPerUser)
-                {
-                    return new CardRegistrationResult
-                    {
-                        Success = false,
-                        Message = $"Maximum {MaxCardsPerUser} cards per user"
-                    };
-                }
-
-                // Check for duplicate
-                if (userCards.Any(c => c.Thumbprint == certificate.Thumbprint))
-                {
-                    return new CardRegistrationResult
-                    {
-                        Success = false,
-                        Message = "Certificate already registered"
-                    };
-                }
-
                 // Create card registration
                 var card = new RegisteredCard
                 {
@@ -290,8 +270,29 @@ protected override async Task<AccessDecision> EvaluateAccessCoreAsync(
                     IsRevoked = false
                 };
 
+                // Atomic check-and-add under single lock to prevent TOCTOU race
                 lock (userCards)
                 {
+                    // Check card limit
+                    if (userCards.Count >= MaxCardsPerUser)
+                    {
+                        return new CardRegistrationResult
+                        {
+                            Success = false,
+                            Message = $"Maximum {MaxCardsPerUser} cards per user"
+                        };
+                    }
+
+                    // Check for duplicate
+                    if (userCards.Any(c => c.Thumbprint == certificate.Thumbprint))
+                    {
+                        return new CardRegistrationResult
+                        {
+                            Success = false,
+                            Message = "Certificate already registered"
+                        };
+                    }
+
                     userCards.Add(card);
                 }
 

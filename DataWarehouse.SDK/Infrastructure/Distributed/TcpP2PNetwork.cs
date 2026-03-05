@@ -43,7 +43,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
     public sealed class TcpP2PNetwork : IP2PNetwork, IDisposable
     {
         private readonly BoundedDictionary<string, PeerInfo> _knownPeers = new BoundedDictionary<string, PeerInfo>(1000);
-        private readonly BoundedDictionary<string, TcpClient> _activeConnections = new BoundedDictionary<string, TcpClient>(1000);
+        private readonly BoundedDictionary<string, (TcpClient Client, Stream Stream)> _activeConnections = new BoundedDictionary<string, (TcpClient Client, Stream Stream)>(1000);
         private readonly ConcurrentQueue<GossipMessage> _pendingGossip = new();
         private readonly TcpListener? _listener;
         private readonly TcpP2PNetworkConfig _config;
@@ -113,8 +113,8 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             if (!_knownPeers.TryGetValue(peerId, out var peer))
                 throw new InvalidOperationException($"Peer '{peerId}' not found");
 
-            var connection = await GetOrCreateConnectionAsync(peer, ct);
-            await SendMessageAsync(connection, new P2PMessage
+            var (_, stream) = await GetOrCreateConnectionAsync(peer, ct);
+            await SendMessageAsync(stream, new P2PMessage
             {
                 MessageType = "Data",
                 SenderId = _config.LocalPeerId,
@@ -150,10 +150,10 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             if (!_knownPeers.TryGetValue(peerId, out var peer))
                 throw new InvalidOperationException($"Peer '{peerId}' not found");
 
-            var connection = await GetOrCreateConnectionAsync(peer, ct);
+            var (_, stream) = await GetOrCreateConnectionAsync(peer, ct);
 
             // Send request
-            await SendMessageAsync(connection, new P2PMessage
+            await SendMessageAsync(stream, new P2PMessage
             {
                 MessageType = "Request",
                 SenderId = _config.LocalPeerId,
@@ -164,7 +164,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             timeoutCts.CancelAfter(TimeSpan.FromSeconds(30));
 
-            var response = await ReceiveMessageAsync(connection, timeoutCts.Token);
+            var response = await ReceiveMessageAsync(stream, timeoutCts.Token);
             return response.Payload;
         }
 
@@ -194,8 +194,9 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                 // Close active connection
                 if (_activeConnections.TryRemove(peerId, out var connection))
                 {
-                    try { connection.Close(); } catch { /* Best-effort cleanup */ }
-                    connection.Dispose();
+                    try { connection.Stream.Dispose(); } catch { /* Best-effort cleanup */ }
+                    try { connection.Client.Close(); } catch { /* Best-effort cleanup */ }
+                    connection.Client.Dispose();
                 }
 
                 OnPeerEvent?.Invoke(new PeerEvent
@@ -209,27 +210,38 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
 
         /// <summary>
         /// Gets or creates a TCP connection to the specified peer with mTLS.
+        /// Returns the TcpClient and the authenticated stream (SslStream if mTLS, NetworkStream otherwise).
         /// </summary>
-        private async Task<TcpClient> GetOrCreateConnectionAsync(PeerInfo peer, CancellationToken ct)
+        private async Task<(TcpClient Client, Stream Stream)> GetOrCreateConnectionAsync(PeerInfo peer, CancellationToken ct)
         {
             // Check if we already have an active connection
-            if (_activeConnections.TryGetValue(peer.PeerId, out var existingClient) && existingClient.Connected)
+            if (_activeConnections.TryGetValue(peer.PeerId, out var existing) && existing.Client.Connected)
             {
-                return existingClient;
+                return existing;
             }
 
             await _connectionLock.WaitAsync(ct);
             try
             {
                 // Double-check after acquiring lock
-                if (_activeConnections.TryGetValue(peer.PeerId, out var existingClient2) && existingClient2.Connected)
+                if (_activeConnections.TryGetValue(peer.PeerId, out var existing2) && existing2.Client.Connected)
                 {
-                    return existingClient2;
+                    return existing2;
+                }
+
+                // Enforce mTLS requirement: reject plaintext connections when RequireMutualTls is true
+                if (_config.RequireMutualTls && !_config.EnableMutualTls)
+                {
+                    throw new AuthenticationException(
+                        "RequireMutualTls is true but EnableMutualTls is false. " +
+                        "Cannot establish plaintext connection when mTLS is required.");
                 }
 
                 // Create new connection
                 var client = new TcpClient();
                 await client.ConnectAsync(peer.Address, peer.Port, ct);
+
+                Stream connectionStream;
 
                 // Upgrade to TLS with mTLS if enabled
                 if (_config.EnableMutualTls)
@@ -254,12 +266,21 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                     // Verify mutual authentication occurred
                     if (!sslStream.IsMutuallyAuthenticated)
                     {
+                        sslStream.Dispose();
+                        client.Dispose();
                         throw new AuthenticationException("mTLS handshake failed: mutual authentication not established");
                     }
+
+                    connectionStream = sslStream;
+                }
+                else
+                {
+                    connectionStream = client.GetStream();
                 }
 
-                _activeConnections[peer.PeerId] = client;
-                return client;
+                var entry = (client, connectionStream);
+                _activeConnections[peer.PeerId] = entry;
+                return entry;
             }
             finally
             {
@@ -327,11 +348,11 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                     stream = sslStream;
                 }
 
-                // Handle messages from this peer
+                // Handle messages from this peer using the authenticated stream
                 while (!_shutdownCts.Token.IsCancellationRequested && client.Connected)
                 {
-                    var message = await ReceiveMessageAsync(client, _shutdownCts.Token);
-                    await ProcessIncomingMessageAsync(message, client);
+                    var message = await ReceiveMessageAsync(stream, _shutdownCts.Token);
+                    await ProcessIncomingMessageAsync(message, stream);
                 }
             }
             catch (OperationCanceledException)
@@ -400,28 +421,28 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         }
 
         /// <summary>
-        /// Sends a P2P message over the connection.
+        /// Sends a P2P message over the authenticated stream.
         /// Protocol: 4-byte length prefix + JSON UTF-8 payload.
+        /// Uses the provided stream (SslStream if mTLS, NetworkStream otherwise) to ensure
+        /// all traffic goes through the authenticated channel.
         /// </summary>
-        private async Task SendMessageAsync(TcpClient client, P2PMessage message, CancellationToken ct)
+        private async Task SendMessageAsync(Stream stream, P2PMessage message, CancellationToken ct)
         {
             var json = JsonSerializer.Serialize(message);
             var payload = System.Text.Encoding.UTF8.GetBytes(json);
             var length = BitConverter.GetBytes(payload.Length);
 
-            var stream = client.GetStream();
             await stream.WriteAsync(length.AsMemory(0, 4), ct);
             await stream.WriteAsync(payload, ct);
             await stream.FlushAsync(ct);
         }
 
         /// <summary>
-        /// Receives a P2P message from the connection.
+        /// Receives a P2P message from the authenticated stream.
         /// Protocol: 4-byte length prefix + JSON UTF-8 payload.
         /// </summary>
-        private async Task<P2PMessage> ReceiveMessageAsync(TcpClient client, CancellationToken ct)
+        private async Task<P2PMessage> ReceiveMessageAsync(Stream stream, CancellationToken ct)
         {
-            var stream = client.GetStream();
 
             // Read 4-byte length prefix
             var lengthBuffer = ArrayPool<byte>.Shared.Rent(4);
@@ -467,7 +488,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         /// <summary>
         /// Processes an incoming message from a peer.
         /// </summary>
-        private async Task ProcessIncomingMessageAsync(P2PMessage message, TcpClient client)
+        private async Task ProcessIncomingMessageAsync(P2PMessage message, Stream stream)
         {
             switch (message.MessageType)
             {
@@ -478,13 +499,18 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
 
                 case "Request":
                     // Handle request and send response
+                    // WARNING: Request handler not yet integrated with application layer.
+                    // Returns error indicator so callers know the request was not processed,
+                    // rather than silently returning empty data that could be misinterpreted as success.
+                    var errorPayload = System.Text.Encoding.UTF8.GetBytes(
+                        "{\"error\":\"request_handler_not_configured\",\"message\":\"No application-level request handler registered.\"}");
                     var response = new P2PMessage
                     {
                         MessageType = "Response",
                         SenderId = _config.LocalPeerId,
-                        Payload = Array.Empty<byte>() // Application handles response payload
+                        Payload = errorPayload
                     };
-                    await SendMessageAsync(client, response, CancellationToken.None);
+                    await SendMessageAsync(stream, response, CancellationToken.None);
                     break;
 
                 case "Response":
@@ -496,7 +522,6 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                     break;
             }
 
-            await Task.CompletedTask;
         }
 
         /// <summary>
@@ -513,10 +538,11 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             try { _listener?.Stop(); } catch { /* Best-effort cleanup */ }
 
             // Close all active connections
-            foreach (var connection in _activeConnections.Values)
+            foreach (var (client, connStream) in _activeConnections.Values)
             {
-                try { connection.Close(); } catch { /* Best-effort cleanup */ }
-                connection.Dispose();
+                try { connStream.Dispose(); } catch { /* Best-effort cleanup */ }
+                try { client.Close(); } catch { /* Best-effort cleanup */ }
+                client.Dispose();
             }
 
             _activeConnections.Clear();

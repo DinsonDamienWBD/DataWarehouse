@@ -104,13 +104,15 @@ public sealed class TamperProofScalingManager : IScalableSubsystem, IBackpressur
     private long _scanBytesProcessed;
     private long _scanOperationsCompleted;
     private readonly SemaphoreSlim _scanThrottle;
-    private bool _scanPaused;
+    // Volatile: read from background scan loop without holding a lock (finding 1028).
+    private volatile bool _scanPaused;
 
     // -------------------------------------------------------------------
     // Backpressure
     // -------------------------------------------------------------------
 
-    private BackpressureState _currentBpState = BackpressureState.Normal;
+    // Volatile: read by polling loops across threads (finding 1028).
+    private volatile BackpressureState _currentBpState = BackpressureState.Normal;
 
     /// <inheritdoc />
     public BackpressureStrategy Strategy { get; set; } = BackpressureStrategy.Adaptive;

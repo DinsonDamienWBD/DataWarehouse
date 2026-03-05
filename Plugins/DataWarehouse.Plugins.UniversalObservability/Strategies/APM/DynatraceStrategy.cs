@@ -1,4 +1,5 @@
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts.Observability;
@@ -32,9 +33,12 @@ public sealed class DynatraceStrategy : ObservabilityStrategyBase
         _environmentUrl = environmentUrl.TrimEnd('/');
         _apiToken = apiToken;
         _entityId = entityId;
-        _httpClient.DefaultRequestHeaders.Clear();
-        _httpClient.DefaultRequestHeaders.Add("Authorization", $"Api-Token {_apiToken}");
+        // Do NOT set DefaultRequestHeaders — inject per-request to avoid thread-safety issues.
     }
+
+    /// <summary>Adds the Dynatrace API token to the request headers (per-request, thread-safe).</summary>
+    private void AddApiToken(HttpRequestMessage request) =>
+        request.Headers.Add("Authorization", $"Api-Token {_apiToken}");
 
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
@@ -44,20 +48,25 @@ public sealed class DynatraceStrategy : ObservabilityStrategyBase
 
         foreach (var metric in metrics)
         {
-            var metricKey = metric.Name.Replace(" ", "_").Replace("-", "_");
-            var dimensions = metric.Labels != null
-                ? string.Join(",", metric.Labels.Select(l => $"{l.Name}=\"{l.Value}\""))
+            // MINT metric key: only lowercase letters, digits, dots, underscores, hyphens.
+            // Dots are allowed as namespace separators (e.g. "jvm.gc.time").
+            var metricKey = metric.Name
+                .Replace(" ", "_")
+                .ToLowerInvariant();
+
+            // MINT dimension format: key="escaped_value" — quote all values and escape backslash, quote, newline.
+            var dimensions = metric.Labels != null && metric.Labels.Any()
+                ? "," + string.Join(",", metric.Labels.Select(l =>
+                    $"{SanitizeMintKey(l.Name)}=\"{EscapeMintValue(l.Value)}\""))
                 : "";
 
-            var line = string.IsNullOrEmpty(dimensions)
-                ? $"{metricKey} {metric.Value} {metric.Timestamp.ToUnixTimeMilliseconds()}"
-                : $"{metricKey},{dimensions} {metric.Value} {metric.Timestamp.ToUnixTimeMilliseconds()}";
-
-            lines.AppendLine(line);
+            lines.AppendLine($"{metricKey}{dimensions} gauge,{metric.Value} {metric.Timestamp.ToUnixTimeMilliseconds()}");
         }
 
         var content = new StringContent(lines.ToString(), Encoding.UTF8, "text/plain");
-        var response = await _httpClient.PostAsync($"{_environmentUrl}/api/v2/metrics/ingest", content, cancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{_environmentUrl}/api/v2/metrics/ingest") { Content = content };
+        AddApiToken(request);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -104,7 +113,9 @@ public sealed class DynatraceStrategy : ObservabilityStrategyBase
 
         var json = JsonSerializer.Serialize(traceData);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{_environmentUrl}/api/v2/otlp/v1/traces", content, cancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{_environmentUrl}/api/v2/otlp/v1/traces") { Content = content };
+        AddApiToken(request);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -132,7 +143,9 @@ public sealed class DynatraceStrategy : ObservabilityStrategyBase
 
         var json = JsonSerializer.Serialize(logs);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{_environmentUrl}/api/v2/logs/ingest", content, cancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{_environmentUrl}/api/v2/logs/ingest") { Content = content };
+        AddApiToken(request);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -140,7 +153,9 @@ public sealed class DynatraceStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{_environmentUrl}/api/v2/activeGates", ct);
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"{_environmentUrl}/api/v2/activeGates");
+            AddApiToken(request);
+            using var response = await _httpClient.SendAsync(request, ct);
             return new HealthCheckResult(response.IsSuccessStatusCode,
                 response.IsSuccessStatusCode ? "Dynatrace is healthy" : "Dynatrace unhealthy",
                 new Dictionary<string, object> { ["environmentUrl"] = _environmentUrl });
@@ -160,18 +175,21 @@ public sealed class DynatraceStrategy : ObservabilityStrategyBase
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
+        // HttpClient in-flight requests are abandoned on Dispose; the 100ms added no real grace.
         IncrementCounter("dynatrace.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     protected override void Dispose(bool disposing) { if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }
+
+    /// <summary>Sanitizes a string to be a valid MINT dimension key (lowercase, alphanumeric, dot, underscore, hyphen).</summary>
+    private static string SanitizeMintKey(string key) =>
+        System.Text.RegularExpressions.Regex.Replace(key.ToLowerInvariant(), @"[^a-z0-9._-]", "_");
+
+    /// <summary>Escapes a MINT dimension value (backslash, double-quote, and newline must be escaped).</summary>
+    private static string EscapeMintValue(string value) =>
+        value.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "\\r");
 }

@@ -157,7 +157,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
 
                 // Send request to OPA
                 var url = $"{_opaEndpoint}/v1/data/{_policyPath}";
-                var response = await _httpClient.PostAsync(url, content, cancellationToken);
+                using var response = await _httpClient.PostAsync(url, content, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                 {

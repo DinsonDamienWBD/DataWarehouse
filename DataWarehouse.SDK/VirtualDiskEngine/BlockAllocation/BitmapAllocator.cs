@@ -304,6 +304,26 @@ public sealed class BitmapAllocator
     }
 
     /// <summary>
+    /// Returns true if the specified block is currently allocated (bit set in bitmap).
+    /// </summary>
+    /// <param name="blockNumber">Block number to query.</param>
+    public bool IsAllocated(long blockNumber)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(blockNumber);
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(blockNumber, _totalBlocks);
+
+        _lock.EnterReadLock();
+        try
+        {
+            return GetBit(blockNumber);
+        }
+        finally
+        {
+            _lock.ExitReadLock();
+        }
+    }
+
+    /// <summary>
     /// Provides read-only access to the bitmap for extent tree building.
     /// </summary>
     public byte[] GetBitmapSnapshot()

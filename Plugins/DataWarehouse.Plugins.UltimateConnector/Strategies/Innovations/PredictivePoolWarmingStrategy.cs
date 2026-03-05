@@ -97,7 +97,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                     new AuthenticationHeaderValue("Bearer", config.AuthCredential);
 
             var sw = Stopwatch.StartNew();
-            var response = await client.GetAsync("/health", ct);
+            using var response = await client.GetAsync("/health", ct);
             sw.Stop();
             response.EnsureSuccessStatusCode();
 
@@ -149,7 +149,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             var client = handle.GetConnection<HttpClient>();
             try
             {
-                var response = await client.SendAsync(new HttpRequestMessage(HttpMethod.Head, "/"), ct);
+                using var response = await client.SendAsync(new HttpRequestMessage(HttpMethod.Head, "/"), ct);
 
                 if (_states.TryGetValue(handle.ConnectionId, out var state))
                 {
@@ -259,7 +259,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                             }
                             catch
                             {
+
                                 // Endpoint unreachable, skip warming
+                                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                             }
                         }
                     }
@@ -290,9 +292,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                     }
                 }
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException ex)
             {
+
                 // Normal shutdown
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -314,6 +318,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             private readonly int[] _sampleCounts = new int[1440];
             private readonly double _alpha;
             private readonly object _lock = new();
+            // P2-1945: Maintain a counter of populated buckets for O(1) GetCoveragePercent
+            // instead of iterating all 1440 elements with LINQ on every health-check tick.
+            private int _populatedBuckets;
 
             public TrafficHistogram(double alpha)
             {
@@ -331,6 +338,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                     if (_sampleCounts[bucket] == 0)
                     {
                         _buckets[bucket] = demand;
+                        _populatedBuckets++;
                     }
                     else
                     {
@@ -375,27 +383,53 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             {
                 lock (_lock)
                 {
-                    int populated = _sampleCounts.Count(c => c > 0);
-                    return populated / 1440.0 * 100.0;
+                    // P2-1945: O(1) read from pre-maintained counter instead of LINQ scan.
+                    return _populatedBuckets / 1440.0 * 100.0;
                 }
             }
         }
 
         private class PoolWarmingState
         {
+            // Finding 1943: Guard mutable scaling fields with a lock so reads from
+            // GetHealthCoreAsync and writes from the background scaling loop don't tear.
+            private readonly object _scaleLock = new();
+
             public required TrafficHistogram Histogram { get; set; }
-            public int CurrentPoolSize { get; set; }
             public int BasePoolSize { get; set; }
             public int MaxPoolSize { get; set; }
             public int LookAheadMinutes { get; set; }
             public int CoolingDelayMinutes { get; set; }
             public int CheckIntervalSec { get; set; }
-            public long WarmingEvents { get; set; }
-            public long CoolingEvents { get; set; }
             public int ActiveConnections;
             public DateTimeOffset LastCoolingCheck { get; set; }
-            public DateTimeOffset? LowDemandSince { get; set; }
             public CancellationTokenSource MonitorCts { get; set; } = new();
+
+            private int _currentPoolSize;
+            private long _warmingEvents;
+            private long _coolingEvents;
+            private DateTimeOffset? _lowDemandSince;
+
+            public int CurrentPoolSize
+            {
+                get { lock (_scaleLock) return _currentPoolSize; }
+                set { lock (_scaleLock) _currentPoolSize = value; }
+            }
+            public long WarmingEvents
+            {
+                get { lock (_scaleLock) return _warmingEvents; }
+                set { lock (_scaleLock) _warmingEvents = value; }
+            }
+            public long CoolingEvents
+            {
+                get { lock (_scaleLock) return _coolingEvents; }
+                set { lock (_scaleLock) _coolingEvents = value; }
+            }
+            public DateTimeOffset? LowDemandSince
+            {
+                get { lock (_scaleLock) return _lowDemandSince; }
+                set { lock (_scaleLock) _lowDemandSince = value; }
+            }
         }
     }
 }

@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -31,12 +32,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
     /// </summary>
     public class KafkaConnectorStrategy : UltimateStorageStrategyBase
     {
+        // Fields reserved for when Confluent.Kafka package is added.
+        // All operations throw NotSupportedException until then.
+#pragma warning disable CS0414 // assigned but never used
         private string _bootstrapServers = string.Empty;
-        private string _groupId = "datawarehouse-group";
         private string _topic = string.Empty;
         private readonly ConcurrentQueue<KafkaMessage> _messageQueue = new();
-        private bool _autoCommit = true;
         private int _maxQueueSize = 10000;
+        private int _enqueuedCount = 0; // Tracks current queue depth atomically to prevent TOCTOU
+#pragma warning restore CS0414
 
         public override string StrategyId => "kafka-connector";
         public override string Name => "Apache Kafka Connector";
@@ -60,20 +64,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
 
         protected override Task InitializeCoreAsync(CancellationToken ct)
         {
-            _bootstrapServers = GetConfiguration<string>("BootstrapServers")
-                ?? throw new InvalidOperationException("Kafka BootstrapServers is required");
-
-            _topic = GetConfiguration<string>("Topic")
-                ?? throw new InvalidOperationException("Kafka Topic is required");
-
-            _groupId = GetConfiguration("GroupId", "datawarehouse-group");
-            _autoCommit = GetConfiguration("AutoCommit", true);
-            _maxQueueSize = GetConfiguration("MaxQueueSize", 10000);
-
-            // Note: Actual Kafka consumer initialization would happen here
-            // using Confluent.Kafka.ConsumerBuilder
-
-            return Task.CompletedTask;
+            throw new NotSupportedException(
+                "Requires Confluent.Kafka NuGet package. Add a reference to Confluent.Kafka and " +
+                "implement a real IConsumer<string,string> / IProducer<string,string> using " +
+                "ConsumerBuilder<TKey,TValue> and ProducerBuilder<TKey,TValue>.");
         }
 
         protected override async Task<StorageObjectMetadata> StoreAsyncCore(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct)
@@ -98,8 +92,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                 Headers = metadata
             };
 
-            if (_messageQueue.Count >= _maxQueueSize)
+            // Atomic bounded enqueue: use Interlocked to prevent TOCTOU race between count check and enqueue.
+            // We track the count separately with Interlocked to make the check-then-act atomic.
+            var currentCount = Interlocked.Increment(ref _enqueuedCount);
+            if (currentCount > _maxQueueSize)
             {
+                Interlocked.Decrement(ref _enqueuedCount);
                 throw new InvalidOperationException($"Kafka message queue is full ({_maxQueueSize})");
             }
 
@@ -114,7 +112,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                 Size = messageValue.Length,
                 Created = DateTime.UtcNow,
                 Modified = DateTime.UtcNow,
-                ETag = $"\"{HashCode.Combine(topic, partition, offset):x}\"",
+                ETag = $"\"{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{topic}:{partition}:{offset}"))).ToLowerInvariant()}\"",
                 ContentType = "application/json",
                 CustomMetadata = new Dictionary<string, string>
                 {
@@ -131,9 +129,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
             EnsureInitialized();
             ValidateKey(key);
 
-            // Dequeue message from internal queue
+            // Kafka message semantics: consumers read the next available message (oldest-first).
+            // Key-addressed random-access retrieval is not part of the Kafka model — the key
+            // parameter serves as a routing hint or is ignored. This is intentional by design.
             if (_messageQueue.TryDequeue(out var message))
             {
+                Interlocked.Decrement(ref _enqueuedCount);
                 var stream = new MemoryStream(Encoding.UTF8.GetBytes(message.Value));
 
                 IncrementBytesRetrieved(stream.Length);
@@ -174,7 +175,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                     Size = message.Value.Length,
                     Created = message.Timestamp,
                     Modified = message.Timestamp,
-                    ETag = $"\"{HashCode.Combine(message.Topic, message.Offset):x}\"",
+                    ETag = $"\"{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{message.Topic}:{message.Offset}"))).ToLowerInvariant()}\"",
                     ContentType = "application/json",
                     Tier = Tier
                 };
@@ -198,7 +199,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                 Size = 0,
                 Created = DateTime.UtcNow,
                 Modified = DateTime.UtcNow,
-                ETag = $"\"{HashCode.Combine(topic, offset):x}\"",
+                ETag = $"\"{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{topic}:{offset}"))).ToLowerInvariant()}\"",
                 ContentType = "application/json",
                 CustomMetadata = new Dictionary<string, string>
                 {

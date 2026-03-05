@@ -106,7 +106,7 @@ public class TamperIncidentService
                 {
                     Confidence = analysis.Confidence,
                     SuspectedPrincipal = analysis.SuspectedPrincipals.FirstOrDefault()?.Principal,
-                    RelatedAccessLogs = analysis.AnalyzedEntries?.Cast<object>().ToList(),
+                    RelatedAccessLogs = analysis.AnalyzedEntries?.ToList(),
                     EstimatedTamperTimeFrom = analysis.TamperingWindow.Start,
                     EstimatedTamperTimeTo = analysis.TamperingWindow.End,
                     Reasoning = string.Join("; ", analysis.Evidence),
@@ -142,7 +142,7 @@ public class TamperIncidentService
                     {
                         Confidence = writeLogs.Count > 0 ? AttributionConfidence.Suspected : AttributionConfidence.Unknown,
                         SuspectedPrincipal = lastWritePrincipal,
-                        RelatedAccessLogs = accessLogs.Cast<object>().ToList(),
+                        RelatedAccessLogs = accessLogs.Select(a => new AccessLogEntry { EntryId = Guid.NewGuid(), ObjectId = objectId, Principal = a.Principal, AccessType = a.AccessType, Timestamp = a.AccessedAt, Succeeded = true }).ToList(),
                         EstimatedTamperTimeFrom = lookbackStart,
                         EstimatedTamperTimeTo = DateTimeOffset.UtcNow,
                         Reasoning = $"Found {accessLogs.Count} access logs, {writeLogs.Count} write operations",

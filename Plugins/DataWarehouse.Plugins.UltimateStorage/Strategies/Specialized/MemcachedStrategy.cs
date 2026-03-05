@@ -237,7 +237,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
             await _client.StoreAsync(StoreMode.Set, metadataKey, metadataBytes, expiration);
 
             // Add to index
-            await AddToIndexAsync(key, startTime.Ticks);
+            await AddToIndexAsync(key, startTime.Ticks, ct);
 
             // Update statistics
             IncrementBytesStored(originalSize);
@@ -362,7 +362,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
             await _client!.RemoveAsync(metadataKey);
 
             // Remove from index
-            await RemoveFromIndexAsync(key);
+            await RemoveFromIndexAsync(key, ct);
 
             // Update statistics
             if (size > 0)
@@ -423,7 +423,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
                     System.Diagnostics.Debug.WriteLine($"[MemcachedStrategy.ListAsyncCore] {ex.GetType().Name}: {ex.Message}");
                     // Skip keys that no longer exist or have invalid metadata
                     // Remove from index
-                    await RemoveFromIndexAsync(key);
+                    await RemoveFromIndexAsync(key, ct);
                     continue;
                 }
 
@@ -605,7 +605,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
             await _client!.StoreAsync(StoreMode.Set, metadataKey, metadataBytes, expiration);
 
             // Add to index
-            await AddToIndexAsync(key, startTime.Ticks);
+            await AddToIndexAsync(key, startTime.Ticks, ct);
 
             // Update statistics
             IncrementBytesStored(content.Length);
@@ -725,9 +725,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
         /// <summary>
         /// Adds a key to the in-memory index for listing support.
         /// </summary>
-        private async Task AddToIndexAsync(string key, long timestamp)
+        private async Task AddToIndexAsync(string key, long timestamp, CancellationToken ct = default)
         {
-            await _indexLock.WaitAsync();
+            await _indexLock.WaitAsync(ct).ConfigureAwait(false);
             try
             {
                 _keyIndex[key] = timestamp;
@@ -741,9 +741,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
         /// <summary>
         /// Removes a key from the in-memory index.
         /// </summary>
-        private async Task RemoveFromIndexAsync(string key)
+        private async Task RemoveFromIndexAsync(string key, CancellationToken ct = default)
         {
-            await _indexLock.WaitAsync();
+            await _indexLock.WaitAsync(ct).ConfigureAwait(false);
             try
             {
                 _keyIndex.Remove(key);

@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using DataWarehouse.SDK.Contracts.Compute;
 
 namespace DataWarehouse.Plugins.UltimateCompute.Strategies.Sandbox;
@@ -9,6 +10,9 @@ namespace DataWarehouse.Plugins.UltimateCompute.Strategies.Sandbox;
 /// </summary>
 internal sealed class AppArmorStrategy : ComputeRuntimeStrategyBase
 {
+    // Allowlist for filesystem paths in AppArmor profiles — prevents profile injection.
+    private static readonly Regex SafeProfilePathRegex = new(@"^[a-zA-Z0-9/_.\-]+/?$", RegexOptions.Compiled);
+
     /// <inheritdoc/>
     public override string StrategyId => "compute.sandbox.apparmor";
     /// <inheritdoc/>
@@ -34,13 +38,19 @@ internal sealed class AppArmorStrategy : ComputeRuntimeStrategyBase
         {
             var codePath = Path.GetTempFileName() + ".sh";
             var profilePath = Path.GetTempFileName() + ".apparmor";
-            var profileName = $"datawarehouse_compute_{task.Id[..Math.Min(12, task.Id.Length)]}";
+            // AppArmor profile names are restricted to [a-zA-Z0-9_.-]. Sanitize task.Id to avoid
+            // characters that would break the profile grammar (hyphens are allowed per the spec).
+            var sanitizedId = Regex.Replace(task.Id, @"[^a-zA-Z0-9_.\-]", "_");
+            var profileName = $"datawarehouse_compute_{sanitizedId[..Math.Min(32, sanitizedId.Length)]}";
 
             try
             {
                 await File.WriteAllBytesAsync(codePath, task.Code.ToArray(), cancellationToken);
 
                 var allowedPaths = task.ResourceLimits?.AllowedFileSystemPaths ?? ["/tmp/", "/usr/", "/lib/", "/bin/"];
+                // Validate codePath and allowed paths to prevent AppArmor profile injection.
+                if (!SafeProfilePathRegex.IsMatch(codePath))
+                    throw new ArgumentException($"Code path '{codePath}' contains invalid characters for AppArmor profile.");
                 var profile = new StringBuilder();
                 profile.AppendLine($"#include <tunables/global>");
                 profile.AppendLine($"profile {profileName} {{");
@@ -49,6 +59,8 @@ internal sealed class AppArmorStrategy : ComputeRuntimeStrategyBase
 
                 foreach (var path in allowedPaths)
                 {
+                    if (!SafeProfilePathRegex.IsMatch(path))
+                        throw new ArgumentException($"Allowed path '{path}' contains invalid characters for AppArmor profile.");
                     profile.AppendLine($"  {path}** r,");
                 }
 

@@ -39,9 +39,10 @@ internal sealed class IncrementalProcessingStrategy : StorageProcessingStrategyB
         if (!Directory.Exists(query.Source))
             return MakeError("Source directory not found", sw);
 
-        var changedFiles = new List<string>();
+        // Use HashSet for O(1) Contains checks (finding 4292: List.Contains is O(n)).
+        var changedFilesSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var cascadedFilesSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var unchangedFiles = new List<string>();
-        var cascadedFiles = new List<string>();
 
         foreach (var file in Directory.EnumerateFiles(query.Source, "*", SearchOption.AllDirectories))
         {
@@ -53,14 +54,14 @@ internal sealed class IncrementalProcessingStrategy : StorageProcessingStrategyB
             {
                 if (lastModified > lastProcessedTime)
                 {
-                    changedFiles.Add(file);
-                    // Check for cascaded dependencies
+                    changedFilesSet.Add(file);
+                    // Check for cascaded dependencies (O(1) set Contains per finding 4292)
                     if (_dependencies.TryGetValue(file, out var deps))
                     {
                         foreach (var dep in deps)
                         {
-                            if (!changedFiles.Contains(dep) && !cascadedFiles.Contains(dep))
-                                cascadedFiles.Add(dep);
+                            if (!changedFilesSet.Contains(dep) && !cascadedFilesSet.Contains(dep))
+                                cascadedFilesSet.Add(dep);
                         }
                     }
                 }
@@ -72,38 +73,38 @@ internal sealed class IncrementalProcessingStrategy : StorageProcessingStrategyB
             else
             {
                 // Never processed before
-                changedFiles.Add(file);
+                changedFilesSet.Add(file);
             }
 
             // Update tracking
             _lastProcessed[file] = DateTimeOffset.UtcNow;
         }
 
-        var totalToProcess = changedFiles.Count + cascadedFiles.Count;
+        var totalToProcess = changedFilesSet.Count + cascadedFilesSet.Count;
         var totalSkipped = unchangedFiles.Count;
         var totalFiles = totalToProcess + totalSkipped;
 
         sw.Stop();
-        return await Task.FromResult(new ProcessingResult
+        return new ProcessingResult
         {
             Data = new Dictionary<string, object?>
             {
                 ["sourcePath"] = query.Source,
-                ["changedFiles"] = changedFiles.Count,
-                ["cascadedFiles"] = cascadedFiles.Count,
+                ["changedFiles"] = changedFilesSet.Count,
+                ["cascadedFiles"] = cascadedFilesSet.Count,
                 ["unchangedFiles"] = unchangedFiles.Count,
                 ["totalToProcess"] = totalToProcess,
                 ["totalSkipped"] = totalSkipped,
                 ["processingReduction"] = totalFiles > 0 ? Math.Round((double)totalSkipped / totalFiles * 100.0, 2) : 0.0,
-                ["changedFileList"] = changedFiles.Take(50).ToList(),
-                ["cascadedFileList"] = cascadedFiles.Take(20).ToList()
+                ["changedFileList"] = changedFilesSet.Take(50).ToList(),
+                ["cascadedFileList"] = cascadedFilesSet.Take(20).ToList()
             },
             Metadata = new ProcessingMetadata
             {
                 RowsProcessed = totalFiles, RowsReturned = totalToProcess,
                 ProcessingTimeMs = sw.Elapsed.TotalMilliseconds
             }
-        });
+        };
     }
 
     /// <inheritdoc/>

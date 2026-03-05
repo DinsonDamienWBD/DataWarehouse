@@ -33,6 +33,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
     public class InfiniteStorageStrategy : UltimateStorageStrategyBase
     {
         private readonly List<ProviderEndpoint> _providers = new();
+        // O(1) lookup by provider ID — updated in sync with _providers
+        private readonly Dictionary<string, ProviderEndpoint> _providerById = new();
         private readonly BoundedDictionary<string, string> _keyToProvider = new BoundedDictionary<string, string>(1000);
         private readonly BoundedDictionary<string, ProviderMetrics> _providerMetrics = new BoundedDictionary<string, ProviderMetrics>(1000);
         private int _replicationFactor = 3;
@@ -43,7 +45,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private long _providerQuotaBytes = 1_000_000_000_000L; // 1TB per provider
         private readonly SemaphoreSlim _initLock = new(1, 1);
         private readonly SortedDictionary<uint, string> _consistentHashRing = new();
-        private readonly Random _random = new();
         private Timer? _healthCheckTimer = null;
 
         public override string StrategyId => "infinite-storage";
@@ -406,6 +407,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             Directory.CreateDirectory(path);
 
             _providers.Add(provider);
+            _providerById[provider.Id] = provider;
             _providerMetrics[providerId] = new ProviderMetrics
             {
                 ProviderId = providerId,
@@ -444,12 +446,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             var selectedProviderIds = new HashSet<string>();
             var result = new List<ProviderEndpoint>();
 
-            // Find providers using consistent hashing
+            // Find providers using consistent hashing — O(log n) ring traversal, O(1) provider lookup
             foreach (var kvp in _consistentHashRing.Where(kvp => kvp.Key >= hash).Concat(_consistentHashRing))
             {
-                if (selectedProviderIds.Add(kvp.Value))
+                if (selectedProviderIds.Add(kvp.Value) && _providerById.TryGetValue(kvp.Value, out var provider))
                 {
-                    var provider = _providers.First(p => p.Id == kvp.Value);
                     if (provider.IsHealthy)
                     {
                         result.Add(provider);
@@ -590,16 +591,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
         private static uint ComputeHash(string input)
         {
-            using var md5 = MD5.Create();
-            var hash = md5.ComputeHash(Encoding.UTF8.GetBytes(input));
+            // Use SHA256 for the consistent hash ring to avoid MD5 collision weaknesses.
+            // We take the first 4 bytes of the SHA256 digest as the ring position.
+            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(input));
             return BitConverter.ToUInt32(hash, 0);
         }
 
         private static string GenerateProviderId(string path)
         {
-            using var md5 = MD5.Create();
-            var hash = md5.ComputeHash(Encoding.UTF8.GetBytes(path));
-            return BitConverter.ToString(hash).Replace("-", "").Substring(0, 16).ToLowerInvariant();
+            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(path));
+            return Convert.ToHexString(hash)[..16].ToLowerInvariant();
         }
 
         #endregion

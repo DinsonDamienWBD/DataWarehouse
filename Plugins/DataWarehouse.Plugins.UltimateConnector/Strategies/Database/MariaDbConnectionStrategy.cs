@@ -58,9 +58,11 @@ public sealed class MariaDbConnectionStrategy : DatabaseConnectionStrategyBase
         // Parse connection string to extract host and port
         var (host, port) = ParseConnectionString(connectionString);
 
-        // Test TCP connectivity
-        using var tcpClient = new TcpClient();
-        await tcpClient.ConnectAsync(host, port, ct);
+        var tcpConnection = new MariaDbTcpConnection(host, port, connectionString);
+
+        // Test TCP connectivity (caches the TcpClient for reuse by health checks)
+        var connected = await tcpConnection.TestConnectivityAsync(ct);
+        if (!connected) throw new InvalidOperationException($"Unable to connect to MariaDB at {host}:{port}");
 
         // Store connection metadata
         var connectionInfo = new Dictionary<string, object>
@@ -72,9 +74,7 @@ public sealed class MariaDbConnectionStrategy : DatabaseConnectionStrategyBase
             ["State"] = "Connected"
         };
 
-        var mockConnection = new MariaDbTcpConnection(host, port, connectionString);
-
-        return new DefaultConnectionHandle(mockConnection, connectionInfo);
+        return new DefaultConnectionHandle(tcpConnection, connectionInfo);
     }
 
     /// <inheritdoc/>
@@ -82,13 +82,8 @@ public sealed class MariaDbConnectionStrategy : DatabaseConnectionStrategyBase
     {
         try
         {
-            var mockConnection = handle.GetConnection<MariaDbTcpConnection>();
-
-            // Test TCP connectivity
-            using var tcpClient = new TcpClient();
-            await tcpClient.ConnectAsync(mockConnection.Host, mockConnection.Port, ct);
-
-            return true;
+            var tcpConnection = handle.GetConnection<MariaDbTcpConnection>();
+            return await tcpConnection.TestConnectivityAsync(ct);
         }
         catch
         {
@@ -114,16 +109,16 @@ public sealed class MariaDbConnectionStrategy : DatabaseConnectionStrategyBase
 
         try
         {
-            var mockConnection = handle.GetConnection<MariaDbTcpConnection>();
-
-            // Test TCP connectivity and measure latency
-            using var tcpClient = new TcpClient();
-            await tcpClient.ConnectAsync(mockConnection.Host, mockConnection.Port, ct);
+            var tcpConnection = handle.GetConnection<MariaDbTcpConnection>();
+            // Finding 1903: Reuse cached connection instead of creating TcpClient per check.
+            var isHealthy = await tcpConnection.TestConnectivityAsync(ct);
             sw.Stop();
 
             return new ConnectionHealth(
-                IsHealthy: true,
-                StatusMessage: $"MariaDB TCP connection active - {mockConnection.Host}:{mockConnection.Port}",
+                IsHealthy: isHealthy,
+                StatusMessage: isHealthy
+                    ? $"MariaDB TCP connection active - {tcpConnection.Host}:{tcpConnection.Port}"
+                    : $"MariaDB TCP connection failed - {tcpConnection.Host}:{tcpConnection.Port}",
                 Latency: sw.Elapsed,
                 CheckedAt: DateTimeOffset.UtcNow);
         }
@@ -272,17 +267,51 @@ public sealed class MariaDbConnectionStrategy : DatabaseConnectionStrategyBase
     /// <summary>
     /// Mock connection object for TCP-based MariaDB connectivity.
     /// </summary>
-    private sealed class MariaDbTcpConnection
+    private sealed class MariaDbTcpConnection : IDisposable
     {
         public string Host { get; }
         public int Port { get; }
         public string ConnectionString { get; }
+        // Finding 1903: Cache a reusable TcpClient rather than creating one per health check.
+        private TcpClient? _cachedClient;
+        private readonly object _lock = new();
 
         public MariaDbTcpConnection(string host, int port, string connectionString)
         {
             Host = host;
             Port = port;
             ConnectionString = connectionString;
+        }
+
+        /// <summary>
+        /// Tests connectivity, reusing the cached TcpClient if still connected.
+        /// Creates a new connection only when the existing one is disconnected or absent.
+        /// </summary>
+        public async Task<bool> TestConnectivityAsync(CancellationToken ct)
+        {
+            lock (_lock)
+            {
+                if (_cachedClient?.Connected == true) return true;
+                _cachedClient?.Dispose();
+                _cachedClient = null;
+            }
+            var client = new TcpClient();
+            try
+            {
+                await client.ConnectAsync(Host, Port, ct);
+                lock (_lock) { _cachedClient?.Dispose(); _cachedClient = client; }
+                return true;
+            }
+            catch
+            {
+                client.Dispose();
+                return false;
+            }
+        }
+
+        public void Dispose()
+        {
+            lock (_lock) { _cachedClient?.Dispose(); _cachedClient = null; }
         }
     }
 }

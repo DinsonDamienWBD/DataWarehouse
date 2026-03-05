@@ -18,7 +18,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.WORM
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("worm_retention.check");
+            IncrementCounter("worm_retention.check");
             var violations = new List<ComplianceViolation>();
 
             // Check 1: Verify retention period is defined
@@ -150,12 +150,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.WORM
             });
         }
 
-        private T GetConfigValue<T>(string key, T defaultValue)
-        {
-            if (Configuration.TryGetValue(key, out var value) && value is T typedValue)
-                return typedValue;
-            return defaultValue;
-        }
+        // LOW-1459: GetConfigValue<T> is now on ComplianceStrategyBase — removed duplicate.
 
         private static List<string> GenerateRecommendations(List<ComplianceViolation> violations)
         {
@@ -179,14 +174,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.WORM
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("worm_retention.initialized");
+            IncrementCounter("worm_retention.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("worm_retention.shutdown");
+            IncrementCounter("worm_retention.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

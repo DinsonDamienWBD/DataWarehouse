@@ -137,82 +137,89 @@ namespace DataWarehouse.SDK.Security.SupplyChain
 
         private IReadOnlyList<SbomComponent> DiscoverComponents(Assembly[] assemblies)
         {
-            var components = new List<SbomComponent>();
             var depsJsonPackages = ParseDepsJsonFiles();
+            // Use a concurrent bag for parallel-safe collection (finding P2-599).
+            var bag = new System.Collections.Concurrent.ConcurrentBag<SbomComponent>();
 
-            foreach (var assembly in assemblies)
+            var parallelOptions = new ParallelOptions
             {
-                if (assembly.IsDynamic)
-                    continue;
+                MaxDegreeOfParallelism = Math.Min(4, Environment.ProcessorCount)
+            };
 
-                var name = assembly.GetName();
-                if (name.Name == null)
-                    continue;
+            Parallel.ForEach(assemblies, parallelOptions, assembly =>
+            {
+                if (assembly.IsDynamic) return;
+                var component = BuildComponent(assembly, depsJsonPackages);
+                if (component != null)
+                    bag.Add(component);
+            });
 
-                // Skip core framework assemblies (System.*, Microsoft.Extensions.* are kept as they're NuGet packages)
-                if (IsFrameworkAssembly(name.Name))
-                    continue;
+            return bag.OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase).ToList();
+        }
 
-                var isFirstParty = name.Name.StartsWith("DataWarehouse.", StringComparison.OrdinalIgnoreCase);
-                string? sha256 = null;
-                string? filePath = null;
+        private SbomComponent? BuildComponent(Assembly assembly, Dictionary<string, DepsJsonPackageInfo> depsJsonPackages)
+        {
+            if (assembly.IsDynamic) return null;
 
-                try
+            var name = assembly.GetName();
+            if (name.Name == null) return null;
+
+            // Skip core framework assemblies (System.*, Microsoft.Extensions.* are kept as they're NuGet packages)
+            if (IsFrameworkAssembly(name.Name)) return null;
+
+            var isFirstParty = name.Name.StartsWith("DataWarehouse.", StringComparison.OrdinalIgnoreCase);
+            string? sha256 = null;
+            string? filePath = null;
+
+            try
+            {
+                if (!string.IsNullOrEmpty(assembly.Location) && File.Exists(assembly.Location))
                 {
-                    if (!string.IsNullOrEmpty(assembly.Location) && File.Exists(assembly.Location))
-                    {
-                        filePath = assembly.Location;
-                        sha256 = ComputeFileSha256(assembly.Location);
-                    }
+                    filePath = assembly.Location;
+                    sha256 = ComputeFileSha256(assembly.Location);
                 }
-                catch (Exception ex)
-                {
-                    _logger?.LogTrace(ex, "Could not compute hash for {Assembly}", name.Name);
-                }
-
-                // Resolve package URL from deps.json data or assembly name
-                var packageUrl = ResolvePackageUrl(name.Name, name.Version?.ToString() ?? "0.0.0", depsJsonPackages);
-
-                // Get direct dependencies
-                var dependencies = new List<string>();
-                try
-                {
-                    var refs = assembly.GetReferencedAssemblies();
-                    foreach (var refAsm in refs)
-                    {
-                        if (refAsm.Name != null && !IsFrameworkAssembly(refAsm.Name))
-                        {
-                            dependencies.Add(refAsm.Name);
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogTrace(ex, "Could not enumerate references for {Assembly}", name.Name);
-                }
-
-                // Try to get license from deps.json metadata
-                string? licenseId = null;
-                if (depsJsonPackages.TryGetValue(name.Name, out var pkgInfo))
-                {
-                    licenseId = pkgInfo.LicenseId;
-                }
-
-                components.Add(new SbomComponent
-                {
-                    Name = name.Name,
-                    Version = name.Version?.ToString() ?? "0.0.0",
-                    ComponentType = isFirstParty ? "application" : "library",
-                    PackageUrl = packageUrl,
-                    Sha256Hash = sha256,
-                    FilePath = filePath,
-                    LicenseId = licenseId,
-                    Dependencies = dependencies,
-                    IsFirstParty = isFirstParty
-                });
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogTrace(ex, "Could not compute hash for {Assembly}", name.Name);
             }
 
-            return components.OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase).ToList();
+            // Resolve package URL from deps.json data or assembly name
+            var packageUrl = ResolvePackageUrl(name.Name, name.Version?.ToString() ?? "0.0.0", depsJsonPackages);
+
+            // Get direct dependencies
+            var dependencies = new List<string>();
+            try
+            {
+                var refs = assembly.GetReferencedAssemblies();
+                foreach (var refAsm in refs)
+                {
+                    if (refAsm.Name != null && !IsFrameworkAssembly(refAsm.Name))
+                        dependencies.Add(refAsm.Name);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogTrace(ex, "Could not enumerate references for {Assembly}", name.Name);
+            }
+
+            // Try to get license from deps.json metadata
+            string? licenseId = null;
+            if (depsJsonPackages.TryGetValue(name.Name, out var pkgInfo))
+                licenseId = pkgInfo.LicenseId;
+
+            return new SbomComponent
+            {
+                Name = name.Name,
+                Version = name.Version?.ToString() ?? "0.0.0",
+                ComponentType = isFirstParty ? "application" : "library",
+                PackageUrl = packageUrl,
+                Sha256Hash = sha256,
+                FilePath = filePath,
+                LicenseId = licenseId,
+                Dependencies = dependencies,
+                IsFirstParty = isFirstParty
+            };
         }
 
         private static bool IsFrameworkAssembly(string name)

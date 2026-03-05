@@ -18,7 +18,9 @@ public sealed class SumoLogicStrategy : ObservabilityStrategyBase
     private readonly HttpClient _httpClient;
     private string _collectorUrl = "";
     private string _sourceName = "datawarehouse";
-    private string _sourceHost = Environment.MachineName;
+    // Finding 4647: do NOT capture MachineName at field init — it can change in containers.
+    // Read it lazily via the property so rename-on-restart produces the correct host in logs.
+    private string? _sourceHostOverride;
 
     /// <inheritdoc/>
     public override string StrategyId => "sumologic";
@@ -48,10 +50,20 @@ public sealed class SumoLogicStrategy : ObservabilityStrategyBase
     /// <param name="sourceHost">Source host name.</param>
     public void Configure(string collectorUrl, string sourceName = "datawarehouse", string? sourceHost = null)
     {
+        // P2-4637: Validate collectorUrl before storing — SendToSumoLogicAsync will throw a
+        // confusing UriFormatException later if the URL is empty or malformed.
+        if (string.IsNullOrWhiteSpace(collectorUrl))
+            throw new ArgumentException("Sumo Logic collector URL must not be empty.", nameof(collectorUrl));
+        if (!Uri.TryCreate(collectorUrl, UriKind.Absolute, out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+            throw new ArgumentException($"Sumo Logic collector URL must be an absolute http/https URL, got: '{collectorUrl}'.", nameof(collectorUrl));
         _collectorUrl = collectorUrl;
         _sourceName = sourceName;
-        _sourceHost = sourceHost ?? Environment.MachineName;
+        _sourceHostOverride = sourceHost; // null means "read MachineName at send time"
     }
+
+    // Returns current hostname — re-read on each call so container renames are reflected.
+    private string SourceHost => _sourceHostOverride ?? Environment.MachineName;
 
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
@@ -62,7 +74,7 @@ public sealed class SumoLogicStrategy : ObservabilityStrategyBase
         {
             timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
             source = _sourceName,
-            sourceHost = _sourceHost,
+            sourceHost = SourceHost,
             sourceCategory = "metrics",
             metricName = m.Name,
             metricValue = m.Value,
@@ -87,7 +99,7 @@ public sealed class SumoLogicStrategy : ObservabilityStrategyBase
         {
             timestamp = log.Timestamp.ToUnixTimeMilliseconds(),
             source = _sourceName,
-            sourceHost = _sourceHost,
+            sourceHost = SourceHost,
             sourceCategory = log.Properties?.GetValueOrDefault("Category")?.ToString() ?? "application",
             level = log.Level.ToString(),
             message = log.Message,
@@ -114,14 +126,16 @@ public sealed class SumoLogicStrategy : ObservabilityStrategyBase
 
             // Add custom headers
             content.Headers.Add("X-Sumo-Name", _sourceName);
-            content.Headers.Add("X-Sumo-Host", _sourceHost);
+            content.Headers.Add("X-Sumo-Host", SourceHost);
 
-            var response = await _httpClient.PostAsync(_collectorUrl, content, ct);
+            using var response = await _httpClient.PostAsync(_collectorUrl, content, ct);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Sumo Logic unavailable - data lost
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -142,7 +156,7 @@ public sealed class SumoLogicStrategy : ObservabilityStrategyBase
         {
             ["timestamp"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
             ["source"] = _sourceName,
-            ["sourceHost"] = _sourceHost,
+            ["sourceHost"] = SourceHost,
             ["sourceCategory"] = category,
             ["message"] = message
         };
@@ -168,7 +182,7 @@ public sealed class SumoLogicStrategy : ObservabilityStrategyBase
             {
                 timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                 source = _sourceName,
-                sourceHost = _sourceHost,
+                sourceHost = SourceHost,
                 sourceCategory = "health-check",
                 message = "Sumo Logic health check"
             };
@@ -177,9 +191,9 @@ public sealed class SumoLogicStrategy : ObservabilityStrategyBase
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             content.Headers.Add("X-Sumo-Name", _sourceName);
-            content.Headers.Add("X-Sumo-Host", _sourceHost);
+            content.Headers.Add("X-Sumo-Host", SourceHost);
 
-            var response = await _httpClient.PostAsync(_collectorUrl, content, cancellationToken);
+            using var response = await _httpClient.PostAsync(_collectorUrl, content, cancellationToken);
 
             return new HealthCheckResult(
                 IsHealthy: response.IsSuccessStatusCode,
@@ -187,7 +201,7 @@ public sealed class SumoLogicStrategy : ObservabilityStrategyBase
                 Data: new Dictionary<string, object>
                 {
                     ["sourceName"] = _sourceName,
-                    ["sourceHost"] = _sourceHost,
+                    ["sourceHost"] = SourceHost,
                     ["hasCollectorUrl"] = !string.IsNullOrEmpty(_collectorUrl)
                 });
         }
@@ -213,17 +227,11 @@ public sealed class SumoLogicStrategy : ObservabilityStrategyBase
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("sumo_logic.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     protected override void Dispose(bool disposing)

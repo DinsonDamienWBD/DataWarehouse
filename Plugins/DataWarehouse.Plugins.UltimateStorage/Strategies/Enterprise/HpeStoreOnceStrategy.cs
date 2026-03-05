@@ -218,12 +218,19 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                 request.Headers.Add("X-HP-Compression-Enabled", "true");
             }
 
-            // Add custom metadata as headers
+            // Add custom metadata as headers.
+            // Validate metadata key names to prevent HTTP header injection.
             if (metadata != null)
             {
                 foreach (var kvp in metadata)
                 {
-                    request.Headers.Add($"X-HP-Meta-{kvp.Key}", kvp.Value);
+                    if (!System.Text.RegularExpressions.Regex.IsMatch(kvp.Key, @"^[A-Za-z0-9\-_]+$"))
+                    {
+                        System.Diagnostics.Debug.WriteLine(
+                            $"[HpeStoreOnceStrategy] Skipping metadata key '{kvp.Key}': contains unsafe characters.");
+                        continue;
+                    }
+                    request.Headers.TryAddWithoutValidation($"X-HP-Meta-{kvp.Key}", kvp.Value);
                 }
             }
 
@@ -674,11 +681,26 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
         /// <summary>
         /// Ensures authentication token is valid, refreshing if necessary.
         /// </summary>
+        private readonly SemaphoreSlim _authLock = new(1, 1);
+
         private async Task EnsureAuthenticatedAsync(CancellationToken ct)
         {
-            if (DateTime.UtcNow >= _tokenExpiry || string.IsNullOrEmpty(_authToken))
+            // Double-check locking to prevent concurrent token refresh races
+            if (DateTime.UtcNow < _tokenExpiry && !string.IsNullOrEmpty(_authToken))
+                return;
+
+            await _authLock.WaitAsync(ct);
+            try
             {
-                await AuthenticateAsync(ct);
+                // Re-check inside the lock (another thread may have refreshed already)
+                if (DateTime.UtcNow >= _tokenExpiry || string.IsNullOrEmpty(_authToken))
+                {
+                    await AuthenticateAsync(ct);
+                }
+            }
+            finally
+            {
+                _authLock.Release();
             }
         }
 
@@ -935,11 +957,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                     var request = new HttpRequestMessage(HttpMethod.Post, $"{_endpoint}{logoutPath}");
                     request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _authToken);
 
-                    await _httpClient.SendAsync(request);
+                    // Use a short timeout to avoid blocking shutdown indefinitely.
+                    using var logoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                    await _httpClient.SendAsync(request, logoutCts.Token);
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Ignore logout failures
+                    System.Diagnostics.Debug.WriteLine($"[HpeStoreOnceStrategy] Logout error during dispose: {ex.GetType().Name}: {ex.Message}");
                 }
             }
 

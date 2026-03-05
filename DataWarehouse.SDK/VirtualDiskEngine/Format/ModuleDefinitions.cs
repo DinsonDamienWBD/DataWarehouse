@@ -5,10 +5,10 @@ using DataWarehouse.SDK.Contracts;
 namespace DataWarehouse.SDK.VirtualDiskEngine.Format;
 
 /// <summary>
-/// Identifies a composable VDE module by its bit position in the 32-bit module manifest.
-/// Bits 0-18 are defined in the current specification; bits 19-31 are reserved for future use.
+/// Identifies a composable VDE module by its bit position in the 64-bit module manifest.
+/// Bits 0-38 are defined in the v2.1 specification; bits 39-63 are reserved for future use.
 /// </summary>
-[SdkCompatibility("6.0.0", Notes = "Phase 71: VDE v2.0 module identifiers (VDE2-04)")]
+[SdkCompatibility("6.0.0", Notes = "Phase 91.5: VDE v2.1 module identifiers expanded to 39 entries (VOPT-87)")]
 public enum ModuleId : byte
 {
     /// <summary>Security module (policy vault, encryption header). Bit 0.</summary>
@@ -67,6 +67,68 @@ public enum ModuleId : byte
 
     /// <summary>Audit log module (audit log region). Bit 18.</summary>
     AuditLog = 18,
+
+    // ── v2.1 Modules (bits 19-38, Phase 91.5 VOPT-87) ──────────────────
+
+    /// <summary>Compute Pushdown module — Smart Extents WASM pushdown (CPSH). Bit 19.</summary>
+    ComputePushdown = 19,
+
+    /// <summary>Ephemeral Key module — Cryptographic ephemerality (EKEY). Bit 20.</summary>
+    EphemeralKey = 20,
+
+    /// <summary>WAL Subscribers module — WAL streaming pub/sub (WALS). Bit 21.</summary>
+    WalSubscribers = 21,
+
+    /// <summary>Delta Extents module — Sub-block delta extents (DELT). Bit 22.</summary>
+    DeltaExtents = 22,
+
+    /// <summary>ZNS Zone Map module — Epoch-to-ZNS zone mapping (ZNSM). Bit 23.</summary>
+    ZnsZoneMap = 23,
+
+    /// <summary>Spatio-Temporal module — 4D spatiotemporal extents (STEX). Bit 24.</summary>
+    SpatioTemporal = 24,
+
+    /// <summary>Semantic Dedup module — Latent-space dedup, v7.0 reserve (SDUP). Bit 25.</summary>
+    SemanticDedup = 25,
+
+    /// <summary>ZKP Compliance module — zk-SNARK compliance, v7.0 reserve (ZKPA). Bit 26.</summary>
+    ZkpCompliance = 26,
+
+    /// <summary>Storage Policy module — Per-inode storage hints (SPOL). Bit 27.</summary>
+    StoragePolicy = 27,
+
+    /// <summary>Online Ops module — Online operations journal (OPJR). Bit 28.</summary>
+    OnlineOps = 28,
+
+    /// <summary>Disaster Recovery module — Failover state machine (DREC). Bit 29.</summary>
+    DisasterRecovery = 29,
+
+    /// <summary>GDPR Tombstone module — Provable erasure (TOMB). Bit 30.</summary>
+    GdprTombstone = 30,
+
+    /// <summary>Semantic Wear Level module — TTL-aware block placement (SWLV). Bit 31.</summary>
+    SemanticWearLevel = 31,
+
+    /// <summary>Quorum Seal module — FROST threshold signatures (QSIG). Bit 32.</summary>
+    QuorumSeal = 32,
+
+    /// <summary>Stego Watermark module — Traitor tracing, v7.0 reserve (STEG). Bit 33.</summary>
+    StegoWatermark = 33,
+
+    /// <summary>Quality of Service module — Per-inode QoS class (QOS). Bit 34.</summary>
+    QualityOfService = 34,
+
+    /// <summary>Vector Quantize module — Vector quantization (VECQ). Bit 35.</summary>
+    VectorQuantize = 35,
+
+    /// <summary>Ancestry Chaining module — Cryptographic ancestry (ANCR). Bit 36.</summary>
+    AncestryChaining = 36,
+
+    /// <summary>Capability Macaroon module — Macaroon capabilities (MACR). Bit 37.</summary>
+    CapabilityMacaroon = 37,
+
+    /// <summary>WORM Time Lock module — Time-locked WORM (WLCK). Bit 38.</summary>
+    WormTimeLock = 38,
 }
 
 /// <summary>
@@ -129,8 +191,10 @@ public static class ModuleRegistry
             Id = ModuleId.Compliance,
             Name = "Compliance",
             Abbreviation = "CMPL",
-            BlockTypeTags = new[] { Format.BlockTypeTags.CMVT, Format.BlockTypeTags.ALOG },
-            RegionNames = new[] { "ComplianceVault", "AuditLog" },
+            // Cat 9 (finding 827): use CMAL (Compliance Audit Log) instead of ALOG to avoid
+            // on-disk ambiguity with the AuditLog module's ALOG blocks during crash recovery.
+            BlockTypeTags = new[] { Format.BlockTypeTags.CMVT, Format.BlockTypeTags.CMAL },
+            RegionNames = new[] { "ComplianceVault", "ComplianceAuditLog" },
             InodeFieldBytes = 12,
         },
         [ModuleId.Intelligence] = new VdeModule
@@ -286,6 +350,189 @@ public static class ModuleRegistry
             RegionNames = new[] { "AuditLogRegion" },
             InodeFieldBytes = 0,
         },
+
+        // ── v2.1 Modules (bits 19-38, VOPT-87) ──────────────────────────
+
+        [ModuleId.ComputePushdown] = new VdeModule
+        {
+            Id = ModuleId.ComputePushdown,
+            Name = "ComputePushdown",
+            Abbreviation = "CPSH",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 48,
+        },
+        [ModuleId.EphemeralKey] = new VdeModule
+        {
+            Id = ModuleId.EphemeralKey,
+            Name = "EphemeralKey",
+            Abbreviation = "EKEY",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 32,
+        },
+        [ModuleId.WalSubscribers] = new VdeModule
+        {
+            Id = ModuleId.WalSubscribers,
+            Name = "WalSubscribers",
+            Abbreviation = "WALS",
+            BlockTypeTags = new[] { Format.BlockTypeTags.WALS },
+            RegionNames = new[] { "WalSubscriberCursorTable" },
+            InodeFieldBytes = 0,
+        },
+        [ModuleId.DeltaExtents] = new VdeModule
+        {
+            Id = ModuleId.DeltaExtents,
+            Name = "DeltaExtents",
+            Abbreviation = "DELT",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 8,
+        },
+        [ModuleId.ZnsZoneMap] = new VdeModule
+        {
+            Id = ModuleId.ZnsZoneMap,
+            Name = "ZnsZoneMap",
+            Abbreviation = "ZNSM",
+            BlockTypeTags = new[] { Format.BlockTypeTags.ZNSM },
+            RegionNames = new[] { "ZnsZoneMapRegion" },
+            InodeFieldBytes = 0,
+        },
+        [ModuleId.SpatioTemporal] = new VdeModule
+        {
+            Id = ModuleId.SpatioTemporal,
+            Name = "SpatioTemporal",
+            Abbreviation = "STEX",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 6,
+        },
+        [ModuleId.SemanticDedup] = new VdeModule
+        {
+            Id = ModuleId.SemanticDedup,
+            Name = "SemanticDedup",
+            Abbreviation = "SDUP",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 266,
+        },
+        [ModuleId.ZkpCompliance] = new VdeModule
+        {
+            Id = ModuleId.ZkpCompliance,
+            Name = "ZkpCompliance",
+            Abbreviation = "ZKPA",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 322,
+        },
+        [ModuleId.StoragePolicy] = new VdeModule
+        {
+            Id = ModuleId.StoragePolicy,
+            Name = "StoragePolicy",
+            Abbreviation = "SPOL",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 2,
+        },
+        [ModuleId.OnlineOps] = new VdeModule
+        {
+            Id = ModuleId.OnlineOps,
+            Name = "OnlineOps",
+            Abbreviation = "OPJR",
+            BlockTypeTags = new[] { Format.BlockTypeTags.OPJR },
+            RegionNames = new[] { "OnlineOpsJournal" },
+            InodeFieldBytes = 0,
+        },
+        [ModuleId.DisasterRecovery] = new VdeModule
+        {
+            Id = ModuleId.DisasterRecovery,
+            Name = "DisasterRecovery",
+            Abbreviation = "DREC",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 0,
+        },
+        [ModuleId.GdprTombstone] = new VdeModule
+        {
+            Id = ModuleId.GdprTombstone,
+            Name = "GdprTombstone",
+            Abbreviation = "TOMB",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 0,
+        },
+        [ModuleId.SemanticWearLevel] = new VdeModule
+        {
+            Id = ModuleId.SemanticWearLevel,
+            Name = "SemanticWearLevel",
+            Abbreviation = "SWLV",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 2,
+        },
+        [ModuleId.QuorumSeal] = new VdeModule
+        {
+            Id = ModuleId.QuorumSeal,
+            Name = "QuorumSeal",
+            Abbreviation = "QSIG",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 79,
+        },
+        [ModuleId.StegoWatermark] = new VdeModule
+        {
+            Id = ModuleId.StegoWatermark,
+            Name = "StegoWatermark",
+            Abbreviation = "STEG",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 8,
+        },
+        [ModuleId.QualityOfService] = new VdeModule
+        {
+            Id = ModuleId.QualityOfService,
+            Name = "QualityOfService",
+            Abbreviation = "QOS",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 4,
+        },
+        [ModuleId.VectorQuantize] = new VdeModule
+        {
+            Id = ModuleId.VectorQuantize,
+            Name = "VectorQuantize",
+            Abbreviation = "VECQ",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 0,
+        },
+        [ModuleId.AncestryChaining] = new VdeModule
+        {
+            Id = ModuleId.AncestryChaining,
+            Name = "AncestryChaining",
+            Abbreviation = "ANCR",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 0,
+        },
+        [ModuleId.CapabilityMacaroon] = new VdeModule
+        {
+            Id = ModuleId.CapabilityMacaroon,
+            Name = "CapabilityMacaroon",
+            Abbreviation = "MACR",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 0,
+        },
+        [ModuleId.WormTimeLock] = new VdeModule
+        {
+            Id = ModuleId.WormTimeLock,
+            Name = "WormTimeLock",
+            Abbreviation = "WLCK",
+            BlockTypeTags = Array.Empty<uint>(),
+            RegionNames = Array.Empty<string>(),
+            InodeFieldBytes = 0,
+        },
     }.ToFrozenDictionary();
 
     private static VdeModule[] BuildOrderedArray(FrozenDictionary<ModuleId, VdeModule> modules)
@@ -307,19 +554,19 @@ public static class ModuleRegistry
     public static VdeModule GetModule(ModuleId id) => Modules[id];
 
     /// <summary>
-    /// All 19 defined modules, ordered by bit position.
+    /// All 39 defined modules, ordered by bit position.
     /// </summary>
     public static IReadOnlyList<VdeModule> AllModules => AllModulesArray;
 
     /// <summary>
-    /// Returns the modules that are active in the given 32-bit manifest.
+    /// Returns the modules that are active in the given 64-bit manifest.
     /// </summary>
-    /// <param name="manifest">The 32-bit module manifest value.</param>
+    /// <param name="manifest">The 64-bit module manifest value.</param>
     /// <returns>List of active modules.</returns>
-    public static IReadOnlyList<VdeModule> GetActiveModules(uint manifest)
+    public static IReadOnlyList<VdeModule> GetActiveModules(ulong manifest)
     {
         var result = new List<VdeModule>(BitOperations.PopCount(manifest));
-        uint bits = manifest;
+        ulong bits = manifest;
         while (bits != 0)
         {
             int bit = BitOperations.TrailingZeroCount(bits);
@@ -335,12 +582,12 @@ public static class ModuleRegistry
     /// <summary>
     /// Calculates the total inode extension bytes for all active modules in the manifest.
     /// </summary>
-    /// <param name="manifest">The 32-bit module manifest value.</param>
+    /// <param name="manifest">The 64-bit module manifest value.</param>
     /// <returns>Sum of <see cref="VdeModule.InodeFieldBytes"/> for active modules.</returns>
-    public static int CalculateTotalInodeFieldBytes(uint manifest)
+    public static int CalculateTotalInodeFieldBytes(ulong manifest)
     {
         int total = 0;
-        uint bits = manifest;
+        ulong bits = manifest;
         while (bits != 0)
         {
             int bit = BitOperations.TrailingZeroCount(bits);
@@ -356,12 +603,12 @@ public static class ModuleRegistry
     /// <summary>
     /// Returns the union of all block type tags required by the active modules in the manifest.
     /// </summary>
-    /// <param name="manifest">The 32-bit module manifest value.</param>
+    /// <param name="manifest">The 64-bit module manifest value.</param>
     /// <returns>Distinct set of block type tags.</returns>
-    public static IReadOnlyList<uint> GetRequiredBlockTypeTags(uint manifest)
+    public static IReadOnlyList<uint> GetRequiredBlockTypeTags(ulong manifest)
     {
         var tags = new HashSet<uint>();
-        uint bits = manifest;
+        ulong bits = manifest;
         while (bits != 0)
         {
             int bit = BitOperations.TrailingZeroCount(bits);
@@ -380,12 +627,12 @@ public static class ModuleRegistry
     /// <summary>
     /// Returns the union of all region names required by the active modules in the manifest.
     /// </summary>
-    /// <param name="manifest">The 32-bit module manifest value.</param>
+    /// <param name="manifest">The 64-bit module manifest value.</param>
     /// <returns>Distinct set of region names.</returns>
-    public static IReadOnlyList<string> GetRequiredRegions(uint manifest)
+    public static IReadOnlyList<string> GetRequiredRegions(ulong manifest)
     {
         var regions = new HashSet<string>(StringComparer.Ordinal);
-        uint bits = manifest;
+        ulong bits = manifest;
         while (bits != 0)
         {
             int bit = BitOperations.TrailingZeroCount(bits);
@@ -404,9 +651,9 @@ public static class ModuleRegistry
     /// <summary>
     /// Checks whether a specific module is active in the given manifest.
     /// </summary>
-    /// <param name="manifest">The 32-bit module manifest value.</param>
+    /// <param name="manifest">The 64-bit module manifest value.</param>
     /// <param name="module">The module to check.</param>
     /// <returns>True if the module's bit is set in the manifest.</returns>
-    public static bool IsModuleActive(uint manifest, ModuleId module)
-        => (manifest & (1u << (int)module)) != 0;
+    public static bool IsModuleActive(ulong manifest, ModuleId module)
+        => (manifest & (1UL << (int)module)) != 0;
 }

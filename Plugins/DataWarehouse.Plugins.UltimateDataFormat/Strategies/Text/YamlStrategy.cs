@@ -55,11 +55,25 @@ public sealed class YamlStrategy : DataFormatStrategyBase
 
         var text = System.Text.Encoding.UTF8.GetString(buffer, 0, bytesRead).TrimStart();
 
-        // Check for YAML markers
-        return text.StartsWith("---") ||
-               text.Contains(": ") ||
-               text.Contains(":\n") ||
-               text.Contains(":\r\n");
+        // P2-2251: Tighter YAML detection — "---" document marker is unambiguous;
+        // "key: value" pattern requires the key to be a bare identifier (no spaces before ':')
+        // to avoid matching HTTP headers, log lines, etc.
+        if (text.StartsWith("---")) return true;
+
+        // Scan first non-empty line for "key: " pattern where key is a valid YAML bare key
+        var firstLine = text.Split('\n')[0].Trim();
+        int colonIdx = firstLine.IndexOf(": ", StringComparison.Ordinal);
+        if (colonIdx > 0)
+        {
+            var key = firstLine[..colonIdx].Trim();
+            // YAML bare keys: letters, digits, _, -, no spaces
+            if (key.Length > 0 && key.All(c => char.IsLetterOrDigit(c) || c == '_' || c == '-'))
+                return true;
+        }
+        // ":\n" on its own line (mapping with block value)
+        if (text.Contains(":\n") || text.Contains(":\r\n")) return true;
+
+        return false;
     }
 
     public override async Task<DataFormatResult> ParseAsync(Stream input, DataFormatContext context, CancellationToken ct = default)

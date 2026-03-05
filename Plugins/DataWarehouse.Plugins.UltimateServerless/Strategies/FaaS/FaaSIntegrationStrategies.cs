@@ -17,6 +17,7 @@ public sealed class AwsLambdaFaaSStrategy : ServerlessStrategyBase
     public override string DisplayName => "AWS Lambda";
     public override ServerlessCategory Category => ServerlessCategory.FaaS;
     public override ServerlessPlatform? TargetPlatform => ServerlessPlatform.AwsLambda;
+    public override bool IsProductionReady => false; // Requires AWS Lambda runtime
 
     public override ServerlessStrategyCapabilities Capabilities => new()
     {
@@ -97,11 +98,14 @@ public sealed class AwsLambdaFaaSStrategy : ServerlessStrategyBase
         if (!_functions.TryGetValue(functionName, out var function))
             throw new KeyNotFoundException($"Function {functionName} not found");
 
-        var version = (int.Parse(function.Version == "$LATEST" ? "0" : function.Version) + 1).ToString();
-        function.Version = version;
+        // Parse current version safely, treating non-numeric versions (e.g. "$LATEST") as version 0
+        var currentVersion = function.Version;
+        var numericVersion = int.TryParse(currentVersion, out var parsed) ? parsed : 0;
+        var newVersion = (numericVersion + 1).ToString();
+        function.Version = newVersion;
         RecordOperation("PublishVersion");
 
-        return Task.FromResult(version);
+        return Task.FromResult(newVersion);
     }
 
     /// <summary>Creates or updates an alias.</summary>
@@ -140,6 +144,7 @@ public sealed class AzureFunctionsFaaSStrategy : ServerlessStrategyBase
     public override string DisplayName => "Azure Functions";
     public override ServerlessCategory Category => ServerlessCategory.FaaS;
     public override ServerlessPlatform? TargetPlatform => ServerlessPlatform.AzureFunctions;
+    public override bool IsProductionReady => false; // Requires Azure Functions runtime
 
     public override ServerlessStrategyCapabilities Capabilities => new()
     {
@@ -238,6 +243,7 @@ public sealed class GoogleCloudFunctionsFaaSStrategy : ServerlessStrategyBase
     public override string DisplayName => "Google Cloud Functions";
     public override ServerlessCategory Category => ServerlessCategory.FaaS;
     public override ServerlessPlatform? TargetPlatform => ServerlessPlatform.GoogleCloudFunctions;
+    public override bool IsProductionReady => false; // Requires GCP Functions runtime
 
     public override ServerlessStrategyCapabilities Capabilities => new()
     {
@@ -313,6 +319,7 @@ public sealed class CloudflareWorkersFaaSStrategy : ServerlessStrategyBase
     public override string DisplayName => "Cloudflare Workers";
     public override ServerlessCategory Category => ServerlessCategory.FaaS;
     public override ServerlessPlatform? TargetPlatform => ServerlessPlatform.CloudflareWorkers;
+    public override bool IsProductionReady => false; // Requires Cloudflare Workers runtime
 
     public override ServerlessStrategyCapabilities Capabilities => new()
     {

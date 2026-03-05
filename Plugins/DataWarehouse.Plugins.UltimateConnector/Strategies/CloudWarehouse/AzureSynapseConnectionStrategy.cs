@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
 {
     public class AzureSynapseConnectionStrategy : DatabaseConnectionStrategyBase
     {
-        private TcpClient? _tcpClient;
+        private volatile TcpClient? _tcpClient;
         public override string StrategyId => "synapse";
         public override string DisplayName => "Azure Synapse Analytics";
         public override string SemanticDescription => "Limitless analytics service bringing together data integration, enterprise data warehousing, and big data analytics";
@@ -19,17 +19,34 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
         public AzureSynapseConnectionStrategy(ILogger<AzureSynapseConnectionStrategy>? logger = null) : base(logger) { }
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var (host, port) = ParseHostPort(config.ConnectionString, 1433);
+            var (host, port) = ParseHostPortSafe(config.ConnectionString, 1433);
             _tcpClient = new TcpClient();
             await _tcpClient.ConnectAsync(host, port, ct);
             return new DefaultConnectionHandle(_tcpClient, new Dictionary<string, object> { ["host"] = host, ["port"] = port, ["protocol"] = "sqlserver" });
         }
-        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { var client = handle.GetConnection<TcpClient>(); await Task.Delay(10, ct); return client.Connected; }
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { if (_tcpClient != null) { _tcpClient.Close(); _tcpClient.Dispose(); _tcpClient = null; } await Task.CompletedTask; }
-        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var isHealthy = await TestCoreAsync(handle, ct); return new ConnectionHealth(isHealthy, isHealthy ? "Synapse healthy" : "Synapse unhealthy", TimeSpan.FromMilliseconds(10), DateTimeOffset.UtcNow); }
-        public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default) { await Task.Delay(10, ct); return new List<Dictionary<string, object?>> { new() { ["id"] = 1, ["value"] = "data" } }; }
-        public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default) { await Task.Delay(10, ct); return 1; }
-        public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default) { await Task.Delay(10, ct); return new List<DataSchema> { new DataSchema("table", new[] { new DataSchemaField("id", "INT", false, null, null) }, new[] { "id" }, new Dictionary<string, object> { ["type"] = "table" }) }; }
-        private (string host, int port) ParseHostPort(string connectionString, int defaultPort) { var parts = connectionString.Split(':'); return (parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : defaultPort); }
+        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        {
+            // Re-probe the TCP endpoint to avoid stale .Connected state
+            var client = handle.GetConnection<TcpClient>();
+            var info = handle.ConnectionInfo;
+            var host = info.TryGetValue("host", out var h) ? h?.ToString() ?? "" : "";
+            var port = info.TryGetValue("port", out var p) && p is int pi ? pi : 1433;
+            try
+            {
+                using var probe = new TcpClient();
+                await probe.ConnectAsync(host, port, ct);
+                return true;
+            }
+            catch { return false; }
+        }
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { if (_tcpClient != null) { _tcpClient.Close(); _tcpClient.Dispose(); _tcpClient = null; } return Task.CompletedTask; }
+        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, isHealthy ? "Synapse healthy" : "Synapse unhealthy", sw.Elapsed, DateTimeOffset.UtcNow); }
+        public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
+            => throw new NotSupportedException("Azure Synapse query execution requires Microsoft.Data.SqlClient NuGet package with a valid SQL connection string including user/password or AAD token.");
+        public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
+            => throw new NotSupportedException("Azure Synapse DML execution requires Microsoft.Data.SqlClient NuGet package with a valid SQL connection string including user/password or AAD token.");
+        public override Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
+            => throw new NotSupportedException("Azure Synapse schema discovery requires Microsoft.Data.SqlClient NuGet package.");
+        // P2-2132: ParseHostPort replaced by base class ParseHostPortSafe to correctly handle IPv6.
     }
 }

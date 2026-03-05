@@ -83,7 +83,9 @@ public sealed class CassandraCqlProtocolStrategy : DatabaseProtocolStrategyBase
     private const ushort ConsistencyLocalOne = 0x000A;
 
     // State
-    private byte _protocolVersion = 4;
+    // LOW-2719: use volatile to ensure _protocolVersion writes in PerformHandshakeAsync are
+    // visible to reads in subsequent async continuations executing on different threads.
+    private volatile byte _protocolVersion = 4;
     private int _streamId;
     private string _currentKeyspace = "";
     private readonly Dictionary<string, (byte[] id, ColumnMetadata[] columns)> _preparedStatements = new();
@@ -143,16 +145,23 @@ public sealed class CassandraCqlProtocolStrategy : DatabaseProtocolStrategyBase
         // Parse supported options
         var supportedOptions = ParseStringMultimap(payload);
 
-        // Negotiate protocol version
-        if (supportedOptions.TryGetValue("CQL_VERSION", out var versions))
+        // Negotiate CQL version — P2-2714: use the latest version the server advertises in SUPPORTED.
+        // Fall back to "3.0.0" (baseline supported by all Cassandra 2.1+ servers) if unspecified.
+        string cqlVersion;
+        if (supportedOptions.TryGetValue("CQL_VERSION", out var versions) && versions.Length > 0)
         {
-            // Use latest supported version
+            // Prefer the highest version the server supports (versions are sorted ascending by convention)
+            cqlVersion = versions[versions.Length - 1];
+        }
+        else
+        {
+            cqlVersion = "3.0.0";
         }
 
         // Send STARTUP
         var startupOptions = new Dictionary<string, string>
         {
-            ["CQL_VERSION"] = "3.4.5",
+            ["CQL_VERSION"] = cqlVersion,
             ["DRIVER_NAME"] = "DataWarehouse.UltimateDatabaseProtocol",
             ["DRIVER_VERSION"] = "1.0.0"
         };
@@ -314,8 +323,30 @@ public sealed class CassandraCqlProtocolStrategy : DatabaseProtocolStrategyBase
                 };
 
             case ResultPrepared:
-                // Parse and cache prepared statement
-                return new QueryResult { Success = true };
+            {
+                // P2-2713: Parse the prepared-statement ID and cache it for subsequent EXECUTE frames.
+                // CQL RESULT PREPARED layout: [short bytes id][metadata][result_metadata]
+                // [short bytes] = 2-byte big-endian length followed by N bytes.
+                if (offset + 2 > payload.Length)
+                    return new QueryResult { Success = false, ErrorMessage = "Malformed PREPARED response: truncated id length" };
+                var idLen = ReadInt16BE(payload, offset);
+                offset += 2;
+                if (idLen < 0 || offset + idLen > payload.Length)
+                    return new QueryResult { Success = false, ErrorMessage = "Malformed PREPARED response: id out of bounds" };
+                var preparedId = new byte[idLen];
+                Array.Copy(payload, offset, preparedId, 0, idLen);
+                var preparedKey = Convert.ToHexString(preparedId);
+                // Cache by hex key so EXECUTE frames can look up the binary ID.
+                lock (_preparedStatements)
+                {
+                    _preparedStatements[preparedKey] = (preparedId, Array.Empty<ColumnMetadata>());
+                }
+                return new QueryResult
+                {
+                    Success = true,
+                    Metadata = new Dictionary<string, object> { ["prepared_id"] = preparedKey }
+                };
+            }
 
             case ResultSchemaChange:
                 return new QueryResult { Success = true };

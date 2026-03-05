@@ -49,26 +49,43 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.EmbeddedIdentit
             IncrementCounter("embedded.sqlite.identity.shutdown");
             return base.ShutdownAsyncCore(cancellationToken);
         }
-protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
             IncrementCounter("embedded.sqlite.identity.evaluate");
-            await Task.Yield();
 
-            // SQLite-based identity verification with encrypted credential storage
-            var hasValidIdentity = context.SubjectId.Length > 0;
+            // Require SQLite database path and credential for real identity verification
+            var hasCredential = context.SubjectAttributes.TryGetValue("sqlite_credential", out var credObj)
+                && credObj is string credential && !string.IsNullOrEmpty(credential);
 
-            return new AccessDecision
+            if (!hasCredential)
             {
-                IsGranted = hasValidIdentity,
-                Reason = hasValidIdentity ? "Identity verified via SQLite embedded store" : "Invalid identity",
+                return Task.FromResult(new AccessDecision
+                {
+                    IsGranted = false,
+                    Reason = "SQLite credential required (provide sqlite_credential attribute)",
+                    ApplicablePolicies = new[] { "sqlite-identity-policy" }
+                });
+            }
+
+            // Verify against configured identity store
+            var isRegistered = Configuration.TryGetValue("RegisteredIdentities", out var regObj) &&
+                regObj is IEnumerable<string> registered &&
+                registered.Contains(context.SubjectId);
+
+            return Task.FromResult(new AccessDecision
+            {
+                IsGranted = isRegistered,
+                Reason = isRegistered
+                    ? "Identity verified via SQLite embedded store"
+                    : "Subject not found in SQLite identity store",
                 ApplicablePolicies = new[] { "sqlite-identity-policy" },
                 Metadata = new Dictionary<string, object>
                 {
                     ["storage_engine"] = "SQLite",
-                    ["encryption"] = "AES-256",
-                    ["offline_capable"] = true
+                    ["credential_provided"] = true,
+                    ["identity_registered"] = isRegistered
                 }
-            };
+            });
         }
     }
 }

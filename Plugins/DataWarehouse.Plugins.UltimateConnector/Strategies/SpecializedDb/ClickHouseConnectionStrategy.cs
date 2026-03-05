@@ -38,10 +38,13 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var (host, port) = ParseHostPort(config.ConnectionString, 8123);
+            var useSsl = GetConfiguration<bool>(config, "UseSsl", false)
+                || config.ConnectionString.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+            var scheme = useSsl ? "https" : "http";
+            var (host, port) = ParseHostPort(config.ConnectionString, useSsl ? 8443 : 8123);
             _httpClient = new HttpClient
             {
-                BaseAddress = new Uri($"http://{host}:{port}"),
+                BaseAddress = new Uri($"{scheme}://{host}:{port}"),
                 Timeout = config.Timeout
             };
 
@@ -52,7 +55,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
                     Convert.ToBase64String(authBytes));
             }
 
-            var response = await _httpClient.GetAsync("/?query=SELECT%201", ct);
+            using var response = await _httpClient.GetAsync("/?query=SELECT%201", ct);
             response.EnsureSuccessStatusCode();
 
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object>
@@ -67,24 +70,24 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             if (_httpClient == null) return false;
             try
             {
-                var response = await _httpClient.GetAsync("/?query=SELECT%201", ct);
+                using var response = await _httpClient.GetAsync("/?query=SELECT%201", ct);
                 return response.IsSuccessStatusCode;
             }
             catch { /* Connection test failed - return false */ return false; }
         }
 
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
-        {
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) {
             _httpClient?.Dispose();
-            _httpClient = null;
-            await Task.CompletedTask;
-        }
+            _httpClient = null; return Task.CompletedTask; }
 
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
+            // P2-2180: Measure actual latency with Stopwatch instead of hardcoded value.
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             var isHealthy = await TestCoreAsync(handle, ct);
+            sw.Stop();
             return new ConnectionHealth(isHealthy, isHealthy ? "ClickHouse healthy" : "ClickHouse unhealthy",
-                TimeSpan.FromMilliseconds(5), DateTimeOffset.UtcNow);
+                sw.Elapsed, DateTimeOffset.UtcNow);
         }
 
         public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(
@@ -93,8 +96,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             if (_httpClient == null) return new List<Dictionary<string, object?>>();
             try
             {
-                var encodedQuery = Uri.EscapeDataString(query + " FORMAT JSONEachRow");
-                var response = await _httpClient.GetAsync($"/?query={encodedQuery}", ct);
+                var encodedQuery = Uri.EscapeDataString(query + (query.Contains("FORMAT", StringComparison.OrdinalIgnoreCase) ? "" : " FORMAT JSONEachRow"));
+                using var response = await _httpClient.GetAsync($"/?query={encodedQuery}", ct);
                 if (!response.IsSuccessStatusCode) return new List<Dictionary<string, object?>>();
                 var json = await response.Content.ReadAsStringAsync(ct);
                 var results = new List<Dictionary<string, object?>>();
@@ -119,7 +122,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             try
             {
                 var content = new StringContent(command, System.Text.Encoding.UTF8, "text/plain");
-                var response = await _httpClient.PostAsync("/", content, ct);
+                using var response = await _httpClient.PostAsync("/", content, ct);
                 return response.IsSuccessStatusCode ? 1 : 0;
             }
             catch { /* Non-query execution failed - return 0 */ return 0; }
@@ -131,7 +134,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             try
             {
                 var query = Uri.EscapeDataString("SELECT database, table, name, type FROM system.columns FORMAT JSONEachRow");
-                var response = await _httpClient.GetAsync($"/?query={query}", ct);
+                using var response = await _httpClient.GetAsync($"/?query={query}", ct);
                 if (!response.IsSuccessStatusCode) return new List<DataSchema>();
                 var json = await response.Content.ReadAsStringAsync(ct);
                 var tableColumns = new Dictionary<string, List<DataSchemaField>>();
@@ -157,9 +160,13 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
 
         private (string host, int port) ParseHostPort(string connectionString, int defaultPort)
         {
-            var clean = connectionString.Replace("http://", "").Replace("https://", "").Split('/')[0];
-            var parts = clean.Split(':');
-            return (parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : defaultPort);
+            // P2-2132: Use Uri parsing to correctly handle IPv6 addresses like http://[::1]:8123/
+            var uriString = connectionString.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                            connectionString.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+                ? connectionString : "http://" + connectionString;
+            if (Uri.TryCreate(uriString, UriKind.Absolute, out var uri) && !string.IsNullOrEmpty(uri.Host) && uri.Port > 0)
+                return (uri.Host, uri.Port);
+            return ParseHostPortSafe(connectionString, defaultPort);
         }
     }
 }

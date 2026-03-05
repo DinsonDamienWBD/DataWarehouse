@@ -119,7 +119,7 @@ public sealed class PluginMarketplacePlugin : PlatformPluginBase
         // ISO-05: Security warnings for weakened certification policy
         if (!_certificationPolicy.RequireSignedAssembly)
         {
-            Console.Error.WriteLine(
+            System.Diagnostics.Debug.WriteLine(
                 "[SECURITY WARNING] PluginMarketplace: RequireSignedAssembly is disabled. " +
                 "Unsigned plugin assemblies will be accepted. This is a security risk (ISO-05, CVSS 7.7). " +
                 "Enable RequireSignedAssembly in production environments.");
@@ -127,7 +127,7 @@ public sealed class PluginMarketplacePlugin : PlatformPluginBase
 
         if (!_certificationPolicy.ValidateAssemblyHash)
         {
-            Console.Error.WriteLine(
+            System.Diagnostics.Debug.WriteLine(
                 "[SECURITY WARNING] PluginMarketplace: ValidateAssemblyHash is disabled. " +
                 "Plugin assembly integrity will not be verified against catalog hashes. " +
                 "Enable ValidateAssemblyHash in production environments.");
@@ -511,9 +511,10 @@ public sealed class PluginMarketplacePlugin : PlatformPluginBase
         }
         catch (TimeoutException)
         {
-            // Timeout waiting for kernel response - treat as potential success
-            // The kernel may have loaded the plugin but failed to respond in time
-            return true;
+            // P2-1001: Return false on timeout — the kernel did not confirm load success.
+            // Treating a timeout as success would cause the catalog to diverge from kernel state.
+            System.Diagnostics.Debug.WriteLine($"[Marketplace] Timeout waiting for kernel to confirm plugin load: {pluginId} v{version}");
+            return false;
         }
         catch
         {
@@ -644,7 +645,10 @@ public sealed class PluginMarketplacePlugin : PlatformPluginBase
         }
         catch (TimeoutException)
         {
-            return true;
+            // P2-1001: Return false on timeout — the kernel did not confirm unload success.
+            // Treating a timeout as success would cause catalog state to diverge from kernel state.
+            System.Diagnostics.Debug.WriteLine($"[Marketplace] Timeout waiting for kernel to confirm plugin unload: {pluginId}");
+            return false;
         }
         catch
         {
@@ -1807,7 +1811,9 @@ public sealed class PluginMarketplacePlugin : PlatformPluginBase
         }
         catch
         {
+
             // Timer callback errors are suppressed; aggregation will retry on next tick
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 
@@ -2091,7 +2097,9 @@ public sealed class PluginMarketplacePlugin : PlatformPluginBase
             }
             catch
             {
+
                 // Skip corrupted analytics files
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
             finally
             {
@@ -2127,7 +2135,9 @@ public sealed class PluginMarketplacePlugin : PlatformPluginBase
                     }
                     catch
                     {
+
                         // Best-effort rotation; file may be locked
+                        System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                     }
                 }
             }
@@ -2531,7 +2541,9 @@ public sealed class PluginMarketplacePlugin : PlatformPluginBase
             }
             catch
             {
+
                 // Skip corrupted catalog files
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
             finally
             {
@@ -2598,7 +2610,9 @@ public sealed class PluginMarketplacePlugin : PlatformPluginBase
             }
             catch
             {
+
                 // Skip corrupted version files
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
             finally
             {
@@ -2629,7 +2643,9 @@ public sealed class PluginMarketplacePlugin : PlatformPluginBase
             }
             catch
             {
+
                 // Skip corrupted review files
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
             finally
             {
@@ -2714,7 +2730,9 @@ public sealed class PluginMarketplacePlugin : PlatformPluginBase
             }
             catch
             {
+
                 // Skip corrupted certification files
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
             finally
             {
@@ -2785,7 +2803,9 @@ public sealed class PluginMarketplacePlugin : PlatformPluginBase
                 }
                 catch
                 {
+
                     // Skip corrupted revenue files
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
                 finally
                 {

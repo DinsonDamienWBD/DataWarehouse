@@ -110,6 +110,8 @@ public sealed class MoonshotPipelineContext
     private readonly BoundedDictionary<string, object> _properties = new BoundedDictionary<string, object>(1000);
     private readonly List<MoonshotStageResult> _stageResults = new();
     private readonly object _resultsLock = new();
+    // Cached read-only snapshot; invalidated on each AddStageResult (finding P2-533)
+    private IReadOnlyList<MoonshotStageResult>? _stageResultsSnapshot;
 
     /// <summary>
     /// Unique identifier of the storage object being processed through the pipeline.
@@ -150,7 +152,8 @@ public sealed class MoonshotPipelineContext
         {
             lock (_resultsLock)
             {
-                return _stageResults.ToList().AsReadOnly();
+                // Return cached snapshot — only rebuilt when AddStageResult invalidates it (finding P2-533)
+                return _stageResultsSnapshot ??= Array.AsReadOnly(_stageResults.ToArray());
             }
         }
     }
@@ -191,6 +194,7 @@ public sealed class MoonshotPipelineContext
         lock (_resultsLock)
         {
             _stageResults.Add(result);
+            _stageResultsSnapshot = null; // Invalidate cached snapshot (finding P2-533)
         }
     }
 }

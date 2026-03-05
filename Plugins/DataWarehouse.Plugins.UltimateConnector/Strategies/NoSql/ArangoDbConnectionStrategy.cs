@@ -13,7 +13,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
     /// </summary>
     public class ArangoDbConnectionStrategy : DatabaseConnectionStrategyBase
     {
-        private HttpClient? _httpClient;
+        private volatile HttpClient? _httpClient;
 
         public override string StrategyId => "arangodb";
         public override string DisplayName => "ArangoDB";
@@ -51,7 +51,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
                     Convert.ToBase64String(authBytes));
             }
 
-            var response = await _httpClient.GetAsync("/_api/version", ct);
+            using var response = await _httpClient.GetAsync("/_api/version", ct);
             response.EnsureSuccessStatusCode();
 
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object>
@@ -66,24 +66,24 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
             if (_httpClient == null) return false;
             try
             {
-                var response = await _httpClient.GetAsync("/_api/version", ct);
+                using var response = await _httpClient.GetAsync("/_api/version", ct);
                 return response.IsSuccessStatusCode;
             }
             catch { return false; /* Connection validation - failure acceptable */ }
         }
 
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
-        {
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) {
             _httpClient?.Dispose();
-            _httpClient = null;
-            await Task.CompletedTask;
-        }
+            _httpClient = null; return Task.CompletedTask; }
 
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
+            // P2-2180: Measure actual latency with Stopwatch instead of hardcoded value.
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             var isHealthy = await TestCoreAsync(handle, ct);
+            sw.Stop();
             return new ConnectionHealth(isHealthy, isHealthy ? "ArangoDB healthy" : "ArangoDB unhealthy",
-                TimeSpan.FromMilliseconds(7), DateTimeOffset.UtcNow);
+                sw.Elapsed, DateTimeOffset.UtcNow);
         }
 
         /// <summary>
@@ -114,7 +114,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
 
                 var json = System.Text.Json.JsonSerializer.Serialize(requestBody);
                 var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync("/_api/cursor", content, ct);
+                using var response = await _httpClient.PostAsync("/_api/cursor", content, ct);
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -190,7 +190,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
 
                 var json = System.Text.Json.JsonSerializer.Serialize(requestBody);
                 var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync("/_api/cursor", content, ct);
+                using var response = await _httpClient.PostAsync("/_api/cursor", content, ct);
 
                 if (!response.IsSuccessStatusCode)
                     return -1;
@@ -223,7 +223,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
 
             try
             {
-                var response = await _httpClient.GetAsync("/_api/collection", ct);
+                using var response = await _httpClient.GetAsync("/_api/collection", ct);
                 if (!response.IsSuccessStatusCode)
                     return Array.Empty<DataSchema>();
 

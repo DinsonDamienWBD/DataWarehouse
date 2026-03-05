@@ -334,7 +334,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
                 // Step 2: Upload parts in parallel
                 var partCount = (int)Math.Ceiling((double)dataLength / _multipartPartSizeBytes);
                 var uploadedParts = new List<PartETag>();
-                var semaphore = new SemaphoreSlim(_maxConcurrentParts, _maxConcurrentParts);
+                using var semaphore = new SemaphoreSlim(_maxConcurrentParts, _maxConcurrentParts);
                 var uploadTasks = new List<Task<PartETag>>();
 
                 for (int partNumber = 1; partNumber <= partCount; partNumber++)

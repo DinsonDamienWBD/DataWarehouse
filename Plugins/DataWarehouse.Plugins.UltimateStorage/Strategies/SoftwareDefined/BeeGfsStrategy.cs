@@ -112,6 +112,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         public override string StrategyId => "beegfs";
         public override string Name => "BeeGFS Parallel File System";
         public override StorageTier Tier => StorageTier.Hot;
+        public override bool IsProductionReady => false; // Metadata stored in sidecar JSON files; requires actual BeeGFS client (beegfs-client kernel module) and management API integration
 
         public override StorageCapabilities Capabilities => new StorageCapabilities
         {
@@ -680,26 +681,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 return;
             }
 
-            // BeeGFS stripe pattern is set via beegfs-ctl command or extended attributes
-            // Example: beegfs-ctl --setpattern --chunksize=512k --numtargets=4 /path
-            // For simplicity, store configuration as marker file
-            var stripeMetadata = new Dictionary<string, string>
-            {
-                ["beegfs.stripe.chunksize"] = _stripeChunkSizeBytes.ToString(),
-                ["beegfs.stripe.numtargets"] = _stripeCount.ToString(),
-                ["beegfs.stripe.pattern"] = _stripePattern
-            };
-
+            // BeeGFS stripe pattern applied via beegfs-ctl CLI
+            // beegfs-ctl --setpattern --chunksize=<N> --numtargets=<N> [--buddymirror] <path>
+            var args = $"--setpattern --chunksize={_stripeChunkSizeBytes} --numtargets={_stripeCount} \"{directoryPath}\"";
             if (_enableBuddyMirroring)
-            {
-                stripeMetadata["beegfs.buddymirror.enabled"] = "true";
-                stripeMetadata["beegfs.buddymirror.type"] = _buddyMirrorPatternType;
-            }
+                args = $"--setpattern --chunksize={_stripeChunkSizeBytes} --numtargets={_stripeCount} --buddymirror \"{directoryPath}\"";
 
-            // In a real implementation, this would use beegfs-ctl CLI or libbeegfs API
-            // For now, store as marker file
-            var stripeFile = Path.Combine(directoryPath, ".beegfs_stripe");
-            await File.WriteAllTextAsync(stripeFile, JsonSerializer.Serialize(stripeMetadata), ct);
+            await RunBeegfsCtlAsync(args, ct);
         }
 
         /// <summary>
@@ -713,16 +701,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 return;
             }
 
-            // Storage pool is set via beegfs-ctl command
-            // Example: beegfs-ctl --setpattern --storagepoolid=2 /path
-            var poolMetadata = new Dictionary<string, string>
-            {
-                ["beegfs.storagepool.id"] = _storagePoolId,
-                ["beegfs.storagepool.available"] = string.Join(",", _availableStoragePools)
-            };
-
-            var poolFile = Path.Combine(directoryPath, ".beegfs_pool");
-            await File.WriteAllTextAsync(poolFile, JsonSerializer.Serialize(poolMetadata), ct);
+            // Storage pool applied via beegfs-ctl --setpattern --storagepoolid=<id> <path>
+            await RunBeegfsCtlAsync($"--setpattern --storagepoolid={_storagePoolId} \"{directoryPath}\"", ct);
         }
 
         /// <summary>
@@ -736,16 +716,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 return;
             }
 
-            // ACL is set via setfacl command or POSIX ACL APIs
-            // Example: setfacl -m u:user:rwx /path
-            var aclMetadata = new Dictionary<string, string>
+            // ACL applied via setfacl (POSIX ACL) — beegfs-ctl does not manage ACLs directly
+            // Enable ACL inheritance via setfattr on the directory if supported
+            if (_inheritAcl)
             {
-                ["beegfs.acl.enabled"] = "true",
-                ["beegfs.acl.inherit"] = _inheritAcl.ToString()
-            };
-
-            var aclFile = Path.Combine(directoryPath, ".beegfs_acl");
-            await File.WriteAllTextAsync(aclFile, JsonSerializer.Serialize(aclMetadata), ct);
+                await RunCommandAsync("setfattr", $"-n system.posix_acl_default -v \"\" \"{directoryPath}\"", ct);
+            }
+            // Actual per-user/group ACL entries would be set by the caller with specific user/group info;
+            // this method ensures the directory is ACL-capable on the BeeGFS mount.
         }
 
         /// <summary>
@@ -759,29 +737,20 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 return;
             }
 
-            // Quota is set via beegfs-ctl command
-            // Example: beegfs-ctl --setquota --uid=1000 --sizelimit=100G --inodelimit=1000000
-            var quotaMetadata = new Dictionary<string, string>
-            {
-                ["beegfs.quota.enabled"] = "true"
-            };
-
+            // Quota applied via beegfs-ctl --setquota
             if (!string.IsNullOrWhiteSpace(_quotaUserId))
             {
-                quotaMetadata["beegfs.quota.user.id"] = _quotaUserId;
-                quotaMetadata["beegfs.quota.user.maxbytes"] = _quotaUserMaxBytes.ToString();
-                quotaMetadata["beegfs.quota.user.maxinodes"] = _quotaUserMaxInodes.ToString();
+                await RunBeegfsCtlAsync(
+                    $"--setquota --uid={_quotaUserId} --sizelimit={_quotaUserMaxBytes} --inodelimit={_quotaUserMaxInodes}",
+                    ct);
             }
 
             if (!string.IsNullOrWhiteSpace(_quotaGroupId))
             {
-                quotaMetadata["beegfs.quota.group.id"] = _quotaGroupId;
-                quotaMetadata["beegfs.quota.group.maxbytes"] = _quotaGroupMaxBytes.ToString();
-                quotaMetadata["beegfs.quota.group.maxinodes"] = _quotaGroupMaxInodes.ToString();
+                await RunBeegfsCtlAsync(
+                    $"--setquota --gid={_quotaGroupId} --sizelimit={_quotaGroupMaxBytes} --inodelimit={_quotaGroupMaxInodes}",
+                    ct);
             }
-
-            var quotaFile = Path.Combine(_mountPath, ".beegfs_quota");
-            await File.WriteAllTextAsync(quotaFile, JsonSerializer.Serialize(quotaMetadata), ct);
         }
 
         /// <summary>
@@ -795,17 +764,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 return;
             }
 
-            // Compression is typically set via extended attributes
-            // Example: setfattr -n user.beegfs.compress -v zstd /path
-            var compressionMetadata = new Dictionary<string, string>
-            {
-                ["beegfs.compression.enabled"] = "true",
-                ["beegfs.compression.algorithm"] = _compressionAlgorithm,
-                ["beegfs.compression.level"] = _compressionLevel.ToString()
-            };
-
-            var compressionFile = filePath + ".beegfs_compression";
-            await File.WriteAllTextAsync(compressionFile, JsonSerializer.Serialize(compressionMetadata), ct);
+            // BeeGFS compression set via extended attribute: setfattr -n user.beegfs.compress -v <algo> <path>
+            var compressValue = $"{_compressionAlgorithm}:{_compressionLevel}";
+            await RunCommandAsync("setfattr", $"-n user.beegfs.compress -v \"{compressValue}\" \"{filePath}\"", ct);
         }
 
         /// <summary>
@@ -832,30 +793,24 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
             try
             {
-                // In a real implementation, this would use beegfs-ctl --getquota command
-                // For now, calculate from directory usage
+                // Use beegfs-ctl --getquota to retrieve live quota data without an O(N) directory walk.
+                // Output format example:
+                //   user        used (Byte) lim (Byte) used (Chunk) lim (Chunk)
+                //   1000          123456789     -1         4096          -1
                 long usedBytes = 0;
                 long usedInodes = 0;
 
-                if (Directory.Exists(_mountPath))
+                if (!string.IsNullOrWhiteSpace(_quotaUserId))
                 {
-                    var files = Directory.GetFiles(_mountPath, "*", SearchOption.AllDirectories)
-                        .Where(f => !IsMetadataFile(f));
-
-                    foreach (var file in files)
-                    {
-                        try
-                        {
-                            var fileInfo = new FileInfo(file);
-                            usedBytes += fileInfo.Length;
-                            usedInodes++;
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"[management.GetQuotaUsageAsync] {ex.GetType().Name}: {ex.Message}");
-                            // Skip files that can't be accessed
-                        }
-                    }
+                    var output = await RunBeegfsCtlWithOutputAsync(
+                        $"--getquota --uid={_quotaUserId} --csv", ct).ConfigureAwait(false);
+                    ParseQuotaOutput(output, out usedBytes, out usedInodes);
+                }
+                else if (!string.IsNullOrWhiteSpace(_quotaGroupId))
+                {
+                    var output = await RunBeegfsCtlWithOutputAsync(
+                        $"--getquota --gid={_quotaGroupId} --csv", ct).ConfigureAwait(false);
+                    ParseQuotaOutput(output, out usedBytes, out usedInodes);
                 }
 
                 return new BeeGfsQuotaInfo
@@ -887,40 +842,47 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             // For now, return configured storage targets
             var targets = new List<BeeGfsStorageTarget>();
 
-            if (_autoDiscoverTargets && _storageTargets.Count == 0)
+            if (_autoDiscoverTargets)
             {
-                // Auto-discovery would query management daemon
-                // Simulate with default targets
-                for (int i = 1; i <= _stripeCount; i++)
+                // Query BeeGFS management daemon for live target list via beegfs-ctl --listtargets.
+                // Output columns (whitespace-separated): TargetID NodeID State ...
+                var output = await RunBeegfsCtlWithOutputAsync("--listtargets --nodetype=storage --state", ct)
+                    .ConfigureAwait(false);
+                foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
                 {
+                    var parts = line.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length < 2) continue;
+                    if (parts[0].Equals("TargetID", StringComparison.OrdinalIgnoreCase)) continue;
                     targets.Add(new BeeGfsStorageTarget
                     {
-                        TargetId = $"target-{i}",
-                        NodeId = $"node-{i}",
+                        TargetId = parts[0],
+                        NodeId = parts.Length > 1 ? parts[1] : "unknown",
                         StoragePoolId = _storagePoolId,
-                        Status = "online",
-                        TotalCapacity = null,
-                        AvailableCapacity = null
-                    });
-                }
-            }
-            else
-            {
-                foreach (var targetId in _storageTargets)
-                {
-                    targets.Add(new BeeGfsStorageTarget
-                    {
-                        TargetId = targetId,
-                        NodeId = "unknown",
-                        StoragePoolId = _storagePoolId,
-                        Status = "online",
+                        Status = parts.Length > 2 ? parts[2] : "unknown",
                         TotalCapacity = null,
                         AvailableCapacity = null
                     });
                 }
             }
 
-            await Task.CompletedTask;
+            // Also include any statically-configured target IDs not returned by discovery.
+            var discoveredIds = new HashSet<string>(targets.Select(t => t.TargetId), StringComparer.OrdinalIgnoreCase);
+            foreach (var targetId in _storageTargets)
+            {
+                if (!discoveredIds.Contains(targetId))
+                {
+                    targets.Add(new BeeGfsStorageTarget
+                    {
+                        TargetId = targetId,
+                        NodeId = "unknown",
+                        StoragePoolId = _storagePoolId,
+                        Status = "unknown",
+                        TotalCapacity = null,
+                        AvailableCapacity = null
+                    });
+                }
+            }
+
             return targets.AsReadOnly();
         }
 
@@ -1155,6 +1117,87 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                     lockObj?.Dispose();
                 }
                 _fileLocks.Clear();
+            }
+        }
+
+        #endregion
+
+        #region CLI Helpers
+
+        /// <summary>Invokes beegfs-ctl with the given arguments and throws on non-zero exit.</summary>
+        private async Task RunBeegfsCtlAsync(string arguments, CancellationToken ct)
+            => await RunCommandAsync("beegfs-ctl", arguments, ct).ConfigureAwait(false);
+
+        /// <summary>Invokes beegfs-ctl and returns stdout as a string; throws on non-zero exit.</summary>
+        private static async Task<string> RunBeegfsCtlWithOutputAsync(string arguments, CancellationToken ct)
+        {
+            using var process = new System.Diagnostics.Process
+            {
+                StartInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "beegfs-ctl",
+                    Arguments = arguments,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+            };
+            process.Start();
+            var stdout = await process.StandardOutput.ReadToEndAsync(ct).ConfigureAwait(false);
+            await process.WaitForExitAsync(ct).ConfigureAwait(false);
+            if (process.ExitCode != 0)
+            {
+                var stderr = await process.StandardError.ReadToEndAsync(ct).ConfigureAwait(false);
+                throw new InvalidOperationException(
+                    $"'beegfs-ctl {arguments}' failed with exit code {process.ExitCode}: {stderr}");
+            }
+            return stdout;
+        }
+
+        /// <summary>
+        /// Parses beegfs-ctl --getquota --csv output to extract used bytes and inode count.
+        /// CSV format: uid/gid,usedBytes,limitBytes,usedInodes,limitInodes
+        /// </summary>
+        private static void ParseQuotaOutput(string output, out long usedBytes, out long usedInodes)
+        {
+            usedBytes = 0;
+            usedInodes = 0;
+            foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var parts = line.Split(',');
+                if (parts.Length < 5) continue;
+                // Skip header line
+                if (parts[0].Trim().Equals("uid", StringComparison.OrdinalIgnoreCase) ||
+                    parts[0].Trim().Equals("gid", StringComparison.OrdinalIgnoreCase)) continue;
+                if (long.TryParse(parts[1].Trim(), out var bytes)) usedBytes = bytes;
+                if (long.TryParse(parts[3].Trim(), out var inodes)) usedInodes = inodes;
+                break; // Single user/group result — first data row
+            }
+        }
+
+        /// <summary>Runs an external process and throws <see cref="InvalidOperationException"/> on failure.</summary>
+        private static async Task RunCommandAsync(string command, string arguments, CancellationToken ct)
+        {
+            using var process = new System.Diagnostics.Process
+            {
+                StartInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = command,
+                    Arguments = arguments,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+            };
+            process.Start();
+            await process.WaitForExitAsync(ct).ConfigureAwait(false);
+            if (process.ExitCode != 0)
+            {
+                var stderr = await process.StandardError.ReadToEndAsync(ct).ConfigureAwait(false);
+                throw new InvalidOperationException(
+                    $"'{command} {arguments}' failed with exit code {process.ExitCode}: {stderr}");
             }
         }
 

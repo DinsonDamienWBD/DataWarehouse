@@ -79,22 +79,38 @@ internal sealed class AssetBundlingStrategy : StorageProcessingStrategyBase
             foreach (var file in files)
             {
                 ct.ThrowIfCancellationRequested();
-                var fileData = await File.ReadAllBytesAsync(file.FullName, ct);
-                var hash = Convert.ToHexStringLower(SHA256.HashData(fileData));
-
-                // Write entry header: name length + name + data length
+                // Stream each file to avoid loading large game assets entirely into memory (finding 4264).
+                // Hash is computed inline by feeding the file stream through SHA256 incrementally.
                 var nameBytes = Encoding.UTF8.GetBytes(file.Name);
-                var entryHeader = new byte[8];
-                BitConverter.TryWriteBytes(entryHeader.AsSpan(0, 4), nameBytes.Length);
-                BitConverter.TryWriteBytes(entryHeader.AsSpan(4, 4), fileData.Length);
-                await bundleStream.WriteAsync(entryHeader, ct);
-                await bundleStream.WriteAsync(nameBytes, ct);
-                await bundleStream.WriteAsync(fileData, ct);
+                string hash;
+                long fileSize;
+                await using (var fileStream = new FileStream(file.FullName, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, true))
+                {
+                    fileSize = fileStream.Length;
+
+                    // Write entry header: name length + name + data length (must know size before streaming)
+                    var entryHeader = new byte[8];
+                    BitConverter.TryWriteBytes(entryHeader.AsSpan(0, 4), nameBytes.Length);
+                    BitConverter.TryWriteBytes(entryHeader.AsSpan(4, 4), (int)Math.Min(fileSize, int.MaxValue));
+                    await bundleStream.WriteAsync(entryHeader, ct);
+                    await bundleStream.WriteAsync(nameBytes, ct);
+
+                    // Stream file data directly into bundle + compute hash incrementally
+                    using var sha256 = System.Security.Cryptography.IncrementalHash.CreateHash(System.Security.Cryptography.HashAlgorithmName.SHA256);
+                    var buffer = new byte[81920];
+                    int read;
+                    while ((read = await fileStream.ReadAsync(buffer, ct)) > 0)
+                    {
+                        sha256.AppendData(buffer, 0, read);
+                        await bundleStream.WriteAsync(buffer.AsMemory(0, read), ct);
+                    }
+                    hash = Convert.ToHexStringLower(sha256.GetCurrentHash());
+                }
 
                 entries.Add(new Dictionary<string, object>
                 {
                     ["name"] = file.Name,
-                    ["size"] = file.Length,
+                    ["size"] = fileSize,
                     ["hash"] = hash
                 });
             }

@@ -60,6 +60,7 @@ public sealed class TypesenseStorageStrategy : DatabaseStorageStrategyBase
             BaseAddress = new Uri(connectionString),
             Timeout = TimeSpan.FromSeconds(30)
         };
+        _httpClient.DefaultRequestHeaders.Remove("X-TYPESENSE-API-KEY");
         _httpClient.DefaultRequestHeaders.Add("X-TYPESENSE-API-KEY", _apiKey);
 
         await EnsureSchemaCoreAsync(ct);
@@ -103,7 +104,7 @@ public sealed class TypesenseStorageStrategy : DatabaseStorageStrategyBase
         };
 
         var content = new StringContent(JsonSerializer.Serialize(schema), Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync("/collections", content, ct);
+        using var response = await _httpClient.PostAsync("/collections", content, ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -186,46 +187,63 @@ public sealed class TypesenseStorageStrategy : DatabaseStorageStrategyBase
 
     protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct)
     {
-        var query = string.IsNullOrEmpty(prefix) ? "*" : $"key:{prefix}*";
-        var response = await _httpClient!.GetAsync(
-            $"/collections/{_collectionName}/documents/search?q={Uri.EscapeDataString(query)}&query_by=key&per_page=250&exclude_fields=data", ct);
+        // Paginate using page + per_page to avoid the 250-hit limit.
+        const int PageSize = 250;
+        int page = 1;
 
-        if (!response.IsSuccessStatusCode)
-        {
-            yield break;
-        }
+        // P2-2839: Use filter_by for structural prefix filtering instead of keyword search
+        // (which is typo-tolerant and unreliable for special characters).
+        // filter_by=key:=[prefix]* is a Typesense prefix match on the 'key' field.
+        var filterBy = string.IsNullOrEmpty(prefix)
+            ? string.Empty
+            : $"&filter_by=key:={Uri.EscapeDataString(prefix)}*";
 
-        var result = await response.Content.ReadFromJsonAsync<TypesenseSearchResult>(cancellationToken: ct);
-
-        foreach (var hit in result?.Hits ?? Enumerable.Empty<TypesenseHit>())
+        while (true)
         {
             ct.ThrowIfCancellationRequested();
 
-            var doc = hit.Document;
-            if (doc == null) continue;
+            var response = await _httpClient!.GetAsync(
+                $"/collections/{_collectionName}/documents/search?q=*&query_by=key&per_page={PageSize}&page={page}&exclude_fields=data{filterBy}", ct);
 
-            if (!string.IsNullOrEmpty(prefix) && !doc.Key.StartsWith(prefix, StringComparison.Ordinal))
+            if (!response.IsSuccessStatusCode)
+                yield break;
+
+            var result = await response.Content.ReadFromJsonAsync<TypesenseSearchResult>(cancellationToken: ct);
+            var hits = result?.Hits ?? Enumerable.Empty<TypesenseHit>();
+            int hitCount = 0;
+
+            foreach (var hit in hits)
             {
-                continue;
+                ct.ThrowIfCancellationRequested();
+                hitCount++;
+
+                var doc = hit.Document;
+                if (doc == null) continue;
+
+                if (!string.IsNullOrEmpty(prefix) && !doc.Key.StartsWith(prefix, StringComparison.Ordinal))
+                    continue;
+
+                Dictionary<string, string>? customMetadata = null;
+                if (!string.IsNullOrEmpty(doc.Metadata))
+                    customMetadata = JsonSerializer.Deserialize<Dictionary<string, string>>(doc.Metadata, JsonOptions);
+
+                yield return new StorageObjectMetadata
+                {
+                    Key = doc.Key,
+                    Size = doc.Size,
+                    ContentType = doc.ContentType,
+                    ETag = doc.ETag,
+                    CustomMetadata = customMetadata,
+                    Created = new DateTime(doc.CreatedAt, DateTimeKind.Utc),
+                    Modified = new DateTime(doc.ModifiedAt, DateTimeKind.Utc),
+                    Tier = Tier
+                };
             }
 
-            Dictionary<string, string>? customMetadata = null;
-            if (!string.IsNullOrEmpty(doc.Metadata))
-            {
-                customMetadata = JsonSerializer.Deserialize<Dictionary<string, string>>(doc.Metadata, JsonOptions);
-            }
+            if (hitCount < PageSize)
+                yield break;
 
-            yield return new StorageObjectMetadata
-            {
-                Key = doc.Key,
-                Size = doc.Size,
-                ContentType = doc.ContentType,
-                ETag = doc.ETag,
-                CustomMetadata = customMetadata,
-                Created = new DateTime(doc.CreatedAt, DateTimeKind.Utc),
-                Modified = new DateTime(doc.ModifiedAt, DateTimeKind.Utc),
-                Tier = Tier
-            };
+            page++;
         }
     }
 

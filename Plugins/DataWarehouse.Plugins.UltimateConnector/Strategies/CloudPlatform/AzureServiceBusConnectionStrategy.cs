@@ -35,7 +35,7 @@ public sealed class AzureServiceBusConnectionStrategy : SaaSConnectionStrategyBa
             var ns = GetConfiguration<string?>(config, "Namespace", null);
             if (string.IsNullOrEmpty(ns))
                 throw new ArgumentException("ConnectionString or Namespace is required for Azure Service Bus.");
-            connectionString = $"Endpoint=sb://{ns}.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=placeholder";
+            connectionString = $"Endpoint=sb://{ns}.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;";
         }
 
         var clientOptions = new ServiceBusClientOptions
@@ -66,7 +66,7 @@ public sealed class AzureServiceBusConnectionStrategy : SaaSConnectionStrategyBa
         try
         {
             var client = handle.GetConnection<ServiceBusClient>();
-            return Task.FromResult(!client.IsClosed);
+            return Task.FromResult(!client.IsClosed && client.FullyQualifiedNamespace != null);
         }
         catch
         {
@@ -91,11 +91,12 @@ public sealed class AzureServiceBusConnectionStrategy : SaaSConnectionStrategyBa
             var client = handle.GetConnection<ServiceBusClient>();
             sw.Stop();
 
+            var isHealthy = !client.IsClosed && client.FullyQualifiedNamespace != null;
             return Task.FromResult(new ConnectionHealth(
-                IsHealthy: !client.IsClosed,
-                StatusMessage: !client.IsClosed
+                IsHealthy: isHealthy,
+                StatusMessage: isHealthy
                     ? $"Service Bus connected to {client.FullyQualifiedNamespace}"
-                    : "Service Bus client is closed",
+                    : "Service Bus client is closed or namespace unavailable",
                 Latency: sw.Elapsed,
                 CheckedAt: DateTimeOffset.UtcNow));
         }

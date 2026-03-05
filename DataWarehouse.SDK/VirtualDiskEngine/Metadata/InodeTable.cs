@@ -80,6 +80,18 @@ public sealed class InodeTable : IInodeTable, IDisposable
     /// <param name="ct">Cancellation token.</param>
     public async Task InitializeAsync(CancellationToken ct = default)
     {
+        // Serialize concurrent InitializeAsync calls to prevent duplicate root-inode creation
+        await _tableMetadataLock.WaitAsync(ct);
+        try
+        {
+            if (_rootInode != null)
+                return; // Already initialized by a concurrent caller
+        }
+        finally
+        {
+            _tableMetadataLock.Release();
+        }
+
         // Try to load root inode (inode 1)
         _rootInode = await GetInodeAsync(RootInodeNumber, ct);
 
@@ -180,12 +192,15 @@ public sealed class InodeTable : IInodeTable, IDisposable
         var inode = await ReadInodeAsync(inodeNumber, ct);
         if (inode != null && inode.LinkCount > 0)
         {
-            // Add to cache (with eviction if needed)
-            if (_cache.Count >= MaxCachedInodes)
+            // Atomically add to cache with eviction under lock to prevent unbounded growth
+            lock (_cache)
             {
-                EvictOldestCacheEntry();
+                if (_cache.Count >= MaxCachedInodes)
+                {
+                    EvictOldestCacheEntry();
+                }
+                _cache[inodeNumber] = inode;
             }
-            _cache[inodeNumber] = inode;
         }
 
         return inode?.LinkCount > 0 ? inode : null;

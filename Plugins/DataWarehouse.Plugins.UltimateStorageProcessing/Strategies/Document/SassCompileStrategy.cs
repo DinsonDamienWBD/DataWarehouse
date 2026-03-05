@@ -30,7 +30,14 @@ internal sealed class SassCompileStrategy : StorageProcessingStrategyBase
     public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default)
     {
         ValidateQuery(query);
-        var style = CliProcessHelper.GetOption<string>(query, "style") ?? "expanded";
+        // Allowlist the output style to prevent flag injection via user-supplied value.
+        var rawStyle = CliProcessHelper.GetOption<string>(query, "style") ?? "expanded";
+        var style = rawStyle switch
+        {
+            "expanded" or "compressed" => rawStyle,
+            _ => throw new ArgumentException(
+                $"Unknown sass output style '{rawStyle}'. Allowed values: expanded, compressed.")
+        };
         var sourceMap = CliProcessHelper.GetOption<bool>(query, "sourceMap");
         var loadPaths = CliProcessHelper.GetOption<string>(query, "loadPaths");
 
@@ -40,7 +47,13 @@ internal sealed class SassCompileStrategy : StorageProcessingStrategyBase
         if (loadPaths != null)
         {
             foreach (var lp in loadPaths.Split(';', StringSplitOptions.RemoveEmptyEntries))
-                args += $" --load-path \"{lp}\"";
+            {
+                // Reject load-path values containing quotes to prevent argument injection.
+                if (lp.Contains('"') || lp.Contains('\''))
+                    throw new ArgumentException($"loadPaths entry '{lp}' contains quote characters which are not allowed.");
+                var normalizedLp = Path.GetFullPath(lp);
+                args += $" --load-path \"{normalizedLp}\"";
+            }
         }
 
         var result = await CliProcessHelper.RunAsync("sass", args, Path.GetDirectoryName(query.Source), ct: ct);

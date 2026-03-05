@@ -35,7 +35,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
     /// </summary>
     public sealed class MlDsaStrategy : EncryptionStrategyBase
     {
-        private readonly SecureRandom _secureRandom;
 
         /// <inheritdoc/>
         public override CipherInfo CipherInfo => new()
@@ -94,7 +93,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
 
         public MlDsaStrategy()
         {
-            _secureRandom = new SecureRandom();
         }
 
         /// <summary>
@@ -122,7 +120,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 else
                 {
                     // Generate new key pair
-                    var keyGenParams = new MLDsaKeyGenerationParameters(_secureRandom, MLDsaParameters.ml_dsa_65);
+                    var keyGenParams = new MLDsaKeyGenerationParameters(new SecureRandom(), MLDsaParameters.ml_dsa_65);
                     var keyPairGenerator = new MLDsaKeyPairGenerator();
                     keyPairGenerator.Init(keyGenParams);
                     keyPair = keyPairGenerator.GenerateKeyPair();
@@ -186,7 +184,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public override byte[] GenerateKey()
         {
-            var keyGenParams = new MLDsaKeyGenerationParameters(_secureRandom, MLDsaParameters.ml_dsa_65);
+            var keyGenParams = new MLDsaKeyGenerationParameters(new SecureRandom(), MLDsaParameters.ml_dsa_65);
             var keyPairGenerator = new MLDsaKeyPairGenerator();
             keyPairGenerator.Init(keyGenParams);
             var keyPair = keyPairGenerator.GenerateKeyPair();
@@ -218,7 +216,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
     /// </summary>
     public sealed class SlhDsaStrategy : EncryptionStrategyBase
     {
-        private readonly SecureRandom _secureRandom;
 
         /// <inheritdoc/>
         public override CipherInfo CipherInfo => new()
@@ -260,7 +257,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
 
         public SlhDsaStrategy()
         {
-            _secureRandom = new SecureRandom();
         }
 
         /// <summary>
@@ -285,7 +281,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 else
                 {
                     var keyGenParams = new SlhDsaKeyGenerationParameters(
-                        _secureRandom, SlhDsaParameters.slh_dsa_shake_128f);
+                        new SecureRandom(), SlhDsaParameters.slh_dsa_shake_128f);
                     var keyPairGenerator = new SlhDsaKeyPairGenerator();
                     keyPairGenerator.Init(keyGenParams);
                     keyPair = keyPairGenerator.GenerateKeyPair();
@@ -346,7 +342,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         public override byte[] GenerateKey()
         {
             var keyGenParams = new SlhDsaKeyGenerationParameters(
-                _secureRandom, SlhDsaParameters.slh_dsa_shake_128f);
+                new SecureRandom(), SlhDsaParameters.slh_dsa_shake_128f);
             var keyPairGenerator = new SlhDsaKeyPairGenerator();
             keyPairGenerator.Init(keyGenParams);
             var keyPair = keyPairGenerator.GenerateKeyPair();

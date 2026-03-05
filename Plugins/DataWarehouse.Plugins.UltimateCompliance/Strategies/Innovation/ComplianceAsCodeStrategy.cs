@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("compliance_as_code.check");
+            IncrementCounter("compliance_as_code.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -71,9 +71,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
 
             recommendations.Add("Version control compliance policies alongside application code");
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -89,14 +90,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("compliance_as_code.initialized");
+            IncrementCounter("compliance_as_code.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("compliance_as_code.shutdown");
+            IncrementCounter("compliance_as_code.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

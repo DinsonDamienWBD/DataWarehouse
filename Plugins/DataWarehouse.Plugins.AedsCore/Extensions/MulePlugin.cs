@@ -68,8 +68,16 @@ public sealed class MulePlugin : DataManagementPluginBase
             ["version"] = "1.0"
         };
 
+        // Validate manifest IDs before using them in file paths (path traversal prevention, finding 980).
+        static bool IsValidExportManifestId(string id) =>
+            !string.IsNullOrEmpty(id) &&
+            id.Length <= 128 &&
+            id.All(c => char.IsLetterOrDigit(c) || c == '-' || c == '_' || c == '.');
+
         foreach (var manifestId in manifestIds)
         {
+            if (!IsValidExportManifestId(manifestId))
+                throw new ArgumentException($"Manifest ID '{manifestId}' contains invalid characters. Only alphanumeric, dash, underscore, and dot are permitted.", nameof(manifestIds));
             var manifestFile = Path.Combine(manifestsPath, $"{manifestId}.json");
             await File.WriteAllTextAsync(manifestFile, $"{{\"manifestId\":\"{manifestId}\"}}", ct);
         }
@@ -122,7 +130,14 @@ public sealed class MulePlugin : DataManagementPluginBase
             ? element.EnumerateArray().Select(e => e.GetString() ?? string.Empty).ToArray()
             : Array.Empty<string>();
 
-        foreach (var manifestId in manifestIds.Where(id => !string.IsNullOrEmpty(id)))
+        // Validate each manifest ID before using it in a file path.
+        // Only allow alphanumeric, dash, underscore, and dot to prevent path traversal (finding 980).
+        static bool IsValidManifestId(string id) =>
+            !string.IsNullOrEmpty(id) &&
+            id.Length <= 128 &&
+            id.All(c => char.IsLetterOrDigit(c) || c == '-' || c == '_' || c == '.');
+
+        foreach (var manifestId in manifestIds.Where(IsValidManifestId))
         {
             if (MessageBus != null)
             {

@@ -119,11 +119,17 @@ internal sealed class WasmLanguageBenchmarkStrategy : ComputeRuntimeStrategyBase
 
             try
             {
+                // Capture heap delta across the verification call as a proxy for per-benchmark memory use.
+                // GC.GetTotalMemory measures the entire process heap, so this delta is an approximation.
+                // For accurate WASM-only memory measurement, use wasmtime's --profile or memlimit stats.
+                GC.Collect(0, GCCollectionMode.Forced, blocking: false);
+                var memBefore = GC.GetTotalMemory(false);
                 var verification = await strategy.VerifyLanguageAsync(ct);
+                var memAfter = GC.GetTotalMemory(false);
 
                 var executionTime = verification.ExecutionTime ?? TimeSpan.Zero;
                 var binarySize = verification.BinarySizeBytes ?? 0;
-                var peakMemory = GC.GetTotalMemory(false);
+                var peakMemory = Math.Max(0, memAfter - memBefore);
 
                 results.Add(new BenchmarkResult(
                     Language: langInfo.Language,
@@ -269,7 +275,9 @@ internal sealed class WasmLanguageBenchmarkStrategy : ComputeRuntimeStrategyBase
             }
             catch
             {
+
                 // Skip types that cannot be instantiated
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

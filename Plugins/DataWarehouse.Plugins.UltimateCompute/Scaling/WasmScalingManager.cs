@@ -109,7 +109,8 @@ public sealed class WasmScalingManager : IScalableSubsystem, IDisposable
     private readonly object _adjustmentLock = new();
 
     // ---- Scaling state ----
-    private ScalingLimits _currentLimits;
+    // _currentLimits is always written inside _adjustmentLock or before concurrent access begins.
+    private volatile ScalingLimits _currentLimits;
     private long _pendingExecutions;
     private long _totalExecutions;
     private long _poolHits;
@@ -448,13 +449,13 @@ public sealed class WasmScalingManager : IScalableSubsystem, IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(limits);
 
-        var oldLimits = _currentLimits;
-        _currentLimits = limits;
-
-        // Update max concurrent executions if changed
-        if (limits.MaxConcurrentOperations != oldLimits.MaxConcurrentOperations)
+        lock (_adjustmentLock)
         {
-            lock (_adjustmentLock)
+            var oldLimits = _currentLimits;
+            _currentLimits = limits;
+
+            // Update max concurrent executions if changed
+            if (limits.MaxConcurrentOperations != oldLimits.MaxConcurrentOperations)
             {
                 _maxConcurrentExecutions = limits.MaxConcurrentOperations;
                 var oldSemaphore = _executionSemaphore;

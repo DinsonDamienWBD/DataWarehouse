@@ -393,9 +393,13 @@ public sealed class FeatureToggleRegistry : IFeatureToggleRegistry
 
         // Fire-and-forget toggle change notification
         _ = _messageBus.PublishAsync("config.toggle.changed", message)
-            .ContinueWith(t => System.Diagnostics.Debug.WriteLine(
-                $"[FeatureToggleRegistry] Toggle change notification failed: {t.Exception?.InnerException?.Message}"),
-                TaskContinuationOptions.OnlyOnFaulted);
+            .ContinueWith(t =>
+            {
+                if (t.Exception != null)
+                    System.Diagnostics.Trace.TraceWarning(
+                        $"[FeatureToggleRegistry] Toggle change notification failed: {t.Exception.InnerException?.Message}");
+            },
+            TaskScheduler.Default);
     }
 
     #endregion

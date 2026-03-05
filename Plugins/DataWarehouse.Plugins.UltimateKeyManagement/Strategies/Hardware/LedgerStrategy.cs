@@ -243,7 +243,12 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
         {
             // Build derivation path
             // Format: m/44'/1234567'/keyIndex'/0/0
-            var keyIndex = Math.Abs(keyId.GetHashCode()) % 1000000;
+            // P2-3502: string.GetHashCode() is randomised per-process in .NET 6+.
+            // Use SHA-256 of the keyId bytes for a stable, deterministic BIP32 index
+            // that maps to the same key on every restart.
+            var keyIdHash = System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(keyId));
+            var keyIndex = (int)(BitConverter.ToUInt32(keyIdHash, 0) % 1000000);
             var derivationPath = $"{_config.DerivationPath.TrimEnd('/')}/{keyIndex}'/0/0";
 
             // Parse path to BIP32 format
@@ -483,6 +488,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                 return new byte[] { cla, ins, p1, p2, 0x00 };
             }
 
+            // P2-3494: APDU Lc field is one byte — data payload must not exceed 255 bytes.
+            if (data.Length > 255)
+                throw new ArgumentException(
+                    $"APDU data payload too large: {data.Length} bytes exceeds the 255-byte APDU limit.", nameof(data));
+
             var apdu = new byte[5 + data.Length];
             apdu[0] = cla;
             apdu[1] = ins;
@@ -553,14 +563,28 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
             return packets;
         }
 
+        // #3484: Maximum packets to read before declaring an error (prevents unbounded loop).
+        private const int MaxResponsePackets = 64;
+        // Default HID read timeout: 5 seconds.
+        private static readonly TimeSpan HidReadTimeout = TimeSpan.FromSeconds(5);
+
         private byte[] ReceiveResponse()
         {
             var response = new List<byte>();
             var expectedLen = 0;
             var packetIndex = 0;
+            var deadline = DateTime.UtcNow + HidReadTimeout;
 
             while (true)
             {
+                // #3484: Enforce per-response timeout and packet-count ceiling.
+                if (DateTime.UtcNow > deadline)
+                    throw new TimeoutException("Ledger device did not respond within the expected time.");
+
+                if (packetIndex >= MaxResponsePackets)
+                    throw new InvalidOperationException(
+                        $"Ledger response exceeded maximum packet count ({MaxResponsePackets}). Possible protocol error.");
+
                 var packet = new byte[HidPacketSize];
                 var bytesRead = _stream!.Read(packet, 0, packet.Length);
 
@@ -576,6 +600,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                     // First packet
                     dataOffset = 7; // Skip header
                     expectedLen = (packet[5] << 8) | packet[6];
+                    // Sanity-check the expected length to avoid allocating huge buffers.
+                    if (expectedLen > HidPacketSize * MaxResponsePackets)
+                        throw new InvalidOperationException($"Ledger response claims unreasonably large payload ({expectedLen} bytes).");
                 }
                 else
                 {
@@ -641,7 +668,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                     continue;
 
                 var hardened = part.EndsWith("'") || part.EndsWith("h");
-                var value = uint.Parse(hardened ? part.TrimEnd('\'', 'h') : part);
+                var raw = hardened ? part.TrimEnd('\'', 'h') : part;
+                if (!uint.TryParse(raw, out var value))
+                    throw new FormatException($"Invalid BIP-32 path component: '{part}'");
 
                 if (hardened)
                 {
@@ -708,9 +737,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                 Directory.CreateDirectory(dir);
             }
 
+            // #3479: Only persist DerivationPath and KeyIndex — never the raw DerivedKey.
+            // The derived key must be re-derived from the Ledger device on load.
             var toStore = _derivedKeys.ToDictionary(
                 kvp => kvp.Key,
-                kvp => LedgerKeyDerivationDto.FromDerivation(kvp.Value));
+                kvp => LedgerKeyDerivationDto.FromDerivationSafe(kvp.Value));
 
             var json = JsonSerializer.Serialize(toStore, new JsonSerializerOptions { WriteIndented = true });
             await File.WriteAllTextAsync(path, json);
@@ -798,24 +829,35 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
         public string KeyId { get; set; } = string.Empty;
         public string DerivationPath { get; set; } = string.Empty;
         public string PublicKey { get; set; } = string.Empty;
-        public string DerivedKey { get; set; } = string.Empty;
+        // #3479: DerivedKey is intentionally NOT persisted to disk.
+        // It is re-derived from the Ledger device on each load.
         public DateTime CreatedAt { get; set; }
 
-        public static LedgerKeyDerivationDto FromDerivation(LedgerKeyDerivation d) => new()
+        /// <summary>
+        /// Safe serialization: omits raw DerivedKey. Only persists derivation metadata.
+        /// </summary>
+        public static LedgerKeyDerivationDto FromDerivationSafe(LedgerKeyDerivation d) => new()
         {
             KeyId = d.KeyId,
             DerivationPath = d.DerivationPath,
             PublicKey = Convert.ToBase64String(d.PublicKey),
-            DerivedKey = Convert.ToBase64String(d.DerivedKey),
+            // DerivedKey deliberately excluded
             CreatedAt = d.CreatedAt
         };
+
+        /// <summary>
+        /// Legacy full serialization (kept for backward compatibility reading old persisted data).
+        /// Do NOT use for writing — use FromDerivationSafe instead.
+        /// </summary>
+        public static LedgerKeyDerivationDto FromDerivation(LedgerKeyDerivation d) => FromDerivationSafe(d);
 
         public LedgerKeyDerivation ToDerivation() => new()
         {
             KeyId = KeyId,
             DerivationPath = DerivationPath,
             PublicKey = Convert.FromBase64String(PublicKey),
-            DerivedKey = Convert.FromBase64String(DerivedKey),
+            // DerivedKey starts empty; caller must re-derive from device
+            DerivedKey = Array.Empty<byte>(),
             CreatedAt = CreatedAt
         };
     }

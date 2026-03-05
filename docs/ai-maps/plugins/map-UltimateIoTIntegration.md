@@ -36,7 +36,7 @@ public abstract class IoTStrategyBase : StrategyBase, IIoTStrategyBase
     protected virtual void OnIntelligenceConfigured();
     public virtual IEnumerable<KnowledgeObject> GetKnowledge();
     public virtual IEnumerable<RegisteredCapability> GetCapabilities();
-    protected Task PublishMessage(string topic, PluginMessage message);
+    protected async Task PublishMessage(string topic, PluginMessage message);
 }
 ```
 
@@ -164,41 +164,6 @@ public interface IDataTransformationStrategy : IIoTStrategyBase
     Task<EnrichmentResult> EnrichAsync(EnrichmentRequest request, CancellationToken ct = default);;
     Task<NormalizationResult> NormalizeAsync(NormalizationRequest request, CancellationToken ct = default);;
     Task<bool> ValidateSchemaAsync(byte[] data, string schema, CancellationToken ct = default);;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/IoTStrategyRegistry.cs
-```csharp
-public sealed class IoTStrategyRegistry
-{
-}
-    public int Count;;
-    public void Register(IIoTStrategyBase strategy);
-    public IIoTStrategyBase? GetStrategy(string strategyId);
-    public T GetStrategy<T>(string strategyId)
-    where T : class, IIoTStrategyBase;
-    public IReadOnlyCollection<IIoTStrategyBase> GetAllStrategies();
-    public IReadOnlyCollection<IIoTStrategyBase> GetByCategory(IoTStrategyCategory category);
-    public IIoTStrategyBase? SelectBestStrategy(IoTStrategyCategory category);
-    public Dictionary<string, int> GetCategorySummary();
-    public void ConfigureIntelligence(IMessageBus? messageBus);
-    public IEnumerable<RegisteredCapability> GetAllStrategyCapabilities();
-    public IEnumerable<KnowledgeObject> GetAllStrategyKnowledge();
-}
-```
-```csharp
-public static class IoTTopics
-{
-}
-    public const string IntelligenceDeviceRecommendation = "iot.intelligence.device.recommendation";
-    public const string IntelligenceDeviceRecommendationResponse = "iot.intelligence.device.recommendation.response";
-    public const string IntelligenceAnomalyDetection = "iot.intelligence.anomaly.detection";
-    public const string IntelligenceAnomalyDetectionResponse = "iot.intelligence.anomaly.detection.response";
-    public const string TelemetryIngested = "iot.telemetry.ingested";
-    public const string DeviceRegistered = "iot.device.registered";
-    public const string DeviceProvisioned = "iot.device.provisioned";
-    public const string CommandSent = "iot.command.sent";
-    public const string EdgeDeployed = "iot.edge.deployed";
 }
 ```
 
@@ -1072,252 +1037,38 @@ public sealed class UltimateIoTIntegrationPlugin : StreamingPluginBase, IDisposa
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/Analytics/AnalyticsStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/IoTStrategyRegistry.cs
 ```csharp
-public abstract class IoTAnalyticsStrategyBase : IoTStrategyBase, IIoTAnalyticsStrategy
+public sealed class IoTStrategyRegistry
 {
 }
-    public override IoTStrategyCategory Category;;
-    public abstract Task<AnomalyDetectionResult> DetectAnomaliesAsync(AnomalyDetectionRequest request, CancellationToken ct = default);;
-    public abstract Task<PredictionResult> PredictAsync(PredictionRequest request, CancellationToken ct = default);;
-    public abstract Task<StreamAnalyticsResult> AnalyzeStreamAsync(StreamAnalyticsQuery query, CancellationToken ct = default);;
-    public abstract Task<PatternDetectionResult> DetectPatternsAsync(PatternDetectionRequest request, CancellationToken ct = default);;
-    public virtual Task<Dictionary<string, double>> ComputeAggregationsAsync(string deviceId, string[] metrics, TimeSpan window, CancellationToken ct = default);
+    public int Count;;
+    public void Register(IIoTStrategyBase strategy);
+    public IIoTStrategyBase? GetStrategy(string strategyId);
+    public T GetStrategy<T>(string strategyId)
+    where T : class, IIoTStrategyBase;
+    public IReadOnlyCollection<IIoTStrategyBase> GetAllStrategies();
+    public IReadOnlyCollection<IIoTStrategyBase> GetByCategory(IoTStrategyCategory category);
+    public IIoTStrategyBase? SelectBestStrategy(IoTStrategyCategory category);
+    public Dictionary<string, int> GetCategorySummary();
+    public void ConfigureIntelligence(IMessageBus? messageBus);
+    public IEnumerable<RegisteredCapability> GetAllStrategyCapabilities();
+    public IEnumerable<KnowledgeObject> GetAllStrategyKnowledge();
 }
 ```
 ```csharp
-public class AnomalyDetectionStrategy : IoTAnalyticsStrategyBase
+public static class IoTTopics
 {
 }
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Description;;
-    public override string[] Tags;;
-    public override Task<AnomalyDetectionResult> DetectAnomaliesAsync(AnomalyDetectionRequest request, CancellationToken ct = default);
-    public override Task<PredictionResult> PredictAsync(PredictionRequest request, CancellationToken ct = default);
-    public override Task<StreamAnalyticsResult> AnalyzeStreamAsync(StreamAnalyticsQuery query, CancellationToken ct = default);
-    public override Task<PatternDetectionResult> DetectPatternsAsync(PatternDetectionRequest request, CancellationToken ct = default);
-}
-```
-```csharp
-public class PredictiveAnalyticsStrategy : IoTAnalyticsStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Description;;
-    public override string[] Tags;;
-    public override Task<AnomalyDetectionResult> DetectAnomaliesAsync(AnomalyDetectionRequest request, CancellationToken ct = default);
-    public override Task<PredictionResult> PredictAsync(PredictionRequest request, CancellationToken ct = default);
-    public override Task<StreamAnalyticsResult> AnalyzeStreamAsync(StreamAnalyticsQuery query, CancellationToken ct = default);
-    public override Task<PatternDetectionResult> DetectPatternsAsync(PatternDetectionRequest request, CancellationToken ct = default);
-}
-```
-```csharp
-public class StreamAnalyticsStrategy : IoTAnalyticsStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Description;;
-    public override string[] Tags;;
-    public override Task<AnomalyDetectionResult> DetectAnomaliesAsync(AnomalyDetectionRequest request, CancellationToken ct = default);
-    public override Task<PredictionResult> PredictAsync(PredictionRequest request, CancellationToken ct = default);
-    public override Task<StreamAnalyticsResult> AnalyzeStreamAsync(StreamAnalyticsQuery query, CancellationToken ct = default);
-    public override Task<PatternDetectionResult> DetectPatternsAsync(PatternDetectionRequest request, CancellationToken ct = default);
-}
-```
-```csharp
-public class PatternRecognitionStrategy : IoTAnalyticsStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Description;;
-    public override string[] Tags;;
-    public override Task<AnomalyDetectionResult> DetectAnomaliesAsync(AnomalyDetectionRequest request, CancellationToken ct = default);
-    public override Task<PredictionResult> PredictAsync(PredictionRequest request, CancellationToken ct = default);
-    public override Task<StreamAnalyticsResult> AnalyzeStreamAsync(StreamAnalyticsQuery query, CancellationToken ct = default);
-    public override Task<PatternDetectionResult> DetectPatternsAsync(PatternDetectionRequest request, CancellationToken ct = default);
-}
-```
-```csharp
-public class PredictiveMaintenanceStrategy : IoTAnalyticsStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Description;;
-    public override string[] Tags;;
-    public override Task<AnomalyDetectionResult> DetectAnomaliesAsync(AnomalyDetectionRequest request, CancellationToken ct = default);
-    public override Task<PredictionResult> PredictAsync(PredictionRequest request, CancellationToken ct = default);
-    public override Task<StreamAnalyticsResult> AnalyzeStreamAsync(StreamAnalyticsQuery query, CancellationToken ct = default);
-    public override Task<PatternDetectionResult> DetectPatternsAsync(PatternDetectionRequest request, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/DeviceManagement/ContinuousSyncService.cs
-```csharp
-internal class DeviceSyncState
-{
-}
-    public required DeviceTwin Twin { get; set; }
-    public BoundedDictionary<string, BoundedList<TimestampedValue>> PropertyHistory { get; };
-    public DateTimeOffset LastSyncAt { get; set; }
-    public long SyncCount { get; set; }
-}
-```
-```csharp
-internal class BoundedList<T>
-{
-}
-    public BoundedList(int maxSize);
-    public void Add(T item);
-    public List<T> GetAll();
-    public int Count
-{
-    get
-    {
-        lock (_lock)
-        {
-            return _items.Count;
-        }
-    }
-}
-}
-```
-```csharp
-public class ContinuousSyncService
-{
-}
-    public ContinuousSyncService(ContinuousSyncOptions? options = null);
-    public void RegisterTwin(string deviceId, DeviceTwin twin);
-    public void UnregisterTwin(string deviceId);
-    public async Task<SyncResult> SyncSensorDataAsync(string deviceId, Dictionary<string, object> sensorReadings, CancellationToken ct = default);
-    internal DeviceSyncState? GetSyncState(string deviceId);
-    public IEnumerable<string> GetRegisteredDevices();
-}
-```
-```csharp
-public class StateProjectionEngine
-{
-}
-    public StateProjectionEngine(ContinuousSyncService syncService);
-    public async Task<ProjectedState> ProjectStateAsync(string deviceId, TimeSpan horizon, CancellationToken ct = default);
-}
-```
-```csharp
-public class WhatIfSimulator
-{
-}
-    public WhatIfSimulator(ContinuousSyncService syncService, StateProjectionEngine projectionEngine);
-    public async Task<SimulationResult> SimulateAsync(string deviceId, Dictionary<string, object> parameterChanges, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/DeviceManagement/DeviceManagementStrategies.cs
-```csharp
-public abstract class DeviceManagementStrategyBase : IoTStrategyBase, IDeviceManagementStrategy
-{
-}
-    protected readonly BoundedDictionary<string, DeviceInfo> Devices = new BoundedDictionary<string, DeviceInfo>(1000);
-    protected readonly BoundedDictionary<string, DeviceTwin> DeviceTwins = new BoundedDictionary<string, DeviceTwin>(1000);
-    public override IoTStrategyCategory Category;;
-    public abstract Task<DeviceRegistration> RegisterDeviceAsync(DeviceRegistrationRequest request, CancellationToken ct = default);;
-    public abstract Task<DeviceTwin> GetDeviceTwinAsync(string deviceId, CancellationToken ct = default);;
-    public abstract Task UpdateDeviceTwinAsync(string deviceId, Dictionary<string, object> desiredProperties, CancellationToken ct = default);;
-    public abstract Task<IEnumerable<DeviceInfo>> ListDevicesAsync(DeviceQuery query, CancellationToken ct = default);;
-    public abstract Task<FirmwareUpdateResult> UpdateFirmwareAsync(FirmwareUpdateRequest request, CancellationToken ct = default);;
-    public abstract Task<bool> DeleteDeviceAsync(string deviceId, CancellationToken ct = default);;
-    public abstract Task<DeviceInfo?> GetDeviceAsync(string deviceId, CancellationToken ct = default);;
-}
-```
-```csharp
-public class DeviceRegistryStrategy : DeviceManagementStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Description;;
-    public override string[] Tags;;
-    public override Task<DeviceRegistration> RegisterDeviceAsync(DeviceRegistrationRequest request, CancellationToken ct = default);
-    public override Task<DeviceTwin> GetDeviceTwinAsync(string deviceId, CancellationToken ct = default);
-    public override Task UpdateDeviceTwinAsync(string deviceId, Dictionary<string, object> desiredProperties, CancellationToken ct = default);
-    public override Task<IEnumerable<DeviceInfo>> ListDevicesAsync(DeviceQuery query, CancellationToken ct = default);
-    public override Task<FirmwareUpdateResult> UpdateFirmwareAsync(FirmwareUpdateRequest request, CancellationToken ct = default);
-    public override Task<bool> DeleteDeviceAsync(string deviceId, CancellationToken ct = default);
-    public override Task<DeviceInfo?> GetDeviceAsync(string deviceId, CancellationToken ct = default);
-}
-```
-```csharp
-public class DeviceTwinStrategy : DeviceManagementStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Description;;
-    public override string[] Tags;;
-    public override Task<DeviceRegistration> RegisterDeviceAsync(DeviceRegistrationRequest request, CancellationToken ct = default);
-    public override Task<DeviceTwin> GetDeviceTwinAsync(string deviceId, CancellationToken ct = default);
-    public override Task UpdateDeviceTwinAsync(string deviceId, Dictionary<string, object> desiredProperties, CancellationToken ct = default);
-    public override Task<IEnumerable<DeviceInfo>> ListDevicesAsync(DeviceQuery query, CancellationToken ct = default);
-    public override Task<FirmwareUpdateResult> UpdateFirmwareAsync(FirmwareUpdateRequest request, CancellationToken ct = default);
-    public override Task<bool> DeleteDeviceAsync(string deviceId, CancellationToken ct = default);
-    public override Task<DeviceInfo?> GetDeviceAsync(string deviceId, CancellationToken ct = default);
-    public async Task<SyncResult> SyncAsync(string deviceId, Dictionary<string, object> sensorData, CancellationToken ct = default);
-    public Task<ProjectedState> ProjectAsync(string deviceId, TimeSpan horizon, CancellationToken ct = default);
-    public Task<SimulationResult> SimulateAsync(string deviceId, Dictionary<string, object> parameterChanges, CancellationToken ct = default);
-}
-```
-```csharp
-public class FleetManagementStrategy : DeviceManagementStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Description;;
-    public override string[] Tags;;
-    public override Task<DeviceRegistration> RegisterDeviceAsync(DeviceRegistrationRequest request, CancellationToken ct = default);
-    public override Task<DeviceTwin> GetDeviceTwinAsync(string deviceId, CancellationToken ct = default);
-    public override Task UpdateDeviceTwinAsync(string deviceId, Dictionary<string, object> desiredProperties, CancellationToken ct = default);
-    public override Task<IEnumerable<DeviceInfo>> ListDevicesAsync(DeviceQuery query, CancellationToken ct = default);
-    public override Task<FirmwareUpdateResult> UpdateFirmwareAsync(FirmwareUpdateRequest request, CancellationToken ct = default);
-    public override Task<bool> DeleteDeviceAsync(string deviceId, CancellationToken ct = default);
-    public override Task<DeviceInfo?> GetDeviceAsync(string deviceId, CancellationToken ct = default);
-}
-```
-```csharp
-public class FirmwareOtaStrategy : DeviceManagementStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Description;;
-    public override string[] Tags;;
-    public override Task<DeviceRegistration> RegisterDeviceAsync(DeviceRegistrationRequest request, CancellationToken ct = default);
-    public override Task<DeviceTwin> GetDeviceTwinAsync(string deviceId, CancellationToken ct = default);
-    public override Task UpdateDeviceTwinAsync(string deviceId, Dictionary<string, object> desiredProperties, CancellationToken ct = default);
-    public override Task<IEnumerable<DeviceInfo>> ListDevicesAsync(DeviceQuery query, CancellationToken ct = default);
-    public override Task<FirmwareUpdateResult> UpdateFirmwareAsync(FirmwareUpdateRequest request, CancellationToken ct = default);
-    public override Task<bool> DeleteDeviceAsync(string deviceId, CancellationToken ct = default);
-    public override Task<DeviceInfo?> GetDeviceAsync(string deviceId, CancellationToken ct = default);
-}
-```
-```csharp
-public class DeviceLifecycleStrategy : DeviceManagementStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Description;;
-    public override string[] Tags;;
-    public override Task<DeviceRegistration> RegisterDeviceAsync(DeviceRegistrationRequest request, CancellationToken ct = default);
-    public override Task<DeviceTwin> GetDeviceTwinAsync(string deviceId, CancellationToken ct = default);
-    public override Task UpdateDeviceTwinAsync(string deviceId, Dictionary<string, object> desiredProperties, CancellationToken ct = default);
-    public override Task<IEnumerable<DeviceInfo>> ListDevicesAsync(DeviceQuery query, CancellationToken ct = default);
-    public override Task<FirmwareUpdateResult> UpdateFirmwareAsync(FirmwareUpdateRequest request, CancellationToken ct = default);
-    public override Task<bool> DeleteDeviceAsync(string deviceId, CancellationToken ct = default);
-    public override Task<DeviceInfo?> GetDeviceAsync(string deviceId, CancellationToken ct = default);
+    public const string IntelligenceDeviceRecommendation = "iot.intelligence.device.recommendation";
+    public const string IntelligenceDeviceRecommendationResponse = "iot.intelligence.device.recommendation.response";
+    public const string IntelligenceAnomalyDetection = "iot.intelligence.anomaly.detection";
+    public const string IntelligenceAnomalyDetectionResponse = "iot.intelligence.anomaly.detection.response";
+    public const string TelemetryIngested = "iot.telemetry.ingested";
+    public const string DeviceRegistered = "iot.device.registered";
+    public const string DeviceProvisioned = "iot.device.provisioned";
+    public const string CommandSent = "iot.command.sent";
+    public const string EdgeDeployed = "iot.edge.deployed";
 }
 ```
 
@@ -1352,8 +1103,9 @@ public sealed class EdgeCacheEntry
     public DateTimeOffset CachedAt { get; init; }
     public DateTimeOffset? ExpiresAt { get; init; }
     public Dictionary<string, string> Metadata { get; init; };
-    public bool IsDirty { get; set; }
-    public long HitCount { get; set; }
+    public bool IsDirty { get => _isDirty; set => _isDirty = value; }
+    public long HitCount;;
+    public void IncrementHitCount();;
 }
 ```
 ```csharp
@@ -1612,6 +1364,7 @@ public class EdgeDeploymentStrategy : EdgeIntegrationStrategyBase
     public override string StrategyName;;
     public override string Description;;
     public override string[] Tags;;
+    public override bool IsProductionReady;;
     public override Task<EdgeDeploymentResult> DeployModuleAsync(EdgeDeploymentRequest request, CancellationToken ct = default);
     public override Task<SyncResult> SyncAsync(EdgeSyncRequest request, CancellationToken ct = default);
     public override Task<EdgeComputeResult> ExecuteComputeAsync(EdgeComputeRequest request, CancellationToken ct = default);
@@ -1627,6 +1380,7 @@ public class EdgeSyncStrategy : EdgeIntegrationStrategyBase
     public override string StrategyName;;
     public override string Description;;
     public override string[] Tags;;
+    public override bool IsProductionReady;;
     public override Task<EdgeDeploymentResult> DeployModuleAsync(EdgeDeploymentRequest request, CancellationToken ct = default);
     public override Task<SyncResult> SyncAsync(EdgeSyncRequest request, CancellationToken ct = default);
     public override Task<EdgeComputeResult> ExecuteComputeAsync(EdgeComputeRequest request, CancellationToken ct = default);
@@ -1641,6 +1395,7 @@ public class EdgeComputeStrategy : EdgeIntegrationStrategyBase
     public override string StrategyName;;
     public override string Description;;
     public override string[] Tags;;
+    public override bool IsProductionReady;;
     public override Task<EdgeDeploymentResult> DeployModuleAsync(EdgeDeploymentRequest request, CancellationToken ct = default);
     public override Task<SyncResult> SyncAsync(EdgeSyncRequest request, CancellationToken ct = default);
     public override Task<EdgeComputeResult> ExecuteComputeAsync(EdgeComputeRequest request, CancellationToken ct = default);
@@ -1655,6 +1410,7 @@ public class EdgeMonitoringStrategy : EdgeIntegrationStrategyBase
     public override string StrategyName;;
     public override string Description;;
     public override string[] Tags;;
+    public override bool IsProductionReady;;
     public override Task<EdgeDeploymentResult> DeployModuleAsync(EdgeDeploymentRequest request, CancellationToken ct = default);
     public override Task<SyncResult> SyncAsync(EdgeSyncRequest request, CancellationToken ct = default);
     public override Task<EdgeComputeResult> ExecuteComputeAsync(EdgeComputeRequest request, CancellationToken ct = default);
@@ -1669,6 +1425,7 @@ public class FogComputingStrategy : EdgeIntegrationStrategyBase
     public override string StrategyName;;
     public override string Description;;
     public override string[] Tags;;
+    public override bool IsProductionReady;;
     public override Task<EdgeDeploymentResult> DeployModuleAsync(EdgeDeploymentRequest request, CancellationToken ct = default);
     public override Task<SyncResult> SyncAsync(EdgeSyncRequest request, CancellationToken ct = default);
     public override Task<EdgeComputeResult> ExecuteComputeAsync(EdgeComputeRequest request, CancellationToken ct = default);
@@ -1676,102 +1433,415 @@ public class FogComputingStrategy : EdgeIntegrationStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/Hardware/BusControllerStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/Transformation/TransformationStrategies.cs
 ```csharp
-public abstract class HardwareBusStrategyBase : IoTStrategyBase, IHardwareBusStrategy
+public abstract class DataTransformationStrategyBase : IoTStrategyBase, IDataTransformationStrategy
 {
 }
     public override IoTStrategyCategory Category;;
-    public abstract string BusType { get; }
-    public abstract Task<bool> InitializeAsync(BusConfiguration config, CancellationToken ct = default);;
-    public abstract new Task ShutdownAsync(CancellationToken ct = default);;
+    public abstract string[] SupportedSourceFormats { get; }
+    public abstract string[] SupportedTargetFormats { get; }
+    public abstract Task<TransformationResult> TransformAsync(TransformationRequest request, CancellationToken ct = default);;
+    public abstract Task<ProtocolTranslationResult> TranslateProtocolAsync(ProtocolTranslationRequest request, CancellationToken ct = default);;
+    public abstract Task<EnrichmentResult> EnrichAsync(EnrichmentRequest request, CancellationToken ct = default);;
+    public abstract Task<NormalizationResult> NormalizeAsync(NormalizationRequest request, CancellationToken ct = default);;
+    public virtual Task<bool> ValidateSchemaAsync(byte[] data, string schema, CancellationToken ct = default);
 }
 ```
 ```csharp
-public class GpioControllerStrategy : HardwareBusStrategyBase
+public class FormatConversionStrategy : DataTransformationStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
-    public override string BusType;;
     public override string Description;;
     public override string[] Tags;;
-    public override Task<bool> InitializeAsync(BusConfiguration config, CancellationToken ct = default);
-    public override Task ShutdownAsync(CancellationToken ct = default);
-    public Task<GpioPinResult> ConfigurePinAsync(int pinNumber, PinMode mode, PullMode pull = PullMode.None, CancellationToken ct = default);
-    public Task<bool> DigitalReadAsync(int pinNumber, CancellationToken ct = default);
-    public Task DigitalWriteAsync(int pinNumber, bool value, CancellationToken ct = default);
-    public Task SetPwmAsync(int pinNumber, double dutyCycle, int frequencyHz = 1000, CancellationToken ct = default);
+    public override string[] SupportedSourceFormats;;
+    public override string[] SupportedTargetFormats;;
+    public override Task<TransformationResult> TransformAsync(TransformationRequest request, CancellationToken ct = default);
+    public override Task<ProtocolTranslationResult> TranslateProtocolAsync(ProtocolTranslationRequest request, CancellationToken ct = default);
+    public override Task<EnrichmentResult> EnrichAsync(EnrichmentRequest request, CancellationToken ct = default);
+    public override Task<NormalizationResult> NormalizeAsync(NormalizationRequest request, CancellationToken ct = default);
 }
 ```
 ```csharp
-public class I2cControllerStrategy : HardwareBusStrategyBase
+public class ProtocolTranslationStrategy : DataTransformationStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
-    public override string BusType;;
     public override string Description;;
     public override string[] Tags;;
-    public override Task<bool> InitializeAsync(BusConfiguration config, CancellationToken ct = default);
-    public override Task ShutdownAsync(CancellationToken ct = default);
-    public async Task<byte[]> ScanBusAsync(CancellationToken ct = default);
-    public async Task<byte[]> ReadRegisterAsync(byte deviceAddress, byte registerAddress, int byteCount, CancellationToken ct = default);
-    public async Task WriteRegisterAsync(byte deviceAddress, byte registerAddress, byte[] data, CancellationToken ct = default);
+    public override string[] SupportedSourceFormats;;
+    public override string[] SupportedTargetFormats;;
+    public override Task<TransformationResult> TransformAsync(TransformationRequest request, CancellationToken ct = default);
+    public override Task<ProtocolTranslationResult> TranslateProtocolAsync(ProtocolTranslationRequest request, CancellationToken ct = default);
+    public override Task<EnrichmentResult> EnrichAsync(EnrichmentRequest request, CancellationToken ct = default);
+    public override Task<NormalizationResult> NormalizeAsync(NormalizationRequest request, CancellationToken ct = default);
 }
 ```
 ```csharp
-public class SpiControllerStrategy : HardwareBusStrategyBase
+public class DataEnrichmentStrategy : DataTransformationStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
-    public override string BusType;;
     public override string Description;;
     public override string[] Tags;;
-    public override Task<bool> InitializeAsync(BusConfiguration config, CancellationToken ct = default);
-    public override Task ShutdownAsync(CancellationToken ct = default);
-    public async Task<byte[]> TransferAsync(byte[] writeData, int readLength = -1, CancellationToken ct = default);
-    public Task SetModeAsync(SpiMode mode, CancellationToken ct = default);
+    public override string[] SupportedSourceFormats;;
+    public override string[] SupportedTargetFormats;;
+    public override Task<TransformationResult> TransformAsync(TransformationRequest request, CancellationToken ct = default);
+    public override Task<ProtocolTranslationResult> TranslateProtocolAsync(ProtocolTranslationRequest request, CancellationToken ct = default);
+    public override Task<EnrichmentResult> EnrichAsync(EnrichmentRequest request, CancellationToken ct = default);
+    public override Task<NormalizationResult> NormalizeAsync(NormalizationRequest request, CancellationToken ct = default);
 }
 ```
 ```csharp
-public interface IHardwareBusStrategy
+public class DataNormalizationStrategy : DataTransformationStrategyBase
 {
 }
-    string BusType { get; }
-    Task<bool> InitializeAsync(BusConfiguration config, CancellationToken ct = default);;
-    Task ShutdownAsync(CancellationToken ct = default);;
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Description;;
+    public override string[] Tags;;
+    public override string[] SupportedSourceFormats;;
+    public override string[] SupportedTargetFormats;;
+    public override Task<TransformationResult> TransformAsync(TransformationRequest request, CancellationToken ct = default);
+    public override Task<ProtocolTranslationResult> TranslateProtocolAsync(ProtocolTranslationRequest request, CancellationToken ct = default);
+    public override Task<EnrichmentResult> EnrichAsync(EnrichmentRequest request, CancellationToken ct = default);
+    public override Task<NormalizationResult> NormalizeAsync(NormalizationRequest request, CancellationToken ct = default);
+    public override Task<bool> ValidateSchemaAsync(byte[] data, string schema, CancellationToken ct = default);
 }
 ```
 ```csharp
-public class BusConfiguration
+public class SchemaMappingStrategy : DataTransformationStrategyBase
 {
 }
-    public int BusFrequency { get; set; }
-    public SpiMode? SpiMode { get; set; }
-    public int ChipSelectPin { get; set; };
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Description;;
+    public override string[] Tags;;
+    public override string[] SupportedSourceFormats;;
+    public override string[] SupportedTargetFormats;;
+    public override Task<TransformationResult> TransformAsync(TransformationRequest request, CancellationToken ct = default);
+    public override Task<ProtocolTranslationResult> TranslateProtocolAsync(ProtocolTranslationRequest request, CancellationToken ct = default);
+    public override Task<EnrichmentResult> EnrichAsync(EnrichmentRequest request, CancellationToken ct = default);
+    public override Task<NormalizationResult> NormalizeAsync(NormalizationRequest request, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/Security/SecurityStrategies.cs
+```csharp
+public abstract class IoTSecurityStrategyBase : IoTStrategyBase, IIoTSecurityStrategy
+{
+}
+    protected readonly BoundedDictionary<string, string> DeviceTokens = new BoundedDictionary<string, string>(1000);
+    public override IoTStrategyCategory Category;;
+    public abstract Task<AuthenticationResult> AuthenticateAsync(DeviceAuthenticationRequest request, CancellationToken ct = default);;
+    public abstract Task<CredentialRotationResult> RotateCredentialsAsync(string deviceId, CancellationToken ct = default);;
+    public abstract Task<SecurityAssessment> AssessSecurityAsync(string deviceId, CancellationToken ct = default);;
+    public abstract Task<ThreatDetectionResult> DetectThreatsAsync(ThreatDetectionRequest request, CancellationToken ct = default);;
+    public virtual async Task<byte[]> EncryptAsync(string deviceId, byte[] data, CancellationToken ct = default);
+    public virtual async Task<byte[]> DecryptAsync(string deviceId, byte[] data, CancellationToken ct = default);
 }
 ```
 ```csharp
-public struct GpioPinState
+public class DeviceAuthenticationStrategy : IoTSecurityStrategyBase
 {
 }
-    public int PinNumber;
-    public PinMode Mode;
-    public PullMode Pull;
-    public bool Value;
-    public double PwmDutyCycle;
-    public int PwmFrequency;
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Description;;
+    public override string[] Tags;;
+    public override Task<AuthenticationResult> AuthenticateAsync(DeviceAuthenticationRequest request, CancellationToken ct = default);
+    public override Task<CredentialRotationResult> RotateCredentialsAsync(string deviceId, CancellationToken ct = default);
+    public override Task<SecurityAssessment> AssessSecurityAsync(string deviceId, CancellationToken ct = default);
+    public override Task<ThreatDetectionResult> DetectThreatsAsync(ThreatDetectionRequest request, CancellationToken ct = default);
 }
 ```
 ```csharp
-public class GpioPinResult
+public class CredentialRotationStrategy : IoTSecurityStrategyBase
 {
 }
-    public bool Success { get; set; }
-    public int PinNumber { get; set; }
-    public string? ErrorMessage { get; set; }
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Description;;
+    public override string[] Tags;;
+    public override Task<AuthenticationResult> AuthenticateAsync(DeviceAuthenticationRequest request, CancellationToken ct = default);
+    public override Task<CredentialRotationResult> RotateCredentialsAsync(string deviceId, CancellationToken ct = default);
+    public override Task<SecurityAssessment> AssessSecurityAsync(string deviceId, CancellationToken ct = default);
+    public override Task<ThreatDetectionResult> DetectThreatsAsync(ThreatDetectionRequest request, CancellationToken ct = default);
+}
+```
+```csharp
+public class SecurityAssessmentStrategy : IoTSecurityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Description;;
+    public override string[] Tags;;
+    public override Task<AuthenticationResult> AuthenticateAsync(DeviceAuthenticationRequest request, CancellationToken ct = default);
+    public override Task<CredentialRotationResult> RotateCredentialsAsync(string deviceId, CancellationToken ct = default);
+    public override Task<SecurityAssessment> AssessSecurityAsync(string deviceId, CancellationToken ct = default);
+    public override Task<ThreatDetectionResult> DetectThreatsAsync(ThreatDetectionRequest request, CancellationToken ct = default);
+}
+```
+```csharp
+public class ThreatDetectionStrategy : IoTSecurityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Description;;
+    public override string[] Tags;;
+    public override Task<AuthenticationResult> AuthenticateAsync(DeviceAuthenticationRequest request, CancellationToken ct = default);
+    public override Task<CredentialRotationResult> RotateCredentialsAsync(string deviceId, CancellationToken ct = default);
+    public override Task<SecurityAssessment> AssessSecurityAsync(string deviceId, CancellationToken ct = default);
+    public override Task<ThreatDetectionResult> DetectThreatsAsync(ThreatDetectionRequest request, CancellationToken ct = default);
+}
+```
+```csharp
+public class CertificateManagementStrategy : IoTSecurityStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Description;;
+    public override string[] Tags;;
+    public override Task<AuthenticationResult> AuthenticateAsync(DeviceAuthenticationRequest request, CancellationToken ct = default);
+    public override Task<CredentialRotationResult> RotateCredentialsAsync(string deviceId, CancellationToken ct = default);
+    public override Task<SecurityAssessment> AssessSecurityAsync(string deviceId, CancellationToken ct = default);
+    public override Task<ThreatDetectionResult> DetectThreatsAsync(ThreatDetectionRequest request, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/Analytics/AnalyticsStrategies.cs
+```csharp
+public abstract class IoTAnalyticsStrategyBase : IoTStrategyBase, IIoTAnalyticsStrategy
+{
+}
+    public override IoTStrategyCategory Category;;
+    public abstract Task<AnomalyDetectionResult> DetectAnomaliesAsync(AnomalyDetectionRequest request, CancellationToken ct = default);;
+    public abstract Task<PredictionResult> PredictAsync(PredictionRequest request, CancellationToken ct = default);;
+    public abstract Task<StreamAnalyticsResult> AnalyzeStreamAsync(StreamAnalyticsQuery query, CancellationToken ct = default);;
+    public abstract Task<PatternDetectionResult> DetectPatternsAsync(PatternDetectionRequest request, CancellationToken ct = default);;
+    public virtual Task<Dictionary<string, double>> ComputeAggregationsAsync(string deviceId, string[] metrics, TimeSpan window, CancellationToken ct = default);
+}
+```
+```csharp
+public class AnomalyDetectionStrategy : IoTAnalyticsStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Description;;
+    public override string[] Tags;;
+    public override Task<AnomalyDetectionResult> DetectAnomaliesAsync(AnomalyDetectionRequest request, CancellationToken ct = default);
+    public override Task<PredictionResult> PredictAsync(PredictionRequest request, CancellationToken ct = default);
+    public override Task<StreamAnalyticsResult> AnalyzeStreamAsync(StreamAnalyticsQuery query, CancellationToken ct = default);
+    public override Task<PatternDetectionResult> DetectPatternsAsync(PatternDetectionRequest request, CancellationToken ct = default);
+}
+```
+```csharp
+public class PredictiveAnalyticsStrategy : IoTAnalyticsStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Description;;
+    public override string[] Tags;;
+    public override Task<AnomalyDetectionResult> DetectAnomaliesAsync(AnomalyDetectionRequest request, CancellationToken ct = default);
+    public override Task<PredictionResult> PredictAsync(PredictionRequest request, CancellationToken ct = default);
+    public override Task<StreamAnalyticsResult> AnalyzeStreamAsync(StreamAnalyticsQuery query, CancellationToken ct = default);
+    public override Task<PatternDetectionResult> DetectPatternsAsync(PatternDetectionRequest request, CancellationToken ct = default);
+}
+```
+```csharp
+public class StreamAnalyticsStrategy : IoTAnalyticsStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Description;;
+    public override string[] Tags;;
+    public override Task<AnomalyDetectionResult> DetectAnomaliesAsync(AnomalyDetectionRequest request, CancellationToken ct = default);
+    public override Task<PredictionResult> PredictAsync(PredictionRequest request, CancellationToken ct = default);
+    public override Task<StreamAnalyticsResult> AnalyzeStreamAsync(StreamAnalyticsQuery query, CancellationToken ct = default);
+    public override Task<PatternDetectionResult> DetectPatternsAsync(PatternDetectionRequest request, CancellationToken ct = default);
+}
+```
+```csharp
+public class PatternRecognitionStrategy : IoTAnalyticsStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Description;;
+    public override string[] Tags;;
+    public override Task<AnomalyDetectionResult> DetectAnomaliesAsync(AnomalyDetectionRequest request, CancellationToken ct = default);
+    public override Task<PredictionResult> PredictAsync(PredictionRequest request, CancellationToken ct = default);
+    public override Task<StreamAnalyticsResult> AnalyzeStreamAsync(StreamAnalyticsQuery query, CancellationToken ct = default);
+    public override Task<PatternDetectionResult> DetectPatternsAsync(PatternDetectionRequest request, CancellationToken ct = default);
+}
+```
+```csharp
+public class PredictiveMaintenanceStrategy : IoTAnalyticsStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Description;;
+    public override string[] Tags;;
+    public override Task<AnomalyDetectionResult> DetectAnomaliesAsync(AnomalyDetectionRequest request, CancellationToken ct = default);
+    public override Task<PredictionResult> PredictAsync(PredictionRequest request, CancellationToken ct = default);
+    public override Task<StreamAnalyticsResult> AnalyzeStreamAsync(StreamAnalyticsQuery query, CancellationToken ct = default);
+    public override Task<PatternDetectionResult> DetectPatternsAsync(PatternDetectionRequest request, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/Protocol/ProtocolStrategies.cs
+```csharp
+public abstract class ProtocolStrategyBase : IoTStrategyBase, IProtocolStrategy
+{
+}
+    public override IoTStrategyCategory Category;;
+    public abstract string ProtocolName { get; }
+    public abstract int DefaultPort { get; }
+    public abstract Task<CommandResult> SendCommandAsync(DeviceCommand command, CancellationToken ct = default);;
+    public abstract Task PublishAsync(string topic, byte[] payload, ProtocolOptions options, CancellationToken ct = default);;
+    public abstract IAsyncEnumerable<byte[]> SubscribeAsync(string topic, CancellationToken ct = default);;
+    public virtual Task<CoApResponse> SendCoApAsync(string endpoint, CoApMethod method, string resourcePath, byte[]? payload, CancellationToken ct = default);;
+    public virtual Task<ModbusResponse> ReadModbusAsync(string address, int slaveId, int registerAddress, int count, ModbusFunction function, CancellationToken ct = default);;
+    public virtual Task<ModbusResponse> WriteModbusAsync(string address, int slaveId, int registerAddress, ushort[] values, CancellationToken ct = default);;
+    public virtual Task<IEnumerable<OpcUaNode>> BrowseOpcUaAsync(string endpoint, string? nodeId, CancellationToken ct = default);;
+    public virtual Task<object?> ReadOpcUaAsync(string endpoint, string nodeId, CancellationToken ct = default);;
+}
+```
+```csharp
+public class MqttProtocolStrategy : ProtocolStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string ProtocolName;;
+    public override int DefaultPort;;
+    public override string Description;;
+    public override string[] Tags;;
+    public override Task<CommandResult> SendCommandAsync(DeviceCommand command, CancellationToken ct = default);
+    public override Task PublishAsync(string topic, byte[] payload, ProtocolOptions options, CancellationToken ct = default);
+    public override async IAsyncEnumerable<byte[]> SubscribeAsync(string topic, [EnumeratorCancellation] CancellationToken ct = default);
+}
+```
+```csharp
+public class CoApProtocolStrategy : ProtocolStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string ProtocolName;;
+    public override int DefaultPort;;
+    public override string Description;;
+    public override string[] Tags;;
+    public override Task<CommandResult> SendCommandAsync(DeviceCommand command, CancellationToken ct = default);
+    public override Task PublishAsync(string topic, byte[] payload, ProtocolOptions options, CancellationToken ct = default);
+    public override async IAsyncEnumerable<byte[]> SubscribeAsync(string topic, [EnumeratorCancellation] CancellationToken ct = default);
+    public override Task<CoApResponse> SendCoApAsync(string endpoint, CoApMethod method, string resourcePath, byte[]? payload, CancellationToken ct = default);
+}
+```
+```csharp
+public class LwM2MProtocolStrategy : ProtocolStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string ProtocolName;;
+    public override int DefaultPort;;
+    public override string Description;;
+    public override string[] Tags;;
+    public override Task<CommandResult> SendCommandAsync(DeviceCommand command, CancellationToken ct = default);
+    public override Task PublishAsync(string topic, byte[] payload, ProtocolOptions options, CancellationToken ct = default);
+    public override async IAsyncEnumerable<byte[]> SubscribeAsync(string topic, [EnumeratorCancellation] CancellationToken ct = default);
+    public override Task<CoApResponse> SendCoApAsync(string endpoint, CoApMethod method, string resourcePath, byte[]? payload, CancellationToken ct = default);
+}
+```
+```csharp
+public class ModbusProtocolStrategy : ProtocolStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string ProtocolName;;
+    public override int DefaultPort;;
+    public override string Description;;
+    public override string[] Tags;;
+    public override Task<CommandResult> SendCommandAsync(DeviceCommand command, CancellationToken ct = default);
+    public override Task PublishAsync(string topic, byte[] payload, ProtocolOptions options, CancellationToken ct = default);
+    public override async IAsyncEnumerable<byte[]> SubscribeAsync(string topic, [EnumeratorCancellation] CancellationToken ct = default);
+    public override Task<ModbusResponse> ReadModbusAsync(string address, int slaveId, int registerAddress, int count, ModbusFunction function, CancellationToken ct = default);
+    public override Task<ModbusResponse> WriteModbusAsync(string address, int slaveId, int registerAddress, ushort[] values, CancellationToken ct = default);
+}
+```
+```csharp
+public class OpcUaProtocolStrategy : ProtocolStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string ProtocolName;;
+    public override int DefaultPort;;
+    public override string Description;;
+    public override string[] Tags;;
+    public override Task<CommandResult> SendCommandAsync(DeviceCommand command, CancellationToken ct = default);
+    public override Task PublishAsync(string topic, byte[] payload, ProtocolOptions options, CancellationToken ct = default);
+    public override async IAsyncEnumerable<byte[]> SubscribeAsync(string topic, [EnumeratorCancellation] CancellationToken ct = default);
+    public override Task<IEnumerable<OpcUaNode>> BrowseOpcUaAsync(string endpoint, string? nodeId, CancellationToken ct = default);
+    public override Task<object?> ReadOpcUaAsync(string endpoint, string nodeId, CancellationToken ct = default);
+}
+```
+```csharp
+public class AmqpProtocolStrategy : ProtocolStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string ProtocolName;;
+    public override int DefaultPort;;
+    public override string Description;;
+    public override string[] Tags;;
+    public override Task<CommandResult> SendCommandAsync(DeviceCommand command, CancellationToken ct = default);
+    public override Task PublishAsync(string topic, byte[] payload, ProtocolOptions options, CancellationToken ct = default);
+    public override async IAsyncEnumerable<byte[]> SubscribeAsync(string topic, [EnumeratorCancellation] CancellationToken ct = default);
+}
+```
+```csharp
+public class HttpProtocolStrategy : ProtocolStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string ProtocolName;;
+    public override int DefaultPort;;
+    public override string Description;;
+    public override string[] Tags;;
+    public override Task<CommandResult> SendCommandAsync(DeviceCommand command, CancellationToken ct = default);
+    public override Task PublishAsync(string topic, byte[] payload, ProtocolOptions options, CancellationToken ct = default);
+    public override async IAsyncEnumerable<byte[]> SubscribeAsync(string topic, [EnumeratorCancellation] CancellationToken ct = default);
+}
+```
+```csharp
+public class WebSocketProtocolStrategy : ProtocolStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string ProtocolName;;
+    public override int DefaultPort;;
+    public override string Description;;
+    public override string[] Tags;;
+    public override Task<CommandResult> SendCommandAsync(DeviceCommand command, CancellationToken ct = default);
+    public override Task PublishAsync(string topic, byte[] payload, ProtocolOptions options, CancellationToken ct = default);
+    public override async IAsyncEnumerable<byte[]> SubscribeAsync(string topic, [EnumeratorCancellation] CancellationToken ct = default);
 }
 ```
 
@@ -2286,6 +2356,7 @@ public sealed class DicomNetworkStrategy : ProtocolStrategyBase
     public override string StrategyName;;
     public override string Description;;
     public override string[] Tags;;
+    public override bool IsProductionReady;;
     public override string ProtocolName;;
     public override int DefaultPort;;
     public override Task<CommandResult> SendCommandAsync(DeviceCommand command, CancellationToken ct = default);;
@@ -2493,435 +2564,6 @@ public sealed class ProtocolMessage
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/Protocol/ProtocolStrategies.cs
-```csharp
-public abstract class ProtocolStrategyBase : IoTStrategyBase, IProtocolStrategy
-{
-}
-    public override IoTStrategyCategory Category;;
-    public abstract string ProtocolName { get; }
-    public abstract int DefaultPort { get; }
-    public abstract Task<CommandResult> SendCommandAsync(DeviceCommand command, CancellationToken ct = default);;
-    public abstract Task PublishAsync(string topic, byte[] payload, ProtocolOptions options, CancellationToken ct = default);;
-    public abstract IAsyncEnumerable<byte[]> SubscribeAsync(string topic, CancellationToken ct = default);;
-    public virtual Task<CoApResponse> SendCoApAsync(string endpoint, CoApMethod method, string resourcePath, byte[]? payload, CancellationToken ct = default);;
-    public virtual Task<ModbusResponse> ReadModbusAsync(string address, int slaveId, int registerAddress, int count, ModbusFunction function, CancellationToken ct = default);;
-    public virtual Task<ModbusResponse> WriteModbusAsync(string address, int slaveId, int registerAddress, ushort[] values, CancellationToken ct = default);;
-    public virtual Task<IEnumerable<OpcUaNode>> BrowseOpcUaAsync(string endpoint, string? nodeId, CancellationToken ct = default);;
-    public virtual Task<object?> ReadOpcUaAsync(string endpoint, string nodeId, CancellationToken ct = default);;
-}
-```
-```csharp
-public class MqttProtocolStrategy : ProtocolStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string ProtocolName;;
-    public override int DefaultPort;;
-    public override string Description;;
-    public override string[] Tags;;
-    public override Task<CommandResult> SendCommandAsync(DeviceCommand command, CancellationToken ct = default);
-    public override Task PublishAsync(string topic, byte[] payload, ProtocolOptions options, CancellationToken ct = default);
-    public override async IAsyncEnumerable<byte[]> SubscribeAsync(string topic, [EnumeratorCancellation] CancellationToken ct = default);
-}
-```
-```csharp
-public class CoApProtocolStrategy : ProtocolStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string ProtocolName;;
-    public override int DefaultPort;;
-    public override string Description;;
-    public override string[] Tags;;
-    public override Task<CommandResult> SendCommandAsync(DeviceCommand command, CancellationToken ct = default);
-    public override Task PublishAsync(string topic, byte[] payload, ProtocolOptions options, CancellationToken ct = default);
-    public override async IAsyncEnumerable<byte[]> SubscribeAsync(string topic, [EnumeratorCancellation] CancellationToken ct = default);
-    public override Task<CoApResponse> SendCoApAsync(string endpoint, CoApMethod method, string resourcePath, byte[]? payload, CancellationToken ct = default);
-}
-```
-```csharp
-public class LwM2MProtocolStrategy : ProtocolStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string ProtocolName;;
-    public override int DefaultPort;;
-    public override string Description;;
-    public override string[] Tags;;
-    public override Task<CommandResult> SendCommandAsync(DeviceCommand command, CancellationToken ct = default);
-    public override Task PublishAsync(string topic, byte[] payload, ProtocolOptions options, CancellationToken ct = default);
-    public override async IAsyncEnumerable<byte[]> SubscribeAsync(string topic, [EnumeratorCancellation] CancellationToken ct = default);
-    public override Task<CoApResponse> SendCoApAsync(string endpoint, CoApMethod method, string resourcePath, byte[]? payload, CancellationToken ct = default);
-}
-```
-```csharp
-public class ModbusProtocolStrategy : ProtocolStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string ProtocolName;;
-    public override int DefaultPort;;
-    public override string Description;;
-    public override string[] Tags;;
-    public override Task<CommandResult> SendCommandAsync(DeviceCommand command, CancellationToken ct = default);
-    public override Task PublishAsync(string topic, byte[] payload, ProtocolOptions options, CancellationToken ct = default);
-    public override async IAsyncEnumerable<byte[]> SubscribeAsync(string topic, [EnumeratorCancellation] CancellationToken ct = default);
-    public override Task<ModbusResponse> ReadModbusAsync(string address, int slaveId, int registerAddress, int count, ModbusFunction function, CancellationToken ct = default);
-    public override Task<ModbusResponse> WriteModbusAsync(string address, int slaveId, int registerAddress, ushort[] values, CancellationToken ct = default);
-}
-```
-```csharp
-public class OpcUaProtocolStrategy : ProtocolStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string ProtocolName;;
-    public override int DefaultPort;;
-    public override string Description;;
-    public override string[] Tags;;
-    public override Task<CommandResult> SendCommandAsync(DeviceCommand command, CancellationToken ct = default);
-    public override Task PublishAsync(string topic, byte[] payload, ProtocolOptions options, CancellationToken ct = default);
-    public override async IAsyncEnumerable<byte[]> SubscribeAsync(string topic, [EnumeratorCancellation] CancellationToken ct = default);
-    public override Task<IEnumerable<OpcUaNode>> BrowseOpcUaAsync(string endpoint, string? nodeId, CancellationToken ct = default);
-    public override Task<object?> ReadOpcUaAsync(string endpoint, string nodeId, CancellationToken ct = default);
-}
-```
-```csharp
-public class AmqpProtocolStrategy : ProtocolStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string ProtocolName;;
-    public override int DefaultPort;;
-    public override string Description;;
-    public override string[] Tags;;
-    public override Task<CommandResult> SendCommandAsync(DeviceCommand command, CancellationToken ct = default);
-    public override Task PublishAsync(string topic, byte[] payload, ProtocolOptions options, CancellationToken ct = default);
-    public override async IAsyncEnumerable<byte[]> SubscribeAsync(string topic, [EnumeratorCancellation] CancellationToken ct = default);
-}
-```
-```csharp
-public class HttpProtocolStrategy : ProtocolStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string ProtocolName;;
-    public override int DefaultPort;;
-    public override string Description;;
-    public override string[] Tags;;
-    public override Task<CommandResult> SendCommandAsync(DeviceCommand command, CancellationToken ct = default);
-    public override Task PublishAsync(string topic, byte[] payload, ProtocolOptions options, CancellationToken ct = default);
-    public override async IAsyncEnumerable<byte[]> SubscribeAsync(string topic, [EnumeratorCancellation] CancellationToken ct = default);
-}
-```
-```csharp
-public class WebSocketProtocolStrategy : ProtocolStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string ProtocolName;;
-    public override int DefaultPort;;
-    public override string Description;;
-    public override string[] Tags;;
-    public override Task<CommandResult> SendCommandAsync(DeviceCommand command, CancellationToken ct = default);
-    public override Task PublishAsync(string topic, byte[] payload, ProtocolOptions options, CancellationToken ct = default);
-    public override async IAsyncEnumerable<byte[]> SubscribeAsync(string topic, [EnumeratorCancellation] CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/Provisioning/ProvisioningStrategies.cs
-```csharp
-public abstract class ProvisioningStrategyBase : IoTStrategyBase, IProvisioningStrategy
-{
-}
-    protected readonly BoundedDictionary<string, DeviceCredentials> Credentials = new BoundedDictionary<string, DeviceCredentials>(1000);
-    public override IoTStrategyCategory Category;;
-    public abstract CredentialType[] SupportedCredentialTypes { get; }
-    public abstract Task<ProvisioningResult> ProvisionAsync(ProvisioningRequest request, CancellationToken ct = default);;
-    public abstract Task<DeviceCredentials> GenerateCredentialsAsync(string deviceId, CredentialType credentialType, CancellationToken ct = default);;
-    public abstract Task<EnrollmentResult> EnrollAsync(EnrollmentRequest request, CancellationToken ct = default);;
-    public virtual Task<bool> RevokeCredentialsAsync(string deviceId, CancellationToken ct = default);
-    public virtual Task<bool> ValidateCredentialsAsync(string deviceId, string credential, CancellationToken ct = default);
-    protected static string GenerateKey(int length = 32);
-}
-```
-```csharp
-public class ZeroTouchProvisioningStrategy : ProvisioningStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Description;;
-    public override string[] Tags;;
-    public override CredentialType[] SupportedCredentialTypes;;
-    public override Task<ProvisioningResult> ProvisionAsync(ProvisioningRequest request, CancellationToken ct = default);
-    public override Task<DeviceCredentials> GenerateCredentialsAsync(string deviceId, CredentialType credentialType, CancellationToken ct = default);
-    public override Task<EnrollmentResult> EnrollAsync(EnrollmentRequest request, CancellationToken ct = default);
-}
-```
-```csharp
-public class X509ProvisioningStrategy : ProvisioningStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Description;;
-    public override string[] Tags;;
-    public override CredentialType[] SupportedCredentialTypes;;
-    public override Task<ProvisioningResult> ProvisionAsync(ProvisioningRequest request, CancellationToken ct = default);
-    public override Task<DeviceCredentials> GenerateCredentialsAsync(string deviceId, CredentialType credentialType, CancellationToken ct = default);
-    public override Task<EnrollmentResult> EnrollAsync(EnrollmentRequest request, CancellationToken ct = default);
-}
-```
-```csharp
-public class TpmProvisioningStrategy : ProvisioningStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Description;;
-    public override string[] Tags;;
-    public override CredentialType[] SupportedCredentialTypes;;
-    public override Task<ProvisioningResult> ProvisionAsync(ProvisioningRequest request, CancellationToken ct = default);
-    public override Task<DeviceCredentials> GenerateCredentialsAsync(string deviceId, CredentialType credentialType, CancellationToken ct = default);
-    public override Task<EnrollmentResult> EnrollAsync(EnrollmentRequest request, CancellationToken ct = default);
-}
-```
-```csharp
-public class DpsEnrollmentStrategy : ProvisioningStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Description;;
-    public override string[] Tags;;
-    public override CredentialType[] SupportedCredentialTypes;;
-    public override Task<ProvisioningResult> ProvisionAsync(ProvisioningRequest request, CancellationToken ct = default);
-    public override Task<DeviceCredentials> GenerateCredentialsAsync(string deviceId, CredentialType credentialType, CancellationToken ct = default);
-    public override Task<EnrollmentResult> EnrollAsync(EnrollmentRequest request, CancellationToken ct = default);
-}
-```
-```csharp
-public class SymmetricKeyProvisioningStrategy : ProvisioningStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Description;;
-    public override string[] Tags;;
-    public override CredentialType[] SupportedCredentialTypes;;
-    public override Task<ProvisioningResult> ProvisionAsync(ProvisioningRequest request, CancellationToken ct = default);
-    public override Task<DeviceCredentials> GenerateCredentialsAsync(string deviceId, CredentialType credentialType, CancellationToken ct = default);
-    public override Task<EnrollmentResult> EnrollAsync(EnrollmentRequest request, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/Security/SecurityStrategies.cs
-```csharp
-public abstract class IoTSecurityStrategyBase : IoTStrategyBase, IIoTSecurityStrategy
-{
-}
-    protected readonly BoundedDictionary<string, string> DeviceTokens = new BoundedDictionary<string, string>(1000);
-    public override IoTStrategyCategory Category;;
-    public abstract Task<AuthenticationResult> AuthenticateAsync(DeviceAuthenticationRequest request, CancellationToken ct = default);;
-    public abstract Task<CredentialRotationResult> RotateCredentialsAsync(string deviceId, CancellationToken ct = default);;
-    public abstract Task<SecurityAssessment> AssessSecurityAsync(string deviceId, CancellationToken ct = default);;
-    public abstract Task<ThreatDetectionResult> DetectThreatsAsync(ThreatDetectionRequest request, CancellationToken ct = default);;
-    public virtual Task<byte[]> EncryptAsync(string deviceId, byte[] data, CancellationToken ct = default);
-    public virtual Task<byte[]> DecryptAsync(string deviceId, byte[] data, CancellationToken ct = default);
-}
-```
-```csharp
-public class DeviceAuthenticationStrategy : IoTSecurityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Description;;
-    public override string[] Tags;;
-    public override Task<AuthenticationResult> AuthenticateAsync(DeviceAuthenticationRequest request, CancellationToken ct = default);
-    public override Task<CredentialRotationResult> RotateCredentialsAsync(string deviceId, CancellationToken ct = default);
-    public override Task<SecurityAssessment> AssessSecurityAsync(string deviceId, CancellationToken ct = default);
-    public override Task<ThreatDetectionResult> DetectThreatsAsync(ThreatDetectionRequest request, CancellationToken ct = default);
-}
-```
-```csharp
-public class CredentialRotationStrategy : IoTSecurityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Description;;
-    public override string[] Tags;;
-    public override Task<AuthenticationResult> AuthenticateAsync(DeviceAuthenticationRequest request, CancellationToken ct = default);
-    public override Task<CredentialRotationResult> RotateCredentialsAsync(string deviceId, CancellationToken ct = default);
-    public override Task<SecurityAssessment> AssessSecurityAsync(string deviceId, CancellationToken ct = default);
-    public override Task<ThreatDetectionResult> DetectThreatsAsync(ThreatDetectionRequest request, CancellationToken ct = default);
-}
-```
-```csharp
-public class SecurityAssessmentStrategy : IoTSecurityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Description;;
-    public override string[] Tags;;
-    public override Task<AuthenticationResult> AuthenticateAsync(DeviceAuthenticationRequest request, CancellationToken ct = default);
-    public override Task<CredentialRotationResult> RotateCredentialsAsync(string deviceId, CancellationToken ct = default);
-    public override Task<SecurityAssessment> AssessSecurityAsync(string deviceId, CancellationToken ct = default);
-    public override Task<ThreatDetectionResult> DetectThreatsAsync(ThreatDetectionRequest request, CancellationToken ct = default);
-}
-```
-```csharp
-public class ThreatDetectionStrategy : IoTSecurityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Description;;
-    public override string[] Tags;;
-    public override Task<AuthenticationResult> AuthenticateAsync(DeviceAuthenticationRequest request, CancellationToken ct = default);
-    public override Task<CredentialRotationResult> RotateCredentialsAsync(string deviceId, CancellationToken ct = default);
-    public override Task<SecurityAssessment> AssessSecurityAsync(string deviceId, CancellationToken ct = default);
-    public override Task<ThreatDetectionResult> DetectThreatsAsync(ThreatDetectionRequest request, CancellationToken ct = default);
-}
-```
-```csharp
-public class CertificateManagementStrategy : IoTSecurityStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Description;;
-    public override string[] Tags;;
-    public override Task<AuthenticationResult> AuthenticateAsync(DeviceAuthenticationRequest request, CancellationToken ct = default);
-    public override Task<CredentialRotationResult> RotateCredentialsAsync(string deviceId, CancellationToken ct = default);
-    public override Task<SecurityAssessment> AssessSecurityAsync(string deviceId, CancellationToken ct = default);
-    public override Task<ThreatDetectionResult> DetectThreatsAsync(ThreatDetectionRequest request, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/SensorFusion/ComplementaryFilter.cs
-```csharp
-public sealed class ComplementaryFilter
-{
-}
-    public ComplementaryFilter(double alpha = 0.98);
-    public double[] Update(double[] accelerometer, double[] gyroscope, double dt);
-    public void Reset();
-    public double[] GetOrientation();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/SensorFusion/KalmanFilter.cs
-```csharp
-public sealed class KalmanFilter
-{
-}
-    public void Initialize(double[] initialPosition);
-    public void Predict(double dt);
-    public void Update(double[] measurement, double[] measurementNoise);
-    public double[] GetEstimate();
-    public double[] GetVelocity();
-    public double[] GetCovariance();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/SensorFusion/MatrixMath.cs
-```csharp
-public sealed class Matrix
-{
-}
-    public Matrix(int rows, int cols);
-    public Matrix(double[, ] data);
-    public int Rows { get; }
-    public int Cols { get; }
-    public double this[int row, int col] { get => _data[row, col]; set => _data[row, col] = value; };
-    public static Matrix Identity(int n);
-    public static Matrix Multiply(Matrix a, Matrix b);
-    public static Matrix Transpose(Matrix m);
-    public static Matrix Add(Matrix a, Matrix b);
-    public static Matrix Subtract(Matrix a, Matrix b);
-    public static Matrix ScalarMultiply(double s, Matrix m);
-    public static Matrix Inverse(Matrix m);
-    public double[] ToArray();
-    public static Matrix FromArray(double[] values);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/SensorFusion/SensorFusionEngine.cs
-```csharp
-public sealed class SensorFusionEngine
-{
-}
-    public SensorFusionEngine(FusionPipelineConfig? config = null);
-    public KalmanFilter? KalmanFilter;;
-    public ComplementaryFilter? ComplementaryFilter;;
-    public WeightedAverageFusion? WeightedAverageFusion;;
-    public VotingFusion? VotingFusion;;
-    public async Task<FusedReading> ProcessAsync(SensorReading[] readings, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/SensorFusion/SensorFusionStrategy.cs
-```csharp
-public sealed class SensorFusionStrategy : IoTStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override IoTStrategyCategory Category;;
-    public override string Description;;
-    public override string[] Tags;;
-    public void Initialize(FusionPipelineConfig? config = null);
-    public async Task<FusedReading> ProcessSensorDataAsync(SensorReading[] readings, CancellationToken ct = default);
-    public SensorFusionEngine GetEngine();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/SensorFusion/TemporalAligner.cs
-```csharp
-public sealed class TemporalAligner
-{
-}
-    public TemporalAligner(int maxBufferSize = 100, double toleranceMs = 1.0);
-    public Task<SensorReading[]> AlignAsync(SensorReading[] readings, DateTimeOffset targetTimestamp, CancellationToken ct = default);
-    public void ClearBuffer(string sensorId);
-    public void ClearAllBuffers();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/SensorFusion/VotingFusion.cs
-```csharp
-public sealed class VotingFusion
-{
-}
-    public FusedReading Vote(SensorReading[] readings, double tolerancePercent = 5.0);
-    public string[] GetFaultySensors();
-    public void ClearFaultTracking();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/SensorFusion/WeightedAverageFusion.cs
-```csharp
-public sealed class WeightedAverageFusion
-{
-}
-    public void Configure(Dictionary<string, double> sensorWeights);
-    public FusedReading Fuse(SensorReading[] readings);
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/SensorIngestion/SensorIngestionStrategies.cs
 ```csharp
 public abstract class SensorIngestionStrategyBase : IoTStrategyBase, ISensorIngestionStrategy
@@ -3013,99 +2655,481 @@ private class AggregationWindow
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/Transformation/TransformationStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/Provisioning/ProvisioningStrategies.cs
 ```csharp
-public abstract class DataTransformationStrategyBase : IoTStrategyBase, IDataTransformationStrategy
+public abstract class ProvisioningStrategyBase : IoTStrategyBase, IProvisioningStrategy
+{
+}
+    protected readonly BoundedDictionary<string, DeviceCredentials> Credentials = new BoundedDictionary<string, DeviceCredentials>(1000);
+    public override IoTStrategyCategory Category;;
+    public abstract CredentialType[] SupportedCredentialTypes { get; }
+    public abstract Task<ProvisioningResult> ProvisionAsync(ProvisioningRequest request, CancellationToken ct = default);;
+    public abstract Task<DeviceCredentials> GenerateCredentialsAsync(string deviceId, CredentialType credentialType, CancellationToken ct = default);;
+    public abstract Task<EnrollmentResult> EnrollAsync(EnrollmentRequest request, CancellationToken ct = default);;
+    public virtual Task<bool> RevokeCredentialsAsync(string deviceId, CancellationToken ct = default);
+    public virtual Task<bool> ValidateCredentialsAsync(string deviceId, string credential, CancellationToken ct = default);
+    protected static string GenerateKey(int length = 32);
+}
+```
+```csharp
+public class ZeroTouchProvisioningStrategy : ProvisioningStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Description;;
+    public override string[] Tags;;
+    public override CredentialType[] SupportedCredentialTypes;;
+    public override Task<ProvisioningResult> ProvisionAsync(ProvisioningRequest request, CancellationToken ct = default);
+    public override Task<DeviceCredentials> GenerateCredentialsAsync(string deviceId, CredentialType credentialType, CancellationToken ct = default);
+    public override Task<EnrollmentResult> EnrollAsync(EnrollmentRequest request, CancellationToken ct = default);
+}
+```
+```csharp
+public class X509ProvisioningStrategy : ProvisioningStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Description;;
+    public override string[] Tags;;
+    public override CredentialType[] SupportedCredentialTypes;;
+    public override Task<ProvisioningResult> ProvisionAsync(ProvisioningRequest request, CancellationToken ct = default);
+    public override Task<DeviceCredentials> GenerateCredentialsAsync(string deviceId, CredentialType credentialType, CancellationToken ct = default);
+    public override Task<EnrollmentResult> EnrollAsync(EnrollmentRequest request, CancellationToken ct = default);
+}
+```
+```csharp
+public class TpmProvisioningStrategy : ProvisioningStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Description;;
+    public override string[] Tags;;
+    public override CredentialType[] SupportedCredentialTypes;;
+    public override Task<ProvisioningResult> ProvisionAsync(ProvisioningRequest request, CancellationToken ct = default);
+    public override Task<DeviceCredentials> GenerateCredentialsAsync(string deviceId, CredentialType credentialType, CancellationToken ct = default);
+    public override Task<EnrollmentResult> EnrollAsync(EnrollmentRequest request, CancellationToken ct = default);
+}
+```
+```csharp
+public class DpsEnrollmentStrategy : ProvisioningStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Description;;
+    public override string[] Tags;;
+    public override CredentialType[] SupportedCredentialTypes;;
+    public override Task<ProvisioningResult> ProvisionAsync(ProvisioningRequest request, CancellationToken ct = default);
+    public override Task<DeviceCredentials> GenerateCredentialsAsync(string deviceId, CredentialType credentialType, CancellationToken ct = default);
+    public override Task<EnrollmentResult> EnrollAsync(EnrollmentRequest request, CancellationToken ct = default);
+}
+```
+```csharp
+public class SymmetricKeyProvisioningStrategy : ProvisioningStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Description;;
+    public override string[] Tags;;
+    public override CredentialType[] SupportedCredentialTypes;;
+    public override Task<ProvisioningResult> ProvisionAsync(ProvisioningRequest request, CancellationToken ct = default);
+    public override Task<DeviceCredentials> GenerateCredentialsAsync(string deviceId, CredentialType credentialType, CancellationToken ct = default);
+    public override Task<EnrollmentResult> EnrollAsync(EnrollmentRequest request, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/Hardware/BusControllerStrategies.cs
+```csharp
+public abstract class HardwareBusStrategyBase : IoTStrategyBase, IHardwareBusStrategy
 {
 }
     public override IoTStrategyCategory Category;;
-    public abstract string[] SupportedSourceFormats { get; }
-    public abstract string[] SupportedTargetFormats { get; }
-    public abstract Task<TransformationResult> TransformAsync(TransformationRequest request, CancellationToken ct = default);;
-    public abstract Task<ProtocolTranslationResult> TranslateProtocolAsync(ProtocolTranslationRequest request, CancellationToken ct = default);;
-    public abstract Task<EnrichmentResult> EnrichAsync(EnrichmentRequest request, CancellationToken ct = default);;
-    public abstract Task<NormalizationResult> NormalizeAsync(NormalizationRequest request, CancellationToken ct = default);;
-    public virtual Task<bool> ValidateSchemaAsync(byte[] data, string schema, CancellationToken ct = default);
+    public abstract string BusType { get; }
+    public abstract Task<bool> InitializeAsync(BusConfiguration config, CancellationToken ct = default);;
+    public abstract new Task ShutdownAsync(CancellationToken ct = default);;
 }
 ```
 ```csharp
-public class FormatConversionStrategy : DataTransformationStrategyBase
+public class GpioControllerStrategy : HardwareBusStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string BusType;;
+    public override string Description;;
+    public override string[] Tags;;
+    public override Task<bool> InitializeAsync(BusConfiguration config, CancellationToken ct = default);
+    public override Task ShutdownAsync(CancellationToken ct = default);
+    public Task<GpioPinResult> ConfigurePinAsync(int pinNumber, PinMode mode, PullMode pull = PullMode.None, CancellationToken ct = default);
+    public Task<bool> DigitalReadAsync(int pinNumber, CancellationToken ct = default);
+    public Task DigitalWriteAsync(int pinNumber, bool value, CancellationToken ct = default);
+    public Task SetPwmAsync(int pinNumber, double dutyCycle, int frequencyHz = 1000, CancellationToken ct = default);
+}
+```
+```csharp
+public class I2cControllerStrategy : HardwareBusStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string BusType;;
+    public override string Description;;
+    public override string[] Tags;;
+    public override Task<bool> InitializeAsync(BusConfiguration config, CancellationToken ct = default);
+    public override Task ShutdownAsync(CancellationToken ct = default);
+    public async Task<byte[]> ScanBusAsync(CancellationToken ct = default);
+    public async Task<byte[]> ReadRegisterAsync(byte deviceAddress, byte registerAddress, int byteCount, CancellationToken ct = default);
+    public async Task WriteRegisterAsync(byte deviceAddress, byte registerAddress, byte[] data, CancellationToken ct = default);
+}
+```
+```csharp
+public class SpiControllerStrategy : HardwareBusStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string BusType;;
+    public override string Description;;
+    public override string[] Tags;;
+    public override Task<bool> InitializeAsync(BusConfiguration config, CancellationToken ct = default);
+    public override Task ShutdownAsync(CancellationToken ct = default);
+    public async Task<byte[]> TransferAsync(byte[] writeData, int readLength = -1, CancellationToken ct = default);
+    public Task SetModeAsync(SpiMode mode, CancellationToken ct = default);
+}
+```
+```csharp
+public interface IHardwareBusStrategy
+{
+}
+    string BusType { get; }
+    Task<bool> InitializeAsync(BusConfiguration config, CancellationToken ct = default);;
+    Task ShutdownAsync(CancellationToken ct = default);;
+}
+```
+```csharp
+public class BusConfiguration
+{
+}
+    public int BusFrequency { get; set; }
+    public SpiMode? SpiMode { get; set; }
+    public int ChipSelectPin { get; set; };
+}
+```
+```csharp
+public struct GpioPinState
+{
+}
+    public int PinNumber;
+    public PinMode Mode;
+    public PullMode Pull;
+    public bool Value;
+    public double PwmDutyCycle;
+    public int PwmFrequency;
+}
+```
+```csharp
+public class GpioPinResult
+{
+}
+    public bool Success { get; set; }
+    public int PinNumber { get; set; }
+    public string? ErrorMessage { get; set; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/DeviceManagement/DeviceManagementStrategies.cs
+```csharp
+public abstract class DeviceManagementStrategyBase : IoTStrategyBase, IDeviceManagementStrategy
+{
+}
+    protected readonly BoundedDictionary<string, DeviceInfo> Devices = new BoundedDictionary<string, DeviceInfo>(1000);
+    protected readonly BoundedDictionary<string, DeviceTwin> DeviceTwins = new BoundedDictionary<string, DeviceTwin>(1000);
+    public override IoTStrategyCategory Category;;
+    public abstract Task<DeviceRegistration> RegisterDeviceAsync(DeviceRegistrationRequest request, CancellationToken ct = default);;
+    public abstract Task<DeviceTwin> GetDeviceTwinAsync(string deviceId, CancellationToken ct = default);;
+    public abstract Task UpdateDeviceTwinAsync(string deviceId, Dictionary<string, object> desiredProperties, CancellationToken ct = default);;
+    public abstract Task<IEnumerable<DeviceInfo>> ListDevicesAsync(DeviceQuery query, CancellationToken ct = default);;
+    public abstract Task<FirmwareUpdateResult> UpdateFirmwareAsync(FirmwareUpdateRequest request, CancellationToken ct = default);;
+    public abstract Task<bool> DeleteDeviceAsync(string deviceId, CancellationToken ct = default);;
+    public abstract Task<DeviceInfo?> GetDeviceAsync(string deviceId, CancellationToken ct = default);;
+}
+```
+```csharp
+public class DeviceRegistryStrategy : DeviceManagementStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Description;;
     public override string[] Tags;;
-    public override string[] SupportedSourceFormats;;
-    public override string[] SupportedTargetFormats;;
-    public override Task<TransformationResult> TransformAsync(TransformationRequest request, CancellationToken ct = default);
-    public override Task<ProtocolTranslationResult> TranslateProtocolAsync(ProtocolTranslationRequest request, CancellationToken ct = default);
-    public override Task<EnrichmentResult> EnrichAsync(EnrichmentRequest request, CancellationToken ct = default);
-    public override Task<NormalizationResult> NormalizeAsync(NormalizationRequest request, CancellationToken ct = default);
+    public override Task<DeviceRegistration> RegisterDeviceAsync(DeviceRegistrationRequest request, CancellationToken ct = default);
+    public override Task<DeviceTwin> GetDeviceTwinAsync(string deviceId, CancellationToken ct = default);
+    public override Task UpdateDeviceTwinAsync(string deviceId, Dictionary<string, object> desiredProperties, CancellationToken ct = default);
+    public override Task<IEnumerable<DeviceInfo>> ListDevicesAsync(DeviceQuery query, CancellationToken ct = default);
+    public override Task<FirmwareUpdateResult> UpdateFirmwareAsync(FirmwareUpdateRequest request, CancellationToken ct = default);
+    public override Task<bool> DeleteDeviceAsync(string deviceId, CancellationToken ct = default);
+    public override Task<DeviceInfo?> GetDeviceAsync(string deviceId, CancellationToken ct = default);
 }
 ```
 ```csharp
-public class ProtocolTranslationStrategy : DataTransformationStrategyBase
+public class DeviceTwinStrategy : DeviceManagementStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Description;;
     public override string[] Tags;;
-    public override string[] SupportedSourceFormats;;
-    public override string[] SupportedTargetFormats;;
-    public override Task<TransformationResult> TransformAsync(TransformationRequest request, CancellationToken ct = default);
-    public override Task<ProtocolTranslationResult> TranslateProtocolAsync(ProtocolTranslationRequest request, CancellationToken ct = default);
-    public override Task<EnrichmentResult> EnrichAsync(EnrichmentRequest request, CancellationToken ct = default);
-    public override Task<NormalizationResult> NormalizeAsync(NormalizationRequest request, CancellationToken ct = default);
+    public override Task<DeviceRegistration> RegisterDeviceAsync(DeviceRegistrationRequest request, CancellationToken ct = default);
+    public override Task<DeviceTwin> GetDeviceTwinAsync(string deviceId, CancellationToken ct = default);
+    public override Task UpdateDeviceTwinAsync(string deviceId, Dictionary<string, object> desiredProperties, CancellationToken ct = default);
+    public override Task<IEnumerable<DeviceInfo>> ListDevicesAsync(DeviceQuery query, CancellationToken ct = default);
+    public override Task<FirmwareUpdateResult> UpdateFirmwareAsync(FirmwareUpdateRequest request, CancellationToken ct = default);
+    public override Task<bool> DeleteDeviceAsync(string deviceId, CancellationToken ct = default);
+    public override Task<DeviceInfo?> GetDeviceAsync(string deviceId, CancellationToken ct = default);
+    public async Task<SyncResult> SyncAsync(string deviceId, Dictionary<string, object> sensorData, CancellationToken ct = default);
+    public Task<ProjectedState> ProjectAsync(string deviceId, TimeSpan horizon, CancellationToken ct = default);
+    public Task<SimulationResult> SimulateAsync(string deviceId, Dictionary<string, object> parameterChanges, CancellationToken ct = default);
 }
 ```
 ```csharp
-public class DataEnrichmentStrategy : DataTransformationStrategyBase
+public class FleetManagementStrategy : DeviceManagementStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Description;;
     public override string[] Tags;;
-    public override string[] SupportedSourceFormats;;
-    public override string[] SupportedTargetFormats;;
-    public override Task<TransformationResult> TransformAsync(TransformationRequest request, CancellationToken ct = default);
-    public override Task<ProtocolTranslationResult> TranslateProtocolAsync(ProtocolTranslationRequest request, CancellationToken ct = default);
-    public override Task<EnrichmentResult> EnrichAsync(EnrichmentRequest request, CancellationToken ct = default);
-    public override Task<NormalizationResult> NormalizeAsync(NormalizationRequest request, CancellationToken ct = default);
+    public override Task<DeviceRegistration> RegisterDeviceAsync(DeviceRegistrationRequest request, CancellationToken ct = default);
+    public override Task<DeviceTwin> GetDeviceTwinAsync(string deviceId, CancellationToken ct = default);
+    public override Task UpdateDeviceTwinAsync(string deviceId, Dictionary<string, object> desiredProperties, CancellationToken ct = default);
+    public override Task<IEnumerable<DeviceInfo>> ListDevicesAsync(DeviceQuery query, CancellationToken ct = default);
+    public override Task<FirmwareUpdateResult> UpdateFirmwareAsync(FirmwareUpdateRequest request, CancellationToken ct = default);
+    public override Task<bool> DeleteDeviceAsync(string deviceId, CancellationToken ct = default);
+    public override Task<DeviceInfo?> GetDeviceAsync(string deviceId, CancellationToken ct = default);
 }
 ```
 ```csharp
-public class DataNormalizationStrategy : DataTransformationStrategyBase
+public class FirmwareOtaStrategy : DeviceManagementStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Description;;
     public override string[] Tags;;
-    public override string[] SupportedSourceFormats;;
-    public override string[] SupportedTargetFormats;;
-    public override Task<TransformationResult> TransformAsync(TransformationRequest request, CancellationToken ct = default);
-    public override Task<ProtocolTranslationResult> TranslateProtocolAsync(ProtocolTranslationRequest request, CancellationToken ct = default);
-    public override Task<EnrichmentResult> EnrichAsync(EnrichmentRequest request, CancellationToken ct = default);
-    public override Task<NormalizationResult> NormalizeAsync(NormalizationRequest request, CancellationToken ct = default);
-    public override Task<bool> ValidateSchemaAsync(byte[] data, string schema, CancellationToken ct = default);
+    public override Task<DeviceRegistration> RegisterDeviceAsync(DeviceRegistrationRequest request, CancellationToken ct = default);
+    public override Task<DeviceTwin> GetDeviceTwinAsync(string deviceId, CancellationToken ct = default);
+    public override Task UpdateDeviceTwinAsync(string deviceId, Dictionary<string, object> desiredProperties, CancellationToken ct = default);
+    public override Task<IEnumerable<DeviceInfo>> ListDevicesAsync(DeviceQuery query, CancellationToken ct = default);
+    public override Task<FirmwareUpdateResult> UpdateFirmwareAsync(FirmwareUpdateRequest request, CancellationToken ct = default);
+    public override Task<bool> DeleteDeviceAsync(string deviceId, CancellationToken ct = default);
+    public override Task<DeviceInfo?> GetDeviceAsync(string deviceId, CancellationToken ct = default);
 }
 ```
 ```csharp
-public class SchemaMappingStrategy : DataTransformationStrategyBase
+public class DeviceLifecycleStrategy : DeviceManagementStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Description;;
     public override string[] Tags;;
-    public override string[] SupportedSourceFormats;;
-    public override string[] SupportedTargetFormats;;
-    public override Task<TransformationResult> TransformAsync(TransformationRequest request, CancellationToken ct = default);
-    public override Task<ProtocolTranslationResult> TranslateProtocolAsync(ProtocolTranslationRequest request, CancellationToken ct = default);
-    public override Task<EnrichmentResult> EnrichAsync(EnrichmentRequest request, CancellationToken ct = default);
-    public override Task<NormalizationResult> NormalizeAsync(NormalizationRequest request, CancellationToken ct = default);
+    public override Task<DeviceRegistration> RegisterDeviceAsync(DeviceRegistrationRequest request, CancellationToken ct = default);
+    public override Task<DeviceTwin> GetDeviceTwinAsync(string deviceId, CancellationToken ct = default);
+    public override Task UpdateDeviceTwinAsync(string deviceId, Dictionary<string, object> desiredProperties, CancellationToken ct = default);
+    public override Task<IEnumerable<DeviceInfo>> ListDevicesAsync(DeviceQuery query, CancellationToken ct = default);
+    public override Task<FirmwareUpdateResult> UpdateFirmwareAsync(FirmwareUpdateRequest request, CancellationToken ct = default);
+    public override Task<bool> DeleteDeviceAsync(string deviceId, CancellationToken ct = default);
+    public override Task<DeviceInfo?> GetDeviceAsync(string deviceId, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/DeviceManagement/ContinuousSyncService.cs
+```csharp
+internal class DeviceSyncState
+{
+}
+    public required DeviceTwin Twin { get; set; }
+    public BoundedDictionary<string, BoundedList<TimestampedValue>> PropertyHistory { get; };
+    public DateTimeOffset LastSyncAt { get; set; }
+    public long SyncCount { get; set; }
+}
+```
+```csharp
+internal class BoundedList<T>
+{
+}
+    public BoundedList(int maxSize);
+    public void Add(T item);
+    public List<T> GetAll();
+    public int Count
+{
+    get
+    {
+        lock (_lock)
+        {
+            return _items.Count;
+        }
+    }
+}
+}
+```
+```csharp
+public class ContinuousSyncService
+{
+}
+    public ContinuousSyncService(ContinuousSyncOptions? options = null);
+    public void RegisterTwin(string deviceId, DeviceTwin twin);
+    public void UnregisterTwin(string deviceId);
+    public async Task<SyncResult> SyncSensorDataAsync(string deviceId, Dictionary<string, object> sensorReadings, CancellationToken ct = default);
+    internal DeviceSyncState? GetSyncState(string deviceId);
+    public IEnumerable<string> GetRegisteredDevices();
+}
+```
+```csharp
+public class StateProjectionEngine
+{
+}
+    public StateProjectionEngine(ContinuousSyncService syncService);
+    public async Task<ProjectedState> ProjectStateAsync(string deviceId, TimeSpan horizon, CancellationToken ct = default);
+}
+```
+```csharp
+public class WhatIfSimulator
+{
+}
+    public WhatIfSimulator(ContinuousSyncService syncService, StateProjectionEngine projectionEngine);
+    public async Task<SimulationResult> SimulateAsync(string deviceId, Dictionary<string, object> parameterChanges, CancellationToken ct = default);
+}
+```
+```csharp
+internal static class DeviceManagementHelper
+{
+}
+    internal static bool TryConvertToDouble(object value, out double result);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/SensorFusion/WeightedAverageFusion.cs
+```csharp
+public sealed class WeightedAverageFusion
+{
+}
+    public void Configure(Dictionary<string, double> sensorWeights);
+    public FusedReading Fuse(SensorReading[] readings);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/SensorFusion/MatrixMath.cs
+```csharp
+public sealed class Matrix
+{
+}
+    public Matrix(int rows, int cols);
+    public Matrix(double[, ] data);
+    public int Rows { get; }
+    public int Cols { get; }
+    public double this[int row, int col] { get => _data[row, col]; set => _data[row, col] = value; };
+    public static Matrix Identity(int n);
+    public static Matrix Multiply(Matrix a, Matrix b);
+    public static Matrix Transpose(Matrix m);
+    public static Matrix Add(Matrix a, Matrix b);
+    public static Matrix Subtract(Matrix a, Matrix b);
+    public static Matrix ScalarMultiply(double s, Matrix m);
+    public static Matrix Inverse(Matrix m);
+    public double[] ToArray();
+    public static Matrix FromArray(double[] values);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/SensorFusion/SensorFusionEngine.cs
+```csharp
+public sealed class SensorFusionEngine
+{
+}
+    public SensorFusionEngine(FusionPipelineConfig? config = null);
+    public KalmanFilter? KalmanFilter;;
+    public ComplementaryFilter? ComplementaryFilter;;
+    public WeightedAverageFusion? WeightedAverageFusion;;
+    public VotingFusion? VotingFusion;;
+    public async Task<FusedReading> ProcessAsync(SensorReading[] readings, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/SensorFusion/SensorFusionStrategy.cs
+```csharp
+public sealed class SensorFusionStrategy : IoTStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override IoTStrategyCategory Category;;
+    public override string Description;;
+    public override string[] Tags;;
+    public void Initialize(FusionPipelineConfig? config = null);
+    public async Task<FusedReading> ProcessSensorDataAsync(SensorReading[] readings, CancellationToken ct = default);
+    public SensorFusionEngine GetEngine();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/SensorFusion/KalmanFilter.cs
+```csharp
+public sealed class KalmanFilter
+{
+}
+    public bool IsInitialized
+{
+    get
+    {
+        lock (_stateLock)
+        {
+            return _state != null;
+        }
+    }
+}
+    public void Initialize(double[] initialPosition);
+    public void Predict(double dt);
+    public void Update(double[] measurement, double[] measurementNoise);
+    public double[] GetEstimate();
+    public double[] GetVelocity();
+    public double[] GetCovariance();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/SensorFusion/TemporalAligner.cs
+```csharp
+public sealed class TemporalAligner
+{
+}
+    public TemporalAligner(int maxBufferSize = 100, double toleranceMs = 1.0);
+    public Task<SensorReading[]> AlignAsync(SensorReading[] readings, DateTimeOffset targetTimestamp, CancellationToken ct = default);
+    public void ClearBuffer(string sensorId);
+    public void ClearAllBuffers();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/SensorFusion/VotingFusion.cs
+```csharp
+public sealed class VotingFusion
+{
+}
+    public FusedReading Vote(SensorReading[] readings, double tolerancePercent = 5.0);
+    public string[] GetFaultySensors();
+    public void ClearFaultTracking();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateIoTIntegration/Strategies/SensorFusion/ComplementaryFilter.cs
+```csharp
+public sealed class ComplementaryFilter
+{
+}
+    public ComplementaryFilter(double alpha = 0.98);
+    public double[] Update(double[] accelerometer, double[] gyroscope, double dt);
+    public void Reset();
+    public double[] GetOrientation();
 }
 ```

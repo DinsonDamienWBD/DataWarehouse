@@ -47,6 +47,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private readonly BoundedDictionary<string, CorrelationScore> _accessCorrelations = new BoundedDictionary<string, CorrelationScore>(1000);
         private readonly ConcurrentQueue<PrefetchTask> _prefetchQueue = new();
         private long _currentL1Size = 0;
+        // Guards check-then-act on _currentL1Size to prevent concurrent threads from
+        // both passing the size check and simultaneously overflowing the L1 cache.
+        private readonly object _l1SizeLock = new();
         private Timer? _prefetchTimer = null;
         private Timer? _learningTimer = null;
 
@@ -143,19 +146,28 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
             await File.WriteAllBytesAsync(backendPath, dataBytes, ct);
 
-            // Add to L1 cache if it fits
-            if (dataBytes.Length <= _l1CacheMaxBytes && _currentL1Size + dataBytes.Length <= _l1CacheMaxBytes)
+            // Add to L1 cache if it fits — use lock to make the check-then-add atomic
+            bool addedToL1 = false;
+            if (dataBytes.Length <= _l1CacheMaxBytes)
             {
-                _l1Cache[key] = new CachedObject
+                lock (_l1SizeLock)
                 {
-                    Data = dataBytes,
-                    LastAccess = DateTime.UtcNow,
-                    AccessCount = 1,
-                    Size = dataBytes.Length
-                };
-                Interlocked.Add(ref _currentL1Size, dataBytes.Length);
+                    if (_currentL1Size + dataBytes.Length <= _l1CacheMaxBytes)
+                    {
+                        _l1Cache[key] = new CachedObject
+                        {
+                            Data = dataBytes,
+                            LastAccess = DateTime.UtcNow,
+                            AccessCount = 1,
+                            Size = dataBytes.Length
+                        };
+                        _currentL1Size += dataBytes.Length;
+                        addedToL1 = true;
+                    }
+                }
             }
-            else
+
+            if (!addedToL1)
             {
                 // Store to L2 cache
                 var l2Path = Path.Combine(_l2CachePath, key);
@@ -208,14 +220,20 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 if (data.Length <= _l1CacheMaxBytes)
                 {
                     EvictIfNeeded(data.Length);
-                    _l1Cache[key] = new CachedObject
+                    lock (_l1SizeLock)
                     {
-                        Data = data,
-                        LastAccess = DateTime.UtcNow,
-                        AccessCount = 1,
-                        Size = data.Length
-                    };
-                    Interlocked.Add(ref _currentL1Size, data.Length);
+                        if (_currentL1Size + data.Length <= _l1CacheMaxBytes)
+                        {
+                            _l1Cache[key] = new CachedObject
+                            {
+                                Data = data,
+                                LastAccess = DateTime.UtcNow,
+                                AccessCount = 1,
+                                Size = data.Length
+                            };
+                            _currentL1Size += data.Length;
+                        }
+                    }
                 }
 
                 RecordAccess(key, l2Latency);
@@ -256,7 +274,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             // Remove from all caches
             if (_l1Cache.TryRemove(key, out var cached))
             {
-                Interlocked.Add(ref _currentL1Size, -cached.Size);
+                lock (_l1SizeLock) { _currentL1Size -= cached.Size; }
             }
 
             if (_l2CacheIndex.TryRemove(key, out var l2Path) && File.Exists(l2Path))
@@ -499,13 +517,38 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
         private void EvictIfNeeded(long requiredSpace)
         {
-            while (_currentL1Size + requiredSpace > _l1CacheMaxBytes && _l1Cache.Any())
+            // Evict entries until there is room, using a single O(n) scan per iteration
+            // (compared to the O(n) OrderBy().First() pattern which is identical complexity
+            // but creates intermediate allocations). We snapshot the LRU key in one pass.
+            while (true)
             {
-                // Evict least recently used
-                var lruKey = _l1Cache.OrderBy(kvp => kvp.Value.LastAccess).First().Key;
-                if (_l1Cache.TryRemove(lruKey, out var evicted))
+                bool needsEviction;
+                lock (_l1SizeLock)
                 {
-                    Interlocked.Add(ref _currentL1Size, -evicted.Size);
+                    needsEviction = _currentL1Size + requiredSpace > _l1CacheMaxBytes && _l1Cache.Any();
+                }
+
+                if (!needsEviction)
+                    break;
+
+                // Single O(n) scan: find the entry with the oldest LastAccess
+                string? lruKey = null;
+                DateTime lruTime = DateTime.MaxValue;
+                foreach (var kvp in _l1Cache)
+                {
+                    if (kvp.Value.LastAccess < lruTime)
+                    {
+                        lruTime = kvp.Value.LastAccess;
+                        lruKey = kvp.Key;
+                    }
+                }
+
+                if (lruKey == null || !_l1Cache.TryRemove(lruKey, out var evicted))
+                    break; // Concurrent eviction handled it
+
+                lock (_l1SizeLock)
+                {
+                    _currentL1Size -= evicted.Size;
                 }
             }
         }
@@ -554,6 +597,17 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             public string Key { get; set; } = string.Empty;
             public double Priority { get; set; }
             public DateTime QueuedAt { get; set; }
+        }
+
+        #endregion
+
+        #region Disposal
+
+        protected override ValueTask DisposeCoreAsync()
+        {
+            _prefetchTimer?.Dispose();
+            _learningTimer?.Dispose();
+            return base.DisposeCoreAsync();
         }
 
         #endregion

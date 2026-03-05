@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.SecurityFrameworks
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("israel_ncs.check");
+            IncrementCounter("israel_ncs.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -73,9 +73,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.SecurityFrameworks
 
             recommendations.Add("Coordinate with Israeli National Cyber Directorate for sector-specific guidance");
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -91,14 +92,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.SecurityFrameworks
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("israel_ncs.initialized");
+            IncrementCounter("israel_ncs.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("israel_ncs.shutdown");
+            IncrementCounter("israel_ncs.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

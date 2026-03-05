@@ -7,7 +7,8 @@ namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.CloudOptimizat
 public sealed class ServerlessOptimizationStrategy : SustainabilityStrategyBase
 {
     private readonly Dictionary<string, ServerlessFunction> _functions = new();
-    private readonly List<FunctionExecution> _executions = new();
+    // Finding 4446: Queue for O(1) dequeue when capping execution history.
+    private readonly Queue<FunctionExecution> _executions = new();
     private readonly object _lock = new();
 
     /// <inheritdoc/>
@@ -64,8 +65,8 @@ public sealed class ServerlessOptimizationStrategy : SustainabilityStrategyBase
                 MemoryEfficiency = (double)memoryUsedMb / function.MemoryMb
             };
 
-            _executions.Add(execution);
-            if (_executions.Count > 50000) _executions.RemoveAt(0);
+            _executions.Enqueue(execution);
+            if (_executions.Count > 50000) _executions.Dequeue(); // O(1) vs O(n) RemoveAt(0)
 
             function.InvocationCount++;
             if (wasColdStart) function.ColdStartCount++;
@@ -80,72 +81,77 @@ public sealed class ServerlessOptimizationStrategy : SustainabilityStrategyBase
     {
         var recommendations = new List<ServerlessRecommendation>();
 
+        // Finding 4446: snapshot data under brief lock, compute LINQ outside lock.
+        ServerlessFunction? function;
+        List<FunctionExecution> executions;
         lock (_lock)
         {
-            if (!_functions.TryGetValue(functionId, out var function)) return recommendations;
+            if (!_functions.TryGetValue(functionId, out function)) return recommendations;
+            executions = _executions.Where(e => e.FunctionId == functionId).ToList();
+        }
 
-            var executions = _executions.Where(e => e.FunctionId == functionId).ToList();
-            if (executions.Count < 10) return recommendations;
+        if (executions.Count < 10) return recommendations;
 
-            // Check cold start rate
-            var coldStartRate = (double)function.ColdStartCount / function.InvocationCount * 100;
-            if (coldStartRate > ColdStartAlertThreshold)
+        // Check cold start rate
+        var coldStartRate = (double)function.ColdStartCount / function.InvocationCount * 100;
+        if (coldStartRate > ColdStartAlertThreshold)
+        {
+            recommendations.Add(new ServerlessRecommendation
             {
-                recommendations.Add(new ServerlessRecommendation
-                {
-                    FunctionId = functionId,
-                    Type = ServerlessRecommendationType.ReduceColdStarts,
-                    Description = $"Cold start rate at {coldStartRate:F0}%. Consider provisioned concurrency or warming.",
-                    Priority = 7,
-                    EstimatedSavingsMs = executions.Where(e => e.WasColdStart).Average(e => e.DurationMs) * 0.5
-                });
-            }
+                FunctionId = functionId,
+                Type = ServerlessRecommendationType.ReduceColdStarts,
+                Description = $"Cold start rate at {coldStartRate:F0}%. Consider provisioned concurrency or warming.",
+                Priority = 7,
+                // Finding 4456: guard against empty cold-start subset before Average().
+                EstimatedSavingsMs = executions.Where(e => e.WasColdStart) is { } cs && cs.Any()
+                    ? cs.Average(e => e.DurationMs) * 0.5 : 0
+            });
+        }
 
-            // Check memory efficiency
-            var avgMemoryEfficiency = executions.Average(e => e.MemoryEfficiency);
-            if (avgMemoryEfficiency < 0.5)
-            {
-                var currentMem = function.MemoryMb;
-                var recommendedMem = (int)(currentMem * avgMemoryEfficiency * 1.5);
-                recommendedMem = Math.Max(128, (recommendedMem / 64) * 64); // Round to 64MB
+        // Check memory efficiency
+        var avgMemoryEfficiency = executions.Average(e => e.MemoryEfficiency);
+        if (avgMemoryEfficiency < 0.5)
+        {
+            var currentMem = function.MemoryMb;
+            var recommendedMem = (int)(currentMem * avgMemoryEfficiency * 1.5);
+            recommendedMem = Math.Max(128, (recommendedMem / 64) * 64); // Round to 64MB
 
-                recommendations.Add(new ServerlessRecommendation
-                {
-                    FunctionId = functionId,
-                    Type = ServerlessRecommendationType.ReduceMemory,
-                    Description = $"Avg memory usage {avgMemoryEfficiency * 100:F0}%. Reduce from {currentMem}MB to {recommendedMem}MB.",
-                    Priority = 6,
-                    RecommendedMemoryMb = recommendedMem,
-                    EstimatedCostSavingsPercent = (1 - (double)recommendedMem / currentMem) * 100
-                });
-            }
-            else if (avgMemoryEfficiency > 0.9)
+            recommendations.Add(new ServerlessRecommendation
             {
-                recommendations.Add(new ServerlessRecommendation
-                {
-                    FunctionId = functionId,
-                    Type = ServerlessRecommendationType.IncreaseMemory,
-                    Description = $"Memory usage at {avgMemoryEfficiency * 100:F0}%. Increase to avoid OOM and improve CPU allocation.",
-                    Priority = 5,
-                    RecommendedMemoryMb = (int)(function.MemoryMb * 1.5),
-                    EstimatedCostSavingsPercent = 0
-                });
-            }
+                FunctionId = functionId,
+                Type = ServerlessRecommendationType.ReduceMemory,
+                Description = $"Avg memory usage {avgMemoryEfficiency * 100:F0}%. Reduce from {currentMem}MB to {recommendedMem}MB.",
+                Priority = 6,
+                RecommendedMemoryMb = recommendedMem,
+                EstimatedCostSavingsPercent = (1 - (double)recommendedMem / currentMem) * 100
+            });
+        }
+        else if (avgMemoryEfficiency > 0.9)
+        {
+            recommendations.Add(new ServerlessRecommendation
+            {
+                FunctionId = functionId,
+                Type = ServerlessRecommendationType.IncreaseMemory,
+                Description = $"Memory usage at {avgMemoryEfficiency * 100:F0}%. Increase to avoid OOM and improve CPU allocation.",
+                Priority = 5,
+                RecommendedMemoryMb = (int)(function.MemoryMb * 1.5),
+                EstimatedCostSavingsPercent = 0
+            });
+        }
 
-            // Check execution patterns
-            var avgDuration = executions.Average(e => e.DurationMs);
-            var maxDuration = executions.Max(e => e.DurationMs);
-            if (maxDuration > avgDuration * 3)
+        // Check execution patterns
+        var avgDuration = executions.Average(e => e.DurationMs);
+        var maxDuration = executions.Max(e => e.DurationMs);
+        if (maxDuration > avgDuration * 3)
+        {
+            recommendations.Add(new ServerlessRecommendation
             {
-                recommendations.Add(new ServerlessRecommendation
-                {
-                    FunctionId = functionId,
-                    Type = ServerlessRecommendationType.OptimizeCode,
-                    Description = $"High variance in execution time (avg {avgDuration:F0}ms, max {maxDuration:F0}ms). Review for optimization.",
-                    Priority = 4,
-                    EstimatedSavingsMs = maxDuration - avgDuration
-                });
-            }
+                FunctionId = functionId,
+                Type = ServerlessRecommendationType.OptimizeCode,
+                Description = $"High variance in execution time (avg {avgDuration:F0}ms, max {maxDuration:F0}ms). Review for optimization.",
+                Priority = 4,
+                EstimatedSavingsMs = maxDuration - avgDuration
+            });
         }
 
         return recommendations.OrderByDescending(r => r.Priority).ToList();
@@ -154,27 +160,30 @@ public sealed class ServerlessOptimizationStrategy : SustainabilityStrategyBase
     /// <summary>Gets function statistics.</summary>
     public ServerlessFunctionStats GetFunctionStats(string functionId)
     {
+        // Finding 4446: snapshot under brief lock, compute stats outside.
+        ServerlessFunction? function;
+        List<FunctionExecution> executions;
         lock (_lock)
         {
-            if (!_functions.TryGetValue(functionId, out var function))
+            if (!_functions.TryGetValue(functionId, out function))
                 return new ServerlessFunctionStats { FunctionId = functionId };
-
-            var executions = _executions.Where(e => e.FunctionId == functionId).ToList();
-            if (!executions.Any())
-                return new ServerlessFunctionStats { FunctionId = functionId, FunctionName = function.Name };
-
-            return new ServerlessFunctionStats
-            {
-                FunctionId = functionId,
-                FunctionName = function.Name,
-                TotalInvocations = function.InvocationCount,
-                ColdStartCount = function.ColdStartCount,
-                ColdStartRate = (double)function.ColdStartCount / function.InvocationCount * 100,
-                AvgDurationMs = executions.Average(e => e.DurationMs),
-                P95DurationMs = executions.OrderBy(e => e.DurationMs).Skip((int)(executions.Count * 0.95)).FirstOrDefault()?.DurationMs ?? 0,
-                AvgMemoryEfficiency = executions.Average(e => e.MemoryEfficiency) * 100
-            };
+            executions = _executions.Where(e => e.FunctionId == functionId).ToList();
         }
+
+        if (!executions.Any())
+            return new ServerlessFunctionStats { FunctionId = functionId, FunctionName = function.Name };
+
+        return new ServerlessFunctionStats
+        {
+            FunctionId = functionId,
+            FunctionName = function.Name,
+            TotalInvocations = function.InvocationCount,
+            ColdStartCount = function.ColdStartCount,
+            ColdStartRate = (double)function.ColdStartCount / function.InvocationCount * 100,
+            AvgDurationMs = executions.Average(e => e.DurationMs),
+            P95DurationMs = executions.OrderBy(e => e.DurationMs).Skip((int)(executions.Count * 0.95)).FirstOrDefault()?.DurationMs ?? 0,
+            AvgMemoryEfficiency = executions.Average(e => e.MemoryEfficiency) * 100
+        };
     }
 
     private void EvaluateOptimizations(string functionId)

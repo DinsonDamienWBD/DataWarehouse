@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using DataWarehouse.SDK.Contracts.Compute;
 
 namespace DataWarehouse.Plugins.UltimateCompute.Strategies.Enclave;
@@ -9,6 +10,11 @@ namespace DataWarehouse.Plugins.UltimateCompute.Strategies.Enclave;
 /// </summary>
 internal sealed class SgxStrategy : ComputeRuntimeStrategyBase
 {
+    // Allowlist for signing key file paths — prevents path traversal.
+    private static readonly Regex SafeKeyPathRegex = new(@"^[a-zA-Z0-9/_.\-]+\.pem$", RegexOptions.Compiled);
+    // Allowlist for app host binary names — prevents arbitrary execution.
+    private static readonly string[] AllowedAppHosts = ["sgx-app-host", "sgx_runner", "sgx-host"];
+
     /// <inheritdoc/>
     public override string StrategyId => "compute.enclave.sgx";
     /// <inheritdoc/>
@@ -62,13 +68,17 @@ internal sealed class SgxStrategy : ComputeRuntimeStrategyBase
                 config.AppendLine("</EnclaveConfiguration>");
                 await File.WriteAllTextAsync(configPath, config.ToString(), cancellationToken);
 
-                // Sign the enclave
+                // Sign the enclave — validate key path to prevent path traversal.
                 var keyPath = task.Metadata?.TryGetValue("signing_key", out var k) == true && k is string ks ? ks : "enclave_private.pem";
+                if (!SafeKeyPathRegex.IsMatch(keyPath))
+                    throw new ArgumentException($"Signing key path '{keyPath}' contains invalid characters or path traversal sequences.");
                 await RunProcessAsync("sgx_sign", $"sign -enclave \"{enclavePath}\" -config \"{configPath}\" -out \"{enclavePath}.signed\" -key \"{keyPath}\"",
                     timeout: TimeSpan.FromSeconds(30), cancellationToken: cancellationToken);
 
-                // Run via app host (assumes SGX-capable system with AESM running)
+                // Run via app host — validate against allowlist to prevent arbitrary execution.
                 var appHost = task.Metadata?.TryGetValue("app_host", out var ah) == true && ah is string ahs ? ahs : "sgx-app-host";
+                if (!Array.Exists(AllowedAppHosts, h => h == appHost))
+                    throw new ArgumentException($"App host '{appHost}' is not in the allowed list. Permitted: {string.Join(", ", AllowedAppHosts)}.");
                 var timeout = GetEffectiveTimeout(task);
                 var result = await RunProcessAsync(appHost, $"\"{enclavePath}.signed\"",
                     stdin: task.InputData.Length > 0 ? task.GetInputDataAsString() : null,

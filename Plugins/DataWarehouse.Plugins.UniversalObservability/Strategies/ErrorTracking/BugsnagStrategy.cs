@@ -51,9 +51,13 @@ public sealed class BugsnagStrategy : ObservabilityStrategyBase
         _apiKey = apiKey;
         _releaseStage = releaseStage;
         _appVersion = appVersion;
-
-        _httpClient.DefaultRequestHeaders.Add("Bugsnag-Api-Key", apiKey);
+        // Do NOT set DefaultRequestHeaders — inject per-request to avoid duplicate header accumulation
+        // and thread-safety issues when Configure is called multiple times or concurrently.
     }
+
+    /// <summary>Adds the Bugsnag API key to the request headers (per-request, thread-safe).</summary>
+    private void AddApiKey(HttpRequestMessage request) =>
+        request.Headers.Add("Bugsnag-Api-Key", _apiKey);
 
     /// <inheritdoc/>
     protected override Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
@@ -213,12 +217,16 @@ public sealed class BugsnagStrategy : ObservabilityStrategyBase
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync("https://notify.bugsnag.com", content, ct);
+            using var bugsnagRequest = new HttpRequestMessage(HttpMethod.Post, "https://notify.bugsnag.com") { Content = content };
+            AddApiKey(bugsnagRequest);
+            using var response = await _httpClient.SendAsync(bugsnagRequest, ct);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Bugsnag unavailable
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -233,15 +241,46 @@ public sealed class BugsnagStrategy : ObservabilityStrategyBase
         };
     }
 
+    /// <summary>
+    /// Parses a .NET stack trace string into Bugsnag stacktrace frames.
+    /// Extracts file path, line number, and method name from each "at ... in file:line N" frame.
+    /// </summary>
     private static object[] ParseStackTrace(string stackTrace)
     {
+        if (string.IsNullOrEmpty(stackTrace))
+            return Array.Empty<object>();
+
         var lines = stackTrace.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-        return lines.Select(line => new
+        return lines.Select(line =>
         {
-            file = "unknown",
-            lineNumber = 0,
-            method = line.Trim(),
-            inProject = true
+            line = line.Trim();
+            string file = "unknown";
+            int lineNumber = 0;
+            string method = line;
+
+            // .NET stack frame: "   at Namespace.Class.Method(...) in /path/file.cs:line 42"
+            var inIdx = line.LastIndexOf(" in ", StringComparison.Ordinal);
+            if (inIdx >= 0)
+            {
+                method = line[..inIdx].TrimStart().TrimStart("at ".ToCharArray()).Trim();
+                var fileAndLine = line[(inIdx + 4)..];
+                var lineColonIdx = fileAndLine.LastIndexOf(":line ", StringComparison.Ordinal);
+                if (lineColonIdx >= 0)
+                {
+                    file = fileAndLine[..lineColonIdx];
+                    int.TryParse(fileAndLine[(lineColonIdx + 6)..], out lineNumber);
+                }
+                else
+                {
+                    file = fileAndLine;
+                }
+            }
+            else if (line.StartsWith("at ", StringComparison.Ordinal))
+            {
+                method = line[3..].Trim();
+            }
+
+            return (object)new { file, lineNumber, method, inProject = true };
         }).ToArray();
     }
 
@@ -273,21 +312,16 @@ public sealed class BugsnagStrategy : ObservabilityStrategyBase
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("bugsnag.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     protected override void Dispose(bool disposing)
     {
+                _apiKey = string.Empty;
         if (disposing)
         {
             _httpClient.Dispose();

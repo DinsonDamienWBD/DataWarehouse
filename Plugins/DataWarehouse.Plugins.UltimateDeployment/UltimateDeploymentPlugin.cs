@@ -136,7 +136,16 @@ public sealed class UltimateDeploymentPlugin : InfrastructurePluginBase, IDispos
 
         try
         {
-            var state = await strategy.DeployAsync(config, ct);
+            var rawState = await strategy.DeployAsync(config, ct);
+
+            // Stamp the strategy name into metadata so that RollbackAsync, ScaleAsync,
+            // and HealthCheckAsync can look up the correct strategy without iterating all.
+            var state = rawState.Metadata.ContainsKey("strategy")
+                ? rawState
+                : rawState with
+                  {
+                      Metadata = new Dictionary<string, object>(rawState.Metadata) { ["strategy"] = strategyName }
+                  };
 
             if (state.Health == DeploymentHealth.Healthy)
             {
@@ -169,22 +178,19 @@ public sealed class UltimateDeploymentPlugin : InfrastructurePluginBase, IDispos
             return cachedState;
         }
 
-        // Try to find the strategy that owns this deployment
-        foreach (var strategy in _strategies.Values)
+        // P2-2894: Query all strategies in parallel instead of serially on cache miss
+        var strategyList = _strategies.Values.ToArray();
+        var tasks = strategyList.Select(async s =>
         {
-            try
-            {
-                var state = await strategy.GetStateAsync(deploymentId, ct);
-                if (state.Health != DeploymentHealth.Unknown)
-                {
-                    _activeDeployments[deploymentId] = state;
-                    return state;
-                }
-            }
-            catch
-            {
-                // Strategy doesn't know this deployment
-            }
+            try { return await s.GetStateAsync(deploymentId, ct); }
+            catch { return null; }
+        });
+        var results = await Task.WhenAll(tasks).ConfigureAwait(false);
+        var found = results.FirstOrDefault(r => r?.Health != DeploymentHealth.Unknown);
+        if (found != null)
+        {
+            _activeDeployments[deploymentId] = found;
+            return found;
         }
 
         return null;
@@ -221,7 +227,9 @@ public sealed class UltimateDeploymentPlugin : InfrastructurePluginBase, IDispos
             }
             catch
             {
+
                 // Strategy doesn't know this deployment
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
@@ -687,7 +695,9 @@ public sealed class UltimateDeploymentPlugin : InfrastructurePluginBase, IDispos
             }
             catch
             {
+
                 // Strategy failed to instantiate, skip
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
     }

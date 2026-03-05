@@ -60,6 +60,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
         private string? _accessToken;
         private DateTime _tokenExpiry;
         private string? _currentKeyId;
+        // P2-3501: Guard token fields against concurrent refresh races.
+        private readonly SemaphoreSlim _tokenLock = new(1, 1);
 
         public override KeyStoreCapabilities Capabilities => new()
         {
@@ -158,7 +160,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
             {
                 await EnsureAuthenticatedAsync(cancellationToken);
                 var request = CreateRequest(HttpMethod.Get, "/sys/v1/health");
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -187,7 +189,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
                 var request = CreateRequest(HttpMethod.Post, $"/crypto/v1/keys/{sobject.Kid}/export");
                 request.Content = new StringContent("{}", Encoding.UTF8, "application/json");
 
-                var response = await _httpClient.SendAsync(request);
+                using var response = await _httpClient.SendAsync(request);
                 response.EnsureSuccessStatusCode();
 
                 var json = await response.Content.ReadAsStringAsync();
@@ -236,7 +238,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             _currentKeyId = keyId;
@@ -278,7 +280,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -338,7 +340,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -359,7 +361,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
             }
 
             var request = CreateRequest(HttpMethod.Get, url);
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
                 return Array.Empty<string>();
@@ -426,7 +428,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
             }
 
             var request = CreateRequest(HttpMethod.Get, url);
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
 
             if (!response.IsSuccessStatusCode)
                 return null;
@@ -440,45 +442,57 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
         private async Task DeleteSecurityObjectAsync(string kid)
         {
             var request = CreateRequest(HttpMethod.Delete, $"/crypto/v1/keys/{kid}");
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
         }
 
         private async Task EnsureAuthenticatedAsync(CancellationToken cancellationToken = default)
         {
-            // Check if we have a valid token
+            // P2-3501: Fast path without lock — if token is valid no synchronisation needed.
             if (_accessToken != null && DateTime.UtcNow < _tokenExpiry.AddMinutes(-5))
                 return;
 
-            if (!string.IsNullOrEmpty(_config.ApiKey))
+            await _tokenLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
             {
-                // API Key authentication - use directly
-                _accessToken = _config.ApiKey;
-                _tokenExpiry = DateTime.UtcNow.AddHours(24); // API keys don't expire this way
-                return;
-            }
+                // Re-check inside lock in case another caller just refreshed.
+                if (_accessToken != null && DateTime.UtcNow < _tokenExpiry.AddMinutes(-5))
+                    return;
 
-            if (!string.IsNullOrEmpty(_config.AppUuid) && !string.IsNullOrEmpty(_config.AppSecret))
+                if (!string.IsNullOrEmpty(_config.ApiKey))
+                {
+                    // API Key authentication - use directly
+                    _accessToken = _config.ApiKey;
+                    _tokenExpiry = DateTime.UtcNow.AddHours(24); // API keys don't expire this way
+                    return;
+                }
+
+                if (!string.IsNullOrEmpty(_config.AppUuid) && !string.IsNullOrEmpty(_config.AppSecret))
+                {
+                    // OAuth2 authentication
+                    var authRequest = new HttpRequestMessage(HttpMethod.Post, $"{_config.ApiEndpoint}/sys/v1/session/auth");
+
+                    // Basic auth header with app credentials
+                    var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_config.AppUuid}:{_config.AppSecret}"));
+                    authRequest.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
+
+                    using var response = await _httpClient.SendAsync(authRequest, cancellationToken);
+                    response.EnsureSuccessStatusCode();
+
+                    var json = await response.Content.ReadAsStringAsync(cancellationToken);
+                    var authResponse = JsonSerializer.Deserialize<DsmAuthResponse>(json);
+
+                    _accessToken = authResponse?.AccessToken;
+                    _tokenExpiry = DateTime.UtcNow.AddSeconds(authResponse?.ExpiresIn ?? 3600);
+                    return;
+                }
+
+                throw new InvalidOperationException("No valid authentication credentials configured for Fortanix DSM");
+            }
+            finally
             {
-                // OAuth2 authentication
-                var authRequest = new HttpRequestMessage(HttpMethod.Post, $"{_config.ApiEndpoint}/sys/v1/session/auth");
-
-                // Basic auth header with app credentials
-                var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_config.AppUuid}:{_config.AppSecret}"));
-                authRequest.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
-
-                var response = await _httpClient.SendAsync(authRequest, cancellationToken);
-                response.EnsureSuccessStatusCode();
-
-                var json = await response.Content.ReadAsStringAsync(cancellationToken);
-                var authResponse = JsonSerializer.Deserialize<DsmAuthResponse>(json);
-
-                _accessToken = authResponse?.AccessToken;
-                _tokenExpiry = DateTime.UtcNow.AddSeconds(authResponse?.ExpiresIn ?? 3600);
-                return;
+                _tokenLock.Release();
             }
-
-            throw new InvalidOperationException("No valid authentication credentials configured for Fortanix DSM");
         }
 
         private HttpRequestMessage CreateRequest(HttpMethod method, string path)

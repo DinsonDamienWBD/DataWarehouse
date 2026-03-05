@@ -215,7 +215,7 @@ public sealed class CassandraConnectionStrategy : DatabaseConnectionStrategyBase
         var keyspace = session.Keyspace ?? "system";
 
         var rs = await Task.Run(() => session.Execute(
-            $"SELECT table_name, column_name, type, kind FROM system_schema.columns WHERE keyspace_name = '{keyspace}'"), ct);
+            $"SELECT table_name, column_name, type, kind FROM system_schema.columns WHERE keyspace_name = ?"), ct);
 
         var schemas = new Dictionary<string, (List<DataSchemaField> Fields, List<string> PrimaryKeys)>();
 

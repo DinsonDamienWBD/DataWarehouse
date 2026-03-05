@@ -51,7 +51,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
 
             var rpcRequest = @"{""jsonrpc"":""2.0"",""method"":""ping"",""params"":[],""id"":1}";
             var content = new StringContent(rpcRequest, Encoding.UTF8, "application/json");
-            var response = await client.PostAsync("", content, ct);
+            using var response = await client.PostAsync("", content, ct);
             response.EnsureSuccessStatusCode();
 
             var info = new Dictionary<string, object>
@@ -70,7 +70,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
             var client = handle.GetConnection<HttpClient>();
             var rpcRequest = @"{""jsonrpc"":""2.0"",""method"":""ping"",""params"":[],""id"":1}";
             var content = new StringContent(rpcRequest, Encoding.UTF8, "application/json");
-            var response = await client.PostAsync("", content, ct);
+            using var response = await client.PostAsync("", content, ct);
             return response.IsSuccessStatusCode;
         }
 

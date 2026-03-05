@@ -3,6 +3,8 @@ using DataWarehouse.SDK.VirtualDiskEngine.BlockAllocation;
 using DataWarehouse.SDK.VirtualDiskEngine.Journal;
 using DataWarehouse.SDK.VirtualDiskEngine.Metadata;
 using System;
+using System.Buffers;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
@@ -64,7 +66,15 @@ public sealed class SnapshotManager
     private readonly IBlockAllocator _allocator;
     private readonly IWriteAheadLog _wal;
     private readonly long _snapshotMetadataInodeNumber;
+    private readonly IBlockDevice? _blockDevice; // Optional: enables full indirect block traversal (finding 775)
+    // Finding 777: Use ReaderWriterLockSlim so concurrent reads (ListSnapshots, GetSnapshot)
+    // can proceed without blocking each other, while mutations (Create, Delete, Clone, Load)
+    // are serialized under write lock.
+    private readonly ReaderWriterLockSlim _snapshotsLock = new(LockRecursionPolicy.NoRecursion);
     private List<Snapshot> _snapshots = new();
+    // Cat 13 (finding 791): secondary name index for O(1) snapshot lookup by name, replacing
+    // O(n) FirstOrDefault scans on the hot CreateSnapshot/DeleteSnapshot/CloneSnapshot paths.
+    private Dictionary<string, Snapshot> _snapshotsByName = new(StringComparer.OrdinalIgnoreCase);
     private long _nextSnapshotId = 1;
 
     /// <summary>
@@ -75,18 +85,27 @@ public sealed class SnapshotManager
     /// <param name="allocator">Block allocator for managing free space.</param>
     /// <param name="wal">Write-ahead log for transaction safety.</param>
     /// <param name="snapshotMetadataInodeNumber">Inode number for storing snapshot table metadata.</param>
+    /// <param name="blockDevice">
+    /// Optional block device used to traverse indirect and double-indirect block pointer chains.
+    /// When provided, <see cref="CollectBlockNumbersAsync"/> fully walks the block tree so that
+    /// large-file snapshots capture all referenced data blocks (finding 775).
+    /// When null the indirect-pointer blocks themselves are still recorded, but their data-block
+    /// children are not — correct only for files that fit entirely in direct block pointers.
+    /// </param>
     public SnapshotManager(
         IInodeTable inodeTable,
         ICowEngine cowEngine,
         IBlockAllocator allocator,
         IWriteAheadLog wal,
-        long snapshotMetadataInodeNumber)
+        long snapshotMetadataInodeNumber,
+        IBlockDevice? blockDevice = null)
     {
         _inodeTable = inodeTable ?? throw new ArgumentNullException(nameof(inodeTable));
         _cowEngine = cowEngine ?? throw new ArgumentNullException(nameof(cowEngine));
         _allocator = allocator ?? throw new ArgumentNullException(nameof(allocator));
         _wal = wal ?? throw new ArgumentNullException(nameof(wal));
         _snapshotMetadataInodeNumber = snapshotMetadataInodeNumber;
+        _blockDevice = blockDevice;
     }
 
     /// <summary>
@@ -103,7 +122,19 @@ public sealed class SnapshotManager
             throw new ArgumentException("Snapshot name cannot be null or whitespace.", nameof(name));
         }
 
-        if (_snapshots.Any(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
+        _snapshotsLock.EnterReadLock();
+        bool nameExists;
+        try
+        {
+            // Cat 13 (finding 791): O(1) dictionary lookup instead of O(n) Any() scan.
+            nameExists = _snapshotsByName.ContainsKey(name);
+        }
+        finally
+        {
+            _snapshotsLock.ExitReadLock();
+        }
+
+        if (nameExists)
         {
             throw new InvalidOperationException($"A snapshot with the name '{name}' already exists.");
         }
@@ -120,17 +151,27 @@ public sealed class SnapshotManager
         await _cowEngine.IncrementRefBatchAsync(blockNumbers, ct);
 
         // Create snapshot record
-        var snapshot = new Snapshot
+        Snapshot snapshot;
+        _snapshotsLock.EnterWriteLock();
+        try
         {
-            SnapshotId = _nextSnapshotId++,
-            Name = name,
-            RootInodeNumber = rootInode.InodeNumber,
-            CreatedUtc = DateTimeOffset.UtcNow,
-            IsReadOnly = true,
-            BlockCount = blockNumbers.Count
-        };
+            snapshot = new Snapshot
+            {
+                SnapshotId = Interlocked.Increment(ref _nextSnapshotId),
+                Name = name,
+                RootInodeNumber = rootInode.InodeNumber,
+                CreatedUtc = DateTimeOffset.UtcNow,
+                IsReadOnly = true,
+                BlockCount = blockNumbers.Count
+            };
 
-        _snapshots.Add(snapshot);
+            _snapshots.Add(snapshot);
+            _snapshotsByName[snapshot.Name] = snapshot; // Cat 13 (finding 791): maintain name index
+        }
+        finally
+        {
+            _snapshotsLock.ExitWriteLock();
+        }
 
         // Persist snapshot table
         await PersistSnapshotTableAsync(ct);
@@ -147,7 +188,16 @@ public sealed class SnapshotManager
     /// <returns>Read-only list of snapshots.</returns>
     public Task<IReadOnlyList<Snapshot>> ListSnapshotsAsync(CancellationToken ct = default)
     {
-        return Task.FromResult<IReadOnlyList<Snapshot>>(_snapshots.AsReadOnly());
+        _snapshotsLock.EnterReadLock();
+        try
+        {
+            // Return a snapshot copy to prevent callers from observing concurrent mutations.
+            return Task.FromResult<IReadOnlyList<Snapshot>>(_snapshots.ToList().AsReadOnly());
+        }
+        finally
+        {
+            _snapshotsLock.ExitReadLock();
+        }
     }
 
     /// <summary>
@@ -158,8 +208,17 @@ public sealed class SnapshotManager
     /// <returns>The snapshot, or null if not found.</returns>
     public Task<Snapshot?> GetSnapshotAsync(string name, CancellationToken ct = default)
     {
-        var snapshot = _snapshots.FirstOrDefault(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
-        return Task.FromResult(snapshot);
+        _snapshotsLock.EnterReadLock();
+        try
+        {
+            // Cat 13 (finding 791): O(1) dictionary lookup.
+            _snapshotsByName.TryGetValue(name, out var snapshot);
+            return Task.FromResult(snapshot);
+        }
+        finally
+        {
+            _snapshotsLock.ExitReadLock();
+        }
     }
 
     /// <summary>
@@ -170,7 +229,18 @@ public sealed class SnapshotManager
     /// <exception cref="InvalidOperationException">Thrown if the snapshot does not exist.</exception>
     public async Task DeleteSnapshotAsync(string name, CancellationToken ct = default)
     {
-        var snapshot = _snapshots.FirstOrDefault(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        Snapshot? snapshot;
+        _snapshotsLock.EnterReadLock();
+        try
+        {
+            // Cat 13 (finding 791): O(1) dictionary lookup.
+            _snapshotsByName.TryGetValue(name, out snapshot);
+        }
+        finally
+        {
+            _snapshotsLock.ExitReadLock();
+        }
+
         if (snapshot == null)
         {
             throw new InvalidOperationException($"Snapshot '{name}' not found.");
@@ -187,8 +257,17 @@ public sealed class SnapshotManager
         // Free the snapshot root inode
         await _inodeTable.FreeInodeAsync(snapshot.RootInodeNumber, ct);
 
-        // Remove from snapshot list
-        _snapshots.Remove(snapshot);
+        // Remove from snapshot list and name index
+        _snapshotsLock.EnterWriteLock();
+        try
+        {
+            _snapshots.Remove(snapshot);
+            _snapshotsByName.Remove(snapshot.Name); // Cat 13 (finding 791): maintain name index
+        }
+        finally
+        {
+            _snapshotsLock.ExitWriteLock();
+        }
 
         // Persist snapshot table
         await PersistSnapshotTableAsync(ct);
@@ -211,12 +290,23 @@ public sealed class SnapshotManager
             throw new ArgumentException("Clone name cannot be null or whitespace.", nameof(cloneName));
         }
 
-        if (_snapshots.Any(s => s.Name.Equals(cloneName, StringComparison.OrdinalIgnoreCase)))
+        Snapshot? sourceSnapshot;
+        _snapshotsLock.EnterReadLock();
+        try
         {
-            throw new InvalidOperationException($"A snapshot with the name '{cloneName}' already exists.");
+            // Cat 13 (finding 791): O(1) dictionary lookups.
+            if (_snapshotsByName.ContainsKey(cloneName))
+            {
+                throw new InvalidOperationException($"A snapshot with the name '{cloneName}' already exists.");
+            }
+
+            _snapshotsByName.TryGetValue(snapshotName, out sourceSnapshot);
+        }
+        finally
+        {
+            _snapshotsLock.ExitReadLock();
         }
 
-        var sourceSnapshot = _snapshots.FirstOrDefault(s => s.Name.Equals(snapshotName, StringComparison.OrdinalIgnoreCase));
         if (sourceSnapshot == null)
         {
             throw new InvalidOperationException($"Snapshot '{snapshotName}' not found.");
@@ -250,17 +340,27 @@ public sealed class SnapshotManager
         await _inodeTable.UpdateInodeAsync(cloneRootInode, ct);
 
         // Create clone record (writable)
-        var clone = new Snapshot
+        Snapshot clone;
+        _snapshotsLock.EnterWriteLock();
+        try
         {
-            SnapshotId = _nextSnapshotId++,
-            Name = cloneName,
-            RootInodeNumber = cloneRootInode.InodeNumber,
-            CreatedUtc = DateTimeOffset.UtcNow,
-            IsReadOnly = false,
-            BlockCount = blockNumbers.Count
-        };
+            clone = new Snapshot
+            {
+                SnapshotId = Interlocked.Increment(ref _nextSnapshotId),
+                Name = cloneName,
+                RootInodeNumber = cloneRootInode.InodeNumber,
+                CreatedUtc = DateTimeOffset.UtcNow,
+                IsReadOnly = false,
+                BlockCount = blockNumbers.Count
+            };
 
-        _snapshots.Add(clone);
+            _snapshots.Add(clone);
+            _snapshotsByName[clone.Name] = clone; // Cat 13 (finding 791): maintain name index
+        }
+        finally
+        {
+            _snapshotsLock.ExitWriteLock();
+        }
 
         // Persist snapshot table
         await PersistSnapshotTableAsync(ct);
@@ -301,20 +401,19 @@ public sealed class SnapshotManager
                 }
             }
 
-            // Collect indirect block pointer (only the pointer block itself)
-            // Note: Indirect block support is not yet implemented. When present, only the indirect block pointer
-            // itself is collected. Full implementation would require reading and collecting referenced data blocks.
+            // Collect indirect block pointer and referenced data blocks
             if (inode.IndirectBlockPointer > 0)
             {
                 blockNumbers.Add(inode.IndirectBlockPointer);
+                // Read indirect block to collect referenced data blocks
+                await CollectIndirectBlockReferencesAsync(inode.IndirectBlockPointer, blockNumbers, ct);
             }
 
-            // Collect double indirect block pointer (only the pointer block itself)
-            // Note: Double indirect block support is not yet implemented. When present, only the double indirect
-            // block pointer itself is collected. Full implementation would require recursive collection.
+            // Collect double indirect block pointer and recursively collect data blocks
             if (inode.DoubleIndirectPointer > 0)
             {
                 blockNumbers.Add(inode.DoubleIndirectPointer);
+                await CollectDoubleIndirectBlockReferencesAsync(inode.DoubleIndirectPointer, blockNumbers, ct);
             }
 
             // Collect extended attributes block
@@ -345,8 +444,21 @@ public sealed class SnapshotManager
     /// </summary>
     private async Task PersistSnapshotTableAsync(CancellationToken ct)
     {
+        // Take a read-locked snapshot of the list before serializing to avoid holding the lock
+        // across an async await (not supported by ReaderWriterLockSlim).
+        List<Snapshot> snapshotsCopy;
+        _snapshotsLock.EnterReadLock();
+        try
+        {
+            snapshotsCopy = _snapshots.ToList();
+        }
+        finally
+        {
+            _snapshotsLock.ExitReadLock();
+        }
+
         // Serialize snapshot list to JSON
-        string json = JsonSerializer.Serialize(_snapshots, new JsonSerializerOptions
+        string json = JsonSerializer.Serialize(snapshotsCopy, new JsonSerializerOptions
         {
             WriteIndented = false
         });
@@ -363,23 +475,98 @@ public sealed class SnapshotManager
     {
         byte[]? jsonBytes = await _inodeTable.GetExtendedAttributeAsync(_snapshotMetadataInodeNumber, "snapshot-table", ct);
 
+        List<Snapshot> loaded;
+        long nextId;
+
         if (jsonBytes == null || jsonBytes.Length == 0)
         {
-            _snapshots = new List<Snapshot>();
-            _nextSnapshotId = 1;
-            return;
-        }
-
-        string json = System.Text.Encoding.UTF8.GetString(jsonBytes);
-        _snapshots = JsonSerializer.Deserialize<List<Snapshot>>(json) ?? new List<Snapshot>();
-
-        if (_snapshots.Count > 0)
-        {
-            _nextSnapshotId = _snapshots.Max(s => s.SnapshotId) + 1;
+            loaded = new List<Snapshot>();
+            nextId = 1;
         }
         else
         {
-            _nextSnapshotId = 1;
+            string json = System.Text.Encoding.UTF8.GetString(jsonBytes);
+            loaded = JsonSerializer.Deserialize<List<Snapshot>>(json) ?? new List<Snapshot>();
+            nextId = loaded.Count > 0 ? loaded.Max(s => s.SnapshotId) + 1 : 1;
+        }
+
+        _snapshotsLock.EnterWriteLock();
+        try
+        {
+            _snapshots = loaded;
+            // Cat 13 (finding 791): rebuild name index from loaded list.
+            _snapshotsByName = new Dictionary<string, Snapshot>(StringComparer.OrdinalIgnoreCase);
+            foreach (var s in loaded)
+                _snapshotsByName[s.Name] = s;
+            _nextSnapshotId = nextId;
+        }
+        finally
+        {
+            _snapshotsLock.ExitWriteLock();
+        }
+    }
+
+    /// <summary>
+    /// Collects data block numbers stored in an indirect block (one level of indirection).
+    /// Each 8-byte slot in the block is a pointer to a data block (0 = unused).
+    /// Requires a <see cref="IBlockDevice"/> to read the indirect block; when unavailable
+    /// the data blocks are not collected (only the pointer block itself has been added by caller).
+    /// </summary>
+    private async Task CollectIndirectBlockReferencesAsync(long indirectBlockPointer, HashSet<long> blockNumbers, CancellationToken ct)
+    {
+        if (_blockDevice == null)
+            return;
+
+        int blockSize = _blockDevice.BlockSize;
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(blockSize);
+        try
+        {
+            await _blockDevice.ReadBlockAsync(indirectBlockPointer, buffer.AsMemory(0, blockSize), ct).ConfigureAwait(false);
+
+            int pointerCount = blockSize / 8;
+            for (int i = 0; i < pointerCount; i++)
+            {
+                long dataBlock = BinaryPrimitives.ReadInt64LittleEndian(buffer.AsSpan(i * 8, 8));
+                if (dataBlock > 0)
+                    blockNumbers.Add(dataBlock);
+            }
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
+    }
+
+    /// <summary>
+    /// Collects data block numbers stored in a double-indirect block (two levels of indirection).
+    /// Reads the top-level block to enumerate first-level indirect blocks, then calls
+    /// <see cref="CollectIndirectBlockReferencesAsync"/> for each to collect data blocks.
+    /// </summary>
+    private async Task CollectDoubleIndirectBlockReferencesAsync(long doubleIndirectPointer, HashSet<long> blockNumbers, CancellationToken ct)
+    {
+        if (_blockDevice == null)
+            return;
+
+        int blockSize = _blockDevice.BlockSize;
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(blockSize);
+        try
+        {
+            await _blockDevice.ReadBlockAsync(doubleIndirectPointer, buffer.AsMemory(0, blockSize), ct).ConfigureAwait(false);
+
+            int pointerCount = blockSize / 8;
+            for (int i = 0; i < pointerCount; i++)
+            {
+                long indirectBlock = BinaryPrimitives.ReadInt64LittleEndian(buffer.AsSpan(i * 8, 8));
+                if (indirectBlock > 0)
+                {
+                    blockNumbers.Add(indirectBlock);
+                    await CollectIndirectBlockReferencesAsync(indirectBlock, blockNumbers, ct).ConfigureAwait(false);
+                }
+            }
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
         }
     }
 }

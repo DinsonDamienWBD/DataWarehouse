@@ -157,11 +157,12 @@ public sealed class SovereigntyRoutingStrategy : ComplianceStrategyBase
     {
         ArgumentNullException.ThrowIfNull(objectId);
         ArgumentNullException.ThrowIfNull(intendedDestination);
-        objectTags ??= new Dictionary<string, object>();
+        // LOW-1553: ??= on a parameter variable only updates the local copy; use an explicit local instead.
+        var effectiveObjectTags = objectTags ?? (IReadOnlyDictionary<string, object>)new Dictionary<string, object>();
 
         ct.ThrowIfCancellationRequested();
         Interlocked.Increment(ref _routingChecksTotal);
-        IncrementCounter("sovereignty_routing.check");
+            IncrementCounter("sovereignty_routing.check");
 
         // 1. Check cache
         var cacheKey = BuildCacheKey(objectId, intendedDestination);
@@ -173,7 +174,7 @@ public sealed class SovereigntyRoutingStrategy : ComplianceStrategyBase
         }
 
         // 2. Determine jurisdictions
-        var sourceJurisdiction = ExtractSourceJurisdiction(objectTags);
+        var sourceJurisdiction = ExtractSourceJurisdiction(effectiveObjectTags);
         var destJurisdiction = MapStorageBackendToJurisdiction(intendedDestination);
 
         // 3. Same jurisdiction = fast-path allow
@@ -233,7 +234,7 @@ public sealed class SovereigntyRoutingStrategy : ComplianceStrategyBase
         else
         {
             // Denied — find alternatives
-            var allowed = await FindAllowedBackendsForObject(objectId, sourceJurisdiction, objectTags, ct);
+            var allowed = await FindAllowedBackendsForObject(objectId, sourceJurisdiction, effectiveObjectTags, ct);
             var recommended = allowed.Count > 0 ? allowed[0] : null;
 
             decision = new RoutingDecision
@@ -353,7 +354,7 @@ public sealed class SovereigntyRoutingStrategy : ComplianceStrategyBase
     {
         ArgumentNullException.ThrowIfNull(objectId);
         objectTags ??= new Dictionary<string, object>();
-        IncrementCounter("sovereignty_routing.get_compliant");
+            IncrementCounter("sovereignty_routing.get_compliant");
 
         var sourceJurisdiction = ExtractSourceJurisdiction(objectTags);
         return await FindAllowedBackendsForObject(objectId, sourceJurisdiction, objectTags, ct);
@@ -386,7 +387,7 @@ public sealed class SovereigntyRoutingStrategy : ComplianceStrategyBase
     /// <returns>Number of entries evicted.</returns>
     public int EvictExpiredCacheEntries()
     {
-        IncrementCounter("sovereignty_routing.cache_evict");
+            IncrementCounter("sovereignty_routing.cache_evict");
         var now = Environment.TickCount64;
         var ttlTicks = (long)_cacheTtl.TotalMilliseconds;
         var evicted = 0;
@@ -413,7 +414,7 @@ public sealed class SovereigntyRoutingStrategy : ComplianceStrategyBase
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        IncrementCounter("sovereignty_routing.compliance_check");
+            IncrementCounter("sovereignty_routing.compliance_check");
 
         var objectId = context.ResourceId ?? "unknown";
         var sourceLocation = context.SourceLocation;
@@ -563,10 +564,13 @@ public sealed class SovereigntyRoutingStrategy : ComplianceStrategyBase
             {
                 throw;
             }
-            catch
+            catch (Exception ex)
             {
-                // If sovereignty check fails for a backend, skip it (fail-safe: exclude uncertain backends)
+                // P2-1548: Log the exception so that configuration errors are visible;
+                // fail-safe by excluding backends whose sovereignty cannot be determined.
                 IncrementCounter("sovereignty_routing.backend_check_error");
+                System.Diagnostics.Debug.WriteLine(
+                    $"[SovereigntyRouting] Backend check failed for '{backendId}' (object '{objectId}'): {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -575,15 +579,22 @@ public sealed class SovereigntyRoutingStrategy : ComplianceStrategyBase
 
     private static string? ExtractEuCountry(string lowerBackendId)
     {
-        // Try to extract country suffix: s3-eu-west-1 -> EU, azure-eu-de -> DE
-        if (lowerBackendId.Contains("-de", StringComparison.Ordinal)) return "DE";
-        if (lowerBackendId.Contains("-fr", StringComparison.Ordinal)) return "FR";
-        if (lowerBackendId.Contains("-it", StringComparison.Ordinal)) return "IT";
-        if (lowerBackendId.Contains("-es", StringComparison.Ordinal)) return "ES";
-        if (lowerBackendId.Contains("-nl", StringComparison.Ordinal)) return "NL";
-        if (lowerBackendId.Contains("-ie", StringComparison.Ordinal)) return "IE";
-        if (lowerBackendId.Contains("-se", StringComparison.Ordinal)) return "SE";
-        if (lowerBackendId.Contains("-pl", StringComparison.Ordinal)) return "PL";
+        // P2-1549: Use exact word-boundary matching to prevent country code misidentification.
+        // For example, "-se" must not match "southeast". A country code appears as
+        // a dash-delimited token: "-<CC>" at end or "-<CC>-" in the middle.
+        static bool HasCountryCode(string id, string code)
+            => id.EndsWith(code, StringComparison.Ordinal) ||
+               id.Contains(code + "-", StringComparison.Ordinal);
+
+        // Try to extract country suffix: s3-eu-west-de -> DE, azure-de -> DE
+        if (HasCountryCode(lowerBackendId, "-de")) return "DE";
+        if (HasCountryCode(lowerBackendId, "-fr")) return "FR";
+        if (HasCountryCode(lowerBackendId, "-it")) return "IT";
+        if (HasCountryCode(lowerBackendId, "-es")) return "ES";
+        if (HasCountryCode(lowerBackendId, "-nl")) return "NL";
+        if (HasCountryCode(lowerBackendId, "-ie")) return "IE";
+        if (HasCountryCode(lowerBackendId, "-se")) return "SE";
+        if (HasCountryCode(lowerBackendId, "-pl")) return "PL";
         return null;
     }
 

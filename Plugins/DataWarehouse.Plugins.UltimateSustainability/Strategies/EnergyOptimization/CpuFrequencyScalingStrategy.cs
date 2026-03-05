@@ -254,21 +254,22 @@ public sealed class CpuFrequencyScalingStrategy : SustainabilityStrategyBase
         {
             var cpuInfoPath = "/sys/devices/system/cpu/cpu0/cpufreq/";
 
-            if (File.Exists(cpuInfoPath + "cpuinfo_min_freq"))
+            // Finding 4450: TryParse guards against corrupt sysfs values.
+            if (File.Exists(cpuInfoPath + "cpuinfo_min_freq") &&
+                long.TryParse(File.ReadAllText(cpuInfoPath + "cpuinfo_min_freq").Trim(), out var minFreq))
             {
-                var minFreq = long.Parse(File.ReadAllText(cpuInfoPath + "cpuinfo_min_freq").Trim());
                 _minFrequencyMhz = minFreq / 1000.0;
             }
 
-            if (File.Exists(cpuInfoPath + "cpuinfo_max_freq"))
+            if (File.Exists(cpuInfoPath + "cpuinfo_max_freq") &&
+                long.TryParse(File.ReadAllText(cpuInfoPath + "cpuinfo_max_freq").Trim(), out var maxFreq))
             {
-                var maxFreq = long.Parse(File.ReadAllText(cpuInfoPath + "cpuinfo_max_freq").Trim());
                 _maxFrequencyMhz = maxFreq / 1000.0;
             }
 
-            if (File.Exists(cpuInfoPath + "base_frequency"))
+            if (File.Exists(cpuInfoPath + "base_frequency") &&
+                long.TryParse(File.ReadAllText(cpuInfoPath + "base_frequency").Trim(), out var baseFreq))
             {
-                var baseFreq = long.Parse(File.ReadAllText(cpuInfoPath + "base_frequency").Trim());
                 _baseFrequencyMhz = baseFreq / 1000.0;
             }
             else
@@ -284,14 +285,43 @@ public sealed class CpuFrequencyScalingStrategy : SustainabilityStrategyBase
         }
         catch
         {
+
             // Use defaults
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
     private void DetectWindowsCpuCapabilities()
     {
-        // Windows detection would use WMI or registry
-        // Using typical values for now
+        // Finding 4457: read base/max/min frequencies from HKLM registry keys written by
+        // Windows power manager. Falls back to conservative processor-count heuristic when
+        // the keys are absent (e.g., VMs, containers without ACPI exposure).
+        try
+        {
+            using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                @"HARDWARE\DESCRIPTION\System\CentralProcessor\0");
+            if (key != null)
+            {
+                // "~MHz" holds the current/base frequency in MHz (DWORD)
+                var mhz = key.GetValue("~MHz");
+                if (mhz is int mhzInt && mhzInt > 0)
+                {
+                    _baseFrequencyMhz = mhzInt;
+                    // Max boost is typically ~40 % above base on modern CPUs
+                    _maxFrequencyMhz = _baseFrequencyMhz * 1.4;
+                    // Minimum idle frequency is typically ~30 % of base
+                    _minFrequencyMhz = _baseFrequencyMhz * 0.3;
+                    return;
+                }
+            }
+        }
+        catch
+        {
+            // Registry access failed (sandboxed process, container without registry, etc.)
+        }
+
+        // Heuristic fallback based on core count; better than a hard-coded constant
         _baseFrequencyMhz = Environment.ProcessorCount >= 8 ? 3200 : 2400;
         _maxFrequencyMhz = _baseFrequencyMhz * 1.4;
         _minFrequencyMhz = _baseFrequencyMhz * 0.3;
@@ -306,9 +336,11 @@ public sealed class CpuFrequencyScalingStrategy : SustainabilityStrategyBase
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
                 var scalingCurFreqPath = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq";
-                if (File.Exists(scalingCurFreqPath))
+                // Finding 4450: TryParse guards against corrupt sysfs values.
+                if (File.Exists(scalingCurFreqPath) &&
+                    long.TryParse(File.ReadAllText(scalingCurFreqPath).Trim(), out var scaleKhz))
                 {
-                    currentFreq = long.Parse(File.ReadAllText(scalingCurFreqPath).Trim()) / 1000.0;
+                    currentFreq = scaleKhz / 1000.0;
                 }
             }
 
@@ -321,7 +353,9 @@ public sealed class CpuFrequencyScalingStrategy : SustainabilityStrategyBase
         }
         catch
         {
+
             // Monitoring failed, continue
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 
@@ -354,7 +388,9 @@ public sealed class CpuFrequencyScalingStrategy : SustainabilityStrategyBase
         }
         catch
         {
+
             // Failed to set power plan
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return false;
@@ -417,10 +453,38 @@ public sealed class CpuFrequencyScalingStrategy : SustainabilityStrategyBase
         }
     }
 
-    private Task<bool> SetWindowsProcessorThrottleAsync(int maxPercent, CancellationToken ct)
+    private async Task<bool> SetWindowsProcessorThrottleAsync(int maxPercent, CancellationToken ct)
     {
-        // Would use powercfg to set processor max state
-        return Task.FromResult(true);
+        try
+        {
+            // Set processor max state using powercfg for the active power scheme
+            maxPercent = Math.Max(1, Math.Min(100, maxPercent));
+
+            using var setProc = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "powercfg",
+                Arguments = $"/setacvalueindex SCHEME_CURRENT SUB_PROCESSOR PROCTHROTTLEMAX {maxPercent}",
+                UseShellExecute = false,
+                CreateNoWindow = true
+            });
+            if (setProc != null) await setProc.WaitForExitAsync(ct);
+
+            // Apply the new settings
+            using var applyProc = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "powercfg",
+                Arguments = "/setactive SCHEME_CURRENT",
+                UseShellExecute = false,
+                CreateNoWindow = true
+            });
+            if (applyProc != null) await applyProc.WaitForExitAsync(ct);
+
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static FrequencyGovernor ParseLinuxGovernor(string governor)

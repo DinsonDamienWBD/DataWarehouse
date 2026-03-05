@@ -66,16 +66,32 @@ internal sealed class NitroEnclavesStrategy : ComputeRuntimeStrategyBase
                 if (runResult.ExitCode != 0)
                     throw new InvalidOperationException($"Enclave launch failed: {runResult.StandardError}");
 
-                // Extract enclave ID from output
-                enclaveId = runResult.StandardOutput.Trim();
+                // Extract and validate the enclave ID from run output.
+                // The ID must be non-empty and contain only alphanumeric chars and hyphens.
+                var rawId = runResult.StandardOutput.Trim();
+                if (string.IsNullOrEmpty(rawId) || !System.Text.RegularExpressions.Regex.IsMatch(rawId, @"^[A-Za-z0-9\-]+$"))
+                    throw new InvalidOperationException($"Enclave launch returned invalid enclave ID: '{rawId}'");
+                enclaveId = rawId;
 
                 // Communicate via vsock (CID from describe-enclaves)
                 var descResult = await RunProcessAsync("nitro-cli", "describe-enclaves",
                     timeout: TimeSpan.FromSeconds(10), cancellationToken: cancellationToken);
 
-                // Wait for completion via vsock or timeout
+                // Wait for enclave completion. In production, open a vsock connection to the enclave
+                // (CID from describe-enclaves output) and read until it closes or returns a result.
+                // For now, poll the enclave console on a 500ms interval up to the task timeout.
                 var timeout = GetEffectiveTimeout(task);
-                await Task.Delay(Math.Min(1000, (int)timeout.TotalMilliseconds), cancellationToken);
+                var deadline = DateTimeOffset.UtcNow.Add(timeout);
+                var pollInterval = TimeSpan.FromMilliseconds(500);
+                while (DateTimeOffset.UtcNow < deadline)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var pollResult = await RunProcessAsync("nitro-cli", $"console --enclave-id {enclaveId}",
+                        timeout: TimeSpan.FromSeconds(5), cancellationToken: cancellationToken);
+                    if (!string.IsNullOrWhiteSpace(pollResult.StandardOutput))
+                        break; // Enclave produced output — assume it has completed.
+                    await Task.Delay(pollInterval, cancellationToken);
+                }
 
                 // Get attestation document
                 var consoleResult = await RunProcessAsync("nitro-cli", $"console --enclave-id {enclaveId}",

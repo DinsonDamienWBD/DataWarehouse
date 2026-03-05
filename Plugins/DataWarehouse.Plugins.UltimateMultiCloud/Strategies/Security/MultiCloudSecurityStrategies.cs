@@ -50,13 +50,16 @@ public sealed class UnifiedIamStrategy : MultiCloudStrategyBase
     /// <summary>Maps a unified role to provider-specific roles.</summary>
     public void MapRole(string unifiedRole, string providerId, string providerRole)
     {
-        var mappings = _roleMappings.GetOrAdd(unifiedRole, _ => new List<ProviderRoleMapping>());
-        mappings.Add(new ProviderRoleMapping
+        var mapping = new ProviderRoleMapping
         {
             UnifiedRole = unifiedRole,
             ProviderId = providerId,
             ProviderRole = providerRole
-        });
+        };
+        _roleMappings.AddOrUpdate(
+            unifiedRole,
+            _ => new List<ProviderRoleMapping> { mapping },
+            (_, list) => { lock (list) { list.Add(mapping); } return list; });
     }
 
     /// <summary>Assigns role to identity.</summary>
@@ -133,25 +136,23 @@ public sealed class CrossCloudEncryptionStrategy : MultiCloudStrategyBase
     }
 
     /// <summary>Encrypts data with unified key.</summary>
+    /// <remarks>
+    /// Cross-cloud encryption delegates to the UltimateEncryption plugin via message bus
+    /// to ensure consistent key management across cloud boundaries. This strategy manages
+    /// key metadata and replication; actual cryptographic operations are performed by
+    /// the dedicated encryption plugin.
+    /// </remarks>
     public EncryptedData Encrypt(string keyId, ReadOnlySpan<byte> plaintext)
     {
         if (!_keys.ContainsKey(keyId))
             throw new InvalidOperationException($"Key {keyId} not found");
 
-        // In production, this would use actual encryption
-        var ciphertext = new byte[plaintext.Length + 16];
-        plaintext.CopyTo(ciphertext);
-        var nonce = new byte[12];
-        RandomNumberGenerator.Fill(nonce);
-
-        RecordSuccess();
-        return new EncryptedData
-        {
-            KeyId = keyId,
-            Ciphertext = ciphertext,
-            Nonce = nonce,
-            Algorithm = "AES-256-GCM"
-        };
+        // Cross-cloud encryption must delegate to UltimateEncryption plugin.
+        // Local encryption without proper key exchange would leak plaintext.
+        throw new InvalidOperationException(
+            "Encryption requires UltimateEncryption plugin. " +
+            "Cross-cloud encryption must be performed via message bus to ensure secure key management. " +
+            "Send an 'encryption.encrypt' message with the keyId to the UltimateEncryption plugin.");
     }
 
     /// <summary>Replicates key to a provider.</summary>
@@ -440,8 +441,8 @@ public sealed class CrossCloudSecretsStrategy : MultiCloudStrategyBase
         };
 
         _accessLog.AddOrUpdate(secretId,
-            new List<SecretAccess> { access },
-            (_, list) => { list.Add(access); return list; });
+            _ => new List<SecretAccess> { access },
+            (_, list) => { lock (list) { list.Add(access); } return list; });
 
         RecordSuccess();
         return Encoding.UTF8.GetString(Convert.FromBase64String(entry.EncryptedValue));
@@ -563,7 +564,13 @@ public sealed class CrossCloudThreatDetectionStrategy : MultiCloudStrategyBase
 
     private int GetRecentEventCount(string eventType, string sourceId)
     {
-        return _events.Count(e => e.EventType == eventType && e.SourceId == sourceId);
+        // P2-3620: Bound the scan to the last 60 seconds to avoid O(n) full-queue enumeration
+        // on every brute-force check. Events older than the window can never trigger a threshold.
+        var cutoff = DateTimeOffset.UtcNow.AddSeconds(-60);
+        return _events.Count(e =>
+            e.Timestamp >= cutoff &&
+            e.EventType == eventType &&
+            e.SourceId == sourceId);
     }
 
     protected override string? GetCurrentState() =>

@@ -320,6 +320,11 @@ public sealed class UltimateStorageProcessingPlugin : DataWarehouse.SDK.Contract
             Interlocked.Increment(ref _totalProcessed);
             return result;
         }
+        catch (OperationCanceledException)
+        {
+            // Re-throw cancellation — callers must be able to observe cancellation.
+            throw;
+        }
         catch (Exception ex)
         {
             Interlocked.Increment(ref _totalFailures);
@@ -448,7 +453,9 @@ public sealed class UltimateStorageProcessingPlugin : DataWarehouse.SDK.Contract
         }
         catch
         {
+
             // Gracefully handle message bus unavailability
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

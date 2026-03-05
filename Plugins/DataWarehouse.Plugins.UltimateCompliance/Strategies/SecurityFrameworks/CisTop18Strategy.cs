@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.SecurityFrameworks
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("cis_top18.check");
+            IncrementCounter("cis_top18.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -71,9 +71,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.SecurityFrameworks
 
             recommendations.Add("Prioritize implementation groups: IG1 (Basic), IG2 (Intermediate), IG3 (Advanced)");
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -89,14 +90,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.SecurityFrameworks
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("cis_top18.initialized");
+            IncrementCounter("cis_top18.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("cis_top18.shutdown");
+            IncrementCounter("cis_top18.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

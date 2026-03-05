@@ -407,7 +407,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("data_pseudonymization.check");
+            IncrementCounter("data_pseudonymization.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -455,9 +455,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
                 }
             }
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -673,14 +674,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("data_pseudonymization.initialized");
+            IncrementCounter("data_pseudonymization.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("data_pseudonymization.shutdown");
+            IncrementCounter("data_pseudonymization.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

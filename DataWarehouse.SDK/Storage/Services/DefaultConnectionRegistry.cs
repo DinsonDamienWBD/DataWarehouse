@@ -76,13 +76,15 @@ public sealed class DefaultConnectionRegistry<TConfig> : IConnectionRegistry<TCo
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionId);
 
-        return _connections.TryGetValue(connectionId, out var entry) ? entry.Config : null;
+        // TryPeek avoids LRU write-lock promotion on the hot read path (finding 655).
+        return _connections.TryPeek(connectionId, out var entry) ? entry.Config : null;
     }
 
     /// <inheritdoc/>
     public IReadOnlyList<string> GetRegisteredIds()
     {
-        return _connections.Keys.ToList().AsReadOnly();
+        // Single allocation: Array.AsReadOnly wraps without an extra copy
+        return Array.AsReadOnly(_connections.Keys.ToArray());
     }
 
     /// <inheritdoc/>

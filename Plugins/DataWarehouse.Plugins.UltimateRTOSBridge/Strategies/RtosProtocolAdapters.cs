@@ -33,6 +33,7 @@ public sealed class VxWorksProtocolAdapter : RtosStrategyBase
 {
     private readonly BoundedDictionary<string, VxWorksQueue> _queues = new BoundedDictionary<string, VxWorksQueue>(1000);
     private readonly BoundedDictionary<string, SemaphoreSlim> _semaphores = new BoundedDictionary<string, SemaphoreSlim>(1000);
+    private readonly BoundedDictionary<string, VxWorksWatchdog> _watchdogs = new BoundedDictionary<string, VxWorksWatchdog>(256);
     private readonly Stopwatch _latencyTimer = new();
 
     /// <inheritdoc/>
@@ -158,6 +159,13 @@ public sealed class VxWorksProtocolAdapter : RtosStrategyBase
     {
         var queue = _queues.GetOrAdd(context.ResourcePath, _ => new VxWorksQueue());
 
+        // P2-3683: Enforce backpressure — reject new messages when the queue is at capacity,
+        // matching VxWorks msgQCreate behavior (MSG_Q_FIFO with finite maxMsgs).
+        if (queue.Messages.Count >= VxWorksQueue.MaxDepth)
+            throw new InvalidOperationException(
+                $"VxWorks message queue '{context.ResourcePath}' is full (max {VxWorksQueue.MaxDepth} messages). " +
+                "Consumer is too slow or queue depth is misconfigured.");
+
         queue.Messages.Enqueue(context.Data ?? Array.Empty<byte>());
         queue.MessageAvailable.Release();
         await Task.CompletedTask;
@@ -176,8 +184,8 @@ public sealed class VxWorksProtocolAdapter : RtosStrategyBase
         await semaphore.WaitAsync(cts.Token);
         try
         {
-            // Simulated critical section
-            await Task.Delay(1, ct);
+            // Mutual exclusion acquired — caller performs critical section work
+            await Task.CompletedTask;
         }
         finally
         {
@@ -202,14 +210,41 @@ public sealed class VxWorksProtocolAdapter : RtosStrategyBase
 
     private Task ResetWatchdogAsync(RtosOperationContext context, CancellationToken ct)
     {
-        // Watchdog reset simulation
+        var watchdog = _watchdogs.GetOrAdd(context.ResourcePath, _ => new VxWorksWatchdog
+        {
+            ResourcePath = context.ResourcePath
+        });
+
+        // Record the kick — resets the watchdog expiry window
+        watchdog.LastKickTime = DateTimeOffset.UtcNow;
+        watchdog.IncrementKickCount();
+        watchdog.IsExpired = false;
+
+        System.Diagnostics.Trace.TraceInformation(
+            "[VxWorks Watchdog] Kicked resource '{0}' at {1} (total kicks: {2})",
+            watchdog.ResourcePath,
+            watchdog.LastKickTime.Value.ToString("O"),
+            watchdog.KickCount);
+
         return Task.CompletedTask;
     }
 
     private class VxWorksQueue
     {
+        /// <summary>Maximum queue depth. VxWorks msgQCreate sets a hard cap; we enforce 4096 messages.</summary>
+        public const int MaxDepth = 4096;
         public ConcurrentQueue<byte[]> Messages { get; } = new();
         public SemaphoreSlim MessageAvailable { get; } = new(0);
+    }
+
+    private class VxWorksWatchdog
+    {
+        public required string ResourcePath { get; init; }
+        public bool IsExpired { get; set; }
+        public DateTimeOffset? LastKickTime { get; set; }
+        private long _kickCount;
+        public long KickCount => Volatile.Read(ref _kickCount);
+        public void IncrementKickCount() => Interlocked.Increment(ref _kickCount);
     }
 }
 
@@ -375,6 +410,11 @@ public sealed class QnxProtocolAdapter : RtosStrategyBase
         catch (OperationCanceledException)
         {
             return Array.Empty<byte>();
+        }
+        finally
+        {
+            // P2-3684: Dispose the per-message SemaphoreSlim whether the wait succeeded or timed out.
+            msg.ReplyReady?.Dispose();
         }
     }
 

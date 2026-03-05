@@ -738,44 +738,17 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 _enableVersioning = true;
             }
 
-            // For MinIO, bucket replication is configured using:
-            // 1. Server-side site replication (mc admin replicate add)
-            // 2. Bucket-level replication rules (AWS S3 API compatible)
-
-            // This implementation uses bucket-level replication via tags and lifecycle policies
-            // as a production workaround since full MinIO Admin API requires elevated permissions
-
-            // Create replication metadata using tags
-            var replicationTags = new Dictionary<string, string>
-            {
-                ["replication-enabled"] = "true",
-                ["replication-destination"] = destinationBucket,
-                ["replication-prefix"] = prefix ?? "*",
-                ["replication-role"] = roleArn ?? "none",
-                ["replication-id"] = Guid.NewGuid().ToString("N")
-            };
-
-            try
-            {
-                // Set replication metadata as bucket tags
-                var tagging = Tagging.GetBucketTags(replicationTags);
-                var setBucketTagsArgs = new SetBucketTagsArgs()
-                    .WithBucket(_bucket)
-                    .WithTagging(tagging);
-
-                await _client!.SetBucketTagsAsync(setBucketTagsArgs, ct);
-
-                // Log success - actual replication requires MinIO server-side configuration
-                // Users should run: mc admin replicate add SOURCE_ALIAS DEST_ALIAS
-                await Task.CompletedTask;
-            }
-            catch (Exception ex)
-            {
-                throw new InvalidOperationException(
-                    $"Failed to configure bucket replication metadata from '{_bucket}' to '{destinationBucket}'. " +
-                    $"For full MinIO site replication, use: mc admin replicate add <source-alias> <dest-alias>. " +
-                    $"Error: {ex.Message}", ex);
-            }
+            // MinIO bucket replication requires either:
+            // 1. Site-level replication via the MinIO Admin API (mc admin replicate add SOURCE DEST)
+            // 2. Bucket-level replication rules via the S3-compatible replication API, which
+            //    requires the MinIO server to be configured with a replication service account and
+            //    the destination cluster's endpoint.
+            // Setting bucket tags to record replication intent is not functional replication — it
+            // does not cause the MinIO server to replicate any objects.
+            throw new NotSupportedException(
+                "MinIO replication requires mc admin API or MinIO server-side replication configuration. " +
+                "Use: mc admin replicate add <source-alias> <dest-alias> to enable site replication, " +
+                "or configure bucket replication rules via the MinIO Console with a replication service account.");
         }
 
         /// <summary>

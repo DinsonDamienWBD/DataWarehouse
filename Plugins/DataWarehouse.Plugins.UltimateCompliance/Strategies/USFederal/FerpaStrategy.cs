@@ -24,7 +24,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("ferpa.check");
+            IncrementCounter("ferpa.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -33,9 +33,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
             CheckDirectoryInformation(context, violations, recommendations);
             CheckDisclosureLogging(context, violations, recommendations);
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -50,10 +51,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckConsentRequirements(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.DataSubjectCategories.Contains("student-education-record", StringComparer.OrdinalIgnoreCase))
+            if (context.DataSubjectCategories != null && context.DataSubjectCategories.Contains("student-education-record", StringComparer.OrdinalIgnoreCase))
             {
-                if (context.OperationType.Equals("disclosure", StringComparison.OrdinalIgnoreCase) ||
-                    context.OperationType.Equals("third-party-sharing", StringComparison.OrdinalIgnoreCase))
+                if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("disclosure", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(context.OperationType, "third-party-sharing", StringComparison.OrdinalIgnoreCase))
                 {
                     if (!context.Attributes.TryGetValue("ParentalConsent", out var consentObj) || consentObj is not true)
                     {
@@ -84,7 +85,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckAccessRights(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.OperationType.Equals("access-request", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("access-request", StringComparison.OrdinalIgnoreCase))
             {
                 if (context.Attributes.TryGetValue("RequestResponseDays", out var daysObj) &&
                     daysObj is int days && days > 45)
@@ -100,7 +101,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
                 }
             }
 
-            if (context.OperationType.Equals("amendment-request", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("amendment-request", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("HearingOffered", out var hearingObj) || hearingObj is not true)
                 {
@@ -141,7 +142,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
 
         private void CheckDisclosureLogging(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.OperationType.Equals("disclosure", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("disclosure", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("DisclosureRecorded", out var recordedObj) || recordedObj is not true)
                 {
@@ -160,14 +161,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USFederal
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("ferpa.initialized");
+            IncrementCounter("ferpa.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("ferpa.shutdown");
+            IncrementCounter("ferpa.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

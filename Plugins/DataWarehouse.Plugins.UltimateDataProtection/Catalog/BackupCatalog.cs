@@ -190,8 +190,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Catalog
                 TotalOriginalSize = entries.Sum(e => e.OriginalSize),
                 TotalStoredSize = entries.Sum(e => e.StoredSize),
                 TotalFiles = entries.Sum(e => e.FileCount),
-                OldestBackup = entries.Min(e => e.CreatedAt),
-                NewestBackup = entries.Max(e => e.CreatedAt),
+                // P2-2534: Guard against empty-list exception from Enumerable.Min/Max.
+                OldestBackup = entries.Count > 0 ? entries.Min(e => e.CreatedAt) : (DateTimeOffset?)null,
+                NewestBackup = entries.Count > 0 ? entries.Max(e => e.CreatedAt) : (DateTimeOffset?)null,
                 BackupsByCategory = entries.GroupBy(e => e.Category).ToDictionary(g => g.Key, g => g.Count()),
                 BackupsByStrategy = entries.GroupBy(e => e.StrategyId).ToDictionary(g => g.Key, g => g.Count()),
                 EncryptedCount = entries.Count(e => e.IsEncrypted),

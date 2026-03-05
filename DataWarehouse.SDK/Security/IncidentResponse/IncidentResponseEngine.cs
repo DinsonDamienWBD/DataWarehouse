@@ -28,8 +28,12 @@ namespace DataWarehouse.SDK.Security.IncidentResponse
         private readonly BoundedDictionary<string, Incident> _incidents = new BoundedDictionary<string, Incident>(1000);
         private readonly BoundedDictionary<string, AutoResponseRule> _autoResponseRules = new BoundedDictionary<string, AutoResponseRule>(1000);
         private readonly BoundedDictionary<string, ConcurrentQueue<DateTimeOffset>> _eventWindows = new BoundedDictionary<string, ConcurrentQueue<DateTimeOffset>>(1000);
-        private readonly List<IDisposable> _subscriptions = new();
-        private bool _disposed;
+        private readonly ConcurrentBag<IDisposable> _subscriptions = new();
+        private int _disposed;
+        // Guards concurrent mutations of Incident.Status/ResolvedAt/Resolution (finding P2-578).
+        private readonly object _incidentStateLock = new();
+        // Atomic counter for active incidents — avoids O(n) scan in ActiveIncidentCount (finding P2-580).
+        private int _activeIncidentCount;
 
         /// <summary>
         /// Creates a new incident response engine.
@@ -52,7 +56,8 @@ namespace DataWarehouse.SDK.Security.IncidentResponse
         /// <summary>
         /// Number of active incidents.
         /// </summary>
-        public int ActiveIncidentCount => _incidents.Values.Count(i => i.Status == IncidentStatus.Open || i.Status == IncidentStatus.Contained);
+        /// <remarks>O(1) — maintained via atomic Interlocked operations on open/resolve paths (finding P2-580).</remarks>
+        public int ActiveIncidentCount => Interlocked.CompareExchange(ref _activeIncidentCount, 0, 0);
 
         /// <summary>
         /// Number of registered auto-response rules.
@@ -101,6 +106,7 @@ namespace DataWarehouse.SDK.Security.IncidentResponse
             };
 
             _incidents[incident.Id.ToString()] = incident;
+            Interlocked.Increment(ref _activeIncidentCount); // Track active count (finding P2-580)
 
             _logger.LogWarning("Security incident created: {IncidentId} [{Severity}] {Description}",
                 incident.Id, severity, description);
@@ -216,10 +222,13 @@ namespace DataWarehouse.SDK.Security.IncidentResponse
                 results.Add(result);
             }
 
-            // Update incident status
+            // Update incident status under lock to prevent concurrent playbook/resolution races
             var allSucceeded = results.All(r => r.Success);
-            incident.Status = allSucceeded ? IncidentStatus.Contained : IncidentStatus.Open;
-            incident.Actions.AddRange(results);
+            lock (_incidentStateLock)
+            {
+                incident.Status = allSucceeded ? IncidentStatus.Contained : IncidentStatus.Open;
+                incident.Actions.AddRange(results);
+            }
 
             var playbookResult = new PlaybookResult
             {
@@ -244,9 +253,15 @@ namespace DataWarehouse.SDK.Security.IncidentResponse
                 throw new KeyNotFoundException($"Incident '{incidentId}' not found");
             }
 
-            incident.Status = IncidentStatus.Resolved;
-            incident.ResolvedAt = DateTimeOffset.UtcNow;
-            incident.Resolution = resolution;
+            lock (_incidentStateLock)
+            {
+                bool wasActive = incident.Status == IncidentStatus.Open || incident.Status == IncidentStatus.Contained;
+                incident.Status = IncidentStatus.Resolved;
+                incident.ResolvedAt = DateTimeOffset.UtcNow;
+                incident.Resolution = resolution;
+                if (wasActive)
+                    Interlocked.Decrement(ref _activeIncidentCount); // Maintain O(1) counter (finding P2-580)
+            }
 
             await _auditTrail.RecordAsync(ObsAuditEntry.Create(
                 actor: "IncidentResponseEngine",
@@ -265,6 +280,18 @@ namespace DataWarehouse.SDK.Security.IncidentResponse
         public void RegisterAutoResponseRule(AutoResponseRule rule)
         {
             ArgumentNullException.ThrowIfNull(rule);
+
+            // Validate regex at registration time to prevent ReDoS during event processing
+            try
+            {
+                _ = new Regex(rule.EventPattern, RegexOptions.None, TimeSpan.FromMilliseconds(100));
+            }
+            catch (ArgumentException ex)
+            {
+                throw new ArgumentException(
+                    $"Auto-response rule '{rule.Name}' has invalid regex pattern: {ex.Message}", nameof(rule), ex);
+            }
+
             if (!_autoResponseRules.TryAdd(rule.Name, rule))
             {
                 throw new InvalidOperationException($"Auto-response rule '{rule.Name}' is already registered.");
@@ -280,7 +307,7 @@ namespace DataWarehouse.SDK.Security.IncidentResponse
         /// </summary>
         public void StartMonitoring()
         {
-            if (_disposed) throw new ObjectDisposedException(nameof(IncidentResponseEngine));
+            if (Volatile.Read(ref _disposed) != 0) throw new ObjectDisposedException(nameof(IncidentResponseEngine));
 
             // Subscribe to critical alerts for auto-incident creation
             var alertSub = _messageBus.SubscribePattern("security.alert.critical", async msg =>
@@ -407,14 +434,12 @@ namespace DataWarehouse.SDK.Security.IncidentResponse
         /// <inheritdoc />
         public void Dispose()
         {
-            if (_disposed) return;
-            _disposed = true;
+            if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0) return;
 
-            foreach (var sub in _subscriptions)
+            while (_subscriptions.TryTake(out var sub))
             {
                 sub.Dispose();
             }
-            _subscriptions.Clear();
         }
     }
 

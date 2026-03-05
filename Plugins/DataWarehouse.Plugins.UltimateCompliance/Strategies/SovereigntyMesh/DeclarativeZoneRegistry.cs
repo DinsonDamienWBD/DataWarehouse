@@ -42,16 +42,18 @@ public sealed class DeclarativeZoneRegistry : ComplianceStrategyBase
     public override string Framework => "SovereigntyMesh";
 
     /// <inheritdoc/>
-    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
+    public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
     {
+        // P2-1535: Call base first so that if base throws the zones are not left
+        // in a half-registered state that could cause inconsistent behaviour on retry.
+        await base.InitializeAsync(configuration, cancellationToken).ConfigureAwait(false);
+
         RegisterEuZones();
         RegisterAmericasZones();
         RegisterApacZones();
         RegisterMiddleEastAfricaZones();
         RegisterIndustryZones();
         RegisterSupranationalZones();
-
-        return base.InitializeAsync(configuration, cancellationToken);
     }
 
     // ==================================================================================
@@ -144,7 +146,7 @@ public sealed class DeclarativeZoneRegistry : ComplianceStrategyBase
     /// <inheritdoc/>
     protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
     {
-        IncrementCounter("zone_registry.check");
+            IncrementCounter("zone_registry.check");
         var violations = new List<ComplianceViolation>();
         var recommendations = new List<string>();
 
@@ -203,14 +205,17 @@ public sealed class DeclarativeZoneRegistry : ComplianceStrategyBase
             }
         }
 
-        var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+        var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+
+
+        var isCompliant = !hasHighViolations;
 
         return Task.FromResult(new ComplianceResult
         {
             IsCompliant = isCompliant,
             Framework = Framework,
             Status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                    violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                    hasHighViolations ? ComplianceStatus.NonCompliant :
                     ComplianceStatus.PartiallyCompliant,
             Violations = violations,
             Recommendations = recommendations,
@@ -226,14 +231,14 @@ public sealed class DeclarativeZoneRegistry : ComplianceStrategyBase
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("zone_registry.initialized");
+            IncrementCounter("zone_registry.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("zone_registry.shutdown");
+            IncrementCounter("zone_registry.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 

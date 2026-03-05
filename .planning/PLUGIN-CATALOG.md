@@ -224,6 +224,34 @@
 
 ---
 
+### UniversalFabric
+| Field | Value |
+|-------|-------|
+| **Plugin Class** | `UniversalFabricPlugin` |
+| **Base Class** | `StoragePluginBase` (implements `IStorageFabric`) |
+| **Plugin ID** | `com.datawarehouse.storage.universal-fabric` |
+| **Purpose** | Physical storage I/O routing — backend registry, placement optimization, S3-compatible server, live migration |
+| **Completeness** | Plugin orchestration REAL, all core operations production-ready |
+
+> **NAMING CLARIFICATION (Phase 94):** UniversalFabric is the *physical storage I/O routing* layer.
+> It routes Store/Retrieve/Delete/Copy/Move operations to registered backend storage strategies via
+> placement rules and address routing. It provides an S3-compatible HTTP server, live data migration
+> between backends, and fabric health monitoring.
+> Do NOT confuse with **UltimateDataFabric** (merged into UltimateDataManagement), which is a
+> *logical data virtualization* layer for unified views across heterogeneous data sources.
+
+**Key Components:**
+- `BackendRegistryImpl` — registers storage backends with descriptors and capabilities
+- `AddressRouter` — routes StorageAddress to backends via bucket/node/cluster mappings
+- `S3HttpServer` — S3-compatible HTTP API with V4 signature auth
+- `LiveMigrationEngine` — zero-downtime data migration between backends
+- `PlacementOptimizer` — optimal backend selection based on placement rules/scoring
+- `FabricScalingManager` — dynamic scaling with backpressure and topology management
+
+**v6.0 Impact:** Phase 95 E2E tests use UniversalFabric for cross-VDE operations.
+
+---
+
 ### WinFspDriver
 | Field | Value |
 |-------|-------|
@@ -496,6 +524,12 @@
 |-------|-------|
 | **Purpose** | Unified data access layer — virtual views, data virtualization |
 | **Completeness** | Plugin orchestration REAL, strategies mixed |
+
+> **NAMING CLARIFICATION (Phase 94):** UltimateDataFabric is the *logical data virtualization* layer
+> (unified views across heterogeneous data sources). It was merged into UltimateDataManagement as 13
+> fabric strategies. Do NOT confuse with **UniversalFabric**, which is a separate plugin providing
+> *physical storage I/O routing* (backend placement, S3-compatible server, live migration).
+> See [UniversalFabric](#universalfabric) in the Storage & Filesystem Layer.
 
 **v3.0 Impact:** Phase 34 (Federated Storage) dual-head router is essentially data fabric. Heavy orchestration.
 
@@ -1690,7 +1724,8 @@ Client Query (e.g., "SELECT * FROM objects WHERE metadata.type = 'image'")
 3. QUERY PLANNING
     ├── UltimateDataCatalog ──── Schema lookup, statistics for query optimization
     ├── UltimateDataMesh ─────── Cross-domain query routing (federated queries)
-    ├── UltimateDataFabric ───── Data virtualization (unified view across sources)
+    ├── UltimateDataFabric ───── Data virtualization (unified view across sources) [MERGED into UltimateDataManagement]
+    ├── UniversalFabric ──────── Physical storage I/O routing (backend placement, S3, migration)
     │
     ▼
 4. QUERY EXECUTION

@@ -109,7 +109,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
 
                 var request = new HttpRequestMessage(HttpMethod.Get, $"{_config.ApiUrl}/api/v3/workspaces/{_config.WorkspaceId}");
                 request.Headers.Add("Authorization", $"Bearer {_accessToken}");
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -127,11 +127,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             var request = CreateAuthenticatedRequest(HttpMethod.Get,
                 $"/api/v3/secrets/raw/{keyId}?workspaceId={_config.WorkspaceId}&environment={_config.Environment}");
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
 
             // Extract secret value
             var secretValue = doc.RootElement.GetProperty("secret").GetProperty("secretValue").GetString();
@@ -159,7 +159,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             var request = CreateAuthenticatedRequest(HttpMethod.Post, "/api/v3/secrets/raw");
             request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             _currentKeyId = keyId;
@@ -173,13 +173,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             var request = CreateAuthenticatedRequest(HttpMethod.Get,
                 $"/api/v3/secrets/raw?workspaceId={_config.WorkspaceId}&environment={_config.Environment}");
 
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
                 return Array.Empty<string>();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
 
             var secrets = new List<string>();
             foreach (var secret in doc.RootElement.GetProperty("secrets").EnumerateArray())
@@ -215,7 +215,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             var request = CreateAuthenticatedRequest(HttpMethod.Delete, "/api/v3/secrets/raw");
             request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
         }
 
@@ -229,13 +229,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
                 var request = CreateAuthenticatedRequest(HttpMethod.Get,
                     $"/api/v3/secrets/raw/{keyId}?workspaceId={_config.WorkspaceId}&environment={_config.Environment}");
 
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                     return null;
 
                 var json = await response.Content.ReadAsStringAsync(cancellationToken);
-                var doc = JsonDocument.Parse(json);
+                using var doc = JsonDocument.Parse(json);
                 var secret = doc.RootElement.GetProperty("secret");
 
                 var secretKey = secret.GetProperty("secretKey").GetString() ?? keyId;
@@ -278,11 +278,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             var request = new HttpRequestMessage(HttpMethod.Post, $"{_config.ApiUrl}/api/v1/auth/universal-auth/login");
             request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
 
             _accessToken = doc.RootElement.GetProperty("accessToken").GetString();
             var expiresIn = doc.RootElement.GetProperty("expiresIn").GetInt32();
@@ -305,7 +305,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
 
                 var request = new HttpRequestMessage(HttpMethod.Get, $"{_config.ApiUrl}/api/v3/workspaces/{_config.WorkspaceId}");
                 request.Headers.Add("Authorization", $"Bearer {_accessToken}");
-                var response = await _httpClient.SendAsync(request);
+                using var response = await _httpClient.SendAsync(request);
                 return response.IsSuccessStatusCode;
             }
             catch

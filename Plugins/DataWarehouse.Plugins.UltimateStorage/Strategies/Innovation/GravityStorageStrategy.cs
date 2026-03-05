@@ -30,7 +30,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
     /// </summary>
     public class GravityStorageStrategy : UltimateStorageStrategyBase
     {
+        // Populated once in InitializeCoreAsync under _initLock; read-only afterwards — no lock needed for reads.
         private readonly List<LocationNode> _locations = new();
+        private IReadOnlyList<LocationNode> _locationsSnapshot = Array.Empty<LocationNode>();
         private readonly BoundedDictionary<string, ObjectLocationInfo> _objectLocations = new BoundedDictionary<string, ObjectLocationInfo>(1000);
         private readonly BoundedDictionary<string, BoundedDictionary<string, long>> _locationAccessCounts = new BoundedDictionary<string, BoundedDictionary<string, long>>(1000);
         private int _migrationThreshold = 10;
@@ -83,6 +85,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     _locationAccessCounts[locationId] = new BoundedDictionary<string, long>(1000);
                 }
 
+                // Publish immutable snapshot so reader threads see a stable list without locking
+                _locationsSnapshot = _locations.ToArray();
+
                 if (_enableAutoMigration)
                 {
                     _migrationTimer = new Timer(_ => AnalyzeAndMigrate(), null,
@@ -105,7 +110,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             await data.CopyToAsync(ms, ct);
             var dataBytes = ms.ToArray();
 
-            var primaryLocation = _locations.OrderByDescending(l => l.Weight).First();
+            var primaryLocation = _locationsSnapshot.OrderByDescending(l => l.Weight).First();
             var filePath = Path.Combine(primaryLocation.Path, key);
             var dir = Path.GetDirectoryName(filePath);
             if (!string.IsNullOrEmpty(dir))
@@ -142,7 +147,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 throw new FileNotFoundException($"Object with key '{key}' not found", key);
             }
 
-            var location = _locations.First(l => l.Id == locationInfo.PrimaryLocationId);
+            var location = _locationsSnapshot.First(l => l.Id == locationInfo.PrimaryLocationId);
             var filePath = Path.Combine(location.Path, key);
 
             if (!File.Exists(filePath))
@@ -165,7 +170,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
             if (_objectLocations.TryRemove(key, out var locationInfo))
             {
-                var location = _locations.First(l => l.Id == locationInfo.PrimaryLocationId);
+                var location = _locationsSnapshot.First(l => l.Id == locationInfo.PrimaryLocationId);
                 var filePath = Path.Combine(location.Path, key);
 
                 if (File.Exists(filePath))
@@ -233,12 +238,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         {
             EnsureInitialized();
 
-            var healthyLocations = _locations.Count(l => l.IsHealthy);
+            var snapshot = _locationsSnapshot;
+            var healthyLocations = snapshot.Count(l => l.IsHealthy);
             return new StorageHealthInfo
             {
                 Status = healthyLocations > 0 ? HealthStatus.Healthy : HealthStatus.Unhealthy,
                 LatencyMs = 5,
-                Message = $"Healthy Locations: {healthyLocations}/{_locations.Count}",
+                Message = $"Healthy Locations: {healthyLocations}/{snapshot.Count}",
                 CheckedAt = DateTime.UtcNow
             };
         }
@@ -248,6 +254,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             EnsureInitialized();
             await Task.CompletedTask;
             return long.MaxValue;
+        }
+
+        protected override async ValueTask DisposeCoreAsync()
+        {
+            if (_migrationTimer != null)
+            {
+                await _migrationTimer.DisposeAsync().ConfigureAwait(false);
+                _migrationTimer = null;
+            }
+            await base.DisposeCoreAsync().ConfigureAwait(false);
         }
 
         private void AnalyzeAndMigrate()
@@ -278,8 +294,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
         private async Task MigrateObjectAsync(string key, string fromLocationId, string toLocationId)
         {
-            var fromLocation = _locations.First(l => l.Id == fromLocationId);
-            var toLocation = _locations.First(l => l.Id == toLocationId);
+            var fromLocation = _locationsSnapshot.First(l => l.Id == fromLocationId);
+            var toLocation = _locationsSnapshot.First(l => l.Id == toLocationId);
 
             var sourcePath = Path.Combine(fromLocation.Path, key);
             var targetPath = Path.Combine(toLocation.Path, key);

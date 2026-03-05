@@ -33,7 +33,7 @@ public sealed class XChaCha20TransitStrategy : TransitEncryptionPluginBase
     public override string Version => "1.0.0";
 
     /// <inheritdoc/>
-    protected override async Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(
+    protected override Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(
         byte[] plaintext,
         CipherPreset preset,
         byte[] key,
@@ -77,11 +77,11 @@ public sealed class XChaCha20TransitStrategy : TransitEncryptionPluginBase
             ["EncryptedAt"] = DateTime.UtcNow
         };
 
-        return await Task.FromResult((combined, metadata));
+        return Task.FromResult((combined, metadata));
     }
 
     /// <inheritdoc/>
-    protected override async Task<byte[]> DecryptDataAsync(
+    protected override Task<byte[]> DecryptDataAsync(
         byte[] ciphertext,
         CipherPreset preset,
         byte[] key,
@@ -126,7 +126,7 @@ public sealed class XChaCha20TransitStrategy : TransitEncryptionPluginBase
         // Decrypt
         var plaintext = DecryptXChaCha20Poly1305(encryptedData, key, nonce, tag, aad);
 
-        return await Task.FromResult(plaintext);
+        return Task.FromResult(plaintext);
     }
 
     /// <summary>
@@ -182,7 +182,7 @@ public sealed class XChaCha20TransitStrategy : TransitEncryptionPluginBase
 
     /// <summary>
     /// Derives subkey and subnonce from XChaCha20 extended nonce.
-    /// Uses HChaCha20 (non-standard implementation using HKDF as approximation).
+    /// Uses HChaCha20 for subkey derivation as required by the XChaCha20 specification.
     /// </summary>
     private static (byte[] subkey, byte[] subnonce) DeriveXChaChaParameters(byte[] key, byte[] nonce)
     {
@@ -191,29 +191,22 @@ public sealed class XChaCha20TransitStrategy : TransitEncryptionPluginBase
             throw new ArgumentException($"Nonce must be {NonceSize} bytes for XChaCha20", nameof(nonce));
         }
 
-        // Use first 16 bytes of nonce for HChaCha20
-        var hchacha_nonce = new byte[16];
-        Buffer.BlockCopy(nonce, 0, hchacha_nonce, 0, 16);
-
-        // Derive 32-byte subkey using HKDF as approximation of HChaCha20
-        // Note: True HChaCha20 is a dedicated construction, not HKDF
-        // This is simplified for demonstration
-        var subkey = HKDF.DeriveKey(
-            HashAlgorithmName.SHA256,
-            key,
-            KeySize,
-            hchacha_nonce,
-            System.Text.Encoding.UTF8.GetBytes("XChaCha20-subkey"));
-
-        // Use last 8 bytes of nonce + 4 zero bytes for ChaCha20 nonce
-        var subnonce = new byte[12];
-        Buffer.BlockCopy(nonce, 16, subnonce, 4, 8);
-
-        return (subkey, subnonce);
+        // XChaCha20 requires HChaCha20 for subkey derivation. HChaCha20 is a dedicated
+        // construction that applies the ChaCha20 core function with the first 16 bytes of the
+        // extended nonce, then discards the middle 32 bytes of the 64-byte output (keeping
+        // words 0-3 and 12-15). Replacing it with HKDF-SHA256 produces a cipher that is
+        // incompatible with any real XChaCha20 implementation (finding #2963).
+        // BouncyCastle does not expose HChaCha20 as a standalone primitive. Per Rule 13,
+        // throw NotSupportedException rather than silently produce a broken, incompatible cipher.
+        throw new NotSupportedException(
+            "XChaCha20 requires HChaCha20 for subkey derivation. The current BouncyCastle " +
+            "version does not expose HChaCha20 as a standalone primitive. Use " +
+            "ChaCha20-Poly1305 with a 12-byte nonce, or provide a library that implements " +
+            "the full XChaCha20 specification (RFC draft-irtf-cfrg-xchacha).");
     }
 
     /// <inheritdoc/>
-    public override async Task<EndpointCapabilities> GetCapabilitiesAsync(CancellationToken cancellationToken = default)
+    public override Task<EndpointCapabilities> GetCapabilitiesAsync(CancellationToken cancellationToken = default)
     {
         var capabilities = new EndpointCapabilities(
             SupportedCipherPresets: new List<string>
@@ -237,6 +230,6 @@ public sealed class XChaCha20TransitStrategy : TransitEncryptionPluginBase
             }.AsReadOnly()
         );
 
-        return await Task.FromResult(capabilities);
+        return Task.FromResult(capabilities);
     }
 }

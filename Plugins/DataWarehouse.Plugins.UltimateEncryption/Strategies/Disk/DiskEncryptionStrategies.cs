@@ -154,6 +154,11 @@ public sealed class XtsAes256Strategy : EncryptionStrategyBase
         aesKey1.Padding = PaddingMode.None;
 
         using var encryptor1 = aesKey1.CreateEncryptor();
+        // Use TransformBlock (not TransformFinalBlock) for all blocks inside the loop.
+        // TransformFinalBlock resets internal ICryptoTransform state after each call, which
+        // makes the next call independent (correct for ECB mode), but is ~2x slower than
+        // TransformBlock and has unnecessary overhead for multi-block processing (#2944).
+        var encBuf = new byte[AesBlockSize];
 
         for (int i = 0; i < blockCount; i++)
         {
@@ -164,13 +169,13 @@ public sealed class XtsAes256Strategy : EncryptionStrategyBase
             // XOR plaintext with tweak
             XorBlocks(plaintextBlock, tweak);
 
-            // Encrypt with AES
-            var encryptedBlock = encryptor1.TransformFinalBlock(plaintextBlock, 0, AesBlockSize);
+            // Encrypt with AES using TransformBlock for efficiency
+            encryptor1.TransformBlock(plaintextBlock, 0, AesBlockSize, encBuf, 0);
 
             // XOR result with tweak
-            XorBlocks(encryptedBlock, tweak);
+            XorBlocks(encBuf, tweak);
 
-            Buffer.BlockCopy(encryptedBlock, 0, ciphertext, blockOffset, AesBlockSize);
+            Buffer.BlockCopy(encBuf, 0, ciphertext, blockOffset, AesBlockSize);
 
             // Multiply tweak by alpha (primitive element in GF(2^128))
             MultiplyTweakByAlpha(tweak);
@@ -191,12 +196,12 @@ public sealed class XtsAes256Strategy : EncryptionStrategyBase
             Buffer.BlockCopy(lastFullBlock, 0, ciphertext, blockCount * AesBlockSize, remainder);
             Buffer.BlockCopy(partialBlock, 0, lastFullBlock, 0, remainder);
 
-            // Re-encrypt the modified last block
+            // Re-encrypt the modified last block using TransformBlock
             XorBlocks(lastFullBlock, tweak);
-            var finalBlock = encryptor1.TransformFinalBlock(lastFullBlock, 0, AesBlockSize);
-            XorBlocks(finalBlock, tweak);
+            encryptor1.TransformBlock(lastFullBlock, 0, AesBlockSize, encBuf, 0);
+            XorBlocks(encBuf, tweak);
 
-            Buffer.BlockCopy(finalBlock, 0, ciphertext, (blockCount - 1) * AesBlockSize, AesBlockSize);
+            Buffer.BlockCopy(encBuf, 0, ciphertext, (blockCount - 1) * AesBlockSize, AesBlockSize);
         }
 
         return ciphertext;
@@ -239,6 +244,7 @@ public sealed class XtsAes256Strategy : EncryptionStrategyBase
         aesKey1.Padding = PaddingMode.None;
 
         using var decryptor = aesKey1.CreateDecryptor();
+        var decBuf = new byte[AesBlockSize];
 
         for (int i = 0; i < blockCount; i++)
         {
@@ -247,10 +253,11 @@ public sealed class XtsAes256Strategy : EncryptionStrategyBase
             Buffer.BlockCopy(ciphertext, blockOffset, ciphertextBlock, 0, AesBlockSize);
 
             XorBlocks(ciphertextBlock, tweak);
-            var decryptedBlock = decryptor.TransformFinalBlock(ciphertextBlock, 0, AesBlockSize);
-            XorBlocks(decryptedBlock, tweak);
+            // Use TransformBlock for efficiency (#2944)
+            decryptor.TransformBlock(ciphertextBlock, 0, AesBlockSize, decBuf, 0);
+            XorBlocks(decBuf, tweak);
 
-            Buffer.BlockCopy(decryptedBlock, 0, plaintext, blockOffset, AesBlockSize);
+            Buffer.BlockCopy(decBuf, 0, plaintext, blockOffset, AesBlockSize);
             MultiplyTweakByAlpha(tweak);
         }
 
@@ -268,10 +275,10 @@ public sealed class XtsAes256Strategy : EncryptionStrategyBase
             Buffer.BlockCopy(partialBlock, 0, lastFullBlock, 0, remainder);
 
             XorBlocks(lastFullBlock, tweak);
-            var finalBlock = decryptor.TransformFinalBlock(lastFullBlock, 0, AesBlockSize);
-            XorBlocks(finalBlock, tweak);
+            decryptor.TransformBlock(lastFullBlock, 0, AesBlockSize, decBuf, 0);
+            XorBlocks(decBuf, tweak);
 
-            Buffer.BlockCopy(finalBlock, 0, plaintext, (blockCount - 1) * AesBlockSize, AesBlockSize);
+            Buffer.BlockCopy(decBuf, 0, plaintext, (blockCount - 1) * AesBlockSize, AesBlockSize);
         }
 
         return plaintext;
@@ -499,10 +506,16 @@ public sealed class AdiantumStrategy : EncryptionStrategyBase
             }
         }
 
-        // Return first 16 bytes of hash
+        // Return 16 bytes of hash using both halves of the accumulator (#2945).
+        // The previous code wrote (accumulator >> 32) zero-extended to 64 bits into bytes 8-15,
+        // making the high word always zero. We now write the two 32-bit halves independently.
         var hashBytes = new byte[16];
         BitConverter.TryWriteBytes(hashBytes.AsSpan(0, 8), accumulator);
-        BitConverter.TryWriteBytes(hashBytes.AsSpan(8, 8), accumulator >> 32);
+        // Bytes 8-11: high 32 bits of accumulator; bytes 12-15: low 32 bits for mixing
+        uint hi32 = (uint)(accumulator >> 32);
+        uint lo32 = (uint)(accumulator & 0xFFFFFFFFu);
+        BitConverter.TryWriteBytes(hashBytes.AsSpan(8, 4), hi32);
+        BitConverter.TryWriteBytes(hashBytes.AsSpan(12, 4), lo32 ^ hi32); // simple diffusion
         return hashBytes;
     }
 
@@ -512,16 +525,9 @@ public sealed class AdiantumStrategy : EncryptionStrategyBase
     /// </summary>
     private static byte[] GenerateXChaChaKeystream(byte[] key, byte[] nonce, int length)
     {
-        // Use ChaCha20 as approximation (XChaCha12 not available in standard library)
-        var keystream = new byte[length];
-
-        // Derive subkey using HChaCha20 (simplified with HKDF)
-        var subkey = HKDF.DeriveKey(
-            HashAlgorithmName.SHA256,
-            key,
-            32,
-            nonce.Take(16).ToArray(),
-            "XChaCha"u8.ToArray());
+        // P2-2952: Use proper HChaCha20 subkey derivation (not HKDF-SHA256 approximation).
+        // XChaCha20 spec (draft-irtf-cfrg-xchacha): first 16 bytes of nonce feed HChaCha20.
+        var subkey = HChaCha20(key, nonce.AsSpan(0, 16).ToArray());
 
         var chachaNonce = new byte[12];
         Buffer.BlockCopy(nonce, 16, chachaNonce, 4, 8);
@@ -534,6 +540,53 @@ public sealed class AdiantumStrategy : EncryptionStrategyBase
 
         chacha.Encrypt(chachaNonce, plaintextZeros, ciphertext, tag);
         return ciphertext;
+    }
+
+    /// <summary>
+    /// HChaCha20 subkey derivation for XChaCha20 (draft-irtf-cfrg-xchacha).
+    /// Takes a 32-byte key and a 16-byte input nonce, returns a 32-byte subkey by running
+    /// 20 rounds of the ChaCha core and extracting the first and last 4 words.
+    /// </summary>
+    private static byte[] HChaCha20(byte[] key, byte[] inputNonce)
+    {
+        var state = new uint[16];
+        state[0] = 0x61707865; // "expa"
+        state[1] = 0x3320646e; // "nd 3"
+        state[2] = 0x79622d32; // "2-by"
+        state[3] = 0x6b206574; // "te k"
+        for (int i = 0; i < 8; i++)
+            state[4 + i] = BitConverter.ToUInt32(key, i * 4);
+        for (int i = 0; i < 4; i++)
+            state[12 + i] = BitConverter.ToUInt32(inputNonce, i * 4);
+
+        // 20 rounds (10 double rounds)
+        for (int r = 0; r < 10; r++)
+        {
+            ChaChaQuarterRound(ref state[0], ref state[4], ref state[8], ref state[12]);
+            ChaChaQuarterRound(ref state[1], ref state[5], ref state[9], ref state[13]);
+            ChaChaQuarterRound(ref state[2], ref state[6], ref state[10], ref state[14]);
+            ChaChaQuarterRound(ref state[3], ref state[7], ref state[11], ref state[15]);
+            ChaChaQuarterRound(ref state[0], ref state[5], ref state[10], ref state[15]);
+            ChaChaQuarterRound(ref state[1], ref state[6], ref state[11], ref state[12]);
+            ChaChaQuarterRound(ref state[2], ref state[7], ref state[8], ref state[13]);
+            ChaChaQuarterRound(ref state[3], ref state[4], ref state[9], ref state[14]);
+        }
+
+        // Output: first 4 words (state[0-3]) + last 4 words (state[12-15])
+        var output = new byte[32];
+        for (int i = 0; i < 4; i++)
+            BitConverter.GetBytes(state[i]).CopyTo(output, i * 4);
+        for (int i = 0; i < 4; i++)
+            BitConverter.GetBytes(state[12 + i]).CopyTo(output, 16 + i * 4);
+        return output;
+    }
+
+    private static void ChaChaQuarterRound(ref uint a, ref uint b, ref uint c, ref uint d)
+    {
+        a += b; d ^= a; d = (d << 16) | (d >> 16);
+        c += d; b ^= c; b = (b << 12) | (b >> 20);
+        a += b; d ^= a; d = (d << 8) | (d >> 24);
+        c += d; b ^= c; b = (b << 7) | (b >> 25);
     }
 
     /// <summary>

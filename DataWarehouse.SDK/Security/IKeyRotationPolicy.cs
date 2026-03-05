@@ -170,14 +170,14 @@ namespace DataWarehouse.SDK.Security
     /// </summary>
     public record KeyRotationMetadata
     {
-        /// <summary>When the key was created.</summary>
-        public DateTime CreatedAt { get; init; }
+        /// <summary>When the key was created (UTC, unambiguous in distributed systems).</summary>
+        public DateTimeOffset CreatedAt { get; init; }
 
-        /// <summary>When the key was last used.</summary>
-        public DateTime? LastUsedAt { get; init; }
+        /// <summary>When the key was last used (UTC).</summary>
+        public DateTimeOffset? LastUsedAt { get; init; }
 
-        /// <summary>When the key was last rotated (null if never rotated).</summary>
-        public DateTime? LastRotatedAt { get; init; }
+        /// <summary>When the key was last rotated (UTC, null if never rotated).</summary>
+        public DateTimeOffset? LastRotatedAt { get; init; }
 
         /// <summary>Number of operations performed with this key.</summary>
         public long UsageCount { get; init; }

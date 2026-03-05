@@ -63,19 +63,21 @@ public sealed class ZipkinStrategy : ObservabilityStrategyBase
 
         var json = JsonSerializer.Serialize(zipkinSpans);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{_url}/api/v2/spans", content, cancellationToken);
+        using var response = await _httpClient.PostAsync($"{_url}/api/v2/spans", content, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
     public async Task<string> GetServicesAsync(CancellationToken ct = default)
     {
-        var response = await _httpClient.GetAsync($"{_url}/api/v2/services", ct);
+        using var response = await _httpClient.GetAsync($"{_url}/api/v2/services", ct);
+ response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(ct);
     }
 
     public async Task<string> GetTraceAsync(string traceId, CancellationToken ct = default)
     {
-        var response = await _httpClient.GetAsync($"{_url}/api/v2/trace/{traceId}", ct);
+        using var response = await _httpClient.GetAsync($"{_url}/api/v2/trace/{traceId}", ct);
+ response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(ct);
     }
 
@@ -89,7 +91,7 @@ public sealed class ZipkinStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{_url}/health", ct);
+            using var response = await _httpClient.GetAsync($"{_url}/health", ct);
             return new HealthCheckResult(response.IsSuccessStatusCode,
                 response.IsSuccessStatusCode ? "Zipkin is healthy" : "Zipkin unhealthy",
                 new Dictionary<string, object> { ["url"] = _url, ["serviceName"] = _serviceName });
@@ -109,17 +111,11 @@ public sealed class ZipkinStrategy : ObservabilityStrategyBase
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("zipkin.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     protected override void Dispose(bool disposing) { if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }

@@ -244,7 +244,7 @@ public sealed class SqliteConnectionStrategy : DatabaseConnectionStrategyBase
                 var tableName = tablesReader.GetString(0);
 
                 // Get table info
-                var tableInfoQuery = $"PRAGMA table_info('{tableName}')";
+                var tableInfoQuery = $"PRAGMA table_info([{tableName.Replace("]", "]]")}])";
                 var fields = new List<DataSchemaField>();
                 var primaryKeys = new List<string>();
 

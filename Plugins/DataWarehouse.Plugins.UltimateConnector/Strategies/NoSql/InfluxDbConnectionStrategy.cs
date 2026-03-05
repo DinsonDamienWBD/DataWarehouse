@@ -13,7 +13,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
     /// </summary>
     public class InfluxDbConnectionStrategy : DatabaseConnectionStrategyBase
     {
-        private HttpClient? _httpClient;
+        private volatile HttpClient? _httpClient;
 
         public override string StrategyId => "influxdb";
         public override string DisplayName => "InfluxDB";
@@ -47,7 +47,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
             if (config.AuthMethod == "bearer" && !string.IsNullOrEmpty(config.AuthCredential))
                 _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Token", config.AuthCredential);
 
-            var response = await _httpClient.GetAsync("/ping", ct);
+            using var response = await _httpClient.GetAsync("/ping", ct);
             response.EnsureSuccessStatusCode();
 
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object>
@@ -62,24 +62,24 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
             if (_httpClient == null) return false;
             try
             {
-                var response = await _httpClient.GetAsync("/ping", ct);
+                using var response = await _httpClient.GetAsync("/ping", ct);
                 return response.IsSuccessStatusCode;
             }
             catch { return false; /* Connection validation - failure acceptable */ }
         }
 
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
-        {
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) {
             _httpClient?.Dispose();
-            _httpClient = null;
-            await Task.CompletedTask;
-        }
+            _httpClient = null; return Task.CompletedTask; }
 
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
+            // P2-2180: Measure actual latency with Stopwatch instead of hardcoded value.
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             var isHealthy = await TestCoreAsync(handle, ct);
+            sw.Stop();
             return new ConnectionHealth(isHealthy, isHealthy ? "InfluxDB healthy" : "InfluxDB unhealthy",
-                TimeSpan.FromMilliseconds(5), DateTimeOffset.UtcNow);
+                sw.Elapsed, DateTimeOffset.UtcNow);
         }
 
         /// <summary>
@@ -105,7 +105,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
             {
                 var org = parameters?.GetValueOrDefault("org")?.ToString() ?? "default";
                 var content = new StringContent(query, System.Text.Encoding.UTF8, "application/vnd.flux");
-                var response = await _httpClient.PostAsync($"/api/v2/query?org={org}", content, ct);
+                using var response = await _httpClient.PostAsync($"/api/v2/query?org={org}", content, ct);
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -135,7 +135,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
                         if (line.StartsWith("#") || string.IsNullOrWhiteSpace(line))
                             continue;
 
-                        var values = line.Split(',');
+                        // Finding 2053: Use RFC 4180-compliant CSV parsing that handles quoted
+                        // fields containing commas and escaped double-quotes.
+                        var values = ParseCsvLine(line);
                         if (headers == null)
                         {
                             headers = values;
@@ -182,7 +184,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
                 var org = parameters?.GetValueOrDefault("org")?.ToString() ?? "default";
 
                 var content = new StringContent(command, System.Text.Encoding.UTF8, "text/plain");
-                var response = await _httpClient.PostAsync($"/api/v2/write?bucket={bucket}&org={org}", content, ct);
+                using var response = await _httpClient.PostAsync($"/api/v2/write?bucket={bucket}&org={org}", content, ct);
 
                 return response.IsSuccessStatusCode ? 1 : -1;
             }
@@ -202,7 +204,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
 
             try
             {
-                var response = await _httpClient.GetAsync("/api/v2/buckets", ct);
+                using var response = await _httpClient.GetAsync("/api/v2/buckets", ct);
                 if (!response.IsSuccessStatusCode)
                     return Array.Empty<DataSchema>();
 
@@ -246,6 +248,59 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
             var clean = connectionString.Replace("http://", "").Replace("https://", "").Split('/')[0];
             var parts = clean.Split(':');
             return (parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : defaultPort);
+        }
+
+        /// <summary>
+        /// RFC 4180-compliant CSV line parser that correctly handles quoted fields containing
+        /// commas or double-quotes. Finding 2053: fixes split(',') which breaks on quoted values.
+        /// </summary>
+        private static string[] ParseCsvLine(string line)
+        {
+            var fields = new List<string>();
+            var current = new System.Text.StringBuilder();
+            bool inQuotes = false;
+            int i = 0;
+            while (i < line.Length)
+            {
+                char c = line[i];
+                if (inQuotes)
+                {
+                    if (c == '"')
+                    {
+                        // Check for escaped double-quote ("")
+                        if (i + 1 < line.Length && line[i + 1] == '"')
+                        {
+                            current.Append('"');
+                            i += 2;
+                            continue;
+                        }
+                        inQuotes = false;
+                    }
+                    else
+                    {
+                        current.Append(c);
+                    }
+                }
+                else
+                {
+                    if (c == '"')
+                    {
+                        inQuotes = true;
+                    }
+                    else if (c == ',')
+                    {
+                        fields.Add(current.ToString());
+                        current.Clear();
+                    }
+                    else
+                    {
+                        current.Append(c);
+                    }
+                }
+                i++;
+            }
+            fields.Add(current.ToString());
+            return fields.ToArray();
         }
     }
 }

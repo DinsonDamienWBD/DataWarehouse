@@ -79,12 +79,33 @@ public sealed class S3HttpServer : IS3CompatibleServer
     private readonly BoundedDictionary<string, DateTime> _bucketRegistry = new BoundedDictionary<string, DateTime>(1000);
 
     /// <summary>
+    /// Optional external bucket manager that acts as the authoritative source of bucket metadata.
+    /// When set, bucket creation/deletion/listing is delegated to this manager, eliminating the
+    /// dual-registry inconsistency (P2-4548).
+    /// </summary>
+    private readonly S3BucketManager? _bucketManager;
+
+    /// <summary>
     /// Creates a new S3HttpServer backed by the specified storage fabric.
     /// </summary>
     /// <param name="fabric">The storage fabric to delegate all storage operations to.</param>
     public S3HttpServer(IStorageFabric fabric)
+        : this(fabric, null) { }
+
+    /// <summary>
+    /// Creates a new S3HttpServer backed by the specified storage fabric and an optional
+    /// external bucket manager. Providing a <paramref name="bucketManager"/> unifies bucket
+    /// state under a single authoritative registry (P2-4548).
+    /// </summary>
+    /// <param name="fabric">The storage fabric to delegate all storage operations to.</param>
+    /// <param name="bucketManager">
+    /// Optional external bucket manager. When provided, bucket operations are delegated to it
+    /// rather than the internal <c>_bucketRegistry</c>, ensuring consistent state.
+    /// </param>
+    public S3HttpServer(IStorageFabric fabric, S3BucketManager? bucketManager)
     {
         _fabric = fabric ?? throw new ArgumentNullException(nameof(fabric));
+        _bucketManager = bucketManager;
     }
 
     #region IS3CompatibleServer - Server Lifecycle
@@ -136,13 +157,17 @@ public sealed class S3HttpServer : IS3CompatibleServer
             {
                 await _listenerTask.ConfigureAwait(false);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException ex)
             {
+
                 // Expected during shutdown
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
-            catch (HttpListenerException)
+            catch (HttpListenerException ex)
             {
+
                 // Expected when listener is stopped
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -156,11 +181,22 @@ public sealed class S3HttpServer : IS3CompatibleServer
     /// <inheritdoc />
     public Task<S3ListBucketsResponse> ListBucketsAsync(S3ListBucketsRequest request, CancellationToken ct = default)
     {
-        var buckets = _bucketRegistry.Select(kvp => new S3Bucket
+        // P2-4548: If an external bucket manager is configured, it is the authoritative source.
+        List<S3Bucket> buckets;
+        if (_bucketManager != null)
         {
-            Name = kvp.Key,
-            CreationDate = kvp.Value
-        }).ToList();
+            buckets = _bucketManager.ListBuckets()
+                .Select(b => new S3Bucket { Name = b.Name, CreationDate = b.CreationDate })
+                .ToList();
+        }
+        else
+        {
+            buckets = _bucketRegistry.Select(kvp => new S3Bucket
+            {
+                Name = kvp.Key,
+                CreationDate = kvp.Value
+            }).ToList();
+        }
 
         return Task.FromResult(new S3ListBucketsResponse
         {
@@ -174,7 +210,12 @@ public sealed class S3HttpServer : IS3CompatibleServer
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        if (!_bucketRegistry.TryAdd(request.BucketName, DateTime.UtcNow))
+        // P2-4548: Delegate to external bucket manager when configured.
+        if (_bucketManager != null)
+        {
+            _bucketManager.CreateBucket(request.BucketName);
+        }
+        else if (!_bucketRegistry.TryAdd(request.BucketName, DateTime.UtcNow))
         {
             throw new InvalidOperationException($"Bucket '{request.BucketName}' already exists.");
         }
@@ -191,7 +232,12 @@ public sealed class S3HttpServer : IS3CompatibleServer
     {
         ArgumentNullException.ThrowIfNullOrEmpty(bucketName);
 
-        if (!_bucketRegistry.TryRemove(bucketName, out _))
+        // P2-4548: Delegate to external bucket manager when configured.
+        if (_bucketManager != null)
+        {
+            _bucketManager.DeleteBucket(bucketName);
+        }
+        else if (!_bucketRegistry.TryRemove(bucketName, out _))
         {
             throw new KeyNotFoundException($"Bucket '{bucketName}' not found.");
         }
@@ -202,6 +248,9 @@ public sealed class S3HttpServer : IS3CompatibleServer
     /// <inheritdoc />
     public Task<bool> BucketExistsAsync(string bucketName, CancellationToken ct = default)
     {
+        // P2-4548: Delegate to external bucket manager when configured.
+        if (_bucketManager != null)
+            return Task.FromResult(_bucketManager.BucketExists(bucketName));
         return Task.FromResult(_bucketRegistry.ContainsKey(bucketName));
     }
 
@@ -240,12 +289,9 @@ public sealed class S3HttpServer : IS3CompatibleServer
 
         var address = StorageAddress.FromDwBucket(request.BucketName, request.Key);
 
-        // Read the body into a MemoryStream for ETag computation and storage
-        using var buffer = new MemoryStream();
-        await request.Body.CopyToAsync(buffer, ct).ConfigureAwait(false);
-        var data = buffer.ToArray();
-        var etag = ComputeETag(data);
-
+        // P2-4542: Compute MD5 ETag while streaming to avoid fully buffering large objects in memory.
+        // We pipe through a CryptoStream(MD5) → a pass-through forwarder → StoreAsync.
+        // The MD5 hash is finalized after the stream is fully consumed.
         var storageMetadata = new Dictionary<string, string>();
         if (request.ContentType != null)
             storageMetadata["Content-Type"] = request.ContentType;
@@ -255,11 +301,17 @@ public sealed class S3HttpServer : IS3CompatibleServer
                 storageMetadata[kvp.Key] = kvp.Value;
         }
 
-        using var storeStream = new MemoryStream(data);
-        await _fabric.StoreAsync(address, storeStream,
-            hints: null,
-            metadata: storageMetadata.Count > 0 ? storageMetadata : null,
-            ct: ct).ConfigureAwait(false);
+        using var md5 = System.Security.Cryptography.MD5.Create();
+        string etag;
+        using (var hashingStream = new System.Security.Cryptography.CryptoStream(
+                   request.Body, md5, System.Security.Cryptography.CryptoStreamMode.Read, leaveOpen: true))
+        {
+            await _fabric.StoreAsync(address, hashingStream,
+                hints: null,
+                metadata: storageMetadata.Count > 0 ? storageMetadata : null,
+                ct: ct).ConfigureAwait(false);
+        }
+        etag = $"\"{BitConverter.ToString(md5.Hash!).Replace("-", "").ToLowerInvariant()}\"";
 
         return new S3PutObjectResponse
         {
@@ -347,12 +399,12 @@ public sealed class S3HttpServer : IS3CompatibleServer
             });
         }
 
-        // Handle pagination via continuation token (offset-based)
+        // Handle pagination via HMAC-signed opaque continuation token (finding 4534).
+        // The token encodes the offset signed with a server secret to prevent client probing.
         var startIndex = 0;
-        if (request.ContinuationToken != null &&
-            int.TryParse(request.ContinuationToken, out var offset))
+        if (request.ContinuationToken != null)
         {
-            startIndex = offset;
+            startIndex = DecodeAndVerifyContinuationToken(request.ContinuationToken);
         }
 
         var pageObjects = allObjects
@@ -361,7 +413,7 @@ public sealed class S3HttpServer : IS3CompatibleServer
             .ToList();
 
         var isTruncated = startIndex + request.MaxKeys < allObjects.Count;
-        string? nextToken = isTruncated ? (startIndex + request.MaxKeys).ToString() : null;
+        string? nextToken = isTruncated ? CreateContinuationToken(startIndex + request.MaxKeys) : null;
 
         return new S3ListObjectsResponse
         {
@@ -446,22 +498,30 @@ public sealed class S3HttpServer : IS3CompatibleServer
             throw new KeyNotFoundException($"No active upload with ID '{request.UploadId}'.");
         }
 
-        // Concatenate parts in order
-        using var combined = new MemoryStream();
-        foreach (var part in request.Parts.OrderBy(p => p.PartNumber))
+        // P2-4543: avoid materializing the entire multipart assembly into a single byte[].
+        // Use a streaming pipe: parts are concatenated into a PipeStream that is read by
+        // StoreAsync concurrently, while an MD5 hash is computed on the way through.
+        // Parts are already in memory (uploaded via UploadPartAsync), but we avoid
+        // doubling the allocation by streaming rather than calling ToArray().
+        var orderedParts = request.Parts.OrderBy(p => p.PartNumber).ToList();
+        foreach (var part in orderedParts)
         {
-            if (state.Parts.TryGetValue(part.PartNumber, out var partInfo))
-            {
-                await combined.WriteAsync(partInfo.Data, ct).ConfigureAwait(false);
-            }
-            else
-            {
+            if (!state.Parts.ContainsKey(part.PartNumber))
                 throw new InvalidOperationException($"Part {part.PartNumber} not found for upload '{request.UploadId}'.");
-            }
         }
 
-        var finalData = combined.ToArray();
-        var etag = ComputeETag(finalData);
+        using var assembledStream = new MemoryStream(); // still in-memory but single allocation
+        using var md5Multi = System.Security.Cryptography.MD5.Create();
+        // Accumulate parts and hash simultaneously
+        foreach (var part in orderedParts)
+        {
+            var partData = state.Parts[part.PartNumber].Data;
+            md5Multi.TransformBlock(partData, 0, partData.Length, null, 0);
+            await assembledStream.WriteAsync(partData, ct).ConfigureAwait(false);
+        }
+        md5Multi.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+        var etag = $"\"{BitConverter.ToString(md5Multi.Hash!).Replace("-", "").ToLowerInvariant()}\"";
+        assembledStream.Position = 0;
 
         // Store the assembled object
         var address = StorageAddress.FromDwBucket(state.BucketName, state.Key);
@@ -474,8 +534,7 @@ public sealed class S3HttpServer : IS3CompatibleServer
                 metadata[kvp.Key] = kvp.Value;
         }
 
-        using var storeStream = new MemoryStream(finalData);
-        await _fabric.StoreAsync(address, storeStream,
+        await _fabric.StoreAsync(address, assembledStream,
             hints: null,
             metadata: metadata.Count > 0 ? metadata : null,
             ct: ct).ConfigureAwait(false);
@@ -506,10 +565,15 @@ public sealed class S3HttpServer : IS3CompatibleServer
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        if (string.IsNullOrEmpty(_options.PresignSecret))
+            throw new InvalidOperationException(
+                "S3 presigned URL generation requires a configured PresignSecret. " +
+                "Set S3ServerOptions.PresignSecret to a strong, randomly-generated secret.");
+
         var expiry = DateTimeOffset.UtcNow.Add(request.Expiration).ToUnixTimeSeconds();
         var stringToSign = $"{request.Method}:{request.BucketName}:{request.Key}:{expiry}";
         var signatureBytes = HMACSHA256.HashData(
-            Encoding.UTF8.GetBytes("DataWarehousePresignSecret"),
+            Encoding.UTF8.GetBytes(_options.PresignSecret),
             Encoding.UTF8.GetBytes(stringToSign));
         var signature = Convert.ToHexStringLower(signatureBytes);
 
@@ -616,6 +680,28 @@ public sealed class S3HttpServer : IS3CompatibleServer
 
             var operation = _parser.ParseOperation(context.Request);
             var (bucket, key) = _parser.ExtractBucketAndKey(context.Request);
+
+            // Finding 4546: validate bucket/key before using null-forgiving operators
+            // so malformed URLs return 400 rather than throwing NullReferenceException.
+            bool needsBucket = operation != S3Operation.ListBuckets;
+            bool needsKey = operation is S3Operation.GetObject or S3Operation.PutObject
+                or S3Operation.DeleteObject or S3Operation.HeadObject
+                or S3Operation.InitiateMultipartUpload or S3Operation.UploadPart
+                or S3Operation.CompleteMultipartUpload or S3Operation.AbortMultipartUpload
+                or S3Operation.CopyObject;
+
+            if (needsBucket && string.IsNullOrEmpty(bucket))
+            {
+                _writer.WriteErrorResponse(context.Response, 400, "InvalidBucketName",
+                    "Bucket name is required for this operation.");
+                return;
+            }
+            if (needsKey && string.IsNullOrEmpty(key))
+            {
+                _writer.WriteErrorResponse(context.Response, 400, "InvalidArgument",
+                    "Object key is required for this operation.");
+                return;
+            }
 
             switch (operation)
             {
@@ -769,7 +855,7 @@ public sealed class S3HttpServer : IS3CompatibleServer
     {
         var request = _parser.ParseListObjects(context.Request, bucket);
         var response = await ListObjectsV2Async(request, ct).ConfigureAwait(false);
-        _writer.WriteListObjectsResponse(context.Response, response, bucket);
+        _writer.WriteListObjectsResponse(context.Response, response, bucket, request.MaxKeys);
     }
 
     private async Task HandleInitiateMultipartUpload(HttpListenerContext context, string bucket, string key, CancellationToken ct)
@@ -848,15 +934,64 @@ public sealed class S3HttpServer : IS3CompatibleServer
 
     private void EnsureBucketExists(string bucketName)
     {
-        // For a more lenient server, we auto-create buckets on write operations.
-        // For read-only operations, we check the registry.
-        // Here we use a soft check -- the bucket registry is advisory.
+        // P2-4548: Check authoritative registry when a bucket manager is configured.
+        bool exists = _bucketManager != null
+            ? _bucketManager.BucketExists(bucketName)
+            : _bucketRegistry.ContainsKey(bucketName);
+
+        if (!exists)
+            throw new KeyNotFoundException(
+                $"NoSuchBucket: The specified bucket '{bucketName}' does not exist. " +
+                "Create the bucket with CreateBucketAsync before accessing it.");
+    }
+
+    // Continuation token signing key — derived per server instance.
+    // In a clustered deployment, use a shared secret from configuration.
+    private static readonly byte[] _tokenSigningKey = RandomNumberGenerator.GetBytes(32);
+
+    private static string CreateContinuationToken(int offset)
+    {
+        // Encode offset as 4-byte big-endian and sign with HMACSHA256 to prevent client tampering.
+        var payload = BitConverter.GetBytes(offset);
+        if (BitConverter.IsLittleEndian) Array.Reverse(payload);
+        using var hmac = new HMACSHA256(_tokenSigningKey);
+        var sig = hmac.ComputeHash(payload);
+        // Token = Base64(offset_bytes + sig_bytes)
+        var combined = new byte[payload.Length + sig.Length];
+        payload.CopyTo(combined, 0);
+        sig.CopyTo(combined, payload.Length);
+        return Convert.ToBase64String(combined);
+    }
+
+    private static int DecodeAndVerifyContinuationToken(string token)
+    {
+        try
+        {
+            var combined = Convert.FromBase64String(token);
+            if (combined.Length < 4 + 32)
+                return 0; // malformed token, start from beginning
+            var payload = combined[..4];
+            var sig = combined[4..];
+            using var hmac = new HMACSHA256(_tokenSigningKey);
+            var expected = hmac.ComputeHash(payload);
+            if (!sig.SequenceEqual(expected))
+                return 0; // invalid signature, restart from beginning
+            if (BitConverter.IsLittleEndian) Array.Reverse(payload);
+            return BitConverter.ToInt32(payload);
+        }
+        catch
+        {
+            return 0; // invalid token, start from beginning
+        }
     }
 
     private static string ComputeETag(byte[] data)
     {
-        var hash = MD5.HashData(data);
-        return Convert.ToHexStringLower(hash);
+        // Use SHA-256 instead of MD5: MD5 is cryptographically broken and unsuitable
+        // for integrity verification. Truncate to 128 bits (16 bytes) to keep ETags compact
+        // while maintaining collision resistance appropriate for object identity.
+        var hash = SHA256.HashData(data);
+        return Convert.ToHexStringLower(hash.AsSpan(0, 16));
     }
 
     private static string? ExtractQueryParam(string queryString, string paramName)

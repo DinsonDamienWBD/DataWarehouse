@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+
 namespace DataWarehouse.Plugins.UltimateResourceManager.Strategies;
 
 /// <summary>
@@ -38,8 +40,12 @@ public sealed class DeadlineIoStrategy : ResourceStrategyBase
     {
         var handle = Guid.NewGuid().ToString("N");
 
-        if (_currentIops + request.Iops > _maxIops)
+        // P2-2560: Atomically check-and-add to prevent TOCTOU over-allocation.
+        // Interlocked.Add returns the new value; if it exceeds the limit, roll back.
+        var newIops = Interlocked.Add(ref _currentIops, request.Iops);
+        if (newIops > _maxIops)
         {
+            Interlocked.Add(ref _currentIops, -request.Iops); // roll back
             return Task.FromResult(new ResourceAllocation
             {
                 RequestId = request.RequestId,
@@ -47,8 +53,6 @@ public sealed class DeadlineIoStrategy : ResourceStrategyBase
                 FailureReason = "IOPS limit exceeded"
             });
         }
-
-        Interlocked.Add(ref _currentIops, request.Iops);
         Interlocked.Add(ref _currentBandwidth, request.IoBandwidth);
 
         return Task.FromResult(new ResourceAllocation
@@ -130,6 +134,9 @@ public sealed class TokenBucketIoStrategy : ResourceStrategyBase
 /// </summary>
 public sealed class BandwidthLimitIoStrategy : ResourceStrategyBase
 {
+    private long _allocatedBandwidth;
+    private readonly ConcurrentDictionary<string, long> _handleBandwidth = new();
+
     public override string StrategyId => "io-bandwidth-limit";
     public override string DisplayName => "Bandwidth Limit I/O Manager";
     public override ResourceCategory Category => ResourceCategory.IO;
@@ -148,7 +155,7 @@ public sealed class BandwidthLimitIoStrategy : ResourceStrategyBase
     {
         return Task.FromResult(new ResourceMetrics
         {
-            IoBandwidth = 500 * 1024 * 1024, // 500 MB/s example
+            IoBandwidth = Interlocked.Read(ref _allocatedBandwidth),
             Timestamp = DateTime.UtcNow
         });
     }
@@ -156,6 +163,8 @@ public sealed class BandwidthLimitIoStrategy : ResourceStrategyBase
     protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct)
     {
         var handle = Guid.NewGuid().ToString("N");
+        _handleBandwidth[handle] = request.IoBandwidth;
+        Interlocked.Add(ref _allocatedBandwidth, request.IoBandwidth);
 
         return Task.FromResult(new ResourceAllocation
         {
@@ -165,6 +174,13 @@ public sealed class BandwidthLimitIoStrategy : ResourceStrategyBase
             AllocatedIoBandwidth = request.IoBandwidth
         });
     }
+
+    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct)
+    {
+        if (allocation.AllocationHandle != null && _handleBandwidth.TryRemove(allocation.AllocationHandle, out var bw))
+            Interlocked.Add(ref _allocatedBandwidth, -bw);
+        return Task.FromResult(true);
+    }
 }
 
 /// <summary>
@@ -173,6 +189,10 @@ public sealed class BandwidthLimitIoStrategy : ResourceStrategyBase
 /// </summary>
 public sealed class PriorityIoStrategy : ResourceStrategyBase
 {
+    private long _currentIops;
+    private long _currentBandwidth;
+    private readonly ConcurrentDictionary<string, (long iops, long bandwidth)> _handleAllocs = new();
+
     public override string StrategyId => "io-priority";
     public override string DisplayName => "Priority I/O Scheduler";
     public override ResourceCategory Category => ResourceCategory.IO;
@@ -191,8 +211,8 @@ public sealed class PriorityIoStrategy : ResourceStrategyBase
     {
         return Task.FromResult(new ResourceMetrics
         {
-            IopsRate = 50000,
-            IoBandwidth = 200 * 1024 * 1024,
+            IopsRate = Interlocked.Read(ref _currentIops),
+            IoBandwidth = Interlocked.Read(ref _currentBandwidth),
             Timestamp = DateTime.UtcNow
         });
     }
@@ -201,14 +221,29 @@ public sealed class PriorityIoStrategy : ResourceStrategyBase
     {
         var handle = Guid.NewGuid().ToString("N");
         var priorityMultiplier = request.Priority > 80 ? 1.5 : (request.Priority > 50 ? 1.0 : 0.5);
+        var allocatedIops = (long)(request.Iops * priorityMultiplier);
+        var allocatedBandwidth = (long)(request.IoBandwidth * priorityMultiplier);
+        _handleAllocs[handle] = (allocatedIops, allocatedBandwidth);
+        Interlocked.Add(ref _currentIops, allocatedIops);
+        Interlocked.Add(ref _currentBandwidth, allocatedBandwidth);
 
         return Task.FromResult(new ResourceAllocation
         {
             RequestId = request.RequestId,
             Success = true,
             AllocationHandle = handle,
-            AllocatedIops = (long)(request.Iops * priorityMultiplier),
-            AllocatedIoBandwidth = (long)(request.IoBandwidth * priorityMultiplier)
+            AllocatedIops = allocatedIops,
+            AllocatedIoBandwidth = allocatedBandwidth
         });
+    }
+
+    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct)
+    {
+        if (allocation.AllocationHandle != null && _handleAllocs.TryRemove(allocation.AllocationHandle, out var alloc))
+        {
+            Interlocked.Add(ref _currentIops, -alloc.iops);
+            Interlocked.Add(ref _currentBandwidth, -alloc.bandwidth);
+        }
+        return Task.FromResult(true);
     }
 }

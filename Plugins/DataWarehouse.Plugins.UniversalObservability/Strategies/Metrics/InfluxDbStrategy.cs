@@ -53,9 +53,12 @@ public sealed class InfluxDbStrategy : ObservabilityStrategyBase
         _token = token;
         _org = org;
         _bucket = bucket;
-        _httpClient.DefaultRequestHeaders.Clear();
-        _httpClient.DefaultRequestHeaders.Add("Authorization", $"Token {_token}");
+        // Do NOT set DefaultRequestHeaders — inject per-request to avoid thread-safety issues.
     }
+
+    /// <summary>Adds the InfluxDB token to the request headers (per-request, thread-safe).</summary>
+    private void AddToken(HttpRequestMessage request) =>
+        request.Headers.Add("Authorization", $"Token {_token}");
 
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
@@ -102,10 +105,11 @@ public sealed class InfluxDbStrategy : ObservabilityStrategyBase
             lineProtocol.AppendLine($"{measurement}{tags} {fields} {timestamp}");
         }
 
-        var content = new StringContent(lineProtocol.ToString(), Encoding.UTF8, "text/plain");
-        var url = $"{_url}/api/v2/write?org={Uri.EscapeDataString(_org)}&bucket={Uri.EscapeDataString(_bucket)}&precision=ms";
-
-        var response = await _httpClient.PostAsync(url, content, cancellationToken);
+        var body = new StringContent(lineProtocol.ToString(), Encoding.UTF8, "text/plain");
+        var writeUrl = $"{_url}/api/v2/write?org={Uri.EscapeDataString(_org)}&bucket={Uri.EscapeDataString(_bucket)}&precision=ms";
+        using var request = new HttpRequestMessage(HttpMethod.Post, writeUrl) { Content = body };
+        AddToken(request);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -117,13 +121,14 @@ public sealed class InfluxDbStrategy : ObservabilityStrategyBase
     /// <returns>Query results as CSV.</returns>
     public async Task<string> QueryAsync(string fluxQuery, CancellationToken ct = default)
     {
-        var content = new StringContent(fluxQuery, Encoding.UTF8, "application/vnd.flux");
         var url = $"{_url}/api/v2/query?org={Uri.EscapeDataString(_org)}";
+        var content = new StringContent(fluxQuery, Encoding.UTF8, "application/vnd.flux");
 
-        _httpClient.DefaultRequestHeaders.Accept.Clear();
-        _httpClient.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/csv"));
+        using var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = content };
+        AddToken(request);
+        request.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/csv"));
 
-        var response = await _httpClient.PostAsync(url, content, ct);
+        using var response = await _httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
 
         return await response.Content.ReadAsStringAsync(ct);
@@ -138,15 +143,26 @@ public sealed class InfluxDbStrategy : ObservabilityStrategyBase
     /// <returns>Query results.</returns>
     public Task<string> GetLastValuesAsync(string metricName, int count = 10, CancellationToken ct = default)
     {
+        // LOW-4651: Escape Flux string literals to prevent query injection.
+        // In Flux, backslash is the escape character inside double-quoted strings.
+        var escapedBucket = EscapeFluxString(_bucket);
+        var escapedMetricName = EscapeFluxString(metricName);
         var query = $@"
-from(bucket: ""{_bucket}"")
+from(bucket: ""{escapedBucket}"")
   |> range(start: -1h)
-  |> filter(fn: (r) => r._measurement == ""{metricName}"")
+  |> filter(fn: (r) => r._measurement == ""{escapedMetricName}"")
   |> last()
   |> limit(n: {count})";
 
         return QueryAsync(query, ct);
     }
+
+    /// <summary>
+    /// Escapes a value for safe embedding in a Flux double-quoted string literal.
+    /// Escapes backslash and double-quote characters as required by the Flux spec.
+    /// </summary>
+    private static string EscapeFluxString(string value)
+        => value.Replace("\\", "\\\\").Replace("\"", "\\\"");
 
     private static string EscapeMeasurement(string measurement)
     {
@@ -193,7 +209,10 @@ from(bucket: ""{_bucket}"")
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{_url}/health", cancellationToken);
+            using var healthReq = new HttpRequestMessage(HttpMethod.Get, $"{_url}/health");
+            AddToken(healthReq);
+            using var response = await _httpClient.SendAsync(healthReq, cancellationToken);
+            response.EnsureSuccessStatusCode();
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
 
             return new HealthCheckResult(
@@ -228,21 +247,16 @@ from(bucket: ""{_bucket}"")
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("influx_db.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     protected override void Dispose(bool disposing)
     {
+                _token = string.Empty;
         if (disposing)
         {
             _httpClient.Dispose();

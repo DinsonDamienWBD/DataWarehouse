@@ -119,7 +119,9 @@ public sealed class AddressWidthPromotionEngine
                 return false; // 128-bit can never need promotion
 
             // For 64-bit, check if we're above 75% of actual addressable range
-            return currentBlockCount > (long)(maxBlocks * PromotionThreshold);
+            // Avoid overflow: compute threshold as maxBlocks / 4 * 3 instead of maxBlocks * 0.75
+            long threshold = (maxBlocks / 4) * 3;
+            return currentBlockCount > threshold;
         }
 
         double ratio = (double)currentBlockCount / maxBlocks;

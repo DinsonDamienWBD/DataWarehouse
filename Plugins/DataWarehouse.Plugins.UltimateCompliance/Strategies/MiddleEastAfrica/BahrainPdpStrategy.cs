@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.MiddleEastAfrica
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("bahrain_pdp.check");
+            IncrementCounter("bahrain_pdp.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -26,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.MiddleEastAfrica
                 violations.Add(new ComplianceViolation { Code = "BH-001", Description = "Consent not obtained", Severity = ViolationSeverity.High, Remediation = "Obtain valid consent", RegulatoryReference = "Bahrain PDPL Law No. 30 of 2018" });
             }
 
-            if (context.DataSubjectCategories.Contains("special-category", StringComparer.OrdinalIgnoreCase))
+            if (context.DataSubjectCategories != null && context.DataSubjectCategories.Contains("special-category", StringComparer.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("SpecialConsent", out var specialObj) || specialObj is not true)
                 {
@@ -39,22 +39,23 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.MiddleEastAfrica
                 recommendations.Add("Consider appointing Data Protection Officer");
             }
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
-            var status = violations.Count == 0 ? ComplianceStatus.Compliant : violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant : ComplianceStatus.PartiallyCompliant;
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
+            var status = violations.Count == 0 ? ComplianceStatus.Compliant : hasHighViolations ? ComplianceStatus.NonCompliant : ComplianceStatus.PartiallyCompliant;
             return Task.FromResult(new ComplianceResult { IsCompliant = isCompliant, Framework = Framework, Status = status, Violations = violations, Recommendations = recommendations });
         }
     
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("bahrain_pdp.initialized");
+            IncrementCounter("bahrain_pdp.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("bahrain_pdp.shutdown");
+            IncrementCounter("bahrain_pdp.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

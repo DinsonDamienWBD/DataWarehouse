@@ -78,7 +78,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Core
 
         public static PNCounterCrdt FromJson(string json)
         {
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             var crdt = new PNCounterCrdt();
             var p = GCounterCrdt.FromJson(doc.RootElement.GetProperty("P").GetString() ?? "{}");
             var n = GCounterCrdt.FromJson(doc.RootElement.GetProperty("N").GetString() ?? "{}");
@@ -266,12 +266,21 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Core
             EnhancedVectorClock mergedClock,
             CancellationToken ct)
         {
-            // CRDT merge: always succeeds without conflict
-            // In a real implementation, this would deserialize and merge the CRDT types
-            // For now, we take the larger payload (assuming more data = more operations merged)
-            var resolved = conflict.LocalData.Length >= conflict.RemoteData.Length
-                ? conflict.LocalData
-                : conflict.RemoteData;
+            // P2-3767: A real CRDT merge requires deserializing the concrete CRDT type (G-Set,
+            // OR-Set, LWW-Register, etc.) and invoking its merge function. Without a registered
+            // CRDT type resolver, we fall back to a Last-Write-Wins heuristic using the remote
+            // clock being causally after local (wins if remote is strictly greater), otherwise local.
+            // This is not a correct CRDT merge but is semantically stronger than payload-size.
+            bool remoteWins = true;
+            foreach (var kvp in conflict.RemoteVersion.Entries)
+            {
+                if (!conflict.LocalVersion.Entries.TryGetValue(kvp.Key, out var localTick) || localTick > kvp.Value)
+                {
+                    remoteWins = false;
+                    break;
+                }
+            }
+            var resolved = remoteWins ? conflict.RemoteData : conflict.LocalData;
 
             return Task.FromResult<(ReadOnlyMemory<byte>, EnhancedVectorClock)>((resolved, mergedClock));
         }
@@ -579,6 +588,12 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Core
         {
             public required string VersionId { get; init; }
             public required byte[] Delta { get; init; }
+            /// <summary>
+            /// Full snapshot of the data at this version. Used as the correct XOR base when
+            /// computing the next delta (LOW-3773: previous code used lastVersion.Delta as base,
+            /// which produced garbage output from ApplyDelta).
+            /// </summary>
+            public required byte[] FullData { get; init; }
             public required EnhancedVectorClock Clock { get; init; }
             public required DateTimeOffset Timestamp { get; init; }
             public string? ParentVersionId { get; init; }
@@ -668,26 +683,36 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Core
             var dataId = metadata?.GetValueOrDefault("dataId") ?? Guid.NewGuid().ToString();
             var versionId = Guid.NewGuid().ToString("N");
 
-            // Track version chain
+            // Track version chain — cap at 100 versions per dataId to prevent unbounded
+            // memory growth on long-lived deployments (finding 3764).
+            const int MaxVersionsPerChain = 100;
             var chain = _versionChains.GetOrAdd(dataId, _ => new List<DeltaVersion>());
             string? parentId = null;
-            byte[] delta = data.ToArray();
+            var fullData = data.ToArray();
+            byte[] delta = fullData;
 
             if (chain.Count > 0)
             {
                 var lastVersion = chain[^1];
                 parentId = lastVersion.VersionId;
-                delta = ComputeDelta(lastVersion.Delta, data.ToArray());
+                // LOW-3773: use lastVersion.FullData (the actual previous snapshot) as the XOR
+                // base, not lastVersion.Delta. ApplyDelta(prevFullData, delta) == newFullData.
+                delta = ComputeDelta(lastVersion.FullData, fullData);
             }
 
             chain.Add(new DeltaVersion
             {
                 VersionId = versionId,
                 Delta = delta,
+                FullData = fullData,
                 Clock = VectorClock.Clone(),
                 Timestamp = DateTimeOffset.UtcNow,
                 ParentVersionId = parentId
             });
+
+            // Evict oldest versions when the chain exceeds the cap.
+            if (chain.Count > MaxVersionsPerChain)
+                chain.RemoveRange(0, chain.Count - MaxVersionsPerChain);
 
             // Replicate delta (much smaller than full data)
             foreach (var targetId in targetNodeIds)

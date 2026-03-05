@@ -90,7 +90,7 @@ public sealed class OpenTelemetryStrategy : ObservabilityStrategyBase
 
         var json = JsonSerializer.Serialize(otlpMetrics);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{_otlpEndpoint}/v1/metrics", content, cancellationToken);
+        using var response = await _httpClient.PostAsync($"{_otlpEndpoint}/v1/metrics", content, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -117,7 +117,8 @@ public sealed class OpenTelemetryStrategy : ObservabilityStrategyBase
                                 name = s.OperationName,
                                 kind = (int)s.Kind + 1,
                                 startTimeUnixNano = ToUnixTimeNanoseconds(s.StartTime).ToString(),
-                                endTimeUnixNano = (ToUnixTimeNanoseconds(s.StartTime) + (long)s.Duration.TotalMilliseconds * 1_000_000).ToString(),
+                                // P2-4670: use Ticks * 100L for nanosecond precision; TotalMilliseconds truncates sub-ms.
+                                endTimeUnixNano = (ToUnixTimeNanoseconds(s.StartTime) + s.Duration.Ticks * 100L).ToString(),
                                 attributes = s.Attributes?.Select(a => new { key = a.Key, value = new { stringValue = a.Value?.ToString() ?? "" } }).ToArray(),
                                 status = new { code = s.Status == SpanStatus.Error ? 2 : 1 },
                                 events = s.Events?.Select(e => new
@@ -134,7 +135,7 @@ public sealed class OpenTelemetryStrategy : ObservabilityStrategyBase
 
         var json = JsonSerializer.Serialize(otlpTraces);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{_otlpEndpoint}/v1/traces", content, cancellationToken);
+        using var response = await _httpClient.PostAsync($"{_otlpEndpoint}/v1/traces", content, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -169,7 +170,7 @@ public sealed class OpenTelemetryStrategy : ObservabilityStrategyBase
 
         var json = JsonSerializer.Serialize(otlpLogs);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{_otlpEndpoint}/v1/logs", content, cancellationToken);
+        using var response = await _httpClient.PostAsync($"{_otlpEndpoint}/v1/logs", content, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -192,15 +193,26 @@ public sealed class OpenTelemetryStrategy : ObservabilityStrategyBase
 
     private static byte[] HexToBytes(string hex)
     {
+        // LOW-4688: Validate that the string is a properly-formed hex string to avoid
+        // FormatException from Convert.ToByte when non-hex characters are present.
+        if (string.IsNullOrEmpty(hex) || hex.Length % 2 != 0)
+            return new byte[hex?.Length / 2 ?? 0];
+
         var bytes = new byte[hex.Length / 2];
         for (int i = 0; i < bytes.Length; i++)
-            bytes[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
+        {
+            var byteStr = hex.Substring(i * 2, 2);
+            // Replace any non-hex character pair with 0x00 rather than throwing.
+            bytes[i] = byte.TryParse(byteStr, System.Globalization.NumberStyles.HexNumber, null, out var b) ? b : (byte)0;
+        }
         return bytes;
     }
 
     private static long ToUnixTimeNanoseconds(DateTimeOffset timestamp)
     {
-        return timestamp.ToUnixTimeMilliseconds() * 1_000_000;
+        // P2-4670: use Ticks for sub-millisecond precision (1 tick = 100 ns).
+        // UnixEpoch ticks = 621_355_968_000_000_000; remaining ticks * 100 = nanoseconds.
+        return (timestamp.UtcTicks - DateTimeOffset.UnixEpoch.UtcTicks) * 100L;
     }
 
     protected override async Task<HealthCheckResult> HealthCheckAsyncCore(CancellationToken ct)
@@ -228,17 +240,11 @@ public sealed class OpenTelemetryStrategy : ObservabilityStrategyBase
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("open_telemetry.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     protected override void Dispose(bool disposing) { if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }

@@ -47,7 +47,19 @@ public readonly record struct ImportSuggestion
         ArgumentException.ThrowIfNullOrEmpty(filePath);
 
         var formatName = VirtualDiskFormatInfo.GetDescription(format);
-        var formatFlag = format.ToString().ToLowerInvariant();
+        // Use a switch expression to avoid ToString()+ToLowerInvariant() allocations on the hot import path (finding 797).
+        var formatFlag = format switch
+        {
+            VirtualDiskFormat.Vhd   => "vhd",
+            VirtualDiskFormat.Vhdx  => "vhdx",
+            VirtualDiskFormat.Vmdk  => "vmdk",
+            VirtualDiskFormat.Qcow2 => "qcow2",
+            VirtualDiskFormat.Vdi   => "vdi",
+            VirtualDiskFormat.Raw   => "raw",
+            VirtualDiskFormat.Img   => "img",
+            VirtualDiskFormat.Dwvd  => "dwvd",
+            _                       => format.ToString().ToLowerInvariant()
+        };
         var fileName = Path.GetFileName(filePath);
         var outputPath = Path.ChangeExtension(filePath, ".dwvd");
         var outputFileName = Path.GetFileName(outputPath);

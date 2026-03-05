@@ -253,6 +253,13 @@ namespace DataWarehouse.SDK.Tags
                         TagValidationErrorCodes.PatternMismatch,
                         $"Pattern validation timed out for pattern '{constraints.Pattern}'."));
                 }
+                catch (ArgumentException ex)
+                {
+                    errors.Add(new TagValidationError(
+                        key,
+                        TagValidationErrorCodes.PatternMismatch,
+                        $"Constraint pattern '{constraints.Pattern}' is not a valid regular expression: {ex.Message}"));
+                }
             }
 
             if (constraints.AllowedValues is not null && !constraints.AllowedValues.Contains(text))

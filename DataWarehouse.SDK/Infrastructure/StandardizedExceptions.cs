@@ -79,12 +79,29 @@ namespace DataWarehouse.SDK.Infrastructure
             IReadOnlyList<int>? affectedShards = null,
             Guid? incidentId = null,
             string? correlationId = null)
+            // P2-525: Resolve the incident ID once so the message string and IncidentId property
+            // share the same GUID (Guid.NewGuid() called twice produced two different values).
+            : this(blockId, version, expectedHash, actualHash, affectedInstance, affectedShards,
+                   incidentId ?? Guid.NewGuid(), correlationId, /* resolved */ true)
+        {
+        }
+
+        private FailClosedCorruptionException(
+            Guid blockId,
+            int version,
+            string expectedHash,
+            string actualHash,
+            string affectedInstance,
+            IReadOnlyList<int>? affectedShards,
+            Guid resolvedIncidentId,
+            string? correlationId,
+            bool _)
             : base(
                 ErrorCode.DataCorruption,
                 $"FAIL CLOSED: Corruption detected in block {blockId} version {version}. " +
                 $"Block has been sealed - no reads or writes permitted. " +
                 $"Expected hash: {expectedHash}, Actual hash: {actualHash}. " +
-                $"Manual intervention required. Incident ID: {incidentId ?? Guid.NewGuid()}",
+                $"Manual intervention required. Incident ID: {resolvedIncidentId}",
                 correlationId)
         {
             BlockId = blockId;
@@ -94,7 +111,7 @@ namespace DataWarehouse.SDK.Infrastructure
             AffectedInstance = affectedInstance;
             AffectedShards = affectedShards;
             SealedAt = DateTimeOffset.UtcNow;
-            IncidentId = incidentId ?? Guid.NewGuid();
+            IncidentId = resolvedIncidentId;
         }
 
         public static FailClosedCorruptionException Create(

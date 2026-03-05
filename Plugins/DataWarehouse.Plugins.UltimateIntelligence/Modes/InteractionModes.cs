@@ -1302,7 +1302,7 @@ public sealed class BackgroundProcessor : FeatureStrategyBase
             task.Error = ex.Message;
 
             // Retry logic
-            if (task.RetryCount < task.MaxRetries && bool.Parse(GetConfig("EnableAutoRetry") ?? "true"))
+            if (task.RetryCount < task.MaxRetries && GetConfigBool("EnableAutoRetry", true))
             {
                 task.RetryCount++;
                 task.Status = BackgroundTaskStatus.Queued;
@@ -1508,7 +1508,7 @@ public sealed class ScheduledTasks : FeatureStrategyBase
 
     private async Task RunSchedulerAsync(CancellationToken ct)
     {
-        var intervalMs = int.Parse(GetConfig("SchedulerIntervalMs") ?? "1000");
+        var intervalMs = GetConfigInt("SchedulerIntervalMs", 1000);
 
         while (!ct.IsCancellationRequested)
         {
@@ -1946,6 +1946,7 @@ public enum EventSeverity
 public sealed class EventListener : FeatureStrategyBase
 {
     private readonly BoundedDictionary<string, List<EventSubscription>> _subscriptions = new BoundedDictionary<string, List<EventSubscription>>(1000);
+    private readonly object _subscriptionsLock = new();
     private readonly ConcurrentQueue<SystemEvent> _eventHistory = new();
     private readonly int _maxHistorySize;
 
@@ -1996,14 +1997,17 @@ public sealed class EventListener : FeatureStrategyBase
             Handler = handler
         };
 
-        _subscriptions.AddOrUpdate(
-            eventType,
-            _ => new List<EventSubscription> { subscription },
-            (_, existing) =>
-            {
-                existing.Add(subscription);
-                return existing;
-            });
+        lock (_subscriptionsLock)
+        {
+            _subscriptions.AddOrUpdate(
+                eventType,
+                _ => new List<EventSubscription> { subscription },
+                (_, existing) =>
+                {
+                    existing.Add(subscription);
+                    return existing;
+                });
+        }
 
         return subscription.SubscriptionId;
     }
@@ -2014,9 +2018,12 @@ public sealed class EventListener : FeatureStrategyBase
     /// <param name="subscriptionId">Subscription identifier.</param>
     public void Unsubscribe(string subscriptionId)
     {
-        foreach (var kvp in _subscriptions)
+        lock (_subscriptionsLock)
         {
-            kvp.Value.RemoveAll(s => s.SubscriptionId == subscriptionId);
+            foreach (var kvp in _subscriptions)
+            {
+                kvp.Value.RemoveAll(s => s.SubscriptionId == subscriptionId);
+            }
         }
     }
 
@@ -2032,20 +2039,18 @@ public sealed class EventListener : FeatureStrategyBase
         while (_eventHistory.Count > _maxHistorySize)
             _eventHistory.TryDequeue(out _);
 
-        // Find matching subscriptions
-        var tasks = new List<Task>();
-
-        foreach (var kvp in _subscriptions)
+        // Find matching subscriptions — take a snapshot under the lock to avoid races
+        List<Func<SystemEvent, Task>> handlers;
+        lock (_subscriptionsLock)
         {
-            if (MatchesPattern(evt.EventType, kvp.Key))
-            {
-                foreach (var subscription in kvp.Value)
-                {
-                    tasks.Add(SafeInvokeHandler(subscription.Handler, evt));
-                }
-            }
+            handlers = _subscriptions
+                .Where(kvp => MatchesPattern(evt.EventType, kvp.Key))
+                .SelectMany(kvp => kvp.Value)
+                .Select(s => s.Handler)
+                .ToList();
         }
 
+        var tasks = handlers.Select(h => SafeInvokeHandler(h, evt)).ToList();
         await Task.WhenAll(tasks);
     }
 
@@ -2409,7 +2414,7 @@ public sealed class AnomalyResponder : FeatureStrategyBase
 
     private async Task HandleAnomalyAsync(SystemEvent evt)
     {
-        if (!bool.Parse(GetConfig("AutoResponseEnabled") ?? "true"))
+        if (!GetConfigBool("AutoResponseEnabled", true))
             return;
 
         var minSeverity = Enum.Parse<EventSeverity>(GetConfig("MinSeverityForResponse") ?? "Warning");

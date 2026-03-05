@@ -1,6 +1,7 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -49,9 +50,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
         private bool _compressData = false; // Compress data before upload
         private string _contentType = "application/octet-stream";
 
-        // Local state tracking (permanent storage means no deletion)
-        private readonly Dictionary<string, ArweaveTransactionInfo> _keyToTransactionMap = new();
-        private readonly object _mapLock = new();
+        // Local state tracking (permanent storage means no deletion).
+        // ConcurrentDictionary provides thread-safe access without a separate lock.
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, ArweaveTransactionInfo> _keyToTransactionMap = new();
 
         public override string StrategyId => "arweave";
         public override string Name => "Arweave Permanent Storage";
@@ -156,8 +157,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                     var balanceAr = balanceWinston / 1_000_000_000_000m; // Convert Winston to AR
                     if (balanceAr < _minArBalance)
                     {
-                        System.Diagnostics.Debug.WriteLine(
-                            $"Warning: Arweave wallet balance ({balanceAr:F4} AR) is below minimum threshold ({_minArBalance} AR)");
+                        // Publish a WARNING-level diagnostic so operators see it in production
+                        // (Debug.WriteLine is stripped in Release builds and invisible without debugger).
+                        Trace.TraceWarning(
+                            $"[ArweaveStrategy] Wallet balance ({balanceAr:F4} AR) is below minimum threshold " +
+                            $"({_minArBalance} AR). Top up your wallet to avoid failed uploads.");
                     }
                 }
             }
@@ -212,11 +216,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 (transactionId, txInfo) = await StoreViaArweaveAsync(key, finalData, dataSize, metadata, ct);
             }
 
-            // Store transaction info in local state
-            lock (_mapLock)
-            {
-                _keyToTransactionMap[key] = txInfo;
-            }
+            // Store transaction info in local state (ConcurrentDictionary — no lock needed)
+            _keyToTransactionMap[key] = txInfo;
 
             // Verify transaction if enabled
             if (_verifyAfterStore)
@@ -251,13 +252,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             ValidateKey(key);
 
             // Get transaction ID from local state
-            ArweaveTransactionInfo? txInfo = null;
-            lock (_mapLock)
+            if (!_keyToTransactionMap.TryGetValue(key, out var txInfo))
             {
-                if (!_keyToTransactionMap.TryGetValue(key, out txInfo))
-                {
-                    throw new FileNotFoundException($"Object with key '{key}' not found in Arweave storage");
-                }
+                throw new FileNotFoundException($"Object with key '{key}' not found in Arweave storage");
             }
 
             // Retrieve content from Arweave
@@ -319,11 +316,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             ValidateKey(key);
 
             // Check local cache first
-            bool existsInCache;
-            lock (_mapLock)
-            {
-                existsInCache = _keyToTransactionMap.ContainsKey(key);
-            }
+            var existsInCache = _keyToTransactionMap.ContainsKey(key);
 
             IncrementOperationCounter(StorageOperationType.Exists);
 
@@ -333,11 +326,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             }
 
             // Optionally verify the transaction still exists on Arweave
-            ArweaveTransactionInfo? txInfo = null;
-            lock (_mapLock)
-            {
-                _keyToTransactionMap.TryGetValue(key, out txInfo);
-            }
+            _keyToTransactionMap.TryGetValue(key, out var txInfo);
 
             if (txInfo != null)
             {
@@ -362,11 +351,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             EnsureInitialized();
             IncrementOperationCounter(StorageOperationType.List);
 
-            List<ArweaveTransactionInfo> transactions;
-            lock (_mapLock)
-            {
-                transactions = _keyToTransactionMap.Values.ToList();
-            }
+            var transactions = _keyToTransactionMap.Values.ToList();
 
             foreach (var txInfo in transactions)
             {
@@ -396,13 +381,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             EnsureInitialized();
             ValidateKey(key);
 
-            ArweaveTransactionInfo? txInfo = null;
-            lock (_mapLock)
+            if (!_keyToTransactionMap.TryGetValue(key, out var txInfo))
             {
-                if (!_keyToTransactionMap.TryGetValue(key, out txInfo))
-                {
-                    throw new FileNotFoundException($"Object with key '{key}' not found");
-                }
+                throw new FileNotFoundException($"Object with key '{key}' not found");
             }
 
             // Optionally fetch latest transaction metadata from Arweave
@@ -528,6 +509,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             // Step 2: Get wallet's last transaction (for nonce)
             var lastTxRequest = new HttpRequestMessage(HttpMethod.Get, $"{_gatewayUrl}/wallet/{_wallet!.Address}/last_tx");
             var lastTxResponse = await _httpClient.SendAsync(lastTxRequest, ct);
+            lastTxResponse.EnsureSuccessStatusCode();
             var lastTx = await lastTxResponse.Content.ReadAsStringAsync(ct);
             lastTx = lastTx.Trim('"');
 
@@ -757,10 +739,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             EnsureInitialized();
             ValidateKey(key);
 
-            lock (_mapLock)
-            {
-                return _keyToTransactionMap.TryGetValue(key, out var txInfo) ? txInfo.TransactionId : null;
-            }
+            return _keyToTransactionMap.TryGetValue(key, out var txInfo) ? txInfo.TransactionId : null;
         }
 
         /// <summary>
@@ -780,10 +759,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             EnsureInitialized();
             ValidateKey(key);
 
-            lock (_mapLock)
-            {
-                return _keyToTransactionMap.TryGetValue(key, out var txInfo) ? txInfo : null;
-            }
+            return _keyToTransactionMap.TryGetValue(key, out var txInfo) ? txInfo : null;
         }
 
         /// <summary>
@@ -795,10 +771,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             EnsureInitialized();
             ValidateKey(key);
 
-            lock (_mapLock)
-            {
-                return _keyToTransactionMap.Remove(key);
-            }
+            return _keyToTransactionMap.TryRemove(key, out _);
         }
 
         /// <summary>

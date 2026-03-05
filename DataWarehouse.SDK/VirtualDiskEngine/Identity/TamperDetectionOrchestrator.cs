@@ -155,6 +155,19 @@ public static class TamperDetectionOrchestrator
         var tempGroup = SuperblockGroup.DeserializeFromBlocks(headerBuffer, FormatConstants.MinBlockSize);
         var blockSize = tempGroup.PrimarySuperblock.BlockSize;
 
+        // Cat 14 (finding 841): validate blockSize from untrusted on-disk data before using it
+        // for stackalloc sizing or buffer allocation. Superblock.Deserialize already checks this
+        // (finding 790), but add a defensive guard here in case the path is reached with a corrupt
+        // or zeroed primary superblock that bypassed checksum validation.
+        if (blockSize < FormatConstants.MinBlockSize
+            || blockSize > FormatConstants.MaxBlockSize
+            || (blockSize & (blockSize - 1)) != 0) // must be a power of two
+        {
+            throw new InvalidDataException(
+                $"Superblock blockSize {blockSize} is invalid (must be a power-of-2 between " +
+                $"{FormatConstants.MinBlockSize} and {FormatConstants.MaxBlockSize}).");
+        }
+
         // If the actual block size is larger, re-read with the correct size
         SuperblockGroup group;
         if (blockSize > FormatConstants.MinBlockSize)

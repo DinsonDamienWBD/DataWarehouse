@@ -80,8 +80,7 @@ public sealed class AwsSqsConnectionStrategy : SaaSConnectionStrategyBase
             await client.ListQueuesAsync(new ListQueuesRequest { MaxResults = 1 }, ct);
             return true;
         }
-        catch (AmazonSQSException) { return true; } // Auth errors mean we can reach AWS
-        catch { return false; }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Health check failed: {ex.Message}"); return false; }
     }
 
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)

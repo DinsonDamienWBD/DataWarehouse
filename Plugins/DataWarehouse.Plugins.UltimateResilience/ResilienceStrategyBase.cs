@@ -211,8 +211,11 @@ public abstract class ResilienceStrategyBase : StrategyBase, IResilienceStrategy
     private long _retryAttempts;
     private long _circuitBreakerRejections;
     private long _fallbackInvocations;
-    private DateTimeOffset? _lastFailure;
-    private DateTimeOffset? _lastSuccess;
+    // Stored as ticks (0 = never) for atomic read/write via Interlocked
+    private long _lastFailureTicks;
+    private long _lastSuccessTicks;
+    private DateTimeOffset? _lastFailure => _lastFailureTicks == 0 ? (DateTimeOffset?)null : new DateTimeOffset(_lastFailureTicks, TimeSpan.Zero);
+    private DateTimeOffset? _lastSuccess => _lastSuccessTicks == 0 ? (DateTimeOffset?)null : new DateTimeOffset(_lastSuccessTicks, TimeSpan.Zero);
 
     /// <inheritdoc/>
     public abstract override string StrategyId { get; }
@@ -248,12 +251,12 @@ public abstract class ResilienceStrategyBase : StrategyBase, IResilienceStrategy
             if (result.Success)
             {
                 Interlocked.Increment(ref _successfulExecutions);
-                _lastSuccess = DateTimeOffset.UtcNow;
+                Interlocked.Exchange(ref _lastSuccessTicks, DateTimeOffset.UtcNow.UtcTicks);
             }
             else
             {
                 Interlocked.Increment(ref _failedExecutions);
-                _lastFailure = DateTimeOffset.UtcNow;
+                Interlocked.Exchange(ref _lastFailureTicks, DateTimeOffset.UtcNow.UtcTicks);
             }
 
             return result;
@@ -261,7 +264,7 @@ public abstract class ResilienceStrategyBase : StrategyBase, IResilienceStrategy
         catch (Exception ex)
         {
             Interlocked.Increment(ref _failedExecutions);
-            _lastFailure = DateTimeOffset.UtcNow;
+            Interlocked.Exchange(ref _lastFailureTicks, DateTimeOffset.UtcNow.UtcTicks);
 
             return new ResilienceResult<T>
             {
@@ -338,8 +341,8 @@ public abstract class ResilienceStrategyBase : StrategyBase, IResilienceStrategy
         Interlocked.Exchange(ref _retryAttempts, 0);
         Interlocked.Exchange(ref _circuitBreakerRejections, 0);
         Interlocked.Exchange(ref _fallbackInvocations, 0);
-        _lastFailure = null;
-        _lastSuccess = null;
+        Interlocked.Exchange(ref _lastFailureTicks, 0);
+        Interlocked.Exchange(ref _lastSuccessTicks, 0);
 
         while (_executionTimes.TryDequeue(out _)) { }
     }
@@ -384,16 +387,22 @@ public abstract class ResilienceStrategyBase : StrategyBase, IResilienceStrategy
     {
         var times = _executionTimes.ToArray();
         if (times.Length == 0) return TimeSpan.Zero;
-        return TimeSpan.FromMilliseconds(times.Average(t => t.TotalMilliseconds));
+        // Manual fold avoids LINQ Average() allocation on hot metrics path
+        double sumMs = 0;
+        foreach (var t in times) sumMs += t.TotalMilliseconds;
+        return TimeSpan.FromMilliseconds(sumMs / times.Length);
     }
 
     private TimeSpan CalculateP99ExecutionTime()
     {
         var times = _executionTimes.ToArray();
         if (times.Length == 0) return TimeSpan.Zero;
-        var sorted = times.OrderBy(t => t.TotalMilliseconds).ToArray();
-        var p99Index = (int)(sorted.Length * 0.99);
-        return sorted[Math.Min(p99Index, sorted.Length - 1)];
+        // Sort the double array directly — avoids boxing TimeSpan values via LINQ
+        var ms = new double[times.Length];
+        for (int i = 0; i < times.Length; i++) ms[i] = times[i].TotalMilliseconds;
+        Array.Sort(ms);
+        var p99Index = Math.Min((int)(ms.Length * 0.99), ms.Length - 1);
+        return TimeSpan.FromMilliseconds(ms[p99Index]);
     }
 
     /// <summary>

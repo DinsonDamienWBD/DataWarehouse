@@ -138,11 +138,15 @@ public readonly record struct CompliancePassport
 
         int issuerLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(offset));
         offset += 4;
+        if (issuerLen < 0 || issuerLen > 4096 || offset + issuerLen > buffer.Length)
+            throw new InvalidDataException($"CompliancePassport issuerLen {issuerLen} is invalid or exceeds buffer.");
         byte[] issuerId = buffer.Slice(offset, issuerLen).ToArray();
         offset += issuerLen;
 
         int notesLen = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(offset));
         offset += 4;
+        if (notesLen < 0 || notesLen > 65536 || offset + notesLen > buffer.Length)
+            throw new InvalidDataException($"CompliancePassport notesLen {notesLen} is invalid or exceeds buffer.");
         byte[] notes = buffer.Slice(offset, notesLen).ToArray();
         offset += notesLen;
 

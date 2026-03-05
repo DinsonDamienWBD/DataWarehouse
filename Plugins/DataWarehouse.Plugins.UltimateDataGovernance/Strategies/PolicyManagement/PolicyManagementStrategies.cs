@@ -100,12 +100,13 @@ public sealed class PolicyEnforcementStrategy : DataGovernanceStrategyBase
     {
         if (!_activePolicies.TryGetValue(policyId, out var policy))
         {
+            // Fail-closed: unknown policy ID denies access to prevent typo-based bypasses (finding 2288).
             return new PolicyEnforcementResult
             {
                 PolicyId = policyId,
                 ResourceId = resourceId,
-                IsAllowed = true,
-                Reason = "Policy not found or not active"
+                IsAllowed = false,
+                Reason = "Policy not found or not active — access denied (fail-closed)"
             };
         }
 
@@ -138,11 +139,10 @@ public sealed class PolicyEnforcementStrategy : DataGovernanceStrategyBase
                 Violations = violations
             };
 
-            if (!_violations.ContainsKey(resourceId))
-            {
-                _violations[resourceId] = new List<PolicyViolation>();
-            }
-            _violations[resourceId].Add(violation);
+            _violations.AddOrUpdate(
+                resourceId,
+                _ => new List<PolicyViolation> { violation },
+                (_, list) => { lock (list) { list.Add(violation); } return list; });
         }
 
         return new PolicyEnforcementResult

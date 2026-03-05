@@ -165,6 +165,7 @@ public class ContinuousSyncService
 {
     private readonly ContinuousSyncOptions _options;
     private readonly BoundedDictionary<string, DeviceSyncState> _syncStates = new BoundedDictionary<string, DeviceSyncState>(1000);
+    private readonly object _registerLock = new();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ContinuousSyncService"/> class.
@@ -182,15 +183,20 @@ public class ContinuousSyncService
     /// <param name="twin">Device twin to sync.</param>
     public void RegisterTwin(string deviceId, DeviceTwin twin)
     {
-        if (_syncStates.Count >= _options.MaxDevices)
-            throw new InvalidOperationException($"Maximum device limit ({_options.MaxDevices}) reached");
-
-        _syncStates[deviceId] = new DeviceSyncState
+        // Lock covers both the count check and the write to prevent concurrent
+        // RegisterTwin calls from exceeding MaxDevices (TOCTOU race).
+        lock (_registerLock)
         {
-            Twin = twin,
-            LastSyncAt = DateTimeOffset.UtcNow,
-            SyncCount = 0
-        };
+            if (_syncStates.Count >= _options.MaxDevices)
+                throw new InvalidOperationException($"Maximum device limit ({_options.MaxDevices}) reached");
+
+            _syncStates[deviceId] = new DeviceSyncState
+            {
+                Twin = twin,
+                LastSyncAt = DateTimeOffset.UtcNow,
+                SyncCount = 0
+            };
+        }
     }
 
     /// <summary>
@@ -428,35 +434,9 @@ public class StateProjectionEngine
         );
     }
 
-    private bool TryConvertToDouble(object value, out double result)
-    {
-        result = 0;
-        if (value == null)
-            return false;
-
-        switch (value)
-        {
-            case double d:
-                result = d;
-                return true;
-            case float f:
-                result = f;
-                return true;
-            case int i:
-                result = i;
-                return true;
-            case long l:
-                result = l;
-                return true;
-            case decimal dec:
-                result = (double)dec;
-                return true;
-            case string s:
-                return double.TryParse(s, out result);
-            default:
-                return false;
-        }
-    }
+    // LOW-3405: delegate to shared static helper to avoid duplication with WhatIfSimulator
+    private static bool TryConvertToDouble(object value, out double result)
+        => DeviceManagementHelper.TryConvertToDouble(value, out result);
 }
 
 /// <summary>
@@ -565,7 +545,17 @@ public class WhatIfSimulator
         return Math.Min(1.0, avgMagnitude);
     }
 
-    private bool TryConvertToDouble(object value, out double result)
+    // LOW-3405: delegate to shared static helper
+    private static bool TryConvertToDouble(object value, out double result)
+        => DeviceManagementHelper.TryConvertToDouble(value, out result);
+}
+
+/// <summary>
+/// LOW-3405: Shared helper methods extracted to avoid duplication between StateProjectionEngine and WhatIfSimulator.
+/// </summary>
+internal static class DeviceManagementHelper
+{
+    internal static bool TryConvertToDouble(object value, out double result)
     {
         result = 0;
         if (value == null)
@@ -573,25 +563,13 @@ public class WhatIfSimulator
 
         switch (value)
         {
-            case double d:
-                result = d;
-                return true;
-            case float f:
-                result = f;
-                return true;
-            case int i:
-                result = i;
-                return true;
-            case long l:
-                result = l;
-                return true;
-            case decimal dec:
-                result = (double)dec;
-                return true;
-            case string s:
-                return double.TryParse(s, out result);
-            default:
-                return false;
+            case double d: result = d; return true;
+            case float f: result = f; return true;
+            case int i: result = i; return true;
+            case long l: result = l; return true;
+            case decimal dec: result = (double)dec; return true;
+            case string s: return double.TryParse(s, out result);
+            default: return false;
         }
     }
 }

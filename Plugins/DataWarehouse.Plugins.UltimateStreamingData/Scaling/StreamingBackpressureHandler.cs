@@ -303,8 +303,10 @@ public sealed class StreamingBackpressureHandler : IBackpressureAware, IDisposab
             return SdkBackpressureStrategy.BlockProducer;
         }
 
-        // Normal -- no backpressure needed
-        return SdkBackpressureStrategy.DropOldest; // No-op in normal state
+        // Normal utilization — no active backpressure is needed.
+        // DropOldest is returned as the lowest-impact value; callers that distinguish "no action"
+        // from "actively dropping" should compare CurrentState against SdkBackpressureState.Normal.
+        return SdkBackpressureStrategy.DropOldest;
     }
 
     // ---------------------------------------------------------------

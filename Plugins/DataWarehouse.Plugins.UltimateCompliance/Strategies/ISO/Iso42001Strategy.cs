@@ -23,7 +23,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.ISO
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("iso42001.check");
+            IncrementCounter("iso42001.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -68,7 +68,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.ISO
             }
 
             // Check transparency and explainability (6.2.8)
-            if (context.OperationType.Equals("automated-decision", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("automated-decision", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("AiExplainabilityProvided", out var explainObj) || explainObj is not true)
                 {
@@ -111,9 +111,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.ISO
 
             recommendations.Add("Monitor AI system performance and retrain models when drift is detected");
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -129,14 +130,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.ISO
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("iso42001.initialized");
+            IncrementCounter("iso42001.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("iso42001.shutdown");
+            IncrementCounter("iso42001.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

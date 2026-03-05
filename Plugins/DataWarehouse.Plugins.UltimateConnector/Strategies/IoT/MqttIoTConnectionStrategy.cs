@@ -39,9 +39,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
         /// <inheritdoc/>
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var parts = config.ConnectionString.Split(':');
-            var host = parts[0];
-            var port = parts.Length > 1 ? int.Parse(parts[1]) : 1883;
+            // P2-2132: Use ParseHostPortSafe to correctly handle IPv6 addresses like [::1]:1883
+            var (host, port) = ParseHostPortSafe(config.ConnectionString ?? throw new ArgumentException("Connection string required"), 1883);
 
             var client = new TcpClient();
             await client.ConnectAsync(host, port, ct);
@@ -61,10 +60,14 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
         }
 
         /// <inheritdoc/>
-        protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
-            var client = handle.GetConnection<TcpClient>();
-            return Task.FromResult(client.Connected);
+            // Finding 1919: TcpClient.Connected is stale — probe with a fresh TCP connect instead.
+            var info = handle.ConnectionInfo;
+            var host = info.GetValueOrDefault("host")?.ToString() ?? "";
+            if (!int.TryParse(info.GetValueOrDefault("port")?.ToString(), out var port)) port = 1883;
+            try { using var probe = new TcpClient(); await probe.ConnectAsync(host, port, ct); return true; }
+            catch { return false; }
         }
 
         /// <inheritdoc/>
@@ -77,16 +80,16 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
         }
 
         /// <inheritdoc/>
-        protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
-            var client = handle.GetConnection<TcpClient>();
-            var isHealthy = client.Connected;
-
-            return Task.FromResult(new ConnectionHealth(
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var isHealthy = await TestCoreAsync(handle, ct);
+            sw.Stop();
+            return new ConnectionHealth(
                 IsHealthy: isHealthy,
-                StatusMessage: isHealthy ? "MQTT broker connected" : "MQTT broker disconnected",
-                Latency: TimeSpan.Zero,
-                CheckedAt: DateTimeOffset.UtcNow));
+                StatusMessage: isHealthy ? "MQTT broker reachable" : "MQTT broker unreachable",
+                Latency: sw.Elapsed,
+                CheckedAt: DateTimeOffset.UtcNow);
         }
 
         /// <inheritdoc/>

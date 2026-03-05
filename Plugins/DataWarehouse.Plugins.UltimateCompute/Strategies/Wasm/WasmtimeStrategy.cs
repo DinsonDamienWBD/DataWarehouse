@@ -36,7 +36,7 @@ internal sealed class WasmtimeStrategy : ComputeRuntimeStrategyBase
         ValidateTask(task);
         return await MeasureExecutionAsync(task.Id, async () =>
         {
-            var wasmPath = Path.GetTempFileName() + ".wasm";
+            var _wasmBase = Path.GetTempFileName(); var wasmPath = Path.ChangeExtension(_wasmBase, ".wasm"); File.Move(_wasmBase, wasmPath);
             try
             {
                 await File.WriteAllBytesAsync(wasmPath, task.Code.ToArray(), cancellationToken);
@@ -50,7 +50,7 @@ internal sealed class WasmtimeStrategy : ComputeRuntimeStrategyBase
                 if (task.ResourceLimits?.AllowFileSystemAccess == true && task.ResourceLimits.AllowedFileSystemPaths != null)
                 {
                     foreach (var path in task.ResourceLimits.AllowedFileSystemPaths)
-                        args.Append($"--dir {path} ");
+                        args.Append($"--dir \"{path}\" ");
                 }
 
                 args.Append($"\"{wasmPath}\"");
@@ -58,7 +58,7 @@ internal sealed class WasmtimeStrategy : ComputeRuntimeStrategyBase
                 if (task.Arguments != null)
                 {
                     foreach (var arg in task.Arguments)
-                        args.Append($" {arg}");
+                        args.Append($" \"{arg.Replace("\"", "\\\"")}\"");
                 }
 
                 var timeout = GetEffectiveTimeout(task);

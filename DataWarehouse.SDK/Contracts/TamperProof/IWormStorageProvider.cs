@@ -4,6 +4,7 @@
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 using System.Threading;
 
 using DataWarehouse.SDK.Contracts.Hierarchy;
@@ -280,14 +281,18 @@ public class LegalHold
 public abstract class WormStorageProviderPluginBase : IntegrityPluginBase, IWormStorageProvider, IIntelligenceAware
 {
     /// <inheritdoc/>
+    /// <remarks>
+    /// Subclasses MUST override to perform actual integrity verification against WORM storage.
+    /// The base implementation throws to prevent silent integrity bypass.
+    /// </remarks>
     public override Task<Dictionary<string, object>> VerifyAsync(string key, CancellationToken ct = default)
-        => Task.FromResult(new Dictionary<string, object> { ["verified"] = true, ["provider"] = GetType().Name });
+        => throw new NotImplementedException(
+            $"WORM provider '{GetType().Name}' must override VerifyAsync to perform actual integrity verification.");
 
     /// <inheritdoc/>
     public override async Task<byte[]> ComputeHashAsync(Stream data, CancellationToken ct = default)
     {
-        using var sha = System.Security.Cryptography.SHA256.Create();
-        return await Task.FromResult(sha.ComputeHash(data));
+        return await System.Security.Cryptography.SHA256.HashDataAsync(data, ct).ConfigureAwait(false);
     }
 
     #region Intelligence Socket
@@ -348,7 +353,25 @@ public abstract class WormStorageProviderPluginBase : IntegrityPluginBase, IWorm
     protected virtual async Task<RetentionPolicyRecommendation?> RequestRetentionPolicyAsync(Guid objectId, CancellationToken ct = default)
     {
         if (!IsIntelligenceAvailable || MessageBus == null) return null;
-        await Task.CompletedTask;
+
+        try
+        {
+            var request = new PluginMessage
+            {
+                Type = "intelligence.worm.retention.recommend",
+                Payload = { ["objectId"] = objectId.ToString() }
+            };
+            var response = await MessageBus.SendAsync("intelligence.worm.retention.recommend", request, TimeSpan.FromSeconds(10), ct);
+            if (response.Success && response.Payload is RetentionPolicyRecommendation recommendation)
+                return recommendation;
+            if (response.Success && response.Payload is Dictionary<string, object> dict
+                && dict.TryGetValue("recommendation", out var rec) && rec is RetentionPolicyRecommendation recTyped)
+                return recTyped;
+        }
+        catch (TimeoutException) { }
+        catch (OperationCanceledException) { throw; }
+        catch { /* Intelligence unavailable — graceful degradation */ }
+
         return null;
     }
 
@@ -411,12 +434,28 @@ public abstract class WormStorageProviderPluginBase : IntegrityPluginBase, IWorm
         if (!status.Exists)
             throw new KeyNotFoundException($"Object {objectId} does not exist in WORM storage.");
 
+        // Reject past dates regardless of current retention state
+        if (newExpiry <= DateTimeOffset.UtcNow)
+        {
+            throw new ArgumentException(
+                $"New expiry {newExpiry:O} is in the past. Retention expiry must be in the future.",
+                nameof(newExpiry));
+        }
+
         // Validate that retention is being extended, not shortened
         if (status.RetentionExpiry.HasValue && newExpiry <= status.RetentionExpiry.Value)
         {
             throw new InvalidOperationException(
                 $"Cannot shorten retention period. Current expiry: {status.RetentionExpiry.Value:O}, " +
                 $"requested expiry: {newExpiry:O}. Retention can only be extended.");
+        }
+
+        // If current retention is indefinite (null expiry), setting a finite expiry would shorten it
+        if (!status.RetentionExpiry.HasValue)
+        {
+            throw new InvalidOperationException(
+                "Cannot set a finite expiry on an object with indefinite retention. " +
+                "Indefinite retention can only remain indefinite.");
         }
 
         // Delegate to provider-specific implementation

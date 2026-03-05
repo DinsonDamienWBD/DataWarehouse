@@ -59,6 +59,14 @@ internal sealed class GpuAcceleratedProcessingStrategy : StorageProcessingStrate
             // GPU-accelerated image resize via ffmpeg with CUDA/NVENC
             outputPath = Path.ChangeExtension(query.Source, ".resized" + Path.GetExtension(query.Source));
             var scale = CliProcessHelper.GetOption<string>(query, "scale") ?? "1280:720";
+
+            // Validate scale against WxH or W:H pattern (digits and : x only)
+            foreach (var c in scale)
+            {
+                if (!char.IsDigit(c) && c != ':' && c != 'x' && c != 'X')
+                    throw new ArgumentException($"'scale' contains invalid character '{c}'. Use WxH or W:H format (e.g. 1280:720).", nameof(scale));
+            }
+
             var args = $"-i \"{query.Source}\" -vf \"scale_cuda={scale}\" -c:v mjpeg -y \"{outputPath}\"";
             result = await CliProcessHelper.RunAsync("ffmpeg", args, Path.GetDirectoryName(query.Source), ct: ct);
 
@@ -94,14 +102,18 @@ internal sealed class GpuAcceleratedProcessingStrategy : StorageProcessingStrate
             }
             else
             {
-                result = new CliOutput { ExitCode = 1, StandardOutput = "", StandardError = "Source not found", Elapsed = sw.Elapsed, Success = false };
+                // Finding 4300: distinct "source-not-found" error indicator for callers.
+                result = new CliOutput { ExitCode = 2, StandardOutput = "", StandardError = "Source not found", Elapsed = sw.Elapsed, Success = false };
             }
         }
 
         return CliProcessHelper.ToProcessingResult(result, query.Source, useGpu ? "gpu" : "cpu", new Dictionary<string, object?>
         {
             ["operation"] = operation, ["gpuAvailable"] = gpuAvailable, ["usedGpu"] = useGpu,
-            ["outputPath"] = outputPath
+            ["outputPath"] = outputPath,
+            // Finding 4300: expose explicit error reason so callers can distinguish source-not-found
+            // (exitCode=2) from GPU/CPU processing failure (exitCode=1) from success (exitCode=0).
+            ["errorReason"] = result.Success ? null : (result.ExitCode == 2 ? "source-not-found" : "processing-failed")
         });
     }
 

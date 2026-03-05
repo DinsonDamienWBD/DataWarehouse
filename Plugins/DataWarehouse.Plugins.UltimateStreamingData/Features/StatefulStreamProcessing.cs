@@ -135,6 +135,12 @@ internal sealed class StatefulStreamProcessing : IDisposable
     private long _evictions;
     private bool _disposed;
 
+    // O(1) LRU eviction tracking: doubly-linked list of keys ordered from LRU (head)
+    // to MRU (tail), plus a dictionary for O(1) node lookup by key.
+    private readonly LinkedList<string> _lruList = new();
+    private readonly Dictionary<string, LinkedListNode<string>> _lruMap = new();
+    private readonly object _lruLock = new();
+
     /// <summary>
     /// Initializes a new instance of the <see cref="StatefulStreamProcessing"/> class.
     /// </summary>
@@ -154,7 +160,17 @@ internal sealed class StatefulStreamProcessing : IDisposable
         _messageBus = messageBus;
 
         _checkpointTimer = new Timer(
-            async _ => await TriggerCheckpointAsync(CancellationToken.None),
+            _ =>
+            {
+                try
+                {
+                    _ = TriggerCheckpointAsync(CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[StatefulStreamProcessing] Checkpoint timer callback failed: {ex.Message}");
+                }
+            },
             null,
             _config.CheckpointInterval,
             _config.CheckpointInterval);
@@ -214,7 +230,7 @@ internal sealed class StatefulStreamProcessing : IDisposable
 
         var fullKey = $"{_namespace}:{key}";
 
-        // Enforce max state size with LRU-style eviction
+        // Enforce max state size with O(1) LRU eviction
         if (_state.Count >= _config.MaxStateEntries && !_state.ContainsKey(fullKey))
         {
             EvictOldestEntry();
@@ -223,6 +239,17 @@ internal sealed class StatefulStreamProcessing : IDisposable
         var checksum = ComputeChecksum(value);
         _state[fullKey] = new StateEntry(value, DateTimeOffset.UtcNow, checksum);
         _dirtyKeys[fullKey] = true;
+
+        // Maintain LRU order: move this key to the tail (most-recently used).
+        lock (_lruLock)
+        {
+            if (_lruMap.TryGetValue(fullKey, out var existingNode))
+            {
+                _lruList.Remove(existingNode);
+            }
+            var node = _lruList.AddLast(fullKey);
+            _lruMap[fullKey] = node;
+        }
 
         return Task.CompletedTask;
     }
@@ -238,7 +265,18 @@ internal sealed class StatefulStreamProcessing : IDisposable
         ArgumentNullException.ThrowIfNull(key);
         var fullKey = $"{_namespace}:{key}";
         var removed = _state.TryRemove(fullKey, out _);
-        if (removed) _dirtyKeys.TryRemove(fullKey, out _);
+        if (removed)
+        {
+            _dirtyKeys.TryRemove(fullKey, out _);
+            lock (_lruLock)
+            {
+                if (_lruMap.TryGetValue(fullKey, out var node))
+                {
+                    _lruList.Remove(node);
+                    _lruMap.Remove(fullKey);
+                }
+            }
+        }
         return Task.FromResult(removed);
     }
 
@@ -425,6 +463,7 @@ internal sealed class StatefulStreamProcessing : IDisposable
         if (entries == null) return 0;
 
         int restored = 0;
+        int skipped = 0;
         foreach (var (key, entry) in entries)
         {
             var value = Convert.FromBase64String(entry.ValueBase64);
@@ -434,6 +473,55 @@ internal sealed class StatefulStreamProcessing : IDisposable
             {
                 _state[key] = new StateEntry(value, entry.Timestamp, checksum);
                 restored++;
+            }
+            else
+            {
+                // P2-4328: Checksum mismatch = data corruption. Publish a warning event via the
+                // message bus so operators can observe and alert on corrupted checkpoint entries.
+                // Do NOT silently ignore — this is data loss and must be surfaced.
+                skipped++;
+                if (_messageBus != null)
+                {
+                    var warnMsg = new PluginMessage
+                    {
+                        Type = "streaming.state.checksum_mismatch",
+                        Source = $"StatefulStreamProcessing/{_namespace}",
+                        Timestamp = DateTime.UtcNow,
+                        Payload = new Dictionary<string, object>
+                        {
+                            ["namespace"] = _namespace,
+                            ["key"] = key,
+                            ["expectedChecksum"] = entry.Checksum,
+                            ["actualChecksum"] = checksum,
+                            ["severity"] = "warning"
+                        }
+                    };
+                    try { await _messageBus.PublishAsync("streaming.state.checksum_mismatch", warnMsg, ct); }
+                    catch { /* best-effort, do not fail restore */ }
+                }
+            }
+        }
+
+        if (skipped > 0)
+        {
+            // Also publish a summary event
+            if (_messageBus != null)
+            {
+                var summaryMsg = new PluginMessage
+                {
+                    Type = "streaming.state.restore_summary",
+                    Source = $"StatefulStreamProcessing/{_namespace}",
+                    Timestamp = DateTime.UtcNow,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["namespace"] = _namespace,
+                        ["restored"] = restored,
+                        ["skipped"] = skipped,
+                        ["severity"] = skipped > 0 ? "warning" : "info"
+                    }
+                };
+                try { await _messageBus.PublishAsync("streaming.state.restore_summary", summaryMsg, ct); }
+                catch { /* best-effort */ }
             }
         }
 
@@ -501,9 +589,11 @@ internal sealed class StatefulStreamProcessing : IDisposable
         {
             await _messageBus.PublishAsync("streaming.state.checkpoint", message, ct);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+
             // Non-critical: checkpoint notification failure does not affect processing
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -528,15 +618,35 @@ internal sealed class StatefulStreamProcessing : IDisposable
 
     private void EvictOldestEntry()
     {
-        var oldest = _state
-            .OrderBy(kv => kv.Value.LastUpdated)
-            .FirstOrDefault();
-
-        if (oldest.Key != null)
+        // O(1) LRU eviction: remove the head of the linked list (least-recently-used key).
+        string? keyToEvict = null;
+        lock (_lruLock)
         {
-            _state.TryRemove(oldest.Key, out _);
-            _dirtyKeys.TryRemove(oldest.Key, out _);
+            var lruNode = _lruList.First;
+            if (lruNode != null)
+            {
+                keyToEvict = lruNode.Value;
+                _lruList.RemoveFirst();
+                _lruMap.Remove(keyToEvict);
+            }
+        }
+
+        if (keyToEvict != null)
+        {
+            _state.TryRemove(keyToEvict, out _);
+            _dirtyKeys.TryRemove(keyToEvict, out _);
             Interlocked.Increment(ref _evictions);
+        }
+        else
+        {
+            // Fallback: LRU list empty but state is full; evict any entry.
+            var any = _state.Keys.FirstOrDefault();
+            if (any != null)
+            {
+                _state.TryRemove(any, out _);
+                _dirtyKeys.TryRemove(any, out _);
+                Interlocked.Increment(ref _evictions);
+            }
         }
     }
 

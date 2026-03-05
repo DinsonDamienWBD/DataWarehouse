@@ -24,7 +24,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USState
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("ccpa.check");
+            IncrementCounter("ccpa.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -33,9 +33,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USState
             CheckPrivacyNotice(context, violations, recommendations);
             CheckDataMinimization(context, violations, recommendations);
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -50,7 +51,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USState
 
         private void CheckConsumerRights(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.OperationType.Equals("access-request", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("access-request", StringComparison.OrdinalIgnoreCase))
             {
                 if (context.Attributes.TryGetValue("ResponseDays", out var daysObj) &&
                     daysObj is int days && days > 45)
@@ -66,7 +67,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USState
                 }
             }
 
-            if (context.OperationType.Equals("deletion-request", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("deletion-request", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("ServiceProvidersNotified", out var notifyObj) || notifyObj is not true)
                 {
@@ -84,7 +85,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USState
 
         private void CheckSaleOptOut(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.OperationType.Equals("data-sale", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("data-sale", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("DoNotSellLinkProvided", out var linkObj) || linkObj is not true)
                 {
@@ -165,14 +166,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USState
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("ccpa.initialized");
+            IncrementCounter("ccpa.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("ccpa.shutdown");
+            IncrementCounter("ccpa.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

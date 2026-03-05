@@ -107,7 +107,7 @@ public sealed class VictorOpsStrategy : ObservabilityStrategyBase
             {
                 var incident = new
                 {
-                    message_type = log.Level == LogLevel.Critical ? "CRITICAL" : "WARNING",
+                    message_type = log.Level == LogLevel.Critical ? "CRITICAL" : "CRITICAL",
                     entity_id = $"log.{log.Properties?.GetValueOrDefault("Source")?.ToString() ?? "unknown"}",
                     entity_display_name = log.Properties?.GetValueOrDefault("Source")?.ToString() ?? "DataWarehouse",
                     state_message = log.Message,
@@ -172,13 +172,15 @@ public sealed class VictorOpsStrategy : ObservabilityStrategyBase
                 var json = JsonSerializer.Serialize(alert);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                var response = await _httpClient.PostAsync(_restEndpoint, content, ct);
+                using var response = await _httpClient.PostAsync(_restEndpoint, content, ct);
                 response.EnsureSuccessStatusCode();
             }
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // VictorOps unavailable - alerts lost (could implement retry queue)
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -199,7 +201,7 @@ public sealed class VictorOpsStrategy : ObservabilityStrategyBase
             var json = JsonSerializer.Serialize(testAlert);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(_restEndpoint, content, cancellationToken);
+            using var response = await _httpClient.PostAsync(_restEndpoint, content, cancellationToken);
 
             return new HealthCheckResult(
                 IsHealthy: response.IsSuccessStatusCode,
@@ -232,21 +234,16 @@ public sealed class VictorOpsStrategy : ObservabilityStrategyBase
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("victor_ops.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     protected override void Dispose(bool disposing)
     {
+                _apiKey = string.Empty;
         if (disposing)
         {
             _httpClient.Dispose();

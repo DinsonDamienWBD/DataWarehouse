@@ -30,10 +30,9 @@ public sealed class ZeroCopyBlockReader : IVdeBlockExporter, IDisposable
     private readonly int _blockSize;
     private readonly long _totalBlocks;
     private readonly MemoryMappedFile? _mappedFile;
-    private readonly MemoryMappedViewAccessor? _viewAccessor;
     private readonly RegionDirectory? _regionDirectory;
     private readonly byte[] _mappedBuffer;
-    private bool _disposed;
+    private volatile bool _disposed;
 
     /// <summary>
     /// Creates a new zero-copy block reader backed by the specified VDE file.
@@ -66,13 +65,14 @@ public sealed class ZeroCopyBlockReader : IVdeBlockExporter, IDisposable
                 mapName: null,
                 capacity: fileSize,
                 MemoryMappedFileAccess.Read);
-            _viewAccessor = _mappedFile.CreateViewAccessor(0, fileSize, MemoryMappedFileAccess.Read);
-
             // Read the entire mapped region into a managed byte array for ReadOnlyMemory slicing.
             // MemoryMappedViewAccessor does not directly provide Memory<byte>, so we pre-read
             // into a pinned buffer. For very large files, callers should use ReadBlocksAsync instead.
             _mappedBuffer = new byte[fileSize];
-            _viewAccessor.ReadArray(0, _mappedBuffer, 0, (int)Math.Min(fileSize, int.MaxValue));
+            using (var viewAccessor = _mappedFile.CreateViewAccessor(0, fileSize, MemoryMappedFileAccess.Read))
+            {
+                viewAccessor.ReadArray(0, _mappedBuffer, 0, (int)Math.Min(fileSize, int.MaxValue));
+            }
         }
         else
         {
@@ -201,7 +201,6 @@ public sealed class ZeroCopyBlockReader : IVdeBlockExporter, IDisposable
         if (_disposed) return;
         _disposed = true;
 
-        _viewAccessor?.Dispose();
         _mappedFile?.Dispose();
     }
 }

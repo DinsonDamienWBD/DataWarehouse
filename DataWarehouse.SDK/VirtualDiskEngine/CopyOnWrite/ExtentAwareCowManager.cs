@@ -89,10 +89,10 @@ public sealed class ExtentAwareCowManager
             static (_, current, _) => current - 1,
             (object?)null);
 
-        if (newCount <= 1)
+        if (newCount <= 0)
         {
-            // Remove from dictionary: either back to default (1) or ready to free (0)
-            _extentRefCounts.TryRemove(extent.StartBlock, out _);
+            // Ref count hit zero — keep it at 0 in the dictionary so GetRefCount returns 0 (freed)
+            _extentRefCounts.TryUpdate(extent.StartBlock, 0, newCount);
         }
     }
 
@@ -395,6 +395,16 @@ public sealed class ExtentAwareCowManager
         if (data.Length < 4) return;
 
         int entryCount = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(data[..4]);
+
+        // Validate entryCount against actual buffer to detect corrupt/malicious input.
+        int maxPossibleEntries = (data.Length - 4) / 12; // 12 bytes per entry
+        if (entryCount < 0 || entryCount > maxPossibleEntries)
+        {
+            System.Diagnostics.Trace.TraceWarning(
+                $"[ExtentAwareCowManager] DeserializeRefCounts: entryCount {entryCount} exceeds buffer capacity {maxPossibleEntries} — treating as corrupt, skipping.");
+            return;
+        }
+
         int offset = 4;
 
         for (int i = 0; i < entryCount && offset + 12 <= data.Length; i++)

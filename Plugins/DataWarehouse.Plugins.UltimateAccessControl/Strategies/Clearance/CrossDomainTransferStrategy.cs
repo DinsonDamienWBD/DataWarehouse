@@ -215,28 +215,25 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Clearance
             });
         }
 
-        private async Task<bool> SanitizeDataAsync(AccessContext context, CancellationToken cancellationToken)
+        private Task<bool> SanitizeDataAsync(AccessContext context, CancellationToken cancellationToken)
         {
-            // Simulate data sanitization (redaction, metadata removal, etc.)
-            _logger.LogInformation("Applying data sanitization for declassification");
-            await Task.Delay(10, cancellationToken); // Simulate processing
-            return true;
+            throw new NotSupportedException(
+                "SanitizeDataAsync requires a real cross-domain guard implementation (e.g., hardware CDS appliance integration). " +
+                "This stub cannot perform actual data sanitization or metadata removal.");
         }
 
-        private async Task<bool> InspectContentAsync(AccessContext context, CancellationToken cancellationToken)
+        private Task<bool> InspectContentAsync(AccessContext context, CancellationToken cancellationToken)
         {
-            // Simulate content inspection (malware scan, policy check, etc.)
-            _logger.LogInformation("Performing content inspection for low-to-high transfer");
-            await Task.Delay(10, cancellationToken); // Simulate processing
-            return true;
+            throw new NotSupportedException(
+                "InspectContentAsync requires a real content inspection engine (e.g., AV scanner, DLP integration). " +
+                "This stub cannot perform actual malware scanning or policy enforcement.");
         }
 
-        private async Task<bool> VerifyMutualAuthenticationAsync(AccessContext context, CancellationToken cancellationToken)
+        private Task<bool> VerifyMutualAuthenticationAsync(AccessContext context, CancellationToken cancellationToken)
         {
-            // Verify mutual authentication between domains
-            _logger.LogInformation("Verifying mutual authentication for peer-to-peer transfer");
-            await Task.Delay(10, cancellationToken); // Simulate processing
-            return true;
+            throw new NotSupportedException(
+                "VerifyMutualAuthenticationAsync requires real domain mutual authentication (e.g., PKI-based cross-domain handshake). " +
+                "This stub cannot perform actual cryptographic mutual authentication.");
         }
 
         private enum TransferDirection

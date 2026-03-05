@@ -15,6 +15,7 @@ public sealed class DistributedTracingStrategy : ServerlessStrategyBase
     public override string StrategyId => "monitoring-distributed-tracing";
     public override string DisplayName => "Distributed Tracing";
     public override ServerlessCategory Category => ServerlessCategory.Monitoring;
+    public override bool IsProductionReady => false; // Trace metrics are fabricated
 
     public override ServerlessStrategyCapabilities Capabilities => new() { SupportsSyncInvocation = true };
 
@@ -55,16 +56,17 @@ public sealed class DistributedTracingStrategy : ServerlessStrategyBase
     }
 
     /// <summary>Ends a segment.</summary>
-    public Task<TraceSegment> EndSegmentAsync(string segmentId, bool success = true, string? error = null, CancellationToken ct = default)
+    public Task<TraceSegment?> EndSegmentAsync(string segmentId, bool success = true, string? error = null, CancellationToken ct = default)
     {
-        if (_traces.TryGetValue(segmentId, out var segment))
+        TraceSegment? segment = null;
+        if (_traces.TryGetValue(segmentId, out segment))
         {
             segment.EndTime = DateTimeOffset.UtcNow;
             segment.Error = error;
             segment.Success = success;
         }
         RecordOperation("EndSegment");
-        return Task.FromResult(segment!);
+        return Task.FromResult<TraceSegment?>(segment);
     }
 
     /// <summary>Gets trace summary.</summary>
@@ -98,6 +100,7 @@ public sealed class CloudWatchMetricsStrategy : ServerlessStrategyBase
     public override string DisplayName => "CloudWatch Metrics";
     public override ServerlessCategory Category => ServerlessCategory.Monitoring;
     public override ServerlessPlatform? TargetPlatform => ServerlessPlatform.AwsLambda;
+    public override bool IsProductionReady => false; // Metrics are fabricated
 
     public override ServerlessStrategyCapabilities Capabilities => new() { SupportsSyncInvocation = true };
 
@@ -169,12 +172,14 @@ public sealed class LogAggregationStrategy : ServerlessStrategyBase
     /// <summary>Creates a log group.</summary>
     public Task<LogGroup> CreateLogGroupAsync(string logGroupName, int retentionDays, CancellationToken ct = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(logGroupName);
         RecordOperation("CreateLogGroup");
+        // ARN uses a placeholder account segment; real deployments configure AccountId via plugin config.
         return Task.FromResult(new LogGroup
         {
             LogGroupName = logGroupName,
             RetentionDays = retentionDays,
-            Arn = $"arn:aws:logs:us-east-1:123456789:log-group:{logGroupName}"
+            Arn = $"arn:aws:logs:us-east-1:000000000000:log-group:{logGroupName}"
         });
     }
 
@@ -252,6 +257,7 @@ public sealed class PerformanceInsightsStrategy : ServerlessStrategyBase
     public override string StrategyId => "monitoring-performance";
     public override string DisplayName => "Performance Insights";
     public override ServerlessCategory Category => ServerlessCategory.Monitoring;
+    public override bool IsProductionReady => false; // Metrics are fabricated
     public override ServerlessStrategyCapabilities Capabilities => new() { SupportsSyncInvocation = true };
     public override string SemanticDescription => "Performance analysis with cold start tracking, memory utilization, and P99 latency analysis.";
     public override string[] Tags => new[] { "performance", "latency", "cold-start", "memory" };

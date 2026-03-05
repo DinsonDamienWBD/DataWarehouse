@@ -34,7 +34,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("e_privacy.check");
+            IncrementCounter("e_privacy.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -50,9 +50,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
             // Check traffic data processing
             CheckTrafficDataProcessing(context, violations, recommendations);
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -67,7 +68,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
 
         private void CheckCookieConsent(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.OperationType.Equals("cookie-placement", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("cookie-placement", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("CookieType", out var cookieTypeObj) ||
                     cookieTypeObj is not string cookieType)
@@ -101,8 +102,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
 
         private void CheckCommunicationConfidentiality(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.OperationType.Equals("communication-interception", StringComparison.OrdinalIgnoreCase) ||
-                context.OperationType.Equals("communication-monitoring", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("communication-interception", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(context.OperationType, "communication-monitoring", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("LegalBasis", out var basisObj) ||
                     basisObj is not string basis ||
@@ -130,7 +131,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
 
         private void CheckDirectMarketingConsent(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.OperationType.Equals("direct-marketing", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("direct-marketing", StringComparison.OrdinalIgnoreCase))
             {
                 if (context.Attributes.TryGetValue("MarketingChannel", out var channelObj) &&
                     channelObj is string channel)
@@ -197,14 +198,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("e_privacy.initialized");
+            IncrementCounter("e_privacy.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("e_privacy.shutdown");
+            IncrementCounter("e_privacy.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

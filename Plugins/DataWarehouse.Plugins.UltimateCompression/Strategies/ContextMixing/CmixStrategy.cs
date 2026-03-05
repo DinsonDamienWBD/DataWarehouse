@@ -53,8 +53,12 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.ContextMixing
             TypicalCompressionRatio = 0.18,
             CompressionSpeed = 1,
             DecompressionSpeed = 1,
-            CompressionMemoryUsage = 1024L * 1024 * 1024,
-            DecompressionMemoryUsage = 1024L * 1024 * 1024,
+            // P2-1578: Actual footprint: 2 × 256 KB (matchTable + matchValid) + ~32 KB
+            // (logit table) + input buffer ≈ 512 KB + input. The previous 1 GB value was
+            // a worst-case estimate for a full CMix reference implementation; this
+            // implementation uses a simplified model with 256 K-entry match table only.
+            CompressionMemoryUsage = 1024L * 1024,   // ~1 MB (match tables + logit table + input copy)
+            DecompressionMemoryUsage = 1024L * 1024,
             SupportsStreaming = false,
             SupportsParallelCompression = false,
             SupportsParallelDecompression = false,
@@ -226,6 +230,31 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.ContextMixing
         {
             private const int NumModels = 3;
 
+            // P2-1578: Precompute logit table to replace Math.Log(p/(1-p)) per-bit.
+            // 4096 steps cover [0.001, 0.999] — identical resolution to the 12-bit
+            // arithmetic coder probability range used in Predict().
+            private const int LogitTableSize = 4096;
+            private static readonly double[] LogitTable = BuildLogitTable();
+
+            private static double[] BuildLogitTable()
+            {
+                var table = new double[LogitTableSize + 1];
+                for (int i = 0; i <= LogitTableSize; i++)
+                {
+                    double p = Math.Clamp(i / (double)LogitTableSize, 0.001, 0.999);
+                    table[i] = Math.Log(p / (1.0 - p));
+                }
+                return table;
+            }
+
+            [System.Runtime.CompilerServices.MethodImpl(
+                System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+            private static double Logit(double p)
+            {
+                int idx = (int)Math.Clamp(p * LogitTableSize, 0, LogitTableSize);
+                return LogitTable[idx];
+            }
+
             // Order-0 model: global bit probabilities
             private int _order0Count1;
             private int _order0Total;
@@ -271,11 +300,12 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.ContextMixing
                 _lastPreds[2] = GetMatchPrediction(data, position);
 
                 // Logistic mixing with gradient-trained weights
+                // P2-1578: Use precomputed Logit() table instead of Math.Log per bit.
                 double logitSum = 0.0;
                 for (int m = 0; m < NumModels; m++)
                 {
                     double p = Math.Clamp(_lastPreds[m], 0.001, 0.999);
-                    double logit = Math.Log(p / (1.0 - p));
+                    double logit = Logit(p);
                     logitSum += _weights[m] * logit;
                 }
 
@@ -301,11 +331,11 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.ContextMixing
                 // Update match table
                 UpdateMatchTable(data, position);
 
-                // Gradient descent on weights
+                // Gradient descent on weights (P2-1578: use Logit table).
                 for (int m = 0; m < NumModels; m++)
                 {
                     double p = Math.Clamp(_lastPreds[m], 0.001, 0.999);
-                    double logit = Math.Log(p / (1.0 - p));
+                    double logit = Logit(p);
                     double error = bit - p; // gradient of cross-entropy w.r.t. logit weight
                     _weights[m] += LearningRate * error * logit;
                 }

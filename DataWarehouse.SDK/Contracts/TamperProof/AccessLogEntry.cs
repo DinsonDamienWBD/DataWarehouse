@@ -231,9 +231,17 @@ public sealed class AccessLogEntry
 
     private static string ComputeBlake3Hash(byte[] data)
     {
-        // Blake3 is not available in standard .NET - fall back to SHA512 for now
-        // In production, add Blake3.NET NuGet package and implement proper Blake3 hashing
-        // For now, use SHA512 as a secure alternative
+        throw new PlatformNotSupportedException(
+            "BLAKE3 hashing requires the Blake3.NET NuGet package. " +
+            "Use ComputeFallbackHash(data) for SHA-512, or install Blake3.NET and implement native BLAKE3.");
+    }
+
+    /// <summary>
+    /// Computes a SHA-512 hash as a fallback when BLAKE3 is not available.
+    /// Callers should be aware this is NOT BLAKE3 — it is a secure alternative.
+    /// </summary>
+    private static string ComputeFallbackHash(byte[] data)
+    {
         return Convert.ToBase64String(SHA512.HashData(data));
     }
 }

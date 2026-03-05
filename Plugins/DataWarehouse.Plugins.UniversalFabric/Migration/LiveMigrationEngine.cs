@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Utilities;
 
@@ -154,35 +155,57 @@ public class LiveMigrationEngine
                     $"Destination backend '{job.DestinationBackendId}' not found.",
                     job.DestinationBackendId, address: null);
 
-            // Phase 1: Enumerate source objects
-            var objects = new List<StorageObjectMetadata>();
-            await foreach (var obj in sourceBackend.ListAsync(job.SourcePrefix, ct))
-            {
-                objects.Add(obj);
-            }
-            job.SetTotal(objects.Count, objects.Sum(o => o.Size));
+            // P2-4549: Stream objects through a bounded Channel instead of materializing all
+            // into a List<T> before starting work. Producer enumerates and writes to channel;
+            // consumers process in parallel via semaphore. Increments total as objects arrive.
+            var channel = Channel.CreateBounded<StorageObjectMetadata>(
+                new BoundedChannelOptions(Math.Max(job.MaxConcurrency * 4, 64))
+                {
+                    FullMode = BoundedChannelFullMode.Wait,
+                    SingleWriter = true
+                });
 
-            // Phase 2: Migrate objects with bounded parallelism
-            using var semaphore = new SemaphoreSlim(job.MaxConcurrency);
-            var tasks = objects.Select(async obj =>
+            // Producer: enumerate source and write to channel
+            var producer = Task.Run(async () =>
             {
-                await semaphore.WaitAsync(ct);
                 try
                 {
-                    // Wait while paused
-                    while (job.Status == MigrationJobStatus.Paused && !ct.IsCancellationRequested)
-                        await Task.Delay(500, ct);
-
-                    ct.ThrowIfCancellationRequested();
-                    await MigrateObjectAsync(sourceBackend, destBackend, obj, job, ct);
+                    await foreach (var obj in sourceBackend.ListAsync(job.SourcePrefix, ct))
+                    {
+                        job.IncrementTotal(1, obj.Size);
+                        await channel.Writer.WriteAsync(obj, ct);
+                    }
                 }
                 finally
                 {
-                    semaphore.Release();
+                    channel.Writer.Complete();
                 }
-            });
+            }, ct);
 
-            await Task.WhenAll(tasks);
+            // Consumers: migrate in parallel with bounded concurrency
+            using var semaphore = new SemaphoreSlim(job.MaxConcurrency);
+            var consumers = Enumerable.Range(0, job.MaxConcurrency).Select(_ => Task.Run(async () =>
+            {
+                await foreach (var obj in channel.Reader.ReadAllAsync(ct))
+                {
+                    await semaphore.WaitAsync(ct);
+                    try
+                    {
+                        // Wait while paused
+                        while (job.Status == MigrationJobStatus.Paused && !ct.IsCancellationRequested)
+                            await Task.Delay(500, ct);
+
+                        ct.ThrowIfCancellationRequested();
+                        await MigrateObjectAsync(sourceBackend, destBackend, obj, job, ct);
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
+                }
+            }, ct)).ToList();
+
+            await Task.WhenAll(new[] { producer }.Concat(consumers));
 
             // If all objects failed, mark the job as failed
             if (job.FailedObjects > 0 && job.MigratedObjects == 0 && job.SkippedObjects == 0)

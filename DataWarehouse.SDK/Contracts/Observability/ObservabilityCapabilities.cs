@@ -36,13 +36,15 @@ public record ObservabilityCapabilities(
 {
     /// <summary>
     /// Gets a value indicating whether this strategy supports any observability features.
+    /// Includes SupportsDistributedTracing because distributed tracing implies tracing capability.
     /// </summary>
-    public bool HasAnyCapability => SupportsMetrics || SupportsTracing || SupportsLogging;
+    public bool HasAnyCapability => SupportsMetrics || SupportsTracing || SupportsLogging || SupportsDistributedTracing;
 
     /// <summary>
     /// Gets a value indicating whether this strategy supports all core observability features.
+    /// SupportsDistributedTracing implies basic tracing support.
     /// </summary>
-    public bool HasFullObservability => SupportsMetrics && SupportsTracing && SupportsLogging;
+    public bool HasFullObservability => SupportsMetrics && (SupportsTracing || SupportsDistributedTracing) && SupportsLogging;
 
     /// <summary>
     /// Creates a minimal observability capabilities instance (no features supported).

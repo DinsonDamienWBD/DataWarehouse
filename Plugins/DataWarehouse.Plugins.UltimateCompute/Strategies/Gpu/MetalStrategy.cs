@@ -9,6 +9,9 @@ namespace DataWarehouse.Plugins.UltimateCompute.Strategies.Gpu;
 /// </summary>
 internal sealed class MetalStrategy : ComputeRuntimeStrategyBase
 {
+    // Allowlist for Metal host app binaries — prevents arbitrary executable injection.
+    private static readonly string[] AllowedHostApps = ["metal-compute-host", "metal-runner", "metal-host"];
+
     /// <inheritdoc/>
     public override string StrategyId => "compute.gpu.metal";
     /// <inheritdoc/>
@@ -64,8 +67,10 @@ internal sealed class MetalStrategy : ComputeRuntimeStrategyBase
                 if (linkResult.ExitCode != 0)
                     throw new InvalidOperationException($"Metal linking failed: {linkResult.StandardError}");
 
-                // Execute via host runner (requires custom Metal host app)
+                // Execute via host runner — validate against allowlist to prevent arbitrary execution.
                 var hostApp = task.Metadata?.TryGetValue("host_app", out var ha) == true && ha is string has ? has : "metal-compute-host";
+                if (!Array.Exists(AllowedHostApps, h => h == hostApp))
+                    throw new ArgumentException($"Host app '{hostApp}' is not in the allowed list. Permitted: {string.Join(", ", AllowedHostApps)}.");
                 var timeout = GetEffectiveTimeout(task);
                 var result = await RunProcessAsync(hostApp, $"--metallib \"{metalLibPath}\"",
                     stdin: task.InputData.Length > 0 ? task.GetInputDataAsString() : null,

@@ -18,9 +18,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
     /// </summary>
     public class JiraConnectionStrategy : SaaSConnectionStrategyBase
     {
-        private string _instance = "";
-        private string _email = "";
-        private string _apiToken = "";
+        private volatile string _instance = "";
+        private volatile string _email = "";
+        private volatile string _apiToken = "";
 
         public override string StrategyId => "jira";
         public override string DisplayName => "Jira";
@@ -33,7 +33,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            _instance = GetConfiguration<string>(config, "Instance", "example");
+            _instance = GetConfiguration<string>(config, "Instance", ""); if (string.IsNullOrEmpty(_instance) || _instance == "example") throw new ArgumentException("Jira instance name is required, 'example' is not valid");
             _email = GetConfiguration<string>(config, "Email", "");
             _apiToken = GetConfiguration<string>(config, "ApiToken", "");
 
@@ -64,16 +64,13 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             {
                 var response = await handle.GetConnection<HttpClient>()
                     .GetAsync("/rest/api/3/myself", ct);
-                return response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable;
+                return response.IsSuccessStatusCode;
             }
             catch { return false; }
         }
 
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
-        {
-            handle.GetConnection<HttpClient>()?.Dispose();
-            await Task.CompletedTask;
-        }
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) {
+            handle.GetConnection<HttpClient>()?.Dispose(); return Task.CompletedTask; }
 
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
@@ -86,8 +83,18 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
         }
 
         protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(
-            IConnectionHandle handle, CancellationToken ct = default) =>
-            Task.FromResult((Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow.AddHours(24)));
+            IConnectionHandle handle, CancellationToken ct = default)
+        {
+            // Jira uses HTTP Basic auth (email:apiToken). Return the encoded Basic credential as the token
+            // so callers that cache the return value can pass it as Authorization header value.
+            if (!string.IsNullOrEmpty(_email) && !string.IsNullOrEmpty(_apiToken))
+            {
+                var encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{_email}:{_apiToken}"));
+                return Task.FromResult((encoded, DateTimeOffset.UtcNow.AddDays(365)));
+            }
+            // Unauthenticated — return empty token; caller will get 401 from Jira
+            return Task.FromResult((string.Empty, DateTimeOffset.UtcNow));
+        }
 
         protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(
             IConnectionHandle handle, string currentToken, CancellationToken ct = default) =>
@@ -99,6 +106,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
         public async Task<JiraSearchResult> SearchIssuesAsync(IConnectionHandle handle, string jql,
             int startAt = 0, int maxResults = 50, string[]? fields = null, CancellationToken ct = default)
         {
+            // Finding 2162: Validate jql before sending to avoid unhelpful Jira error responses.
+            if (string.IsNullOrWhiteSpace(jql))
+                throw new ArgumentException("JQL query must not be empty or whitespace.", nameof(jql));
+
             var client = handle.GetConnection<HttpClient>();
             var body = new Dictionary<string, object>
             {
@@ -111,7 +122,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
 
             var json = JsonSerializer.Serialize(body);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await client.PostAsync("/rest/api/3/search", content, ct);
+            using var response = await client.PostAsync("/rest/api/3/search", content, ct);
+            response.EnsureSuccessStatusCode();
             var responseJson = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
@@ -178,7 +190,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
 
             var body = JsonSerializer.Serialize(new { fields });
             var content = new StringContent(body, Encoding.UTF8, "application/json");
-            var response = await client.PostAsync("/rest/api/3/issue", content, ct);
+            using var response = await client.PostAsync("/rest/api/3/issue", content, ct);
+            response.EnsureSuccessStatusCode();
             var responseJson = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
@@ -206,7 +219,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                 Content = new StringContent(body, Encoding.UTF8, "application/json")
             };
 
-            var response = await client.SendAsync(request, ct);
+            using var response = await client.SendAsync(request, ct);
             return new JiraIssueResult
             {
                 Success = response.IsSuccessStatusCode,
@@ -225,7 +238,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             var body = JsonSerializer.Serialize(new { transition = new { id = transitionId } });
             var content = new StringContent(body, Encoding.UTF8, "application/json");
 
-            var response = await client.PostAsync($"/rest/api/3/issue/{issueKeyOrId}/transitions", content, ct);
+            using var response = await client.PostAsync($"/rest/api/3/issue/{issueKeyOrId}/transitions", content, ct);
             return new JiraIssueResult
             {
                 Success = response.IsSuccessStatusCode,
@@ -241,7 +254,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             CancellationToken ct = default)
         {
             var client = handle.GetConnection<HttpClient>();
-            var response = await client.GetAsync($"/rest/agile/1.0/board/{boardId}/sprint?state=active", ct);
+            using var response = await client.GetAsync($"/rest/agile/1.0/board/{boardId}/sprint?state=active", ct);
+            response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
@@ -285,7 +299,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             });
             var content = new StringContent(body, Encoding.UTF8, "application/json");
 
-            var response = await client.PostAsync("/rest/webhooks/1.0/webhook", content, ct);
+            using var response = await client.PostAsync("/rest/webhooks/1.0/webhook", content, ct);
+            response.EnsureSuccessStatusCode();
             var responseJson = await response.Content.ReadAsStringAsync(ct);
 
             return new JiraWebhookResult

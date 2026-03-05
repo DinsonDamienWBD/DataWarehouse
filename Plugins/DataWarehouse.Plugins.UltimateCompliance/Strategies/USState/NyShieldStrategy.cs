@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USState
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("ny_shield.check");
+            IncrementCounter("ny_shield.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -26,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USState
                 violations.Add(new ComplianceViolation { Code = "NYSHIELD-001", Description = "Data security program not implemented", Severity = ViolationSeverity.Critical, Remediation = "Implement reasonable data security safeguards", RegulatoryReference = "NY GBL § 899-bb" });
             }
 
-            if (context.OperationType.Equals("data-breach", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("data-breach", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("BreachNotificationSent", out var notifyObj) || notifyObj is not true)
                 {
@@ -34,27 +34,35 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USState
                 }
             }
 
-            if (!context.Attributes.TryGetValue("EncryptionImplemented", out var encryptObj) || encryptObj is not true)
+            // LOW-1565: Encryption check applies to write/store operations, not reads or audit operations.
+            var isWriteOrStoreOperation = string.IsNullOrEmpty(context.OperationType) ||
+                context.OperationType.Contains("write", StringComparison.OrdinalIgnoreCase) ||
+                context.OperationType.Contains("store", StringComparison.OrdinalIgnoreCase) ||
+                context.OperationType.Contains("transfer", StringComparison.OrdinalIgnoreCase) ||
+                context.OperationType.Contains("export", StringComparison.OrdinalIgnoreCase);
+            if (isWriteOrStoreOperation &&
+                (!context.Attributes.TryGetValue("EncryptionImplemented", out var encryptObj) || encryptObj is not true))
             {
                 violations.Add(new ComplianceViolation { Code = "NYSHIELD-003", Description = "Private information not encrypted", Severity = ViolationSeverity.High, Remediation = "Encrypt private information", RegulatoryReference = "NY GBL § 899-bb" });
             }
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
-            var status = violations.Count == 0 ? ComplianceStatus.Compliant : violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant : ComplianceStatus.PartiallyCompliant;
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
+            var status = violations.Count == 0 ? ComplianceStatus.Compliant : hasHighViolations ? ComplianceStatus.NonCompliant : ComplianceStatus.PartiallyCompliant;
             return Task.FromResult(new ComplianceResult { IsCompliant = isCompliant, Framework = Framework, Status = status, Violations = violations, Recommendations = recommendations });
         }
     
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("ny_shield.initialized");
+            IncrementCounter("ny_shield.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("ny_shield.shutdown");
+            IncrementCounter("ny_shield.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

@@ -31,6 +31,9 @@ internal sealed class DartWasmLanguageStrategy : WasmLanguageStrategyBase
     public override string StrategyId => "compute.wasm.lang.dart";
 
     /// <inheritdoc/>
+    protected override string[] GetToolchainBinaryNames() => new[] { "dart" };
+
+    /// <inheritdoc/>
     public override string StrategyName => "Dart WASM Language";
 
     /// <inheritdoc/>

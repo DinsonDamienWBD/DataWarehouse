@@ -422,7 +422,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AirGap
             }
 
             // Hash-based assignment if no prefix match
-            var hash = key.GetHashCode();
+            var hash = StableHash.Compute(key);
             var sites = _sites.Keys.ToArray();
             if (sites.Length > 0)
             {

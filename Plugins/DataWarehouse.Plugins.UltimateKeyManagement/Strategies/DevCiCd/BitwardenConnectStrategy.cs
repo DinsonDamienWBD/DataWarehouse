@@ -39,6 +39,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
         private readonly HttpClient _httpClient;
         private BitwardenSecretsConfig _config = new();
         private readonly BoundedDictionary<string, byte[]> _keyCache = new BoundedDictionary<string, byte[]>(1000);
+        // P2-3472: Cache secret IDs to avoid O(n) list-all on every key lookup.
+        private readonly BoundedDictionary<string, string> _secretIdCache = new BoundedDictionary<string, string>(1000);
         private string? _currentKeyId;
         private string? _authToken;
         private DateTime _tokenExpiry = DateTime.MinValue;
@@ -234,6 +236,17 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
                     createPayload);
 
                 response.EnsureSuccessStatusCode();
+
+                // P2-3472: Populate secretId cache from the create response so subsequent
+                // lookups by name don't require an O(n) list-all round-trip.
+                var createJson = await response.Content.ReadAsStringAsync();
+                using var createDoc = JsonDocument.Parse(createJson);
+                if (createDoc.RootElement.TryGetProperty("id", out var idProp))
+                {
+                    var newId = idProp.GetString();
+                    if (!string.IsNullOrEmpty(newId))
+                        _secretIdCache[keyId] = newId;
+                }
             }
 
             // Update cache
@@ -297,6 +310,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
 
             response.EnsureSuccessStatusCode();
             _keyCache.TryRemove(keyId, out _);
+            _secretIdCache.TryRemove(keyId, out _); // P2-3472: Evict secretId cache on delete
         }
 
         public override async Task<KeyMetadata?> GetKeyMetadataAsync(string keyId, ISecurityContext context, CancellationToken cancellationToken = default)
@@ -347,16 +361,47 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
             await _authLock.WaitAsync(cancellationToken);
             try
             {
-                // Parse the access token to extract credentials
-                // Bitwarden service account tokens are in the format: version.clientId.clientSecret
-                var tokenParts = _config.AccessToken?.Split('.') ?? Array.Empty<string>();
-                if (tokenParts.Length < 3)
+                // #3456: Parse the Bitwarden machine account token as a JWT (3 dot-separated parts).
+                // A JWT consists of: base64url(header) . base64url(payload) . base64url(signature)
+                // Split on '.' but only take the first 3 parts (payload may contain '=' padding).
+                var rawToken = _config.AccessToken ?? "";
+                var dotParts = rawToken.Split('.');
+                if (dotParts.Length < 3)
                 {
-                    throw new InvalidOperationException("Invalid Bitwarden access token format.");
+                    throw new InvalidOperationException(
+                        "Invalid Bitwarden access token format. Expected a JWT with 3 dot-separated parts (header.payload.signature).");
                 }
 
-                var clientId = $"service_account.{tokenParts[1]}";
-                var clientSecret = tokenParts[2];
+                // Decode the JWT payload (second part) to extract client_id and client_secret
+                // Add padding as needed for base64url decoding
+                var payloadBase64 = dotParts[1].Replace('-', '+').Replace('_', '/');
+                var padLen = (4 - payloadBase64.Length % 4) % 4;
+                payloadBase64 += new string('=', padLen);
+                var payloadBytes = Convert.FromBase64String(payloadBase64);
+                using var payloadDoc = JsonDocument.Parse(payloadBytes);
+                var payloadRoot = payloadDoc.RootElement;
+
+                string clientId;
+                string clientSecret;
+
+                // Try standard JWT claim names first, then Bitwarden-specific names
+                if (payloadRoot.TryGetProperty("client_id", out var cidProp) &&
+                    payloadRoot.TryGetProperty("client_secret", out var csProp))
+                {
+                    clientId = cidProp.GetString() ?? throw new InvalidOperationException("JWT payload missing client_id.");
+                    clientSecret = csProp.GetString() ?? throw new InvalidOperationException("JWT payload missing client_secret.");
+                }
+                else if (payloadRoot.TryGetProperty("sub", out var subProp))
+                {
+                    // Fall back: sub claim is the service account ID, token is used directly
+                    clientId = $"service_account.{subProp.GetString()}";
+                    clientSecret = dotParts[2]; // Signature part used as secret in some Bitwarden flows
+                }
+                else
+                {
+                    throw new InvalidOperationException(
+                        "Bitwarden JWT payload does not contain expected claims (client_id/client_secret or sub).");
+                }
 
                 // Request bearer token using client credentials
                 var tokenRequest = new FormUrlEncodedContent(new Dictionary<string, string>
@@ -367,7 +412,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
                     ["scope"] = "api.secrets"
                 });
 
-                var response = await _httpClient.PostAsync(
+                using var response = await _httpClient.PostAsync(
                     $"{_config.IdentityUrl}/connect/token",
                     tokenRequest,
                     cancellationToken);
@@ -427,7 +472,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
             }
             catch
             {
+
                 // Token parsing failed
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             return null;
@@ -439,6 +486,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
 
         private async Task<string?> GetSecretIdByNameAsync(string keyName, CancellationToken cancellationToken = default)
         {
+            // P2-3472: Return cached secret ID to avoid O(n) list-all API call on every lookup.
+            if (_secretIdCache.TryGetValue(keyName, out var cachedId))
+                return cachedId;
+
             string url;
             if (!string.IsNullOrEmpty(_config.ProjectId))
             {
@@ -456,6 +507,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
             var result = JsonSerializer.Deserialize<BitwardenSecretsListResponse>(json, _jsonOptions);
+
+            // Populate cache for all returned secrets to amortise future lookups.
+            if (result?.Secrets != null)
+            {
+                foreach (var secret in result.Secrets)
+                {
+                    if (!string.IsNullOrEmpty(secret.Key) && !string.IsNullOrEmpty(secret.Id))
+                        _secretIdCache[secret.Key] = secret.Id;
+                }
+            }
 
             return result?.Secrets?.FirstOrDefault(s => s.Key == keyName)?.Id;
         }

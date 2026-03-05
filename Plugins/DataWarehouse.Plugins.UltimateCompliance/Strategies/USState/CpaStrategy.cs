@@ -17,11 +17,18 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USState
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("cpa.check");
+            IncrementCounter("cpa.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
-            if (!context.Attributes.TryGetValue("UniversalOptOutHonored", out var uooObj) || uooObj is not true)
+            // LOW-1564: Universal opt-out applies to data sales/sharing operations, not reads or audits.
+            var isSaleOrSharingOperation = string.IsNullOrEmpty(context.OperationType) ||
+                context.OperationType.Contains("sale", StringComparison.OrdinalIgnoreCase) ||
+                context.OperationType.Contains("share", StringComparison.OrdinalIgnoreCase) ||
+                context.OperationType.Contains("transfer", StringComparison.OrdinalIgnoreCase) ||
+                context.OperationType.Contains("write", StringComparison.OrdinalIgnoreCase);
+            if (isSaleOrSharingOperation &&
+                (!context.Attributes.TryGetValue("UniversalOptOutHonored", out var uooObj) || uooObj is not true))
             {
                 violations.Add(new ComplianceViolation
                 {
@@ -33,7 +40,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USState
                 });
             }
 
-            if (context.OperationType.Equals("profiling", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("profiling", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("ProfilingDisclosed", out var disclosedObj) || disclosedObj is not true)
                 {
@@ -48,7 +55,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USState
                 }
             }
 
-            if (context.DataClassification.Equals("sensitive", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("sensitive", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("ConsentObtained", out var consentObj) || consentObj is not true)
                 {
@@ -63,9 +70,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USState
                 }
             }
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult { IsCompliant = isCompliant, Framework = Framework, Status = status, Violations = violations, Recommendations = recommendations });
@@ -74,14 +82,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.USState
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("cpa.initialized");
+            IncrementCounter("cpa.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("cpa.shutdown");
+            IncrementCounter("cpa.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

@@ -104,9 +104,9 @@ public abstract class InterfaceStrategyBase : StrategyBase, IInterfaceStrategy
         {
             throw;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            return InterfaceResponse.InternalServerError($"Request processing failed: {ex.Message}");
+            return InterfaceResponse.InternalServerError("An internal error occurred while processing the request.");
         }
     }
 

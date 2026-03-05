@@ -23,7 +23,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.AsiaPacific
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("appi.check");
+            IncrementCounter("appi.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -54,7 +54,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.AsiaPacific
             }
 
             // Check opt-out for third-party provision (Article 27)
-            if (context.OperationType.Equals("transfer", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("transfer", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("OptOutOffered", out var optOutObj) || optOutObj is not true)
                 {
@@ -104,9 +104,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.AsiaPacific
 
             recommendations.Add("Appoint representative if handling over 5,000 records without Japan office");
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -122,14 +123,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.AsiaPacific
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("appi.initialized");
+            IncrementCounter("appi.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("appi.shutdown");
+            IncrementCounter("appi.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

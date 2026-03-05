@@ -90,9 +90,10 @@ public sealed class SovereigntyObservabilityStrategy : ComplianceStrategyBase
     // ==================================================================================
 
     /// <inheritdoc/>
-    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
+    public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
     {
-        base.InitializeAsync(configuration, cancellationToken);
+        // P1-1543: await base so base-class initialization completes before reading config.
+        await base.InitializeAsync(configuration, cancellationToken).ConfigureAwait(false);
 
         if (configuration.TryGetValue("expirationRateThreshold", out var ert) && ert is double ertVal)
             _expirationRateThreshold = ertVal;
@@ -100,8 +101,6 @@ public sealed class SovereigntyObservabilityStrategy : ComplianceStrategyBase
             _enforcementDenialRateThreshold = edrtVal;
         if (configuration.TryGetValue("transferDenialRateThreshold", out var tdrt) && tdrt is double tdrtVal)
             _transferDenialRateThreshold = tdrtVal;
-
-        return Task.CompletedTask;
     }
 
     // ==================================================================================
@@ -117,11 +116,9 @@ public sealed class SovereigntyObservabilityStrategy : ComplianceStrategyBase
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(metricName);
 
-        _counters.AddOrUpdate(metricName, value, (_, current) =>
-        {
-            Interlocked.Add(ref current, value);
-            return current;
-        });
+        // ConcurrentDictionary.AddOrUpdate guarantees the update factory is retried on conflict;
+        // simple addition is correct here — no need for Interlocked inside the lambda (current is a value-type copy)
+        _counters.AddOrUpdate(metricName, value, (_, current) => current + value);
 
         return Task.CompletedTask;
     }
@@ -304,7 +301,7 @@ public sealed class SovereigntyObservabilityStrategy : ComplianceStrategyBase
         ComplianceContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        IncrementCounter("sovereignty_observability.compliance_check");
+            IncrementCounter("sovereignty_observability.compliance_check");
 
         var health = await GetHealthAsync(cancellationToken);
 

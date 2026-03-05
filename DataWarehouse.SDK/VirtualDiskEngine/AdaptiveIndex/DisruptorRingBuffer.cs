@@ -595,12 +595,22 @@ public sealed class BatchEventProcessor<T> : IDisposable where T : struct
     /// <summary>
     /// Gets the last processed sequence number.
     /// </summary>
-    public long Sequence { get; private set; } = -1;
+    public long Sequence
+    {
+        get => Volatile.Read(ref _sequence);
+        private set => Volatile.Write(ref _sequence, value);
+    }
+    private long _sequence = -1;
 
     /// <summary>
     /// Gets the total number of events processed.
     /// </summary>
-    public long ProcessedCount { get; private set; }
+    public long ProcessedCount
+    {
+        get => Volatile.Read(ref _processedCount);
+        private set => Volatile.Write(ref _processedCount, value);
+    }
+    private long _processedCount;
 
     /// <summary>
     /// Initializes a new batch event processor.

@@ -222,10 +222,12 @@ public sealed class SlidingWindowStrategy : StreamingDataStrategyBase
     {
         var assignments = new List<WindowAssignment>();
 
-        // Calculate the first window that contains this event
-        var firstWindowStart = new DateTimeOffset(
-            eventTime.Ticks - (eventTime.Ticks % spec.Slide.Ticks) - spec.Size.Ticks + spec.Slide.Ticks,
-            eventTime.Offset);
+        // Calculate the first window that contains this event.
+        // Finding 4361: clamp to DateTimeOffset.MinValue to prevent negative-tick underflow when
+        // Size > Slide and eventTime is near epoch (small Ticks value).
+        var rawFirstTicks = eventTime.Ticks - (eventTime.Ticks % spec.Slide.Ticks) - spec.Size.Ticks + spec.Slide.Ticks;
+        var firstTicks = Math.Max(rawFirstTicks, DateTimeOffset.MinValue.Ticks);
+        var firstWindowStart = new DateTimeOffset(firstTicks, eventTime.Offset);
 
         // Find all windows containing this event
         for (var windowStart = firstWindowStart; windowStart <= eventTime; windowStart += spec.Slide)

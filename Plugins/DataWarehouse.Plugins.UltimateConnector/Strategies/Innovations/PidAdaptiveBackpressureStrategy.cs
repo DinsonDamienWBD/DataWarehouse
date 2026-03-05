@@ -97,7 +97,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                     new AuthenticationHeaderValue("Bearer", config.AuthCredential);
 
             var sw = Stopwatch.StartNew();
-            var response = await client.GetAsync("/health", ct);
+            using var response = await client.GetAsync("/health", ct);
             sw.Stop();
             response.EnsureSuccessStatusCode();
 
@@ -159,7 +159,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             try
             {
                 var sw = Stopwatch.StartNew();
-                var response = await client.GetAsync("/health", ct);
+                using var response = await client.GetAsync("/health", ct);
                 sw.Stop();
 
                 if (_states.TryGetValue(handle.ConnectionId, out var state))
@@ -246,7 +246,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                     {
                         var sw = Stopwatch.StartNew();
                         using var request = new HttpRequestMessage(HttpMethod.Head, "/");
-                        var response = await client.SendAsync(request, token);
+                        using var response = await client.SendAsync(request, token);
                         sw.Stop();
 
                         var latencyMs = sw.Elapsed.TotalMilliseconds;
@@ -267,8 +267,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                     var pidResult = ComputePid(state);
                     state.PidOutput = pidResult;
 
-                    // Apply PID output as window adjustment
-                    var newWindow = state.CurrentWindowKb + (int)(pidResult * 4);
+                    // Apply PID output as window adjustment.
+                    // Finding 1950: Positive error means ack-rate is below target — we should REDUCE
+                    // the window (slow down). Subtract pidResult so a positive controller output
+                    // decreases the window, matching the documented behaviour.
+                    var newWindow = state.CurrentWindowKb - (int)(pidResult * 4);
                     state.CurrentWindowKb = Math.Clamp(newWindow, state.MinWindowKb, state.MaxWindowKb);
                     state.TotalAdjustments++;
 
@@ -280,9 +283,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                     AutoTuneGains(state);
                 }
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException ex)
             {
+
                 // Normal shutdown
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -379,6 +384,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
 
         private class PidConnectionState
         {
+            public readonly object SyncRoot = new();
             public double TargetAckRate { get; set; }
             public double MeasuredAckRate { get; set; }
             public int CurrentWindowKb { get; set; }

@@ -79,7 +79,7 @@ public sealed class ONNXEmbeddingProvider : EmbeddingProviderBase
     private readonly PoolingStrategy _poolingStrategy;
 
     // Simulated ONNX session and tokenizer (in production, use Microsoft.ML.OnnxRuntime)
-    private bool _isLoaded;
+    private volatile bool _isLoaded; // volatile for double-checked locking correctness
     private readonly BoundedDictionary<string, int> _vocabulary = new BoundedDictionary<string, int>(1000);
     private readonly object _loadLock = new();
 
@@ -140,8 +140,13 @@ public sealed class ONNXEmbeddingProvider : EmbeddingProviderBase
         if (string.IsNullOrWhiteSpace(modelPath))
             throw new ArgumentException("Model path is required", nameof(modelPath));
 
-        _modelPath = modelPath;
-        _tokenizerPath = tokenizerPath ?? Path.ChangeExtension(modelPath, null); // Look for tokenizer in same directory
+        // Validate path to prevent directory traversal (e.g., ../../etc/passwd).
+        var fullPath = Path.GetFullPath(modelPath);
+        if (!fullPath.EndsWith(".onnx", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Model path must point to an .onnx file", nameof(modelPath));
+
+        _modelPath = fullPath;
+        _tokenizerPath = tokenizerPath != null ? Path.GetFullPath(tokenizerPath) : Path.GetDirectoryName(fullPath);
         _currentModel = config.Model ?? "custom";
 
         // Get dimensions from known models or config
@@ -208,15 +213,38 @@ public sealed class ONNXEmbeddingProvider : EmbeddingProviderBase
             return;
         }
 
-        // Try to load tokenizer.json
+        // Try to load tokenizer.json (HuggingFace/Tokenizers format).
         var tokenizerJsonPath = Path.Combine(_tokenizerPath ?? Path.GetDirectoryName(_modelPath) ?? "", "tokenizer.json");
         if (File.Exists(tokenizerJsonPath))
         {
-            // Parse tokenizer.json for vocabulary
-            // This is a simplified implementation
-            var json = File.ReadAllText(tokenizerJsonPath);
-            // In production, properly parse the tokenizer.json format
-            return;
+            try
+            {
+                var json = File.ReadAllText(tokenizerJsonPath);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                // HuggingFace tokenizer.json stores the vocabulary under "model.vocab" as an object.
+                if (doc.RootElement.TryGetProperty("model", out var model) &&
+                    model.TryGetProperty("vocab", out var vocab))
+                {
+                    foreach (var kv in vocab.EnumerateObject())
+                    {
+                        if (kv.Value.TryGetInt32(out var id))
+                            _vocabulary[kv.Name] = id;
+                    }
+                }
+                else if (doc.RootElement.TryGetProperty("vocab", out var directVocab))
+                {
+                    foreach (var kv in directVocab.EnumerateObject())
+                    {
+                        if (kv.Value.TryGetInt32(out var id))
+                            _vocabulary[kv.Name] = id;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to parse tokenizer.json: {ex.Message}. Falling back to basic vocabulary.");
+            }
+            if (_vocabulary.Count > 0) return;
         }
 
         // Fall back to basic word-level tokenization with unknown token handling
@@ -342,7 +370,10 @@ public sealed class ONNXEmbeddingProvider : EmbeddingProviderBase
 
     private Task<float[]> RunInferenceAsync(int[] tokens, CancellationToken ct)
     {
-        // In production, this would use ONNX Runtime:
+        // ONNX Runtime is required for actual embedding inference.
+        // Install the Microsoft.ML.OnnxRuntime NuGet package and provide a valid ONNX model file.
+        //
+        // Example usage with ONNX Runtime:
         // var inputTensor = new DenseTensor<long>(tokens.Select(t => (long)t).ToArray(), new[] { 1, tokens.Length });
         // var attentionMask = new DenseTensor<long>(Enumerable.Repeat(1L, tokens.Length).ToArray(), new[] { 1, tokens.Length });
         // var inputs = new List<NamedOnnxValue>
@@ -353,32 +384,10 @@ public sealed class ONNXEmbeddingProvider : EmbeddingProviderBase
         // using var results = _session.Run(inputs);
         // var output = results.First().AsTensor<float>();
 
-        // Deterministic hash-based pseudo-embeddings (Phase 36-04 will build proper WASI-NN + ONNX Runtime)
-        var embedding = new float[_dimensions];
-        using var sha256 = System.Security.Cryptography.SHA256.Create();
-        var tokenBytes = new byte[tokens.Length * 4];
-        Buffer.BlockCopy(tokens, 0, tokenBytes, 0, tokenBytes.Length);
-        var hash = sha256.ComputeHash(tokenBytes);
-
-        // Generate deterministic pseudo-embedding from hash
-        for (int i = 0; i < _dimensions; i++)
-        {
-            var hashIndex = (i * 2) % hash.Length;
-            var value = (hash[hashIndex] << 8 | hash[(hashIndex + 1) % hash.Length]) / 65535.0f;
-            embedding[i] = (float)(value * 2 - 1); // Map [0,1] to [-1,1]
-        }
-
-        // Normalize the embedding
-        var norm = (float)Math.Sqrt(embedding.Sum(x => x * x));
-        if (norm > 0)
-        {
-            for (int i = 0; i < embedding.Length; i++)
-            {
-                embedding[i] /= norm;
-            }
-        }
-
-        return Task.FromResult(embedding);
+        throw new PlatformNotSupportedException(
+            "ONNX Runtime is required for embedding inference. " +
+            "Install the 'Microsoft.ML.OnnxRuntime' NuGet package and configure an ONNX model path. " +
+            "Hash-based pseudo-embeddings are not suitable for production use.");
     }
 
     private async Task<float[][]> RunBatchInferenceAsync(string[] texts, CancellationToken ct)

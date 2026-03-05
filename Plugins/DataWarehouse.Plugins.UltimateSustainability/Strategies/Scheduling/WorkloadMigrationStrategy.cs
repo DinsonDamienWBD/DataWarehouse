@@ -65,8 +65,22 @@ public sealed class WorkloadMigrationStrategy : SustainabilityStrategyBase
     }
 
     /// <summary>Registers a workload.</summary>
+    /// <param name="workloadId">Unique workload identifier (required).</param>
+    /// <param name="name">Workload display name (required).</param>
+    /// <param name="currentDcId">Current data center ID (required).</param>
+    /// <param name="powerWatts">Power consumption in watts (must be &gt;= 0).</param>
+    /// <param name="isMigratable">Whether the workload may be migrated.</param>
     public void RegisterWorkload(string workloadId, string name, string currentDcId, double powerWatts, bool isMigratable)
     {
+        if (string.IsNullOrWhiteSpace(workloadId))
+            throw new ArgumentException("Workload ID must not be empty.", nameof(workloadId));
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Workload name must not be empty.", nameof(name));
+        if (string.IsNullOrWhiteSpace(currentDcId))
+            throw new ArgumentException("Current data center ID must not be empty.", nameof(currentDcId));
+        if (powerWatts < 0)
+            throw new ArgumentOutOfRangeException(nameof(powerWatts), powerWatts, "Power consumption must be zero or greater.");
+
         lock (_lock)
         {
             _workloads[workloadId] = new Workload

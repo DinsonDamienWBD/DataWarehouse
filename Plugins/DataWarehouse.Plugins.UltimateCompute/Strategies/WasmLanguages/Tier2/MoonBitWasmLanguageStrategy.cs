@@ -30,6 +30,9 @@ internal sealed class MoonBitWasmLanguageStrategy : WasmLanguageStrategyBase
     public override string StrategyId => "compute.wasm.lang.moonbit";
 
     /// <inheritdoc/>
+    protected override string[] GetToolchainBinaryNames() => new[] { "moon" };
+
+    /// <inheritdoc/>
     public override string StrategyName => "MoonBit WASM Language";
 
     /// <inheritdoc/>

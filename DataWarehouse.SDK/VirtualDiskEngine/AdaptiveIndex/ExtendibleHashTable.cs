@@ -193,43 +193,52 @@ public sealed class ExtendibleHashTable : IDisposable
 
     private void InsertInternal(ulong inodeId, long blockNumber, IBlockAllocator? allocator)
     {
-        ulong hash = HashInodeId(inodeId);
-        int index = GetDirectoryIndex(hash);
-        long bucketBlock = _directory[index];
+        // Iterative insert with split: avoids unbounded recursion on pathological key distributions.
+        // Maximum splits bounded by GlobalDepth limit (30) — at most 30 splits before insertion succeeds.
+        const int MaxSplits = 64; // safety net: far beyond the 30-bit global depth ceiling
+        int splits = 0;
 
-        if (!_bucketCache.TryGetValue(bucketBlock, out var bucket))
+        while (true)
         {
-            // Create a new bucket on first access
-            bucket = new ExtendibleHashBucket(_blockSize, GlobalDepth > 0 ? 0 : 0)
-            {
-                BlockNumber = bucketBlock
-            };
-            _bucketCache[bucketBlock] = bucket;
-        }
+            ulong hash = HashInodeId(inodeId);
+            int index = GetDirectoryIndex(hash);
+            long bucketBlock = _directory[index];
 
-        // Check for existing entry (update case)
-        for (int i = 0; i < bucket.Entries.Count; i++)
-        {
-            if (bucket.Entries[i].InodeId == inodeId)
+            if (!_bucketCache.TryGetValue(bucketBlock, out var bucket))
             {
-                bucket.Entries[i] = (inodeId, blockNumber);
+                // Create a new bucket on first access
+                bucket = new ExtendibleHashBucket(_blockSize, 0)
+                {
+                    BlockNumber = bucketBlock
+                };
+                _bucketCache[bucketBlock] = bucket;
+            }
+
+            // Check for existing entry (update case)
+            for (int i = 0; i < bucket.Entries.Count; i++)
+            {
+                if (bucket.Entries[i].InodeId == inodeId)
+                {
+                    bucket.Entries[i] = (inodeId, blockNumber);
+                    return;
+                }
+            }
+
+            // Insert if bucket has room
+            if (!bucket.IsFull)
+            {
+                bucket.Entries.Add((inodeId, blockNumber));
+                EntryCount++;
                 return;
             }
+
+            // Bucket is full: split, then retry
+            if (splits++ >= MaxSplits)
+                throw new InvalidOperationException(
+                    $"ExtendibleHashTable: exceeded {MaxSplits} consecutive bucket splits — possible degenerate key distribution.");
+
+            SplitBucket(bucket, allocator);
         }
-
-        // Insert if bucket has room
-        if (!bucket.IsFull)
-        {
-            bucket.Entries.Add((inodeId, blockNumber));
-            EntryCount++;
-            return;
-        }
-
-        // Bucket is full: split
-        SplitBucket(bucket, allocator);
-
-        // Retry insert after split (recursive, but bounded by depth growth)
-        InsertInternal(inodeId, blockNumber, allocator);
     }
 
     /// <summary>

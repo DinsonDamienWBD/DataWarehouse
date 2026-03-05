@@ -32,6 +32,7 @@ public sealed class DatadogConnectionStrategy : ObservabilityConnectionStrategyB
 
         if (config.Properties.TryGetValue("ApiKey", out var apiKey))
         {
+            httpClient.DefaultRequestHeaders.Remove("DD-API-KEY");
             httpClient.DefaultRequestHeaders.Add("DD-API-KEY", apiKey.ToString()!);
         }
 
@@ -62,7 +63,7 @@ public sealed class DatadogConnectionStrategy : ObservabilityConnectionStrategyB
         var httpClient = handle.GetConnection<HttpClient>();
         var json = JsonSerializer.Serialize(new { series = metrics });
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await httpClient.PostAsync("/api/v1/series", content, ct);
+        using var response = await httpClient.PostAsync("/api/v1/series", content, ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -71,7 +72,8 @@ public sealed class DatadogConnectionStrategy : ObservabilityConnectionStrategyB
         var httpClient = handle.GetConnection<HttpClient>();
         var json = JsonSerializer.Serialize(logs);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await httpClient.PostAsync("/v1/input", content, ct);
+        // Finding 2079: Correct Datadog Logs API path is /api/v2/logs (not /v1/input).
+        using var response = await httpClient.PostAsync("/api/v2/logs", content, ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -80,7 +82,8 @@ public sealed class DatadogConnectionStrategy : ObservabilityConnectionStrategyB
         var httpClient = handle.GetConnection<HttpClient>();
         var json = JsonSerializer.Serialize(traces);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await httpClient.PostAsync("/v0.3/traces", content, ct);
+        // Finding 2079: Correct Datadog Traces API path is /v0.4/traces (not /v0.3/traces).
+        using var response = await httpClient.PostAsync("/v0.4/traces", content, ct);
         response.EnsureSuccessStatusCode();
     }
 }

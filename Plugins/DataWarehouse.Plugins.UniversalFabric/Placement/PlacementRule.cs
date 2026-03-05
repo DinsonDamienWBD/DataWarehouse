@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 
@@ -130,13 +131,20 @@ public record PlacementCondition
         return true;
     }
 
+    // P2-4541: Cache compiled Regex instances by pattern to avoid O(1) recompilation on every call.
+    private static readonly ConcurrentDictionary<string, Regex> _wildcardCache = new();
+
     /// <summary>
     /// Matches a value against a simple wildcard pattern (supports * as any characters).
     /// </summary>
     private static bool MatchesWildcard(string value, string pattern)
     {
-        var regexPattern = "^" + Regex.Escape(pattern).Replace("\\*", ".*") + "$";
-        return Regex.IsMatch(value, regexPattern, RegexOptions.IgnoreCase);
+        var regex = _wildcardCache.GetOrAdd(pattern, static p =>
+        {
+            var regexPattern = "^" + Regex.Escape(p).Replace("\\*", ".*") + "$";
+            return new Regex(regexPattern, RegexOptions.IgnoreCase | RegexOptions.Compiled, TimeSpan.FromSeconds(1));
+        });
+        return regex.IsMatch(value);
     }
 }
 

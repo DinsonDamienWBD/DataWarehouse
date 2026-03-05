@@ -21,6 +21,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Services
         private readonly string _pluginId;
         private readonly BoundedDictionary<string, IncidentTicket> _incidents = new BoundedDictionary<string, IncidentTicket>(1000);
         private long _incidentSequence;
+        // Instance-unique token prevents ID collisions when the service restarts and the
+        // date-stamped sequence counter resets to zero (e.g. INC-20260301-000001 collides
+        // with a previous run's INC-20260301-000001 in persistent storage).
+        private readonly string _instanceToken = Guid.NewGuid().ToString("N").Substring(0, 8);
 
         public TamperIncidentWorkflowService(
             ComplianceAlertService alertService,
@@ -43,7 +47,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Services
             if (tamperEvent == null) throw new ArgumentNullException(nameof(tamperEvent));
 
             var sequence = Interlocked.Increment(ref _incidentSequence);
-            var incidentId = $"INC-{DateTime.UtcNow:yyyyMMdd}-{sequence:D6}";
+            // Include instance token so IDs are globally unique across restarts.
+            var incidentId = $"INC-{DateTime.UtcNow:yyyyMMdd}-{_instanceToken}-{sequence:D6}";
 
             var ticket = new IncidentTicket
             {

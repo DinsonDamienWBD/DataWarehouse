@@ -253,22 +253,82 @@ public sealed class BadBlockRemapping
         return recoveredData;
     }
 
-    private Task<byte[]?> ReadBlockFromDiskAsync(string diskId, long lba, CancellationToken ct)
+    private async Task<byte[]?> ReadBlockFromDiskAsync(string diskId, long lba, CancellationToken ct)
     {
-        // Simulated disk read
-        return Task.FromResult<byte[]?>(new byte[512]);
+        // Read a single 512-byte block from the block device at the given LBA.
+        // diskId is the device path (e.g. /dev/sda, \\.\PhysicalDrive0, or a file path for testing).
+        if (string.IsNullOrWhiteSpace(diskId))
+            return null;
+
+        try
+        {
+            const int blockSize = 512;
+            using var fs = new System.IO.FileStream(
+                diskId,
+                System.IO.FileMode.Open,
+                System.IO.FileAccess.Read,
+                System.IO.FileShare.ReadWrite,
+                bufferSize: blockSize,
+                useAsync: true);
+
+            var offset = lba * blockSize;
+            if (offset >= fs.Length)
+                return null;
+
+            fs.Seek(offset, System.IO.SeekOrigin.Begin);
+            var buffer = new byte[blockSize];
+            var totalRead = 0;
+            while (totalRead < blockSize)
+            {
+                var read = await fs.ReadAsync(buffer.AsMemory(totalRead, blockSize - totalRead), ct);
+                if (read == 0) break;
+                totalRead += read;
+            }
+            return totalRead > 0 ? buffer : null;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
     }
 
-    private Task WriteToSpareBlockAsync(string diskId, long spareLba, byte[] data, CancellationToken ct)
+    private async Task WriteToSpareBlockAsync(string diskId, long spareLba, byte[] data, CancellationToken ct)
     {
-        // Simulated write to spare area
-        return Task.CompletedTask;
+        // Write remapped data to the spare area of the block device.
+        if (string.IsNullOrWhiteSpace(diskId) || data.Length == 0)
+            return;
+
+        const int blockSize = 512;
+        using var fs = new System.IO.FileStream(
+            diskId,
+            System.IO.FileMode.OpenOrCreate,
+            System.IO.FileAccess.Write,
+            System.IO.FileShare.Read,
+            bufferSize: blockSize,
+            useAsync: true);
+
+        fs.Seek(spareLba * blockSize, System.IO.SeekOrigin.Begin);
+        await fs.WriteAsync(data.AsMemory(0, Math.Min(data.Length, blockSize)), ct);
+        await fs.FlushAsync(ct);
     }
 
-    private Task<BlockTestResult> TestBlockAsync(string diskId, long lba, CancellationToken ct)
+    private async Task<BlockTestResult> TestBlockAsync(string diskId, long lba, CancellationToken ct)
     {
-        // Simulated block test - in production would do actual read/write test
-        return Task.FromResult(BlockTestResult.Good);
+        // Perform a read-verify test on the block: read it, then attempt a write-back of the same data.
+        var data = await ReadBlockFromDiskAsync(diskId, lba, ct);
+        if (data == null)
+            return BlockTestResult.ReadError;
+
+        // Verify the block is writable by writing it back unchanged.
+        try
+        {
+            await WriteToSpareBlockAsync(diskId, lba, data, ct);
+            return BlockTestResult.Good;
+        }
+        catch (Exception)
+        {
+            return BlockTestResult.WriteError;
+        }
     }
 
     private DiskHealthStatus EvaluateDiskHealth(RemappingStatistics stats)

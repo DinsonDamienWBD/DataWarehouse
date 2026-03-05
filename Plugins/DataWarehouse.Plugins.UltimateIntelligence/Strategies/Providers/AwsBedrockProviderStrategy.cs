@@ -58,12 +58,29 @@ public sealed class AwsBedrockProviderStrategy : AIProviderStrategyBase
         Tags = new[] { "aws", "bedrock", "claude", "titan", "llama", "enterprise" }
     };
 
-    private static readonly HttpClient SharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+    private static readonly HttpClient SharedHttpClient = // Cat 15 (finding 3246): AI completions routinely take 60-120s; 30s causes spurious timeouts.
+new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
     public AwsBedrockProviderStrategy() : this(SharedHttpClient) { }
 
     public AwsBedrockProviderStrategy(HttpClient httpClient)
     {
         _httpClient = httpClient;
+    }
+
+    /// <summary>
+    /// P2-3238: Sanitizes a model ID before embedding it in a URL path segment.
+    /// AWS Bedrock model IDs use the format: provider.model-name-version (e.g.
+    /// "anthropic.claude-3-sonnet-20240229-v1:0"). Any character that could alter the URL
+    /// structure (path separators, query chars, fragments) is rejected.
+    /// </summary>
+    private static string SanitizeModelId(string modelId)
+    {
+        // Allow: letters, digits, hyphen, period, colon, underscore (all legal in Bedrock IDs)
+        if (!System.Text.RegularExpressions.Regex.IsMatch(modelId, @"^[A-Za-z0-9\-\._:]+$"))
+            throw new ArgumentException(
+                $"[AwsBedrockProviderStrategy] Model ID '{modelId}' contains disallowed characters.",
+                nameof(modelId));
+        return modelId;
     }
 
     /// <inheritdoc/>
@@ -72,7 +89,7 @@ public sealed class AwsBedrockProviderStrategy : AIProviderStrategyBase
         return await ExecuteWithTrackingAsync(async () =>
         {
             var region = GetConfig("Region") ?? DefaultRegion;
-            var model = request.Model ?? GetConfig("Model") ?? DefaultModel;
+            var model = SanitizeModelId(request.Model ?? GetConfig("Model") ?? DefaultModel);
 
             var endpoint = $"https://bedrock-runtime.{region}.amazonaws.com";
             var path = $"/model/{model}/invoke";
@@ -100,7 +117,7 @@ public sealed class AwsBedrockProviderStrategy : AIProviderStrategyBase
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var region = GetConfig("Region") ?? DefaultRegion;
-        var model = request.Model ?? GetConfig("Model") ?? DefaultModel;
+        var model = SanitizeModelId(request.Model ?? GetConfig("Model") ?? DefaultModel);
 
         var endpoint = $"https://bedrock-runtime.{region}.amazonaws.com";
         var path = $"/model/{model}/invoke-with-response-stream";
@@ -141,7 +158,7 @@ public sealed class AwsBedrockProviderStrategy : AIProviderStrategyBase
         return await ExecuteWithTrackingAsync(async () =>
         {
             var region = GetConfig("Region") ?? DefaultRegion;
-            var model = GetConfig("EmbeddingModel") ?? DefaultEmbeddingModel;
+            var model = SanitizeModelId(GetConfig("EmbeddingModel") ?? DefaultEmbeddingModel);
 
             var endpoint = $"https://bedrock-runtime.{region}.amazonaws.com";
             var path = $"/model/{model}/invoke";

@@ -53,7 +53,7 @@ public sealed class RenewableRoutingStrategy : SustainabilityStrategyBase
 
         try
         {
-            var response = await _httpClient.GetAsync(
+            using var response = await _httpClient.GetAsync(
                 $"https://api.electricitymap.org/v3/power-breakdown/latest?zone={zone}", ct);
 
             if (response.IsSuccessStatusCode)
@@ -81,7 +81,9 @@ public sealed class RenewableRoutingStrategy : SustainabilityStrategyBase
         }
         catch
         {
+
             // Fallback to cached/static data
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return _regionData.TryGetValue(zone, out var fallback) ? fallback : null;

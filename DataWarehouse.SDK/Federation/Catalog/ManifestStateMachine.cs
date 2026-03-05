@@ -32,7 +32,7 @@ namespace DataWarehouse.SDK.Federation.Catalog;
 [SdkCompatibility("3.0.0", Notes = "Phase 34: Raft state machine for manifest")]
 internal sealed class ManifestStateMachine : IDisposable
 {
-    private bool _disposed;
+    private volatile bool _disposed;
     private readonly BoundedDictionary<ObjectIdentity, ObjectLocationEntry> _index;
     private readonly ReaderWriterLockSlim _lock;
 
@@ -69,6 +69,7 @@ internal sealed class ManifestStateMachine : IDisposable
     /// <param name="snapshot">The JSON-serialized snapshot data.</param>
     public void RestoreSnapshot(byte[] snapshot)
     {
+        if (snapshot == null || snapshot.Length == 0) return;
         _lock.EnterWriteLock();
         try
         {
@@ -91,6 +92,7 @@ internal sealed class ManifestStateMachine : IDisposable
     /// <param name="logEntry">The JSON-serialized ManifestCommand.</param>
     public void Apply(byte[] logEntry)
     {
+        if (logEntry == null || logEntry.Length == 0) return;
         var command = JsonSerializer.Deserialize<ManifestCommand>(logEntry);
         if (command == null) return;
 
@@ -126,6 +128,14 @@ internal sealed class ManifestStateMachine : IDisposable
                     {
                         _index.TryRemove(command.ObjectId.Value, out _);
                     }
+                    break;
+
+                default:
+                    // Unknown action in Raft log — log a warning rather than silently dropping
+                    // to make log corruption visible during diagnostics.
+                    System.Diagnostics.Trace.TraceWarning(
+                        $"[ManifestStateMachine] Unknown Raft log action '{command.Action}' — entry dropped. " +
+                        "This may indicate log corruption or an incompatible version.");
                     break;
             }
         }
@@ -208,13 +218,27 @@ internal sealed class ManifestStateMachine : IDisposable
         _lock.EnterReadLock();
         try
         {
-            var entries = _index.Values;
+            // Single-pass aggregation to avoid repeated enumeration under the read lock
+            long totalBytes = 0;
+            long totalReplication = 0;
+            int count = 0;
+            var uniqueNodes = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var entry in _index.Values)
+            {
+                totalBytes += entry.SizeBytes;
+                totalReplication += entry.ReplicationFactor;
+                count++;
+                foreach (var nodeId in entry.NodeIds)
+                    uniqueNodes.Add(nodeId);
+            }
+
             return new ManifestStatistics
             {
-                TotalObjects = entries.Count(),
-                TotalBytes = entries.Sum(e => e.SizeBytes),
-                AverageReplication = entries.Any() ? entries.Average(e => e.ReplicationFactor) : 0,
-                UniqueNodes = entries.SelectMany(e => e.NodeIds).Distinct().Count()
+                TotalObjects = count,
+                TotalBytes = totalBytes,
+                AverageReplication = count > 0 ? (double)totalReplication / count : 0,
+                UniqueNodes = uniqueNodes.Count
             };
         }
         finally

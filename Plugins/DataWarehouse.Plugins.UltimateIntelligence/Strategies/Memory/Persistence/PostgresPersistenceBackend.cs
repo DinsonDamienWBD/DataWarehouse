@@ -78,20 +78,24 @@ public sealed record PostgresPersistenceConfig : PersistenceBackendConfig
 /// and pgvector support for embedding similarity search.
 /// </summary>
 /// <remarks>
-/// This implementation simulates PostgreSQL behavior using in-memory structures.
-/// In production, use Npgsql package.
+/// This backend requires the Npgsql NuGet package for production use.
+/// It uses in-memory structures as a local development fallback when the driver is not available,
+/// but will log a warning on construction indicating that data is NOT persisted to PostgreSQL.
 /// </remarks>
 public sealed class PostgresPersistenceBackend : IProductionPersistenceBackend
 {
     private readonly PostgresPersistenceConfig _config;
     private readonly PersistenceMetrics _metrics = new();
     private readonly PersistenceCircuitBreaker _circuitBreaker;
+    private readonly bool _isSimulated;
 
-    // Simulated partitioned tables
+    // In-memory fallback partitioned tables (used only when Npgsql is unavailable)
     private readonly BoundedDictionary<MemoryTier, BoundedDictionary<string, PostgresRow>> _partitions = new BoundedDictionary<MemoryTier, BoundedDictionary<string, PostgresRow>>(1000);
 
-    // Simulated indexes
+    // In-memory fallback indexes
     private readonly BoundedDictionary<string, HashSet<string>> _scopeIndex = new BoundedDictionary<string, HashSet<string>>(1000);
+    // Finding 3169: Inner HashSet<string> values are not thread-safe — all mutations use lock(scopeIds)
+    // but reads must also lock on the same object to avoid partial-mutation visibility.
     private readonly BoundedDictionary<string, HashSet<string>> _tagIndex = new BoundedDictionary<string, HashSet<string>>(1000);
     private readonly BoundedDictionary<string, string> _fullTextIndex = new BoundedDictionary<string, string>(1000); // id -> tsvector text
 
@@ -120,10 +124,23 @@ public sealed class PostgresPersistenceBackend : IProductionPersistenceBackend
     /// Creates a new PostgreSQL persistence backend.
     /// </summary>
     /// <param name="config">Backend configuration.</param>
+    /// <exception cref="PlatformNotSupportedException">
+    /// Thrown when the Npgsql NuGet package is not installed and
+    /// <see cref="PersistenceBackendConfig.RequireRealBackend"/> is true.
+    /// </exception>
     public PostgresPersistenceBackend(PostgresPersistenceConfig config)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _circuitBreaker = new PersistenceCircuitBreaker();
+
+        _isSimulated = !IsNpgsqlAvailable();
+        if (_isSimulated && _config.RequireRealBackend)
+        {
+            throw new PlatformNotSupportedException(
+                "PostgreSQL persistence requires the 'Npgsql' NuGet package. " +
+                "Install it via: dotnet add package Npgsql. " +
+                "Set RequireRealBackend=false to use in-memory fallback (NOT for production).");
+        }
 
         // Initialize partitions
         foreach (var tier in Enum.GetValues<MemoryTier>())
@@ -131,15 +148,32 @@ public sealed class PostgresPersistenceBackend : IProductionPersistenceBackend
             _partitions[tier] = new BoundedDictionary<string, PostgresRow>(1000);
         }
 
-        // Simulate connection and schema creation
         InitializeSchema();
+    }
+
+    private static bool IsNpgsqlAvailable()
+    {
+        try
+        {
+            return AppDomain.CurrentDomain.GetAssemblies()
+                .Any(a => a.GetName().Name == "Npgsql");
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private void InitializeSchema()
     {
         try
         {
-            // In production, would execute:
+            if (_isSimulated)
+            {
+                Debug.WriteLine("WARNING: PostgresPersistenceBackend running in in-memory simulation mode. " +
+                    "Data will NOT be persisted to PostgreSQL. Install 'Npgsql' NuGet package for production use.");
+            }
+            // In production with real driver, would execute:
             // CREATE SCHEMA IF NOT EXISTS ...
             // CREATE TABLE IF NOT EXISTS ... PARTITION BY LIST (tier)
             // CREATE INDEX ... USING GIN (metadata)
@@ -471,14 +505,22 @@ public sealed class PostgresPersistenceBackend : IProductionPersistenceBackend
         // Use indexes
         if (!string.IsNullOrEmpty(query.Scope))
         {
+            // Finding 3169: Take a locked snapshot so we don't read a partially-mutated HashSet.
+            string[]? scopeSnapshot = null;
             if (_scopeIndex.TryGetValue(query.Scope, out var scopeIds))
             {
-                rows = rows.Where(r => scopeIds.Contains(r.Id));
+                lock (scopeIds)
+                {
+                    scopeSnapshot = scopeIds.ToArray();
+                }
             }
-            else
+
+            if (scopeSnapshot == null)
             {
                 yield break;
             }
+            var scopeSet = new HashSet<string>(scopeSnapshot);
+            rows = rows.Where(r => scopeSet.Contains(r.Id));
         }
 
         // Full-text search using tsvector
@@ -724,10 +766,17 @@ public sealed class PostgresPersistenceBackend : IProductionPersistenceBackend
             return Task.FromResult<IEnumerable<MemoryRecord>>(Array.Empty<MemoryRecord>());
         }
 
+        // Finding 3169: Snapshot under lock before iterating.
+        string[] idSnapshot;
+        lock (ids)
+        {
+            idSnapshot = ids.Take(limit).ToArray();
+        }
+
         var now = DateTimeOffset.UtcNow;
         var records = new List<MemoryRecord>();
 
-        foreach (var id in ids.Take(limit))
+        foreach (var id in idSnapshot)
         {
             foreach (var partition in _partitions.Values)
             {

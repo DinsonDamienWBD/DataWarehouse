@@ -53,7 +53,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
             SupportsVersioning = true,
             SupportsPerKeyAcl = true,
             SupportsAuditLogging = true,
-            MaxKeySizeBytes = 0,
+            // Nitrokey HSMs support AES-256 (32B), RSA-4096 (512B), ECC-521 (66B).
+            // Set to a generous upper bound; consumers validating against this should use > 0 check.
+            MaxKeySizeBytes = 512, // RSA-4096 private key bytes (max supported key size)
             MinKeySizeBytes = 16,
             Metadata = new Dictionary<string, object>
             {
@@ -100,10 +102,19 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                 else if (slotObj is long slotIdLong) _config.SlotId = (ulong)slotIdLong;
                 else if (slotObj is ulong slotIdUlong) _config.SlotId = slotIdUlong;
             }
+            // #3485: PINs are stored as strings because the underlying PKCS#11 library requires strings.
+            // We read them from configuration and clear them from the config dictionary immediately after
+            // use so they do not persist in memory longer than necessary.
             if (Configuration.TryGetValue("UserPin", out var pinObj) && pinObj is string pin)
+            {
                 _config.UserPin = pin;
+                Configuration.Remove("UserPin"); // Clear from config map to reduce plaintext exposure.
+            }
             if (Configuration.TryGetValue("SoPin", out var soPinObj) && soPinObj is string soPin)
+            {
                 _config.SoPin = soPin;
+                Configuration.Remove("SoPin");
+            }
             if (Configuration.TryGetValue("DefaultKeyLabel", out var labelObj) && labelObj is string label)
                 _config.DefaultKeyLabel = label;
             if (Configuration.TryGetValue("Model", out var modelObj) && modelObj is string model)
@@ -727,8 +738,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                     }
                 };
             }
-            catch
+            catch (OperationCanceledException)
             {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // P2-3495: Surface PKCS#11 errors (token removal, session expiry) via Trace so
+                // they are visible in production instead of silently returning null.
+                System.Diagnostics.Trace.TraceWarning(
+                    $"[NitrokeyStrategy] GetKeyMetadataAsync failed for keyId '{keyId}': {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
             finally

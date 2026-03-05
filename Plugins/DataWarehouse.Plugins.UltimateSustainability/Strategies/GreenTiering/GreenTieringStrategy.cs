@@ -109,7 +109,8 @@ public sealed class GreenTieringStrategy : SustainabilityStrategyBase
     private readonly ConcurrentQueue<GreenMigrationBatch> _pendingBatches = new();
     private readonly BoundedDictionary<string, DateTimeOffset> _lastScanTimes = new BoundedDictionary<string, DateTimeOffset>(1000);
     private Timer? _scanTimer;
-    private volatile bool _scanning;
+    // 0 = not scanning, 1 = scanning. Use Interlocked to avoid TOCTOU race (P2-4431).
+    private int _scanning;
 
     // Energy cost of network transfer: ~0.0000006 kWh per MB (approximate for modern data centers)
     private const double NetworkEnergyKwhPerByte = 0.0000006 / (1024.0 * 1024.0);
@@ -171,7 +172,9 @@ public sealed class GreenTieringStrategy : SustainabilityStrategyBase
     /// </summary>
     public IReadOnlyList<GreenMigrationBatch> GetPendingBatches()
     {
-        return _pendingBatches.ToArray().ToList().AsReadOnly();
+        // Finding 4566: ToArray() already materializes the ConcurrentQueue snapshot; ToList() then
+        // AsReadOnly() adds two unnecessary allocations. Single ToList().AsReadOnly() is sufficient.
+        return _pendingBatches.ToList().AsReadOnly();
     }
 
     /// <summary>
@@ -188,7 +191,7 @@ public sealed class GreenTieringStrategy : SustainabilityStrategyBase
     {
         // Background scan every 15 minutes
         _scanTimer = new Timer(
-            async _ => await RunScanCycleAsync(),
+            async _ => { try { await RunScanCycleAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } },
             null,
             TimeSpan.FromMinutes(1),   // Initial delay: 1 minute after startup
             TimeSpan.FromMinutes(15)); // Repeat every 15 minutes
@@ -288,7 +291,9 @@ public sealed class GreenTieringStrategy : SustainabilityStrategyBase
         }
         catch
         {
+
             // Storage listing failed -- return empty candidates rather than crashing
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return candidates.OrderByDescending(c => c.SizeBytes).ToList().AsReadOnly();
@@ -484,9 +489,9 @@ public sealed class GreenTieringStrategy : SustainabilityStrategyBase
 
     private async Task RunScanCycleAsync()
     {
-        if (_scanning || MessageBus == null) return;
+        // P2-4431: Use Interlocked.CompareExchange so only one timer firing runs at a time.
+        if (MessageBus == null || Interlocked.CompareExchange(ref _scanning, 1, 0) != 0) return;
 
-        _scanning = true;
         try
         {
             var enabledTenants = _policyEngine.GetEnabledTenants();
@@ -542,7 +547,9 @@ public sealed class GreenTieringStrategy : SustainabilityStrategyBase
                 }
                 catch
                 {
+
                     // Individual tenant scan failure should not stop other tenants
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
 
@@ -552,7 +559,7 @@ public sealed class GreenTieringStrategy : SustainabilityStrategyBase
         }
         finally
         {
-            _scanning = false;
+            Interlocked.Exchange(ref _scanning, 0);
         }
     }
 
@@ -595,7 +602,9 @@ public sealed class GreenTieringStrategy : SustainabilityStrategyBase
         }
         catch
         {
+
             // Scores unavailable -- return empty
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return scores;
@@ -641,7 +650,9 @@ public sealed class GreenTieringStrategy : SustainabilityStrategyBase
         }
         catch
         {
+
             // Fall through to time-of-day estimation
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         var fallbackHour = DateTimeOffset.UtcNow.Hour;

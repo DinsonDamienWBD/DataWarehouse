@@ -46,7 +46,7 @@ public sealed class S3ResponseWriter
     /// <summary>
     /// Writes a ListObjectsV2 XML response.
     /// </summary>
-    public void WriteListObjectsResponse(HttpListenerResponse resp, S3ListObjectsResponse data, string bucketName)
+    public void WriteListObjectsResponse(HttpListenerResponse resp, S3ListObjectsResponse data, string bucketName, int maxKeys = 1000)
     {
         ArgumentNullException.ThrowIfNull(resp);
         ArgumentNullException.ThrowIfNull(data);
@@ -55,7 +55,8 @@ public sealed class S3ResponseWriter
         {
             new XElement(S3Ns + "Name", bucketName),
             new XElement(S3Ns + "KeyCount", data.KeyCount),
-            new XElement(S3Ns + "MaxKeys", 1000),
+            // P2-4576: Echo the request MaxKeys value instead of hardcoding 1000.
+            new XElement(S3Ns + "MaxKeys", maxKeys),
             new XElement(S3Ns + "IsTruncated", data.IsTruncated.ToString().ToLowerInvariant())
         };
 

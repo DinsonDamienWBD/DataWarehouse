@@ -65,7 +65,7 @@ public sealed class LaunchDarklyStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
-        IncrementCounter("launch_darkly.deploy");
+        IncrementCounter("launch_darkly.rollback");
         var projectKey = currentState.Metadata.TryGetValue("projectKey", out var pk) ? pk?.ToString() : "";
         var flagKey = currentState.Metadata.TryGetValue("flagKey", out var fk) ? fk?.ToString() : "";
         var environmentKey = currentState.Metadata.TryGetValue("environmentKey", out var ek) ? ek?.ToString() : "";
@@ -348,7 +348,7 @@ public sealed class SplitIoStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
-        IncrementCounter("flagsmith.deploy");
+        IncrementCounter("split_io.rollback");
         var splitName = currentState.Metadata.TryGetValue("splitName", out var sn) ? sn?.ToString() : "";
         var environment = currentState.Metadata.TryGetValue("environment", out var env) ? env?.ToString() : "";
 
@@ -436,6 +436,7 @@ public sealed class UnleashStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("unleash.rollback");
         var project = currentState.Metadata.TryGetValue("project", out var p) ? p?.ToString() : "";
         var toggleName = currentState.Metadata.TryGetValue("toggleName", out var tn) ? tn?.ToString() : "";
 
@@ -508,6 +509,7 @@ public sealed class FlagsmithStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("flagsmith.rollback");
         var featureName = currentState.Metadata.TryGetValue("featureName", out var fn) ? fn?.ToString() : "";
         var environmentId = currentState.Metadata.TryGetValue("environmentId", out var ei) ? ei?.ToString() : "";
 
@@ -583,6 +585,7 @@ public sealed class CustomFeatureFlagStrategy : DeploymentStrategyBase
 
     protected override async Task<DeploymentState> RollbackCoreAsync(string deploymentId, string targetVersion, DeploymentState currentState, CancellationToken ct)
     {
+        IncrementCounter("custom_feature_flag.rollback");
         var flagName = currentState.Metadata.TryGetValue("flagName", out var fn) ? fn?.ToString() : "";
         var configEndpoint = currentState.Metadata.TryGetValue("configEndpoint", out var ce) ? ce?.ToString() : "";
 

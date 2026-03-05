@@ -3,6 +3,7 @@ using DataWarehouse.SDK.Database;
 using Npgsql;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace DataWarehouse.Plugins.UltimateDatabaseStorage.Strategies.TimeSeries;
 
@@ -46,10 +47,24 @@ public sealed class TimescaleDbStorageStrategy : DatabaseStorageStrategyBase
     public override bool SupportsTransactions => true;
     public override bool SupportsSql => true;
 
+    /// <summary>
+    /// Regex for safe PostgreSQL interval literals: digits + time unit keywords only.
+    /// </summary>
+    private static readonly Regex SafeIntervalRegex =
+        new(@"^\d+\s+(microseconds?|milliseconds?|seconds?|minutes?|hours?|days?|weeks?|months?|years?)$",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
     protected override async Task InitializeCoreAsync(CancellationToken ct)
     {
         _tableName = GetConfiguration("TableName", "storage_timeseries");
+        ValidateSqlIdentifier(_tableName, nameof(_tableName));
         _chunkInterval = GetConfiguration("ChunkInterval", "1 day");
+        if (!SafeIntervalRegex.IsMatch(_chunkInterval))
+        {
+            throw new ArgumentException(
+                $"ChunkInterval contains unsafe characters. Must be a simple interval like '1 day'. Got: '{_chunkInterval}'",
+                nameof(_chunkInterval));
+        }
 
         var connectionString = GetConnectionString();
         _dataSource = NpgsqlDataSource.Create(connectionString);
@@ -115,7 +130,9 @@ public sealed class TimescaleDbStorageStrategy : DatabaseStorageStrategyBase
             }
             catch
             {
+
                 // Table might already be a hypertable
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
@@ -137,9 +154,19 @@ public sealed class TimescaleDbStorageStrategy : DatabaseStorageStrategyBase
         await using var connection = await _dataSource!.OpenConnectionAsync(ct);
         await using var command = connection.CreateCommand();
 
+        // P2-2868: Use ON CONFLICT DO UPDATE (upsert) to handle rapid same-key writes
+        // at the same millisecond without throwing a UNIQUE constraint violation.
+        // TimescaleDB hypertables partition by time; duplicate (time, key) within the same
+        // chunk chunk would violate the unique index without this clause.
         command.CommandText = $@"
             INSERT INTO {_tableName} (time, key, data, size, content_type, etag, metadata)
-            VALUES (@time, @key, @data, @size, @contentType, @etag, @metadata::jsonb)";
+            VALUES (@time, @key, @data, @size, @contentType, @etag, @metadata::jsonb)
+            ON CONFLICT (time, key) DO UPDATE SET
+                data = EXCLUDED.data,
+                size = EXCLUDED.size,
+                content_type = EXCLUDED.content_type,
+                etag = EXCLUDED.etag,
+                metadata = EXCLUDED.metadata";
 
         command.Parameters.AddWithValue("@time", now);
         command.Parameters.AddWithValue("@key", key);
@@ -331,6 +358,11 @@ public sealed class TimescaleDbStorageStrategy : DatabaseStorageStrategyBase
     /// </summary>
     public async Task EnableCompressionAsync(string olderThan = "7 days", CancellationToken ct = default)
     {
+        if (!SafeIntervalRegex.IsMatch(olderThan))
+        {
+            throw new ArgumentException($"olderThan contains unsafe characters. Got: '{olderThan}'", nameof(olderThan));
+        }
+
         await using var connection = await _dataSource!.OpenConnectionAsync(ct);
 
         await using (var cmd = connection.CreateCommand())
@@ -352,6 +384,11 @@ public sealed class TimescaleDbStorageStrategy : DatabaseStorageStrategyBase
     /// </summary>
     public async Task SetRetentionPolicyAsync(string retentionPeriod = "90 days", CancellationToken ct = default)
     {
+        if (!SafeIntervalRegex.IsMatch(retentionPeriod))
+        {
+            throw new ArgumentException($"retentionPeriod contains unsafe characters. Got: '{retentionPeriod}'", nameof(retentionPeriod));
+        }
+
         await using var connection = await _dataSource!.OpenConnectionAsync(ct);
         await using var cmd = connection.CreateCommand();
 

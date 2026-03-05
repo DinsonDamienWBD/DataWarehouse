@@ -138,6 +138,8 @@ internal sealed class JpegImageStrategy : MediaStrategyBase
     protected override async Task<Stream> TranscodeAsyncCore(
         Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
     {
+        // LOW-1095: Hoist quality before try so catch block can reference it in the error message.
+        var quality = DetermineQuality(options);
         try
         {
             // Input validation
@@ -160,8 +162,6 @@ internal sealed class JpegImageStrategy : MediaStrategyBase
             }
 
         var outputStream = new MemoryStream(1024 * 1024);
-
-        var quality = DetermineQuality(options);
 
         // Validate quality range
         if (quality < MinQuality || quality > MaxQuality)
@@ -314,8 +314,9 @@ internal sealed class JpegImageStrategy : MediaStrategyBase
         catch (Exception ex)
         {
             IncrementCounter("image.error");
+            // LOW-1095: Use existing `quality` local instead of calling DetermineQuality(options) again.
             throw new InvalidOperationException(
-                $"JPEG image processing failed: quality={DetermineQuality(options)}, " +
+                $"JPEG image processing failed: quality={quality}, " +
                 $"resolution={options.TargetResolution?.Width ?? 0}x{options.TargetResolution?.Height ?? 0}",
                 ex);
         }

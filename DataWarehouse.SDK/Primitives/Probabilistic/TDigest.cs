@@ -139,7 +139,7 @@ public sealed class TDigest : IProbabilisticStructure, IMergeable<TDigest>, ICon
         {
             // Try to merge with nearest centroid
             var nearest = _centroids[index];
-            var q = Quantile(nearest);
+            var q = QuantileAtIndex(index); // Use index-based lookup to avoid float equality (finding P2-558)
             var maxSize = MaxCentroidSize(q);
 
             if (nearest.Weight + weight <= maxSize)
@@ -355,6 +355,8 @@ public sealed class TDigest : IProbabilisticStructure, IMergeable<TDigest>, ICon
     /// </summary>
     public static TDigest Deserialize(byte[] data)
     {
+        ArgumentNullException.ThrowIfNull(data);
+
         using var ms = new System.IO.MemoryStream(data);
         using var reader = new System.IO.BinaryReader(ms);
 
@@ -363,6 +365,13 @@ public sealed class TDigest : IProbabilisticStructure, IMergeable<TDigest>, ICon
         var min = reader.ReadDouble();
         var max = reader.ReadDouble();
         var centroidCount = reader.ReadInt32();
+
+        // Guard against OOM bomb from corrupt/malicious data with huge centroidCount
+        // Max realistic t-digest has ~compression * 4 centroids; 100,000 is a conservative upper bound
+        const int MaxCentroidCount = 100_000;
+        if (centroidCount < 0 || centroidCount > MaxCentroidCount)
+            throw new InvalidDataException(
+                $"TDigest deserialization failed: centroidCount {centroidCount} is out of valid range [0, {MaxCentroidCount}].");
 
         var centroids = new List<Centroid>(centroidCount);
         for (int i = 0; i < centroidCount; i++)
@@ -394,24 +403,33 @@ public sealed class TDigest : IProbabilisticStructure, IMergeable<TDigest>, ICon
 
         var compressed = new List<Centroid>((int)_compression);
         var current = _centroids[0];
+        // Track cumulative weight to compute quantile in O(1) per centroid,
+        // avoiding the O(n) Quantile() scan inside the loop (finding P2-557).
+        double cumulativeWeight = 0;
 
         for (int i = 1; i < _centroids.Count; i++)
         {
             var next = _centroids[i];
-            var q = Quantile(current);
+            // q = (cumulativeWeight + current.Weight / 2) / _count
+            var q = _count > 0
+                ? (cumulativeWeight + current.Weight / 2.0) / _count
+                : 0.5;
             var maxSize = MaxCentroidSize(q);
 
             if (current.Weight + next.Weight <= maxSize)
             {
-                // Merge
+                // Merge — cumulative weight stays at its pre-merge value until we commit current
+                var mergedWeight = current.Weight + next.Weight;
                 current = new Centroid
                 {
-                    Mean = (current.Mean * current.Weight + next.Mean * next.Weight) / (current.Weight + next.Weight),
-                    Weight = current.Weight + next.Weight
+                    Mean = (current.Mean * current.Weight + next.Mean * next.Weight) / mergedWeight,
+                    Weight = mergedWeight
                 };
+                // Don't advance cumulativeWeight yet — current is still being built
             }
             else
             {
+                cumulativeWeight += current.Weight;
                 compressed.Add(current);
                 current = next;
             }
@@ -428,7 +446,22 @@ public sealed class TDigest : IProbabilisticStructure, IMergeable<TDigest>, ICon
         return 4 * _count * q * (1 - q) / _compression;
     }
 
-    private double Quantile(Centroid centroid)
+    /// <summary>
+    /// Returns the approximate quantile of the centroid at the given index.
+    /// Uses index directly to avoid float equality comparison (finding P2-558).
+    /// </summary>
+    private double QuantileAtIndex(int index)
+    {
+        double weight = 0;
+        for (int i = 0; i < index; i++)
+            weight += _centroids[i].Weight;
+        var c = _centroids[index];
+        return _count > 0 ? (weight + c.Weight / 2.0) / _count : 0.5;
+    }
+
+    // Cat 15 (finding 566): renamed from Quantile(Centroid) to CentroidQuantilePosition to avoid
+    // shadowing public Quantile(double) and eliminate naming confusion.
+    private double CentroidQuantilePosition(Centroid centroid)
     {
         double weight = 0;
         for (int i = 0; i < _centroids.Count; i++)

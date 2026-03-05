@@ -1604,15 +1604,26 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Generative
 
         private static byte[] DecompressGenerative(byte[] data)
         {
-            if (data.Length < 4) return Array.Empty<byte>();
+            if (data.Length < 4)
+                throw new InvalidDataException($"Generative decompression requires at least 4 header bytes, got {data.Length}.");
 
             int length = (data[0] << 24) | (data[1] << 16) | (data[2] << 8) | data[3];
-            if (length <= 0 || length > 100_000_000) return Array.Empty<byte>();
+            if (length < 0 || length > 100_000_000)
+                throw new InvalidDataException($"Generative decompression: invalid length header {length}.");
+
+            if (length == 0)
+                return Array.Empty<byte>();
+
+            // Validate that the compressed payload is large enough for all expected delta bytes
+            int expectedDataBytes = length + 4; // 4-byte header + 'length' delta bytes
+            if (data.Length < expectedDataBytes)
+                throw new InvalidDataException(
+                    $"Generative decompression: compressed data truncated. Expected {expectedDataBytes} bytes, got {data.Length}.");
 
             var result = new byte[length];
             byte prev = 0;
 
-            for (int i = 0; i < length && i + 4 < data.Length; i++)
+            for (int i = 0; i < length; i++)
             {
                 byte delta = data[i + 4];
                 result[i] = (byte)(prev + delta);
@@ -1850,8 +1861,12 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Generative
 
                 return false;
             }
-            catch
+            catch (Exception ex)
             {
+                // P2-1623: Log rather than swallow — GPU detection errors affect all subsequent
+                // compression decisions. Operators need to know if GPU configuration is broken.
+                System.Diagnostics.Debug.WriteLine(
+                    $"[GenerativeCompression] GPU availability detection failed (defaulting to CPU): {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
         }
@@ -1870,10 +1885,15 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Generative
             return CpuMatrixMultiply(input, weights, inputSize, outputSize);
         }
 
+        /// <remarks>
+        /// GPU acceleration is not implemented in this release.
+        /// GPU matrix multiplication requires an external GPGPU library (e.g., CUDA, OpenCL, or Vulkan compute shaders)
+        /// which is outside the current dependency set. Falls back to CPU implementation.
+        /// To enable GPU acceleration, inject a custom <c>IGpuComputeProvider</c> and override this method.
+        /// </remarks>
         private static float[] GpuMatrixMultiply(float[] input, float[] weights, int inputSize, int outputSize)
         {
-            // GPU implementation would use compute shaders
-            // For now, use optimized CPU with SIMD hints
+            // GPU acceleration unavailable — CPU fallback (see remarks on this method).
             return CpuMatrixMultiply(input, weights, inputSize, outputSize);
         }
 

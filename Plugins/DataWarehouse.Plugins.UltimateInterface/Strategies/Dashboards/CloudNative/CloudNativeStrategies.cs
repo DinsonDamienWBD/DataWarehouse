@@ -133,7 +133,7 @@ public sealed class GoogleDataStudioStrategy : DashboardStrategyBase
     {
         EnsureConfigured();
         var startTime = DateTimeOffset.UtcNow;
-        // Looker Studio uses BigQuery or other connectors, simulate data source update
+        // Looker Studio data sources are updated via the Data Studio API endpoint.
         var payload = new { dataSourceId = targetId, rows = data.Select(r => r.ToDictionary(k => k.Key, k => k.Value)).ToArray() };
         var response = await SendAuthenticatedRequestAsync(HttpMethod.Post, $"/v1/datasources/{targetId}/data", CreateJsonContent(payload), ct);
         var duration = (DateTimeOffset.UtcNow - startTime).TotalMilliseconds;

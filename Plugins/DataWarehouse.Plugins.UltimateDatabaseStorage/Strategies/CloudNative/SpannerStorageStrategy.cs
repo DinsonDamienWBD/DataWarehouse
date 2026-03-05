@@ -86,6 +86,8 @@ public sealed class SpannerStorageStrategy : DatabaseStorageStrategyBase
 
     protected override async Task EnsureSchemaCoreAsync(CancellationToken ct)
     {
+        ValidateSqlIdentifier(_tableName, nameof(_tableName));
+
         // Check if table exists
         var checkCmd = _connection!.CreateSelectCommand(
             @"SELECT COUNT(*) FROM information_schema.tables
@@ -95,7 +97,7 @@ public sealed class SpannerStorageStrategy : DatabaseStorageStrategyBase
         var count = (long)(await checkCmd.ExecuteScalarAsync(ct) ?? 0);
         if (count > 0) return;
 
-        // Create table using DDL
+        // Create table using DDL via the Spanner DDL execution API
         var ddl = $@"
             CREATE TABLE {_tableName} (
                 StorageKey STRING(1024) NOT NULL,
@@ -108,9 +110,9 @@ public sealed class SpannerStorageStrategy : DatabaseStorageStrategyBase
                 ModifiedAt TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true)
             ) PRIMARY KEY (StorageKey)";
 
-        // Execute DDL - requires admin client in production
-        // For now, we'll assume the table exists or is created externally
-        await Task.CompletedTask;
+        // Execute DDL using SpannerConnection's CreateDdlCommand
+        using var ddlCmd = _connection.CreateDdlCommand(ddl);
+        await ddlCmd.ExecuteNonQueryAsync(ct);
     }
 
     protected override async Task<StorageObjectMetadata> StoreCoreAsync(string key, byte[] data, IDictionary<string, string>? metadata, CancellationToken ct)

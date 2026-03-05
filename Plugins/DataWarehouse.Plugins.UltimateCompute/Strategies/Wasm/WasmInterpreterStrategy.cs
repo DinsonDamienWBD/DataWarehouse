@@ -52,6 +52,10 @@ internal sealed class WasmInterpreterStrategy : ComputeRuntimeStrategyBase
         "hot reload, and version management. No external runtime dependencies required.";
 
     /// <inheritdoc/>
+    // The built-in WASM interpreter only parses sections and validates magic bytes — full instruction dispatch is not yet implemented.
+    public override bool IsProductionReady => false;
+
+    /// <inheritdoc/>
     public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default)
     {
         ValidateTask(task);
@@ -80,16 +84,19 @@ internal sealed class WasmInterpreterStrategy : ComputeRuntimeStrategyBase
             int offset = 8;
             while (offset < code.Length)
             {
-                if (offset + 1 >= code.Length) break;
+                if (offset >= code.Length) break; // allows section starting at last byte to be processed
                 var sectionId = code[offset++];
-                // Read LEB128 section size
+                // Read LEB128 section size — bounds-checked to prevent infinite loop on malformed input.
                 long sectionSize = 0;
                 int shift = 0;
-                byte b;
+                byte b = 0;
+                int leb128Bytes = 0;
+                const int MaxLeb128Bytes = 5; // 32-bit LEB128 max 5 bytes; use 5 for section size
                 do
                 {
-                    if (offset >= code.Length) break;
+                    if (offset >= code.Length || leb128Bytes >= MaxLeb128Bytes) break;
                     b = code[offset++];
+                    leb128Bytes++;
                     sectionSize |= (long)(b & 0x7F) << shift;
                     shift += 7;
                 } while ((b & 0x80) != 0 && shift < 35);
@@ -105,8 +112,8 @@ internal sealed class WasmInterpreterStrategy : ComputeRuntimeStrategyBase
                 ? task.InputData.ToArray()
                 : Encoding.UTF8.GetBytes("{}");
 
-            await Task.CompletedTask; // Async signature compatibility
-
+            // NOTE: Full WASM instruction dispatch is not yet implemented. Only section parsing
+            // and magic-number validation are performed. IsProductionReady = false reflects this.
             return (output, sb.ToString());
         }, cancellationToken);
     }

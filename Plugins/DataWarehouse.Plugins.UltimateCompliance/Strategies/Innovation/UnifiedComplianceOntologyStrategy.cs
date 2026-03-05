@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("unified_compliance_ontology.check");
+            IncrementCounter("unified_compliance_ontology.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -59,9 +59,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
 
             recommendations.Add("Use Common Controls Hub for unified control library management");
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -77,14 +78,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("unified_compliance_ontology.initialized");
+            IncrementCounter("unified_compliance_ontology.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("unified_compliance_ontology.shutdown");
+            IncrementCounter("unified_compliance_ontology.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

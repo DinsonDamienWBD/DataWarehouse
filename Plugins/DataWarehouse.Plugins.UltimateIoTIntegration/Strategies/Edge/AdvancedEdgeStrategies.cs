@@ -47,7 +47,7 @@ public sealed class EdgeCachingStrategy : EdgeIntegrationStrategyBase
                 return null;
             }
             _accessOrder[key] = Interlocked.Increment(ref _accessCounter);
-            entry.HitCount++;
+            entry.IncrementHitCount();
             return entry;
         }
         return null;
@@ -144,8 +144,21 @@ public sealed class EdgeCacheEntry
     public DateTimeOffset CachedAt { get; init; }
     public DateTimeOffset? ExpiresAt { get; init; }
     public Dictionary<string, string> Metadata { get; init; } = new();
-    public bool IsDirty { get; set; }
-    public long HitCount { get; set; }
+
+    // volatile ensures cross-thread visibility of bool flag without a full lock.
+    private volatile bool _isDirty;
+    public bool IsDirty
+    {
+        get => _isDirty;
+        set => _isDirty = value;
+    }
+
+    // Backing field for thread-safe increment via Interlocked.
+    private long _hitCount;
+    public long HitCount => Interlocked.Read(ref _hitCount);
+
+    /// <summary>Atomically increments the hit counter.</summary>
+    public void IncrementHitCount() => Interlocked.Increment(ref _hitCount);
 }
 
 /// <summary>Cache mode.</summary>
@@ -212,8 +225,15 @@ public sealed class OfflineSyncStrategy : EdgeIntegrationStrategyBase
         while (_operationLog.TryDequeue(out var op))
             pending.Add(op);
 
-        // Sort by vector clock for causal ordering
-        pending.Sort((a, b) => a.Timestamp.CompareTo(b.Timestamp));
+        // Sort by vector clock sum for causal ordering, falling back to wall-clock timestamp.
+        // A lower total vector-clock sum indicates the operation happened causally earlier.
+        pending.Sort((a, b) =>
+        {
+            var sumA = a.VectorClock?.Values.Sum() ?? 0;
+            var sumB = b.VectorClock?.Values.Sum() ?? 0;
+            var cmp = sumA.CompareTo(sumB);
+            return cmp != 0 ? cmp : a.Timestamp.CompareTo(b.Timestamp);
+        });
 
         foreach (var op in pending)
         {
@@ -323,11 +343,21 @@ public sealed class BandwidthEstimationStrategy : EdgeIntegrationStrategyBase
             Timestamp = DateTimeOffset.UtcNow
         });
 
-        while (_samples.Count > _maxSamples)
+        // P2-3396: compute excess once; for-loop avoids infinite spin under concurrent enqueues.
+        int excess = _samples.Count - _maxSamples;
+        for (int i = 0; i < excess; i++)
             _samples.TryDequeue(out _);
 
-        // EWMA (Exponential Weighted Moving Average) with alpha = 0.3
-        _currentEstimateBps = _currentEstimateBps == 0 ? bps : _currentEstimateBps * 0.7 + bps * 0.3;
+        // EWMA (Exponential Weighted Moving Average) with alpha = 0.3.
+        // Use Interlocked for atomic double read+write on 32-bit platforms where
+        // double reads/writes are not guaranteed to be atomic.
+        double current, updated;
+        do
+        {
+            current = Interlocked.CompareExchange(ref _currentEstimateBps, 0.0, 0.0);
+            updated = current == 0.0 ? bps : current * 0.7 + bps * 0.3;
+        }
+        while (Interlocked.CompareExchange(ref _currentEstimateBps, updated, current) != current);
     }
 
     /// <summary>Gets the current bandwidth estimate.</summary>
@@ -343,7 +373,7 @@ public sealed class BandwidthEstimationStrategy : EdgeIntegrationStrategyBase
 
         return new BandwidthEstimate
         {
-            EstimatedBps = _currentEstimateBps,
+            EstimatedBps = Interlocked.CompareExchange(ref _currentEstimateBps, 0.0, 0.0),
             UploadBps = upSamples.Length > 0 ? upSamples.Average(s => s.Bps) : 0,
             DownloadBps = downSamples.Length > 0 ? downSamples.Average(s => s.Bps) : 0,
             Confidence = Math.Min(1.0, recentSamples.Length / 10.0),
@@ -780,10 +810,14 @@ internal sealed class SlidingWindow
         if (timestamp < OldestTimestamp) OldestTimestamp = timestamp;
         if (timestamp > NewestTimestamp) NewestTimestamp = timestamp;
 
-        // Evict old values
+        // Evict old values and keep OldestTimestamp current — P2-3401
         var cutoff = DateTimeOffset.UtcNow - _windowSize;
         while (_values.TryPeek(out var oldest) && oldest.Timestamp < cutoff)
+        {
             _values.TryDequeue(out _);
+        }
+        // Update OldestTimestamp to reflect the current oldest retained sample.
+        OldestTimestamp = _values.TryPeek(out var head) ? head.Timestamp : DateTimeOffset.MaxValue;
     }
 
     public double[] GetValues() => _values.Select(v => v.Value).ToArray();

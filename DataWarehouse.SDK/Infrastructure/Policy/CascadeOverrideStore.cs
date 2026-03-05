@@ -66,22 +66,20 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
 
             var key = BuildKey(featureId, level);
 
-            // If the key already exists, update in place (no capacity check needed)
-            if (_overrides.ContainsKey(key))
-            {
-                _overrides[key] = strategy;
-                return;
-            }
-
-            // Enforce bounded capacity for new entries
-            if (_overrides.Count >= MaxOverrides)
-            {
-                throw new InvalidOperationException(
-                    $"Cascade override store has reached its maximum capacity of {MaxOverrides} entries. " +
-                    "Remove unused overrides before adding new ones.");
-            }
-
-            _overrides[key] = strategy;
+            // P2-488: Use atomic AddOrUpdate to eliminate ContainsKey + indexed-set TOCTOU race.
+            // Capacity is enforced only on add; updates to existing keys bypass the limit.
+            _overrides.AddOrUpdate(
+                key,
+                addValueFactory: k =>
+                {
+                    // Enforce bounded capacity for new entries only
+                    if (_overrides.Count >= MaxOverrides)
+                        throw new InvalidOperationException(
+                            $"Cascade override store has reached its maximum capacity of {MaxOverrides} entries. " +
+                            "Remove unused overrides before adding new ones.");
+                    return strategy;
+                },
+                updateValueFactory: (k, _) => strategy);
         }
 
         /// <summary>

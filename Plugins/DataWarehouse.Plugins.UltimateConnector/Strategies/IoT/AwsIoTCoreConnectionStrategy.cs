@@ -45,7 +45,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
 
             var client = new HttpClient { BaseAddress = new Uri($"https://{endpoint}") };
 
-            var response = await client.GetAsync("/", ct);
+            using var response = await client.GetAsync("/", ct);
 
             var info = new Dictionary<string, object>
             {
@@ -61,8 +61,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             var client = handle.GetConnection<HttpClient>();
-            var response = await client.GetAsync("/", ct);
-            return response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable;
+            using var response = await client.GetAsync("/", ct);
+            return response.IsSuccessStatusCode;
         }
 
         /// <inheritdoc/>
@@ -95,7 +95,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
             var shadowUrl = $"/things/{deviceId}/shadow";
             try
             {
-                var response = await client.GetAsync(shadowUrl, ct);
+                using var response = await client.GetAsync(shadowUrl, ct);
+                response.EnsureSuccessStatusCode();
                 var content = await response.Content.ReadAsStringAsync(ct);
                 return new Dictionary<string, object>
                 {
@@ -128,7 +129,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
             var jobsUrl = $"/things/{deviceId}/jobs";
             try
             {
-                var response = await client.GetAsync(jobsUrl, ct);
+                using var response = await client.GetAsync(jobsUrl, ct);
                 return $"{{\"status\":\"queued\",\"thingName\":\"{deviceId}\",\"command\":\"{command}\",\"endpoint\":\"{jobsUrl}\"}}";
             }
             catch (Exception ex)

@@ -47,7 +47,8 @@ public enum RebalanceStatus
     Running,
     Paused,
     Completed,
-    Failed
+    Failed,
+    Cancelled
 }
 
 /// <summary>

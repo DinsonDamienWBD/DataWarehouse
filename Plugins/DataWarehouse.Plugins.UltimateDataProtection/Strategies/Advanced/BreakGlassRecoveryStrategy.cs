@@ -26,11 +26,14 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
         private readonly BoundedDictionary<string, EmergencyBackup> _emergencyBackups = new BoundedDictionary<string, EmergencyBackup>(1000);
         private readonly BoundedDictionary<string, BreakGlassSession> _activeSessions = new BoundedDictionary<string, BreakGlassSession>(1000);
         private readonly BoundedDictionary<string, EmergencyAccessToken> _activeTokens = new BoundedDictionary<string, EmergencyAccessToken>(1000);
+        private readonly BoundedDictionary<string, List<KeyShare>> _keyShareStore = new BoundedDictionary<string, List<KeyShare>>(1000);
+        private readonly object _keyShareLock = new();
         private readonly List<AuditLogEntry> _auditLog = new();
         private readonly object _auditLock = new();
 
         /// <inheritdoc/>
         public override string StrategyId => "break-glass";
+        public override bool IsProductionReady => false;
 
         /// <inheritdoc/>
         public override string StrategyName => "Break-Glass Recovery";
@@ -238,7 +241,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
                     await AuditLogAsync(
                         request.BackupId,
                         "EMERGENCY_ACCESS_DENIED",
-                        $"Invalid token: {token[..8]}...",
+                        $"Invalid token: {(token.Length >= 8 ? token[..8] : token)}...",
                         ct);
 
                     return new RestoreResult
@@ -558,42 +561,112 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 
         private string ComputeKeyId(byte[] key)
         {
-            using var sha256 = SHA256.Create();
-            return Convert.ToHexString(sha256.ComputeHash(key))[..16];
+            // P2-2556: Do not log a raw SHA-256 of the master key — it leaks a detectable hash of
+            // the secret and enables offline dictionary attacks. Use HMAC-SHA256 with a fixed
+            // context label so the output is bound to this specific use and not invertible to key.
+            var keyIdBytes = System.Security.Cryptography.HKDF.DeriveKey(
+                System.Security.Cryptography.HashAlgorithmName.SHA256,
+                key,
+                8, // 8 bytes → 16 hex chars
+                System.Text.Encoding.UTF8.GetBytes("BreakGlass_KeyId_v1"),
+                System.Text.Encoding.UTF8.GetBytes("break-glass-key-id"));
+            return Convert.ToHexString(keyIdBytes);
         }
 
         private List<KeyShare> SplitSecretKey(byte[] secret, int threshold, int totalShares)
         {
-            // In production, use Shamir's Secret Sharing algorithm
-            var shares = new List<KeyShare>();
-            for (int i = 1; i <= totalShares; i++)
+            // XOR-based secret sharing (t-of-n): n-1 random shares XOR'd together to produce share n.
+            // For t=n this guarantees all shares required. A full Shamir's SSS implementation
+            // requires a finite-field polynomial library; this provides correct k=n semantics.
+            if (threshold != totalShares)
+                throw new NotSupportedException("Only t=n threshold supported in this implementation. Use threshold == totalShares.");
+
+            var shares = new List<byte[]>();
+            byte[] xorCumulative = new byte[secret.Length];
+
+            // Generate n-1 random shares
+            for (int i = 1; i < totalShares; i++)
             {
-                shares.Add(new KeyShare
-                {
-                    ShareId = $"share-{i:D2}",
-                    ShareIndex = i,
-                    ShareData = Convert.ToBase64String(secret) // Simplified
-                });
+                var share = new byte[secret.Length];
+                RandomNumberGenerator.Fill(share);
+                shares.Add(share);
+                for (int b = 0; b < secret.Length; b++)
+                    xorCumulative[b] ^= share[b];
             }
-            return shares;
+
+            // Last share = secret XOR all previous shares
+            var lastShare = new byte[secret.Length];
+            for (int b = 0; b < secret.Length; b++)
+                lastShare[b] = (byte)(secret[b] ^ xorCumulative[b]);
+            shares.Add(lastShare);
+
+            return shares.Select((s, idx) => new KeyShare
+            {
+                ShareId = $"share-{idx + 1:D2}",
+                ShareIndex = idx + 1,
+                ShareData = Convert.ToBase64String(s)
+            }).ToList();
         }
 
         private byte[] ReconstructSecretKey(List<string> shareData, int threshold)
         {
-            // In production, use Shamir's Secret Sharing reconstruction
-            // For now, simulate with first share
-            return Convert.FromBase64String(shareData[0]);
+            // XOR reconstruction: XOR all share bytes together to recover the secret.
+            if (shareData.Count < threshold)
+                throw new InvalidOperationException($"Insufficient shares: need {threshold}, got {shareData.Count}");
+
+            byte[]? result = null;
+            foreach (var b64 in shareData)
+            {
+                var share = Convert.FromBase64String(b64);
+                if (result == null)
+                {
+                    result = share.ToArray();
+                }
+                else
+                {
+                    for (int i = 0; i < result.Length; i++)
+                        result[i] ^= share[i];
+                }
+            }
+            return result!;
         }
 
-        private async Task<CatalogResult> CatalogSourceDataAsync(IReadOnlyList<string> sources, CancellationToken ct)
+        private Task<CatalogResult> CatalogSourceDataAsync(IReadOnlyList<string> sources, CancellationToken ct)
         {
-            await Task.CompletedTask;
-            return new CatalogResult
+            // Enumerate source paths to build catalog metadata.
+            long totalBytes = 0;
+            var files = new List<string>();
+            foreach (var source in sources)
             {
-                FileCount = 5000,
-                TotalBytes = 2L * 1024 * 1024 * 1024, // 2 GB
-                Files = new List<string>()
-            };
+                if (!string.IsNullOrWhiteSpace(source))
+                {
+                    try
+                    {
+                        if (Directory.Exists(source))
+                        {
+                            foreach (var f in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+                            {
+                                files.Add(f);
+                                try { totalBytes += new FileInfo(f).Length; } catch { /* best effort */ }
+                                if (files.Count >= 100000) break; // safety cap
+                            }
+                        }
+                        else if (File.Exists(source))
+                        {
+                            files.Add(source);
+                            try { totalBytes += new FileInfo(source).Length; } catch { /* best effort */ }
+                        }
+                    }
+                    catch (UnauthorizedAccessException) { /* skip inaccessible paths */ }
+                    catch (DirectoryNotFoundException) { /* skip missing paths */ }
+                }
+            }
+            return Task.FromResult(new CatalogResult
+            {
+                FileCount = files.Count,
+                TotalBytes = totalBytes,
+                Files = files
+            });
         }
 
         private async Task<byte[]> CreateBackupDataAsync(
@@ -602,9 +675,23 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
             Action<long> progressCallback,
             CancellationToken ct)
         {
-            await Task.Delay(100, ct);
-            progressCallback(2L * 1024 * 1024 * 1024);
-            return new byte[1024 * 1024]; // Placeholder
+            // Produce a backup archive: iterate files and concatenate their bytes.
+            // In production this would stream to a compressed/encrypted archive format.
+            using var ms = new System.IO.MemoryStream();
+            long bytesWritten = 0;
+            foreach (var file in files)
+            {
+                ct.ThrowIfCancellationRequested();
+                try
+                {
+                    var data = await File.ReadAllBytesAsync(file, ct);
+                    await ms.WriteAsync(data, ct);
+                    bytesWritten += data.Length;
+                    progressCallback(bytesWritten);
+                }
+                catch (IOException) { /* skip unreadable files */ }
+            }
+            return ms.ToArray();
         }
 
         private async Task<byte[]> EncryptBackupAsync(byte[] data, byte[] key, CancellationToken ct)
@@ -655,14 +742,30 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 
         private Task StoreKeySharesAsync(string backupId, List<KeyShare> shares, CancellationToken ct)
         {
-            // In production, distribute shares to secure storage/personnel
+            // Store key shares in the in-memory secure store keyed by backupId.
+            // In a production deployment these would be distributed to separate custodians/HSMs;
+            // here they are held in a bounded in-memory dictionary so CountAvailableKeySharesAsync
+            // returns a real count and reconstruction can use the stored shares.
+            ct.ThrowIfCancellationRequested();
+            lock (_keyShareLock)
+            {
+                _keyShareStore[backupId] = shares.ToList();
+            }
             return Task.CompletedTask;
         }
 
         private Task<bool> ValidateEmergencyTokenAsync(string token, CancellationToken ct)
         {
-            // In production, validate token signature and expiration
-            return Task.FromResult(true);
+            if (string.IsNullOrWhiteSpace(token))
+                return Task.FromResult(false);
+
+            // Check token exists in the active token store and has not expired.
+            if (_activeTokens.TryGetValue(token, out var tokenRecord))
+            {
+                return Task.FromResult(tokenRecord.ExpiresAt > DateTimeOffset.UtcNow);
+            }
+
+            return Task.FromResult(false);
         }
 
         private async Task<BreakGlassSession> InitiateBreakGlassSessionAsync(
@@ -710,8 +813,12 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 
         private Task<int> CountAvailableKeySharesAsync(string backupId, CancellationToken ct)
         {
-            // In production, check availability of key shares
-            return Task.FromResult(5);
+            ct.ThrowIfCancellationRequested();
+            lock (_keyShareLock)
+            {
+                return Task.FromResult(
+                    _keyShareStore.TryGetValue(backupId, out var shares) ? shares.Count : 0);
+            }
         }
 
         private Task<bool> VerifyBackupDataIntegrityAsync(string backupId, CancellationToken ct)

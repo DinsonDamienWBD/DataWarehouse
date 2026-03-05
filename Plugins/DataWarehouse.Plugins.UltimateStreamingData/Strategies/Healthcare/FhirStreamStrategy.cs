@@ -474,11 +474,16 @@ internal sealed class FhirStreamStrategy : StreamingDataStrategyBase
 
         while (delivered < maxBatchSize && queue.TryDequeue(out var notification))
         {
+            // Finding 4389: We cannot make real HTTP calls without an HttpClient.
+            // The result accurately reflects that delivery is in-process (queued for the transport
+            // adapter) rather than claiming an HTTP 200 for a request that was never sent.
+            // The transport adapter layer is responsible for POSTing the notification to the
+            // subscription endpoint and calling UpdateDeliveryResultAsync with the real outcome.
             var result = new FhirWebhookDeliveryResult
             {
                 NotificationId = notification.NotificationId,
                 Success = true,
-                HttpStatusCode = 200,
+                HttpStatusCode = 202, // 202 Accepted: queued for delivery by transport adapter
                 DeliveredAt = DateTimeOffset.UtcNow,
                 AttemptNumber = 1
             };
@@ -684,9 +689,11 @@ internal sealed class FhirStreamStrategy : StreamingDataStrategyBase
                     if (!matches) return false;
                 }
             }
-            catch (JsonException)
+            catch (JsonException ex)
             {
+
                 // If JSON parsing fails, skip this filter
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 

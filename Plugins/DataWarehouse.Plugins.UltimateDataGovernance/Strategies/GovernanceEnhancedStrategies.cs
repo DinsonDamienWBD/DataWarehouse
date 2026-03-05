@@ -39,10 +39,16 @@ public sealed class ClassificationConfidenceCalibrationStrategy : DataGovernance
             Timestamp = DateTimeOffset.UtcNow
         };
 
-        _samples.AddOrUpdate(
-            classifierId,
-            _ => new List<CalibrationSample> { sample },
-            (_, list) => { lock (list) { list.Add(sample); if (list.Count > 10000) list.RemoveAt(0); } return list; });
+        // P2-2269: AddOrUpdate add-factory may be called multiple times under ConcurrentDictionary
+        // contention, causing double-inserts. Use GetOrAdd to ensure a single canonical list per
+        // classifierId, then mutate under lock.
+        var calibrationList = _samples.GetOrAdd(classifierId, _ => new List<CalibrationSample>());
+        lock (calibrationList)
+        {
+            calibrationList.Add(sample);
+            if (calibrationList.Count > 10000)
+                calibrationList.RemoveAt(0);
+        }
     }
 
     /// <summary>

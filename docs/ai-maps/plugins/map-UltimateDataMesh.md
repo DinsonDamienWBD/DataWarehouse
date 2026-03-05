@@ -121,6 +121,338 @@ public sealed class DataMeshScalingManager : IScalableSubsystem, IDisposable
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateDataMesh/Strategies/SelfServe/SelfServeStrategies.cs
+```csharp
+public sealed class SelfServiceDataPlatformStrategy : DataMeshStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataMeshCategory Category;;
+    public override DataMeshCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class InfrastructureAsCodeStrategy : DataMeshStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataMeshCategory Category;;
+    public override DataMeshCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class DataProductTemplateStrategy : DataMeshStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataMeshCategory Category;;
+    public override DataMeshCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class AutomatedPipelineStrategy : DataMeshStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataMeshCategory Category;;
+    public override DataMeshCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class SelfServiceAnalyticsStrategy : DataMeshStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataMeshCategory Category;;
+    public override DataMeshCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class ApiPortalStrategy : DataMeshStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataMeshCategory Category;;
+    public override DataMeshCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class ResourceQuotaStrategy : DataMeshStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataMeshCategory Category;;
+    public override DataMeshCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataMesh/Strategies/DomainOwnership/DomainOwnershipStrategies.cs
+```csharp
+public sealed class DomainTeamAutonomyStrategy : DataMeshStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataMeshCategory Category;;
+    public override DataMeshCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class DomainBoundedContextStrategy : DataMeshStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataMeshCategory Category;;
+    public override DataMeshCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class DomainLifecycleStrategy : DataMeshStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataMeshCategory Category;;
+    public override DataMeshCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class DomainOwnershipTransferStrategy : DataMeshStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataMeshCategory Category;;
+    public override DataMeshCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class DomainTeamStructureStrategy : DataMeshStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataMeshCategory Category;;
+    public override DataMeshCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class DomainDataSovereigntyStrategy : DataMeshStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataMeshCategory Category;;
+    public override DataMeshCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataMesh/Strategies/FederatedGovernance/FederatedGovernanceStrategies.cs
+```csharp
+public sealed class FederatedPolicyManagementStrategy : DataMeshStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataMeshCategory Category;;
+    public override DataMeshCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class ComputationalGovernanceStrategy : DataMeshStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataMeshCategory Category;;
+    public override DataMeshCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class GlobalStandardsStrategy : DataMeshStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataMeshCategory Category;;
+    public override DataMeshCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class InteroperabilityStandardsStrategy : DataMeshStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataMeshCategory Category;;
+    public override DataMeshCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class ComplianceFrameworkStrategy : DataMeshStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataMeshCategory Category;;
+    public override DataMeshCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class DataClassificationGovernanceStrategy : DataMeshStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataMeshCategory Category;;
+    public override DataMeshCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class GovernanceCouncilStrategy : DataMeshStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataMeshCategory Category;;
+    public override DataMeshCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataMesh/Strategies/DomainDiscovery/DomainDiscoveryStrategies.cs
+```csharp
+public sealed class DataCatalogDiscoveryStrategy : DataMeshStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataMeshCategory Category;;
+    public override DataMeshCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class SemanticSearchStrategy : DataMeshStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataMeshCategory Category;;
+    public override DataMeshCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class DataLineageDiscoveryStrategy : DataMeshStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataMeshCategory Category;;
+    public override DataMeshCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class DomainMarketplaceStrategy : DataMeshStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataMeshCategory Category;;
+    public override DataMeshCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class KnowledgeGraphStrategy : DataMeshStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataMeshCategory Category;;
+    public override DataMeshCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class AutoDiscoveryStrategy : DataMeshStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataMeshCategory Category;;
+    public override DataMeshCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class DataProfilingDiscoveryStrategy : DataMeshStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataMeshCategory Category;;
+    public override DataMeshCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateDataMesh/Strategies/CrossDomainSharing/CrossDomainSharingStrategies.cs
 ```csharp
 public sealed class DataSharingAgreementStrategy : DataMeshStrategyBase
@@ -293,338 +625,6 @@ public sealed class DataProductFeedbackStrategy : DataMeshStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataMesh/Strategies/DomainDiscovery/DomainDiscoveryStrategies.cs
-```csharp
-public sealed class DataCatalogDiscoveryStrategy : DataMeshStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataMeshCategory Category;;
-    public override DataMeshCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class SemanticSearchStrategy : DataMeshStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataMeshCategory Category;;
-    public override DataMeshCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class DataLineageDiscoveryStrategy : DataMeshStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataMeshCategory Category;;
-    public override DataMeshCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class DomainMarketplaceStrategy : DataMeshStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataMeshCategory Category;;
-    public override DataMeshCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class KnowledgeGraphStrategy : DataMeshStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataMeshCategory Category;;
-    public override DataMeshCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class AutoDiscoveryStrategy : DataMeshStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataMeshCategory Category;;
-    public override DataMeshCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class DataProfilingDiscoveryStrategy : DataMeshStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataMeshCategory Category;;
-    public override DataMeshCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataMesh/Strategies/DomainOwnership/DomainOwnershipStrategies.cs
-```csharp
-public sealed class DomainTeamAutonomyStrategy : DataMeshStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataMeshCategory Category;;
-    public override DataMeshCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class DomainBoundedContextStrategy : DataMeshStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataMeshCategory Category;;
-    public override DataMeshCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class DomainLifecycleStrategy : DataMeshStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataMeshCategory Category;;
-    public override DataMeshCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class DomainOwnershipTransferStrategy : DataMeshStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataMeshCategory Category;;
-    public override DataMeshCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class DomainTeamStructureStrategy : DataMeshStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataMeshCategory Category;;
-    public override DataMeshCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class DomainDataSovereigntyStrategy : DataMeshStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataMeshCategory Category;;
-    public override DataMeshCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataMesh/Strategies/FederatedGovernance/FederatedGovernanceStrategies.cs
-```csharp
-public sealed class FederatedPolicyManagementStrategy : DataMeshStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataMeshCategory Category;;
-    public override DataMeshCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class ComputationalGovernanceStrategy : DataMeshStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataMeshCategory Category;;
-    public override DataMeshCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class GlobalStandardsStrategy : DataMeshStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataMeshCategory Category;;
-    public override DataMeshCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class InteroperabilityStandardsStrategy : DataMeshStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataMeshCategory Category;;
-    public override DataMeshCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class ComplianceFrameworkStrategy : DataMeshStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataMeshCategory Category;;
-    public override DataMeshCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class DataClassificationGovernanceStrategy : DataMeshStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataMeshCategory Category;;
-    public override DataMeshCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class GovernanceCouncilStrategy : DataMeshStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataMeshCategory Category;;
-    public override DataMeshCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataMesh/Strategies/MeshObservability/MeshObservabilityStrategies.cs
-```csharp
-public sealed class MeshMetricsStrategy : DataMeshStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataMeshCategory Category;;
-    public override DataMeshCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class DistributedTracingStrategy : DataMeshStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataMeshCategory Category;;
-    public override DataMeshCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class DataQualityMonitoringStrategy : DataMeshStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataMeshCategory Category;;
-    public override DataMeshCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class UsageAnalyticsStrategy : DataMeshStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataMeshCategory Category;;
-    public override DataMeshCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class MeshAlertingStrategy : DataMeshStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataMeshCategory Category;;
-    public override DataMeshCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class MeshDashboardStrategy : DataMeshStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataMeshCategory Category;;
-    public override DataMeshCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class LogAggregationStrategy : DataMeshStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataMeshCategory Category;;
-    public override DataMeshCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateDataMesh/Strategies/MeshSecurity/MeshSecurityStrategies.cs
 ```csharp
 public sealed class ZeroTrustSecurityStrategy : DataMeshStrategyBase
@@ -723,9 +723,9 @@ public sealed class ThreatDetectionStrategy : DataMeshStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataMesh/Strategies/SelfServe/SelfServeStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDataMesh/Strategies/MeshObservability/MeshObservabilityStrategies.cs
 ```csharp
-public sealed class SelfServiceDataPlatformStrategy : DataMeshStrategyBase
+public sealed class MeshMetricsStrategy : DataMeshStrategyBase
 {
 }
     public override string StrategyId;;
@@ -737,7 +737,7 @@ public sealed class SelfServiceDataPlatformStrategy : DataMeshStrategyBase
 }
 ```
 ```csharp
-public sealed class InfrastructureAsCodeStrategy : DataMeshStrategyBase
+public sealed class DistributedTracingStrategy : DataMeshStrategyBase
 {
 }
     public override string StrategyId;;
@@ -749,7 +749,7 @@ public sealed class InfrastructureAsCodeStrategy : DataMeshStrategyBase
 }
 ```
 ```csharp
-public sealed class DataProductTemplateStrategy : DataMeshStrategyBase
+public sealed class DataQualityMonitoringStrategy : DataMeshStrategyBase
 {
 }
     public override string StrategyId;;
@@ -761,7 +761,7 @@ public sealed class DataProductTemplateStrategy : DataMeshStrategyBase
 }
 ```
 ```csharp
-public sealed class AutomatedPipelineStrategy : DataMeshStrategyBase
+public sealed class UsageAnalyticsStrategy : DataMeshStrategyBase
 {
 }
     public override string StrategyId;;
@@ -773,7 +773,7 @@ public sealed class AutomatedPipelineStrategy : DataMeshStrategyBase
 }
 ```
 ```csharp
-public sealed class SelfServiceAnalyticsStrategy : DataMeshStrategyBase
+public sealed class MeshAlertingStrategy : DataMeshStrategyBase
 {
 }
     public override string StrategyId;;
@@ -785,7 +785,7 @@ public sealed class SelfServiceAnalyticsStrategy : DataMeshStrategyBase
 }
 ```
 ```csharp
-public sealed class ApiPortalStrategy : DataMeshStrategyBase
+public sealed class MeshDashboardStrategy : DataMeshStrategyBase
 {
 }
     public override string StrategyId;;
@@ -797,7 +797,7 @@ public sealed class ApiPortalStrategy : DataMeshStrategyBase
 }
 ```
 ```csharp
-public sealed class ResourceQuotaStrategy : DataMeshStrategyBase
+public sealed class LogAggregationStrategy : DataMeshStrategyBase
 {
 }
     public override string StrategyId;;

@@ -144,11 +144,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
                 throw new ArgumentNullException(nameof(stream));
             }
 
-            // Read header
+            // Read header — use ReadExactlyAsync to guarantee all 8 bytes are read
+            // even when the stream returns partial results (e.g. buffered network streams).
             var header = new byte[8];
-            if (await stream.ReadAsync(header) != 8)
+            try
             {
-                throw new InvalidDataException("Invalid Bloom filter header");
+                await stream.ReadExactlyAsync(header);
+            }
+            catch (EndOfStreamException)
+            {
+                throw new InvalidDataException("Invalid Bloom filter header: unexpected end of stream.");
             }
 
             var bitCount = BinaryPrimitives.ReadInt32LittleEndian(header.AsSpan(0, 4));
@@ -159,12 +164,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
                 throw new InvalidDataException("Invalid Bloom filter parameters");
             }
 
-            // Read bit array
+            // Read bit array — ReadExactlyAsync handles partial reads.
             var byteCount = (bitCount + 7) / 8;
             var bytes = new byte[byteCount];
-            if (await stream.ReadAsync(bytes) != byteCount)
+            try
             {
-                throw new InvalidDataException("Invalid Bloom filter data");
+                await stream.ReadExactlyAsync(bytes);
+            }
+            catch (EndOfStreamException)
+            {
+                throw new InvalidDataException("Invalid Bloom filter data: unexpected end of stream.");
             }
 
             var bits = new BitArray(bytes)

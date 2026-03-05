@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Caching;
@@ -124,7 +125,9 @@ internal sealed class CacheConnection : IDisposable
         _client = new TcpClient();
         _client.ReceiveTimeout = (int)timeout.TotalMilliseconds;
         _client.SendTimeout = (int)timeout.TotalMilliseconds;
-        _client.Connect(host, port);
+        // P2-2399: bound the TCP connect with the caller-supplied timeout so we never hang forever.
+        using var cts = new CancellationTokenSource(timeout);
+        _client.ConnectAsync(host, port, cts.Token).GetAwaiter().GetResult();
         _stream = _client.GetStream();
     }
 
@@ -249,6 +252,8 @@ public sealed class DistributedCacheStrategy : CachingStrategyBase
     private ConnectionPool? _pool;
     private readonly BoundedDictionary<string, HashSet<string>> _tagIndex = new BoundedDictionary<string, HashSet<string>>(1000);
     private readonly object _tagLock = new();
+    private long _trackedSize;
+    private long _trackedEntryCount;
 
     /// <summary>
     /// Initializes a new DistributedCacheStrategy.
@@ -286,10 +291,10 @@ public sealed class DistributedCacheStrategy : CachingStrategyBase
     public override string[] Tags => ["cache", "distributed", "redis", "memcached", "cluster"];
 
     /// <inheritdoc/>
-    public override long GetCurrentSize() => 0; // Size tracked by backend
+    public override long GetCurrentSize() => Interlocked.Read(ref _trackedSize);
 
     /// <inheritdoc/>
-    public override long GetEntryCount() => 0; // Count tracked by backend
+    public override long GetEntryCount() => Interlocked.Read(ref _trackedEntryCount);
 
     /// <inheritdoc/>
     protected override Task InitializeCoreAsync(CancellationToken ct)
@@ -359,6 +364,10 @@ public sealed class DistributedCacheStrategy : CachingStrategyBase
             await ExecuteMemcachedCommandAsync(command, ct);
         }
 
+        // Track size and entry count locally (distributed backends track internally)
+        Interlocked.Add(ref _trackedSize, value.Length);
+        Interlocked.Increment(ref _trackedEntryCount);
+
         // Track tags
         if (options.Tags != null && options.Tags.Length > 0)
         {
@@ -381,12 +390,16 @@ public sealed class DistributedCacheStrategy : CachingStrategyBase
         if (_config.Backend == DistributedCacheBackend.Redis)
         {
             var result = await ExecuteRedisCommandAsync($"DEL {fullKey}\r\n", ct);
-            return result != null && result.Contains(":1");
+            var removed = result != null && result.Contains(":1");
+            if (removed) { Interlocked.Decrement(ref _trackedEntryCount); }
+            return removed;
         }
         else if (_config.Backend == DistributedCacheBackend.Memcached)
         {
             var result = await ExecuteMemcachedCommandAsync($"delete {fullKey}\r\n", ct);
-            return result != null && result.Contains("DELETED");
+            var removed = result != null && result.Contains("DELETED");
+            if (removed) { Interlocked.Decrement(ref _trackedEntryCount); }
+            return removed;
         }
 
         return false;
@@ -463,11 +476,16 @@ public sealed class DistributedCacheStrategy : CachingStrategyBase
         }
 
         _tagIndex.Clear();
+        Interlocked.Exchange(ref _trackedSize, 0);
+        Interlocked.Exchange(ref _trackedEntryCount, 0);
     }
 
     private string GetFullKey(string key)
     {
-        return string.IsNullOrEmpty(_config.KeyPrefix) ? key : $"{_config.KeyPrefix}:{key}";
+        // P2-2350/P2-2351: Sanitize key to prevent RESP and Memcached command injection.
+        // Remove CR, LF, and space characters which are used as protocol delimiters.
+        var sanitized = key.Replace("\r", string.Empty).Replace("\n", string.Empty).Replace(" ", "_");
+        return string.IsNullOrEmpty(_config.KeyPrefix) ? sanitized : $"{_config.KeyPrefix}:{sanitized}";
     }
 
     private async Task<string?> ExecuteRedisCommandAsync(string command, CancellationToken ct)

@@ -5,23 +5,6 @@
 
 ## Project: DataWarehouse.Plugins.UltimateStorageProcessing
 
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/StorageProcessingStrategyRegistryInternal.cs
-```csharp
-internal sealed class StorageProcessingStrategyRegistryInternal
-{
-}
-    public int Count;;
-    public int DiscoverStrategies(params Assembly[] assemblies);
-    public bool Register(StorageProcessingStrategyBase strategy);
-    public IStorageProcessingStrategy? GetStrategy(string strategyId);
-    public bool TryGetStrategy(string strategyId, out IStorageProcessingStrategy? strategy);
-    public IReadOnlyCollection<IStorageProcessingStrategy> GetStrategiesByCategory(string category);
-    public IReadOnlyCollection<IStorageProcessingStrategy> GetAllStrategies();
-    public IReadOnlyCollection<string> GetAllStrategyIds();
-    public IReadOnlyCollection<string> GetAllCategories();
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/UltimateStorageProcessingPlugin.cs
 ```csharp
 public sealed class UltimateStorageProcessingPlugin : DataWarehouse.SDK.Contracts.Hierarchy.StoragePluginBase, IDisposable
@@ -88,6 +71,80 @@ public sealed class UltimateStorageProcessingPlugin : DataWarehouse.SDK.Contract
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/StorageProcessingStrategyRegistryInternal.cs
+```csharp
+internal sealed class StorageProcessingStrategyRegistryInternal
+{
+}
+    public int Count;;
+    public int DiscoverStrategies(params Assembly[] assemblies);
+    public bool Register(StorageProcessingStrategyBase strategy);
+    public IStorageProcessingStrategy? GetStrategy(string strategyId);
+    public bool TryGetStrategy(string strategyId, out IStorageProcessingStrategy? strategy);
+    public IReadOnlyCollection<IStorageProcessingStrategy> GetStrategiesByCategory(string category);
+    public IReadOnlyCollection<IStorageProcessingStrategy> GetAllStrategies();
+    public IReadOnlyCollection<string> GetAllStrategyIds();
+    public IReadOnlyCollection<string> GetAllCategories();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/CliProcessHelper.cs
+```csharp
+internal static class CliProcessHelper
+{
+}
+    public static async Task<CliOutput> RunAsync(string fileName, string arguments, string? workingDirectory = null, int timeoutMs = 300_000, CancellationToken ct = default);
+    public static ProcessingResult ToProcessingResult(CliOutput output, string sourcePath, string toolName, Dictionary<string, object?>? extraData = null);
+    public static ProcessingResult ToolNotFound(string toolName, string source, Stopwatch sw);
+    public static async IAsyncEnumerable<ProcessingResult> EnumerateProjectFiles(ProcessingQuery query, string[] extensions, Stopwatch sw, [EnumeratorCancellation] CancellationToken ct = default);
+    public static Task<AggregationResult> AggregateProjectFiles(ProcessingQuery query, AggregationType aggregationType, string[] extensions, CancellationToken ct);
+    public static T? GetOption<T>(ProcessingQuery query, string key);
+    public static void ValidateNoShellMetachars(string value, string paramName);
+    public static void ValidateAllowlist(string value, string paramName, IReadOnlySet<string> allowedValues);
+    public static void ValidateIdentifier(string value, string paramName);
+}
+```
+```csharp
+internal sealed record CliOutput
+{
+}
+    public required int ExitCode { get; init; }
+    public required string StandardOutput { get; init; }
+    public required string StandardError { get; init; }
+    public required TimeSpan Elapsed { get; init; }
+    public required bool Success { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Infrastructure/SharedCacheManager.cs
+```csharp
+internal sealed class SharedCacheManager : IDisposable
+{
+}
+    public int Count;;
+    public SharedCacheManager(TimeSpan? cleanupInterval = null);
+    public IReadOnlyDictionary<string, object?>? TryGetCached(string key);
+    public void SetCached(string key, IReadOnlyDictionary<string, object?> data, TimeSpan ttl);
+    public bool Invalidate(string key);
+    public int InvalidateByPrefix(string prefix);
+    public IReadOnlyDictionary<string, object> GetStats();
+    public void Clear();
+    public void Dispose();
+}
+```
+```csharp
+private sealed class CachedEntry
+{
+}
+    public required string Key { get; init; }
+    public required IReadOnlyDictionary<string, object?> Data { get; init; }
+    public required DateTimeOffset CreatedAt { get; init; }
+    public DateTimeOffset LastAccessed { get; set; }
+    public required TimeSpan TimeToLive { get; init; }
+    public bool IsExpired;;
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Infrastructure/ProcessingJobScheduler.cs
 ```csharp
 internal sealed class ProcessingJobScheduler : IDisposable
@@ -123,269 +180,13 @@ private sealed class ScheduledJob
     public required int Priority { get; init; }
     public required DateTimeOffset ScheduledAt { get; init; }
     public required TaskCompletionSource<ProcessingResult> Completion { get; init; }
+    public required CancellationTokenSource Cts { get; init; }
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Infrastructure/SharedCacheManager.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Data/IndexBuildingStrategy.cs
 ```csharp
-internal sealed class SharedCacheManager : IDisposable
-{
-}
-    public int Count;;
-    public SharedCacheManager(TimeSpan? cleanupInterval = null);
-    public IReadOnlyDictionary<string, object?>? TryGetCached(string key);
-    public void SetCached(string key, IReadOnlyDictionary<string, object?> data, TimeSpan ttl);
-    public bool Invalidate(string key);
-    public int InvalidateByPrefix(string prefix);
-    public IReadOnlyDictionary<string, object> GetStats();
-    public void Clear();
-    public void Dispose();
-}
-```
-```csharp
-private sealed class CachedEntry
-{
-}
-    public required string Key { get; init; }
-    public required IReadOnlyDictionary<string, object?> Data { get; init; }
-    public required DateTimeOffset CreatedAt { get; init; }
-    public DateTimeOffset LastAccessed { get; set; }
-    public required TimeSpan TimeToLive { get; init; }
-    public bool IsExpired;;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/CliProcessHelper.cs
-```csharp
-internal static class CliProcessHelper
-{
-}
-    public static async Task<CliOutput> RunAsync(string fileName, string arguments, string? workingDirectory = null, int timeoutMs = 300_000, CancellationToken ct = default);
-    public static ProcessingResult ToProcessingResult(CliOutput output, string sourcePath, string toolName, Dictionary<string, object?>? extraData = null);
-    public static ProcessingResult ToolNotFound(string toolName, string source, Stopwatch sw);
-    public static async IAsyncEnumerable<ProcessingResult> EnumerateProjectFiles(ProcessingQuery query, string[] extensions, Stopwatch sw, [EnumeratorCancellation] CancellationToken ct = default);
-    public static Task<AggregationResult> AggregateProjectFiles(ProcessingQuery query, AggregationType aggregationType, string[] extensions, CancellationToken ct);
-    public static T? GetOption<T>(ProcessingQuery query, string key);
-}
-```
-```csharp
-internal sealed record CliOutput
-{
-}
-    public required int ExitCode { get; init; }
-    public required string StandardOutput { get; init; }
-    public required string StandardError { get; init; }
-    public required TimeSpan Elapsed { get; init; }
-    public required bool Success { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Build/BazelBuildStrategy.cs
-```csharp
-internal sealed class BazelBuildStrategy : StorageProcessingStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageProcessingCapabilities Capabilities;;
-    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
-    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
-    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Build/DockerBuildStrategy.cs
-```csharp
-internal sealed class DockerBuildStrategy : StorageProcessingStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageProcessingCapabilities Capabilities;;
-    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
-    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
-    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Build/DotNetBuildStrategy.cs
-```csharp
-internal sealed class DotNetBuildStrategy : StorageProcessingStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageProcessingCapabilities Capabilities;;
-    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
-    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
-    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Build/GoBuildStrategy.cs
-```csharp
-internal sealed class GoBuildStrategy : StorageProcessingStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageProcessingCapabilities Capabilities;;
-    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
-    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
-    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Build/GradleBuildStrategy.cs
-```csharp
-internal sealed class GradleBuildStrategy : StorageProcessingStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageProcessingCapabilities Capabilities;;
-    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
-    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
-    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Build/MavenBuildStrategy.cs
-```csharp
-internal sealed class MavenBuildStrategy : StorageProcessingStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageProcessingCapabilities Capabilities;;
-    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
-    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
-    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Build/NpmBuildStrategy.cs
-```csharp
-internal sealed class NpmBuildStrategy : StorageProcessingStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageProcessingCapabilities Capabilities;;
-    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
-    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
-    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Build/RustBuildStrategy.cs
-```csharp
-internal sealed class RustBuildStrategy : StorageProcessingStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageProcessingCapabilities Capabilities;;
-    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
-    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
-    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Build/TypeScriptBuildStrategy.cs
-```csharp
-internal sealed class TypeScriptBuildStrategy : StorageProcessingStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageProcessingCapabilities Capabilities;;
-    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
-    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
-    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Compression/ContentAwareCompressionStrategy.cs
-```csharp
-internal sealed class ContentAwareCompressionStrategy : StorageProcessingStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageProcessingCapabilities Capabilities;;
-    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
-    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
-    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Compression/OnStorageBrotliStrategy.cs
-```csharp
-internal sealed class OnStorageBrotliStrategy : StorageProcessingStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageProcessingCapabilities Capabilities;;
-    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
-    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
-    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
-}
-```
-```csharp
-internal static class CompressionAggregationHelper
-{
-}
-    public static Task<AggregationResult> AggregateFileSizes(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Compression/OnStorageLz4Strategy.cs
-```csharp
-internal sealed class OnStorageLz4Strategy : StorageProcessingStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageProcessingCapabilities Capabilities;;
-    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
-    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
-    public override async Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Compression/OnStorageSnappyStrategy.cs
-```csharp
-internal sealed class OnStorageSnappyStrategy : StorageProcessingStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageProcessingCapabilities Capabilities;;
-    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
-    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
-    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Compression/OnStorageZstdStrategy.cs
-```csharp
-internal sealed class OnStorageZstdStrategy : StorageProcessingStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageProcessingCapabilities Capabilities;;
-    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
-    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
-    public override async Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Compression/TransparentCompressionStrategy.cs
-```csharp
-internal sealed class TransparentCompressionStrategy : StorageProcessingStrategyBase
+internal sealed class IndexBuildingStrategy : StorageProcessingStrategyBase
 {
 }
     public override string StrategyId;;
@@ -411,9 +212,9 @@ internal sealed class DataValidationStrategy : StorageProcessingStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Data/IndexBuildingStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Data/ParquetCompactionStrategy.cs
 ```csharp
-internal sealed class IndexBuildingStrategy : StorageProcessingStrategyBase
+internal sealed class ParquetCompactionStrategy : StorageProcessingStrategyBase
 {
 }
     public override string StrategyId;;
@@ -425,9 +226,9 @@ internal sealed class IndexBuildingStrategy : StorageProcessingStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Data/ParquetCompactionStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Data/VectorEmbeddingStrategy.cs
 ```csharp
-internal sealed class ParquetCompactionStrategy : StorageProcessingStrategyBase
+internal sealed class VectorEmbeddingStrategy : StorageProcessingStrategyBase
 {
 }
     public override string StrategyId;;
@@ -470,9 +271,9 @@ private sealed class FieldStats
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Data/VectorEmbeddingStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Document/MinificationStrategy.cs
 ```csharp
-internal sealed class VectorEmbeddingStrategy : StorageProcessingStrategyBase
+internal sealed class MinificationStrategy : StorageProcessingStrategyBase
 {
 }
     public override string StrategyId;;
@@ -498,37 +299,9 @@ internal sealed class JupyterExecuteStrategy : StorageProcessingStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Document/LatexRenderStrategy.cs
-```csharp
-internal sealed class LatexRenderStrategy : StorageProcessingStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageProcessingCapabilities Capabilities;;
-    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
-    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
-    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Document/MarkdownRenderStrategy.cs
 ```csharp
 internal sealed class MarkdownRenderStrategy : StorageProcessingStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageProcessingCapabilities Capabilities;;
-    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
-    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
-    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Document/MinificationStrategy.cs
-```csharp
-internal sealed class MinificationStrategy : StorageProcessingStrategyBase
 {
 }
     public override string StrategyId;;
@@ -554,6 +327,143 @@ internal sealed class SassCompileStrategy : StorageProcessingStrategyBase
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Document/LatexRenderStrategy.cs
+```csharp
+internal sealed class LatexRenderStrategy : StorageProcessingStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageProcessingCapabilities Capabilities;;
+    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
+    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
+    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/IndustryFirst/CostOptimizedProcessingStrategy.cs
+```csharp
+internal sealed class CostOptimizedProcessingStrategy : StorageProcessingStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageProcessingCapabilities Capabilities;;
+    public override Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
+    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
+    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
+}
+```
+```csharp
+private sealed record StrategyEstimate(string Name, double CpuCost, double MemoryCost, double IoCost, double Quality)
+{
+}
+    public double TotalCost;;
+}
+```
+```csharp
+private sealed class CostRecord
+{
+}
+    public required string Strategy { get; init; }
+    public required double PredictedCost { get; init; }
+    public required double ActualCost { get; init; }
+    public required long FileSize { get; init; }
+    public required DateTimeOffset Timestamp { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/IndustryFirst/GpuAcceleratedProcessingStrategy.cs
+```csharp
+internal sealed class GpuAcceleratedProcessingStrategy : StorageProcessingStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageProcessingCapabilities Capabilities;;
+    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
+    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
+    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/IndustryFirst/DependencyAwareProcessingStrategy.cs
+```csharp
+internal sealed class DependencyAwareProcessingStrategy : StorageProcessingStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageProcessingCapabilities Capabilities;;
+    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
+    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
+    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/IndustryFirst/IncrementalProcessingStrategy.cs
+```csharp
+internal sealed class IncrementalProcessingStrategy : StorageProcessingStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageProcessingCapabilities Capabilities;;
+    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
+    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
+    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/IndustryFirst/BuildCacheSharingStrategy.cs
+```csharp
+internal sealed class BuildCacheSharingStrategy : StorageProcessingStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageProcessingCapabilities Capabilities;;
+    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
+    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
+    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
+}
+```
+```csharp
+private sealed class CacheEntry
+{
+}
+    public required string Key { get; init; }
+    public required string Hash { get; init; }
+    public required long Size { get; init; }
+    public required DateTimeOffset StoredAt { get; init; }
+    public required string Namespace { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/IndustryFirst/PredictiveProcessingStrategy.cs
+```csharp
+internal sealed class PredictiveProcessingStrategy : StorageProcessingStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageProcessingCapabilities Capabilities;;
+    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
+    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
+    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
+}
+```
+```csharp
+private sealed class AccessStats
+{
+}
+    public DateTime LastAccessed;
+    public int AccessCount;
+    public double EmaPrediction;
+    public long Size;
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/GameAsset/AssetBundlingStrategy.cs
 ```csharp
 internal sealed class AssetBundlingStrategy : StorageProcessingStrategyBase
@@ -568,37 +478,9 @@ internal sealed class AssetBundlingStrategy : StorageProcessingStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/GameAsset/AudioConversionStrategy.cs
-```csharp
-internal sealed class AudioConversionStrategy : StorageProcessingStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageProcessingCapabilities Capabilities;;
-    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
-    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
-    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/GameAsset/LodGenerationStrategy.cs
 ```csharp
 internal sealed class LodGenerationStrategy : StorageProcessingStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageProcessingCapabilities Capabilities;;
-    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
-    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
-    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/GameAsset/MeshOptimizationStrategy.cs
-```csharp
-internal sealed class MeshOptimizationStrategy : StorageProcessingStrategyBase
 {
 }
     public override string StrategyId;;
@@ -638,66 +520,9 @@ internal sealed class TextureCompressionStrategy : StorageProcessingStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/IndustryFirst/BuildCacheSharingStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/GameAsset/MeshOptimizationStrategy.cs
 ```csharp
-internal sealed class BuildCacheSharingStrategy : StorageProcessingStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageProcessingCapabilities Capabilities;;
-    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
-    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
-    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
-}
-```
-```csharp
-private sealed class CacheEntry
-{
-}
-    public required string Key { get; init; }
-    public required string Hash { get; init; }
-    public required long Size { get; init; }
-    public required DateTimeOffset StoredAt { get; init; }
-    public required string Namespace { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/IndustryFirst/CostOptimizedProcessingStrategy.cs
-```csharp
-internal sealed class CostOptimizedProcessingStrategy : StorageProcessingStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageProcessingCapabilities Capabilities;;
-    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
-    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
-    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
-}
-```
-```csharp
-private sealed record StrategyEstimate(string Name, double CpuCost, double MemoryCost, double IoCost, double Quality)
-{
-}
-    public double TotalCost;;
-}
-```
-```csharp
-private sealed class CostRecord
-{
-}
-    public required string Strategy { get; init; }
-    public required double PredictedCost { get; init; }
-    public required double ActualCost { get; init; }
-    public required long FileSize { get; init; }
-    public required DateTimeOffset Timestamp { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/IndustryFirst/DependencyAwareProcessingStrategy.cs
-```csharp
-internal sealed class DependencyAwareProcessingStrategy : StorageProcessingStrategyBase
+internal sealed class MeshOptimizationStrategy : StorageProcessingStrategyBase
 {
 }
     public override string StrategyId;;
@@ -709,9 +534,9 @@ internal sealed class DependencyAwareProcessingStrategy : StorageProcessingStrat
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/IndustryFirst/GpuAcceleratedProcessingStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/GameAsset/AudioConversionStrategy.cs
 ```csharp
-internal sealed class GpuAcceleratedProcessingStrategy : StorageProcessingStrategyBase
+internal sealed class AudioConversionStrategy : StorageProcessingStrategyBase
 {
 }
     public override string StrategyId;;
@@ -723,9 +548,9 @@ internal sealed class GpuAcceleratedProcessingStrategy : StorageProcessingStrate
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/IndustryFirst/IncrementalProcessingStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Build/MavenBuildStrategy.cs
 ```csharp
-internal sealed class IncrementalProcessingStrategy : StorageProcessingStrategyBase
+internal sealed class MavenBuildStrategy : StorageProcessingStrategyBase
 {
 }
     public override string StrategyId;;
@@ -737,33 +562,9 @@ internal sealed class IncrementalProcessingStrategy : StorageProcessingStrategyB
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/IndustryFirst/PredictiveProcessingStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Build/GoBuildStrategy.cs
 ```csharp
-internal sealed class PredictiveProcessingStrategy : StorageProcessingStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string Name;;
-    public override StorageProcessingCapabilities Capabilities;;
-    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
-    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
-    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
-}
-```
-```csharp
-private sealed class AccessStats
-{
-}
-    public DateTime LastAccessed;
-    public int AccessCount;
-    public double EmaPrediction;
-    public long Size;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Media/AvifConversionStrategy.cs
-```csharp
-internal sealed class AvifConversionStrategy : StorageProcessingStrategyBase
+internal sealed class GoBuildStrategy : StorageProcessingStrategyBase
 {
 }
     public override string StrategyId;;
@@ -775,9 +576,93 @@ internal sealed class AvifConversionStrategy : StorageProcessingStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Media/DashPackagingStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Build/NpmBuildStrategy.cs
 ```csharp
-internal sealed class DashPackagingStrategy : StorageProcessingStrategyBase
+internal sealed class NpmBuildStrategy : StorageProcessingStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageProcessingCapabilities Capabilities;;
+    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
+    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
+    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Build/BazelBuildStrategy.cs
+```csharp
+internal sealed class BazelBuildStrategy : StorageProcessingStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageProcessingCapabilities Capabilities;;
+    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
+    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
+    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Build/RustBuildStrategy.cs
+```csharp
+internal sealed class RustBuildStrategy : StorageProcessingStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageProcessingCapabilities Capabilities;;
+    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
+    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
+    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Build/GradleBuildStrategy.cs
+```csharp
+internal sealed class GradleBuildStrategy : StorageProcessingStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageProcessingCapabilities Capabilities;;
+    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
+    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
+    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Build/TypeScriptBuildStrategy.cs
+```csharp
+internal sealed class TypeScriptBuildStrategy : StorageProcessingStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageProcessingCapabilities Capabilities;;
+    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
+    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
+    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Build/DotNetBuildStrategy.cs
+```csharp
+internal sealed class DotNetBuildStrategy : StorageProcessingStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageProcessingCapabilities Capabilities;;
+    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
+    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
+    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Build/DockerBuildStrategy.cs
+```csharp
+internal sealed class DockerBuildStrategy : StorageProcessingStrategyBase
 {
 }
     public override string StrategyId;;
@@ -803,9 +688,9 @@ internal sealed class FfmpegTranscodeStrategy : StorageProcessingStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Media/HlsPackagingStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Media/WebPConversionStrategy.cs
 ```csharp
-internal sealed class HlsPackagingStrategy : StorageProcessingStrategyBase
+internal sealed class WebPConversionStrategy : StorageProcessingStrategyBase
 {
 }
     public override string StrategyId;;
@@ -831,9 +716,128 @@ internal sealed class ImageMagickStrategy : StorageProcessingStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Media/WebPConversionStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Media/AvifConversionStrategy.cs
 ```csharp
-internal sealed class WebPConversionStrategy : StorageProcessingStrategyBase
+internal sealed class AvifConversionStrategy : StorageProcessingStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageProcessingCapabilities Capabilities;;
+    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
+    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
+    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Media/HlsPackagingStrategy.cs
+```csharp
+internal sealed class HlsPackagingStrategy : StorageProcessingStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageProcessingCapabilities Capabilities;;
+    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
+    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
+    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Media/DashPackagingStrategy.cs
+```csharp
+internal sealed class DashPackagingStrategy : StorageProcessingStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageProcessingCapabilities Capabilities;;
+    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
+    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
+    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Compression/OnStorageSnappyStrategy.cs
+```csharp
+internal sealed class OnStorageSnappyStrategy : StorageProcessingStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageProcessingCapabilities Capabilities;;
+    public override Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
+    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
+    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Compression/OnStorageZstdStrategy.cs
+```csharp
+internal sealed class OnStorageZstdStrategy : StorageProcessingStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageProcessingCapabilities Capabilities;;
+    public override Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
+    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
+    public override async Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Compression/TransparentCompressionStrategy.cs
+```csharp
+internal sealed class TransparentCompressionStrategy : StorageProcessingStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageProcessingCapabilities Capabilities;;
+    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
+    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
+    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Compression/OnStorageBrotliStrategy.cs
+```csharp
+internal sealed class OnStorageBrotliStrategy : StorageProcessingStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageProcessingCapabilities Capabilities;;
+    public override async Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
+    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
+    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
+}
+```
+```csharp
+internal static class CompressionAggregationHelper
+{
+}
+    public static Task<AggregationResult> AggregateFileSizes(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Compression/OnStorageLz4Strategy.cs
+```csharp
+internal sealed class OnStorageLz4Strategy : StorageProcessingStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string Name;;
+    public override StorageProcessingCapabilities Capabilities;;
+    public override Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
+    public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
+    public override async Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/Strategies/Compression/ContentAwareCompressionStrategy.cs
+```csharp
+internal sealed class ContentAwareCompressionStrategy : StorageProcessingStrategyBase
 {
 }
     public override string StrategyId;;

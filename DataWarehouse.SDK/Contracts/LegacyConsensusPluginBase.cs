@@ -28,16 +28,24 @@ namespace DataWarehouse.SDK.Contracts
         public abstract bool IsLeader { get; }
 
         /// <summary>
+        /// The node ID of the current Raft leader as known to this node.
+        /// Returns <c>null</c> when the cluster has no established leader (e.g. during election).
+        /// Override in derived classes that track leader state explicitly.
+        /// </summary>
+        public virtual string? LeaderId => null;
+
+        /// <summary>
         /// Propose a state change to the cluster. Returns when quorum is reached.
         /// Must be implemented by derived classes.
         /// </summary>
-        public abstract Task<bool> ProposeAsync(Proposal proposal);
+        public abstract Task<bool> ProposeAsync(Proposal proposal, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Subscribe to committed entries from other nodes.
+        /// Returns a registration token that can be disposed to unsubscribe.
         /// Must be implemented by derived classes.
         /// </summary>
-        public abstract void OnCommit(Action<Proposal> handler);
+        public abstract IDisposable OnCommit(Action<Proposal> handler);
 
         /// <summary>
         /// Get current cluster state. Override for custom state reporting.
@@ -78,7 +86,7 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Propose raw data to the consensus cluster. Routes to appropriate group in Multi-Raft.
         /// Default implementation wraps data in a <see cref="Proposal"/> and delegates to
-        /// <see cref="ProposeAsync(Proposal)"/>.
+        /// <see cref="ProposeAsync(Proposal, CancellationToken)"/>.
         /// </summary>
         /// <param name="data">Binary data to propose.</param>
         /// <param name="ct">Cancellation token.</param>
@@ -87,7 +95,7 @@ namespace DataWarehouse.SDK.Contracts
         {
             ct.ThrowIfCancellationRequested();
             var proposal = new Proposal { Payload = data };
-            var success = await ProposeAsync(proposal).ConfigureAwait(false);
+            var success = await ProposeAsync(proposal, ct).ConfigureAwait(false);
             return new ConsensusResult(success, null, 0, success ? null : "Proposal not committed by quorum");
         }
 
@@ -122,14 +130,35 @@ namespace DataWarehouse.SDK.Contracts
 
         /// <summary>
         /// Gets cluster health information aggregated across all consensus groups.
-        /// Override for detailed per-group health reporting.
+        /// Default implementation derives health from <see cref="GetClusterStateAsync"/>;
+        /// override for detailed per-group health reporting.
         /// </summary>
         /// <param name="ct">Cancellation token.</param>
         /// <returns>Aggregated health information.</returns>
-        public virtual Task<ClusterHealthInfo> GetClusterHealthAsync(CancellationToken ct)
+        public virtual async Task<ClusterHealthInfo> GetClusterHealthAsync(CancellationToken ct)
         {
             ct.ThrowIfCancellationRequested();
-            return Task.FromResult(new ClusterHealthInfo(0, 0, new Dictionary<string, string>()));
+            // Derive basic health from GetClusterStateAsync instead of returning hardcoded zeros
+            // (finding P2-139).
+            ClusterState state;
+            try
+            {
+                state = await GetClusterStateAsync().ConfigureAwait(false);
+            }
+            catch
+            {
+                return new ClusterHealthInfo(0, 0, new Dictionary<string, string>());
+            }
+
+            var nodeStates = new Dictionary<string, string>(StringComparer.Ordinal);
+            if (state.LeaderId != null)
+                nodeStates[state.LeaderId] = "leader";
+
+            // IsHealthy=true and having a leader counts as 1 healthy node minimum.
+            int total = Math.Max(state.NodeCount, nodeStates.Count);
+            int healthy = state.IsHealthy ? Math.Max(1, total) : 0;
+
+            return new ClusterHealthInfo(total, healthy, nodeStates);
         }
 
         #endregion

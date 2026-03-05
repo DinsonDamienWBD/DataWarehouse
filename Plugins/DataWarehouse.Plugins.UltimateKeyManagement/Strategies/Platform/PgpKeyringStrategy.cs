@@ -471,9 +471,51 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
 
         private string DeriveDefaultPassphrase()
         {
+            // #3567: MachineName+UserName are low-entropy and enumerable. Add a cryptographic salt
+            // stored on disk (generated once per installation) so the passphrase has at least 128 bits
+            // of randomness even if MachineName and UserName are known to an attacker.
+            var saltPath = GetPassphraseSaltPath();
+            byte[] salt;
+            if (File.Exists(saltPath))
+            {
+                salt = File.ReadAllBytes(saltPath);
+            }
+            else
+            {
+                salt = new byte[32];
+                RandomNumberGenerator.Fill(salt);
+                try
+                {
+                    var dir = Path.GetDirectoryName(saltPath);
+                    if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                    File.WriteAllBytes(saltPath, salt);
+                }
+                catch
+                {
+                    // If we can't persist the salt, the passphrase will not survive a restart — acceptable
+                    // as this is the fallback path. Production should set an explicit Passphrase.
+                }
+            }
+
             var entropy = $"{Environment.MachineName}:{Environment.UserName}:DataWarehouse.PGP.v1";
-            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(entropy));
+            var hash = HKDF.DeriveKey(
+                HashAlgorithmName.SHA256,
+                SHA256.HashData(Encoding.UTF8.GetBytes(entropy)),
+                32,
+                salt: salt,
+                info: Encoding.UTF8.GetBytes("dw-pgp-passphrase-v1"));
             return Convert.ToBase64String(hash);
+        }
+
+        private string GetPassphraseSaltPath()
+        {
+            var storePath = _config.KeyringPath;
+            if (string.IsNullOrEmpty(storePath))
+            {
+                var baseDir = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                storePath = Path.Combine(baseDir, "DataWarehouse", "PgpKeyring");
+            }
+            return Path.Combine(storePath, ".pgp-passphrase-salt");
         }
 
         #endregion

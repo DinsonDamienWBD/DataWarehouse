@@ -68,7 +68,7 @@ public enum MorphDirection : byte
 public sealed class MorphTransition
 {
     private long _migratedEntries;
-    private MorphTransitionState _state;
+    private volatile MorphTransitionState _state;
 
     /// <summary>
     /// Unique identifier for this transition.

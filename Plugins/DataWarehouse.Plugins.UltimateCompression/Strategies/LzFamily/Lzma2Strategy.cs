@@ -2,7 +2,6 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
-using System.IO.Compression;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.Compression;
@@ -306,21 +305,9 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
         private static byte[] CompressBlock(byte[] block)
         {
             using var outputStream = new MemoryStream(block.Length + 256);
-
-            try
-            {
-                // Try using SharpCompress's LzmaStream with default properties
-                var props = new LzmaEncoderProperties();
-                using var lzmaStream = LzmaStream.Create(props, false, outputStream);
-                lzmaStream.Write(block, 0, block.Length);
-            }
-            catch
-            {
-                // Fallback: Use DeflateStream as LZMA internal APIs are not accessible in SharpCompress 0.38.x
-                using var deflateStream = new DeflateStream(outputStream, System.IO.Compression.CompressionLevel.Optimal, leaveOpen: true);
-                deflateStream.Write(block, 0, block.Length);
-            }
-
+            var props = new LzmaEncoderProperties();
+            using var lzmaStream = LzmaStream.Create(props, false, outputStream);
+            lzmaStream.Write(block, 0, block.Length);
             return outputStream.ToArray();
         }
 
@@ -329,23 +316,12 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
             using var inputStream = new MemoryStream(compressed);
             using var outputStream = new MemoryStream(originalLength);
 
-            try
-            {
-                // Try using SharpCompress's LzmaStream for decompression
-                var properties = new byte[5];
-                if (inputStream.Read(properties, 0, 5) != 5)
-                    throw new InvalidDataException("Failed to read LZMA properties from block.");
+            var properties = new byte[5];
+            if (inputStream.Read(properties, 0, 5) != 5)
+                throw new InvalidDataException("Failed to read LZMA properties from block.");
 
-                using var lzmaStream = LzmaStream.Create(properties, inputStream, originalLength, false);
-                lzmaStream.CopyTo(outputStream);
-            }
-            catch
-            {
-                // Fallback: Use DeflateStream as LZMA internal APIs are not accessible
-                inputStream.Position = 0;
-                using var deflateStream = new DeflateStream(inputStream, System.IO.Compression.CompressionMode.Decompress);
-                deflateStream.CopyTo(outputStream);
-            }
+            using var lzmaStream = LzmaStream.Create(properties, inputStream, originalLength, false);
+            lzmaStream.CopyTo(outputStream);
 
             return outputStream.ToArray();
         }

@@ -81,14 +81,14 @@ namespace DataWarehouse.Kernel.Messaging
     /// Bounded concurrent dictionary that enforces a maximum capacity.
     /// When capacity is reached, oldest entries are evicted.
     /// </summary>
-    internal sealed class BoundedBoundedDictionary<TKey, TValue> where TKey : notnull
+    internal sealed class CappedDictionary<TKey, TValue> where TKey : notnull
     {
         private readonly BoundedDictionary<TKey, TValue> _dictionary;
         private readonly ConcurrentQueue<TKey> _keyOrder = new();
         private readonly int _maxCapacity;
         private readonly object _evictionLock = new();
 
-        public BoundedBoundedDictionary(int maxCapacity)
+        public CappedDictionary(int maxCapacity)
         {
             _maxCapacity = maxCapacity > 0 ? maxCapacity : int.MaxValue;
             _dictionary = new BoundedDictionary<TKey, TValue>(_maxCapacity);
@@ -107,6 +107,18 @@ namespace DataWarehouse.Kernel.Messaging
         public bool TryRemove(TKey key, out TValue? value) => _dictionary.TryRemove(key, out value);
 
         public bool ContainsKey(TKey key) => _dictionary.ContainsKey(key);
+
+        /// <summary>
+        /// Attempts to add the key-value pair atomically. Returns false if the key already exists.
+        /// </summary>
+        public bool TryAdd(TKey key, TValue value)
+        {
+            if (!_dictionary.TryAdd(key, value))
+                return false;
+            _keyOrder.Enqueue(key);
+            EnforceCapacity();
+            return true;
+        }
 
         public IEnumerable<TValue> Values => _dictionary.Values;
 
@@ -172,8 +184,8 @@ namespace DataWarehouse.Kernel.Messaging
     /// </summary>
     public class AdvancedMessageBus : MessageBusBase, IAdvancedMessageBus
     {
-        private readonly BoundedBoundedDictionary<string, PendingMessage> _pendingMessages;
-        private readonly BoundedBoundedDictionary<string, MessageGroup> _messageGroups;
+        private readonly CappedDictionary<string, PendingMessage> _pendingMessages;
+        private readonly CappedDictionary<string, MessageGroup> _messageGroups;
         private readonly BoundedDictionary<string, FilteredSubscription> _filteredSubscriptions = new BoundedDictionary<string, FilteredSubscription>(1000);
         private readonly MessageBusStatistics _statistics = new();
         private readonly IKernelContext _context;
@@ -194,8 +206,8 @@ namespace DataWarehouse.Kernel.Messaging
             _config = config ?? new AdvancedMessageBusConfig();
 
             // Initialize bounded collections with configured limits
-            _pendingMessages = new BoundedBoundedDictionary<string, PendingMessage>(_config.MaxPendingMessages);
-            _messageGroups = new BoundedBoundedDictionary<string, MessageGroup>(_config.MaxMessageGroups);
+            _pendingMessages = new CappedDictionary<string, PendingMessage>(_config.MaxPendingMessages);
+            _messageGroups = new CappedDictionary<string, MessageGroup>(_config.MaxMessageGroups);
 
             // Start background timers
             _retryTimer = new Timer(ProcessRetries, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
@@ -528,17 +540,22 @@ namespace DataWarehouse.Kernel.Messaging
 
             foreach (var pending in toRetry)
             {
-                if (pending.RetryCount >= pending.Options.MaxRetries)
+                // All state mutations guarded by SyncRoot to prevent races between
+                // the retry timer and concurrent delivery task completions.
+                lock (pending.SyncRoot)
                 {
-                    pending.State = MessageState.Failed;
-                    pending.LastError = $"Max retries ({pending.Options.MaxRetries}) exceeded";
-                    RecordStatistic(s => s.TotalFailed++);
-                    _context.LogWarning($"[MessageBus] Message {pending.MessageId} failed after {pending.RetryCount} retries");
-                    continue;
-                }
+                    if (pending.RetryCount >= pending.Options.MaxRetries)
+                    {
+                        pending.State = MessageState.Failed;
+                        pending.LastError = $"Max retries ({pending.Options.MaxRetries}) exceeded";
+                        RecordStatistic(s => s.TotalFailed++);
+                        _context.LogWarning($"[MessageBus] Message {pending.MessageId} failed after {pending.RetryCount} retries");
+                        continue;
+                    }
 
-                pending.RetryCount++;
-                pending.NextRetryAt = now + CalculateBackoff(pending.RetryCount, pending.Options);
+                    pending.RetryCount++;
+                    pending.NextRetryAt = now + CalculateBackoff(pending.RetryCount, pending.Options);
+                }
 
                 _context.LogDebug($"[MessageBus] Retrying message {pending.MessageId} (attempt {pending.RetryCount})");
 
@@ -547,16 +564,22 @@ namespace DataWarehouse.Kernel.Messaging
                     try
                     {
                         var delivered = await DeliverMessageAsync(pending.Topic, pending.Message, CancellationToken.None);
-                        if (delivered)
+                        lock (pending.SyncRoot)
                         {
-                            pending.State = MessageState.Delivered;
-                            pending.DeliveredAt = DateTime.UtcNow;
-                            RecordStatistic(s => { s.TotalDelivered++; s.TotalRetried++; });
+                            if (delivered)
+                            {
+                                pending.State = MessageState.Delivered;
+                                pending.DeliveredAt = DateTime.UtcNow;
+                                RecordStatistic(s => { s.TotalDelivered++; s.TotalRetried++; });
+                            }
                         }
                     }
                     catch (Exception ex)
                     {
-                        pending.LastError = ex.Message;
+                        lock (pending.SyncRoot)
+                        {
+                            pending.LastError = ex.Message;
+                        }
                         _context.LogError($"[MessageBus] Retry failed for {pending.MessageId}: {ex.Message}", ex);
                     }
                 });
@@ -639,11 +662,6 @@ namespace DataWarehouse.Kernel.Messaging
         /// </summary>
         public IMessageGroup CreateGroup(string groupId)
         {
-            if (_messageGroups.ContainsKey(groupId))
-            {
-                throw new InvalidOperationException($"Message group '{groupId}' already exists");
-            }
-
             var group = new MessageGroup
             {
                 GroupId = groupId,
@@ -652,7 +670,12 @@ namespace DataWarehouse.Kernel.Messaging
                 Messages = new List<GroupedMessage>()
             };
 
-            _messageGroups.AddOrUpdate(groupId, group);
+            // Use TryAdd semantics: if a group with this ID already exists the add is rejected atomically
+            if (!_messageGroups.TryAdd(groupId, group))
+            {
+                throw new InvalidOperationException($"Message group '{groupId}' already exists");
+            }
+
             _context.LogDebug($"[MessageBus] Created message group {groupId}");
 
             return new MessageGroupHandle(groupId, this);
@@ -854,6 +877,8 @@ namespace DataWarehouse.Kernel.Messaging
 
         private class PendingMessage
         {
+            /// <summary>Guards all mutable fields against concurrent access from retry timer and delivery tasks.</summary>
+            public readonly object SyncRoot = new();
             public string MessageId { get; set; } = string.Empty;
             public string Topic { get; set; } = string.Empty;
             public required PluginMessage Message { get; set; }

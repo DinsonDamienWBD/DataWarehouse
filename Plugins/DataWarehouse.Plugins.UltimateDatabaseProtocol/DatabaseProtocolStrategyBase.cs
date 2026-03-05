@@ -475,7 +475,8 @@ public abstract class DatabaseProtocolStrategyBase : StrategyBase, IDatabaseProt
     private long _transactionsRolledBack;
     private long _totalQueryTimeMs;
     private readonly DateTime _startTime;
-    private DateTime _lastUpdateTime;
+    // P2-2684: DateTime cannot be volatile; store ticks as long for Interlocked-safe access.
+    private long _lastUpdateTimeTicks;
 
     // Connection state
     private volatile ProtocolConnectionState _connectionState = ProtocolConnectionState.Disconnected;
@@ -513,7 +514,7 @@ public abstract class DatabaseProtocolStrategyBase : StrategyBase, IDatabaseProt
     protected DatabaseProtocolStrategyBase()
     {
         _startTime = DateTime.UtcNow;
-        _lastUpdateTime = DateTime.UtcNow;
+        Interlocked.Exchange(ref _lastUpdateTimeTicks, DateTime.UtcNow.Ticks);
     }
 
     #region Connection Management
@@ -557,7 +558,7 @@ public abstract class DatabaseProtocolStrategyBase : StrategyBase, IDatabaseProt
 
             _connectionState = ProtocolConnectionState.Ready;
             Interlocked.Increment(ref _connectionsEstablished);
-            _lastUpdateTime = DateTime.UtcNow;
+            Interlocked.Exchange(ref _lastUpdateTimeTicks, DateTime.UtcNow.Ticks);
 
             return true;
         }
@@ -642,7 +643,9 @@ public abstract class DatabaseProtocolStrategyBase : StrategyBase, IDatabaseProt
         }
         catch
         {
+
             // Ignore errors during disconnect
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
         finally
         {
@@ -695,7 +698,7 @@ public abstract class DatabaseProtocolStrategyBase : StrategyBase, IDatabaseProt
             Interlocked.Increment(ref _queriesExecuted);
             var executionTime = (long)(DateTime.UtcNow - startTime).TotalMilliseconds;
             Interlocked.Add(ref _totalQueryTimeMs, executionTime);
-            _lastUpdateTime = DateTime.UtcNow;
+            Interlocked.Exchange(ref _lastUpdateTimeTicks, DateTime.UtcNow.Ticks);
 
             return result with { ExecutionTimeMs = executionTime };
         }
@@ -733,7 +736,7 @@ public abstract class DatabaseProtocolStrategyBase : StrategyBase, IDatabaseProt
             Interlocked.Increment(ref _queriesExecuted);
             var executionTime = (long)(DateTime.UtcNow - startTime).TotalMilliseconds;
             Interlocked.Add(ref _totalQueryTimeMs, executionTime);
-            _lastUpdateTime = DateTime.UtcNow;
+            Interlocked.Exchange(ref _lastUpdateTimeTicks, DateTime.UtcNow.Ticks);
 
             return result with { ExecutionTimeMs = executionTime };
         }
@@ -773,7 +776,7 @@ public abstract class DatabaseProtocolStrategyBase : StrategyBase, IDatabaseProt
         var transactionId = await BeginTransactionCoreAsync(ct);
         ActiveTransactions[transactionId] = new object();
         Interlocked.Increment(ref _transactionsStarted);
-        _lastUpdateTime = DateTime.UtcNow;
+        Interlocked.Exchange(ref _lastUpdateTimeTicks, DateTime.UtcNow.Ticks);
 
         return transactionId;
     }
@@ -797,7 +800,7 @@ public abstract class DatabaseProtocolStrategyBase : StrategyBase, IDatabaseProt
 
         await CommitTransactionCoreAsync(transactionId, ct);
         Interlocked.Increment(ref _transactionsCommitted);
-        _lastUpdateTime = DateTime.UtcNow;
+        Interlocked.Exchange(ref _lastUpdateTimeTicks, DateTime.UtcNow.Ticks);
     }
 
     /// <summary>Core transaction commit. Override for protocol-specific implementation.</summary>
@@ -818,7 +821,7 @@ public abstract class DatabaseProtocolStrategyBase : StrategyBase, IDatabaseProt
 
         await RollbackTransactionCoreAsync(transactionId, ct);
         Interlocked.Increment(ref _transactionsRolledBack);
-        _lastUpdateTime = DateTime.UtcNow;
+        Interlocked.Exchange(ref _lastUpdateTimeTicks, DateTime.UtcNow.Ticks);
     }
 
     /// <summary>Core transaction rollback. Override for protocol-specific implementation.</summary>
@@ -977,7 +980,7 @@ public abstract class DatabaseProtocolStrategyBase : StrategyBase, IDatabaseProt
             TransactionsRolledBack = Interlocked.Read(ref _transactionsRolledBack),
             AverageQueryTimeMs = avgTime,
             StartTime = _startTime,
-            LastUpdateTime = _lastUpdateTime
+            LastUpdateTime = new DateTime(Interlocked.Read(ref _lastUpdateTimeTicks), DateTimeKind.Utc)
         };
     }
 
@@ -994,7 +997,7 @@ public abstract class DatabaseProtocolStrategyBase : StrategyBase, IDatabaseProt
         Interlocked.Exchange(ref _transactionsCommitted, 0);
         Interlocked.Exchange(ref _transactionsRolledBack, 0);
         Interlocked.Exchange(ref _totalQueryTimeMs, 0);
-        _lastUpdateTime = DateTime.UtcNow;
+        Interlocked.Exchange(ref _lastUpdateTimeTicks, DateTime.UtcNow.Ticks);
     }
 
     /// <inheritdoc/>
@@ -1220,13 +1223,17 @@ public sealed class DatabaseProtocolStrategyRegistry : IDatabaseProtocolStrategy
                     }
                     catch
                     {
+
                         // Skip types that can't be instantiated
+                        System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                     }
                 }
             }
             catch
             {
+
                 // Skip assemblies that can't be scanned
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
     }

@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Industry
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("soc1.check");
+            IncrementCounter("soc1.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -71,9 +71,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Industry
 
             recommendations.Add("Engage independent auditor for annual SOC 1 Type II examination");
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -89,14 +90,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Industry
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("soc1.initialized");
+            IncrementCounter("soc1.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("soc1.shutdown");
+            IncrementCounter("soc1.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

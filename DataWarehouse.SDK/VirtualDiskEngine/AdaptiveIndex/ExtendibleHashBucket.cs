@@ -131,8 +131,17 @@ public sealed class ExtendibleHashBucket
     /// <returns>A populated <see cref="ExtendibleHashBucket"/>.</returns>
     public static ExtendibleHashBucket Deserialize(ReadOnlySpan<byte> data, int blockSize)
     {
+        if (data.Length < HeaderSize)
+            throw new InvalidDataException($"ExtendibleHashBucket: data too short ({data.Length} bytes, need at least {HeaderSize}).");
+
         int localDepth = BinaryPrimitives.ReadInt32LittleEndian(data.Slice(0, 4));
         int count = BinaryPrimitives.ReadInt32LittleEndian(data.Slice(4, 4));
+
+        // Validate count against actual buffer size to prevent out-of-bounds reads.
+        int maxEntries = (data.Length - HeaderSize) / EntrySize;
+        if (count < 0 || count > maxEntries)
+            throw new InvalidDataException(
+                $"ExtendibleHashBucket: deserialized count {count} exceeds buffer capacity {maxEntries} — corrupt or crafted data.");
 
         var bucket = new ExtendibleHashBucket(blockSize, localDepth);
 

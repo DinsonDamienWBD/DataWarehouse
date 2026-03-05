@@ -32,6 +32,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         private readonly object _lock = new();
         private long _currentTerm;
         private string? _votedFor;
+        private long _compactionBaseIndex; // tracks compacted entries to preserve original indices (finding P2-430)
 
         /// <inheritdoc/>
         public long Count
@@ -163,12 +164,8 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                     return Task.CompletedTask;
 
                 _log.RemoveRange(0, (int)upToIndex);
-
-                // Re-index remaining entries starting from 1
-                for (int i = 0; i < _log.Count; i++)
-                {
-                    _log[i].Index = i + 1;
-                }
+                // Advance base index — remaining entries keep their original indices (finding P2-430).
+                _compactionBaseIndex += upToIndex;
             }
 
             return Task.CompletedTask;

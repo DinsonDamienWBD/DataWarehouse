@@ -54,10 +54,29 @@ public sealed class TomlStrategy : DataFormatStrategyBase
 
         var text = System.Text.Encoding.UTF8.GetString(buffer, 0, bytesRead).TrimStart();
 
-        // Check for TOML markers: [section] or key = value
-        return text.Contains('[') ||
-               text.Contains('=') ||
-               text.StartsWith("#");
+        // P2-2250: Use tighter TOML markers to avoid matching INI, shell scripts, JSON, etc.
+        // Require a [section] header, a key = value line, or a bare # comment on the first line
+        // (TOML files typically start with one of these).
+        var lines = text.Split('\n');
+        foreach (var rawLine in lines)
+        {
+            var line = rawLine.Trim();
+            if (line.Length == 0) continue;
+            // [SectionHeader] — must start with '[' and end with ']'
+            if (line.StartsWith('[') && line.EndsWith(']')) return true;
+            // key = value — identifier, optional spaces, '=', then something
+            // Require that the token before '=' is a bare key (letters, digits, _, -)
+            int eqIdx = line.IndexOf('=');
+            if (eqIdx > 0)
+            {
+                var key = line[..eqIdx].Trim();
+                if (key.Length > 0 && key.All(c => char.IsLetterOrDigit(c) || c == '_' || c == '-' || c == '.'))
+                    return true;
+            }
+            // # comment must start the file — but that alone is not enough; skip
+            break;
+        }
+        return false;
     }
 
     public override async Task<DataFormatResult> ParseAsync(Stream input, DataFormatContext context, CancellationToken ct = default)

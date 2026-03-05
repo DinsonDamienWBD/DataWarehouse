@@ -45,30 +45,35 @@ public sealed class FluentdStrategy : ObservabilityStrategyBase
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken)
     {
         IncrementCounter("fluentd.logs_sent");
-        var records = logEntries.Select(entry => new
+        // LOW-4618: Fluentd HTTP input expects one JSON object per request (or NDJSON), NOT a
+        // JSON array — an array is treated as a single event. Post each record individually.
+        foreach (var entry in logEntries)
         {
-            tag = _tag,
-            time = entry.Timestamp.ToUnixTimeSeconds(),
-            record = new Dictionary<string, object?>
+            var record = new
             {
-                ["level"] = entry.Level.ToString(),
-                ["message"] = entry.Message,
-                ["host"] = Environment.MachineName,
-                ["timestamp"] = entry.Timestamp.ToString("o"),
-                ["properties"] = entry.Properties ?? new Dictionary<string, object>(),
-                ["exception"] = entry.Exception != null ? new
+                tag = _tag,
+                time = entry.Timestamp.ToUnixTimeSeconds(),
+                record = new Dictionary<string, object?>
                 {
-                    type = entry.Exception.GetType().Name,
-                    message = entry.Exception.Message,
-                    stacktrace = entry.Exception.StackTrace ?? ""
-                } : null
-            }
-        });
+                    ["level"] = entry.Level.ToString(),
+                    ["message"] = entry.Message,
+                    ["host"] = Environment.MachineName,
+                    ["timestamp"] = entry.Timestamp.ToString("o"),
+                    ["properties"] = entry.Properties ?? new Dictionary<string, object>(),
+                    ["exception"] = entry.Exception != null ? new
+                    {
+                        type = entry.Exception.GetType().Name,
+                        message = entry.Exception.Message,
+                        stacktrace = entry.Exception.StackTrace ?? ""
+                    } : (object?)null
+                }
+            };
 
-        var json = JsonSerializer.Serialize(records);
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{_url}/{_tag}", content, cancellationToken);
-        response.EnsureSuccessStatusCode();
+            var json = JsonSerializer.Serialize(record);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            using var response = await _httpClient.PostAsync($"{_url}/{_tag}", content, cancellationToken);
+            response.EnsureSuccessStatusCode();
+        }
     }
 
     protected override Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
@@ -81,7 +86,7 @@ public sealed class FluentdStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{_url}/api/plugins.json", cancellationToken);
+            using var response = await _httpClient.GetAsync($"{_url}/api/plugins.json", cancellationToken);
             return new HealthCheckResult(response.IsSuccessStatusCode,
                 response.IsSuccessStatusCode ? "Fluentd is healthy" : "Fluentd unhealthy",
                 new Dictionary<string, object> { ["url"] = _url, ["tag"] = _tag });
@@ -104,17 +109,11 @@ public sealed class FluentdStrategy : ObservabilityStrategyBase
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("fluentd.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     protected override void Dispose(bool disposing) { if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }

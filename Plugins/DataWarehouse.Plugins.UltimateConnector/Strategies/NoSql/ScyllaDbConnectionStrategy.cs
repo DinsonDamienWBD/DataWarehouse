@@ -13,7 +13,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
     /// </summary>
     public class ScyllaDbConnectionStrategy : DatabaseConnectionStrategyBase
     {
-        private TcpClient? _tcpClient;
+        private volatile TcpClient? _tcpClient;
 
         public override string StrategyId => "scylladb";
         public override string DisplayName => "ScyllaDB";
@@ -21,7 +21,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
         public override string[] Tags => new[] { "nosql", "scylladb", "cassandra-compatible", "distributed", "high-performance" };
 
         public override ConnectionStrategyCapabilities Capabilities => new(
-            SupportsPooling: true,
+            SupportsPooling: false,
             SupportsStreaming: true,
             SupportsTransactions: false,
             SupportsBulkOperations: true,
@@ -69,9 +69,12 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
 
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
+            // P2-2180: Measure actual latency with Stopwatch instead of hardcoded value.
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             var isHealthy = await TestCoreAsync(handle, ct);
+            sw.Stop();
             return new ConnectionHealth(isHealthy, isHealthy ? "ScyllaDB healthy" : "ScyllaDB unhealthy",
-                TimeSpan.FromMilliseconds(3), DateTimeOffset.UtcNow);
+                sw.Elapsed, DateTimeOffset.UtcNow);
         }
 
         /// <summary>
@@ -119,8 +122,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
 
         private (string host, int port) ParseHostPort(string connectionString, int defaultPort)
         {
-            var parts = connectionString.Split(':');
-            return (parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : defaultPort);
+            // P2-2132: delegate to base class ParseHostPortSafe which handles IPv6 bracket notation
+            return ParseHostPortSafe(connectionString, defaultPort);
         }
     }
 }

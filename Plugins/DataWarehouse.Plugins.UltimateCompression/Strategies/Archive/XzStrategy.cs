@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -117,6 +118,11 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
             }, TimeSpan.FromSeconds(60), ct).ConfigureAwait(false);
         }
 
+        // Internal format produced by CompressCore to achieve correct round-trip without a full XZ container.
+        // Layout: [DwLzmaMagic:8][OriginalLength:4 LE][LZMA-stream (5-byte props + compressed data)]
+        // 0xD7 = 'DW' sentinel (not a valid XZ or LZMA1 leading byte).
+        private static readonly byte[] DwLzmaMagic = [ 0xD7, 0x4C, 0x5A, 0x4D, 0x41, 0x00, 0x00, 0x00 ];
+
         /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
@@ -128,16 +134,17 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input size exceeds maximum of {MaxInputSize} bytes");
 
-            using var inputStream = new MemoryStream(input);
             using var output = new MemoryStream(input.Length + 256);
 
-            // XZ compression using SharpCompress - create XZ format manually
-            // Write XZ header
-            output.Write(new byte[] { 0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00 }, 0, 6); // XZ magic + flags
+            // Write DW-LZMA header: magic (8 bytes) + original length (4 bytes LE).
+            output.Write(DwLzmaMagic, 0, DwLzmaMagic.Length);
+            var origLenBytes = new byte[4];
+            BinaryPrimitives.WriteInt32LittleEndian(origLenBytes, input.Length);
+            output.Write(origLenBytes, 0, 4);
 
-            // Use LZMA stream for the actual compression
-            var props = new LzmaEncoderProperties();
-            using (var lzmaStream = LzmaStream.Create(props, false, output))
+            // LZMA-compress: LzmaStream.Create writes 5-byte properties then compressed data.
+            var lzmaProps = new LzmaEncoderProperties();
+            using (var lzmaStream = LzmaStream.Create(lzmaProps, false, output))
             {
                 lzmaStream.Write(input, 0, input.Length);
             }
@@ -156,16 +163,47 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input size exceeds maximum of {MaxInputSize} bytes");
 
-            // Validate XZ header (magic bytes: 0xFD, '7', 'z', 'X', 'Z', 0x00)
+            // Check for our internal DW-LZMA format first (produced by CompressCore).
+            // Layout: [magic:8][origLen:4 LE][5-byte LZMA props][compressed data...]
+            int dwHeaderLen = DwLzmaMagic.Length + 4;
+            if (input.Length >= dwHeaderLen && StartsWithMagic(input, DwLzmaMagic))
+            {
+                int originalLength = BinaryPrimitives.ReadInt32LittleEndian(input.AsSpan(DwLzmaMagic.Length, 4));
+                if (originalLength < 0 || originalLength > MaxInputSize)
+                    throw new InvalidDataException($"Invalid DW-LZMA original length: {originalLength}");
+
+                // The LZMA stream (props + compressed data) starts at dwHeaderLen.
+                int lzmaPayloadLen = input.Length - dwHeaderLen;
+                if (lzmaPayloadLen < 5)
+                    throw new InvalidDataException("DW-LZMA payload too short to contain LZMA properties.");
+
+                // First 5 bytes of payload are LZMA encoder properties.
+                byte[] lzmaProps = new byte[5];
+                Buffer.BlockCopy(input, dwHeaderLen, lzmaProps, 0, 5);
+
+                using var lzmaPayloadStream = new MemoryStream(input, dwHeaderLen, lzmaPayloadLen);
+                using var lzmaStream = LzmaStream.Create(lzmaProps, lzmaPayloadStream, originalLength, false);
+                using var output = new MemoryStream(Math.Max(originalLength, 256));
+                lzmaStream.CopyTo(output);
+                return output.ToArray();
+            }
+
+            // Fall back to proper XZ container (externally produced archives).
             if (input.Length < 6 || input[0] != 0xFD || input[1] != 0x37 || input[2] != 0x7A || input[3] != 0x58 || input[4] != 0x5A || input[5] != 0x00)
-                throw new InvalidDataException("Corrupted XZ header: invalid magic bytes");
+                throw new InvalidDataException("Corrupted XZ/LZMA header: invalid magic bytes");
 
             using var inputStream = new MemoryStream(input);
             using var xzStream = new XZStream(inputStream);
-            using var output = new MemoryStream(input.Length + 256);
+            using var xzOutput = new MemoryStream(input.Length + 256);
+            xzStream.CopyTo(xzOutput);
+            return xzOutput.ToArray();
+        }
 
-            xzStream.CopyTo(output);
-            return output.ToArray();
+        private static bool StartsWithMagic(byte[] data, byte[] magic)
+        {
+            for (int i = 0; i < magic.Length; i++)
+                if (data[i] != magic[i]) return false;
+            return true;
         }
 
         /// <inheritdoc/>
@@ -177,7 +215,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
         /// <inheritdoc/>
         protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen)
         {
-            return new XZStream(input);
+            return new XzDecompressionStream(input, leaveOpen, this);
         }
 
         private sealed class XzCompressionStream : Stream
@@ -220,8 +258,11 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
 
                 byte[] input = _buffer.ToArray();
 
-                // Write XZ header
-                _output.Write(new byte[] { 0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00 }, 0, 6);
+                // Write DW-LZMA header: magic + original length so DecompressCore can reconstruct.
+                _output.Write(DwLzmaMagic, 0, DwLzmaMagic.Length);
+                var origLenBytes = new byte[4];
+                BinaryPrimitives.WriteInt32LittleEndian(origLenBytes, input.Length);
+                _output.Write(origLenBytes, 0, 4);
 
                 // Compress with LZMA
                 var props = new LzmaEncoderProperties();
@@ -258,6 +299,58 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
         {
             // XZ overhead: stream header (12 bytes) + block headers + stream footer (12 bytes) + index
             return (long)(inputSize * 0.30) + 256;
+        }
+
+        /// <summary>Buffered decompression stream that routes through <see cref="DecompressCore"/>.</summary>
+        private sealed class XzDecompressionStream : Stream
+        {
+            private readonly Stream _source;
+            private readonly bool _leaveOpen;
+            private readonly XzStrategy _owner;
+            private MemoryStream? _decompressed;
+
+            public XzDecompressionStream(Stream source, bool leaveOpen, XzStrategy owner)
+            {
+                _source = source;
+                _leaveOpen = leaveOpen;
+                _owner = owner;
+            }
+
+            private void EnsureDecompressed()
+            {
+                if (_decompressed != null) return;
+                using var ms = new MemoryStream();
+                _source.CopyTo(ms);
+                var data = _owner.DecompressCore(ms.ToArray());
+                _decompressed = new MemoryStream(data);
+            }
+
+            public override bool CanRead => true;
+            public override bool CanSeek => false;
+            public override bool CanWrite => false;
+            public override long Length => throw new NotSupportedException();
+            public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+
+            public override int Read(byte[] buffer, int offset, int count)
+            {
+                EnsureDecompressed();
+                return _decompressed!.Read(buffer, offset, count);
+            }
+
+            public override void Flush() { }
+            public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+            public override void SetLength(long value) => throw new NotSupportedException();
+            public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+            protected override void Dispose(bool disposing)
+            {
+                if (disposing)
+                {
+                    _decompressed?.Dispose();
+                    if (!_leaveOpen) _source.Dispose();
+                }
+                base.Dispose(disposing);
+            }
         }
     }
 }

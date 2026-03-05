@@ -49,24 +49,13 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.EmbeddedIdentit
             IncrementCounter("password.hashing.shutdown");
             return base.ShutdownAsyncCore(cancellationToken);
         }
-protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
+protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
             IncrementCounter("password.hashing.evaluate");
-            await Task.Yield();
-
-            var hasValidIdentity = context.SubjectId.Length > 0;
-
-            return new AccessDecision
-            {
-                IsGranted = hasValidIdentity,
-                Reason = hasValidIdentity ? "Password Hashing Strategy verified" : "Authentication failed",
-                ApplicablePolicies = new[] { "password-hashing-policy" },
-                Metadata = new Dictionary<string, object>
-                {
-                    ["algorithm"] = "Argon2id",
-                    ["strategy_type"] = "EmbeddedIdentity"
-                }
-            };
+            throw new NotSupportedException(
+                "PasswordHashingStrategy requires the Konscious.Security.Cryptography or Isopoh.Cryptography.Argon2 NuGet package " +
+                "for real Argon2id hashing, a configured credential store, and constant-time hash comparison. " +
+                "Granting access for any non-empty SubjectId is not a valid implementation.");
         }
     }
 }

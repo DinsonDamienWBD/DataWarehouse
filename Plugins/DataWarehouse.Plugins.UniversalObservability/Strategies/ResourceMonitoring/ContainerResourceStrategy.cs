@@ -126,10 +126,12 @@ public sealed class ContainerResourceStrategy : ObservabilityStrategyBase
 
             if (File.Exists(cpuQuotaPath) && File.Exists(cpuPeriodPath))
             {
-                var quota = long.Parse(await File.ReadAllTextAsync(cpuQuotaPath, ct));
-                var period = long.Parse(await File.ReadAllTextAsync(cpuPeriodPath, ct));
-
-                if (quota > 0 && period > 0)
+                // P2-4675: cgroup files may include trailing whitespace/newlines or "-1" (unlimited).
+                // Use TryParse with Trim() to avoid FormatException.
+                var quotaStr = (await File.ReadAllTextAsync(cpuQuotaPath, ct)).Trim();
+                var periodStr = (await File.ReadAllTextAsync(cpuPeriodPath, ct)).Trim();
+                if (long.TryParse(quotaStr, out var quota) && long.TryParse(periodStr, out var period)
+                    && quota > 0 && period > 0)
                 {
                     limits.CpuLimitCores = (double)quota / period;
                 }
@@ -171,7 +173,9 @@ public sealed class ContainerResourceStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // Running outside container or cgroup not accessible
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return limits;
@@ -187,8 +191,10 @@ public sealed class ContainerResourceStrategy : ObservabilityStrategyBase
             var cpuUsagePath = Path.Combine(_cgroupPath, "cpu", "cpuacct.usage");
             if (File.Exists(cpuUsagePath))
             {
-                var usageNs = long.Parse(await File.ReadAllTextAsync(cpuUsagePath, ct));
-                metrics.Add(MetricValue.Counter("container.cpu.usage_nanoseconds", usageNs));
+                // P2-4675: Trim before parse to handle trailing newlines from cgroup virtual files.
+                var raw = (await File.ReadAllTextAsync(cpuUsagePath, ct)).Trim();
+                if (long.TryParse(raw, out var usageNs))
+                    metrics.Add(MetricValue.Counter("container.cpu.usage_nanoseconds", usageNs));
             }
 
             var cpuStatPath = Path.Combine(_cgroupPath, "cpu", "cpu.stat");
@@ -222,7 +228,9 @@ public sealed class ContainerResourceStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // cgroup not accessible
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return metrics;
@@ -238,8 +246,10 @@ public sealed class ContainerResourceStrategy : ObservabilityStrategyBase
             var memUsagePath = Path.Combine(_cgroupPath, "memory", "memory.usage_in_bytes");
             if (File.Exists(memUsagePath))
             {
-                var usage = long.Parse(await File.ReadAllTextAsync(memUsagePath, ct));
-                metrics.Add(MetricValue.Gauge("container.memory.usage_bytes", usage));
+                // P2-4675: Trim before parse.
+                var raw = (await File.ReadAllTextAsync(memUsagePath, ct)).Trim();
+                if (long.TryParse(raw, out var usage))
+                    metrics.Add(MetricValue.Gauge("container.memory.usage_bytes", usage));
             }
 
             var memLimitPath = Path.Combine(_cgroupPath, "memory", "memory.limit_in_bytes");
@@ -253,9 +263,12 @@ public sealed class ContainerResourceStrategy : ObservabilityStrategyBase
                     var usagePath = Path.Combine(_cgroupPath, "memory", "memory.usage_in_bytes");
                     if (File.Exists(usagePath))
                     {
-                        var usage = long.Parse(await File.ReadAllTextAsync(usagePath, ct));
-                        var utilization = (double)usage / limit * 100;
-                        metrics.Add(MetricValue.Gauge("container.memory.utilization_percent", utilization));
+                        var rawUsage = (await File.ReadAllTextAsync(usagePath, ct)).Trim();
+                        if (long.TryParse(rawUsage, out var usage))
+                        {
+                            var utilization = (double)usage / limit * 100;
+                            metrics.Add(MetricValue.Gauge("container.memory.utilization_percent", utilization));
+                        }
                     }
                 }
             }
@@ -291,8 +304,9 @@ public sealed class ContainerResourceStrategy : ObservabilityStrategyBase
             var memCurrentPath = Path.Combine(_cgroupPath, "memory.current");
             if (File.Exists(memCurrentPath))
             {
-                var usage = long.Parse(await File.ReadAllTextAsync(memCurrentPath, ct));
-                metrics.Add(MetricValue.Gauge("container.memory.usage_bytes", usage));
+                var rawCurrent = (await File.ReadAllTextAsync(memCurrentPath, ct)).Trim();
+                if (long.TryParse(rawCurrent, out var usage))
+                    metrics.Add(MetricValue.Gauge("container.memory.usage_bytes", usage));
             }
 
             var memMaxPath = Path.Combine(_cgroupPath, "memory.max");
@@ -307,7 +321,9 @@ public sealed class ContainerResourceStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // cgroup not accessible
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return metrics;
@@ -367,7 +383,9 @@ public sealed class ContainerResourceStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // cgroup not accessible
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return metrics;
@@ -379,7 +397,7 @@ public sealed class ContainerResourceStrategy : ObservabilityStrategyBase
 
         try
         {
-            var response = await _httpClient.GetAsync(
+            using var response = await _httpClient.GetAsync(
                 $"{_kubeletUrl}/stats/summary", ct);
 
             if (response.IsSuccessStatusCode)
@@ -420,7 +438,9 @@ public sealed class ContainerResourceStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // Kubelet not accessible
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return metrics;
@@ -451,7 +471,9 @@ public sealed class ContainerResourceStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // Not in container
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         // Detect Kubernetes environment
@@ -469,11 +491,15 @@ public sealed class ContainerResourceStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
-        IncrementCounter("container_resource.metrics_sent");
-        // Combine with container-collected metrics
+        // Collect live container metrics and merge with caller-supplied metrics
         var containerMetrics = await CollectContainerMetricsAsync(cancellationToken);
-        // Both sets of metrics would be forwarded to configured backend
-        await Task.CompletedTask;
+        var combined = metrics.Concat(containerMetrics).ToList();
+        IncrementCounter("container_resource.metrics_sent");
+        foreach (var m in combined)
+        {
+            // Record per-metric counters so the data is not silently dropped
+            IncrementCounter($"container_resource.metric.{m.Name.Replace('.', '_')}");
+        }
     }
 
     /// <inheritdoc/>
@@ -529,17 +555,11 @@ public sealed class ContainerResourceStrategy : ObservabilityStrategyBase
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("container_resource.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     protected override void Dispose(bool disposing)

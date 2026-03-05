@@ -17,8 +17,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
     /// </summary>
     public class SlackConnectionStrategy : SaaSConnectionStrategyBase
     {
-        private string _botToken = "";
-        private string _signingSecret = "";
+        private volatile string _botToken = "";
+        private volatile string _signingSecret = "";
 
         public override string StrategyId => "slack";
         public override string DisplayName => "Slack";
@@ -59,11 +59,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             catch { return false; }
         }
 
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
-        {
-            handle.GetConnection<HttpClient>()?.Dispose();
-            await Task.CompletedTask;
-        }
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) {
+            handle.GetConnection<HttpClient>()?.Dispose(); return Task.CompletedTask; }
 
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
@@ -96,7 +93,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
 
             var json = JsonSerializer.Serialize(body);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await client.PostAsync("/api/chat.postMessage", content, ct);
+            using var response = await client.PostAsync("/api/chat.postMessage", content, ct);
+            response.EnsureSuccessStatusCode();
             var responseJson = await response.Content.ReadAsStringAsync(ct);
 
             using var doc = JsonDocument.Parse(responseJson);
@@ -121,7 +119,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             var url = $"/api/conversations.list?limit={limit}&exclude_archived={excludeArchived}";
             if (cursor != null) url += $"&cursor={cursor}";
 
-            var response = await client.GetAsync(url, ct);
+            using var response = await client.GetAsync(url, ct);
+            response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
 
             using var doc = JsonDocument.Parse(json);
@@ -158,7 +157,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             if (title != null) form.Add(new StringContent(title), "title");
             form.Add(new ByteArrayContent(fileContent), "file", filename);
 
-            var response = await client.PostAsync("/api/files.upload", form, ct);
+            using var response = await client.PostAsync("/api/files.upload", form, ct);
+            response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
             using var doc = JsonDocument.Parse(json);
 

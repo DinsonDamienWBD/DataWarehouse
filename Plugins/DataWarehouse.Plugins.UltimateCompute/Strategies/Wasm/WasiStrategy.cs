@@ -58,12 +58,13 @@ internal sealed class WasiStrategy : ComputeRuntimeStrategyBase
 
                 var args = new StringBuilder();
                 args.Append("run --wasi ");
-                args.Append($"--dir {tmpDir}::/tmp ");
+                // Quote paths to handle spaces and special characters in directory names.
+                args.Append($"--dir \"{tmpDir}\"::/tmp ");
 
                 if (task.ResourceLimits?.AllowedFileSystemPaths != null)
                 {
                     foreach (var preOpen in task.ResourceLimits.AllowedFileSystemPaths)
-                        args.Append($"--dir {preOpen}::{preOpen} ");
+                        args.Append($"--dir \"{preOpen}\"::\"{preOpen}\" ");
                 }
 
                 args.Append($"\"{wasmPath}\"");
@@ -71,7 +72,7 @@ internal sealed class WasiStrategy : ComputeRuntimeStrategyBase
                 if (task.Arguments != null)
                 {
                     foreach (var arg in task.Arguments)
-                        args.Append($" {arg}");
+                        args.Append($" \"{arg.Replace("\"", "\\\"")}\"");
                 }
 
                 var timeout = GetEffectiveTimeout(task);

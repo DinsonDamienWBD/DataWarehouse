@@ -18,12 +18,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("digital_twin_compliance.check");
+            IncrementCounter("digital_twin_compliance.check");
             var violations = new List<ComplianceViolation>();
 
-            // Check 1: Verify digital twin exists
-            if (!context.Attributes.TryGetValue("HasDigitalTwin", out var hasTwin) ||
-                !(hasTwin is bool exists && exists))
+            // Check 1: Verify digital twin exists (single lookup, reused in check 2)
+            bool hasDigitalTwin = context.Attributes.TryGetValue("HasDigitalTwin", out var hasTwinObj) &&
+                                  hasTwinObj is bool hasTwinBool && hasTwinBool;
+
+            if (!hasDigitalTwin)
             {
                 violations.Add(new ComplianceViolation
                 {
@@ -36,12 +38,23 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
                 });
             }
 
-            // Check 2: Verify twin synchronization
-            if (context.Attributes.TryGetValue("HasDigitalTwin", out var ht) &&
-                ht is bool hasDt && hasDt)
+            // Check 2: Verify twin synchronization (only when twin exists; reuse hasDigitalTwin)
+            if (hasDigitalTwin)
             {
-                if (!context.Attributes.TryGetValue("LastSyncTime", out var syncTime) ||
-                    !(syncTime is DateTime lastSync && (DateTime.UtcNow - lastSync).TotalDays <= 7))
+                bool syncRecent = false;
+                if (context.Attributes.TryGetValue("LastSyncTime", out var syncTime))
+                {
+                    // Accept both DateTime and DateTimeOffset stored in the attributes bag
+                    DateTime? lastSync = syncTime switch
+                    {
+                        DateTime dt => dt,
+                        DateTimeOffset dto => dto.UtcDateTime,
+                        _ => null
+                    };
+                    syncRecent = lastSync.HasValue && (DateTime.UtcNow - lastSync.Value).TotalDays <= 7;
+                }
+
+                if (!syncRecent)
                 {
                     violations.Add(new ComplianceViolation
                     {
@@ -56,8 +69,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
             }
 
             // Check 3: Verify pre-deployment testing
-            if (context.OperationType.Contains("deploy", StringComparison.OrdinalIgnoreCase) ||
-                context.OperationType.Contains("change", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) &&
+                (context.OperationType.Contains("deploy", StringComparison.OrdinalIgnoreCase) ||
+                context.OperationType.Contains("change", StringComparison.OrdinalIgnoreCase)))
             {
                 if (!context.Attributes.ContainsKey("TestedInTwin") ||
                     !context.Attributes.ContainsKey("TwinTestResults"))
@@ -156,14 +170,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("digital_twin_compliance.initialized");
+            IncrementCounter("digital_twin_compliance.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("digital_twin_compliance.shutdown");
+            IncrementCounter("digital_twin_compliance.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

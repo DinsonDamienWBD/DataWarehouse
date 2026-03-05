@@ -215,7 +215,7 @@ public sealed class SchemaValidationStrategy : DataQualityStrategyBase
     /// </summary>
     public void RegisterSchema(string schemaId, string schemaJson)
     {
-        var doc = JsonDocument.Parse(schemaJson);
+        using var doc = JsonDocument.Parse(schemaJson);
         _schemas[schemaId] = doc;
         _schemaRules[schemaId] = ParseSchemaToRules(schemaId, doc);
     }

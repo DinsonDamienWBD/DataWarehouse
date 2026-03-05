@@ -180,6 +180,9 @@ public sealed class ValidationException : Exception
 /// </summary>
 public sealed class InputValidator : IInputValidator
 {
+    // Cache GetProperties() results per type to avoid repeated reflection on hot validation path
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, System.Reflection.PropertyInfo[]> _propertyCache
+        = new();
     private readonly BoundedDictionary<Type, object> _validators = new BoundedDictionary<Type, object>(1000);
     private readonly InputValidatorConfig _config;
 
@@ -258,7 +261,7 @@ public sealed class InputValidator : IInputValidator
 
     private void ValidateSecurityRules<T>(T input, ValidationResult result, ValidationContext? context) where T : class
     {
-        var properties = typeof(T).GetProperties();
+        var properties = _propertyCache.GetOrAdd(typeof(T), t => t.GetProperties());
 
         foreach (var property in properties)
         {
@@ -343,9 +346,11 @@ public static class SecurityRules
         RegexOptions.Compiled,
         TimeSpan.FromMilliseconds(100));
 
-    // Command injection patterns
+    // Command injection patterns — deliberately excludes SQL-safe characters (';', '|', '&')
+    // to avoid false positives on legitimate SQL input (finding 701).
+    // Detection focuses on shell metacharacters and OS command execution functions.
     private static readonly Regex CommandInjectionPattern = new(
-        @"([;&|`$]|\$\(|`.*`|\|{1,2}|>{1,2}|<{1,2}|\beval\b|\bexec\b|\bsystem\b|\bshell_exec\b)",
+        @"(`|\$\(|`[^`]*`|>{1,2}|<{1,2}|\beval\b|\bshell_exec\b|\bpassthru\b|\bpopen\b)",
         RegexOptions.IgnoreCase | RegexOptions.Compiled,
         TimeSpan.FromMilliseconds(100));
 

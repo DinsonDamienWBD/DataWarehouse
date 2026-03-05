@@ -71,7 +71,20 @@ namespace DataWarehouse.SDK.Contracts.Persistence
         /// <param name="pluginId">Unique identifier of the owning plugin.</param>
         /// <param name="key">State key within the plugin's namespace.</param>
         /// <returns>Fully qualified path string.</returns>
-        static string BuildPath(string pluginId, string key) =>
-            $"dw://internal/plugin-state/{pluginId}/{key}";
+        static string BuildPath(string pluginId, string key)
+        {
+            if (string.IsNullOrWhiteSpace(pluginId))
+                throw new ArgumentException("pluginId must not be null or empty.", nameof(pluginId));
+            if (string.IsNullOrWhiteSpace(key))
+                throw new ArgumentException("key must not be null or empty.", nameof(key));
+
+            // Guard against path traversal: reject any segment containing '..', '/', or '\\'
+            if (pluginId.Contains("..") || pluginId.Contains('/') || pluginId.Contains('\\'))
+                throw new ArgumentException($"pluginId contains disallowed path characters: '{pluginId}'", nameof(pluginId));
+            if (key.Contains("..") || key.Contains('/') || key.Contains('\\'))
+                throw new ArgumentException($"key contains disallowed path characters: '{key}'", nameof(key));
+
+            return $"dw://internal/plugin-state/{pluginId}/{key}";
+        }
     }
 }

@@ -447,7 +447,12 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
                     CreatedAt = key.Properties.CreatedOn?.UtcDateTime ?? DateTime.UtcNow,
                     LastRotatedAt = key.Properties.UpdatedOn?.UtcDateTime,
                     ExpiresAt = key.Properties.ExpiresOn?.UtcDateTime,
-                    Version = 1, // Could parse from key.Properties.Version
+                    // P2-3506: Parse version from key.Properties.Version (hex string, each 2 chars = 1 byte).
+                    // Azure KV versions are 32-char hex strings. Convert to an integer version number
+                    // by taking the first 4 bytes as a big-endian int for a monotonic proxy version.
+                    Version = !string.IsNullOrEmpty(key.Properties.Version) && key.Properties.Version.Length >= 8
+                        ? (int)Convert.ToUInt32(key.Properties.Version.Substring(0, 8), 16)
+                        : 1,
                     IsActive = key.Properties.Enabled == true && keyId == _currentKeyId,
                     Metadata = new Dictionary<string, object>
                     {

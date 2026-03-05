@@ -66,29 +66,39 @@ public abstract class DataGovernanceStrategyBase : StrategyBase, IDataGovernance
     public abstract string[] Tags { get; }
 
     /// <summary>Initializes the strategy. Idempotent.</summary>
-    protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
+    // P2-2253: Avoid async state-machine allocation for no-op override — use synchronous base call.
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
         IncrementCounter("initialized");
-        await Task.CompletedTask;
+        return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <summary>Shuts down the strategy gracefully.</summary>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    // P2-2253: Avoid async state-machine allocation for no-op override — use synchronous base call.
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
         IncrementCounter("shutdown");
-        await Task.CompletedTask;
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     /// <summary>Gets a cached health status, refreshing every 60 seconds.</summary>
     public HealthStatus GetHealth()
     {
-        var result = GetCachedHealthAsync(ct =>
+        // Avoid sync-over-async deadlock: compute synchronously without async context capture.
+        var status = IsInitialized ? HealthStatus.Healthy : HealthStatus.NotInitialized;
+        return status;
+    }
+
+    /// <summary>Gets a cached health status asynchronously, refreshing every 60 seconds.</summary>
+    public async Task<HealthStatus> GetHealthAsync(CancellationToken ct = default)
+    {
+        var result = await GetCachedHealthAsync(innerCt =>
         {
             var status = IsInitialized ? HealthStatus.Healthy : HealthStatus.NotInitialized;
             return Task.FromResult(new StrategyHealthCheckResult(
                 status == HealthStatus.Healthy,
                 status.ToString()));
-        }, TimeSpan.FromSeconds(60)).GetAwaiter().GetResult();
+        }, TimeSpan.FromSeconds(60));
 
         return result.IsHealthy ? HealthStatus.Healthy : HealthStatus.NotInitialized;
     }

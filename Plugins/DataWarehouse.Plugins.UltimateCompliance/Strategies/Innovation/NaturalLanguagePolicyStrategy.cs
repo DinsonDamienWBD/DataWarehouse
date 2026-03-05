@@ -18,7 +18,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("natural_language_policy.check");
+            IncrementCounter("natural_language_policy.check");
             var violations = new List<ComplianceViolation>();
 
             // Check 1: Verify policy is in natural language format
@@ -133,14 +133,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("natural_language_policy.initialized");
+            IncrementCounter("natural_language_policy.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("natural_language_policy.shutdown");
+            IncrementCounter("natural_language_policy.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

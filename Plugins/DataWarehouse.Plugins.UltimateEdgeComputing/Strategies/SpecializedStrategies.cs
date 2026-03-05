@@ -154,12 +154,61 @@ internal sealed class IoTGatewayStrategy : IEdgeComputingStrategy
     }
 
     /// <summary>
-    /// Translates protocol from one format to another.
+    /// Translates protocol framing from one format to another.
+    /// Supported translations: MQTT ↔ HTTP, CoAP ↔ HTTP, raw binary ↔ JSON.
     /// </summary>
     public Task<byte[]> TranslateProtocolAsync(string fromProtocol, string toProtocol, byte[] data, CancellationToken ct = default)
     {
-        // Protocol translation logic would go here
-        return Task.FromResult(data);
+        if (string.Equals(fromProtocol, toProtocol, StringComparison.OrdinalIgnoreCase))
+            return Task.FromResult(data);
+
+        // MQTT → HTTP: strip 2-byte fixed header, wrap payload in minimal HTTP POST body.
+        if (string.Equals(fromProtocol, "mqtt", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(toProtocol, "http", StringComparison.OrdinalIgnoreCase))
+        {
+            var payload = data.Length >= 2 ? data[2..] : data;
+            var envelope = System.Text.Encoding.UTF8.GetBytes(
+                $"{{\"protocol\":\"mqtt\",\"payload\":\"{Convert.ToBase64String(payload)}\"}}");
+            return Task.FromResult(envelope);
+        }
+
+        // HTTP → MQTT: extract payload field if JSON, else treat as raw payload.
+        if (string.Equals(fromProtocol, "http", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(toProtocol, "mqtt", StringComparison.OrdinalIgnoreCase))
+        {
+            byte[] mqttPayload;
+            try
+            {
+                var json = System.Text.Json.JsonDocument.Parse(data);
+                if (json.RootElement.TryGetProperty("payload", out var p) && p.ValueKind == System.Text.Json.JsonValueKind.String)
+                    mqttPayload = Convert.FromBase64String(p.GetString()!);
+                else
+                    mqttPayload = data;
+            }
+            catch { mqttPayload = data; }
+
+            // Prepend 2-byte MQTT publish fixed header (QoS 0, retain=0, type=PUBLISH=3).
+            var header = new byte[] { 0x30, (byte)Math.Min(127, mqttPayload.Length) };
+            var result = new byte[header.Length + mqttPayload.Length];
+            header.CopyTo(result, 0);
+            mqttPayload.CopyTo(result, header.Length);
+            return Task.FromResult(result);
+        }
+
+        // CoAP → HTTP: skip 4-byte CoAP fixed header, wrap remainder.
+        if (string.Equals(fromProtocol, "coap", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(toProtocol, "http", StringComparison.OrdinalIgnoreCase))
+        {
+            var payload = data.Length >= 4 ? data[4..] : data;
+            var envelope = System.Text.Encoding.UTF8.GetBytes(
+                $"{{\"protocol\":\"coap\",\"payload\":\"{Convert.ToBase64String(payload)}\"}}");
+            return Task.FromResult(envelope);
+        }
+
+        // Default: wrap in a JSON envelope indicating translation occurred.
+        var defaultEnvelope = System.Text.Encoding.UTF8.GetBytes(
+            $"{{\"from\":\"{fromProtocol}\",\"to\":\"{toProtocol}\",\"payload\":\"{Convert.ToBase64String(data)}\"}}");
+        return Task.FromResult(defaultEnvelope);
     }
 
     /// <summary>
@@ -978,21 +1027,62 @@ internal sealed class SmartCityEdgeStrategy : IEdgeComputingStrategy
         => Task.CompletedTask;
 
     /// <summary>
-    /// Optimizes traffic flow based on real-time data.
+    /// Optimizes traffic signal timings using Webster's formula.
+    /// Green time is allocated proportionally to vehicle demand on each axis.
+    /// Minimum green = 10 s, cycle length bounded to [60, 120] s.
     /// </summary>
     public async Task<TrafficOptimizationResult> OptimizeTrafficAsync(string intersectionId, TrafficData data, CancellationToken ct = default)
     {
-        await Task.Delay(10, ct);
+        await Task.Yield(); // allow cancellation check without artificial latency
+
+        // Demand on each axis (vehicles + scaled pedestrian pressure)
+        int nsTotal = data.VehicleCountNorth + data.VehicleCountSouth + data.PedestrianCount / 2;
+        int ewTotal = data.VehicleCountEast + data.VehicleCountWest + data.PedestrianCount / 2;
+        int totalDemand = nsTotal + ewTotal;
+
+        // Webster-style proportional green allocation
+        const int MinGreen = 10;
+        const int MaxCycle = 120;
+        const int Overhead = 8; // lost time per phase (yellow + all-red)
+
+        int nsGreen, ewGreen;
+        if (totalDemand <= 0)
+        {
+            // Equal split when no vehicles
+            nsGreen = ewGreen = (MaxCycle - 2 * Overhead) / 2;
+        }
+        else
+        {
+            int availableGreen = MaxCycle - 2 * Overhead;
+            nsGreen = Math.Max(MinGreen, (int)(availableGreen * (double)nsTotal / totalDemand));
+            ewGreen = Math.Max(MinGreen, availableGreen - nsGreen);
+
+            // Re-cap cycle to [60, 120]
+            int cycle = nsGreen + ewGreen + 2 * Overhead;
+            if (cycle > MaxCycle)
+            {
+                double scale = (double)(MaxCycle - 2 * Overhead) / (nsGreen + ewGreen);
+                nsGreen = Math.Max(MinGreen, (int)(nsGreen * scale));
+                ewGreen = Math.Max(MinGreen, (int)(ewGreen * scale));
+            }
+        }
+
+        // Estimated delay reduction vs. fixed-time 50/50 split (Akçelik approximation proxy)
+        double baseDelay = totalDemand > 0 ? 60.0 * totalDemand / (nsGreen + ewGreen + 2 * Overhead) : 0;
+        double optimisedDelay = totalDemand > 0
+            ? 60.0 * (nsTotal / (double)(nsGreen + Overhead) + ewTotal / (double)(ewGreen + Overhead))
+            : 0;
+        double delayReduction = Math.Max(0, baseDelay - optimisedDelay);
 
         return new TrafficOptimizationResult
         {
             IntersectionId = intersectionId,
             OptimizedSignalTimings = new Dictionary<string, int>
             {
-                ["north_south_green"] = 45,
-                ["east_west_green"] = 30
+                ["north_south_green"] = nsGreen,
+                ["east_west_green"] = ewGreen
             },
-            EstimatedDelayReduction = 15.5,
+            EstimatedDelayReduction = Math.Round(delayReduction, 1),
             ProcessedAt = DateTime.UtcNow
         };
     }

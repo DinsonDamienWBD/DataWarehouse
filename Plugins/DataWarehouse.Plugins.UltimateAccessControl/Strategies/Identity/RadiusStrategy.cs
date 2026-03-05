@@ -21,7 +21,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
     {
         private string _radiusServer = "localhost";
         private int _radiusPort = 1812;
-        private string _sharedSecret = "";
+        private string _sharedSecret = ""; // Must be configured - empty secret is rejected at init
         private TimeSpan _timeout = TimeSpan.FromSeconds(5);
 
         public override string StrategyId => "identity-radius";
@@ -61,6 +61,13 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
         protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
         {
             IncrementCounter("identity.radius.init");
+
+            if (string.IsNullOrEmpty(_sharedSecret))
+            {
+                throw new InvalidOperationException(
+                    "RADIUS SharedSecret must be configured. An empty shared secret makes all RADIUS packets trivially forgeable.");
+            }
+
             return base.InitializeAsyncCore(cancellationToken);
         }
 
@@ -230,7 +237,33 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
                 };
             }
 
+            // Verify response authenticator per RFC 2865 Section 3
+            // ResponseAuth = MD5(Code+ID+Length+RequestAuth+Attributes+Secret)
             var code = response[0];
+            var responseAuth = new byte[16];
+            Buffer.BlockCopy(response, 4, responseAuth, 0, 16);
+
+            // Build verification hash: replace response authenticator with request authenticator
+            var verifyBuffer = new byte[response.Length + Encoding.UTF8.GetByteCount(_sharedSecret)];
+            Buffer.BlockCopy(response, 0, verifyBuffer, 0, response.Length);
+            // Overwrite response authenticator position with request authenticator
+            Buffer.BlockCopy(requestAuthenticator, 0, verifyBuffer, 4, 16);
+            // Append shared secret
+            var secretBytes = Encoding.UTF8.GetBytes(_sharedSecret);
+            Buffer.BlockCopy(secretBytes, 0, verifyBuffer, response.Length, secretBytes.Length);
+
+            var expectedAuth = System.Security.Cryptography.MD5.HashData(
+                verifyBuffer.AsSpan(0, response.Length + secretBytes.Length));
+
+            if (!System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(responseAuth, expectedAuth))
+            {
+                return new RadiusAuthenticationResult
+                {
+                    IsAuthenticated = false,
+                    ErrorMessage = "RADIUS response authenticator verification failed - possible spoofing"
+                };
+            }
+
             // 2 = Access-Accept, 3 = Access-Reject
             return new RadiusAuthenticationResult
             {

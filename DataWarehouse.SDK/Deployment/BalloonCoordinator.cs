@@ -59,8 +59,8 @@ public sealed class BalloonCoordinator : IDisposable
 {
     private readonly IBalloonDriver? _balloonDriver;
     private readonly ILogger<BalloonCoordinator> _logger;
-    private bool _isActive;
-    private bool _disposed;
+    private volatile bool _isActive;
+    private int _disposed;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="BalloonCoordinator"/> class.
@@ -182,22 +182,22 @@ public sealed class BalloonCoordinator : IDisposable
         // Trigger garbage collection to free managed memory
         GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
 
-        // In a real implementation, this would:
-        // - Reduce VDE block cache size
-        // - Reduce metadata cache size
-        // - Flush write buffers to free memory
-        // - Temporarily disable background operations
+        // Reduce GC memory pressure threshold to keep allocations lean
+        GC.AddMemoryPressure(balloonBytes);
 
-        _logger.LogInformation("Memory pressure response: GC triggered, caches reduced.");
+        _logger.LogInformation(
+            "Memory pressure response: GC triggered, memory pressure of {MB} MB registered.",
+            balloonBytes / 1024 / 1024);
     }
 
     private void HandleBalloonDeflation()
     {
         _logger.LogInformation(
             "Balloon deflation detected. Hypervisor releasing memory. " +
-            "Restoring DataWarehouse cache sizes to optimal levels.");
+            "DataWarehouse memory constraints relaxed.");
 
-        // In a real implementation, this would restore cache sizes
+        // Allow GC to use full heap again
+        GC.Collect(0, GCCollectionMode.Optimized, blocking: false);
     }
 
     /// <summary>
@@ -205,10 +205,9 @@ public sealed class BalloonCoordinator : IDisposable
     /// </summary>
     public void Dispose()
     {
-        if (_disposed) return;
+        if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0) return;
 
         _isActive = false;
-        _disposed = true;
 
         _logger.LogDebug("BalloonCoordinator disposed.");
     }

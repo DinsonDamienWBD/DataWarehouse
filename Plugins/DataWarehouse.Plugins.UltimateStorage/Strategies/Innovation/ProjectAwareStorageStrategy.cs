@@ -66,13 +66,28 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             var projectName = "default";
             if (metadata != null && metadata.TryGetValue("ProjectName", out var projName))
             {
-                projectName = projName;
+                // Sanitize projectName from user-supplied metadata to prevent path traversal.
+                projectName = SanitizePathSegment(projName);
             }
 
             var projectPath = Path.Combine(_baseStoragePath, projectName);
+            // Canonicalize and verify the project path stays inside the base storage path.
+            projectPath = Path.GetFullPath(projectPath);
+            if (!projectPath.StartsWith(Path.GetFullPath(_baseStoragePath), StringComparison.OrdinalIgnoreCase))
+                throw new UnauthorizedAccessException(
+                    $"ProjectName '{projectName}' resolves outside the base storage path.");
+
             Directory.CreateDirectory(projectPath);
 
-            var filePath = Path.Combine(projectPath, key);
+            // Sanitize the key as well to prevent traversal via the key parameter.
+            var safeKey = SanitizePathSegment(key);
+            var filePath = Path.Combine(projectPath, safeKey);
+            // Canonicalize and verify the file path stays inside the project path.
+            filePath = Path.GetFullPath(filePath);
+            if (!filePath.StartsWith(projectPath, StringComparison.OrdinalIgnoreCase))
+                throw new UnauthorizedAccessException(
+                    $"Key '{key}' resolves outside the project storage path.");
+
             var dir = Path.GetDirectoryName(filePath);
             if (!string.IsNullOrEmpty(dir))
             {
@@ -213,6 +228,31 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             var driveInfo = new DriveInfo(Path.GetPathRoot(_baseStoragePath) ?? "C:\\");
             await Task.CompletedTask;
             return driveInfo.AvailableFreeSpace;
+        }
+
+        /// <summary>
+        /// Sanitizes a caller-supplied path segment by removing traversal sequences,
+        /// path separators, and other characters that could escape the intended directory.
+        /// </summary>
+        private static string SanitizePathSegment(string segment)
+        {
+            if (string.IsNullOrWhiteSpace(segment))
+                return "_empty_";
+
+            // Replace path separators and traversal sequences.
+            var sanitized = segment
+                .Replace('/', '_')
+                .Replace('\\', '_')
+                .Replace(':', '_');
+
+            // Collapse '..' references.
+            while (sanitized.Contains(".."))
+                sanitized = sanitized.Replace("..", "__");
+
+            // Remove any remaining invalid file-name characters.
+            sanitized = string.Join("_", sanitized.Split(Path.GetInvalidFileNameChars()));
+
+            return string.IsNullOrWhiteSpace(sanitized) ? "_empty_" : sanitized;
         }
     }
 }

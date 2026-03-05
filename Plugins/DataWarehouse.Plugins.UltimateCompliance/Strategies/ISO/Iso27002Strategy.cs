@@ -23,7 +23,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.ISO
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("iso27002.check");
+            IncrementCounter("iso27002.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -54,8 +54,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.ISO
             }
 
             // Check cryptographic controls (A.8.24)
-            if (context.DataClassification.Equals("confidential", StringComparison.OrdinalIgnoreCase) ||
-                context.DataClassification.Equals("secret", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("confidential", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(context.DataClassification, "secret", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("EncryptionEnabled", out var encryptObj) || encryptObj is not true)
                 {
@@ -71,8 +71,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.ISO
             }
 
             // Check change management (A.8.32)
-            if (context.OperationType.Equals("modify", StringComparison.OrdinalIgnoreCase) ||
-                context.OperationType.Equals("update", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("modify", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(context.OperationType, "update", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("ChangeApproved", out var approvedObj) || approvedObj is not true)
                 {
@@ -115,9 +115,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.ISO
 
             recommendations.Add("Regularly review and update control implementation based on risk assessments");
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -133,14 +134,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.ISO
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("iso27002.initialized");
+            IncrementCounter("iso27002.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("iso27002.shutdown");
+            IncrementCounter("iso27002.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

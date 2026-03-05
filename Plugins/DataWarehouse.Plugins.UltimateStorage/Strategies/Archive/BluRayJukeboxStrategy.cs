@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -53,8 +54,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
         private TimeSpan _verificationTimeout = TimeSpan.FromMinutes(10);
 
         private readonly SemaphoreSlim _driveLock = new(1, 1);
-        private readonly BoundedDictionary<string, BluRayDiscInfo> _discInventory = new BoundedDictionary<string, BluRayDiscInfo>(1000);
-        private readonly BoundedDictionary<string, string> _objectToDiscMap = new BoundedDictionary<string, string>(1000);
+        // Use ConcurrentDictionary (unbounded) instead of BoundedDictionary(1000) to prevent
+        // silent eviction of disc inventory entries; jukeboxes may contain thousands of discs.
+        private readonly ConcurrentDictionary<string, BluRayDiscInfo> _discInventory = new();
+        private readonly ConcurrentDictionary<string, string> _objectToDiscMap = new();
         private BluRayDiscCatalog? _catalog;
         private IntPtr _driveHandle = IntPtr.Zero;
         private string? _currentLoadedDisc = null;
@@ -168,6 +171,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             }
 
             await _driveLock.WaitAsync(ct);
+            MemoryStream? bufferedStream = null;
             try
             {
                 // Find disc with available capacity or prepare new disc
@@ -184,16 +188,17 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                     await LoadDiscAsync(targetDisc.VolumeId, ct);
                 }
 
-                // Calculate data size
+                // Calculate data size; for non-seekable streams, buffer into memory first.
+                // bufferedStream declared outside try so finally can dispose it.
                 var dataLength = data.CanSeek ? data.Length - data.Position : 0L;
                 if (dataLength == 0)
                 {
-                    // Read into memory to get size
-                    using var ms = new MemoryStream(65536);
-                    await data.CopyToAsync(ms, 81920, ct);
-                    dataLength = ms.Length;
-                    ms.Position = 0;
-                    data = ms;
+                    // Read into memory to get size (non-seekable or empty-position seekable)
+                    bufferedStream = new MemoryStream(65536);
+                    await data.CopyToAsync(bufferedStream, 81920, ct);
+                    dataLength = bufferedStream.Length;
+                    bufferedStream.Position = 0;
+                    data = bufferedStream;
                 }
 
                 // Check if disc has enough capacity
@@ -241,6 +246,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             finally
             {
                 _driveLock.Release();
+                bufferedStream?.Dispose();
             }
         }
 
@@ -576,7 +582,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             // Examples: Sony, Rimage, Primera, Microboards APIs
 
             using var client = new System.Net.Http.HttpClient();
-            var response = await client.GetAsync($"{_vendorApiEndpoint}/api/jukebox/inventory", ct);
+            using var response = await client.GetAsync($"{_vendorApiEndpoint}/api/jukebox/inventory", ct);
             response.EnsureSuccessStatusCode();
 
             var jsonResponse = await response.Content.ReadAsStringAsync(ct);
@@ -699,14 +705,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await client.PostAsync($"{_vendorApiEndpoint}/api/jukebox/load", content, ct);
+            using var response = await client.PostAsync($"{_vendorApiEndpoint}/api/jukebox/load", content, ct);
             response.EnsureSuccessStatusCode();
         }
 
         private async Task UnloadDiscViaApiAsync(CancellationToken ct)
         {
             using var client = new System.Net.Http.HttpClient();
-            var response = await client.PostAsync($"{_vendorApiEndpoint}/api/jukebox/unload", null, ct);
+            using var response = await client.PostAsync($"{_vendorApiEndpoint}/api/jukebox/unload", null, ct);
             response.EnsureSuccessStatusCode();
         }
 
@@ -982,7 +988,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 {
                     using var client = new System.Net.Http.HttpClient();
                     client.Timeout = TimeSpan.FromSeconds(5);
-                    var response = await client.GetAsync($"{_vendorApiEndpoint}/api/jukebox/status", ct);
+                    using var response = await client.GetAsync($"{_vendorApiEndpoint}/api/jukebox/status", ct);
                     return response.IsSuccessStatusCode;
                 }
                 else if (_useScsiPassthrough)
@@ -1250,7 +1256,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
     public class BluRayDiscCatalog
     {
         private readonly string _catalogFilePath;
-        private readonly BoundedDictionary<string, BluRayCatalogEntry> _entries = new BoundedDictionary<string, BluRayCatalogEntry>(1000);
+        // Use ConcurrentDictionary (unbounded): disc catalogs may contain millions of entries.
+        private readonly ConcurrentDictionary<string, BluRayCatalogEntry> _entries = new();
         private readonly SemaphoreSlim _saveLock = new(1, 1);
 
         private BluRayDiscCatalog(string catalogPath)

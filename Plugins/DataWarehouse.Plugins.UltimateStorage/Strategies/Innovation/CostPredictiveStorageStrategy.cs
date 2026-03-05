@@ -42,8 +42,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private readonly SemaphoreSlim _initLock = new(1, 1);
         private readonly BoundedDictionary<string, StoredObjectInfo> _objects = new BoundedDictionary<string, StoredObjectInfo>(1000);
         private readonly BoundedDictionary<DateTime, DailyCostMetrics> _costHistory = new BoundedDictionary<DateTime, DailyCostMetrics>(1000);
-        private decimal _currentMonthSpend = 0;
+        private long _currentMonthSpendCents = 0; // stored as cents (decimal * 10000) for Interlocked atomicity
         private Timer? _costAnalysisTimer = null;
+        // Re-entry guard: prevents concurrent timer callbacks from running two migration cycles simultaneously.
+        private int _analysisRunning = 0;
 
         public override string StrategyId => "cost-predictive-storage";
         public override string Name => "Cost-Predictive Storage";
@@ -117,7 +119,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
             var optimalTier = DetermineOptimalTier(dataBytes.Length, metadata);
             var tierPath = GetTierPath(optimalTier);
-            var filePath = Path.Combine(_baseStoragePath, tierPath, key);
+            var rawFilePath = Path.Combine(_baseStoragePath, tierPath, key);
+            var filePath = Path.GetFullPath(rawFilePath);
+            if (!filePath.StartsWith(_baseStoragePath, StringComparison.OrdinalIgnoreCase))
+                throw new UnauthorizedAccessException($"Key '{key}' resolves outside storage root.");
             var dir = Path.GetDirectoryName(filePath);
             if (!string.IsNullOrEmpty(dir))
             {
@@ -262,7 +267,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             EnsureInitialized();
 
             var projectedMonthly = PredictMonthlyCost();
-            var budgetUtilization = _monthlyBudget > 0 ? (double)(_currentMonthSpend / _monthlyBudget) : 0;
+            var currentMonthSpend = (decimal)Interlocked.Read(ref _currentMonthSpendCents) / 10000m;
+            var budgetUtilization = _monthlyBudget > 0 ? (double)(currentMonthSpend / _monthlyBudget) : 0;
 
             var status = budgetUtilization < 0.8 ? HealthStatus.Healthy :
                         budgetUtilization < 1.0 ? HealthStatus.Degraded : HealthStatus.Unhealthy;
@@ -271,7 +277,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             {
                 Status = status,
                 LatencyMs = 3,
-                Message = $"Month Spend: {_currentMonthSpend:C}, Budget: {_monthlyBudget:C}, Projected: {projectedMonthly:C}",
+                Message = $"Month Spend: {currentMonthSpend:C}, Budget: {_monthlyBudget:C}, Projected: {projectedMonthly:C}",
                 CheckedAt = DateTime.UtcNow
             };
         }
@@ -346,19 +352,19 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             var today = DateTime.UtcNow.Date;
             var metrics = _costHistory.GetOrAdd(today, _ => new DailyCostMetrics { Date = today });
 
-            metrics.TotalCost += cost;
-            if (operation == "Store")
+            lock (metrics)
             {
-                metrics.StorageCost += cost;
-            }
-            else if (operation == "Retrieve")
-            {
-                metrics.RetrievalCost += cost;
+                metrics.TotalCost += cost;
+                if (operation == "Store")
+                    metrics.StorageCost += cost;
+                else if (operation == "Retrieve")
+                    metrics.RetrievalCost += cost;
             }
 
             if (today.Month == DateTime.UtcNow.Month)
             {
-                _currentMonthSpend += cost;
+                // Store as cents (cost * 10000) to allow Interlocked.Add on long
+                Interlocked.Add(ref _currentMonthSpendCents, (long)(cost * 10000m));
             }
         }
 
@@ -367,7 +373,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             var daysElapsed = DateTime.UtcNow.Day;
             if (daysElapsed == 0) daysElapsed = 1;
 
-            var dailyAverage = _currentMonthSpend / daysElapsed;
+            var dailyAverage = (decimal)Interlocked.Read(ref _currentMonthSpendCents) / 10000m / daysElapsed;
             var daysInMonth = DateTime.DaysInMonth(DateTime.UtcNow.Year, DateTime.UtcNow.Month);
 
             return dailyAverage * daysInMonth;
@@ -376,23 +382,33 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private void AnalyzeCostsAndOptimize()
         {
             if (!_enableCostOptimization)
-            {
                 return;
-            }
 
-            foreach (var kvp in _objects.Where(o => o.Value.CurrentTier == StorageTier.Hot))
+            // Prevent concurrent timer invocations from running two migration cycles at the same time.
+            if (Interlocked.CompareExchange(ref _analysisRunning, 1, 0) != 0)
+                return;
+
+            try
             {
-                var objectInfo = kvp.Value;
-                var daysSinceAccess = (DateTime.UtcNow - objectInfo.LastAccessed).TotalDays;
+                // Iterate all objects across tiers so that both Hot→Warm and Warm→Cold transitions are evaluated.
+                foreach (var kvp in _objects)
+                {
+                    var objectInfo = kvp.Value;
+                    var daysSinceAccess = (DateTime.UtcNow - objectInfo.LastAccessed).TotalDays;
 
-                if (daysSinceAccess > 30 && objectInfo.CurrentTier == StorageTier.Hot)
-                {
-                    _ = Task.Run(() => MigrateTierAsync(objectInfo.Key, StorageTier.Warm));
+                    if (daysSinceAccess > 30 && objectInfo.CurrentTier == StorageTier.Hot)
+                    {
+                        _ = Task.Run(() => MigrateTierAsync(objectInfo.Key, StorageTier.Warm));
+                    }
+                    else if (daysSinceAccess > 90 && objectInfo.CurrentTier == StorageTier.Warm)
+                    {
+                        _ = Task.Run(() => MigrateTierAsync(objectInfo.Key, StorageTier.Cold));
+                    }
                 }
-                else if (daysSinceAccess > 90 && objectInfo.CurrentTier == StorageTier.Warm)
-                {
-                    _ = Task.Run(() => MigrateTierAsync(objectInfo.Key, StorageTier.Cold));
-                }
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _analysisRunning, 0);
             }
         }
 

@@ -27,11 +27,17 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
     /// </summary>
     public class NatsConnectorStrategy : UltimateStorageStrategyBase
     {
+        // Fields reserved for when NATS.Client package is added.
+        // All operations throw NotSupportedException until then.
+#pragma warning disable CS0169, CS0414
         private string _serverUrl = string.Empty;
         private string _subject = string.Empty;
         private string? _queueGroup;
         private readonly ConcurrentQueue<NatsMessage> _messageQueue = new();
         private int _maxQueueSize = 10000;
+        // Interlocked counter mirrors queue size to make check-then-enqueue atomic (TOCTOU fix).
+        private int _enqueuedCount = 0;
+#pragma warning restore CS0169, CS0414
 
         public override string StrategyId => "nats-connector";
         public override string Name => "NATS Connector";
@@ -55,16 +61,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
 
         protected override Task InitializeCoreAsync(CancellationToken ct)
         {
-            _serverUrl = GetConfiguration<string>("ServerUrl")
-                ?? throw new InvalidOperationException("NATS ServerUrl is required");
-
-            _subject = GetConfiguration<string>("Subject")
-                ?? throw new InvalidOperationException("NATS Subject is required");
-
-            _queueGroup = GetConfiguration<string?>("QueueGroup", null);
-            _maxQueueSize = GetConfiguration("MaxQueueSize", 10000);
-
-            return Task.CompletedTask;
+            throw new NotSupportedException(
+                "Requires NATS.Client NuGet package. Add a reference to NATS.Client (or NATS.Net for .NET 6+) " +
+                "and implement a real IConnection / INatsConnection using ConnectionFactory or NatsClient.");
         }
 
         protected override async Task<StorageObjectMetadata> StoreAsyncCore(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct)
@@ -87,8 +86,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                 Headers = metadata
             };
 
-            if (_messageQueue.Count >= _maxQueueSize)
+            // Atomic bounded enqueue: use Interlocked to prevent TOCTOU race between count check and enqueue.
+            var currentCount = Interlocked.Increment(ref _enqueuedCount);
+            if (currentCount > _maxQueueSize)
             {
+                Interlocked.Decrement(ref _enqueuedCount);
                 throw new InvalidOperationException($"NATS message queue is full ({_maxQueueSize})");
             }
 
@@ -122,6 +124,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
 
             if (_messageQueue.TryDequeue(out var message))
             {
+                Interlocked.Decrement(ref _enqueuedCount);
                 var stream = new MemoryStream(Encoding.UTF8.GetBytes(message.Data));
 
                 IncrementBytesRetrieved(stream.Length);

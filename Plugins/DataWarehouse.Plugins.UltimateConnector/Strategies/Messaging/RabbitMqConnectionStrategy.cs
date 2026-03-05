@@ -202,7 +202,13 @@ public sealed class RabbitMqConnectionStrategy : MessagingConnectionStrategyBase
         // Set prefetch count for fair dispatch
         await channel.BasicQosAsync(prefetchSize: 0, prefetchCount: 10, global: false, cancellationToken: ct);
 
-        var messageChannel = Channel.CreateUnbounded<byte[]>();
+        // Bounded to prevent unbounded memory growth when consumer is slower than producer
+        var messageChannel = Channel.CreateBounded<byte[]>(new BoundedChannelOptions(1024)
+        {
+            FullMode = BoundedChannelFullMode.Wait,
+            SingleReader = true,
+            SingleWriter = false
+        });
 
         var consumer = new AsyncEventingBasicConsumer(channel);
         consumer.ReceivedAsync += async (_, ea) =>

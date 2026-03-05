@@ -40,6 +40,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
         private static readonly byte[] Magic = { 0x56, 0x43, 0x44, 0x46 }; // "VCDF"
         private const int WindowSize = 16384;
         private const int MinMatchLength = 4;
+        // P2-1596: Limit bucket depth to prevent unbounded memory and O(n) inner scan.
+        private const int MaxBucketDepth = 16;
         private const byte OpAdd = 0x01;
         private const byte OpCopy = 0x02;
         private const byte OpRun = 0x03;
@@ -200,8 +202,11 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
                         {
                             uint h = ComputeHash(input, pos, MinMatchLength);
                             if (!hashTable.ContainsKey(h))
-                                hashTable[h] = new List<int>();
-                            hashTable[h].Add(pos);
+                                hashTable[h] = new List<int>(MaxBucketDepth);
+                            var bucket = hashTable[h];
+                            // P2-1596: Cap bucket depth to bound memory and inner-scan cost.
+                            if (bucket.Count < MaxBucketDepth)
+                                bucket.Add(pos);
                         }
                         pos++;
                     }
@@ -244,8 +249,10 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
                         {
                             uint h = ComputeHash(input, pos, MinMatchLength);
                             if (!hashTable.ContainsKey(h))
-                                hashTable[h] = new List<int>();
-                            hashTable[h].Add(pos);
+                                hashTable[h] = new List<int>(MaxBucketDepth);
+                            var bkt = hashTable[h];
+                            if (bkt.Count < MaxBucketDepth)
+                                bkt.Add(pos);
                         }
 
                         pos++;

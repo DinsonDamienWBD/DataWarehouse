@@ -246,6 +246,10 @@ public sealed class TagIndexRegion
     private BPlusTreeNode _root;
     private readonly TagIndexBloomFilter _bloomFilter;
     private int _entryCount;
+    // Cat 13 (finding 913): maintain running node count so RequiredBlocks is O(1) instead of
+    // O(N) recursive CountNodes traversal. Incremented on every node allocation (root split +
+    // SplitChild); rebuilt from tree during Deserialize.
+    private int _nodeCount = 1; // always at least the root
 
     /// <summary>Monotonic generation number for torn-write detection.</summary>
     public uint Generation { get; set; }
@@ -281,8 +285,9 @@ public sealed class TagIndexRegion
             var oldRoot = _root;
             var newRoot = new BPlusTreeNode(_root.Order, isLeaf: false);
             newRoot.Children.Add(oldRoot);
-            SplitChild(newRoot, 0);
+            SplitChild(newRoot, 0); // SplitChild increments _nodeCount for the new sibling
             _root = newRoot;
+            _nodeCount++; // new root node
         }
 
         InsertNonFull(_root, entry);
@@ -465,8 +470,8 @@ public sealed class TagIndexRegion
     /// <returns>Number of blocks: 1 header + N tree node blocks.</returns>
     public int RequiredBlocks(int blockSize)
     {
-        int nodeCount = CountNodes(_root);
-        return 1 + nodeCount; // 1 header block + tree node blocks
+        // Cat 13 (finding 913): use O(1) maintained counter instead of O(N) CountNodes traversal.
+        return 1 + _nodeCount; // 1 header block + tree node blocks
     }
 
     /// <summary>
@@ -624,6 +629,9 @@ public sealed class TagIndexRegion
             bool isLeaf = nodeBlock[offset++] == 1;
             int keyCount = BinaryPrimitives.ReadUInt16LittleEndian(nodeBlock.Slice(offset));
             offset += 2;
+            int maxKeysPerBlock = (blockSize - 16) / 8; // Conservative estimate of max keys that fit in a block
+            if (keyCount < 0 || keyCount > maxKeysPerBlock)
+                throw new InvalidDataException($"TagIndex B+-tree node keyCount {keyCount} exceeds block capacity {maxKeysPerBlock}.");
 
             var node = new BPlusTreeNode(Math.Max(keyCount + 1, DefaultOrder), isLeaf);
 
@@ -739,6 +747,9 @@ public sealed class TagIndexRegion
         _root = root;
         _bloomFilter = bloomFilter;
         _entryCount = entryCount;
+        // Cat 13 (finding 913): rebuild node count from tree once during deserialization so that
+        // subsequent RequiredBlocks calls are O(1). This is the only O(N) CountNodes call allowed.
+        _nodeCount = CountNodes(root);
     }
 
     // ── B+-tree Operations ──────────────────────────────────────────────
@@ -780,6 +791,7 @@ public sealed class TagIndexRegion
         int mid = fullChild.Keys.Count / 2;
 
         var newNode = new BPlusTreeNode(fullChild.Order, fullChild.IsLeaf);
+        _nodeCount++; // Cat 13 (finding 913): track new sibling node for O(1) RequiredBlocks
 
         if (fullChild.IsLeaf)
         {

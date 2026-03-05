@@ -326,7 +326,9 @@ public sealed class OracleStorageStrategy : DatabaseStorageStrategyBase
     {
         var conn = new OracleConnection(_connectionString);
         await conn.OpenAsync(ct);
-        var transaction = conn.BeginTransaction(isolationLevel);
+        // P2-2835: Oracle's managed driver does not expose BeginTransactionAsync; offload to avoid
+        // blocking the async continuation on a network-bound synchronous call.
+        var transaction = await Task.Run(() => conn.BeginTransaction(isolationLevel), ct);
         return new OracleDbTransaction(conn, transaction);
     }
 
@@ -347,14 +349,15 @@ public sealed class OracleStorageStrategy : DatabaseStorageStrategyBase
 
         public Task CommitAsync(CancellationToken ct = default)
         {
-            _transaction.Commit();
-            return Task.CompletedTask;
+            // P2-2836: OracleTransaction has no async Commit; offload to thread pool to avoid
+            // blocking the caller's async context during network round-trip to the database.
+            return Task.Run(() => _transaction.Commit(), ct);
         }
 
         public Task RollbackAsync(CancellationToken ct = default)
         {
-            _transaction.Rollback();
-            return Task.CompletedTask;
+            // P2-2836: Same as CommitAsync — offload synchronous Oracle network call.
+            return Task.Run(() => _transaction.Rollback(), ct);
         }
 
         public ValueTask DisposeAsync()

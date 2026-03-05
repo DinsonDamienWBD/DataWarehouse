@@ -73,8 +73,11 @@ public sealed class MemoryBudgetTracker
                 throw new OutOfMemoryException($"Memory ceiling exceeded: {CurrentUsage + size} > {Ceiling}");
         }
 
-        Interlocked.Add(ref _allocatedBytes, size);
-        return _arrayPool.Rent(size);
+        // Track actual allocated size (array.Length), not requested size,
+        // because ArrayPool.Rent may return a larger buffer
+        var rented = _arrayPool.Rent(size);
+        Interlocked.Add(ref _allocatedBytes, rented.Length);
+        return rented;
     }
 
     /// <summary>
@@ -85,6 +88,7 @@ public sealed class MemoryBudgetTracker
     public void Return(byte[] array, bool clearArray = false)
     {
         if (!_settings.Enabled) return;
+        // Decrement by actual array length (matches what was added in Rent)
         Interlocked.Add(ref _allocatedBytes, -array.Length);
         _arrayPool.Return(array, clearArray);
     }

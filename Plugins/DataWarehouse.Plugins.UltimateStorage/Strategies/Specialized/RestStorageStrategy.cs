@@ -244,6 +244,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
                 // Configure certificate validation
                 if (!_validateServerCertificate)
                 {
+                    // SECURITY WARNING: TLS certificate validation is DISABLED.
+                    // This should only be used in isolated development/test environments.
+                    // Disabling certificate validation exposes all traffic to MITM attacks.
+                    System.Diagnostics.Trace.TraceWarning(
+                        "[RestStorageStrategy] TLS certificate validation is DISABLED (ValidateServerCertificate=false). " +
+                        "All HTTPS traffic is vulnerable to man-in-the-middle attacks. " +
+                        "Enable certificate validation in production.");
                     handler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true;
                 }
 
@@ -827,7 +834,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
         /// </summary>
         private async Task<Stream> ParseJsonRetrieveResponse(string jsonContent, CancellationToken ct)
         {
-            var doc = JsonDocument.Parse(jsonContent);
+            using var doc = JsonDocument.Parse(jsonContent);
             var root = doc.RootElement;
 
             if (root.TryGetProperty(_jsonDataPath, out var dataElement))
@@ -861,7 +868,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
 
             try
             {
-                var doc = JsonDocument.Parse(content);
+                using var doc = JsonDocument.Parse(content);
                 var root = doc.RootElement;
 
                 // Try to extract items array
@@ -891,9 +898,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
                     }
                 }
             }
-            catch (JsonException)
+            catch (JsonException ex)
             {
+
                 // If JSON parsing fails, return empty list
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
 
             return items;
@@ -948,7 +957,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
         {
             try
             {
-                var doc = JsonDocument.Parse(content);
+                using var doc = JsonDocument.Parse(content);
                 var root = doc.RootElement;
 
                 var size = root.TryGetProperty("size", out var sizeProp) ? sizeProp.GetInt64() : 0;

@@ -107,28 +107,53 @@ public sealed class TranscodePackageExecutor
         var magicBytes = reader.ReadBytes(4);
         var magic = Encoding.UTF8.GetString(magicBytes).TrimEnd('\0');
 
+        // Bounds constants to prevent OOM from crafted/corrupt packages
+        const int MaxStringFieldBytes = 64 * 1024;         // 64 KB for encoder name and args
+        const int MaxHashBytes = 256;                       // Hash at most 256 bytes
+
         // Read encoder name (length-prefixed)
         var encoderLength = reader.ReadInt32();
+        if (encoderLength < 0 || encoderLength > MaxStringFieldBytes)
+            throw new InvalidDataException($"TranscodePackage: encoderLength {encoderLength} is out of valid range [0, {MaxStringFieldBytes}].");
         var encoderBytes = reader.ReadBytes(encoderLength);
         var encoder = Encoding.UTF8.GetString(encoderBytes);
 
         // Read FFmpeg arguments (length-prefixed)
         var argsLength = reader.ReadInt32();
+        if (argsLength < 0 || argsLength > MaxStringFieldBytes)
+            throw new InvalidDataException($"TranscodePackage: argsLength {argsLength} is out of valid range [0, {MaxStringFieldBytes}].");
         var argsBytes = reader.ReadBytes(argsLength);
         var ffmpegArgs = Encoding.UTF8.GetString(argsBytes);
 
         // Read source hash (length-prefixed)
         var hashLength = reader.ReadInt32();
+        if (hashLength < 0 || hashLength > MaxHashBytes)
+            throw new InvalidDataException($"TranscodePackage: hashLength {hashLength} is out of valid range [0, {MaxHashBytes}].");
         var sourceHash = reader.ReadBytes(hashLength);
 
         // Read source data length
         var sourceDataLength = reader.ReadInt32();
+        if (sourceDataLength < 0)
+            throw new InvalidDataException($"TranscodePackage: sourceDataLength {sourceDataLength} is negative — package is corrupt.");
 
-        // Read source data from the original input stream
-        // Note: The package format doesn't actually include the source data inline,
-        // it just references it. For now, we'll return empty source data.
-        // Strategies that want full execution should embed the source data in the package.
-        var sourceData = Array.Empty<byte>();
+        // Read source data if present inline in the package
+        byte[] sourceData;
+        if (sourceDataLength > 0)
+        {
+            sourceData = reader.ReadBytes(sourceDataLength);
+            if (sourceData.Length != sourceDataLength)
+            {
+                throw new InvalidOperationException(
+                    $"Package truncated: expected {sourceDataLength} bytes of source data but got {sourceData.Length}. " +
+                    "The transcode package may be corrupt or incomplete.");
+            }
+        }
+        else
+        {
+            throw new InvalidOperationException(
+                "Package does not contain inline source data (sourceDataLength is 0). " +
+                "Provide source data embedded in the package, or supply a source path separately.");
+        }
 
         return new TranscodePackage(
             Magic: magic,

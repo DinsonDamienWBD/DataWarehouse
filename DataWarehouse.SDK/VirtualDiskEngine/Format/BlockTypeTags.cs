@@ -88,8 +88,15 @@ public static class BlockTypeTags
     /// <summary>Compliance vault ("CMVT").</summary>
     public const uint CMVT = 0x434D5654;
 
-    /// <summary>Audit log ("ALOG").</summary>
+    /// <summary>Audit log ("ALOG") — owned by the AuditLog module.</summary>
     public const uint ALOG = 0x414C4F47;
+
+    /// <summary>
+    /// Compliance audit log ("CMAL") — compliance-module-specific audit trail,
+    /// distinct from the standalone AuditLog module's ALOG blocks.
+    /// Cat 9 (finding 827): separate tag prevents ambiguity during crash recovery.
+    /// </summary>
+    public const uint CMAL = 0x434D414C;
 
     /// <summary>Consensus log ("CLOG").</summary>
     public const uint CLOG = 0x434C4F47;
@@ -108,8 +115,17 @@ public static class BlockTypeTags
     /// <summary>Emergency Recovery ("ERCV").</summary>
     public const uint ERCV = 0x45524356;
 
+    /// <summary>Recovery Control ("RCVR") — always at block 14, never encrypted (AD-67).</summary>
+    public const uint RCVR = 0x52435652;
+
     /// <summary>Extent tree node ("EXTN").</summary>
     public const uint EXTN = 0x4558544E;
+
+    /// <summary>Extended metadata ("EXMD").</summary>
+    public const uint EXMD = 0x45584D44;
+
+    /// <summary>Integrity anchor ("IANT").</summary>
+    public const uint IANT = 0x49414E54;
 
     // ── SQL / Analytics ─────────────────────────────────────────────────
 
@@ -119,14 +135,28 @@ public static class BlockTypeTags
     /// <summary>Zone map index ("ZMAP").</summary>
     public const uint ZMAP = 0x5A4D4150;
 
+    // ── v2.1 Module Extensions (VOPT-87) ────────────────────────────────
+
+    /// <summary>WAL Subscriber Cursors ("WALS") — WalSubscribers module (bit 21).</summary>
+    public const uint WALS = 0x57414C53;
+
+    /// <summary>ZNS Zone Map ("ZNSM") — ZnsZoneMap module (bit 23).</summary>
+    public const uint ZNSM = 0x5A4E534D;
+
+    /// <summary>Online Operations Journal ("OPJR") — OnlineOps module (bit 28).</summary>
+    public const uint OPJR = 0x4F504A52;
+
+    /// <summary>Trailer block ("TRLR") — format trailer sentinel.</summary>
+    public const uint TRLR = 0x54524C52;
+
     // ── Lookup Set ─────────────────────────────────────────────────────
 
     private static readonly FrozenSet<uint> KnownTags = new HashSet<uint>
     {
         SUPB, RMAP, POLV, ENCR, BMAP, INOD, TAGI, MWAL, MTRK, BTRE,
         SNAP, REPL, RAID, COMP, INTE, STRE, XREF, WORM, CODE, DWAL,
-        DATA, FREE, CMVT, ALOG, CLOG, DICT, ANON, MLOG, ERCV, EXTN,
-        COLR, ZMAP
+        DATA, FREE, CMVT, ALOG, CMAL, CLOG, DICT, ANON, MLOG, ERCV, EXTN,
+        COLR, ZMAP, EXMD, IANT, WALS, ZNSM, OPJR, TRLR, RCVR
     }.ToFrozenSet();
 
     /// <summary>
@@ -154,6 +184,16 @@ public static class BlockTypeTags
     {
         if (s is null) throw new ArgumentNullException(nameof(s));
         if (s.Length != 4) throw new ArgumentException("Tag string must be exactly 4 characters.", nameof(s));
+
+        // Cat 9 (finding 815): validate all characters are printable ASCII (0x20-0x7E) so that
+        // non-ASCII chars do not silently produce incorrect tag values via char-to-uint truncation.
+        for (int i = 0; i < 4; i++)
+        {
+            if (s[i] < 0x20 || s[i] > 0x7E)
+                throw new ArgumentException(
+                    $"Tag string must contain only printable ASCII characters (0x20-0x7E). Character at index {i} is 0x{(int)s[i]:X2}.",
+                    nameof(s));
+        }
 
         return ((uint)s[0] << 24)
              | ((uint)s[1] << 16)

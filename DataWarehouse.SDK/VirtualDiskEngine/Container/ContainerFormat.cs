@@ -62,9 +62,10 @@ public static class ContainerFormat
             throw new ArgumentException($"Container is too small: {totalBlocks} blocks is insufficient for the required metadata regions.");
         }
 
-        // Recompute bitmap and checksum table based on actual data block count
-        bitmapBlockCount = ComputeBitmapBlockCount(actualDataBlocks, blockSize);
-        long checksumBlockCount = (actualDataBlocks * 8 + blockSize - 1) / blockSize;
+        // Use the originally-reserved region sizes (based on estimated data blocks) to avoid
+        // region overlap: recomputing based on actualDataBlocks could produce larger counts
+        // than the space that was reserved for them above.
+        long checksumBlockCount = estimatedChecksumBlocks;
 
         return new ContainerLayout
         {

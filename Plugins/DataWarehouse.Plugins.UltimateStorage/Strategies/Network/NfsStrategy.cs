@@ -47,7 +47,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         private int _writeSizeKb = 32;
         private bool _autoMount = true;
         private bool _useAdvisoryLocks = true;
-        private bool _isMounted = false;
+        private volatile bool _isMounted = false;
         private bool _isWindowsNfsClient = false;
         private string? _kerberosRealm = null;
         private string? _kerberosPrincipal = null;
@@ -157,6 +157,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             // Normalize paths
             _exportPath = NormalizePath(_exportPath, isExportPath: true);
             _basePath = NormalizePath(_basePath, isExportPath: false);
+
+            // Validate server address and export path to prevent shell injection via concatenated mount command strings.
+            // Values must not contain shell metacharacters: ;, &, |, $, `, (, ), <, >, newline, null
+            ValidateNoShellMetachars(_serverAddress, "ServerAddress");
+            ValidateNoShellMetachars(_exportPath, "ExportPath");
+            ValidateNoShellMetachars(_mountPoint, "MountPoint");
+
+            if (string.IsNullOrWhiteSpace(_mountPoint))
+                throw new InvalidOperationException("MountPoint must not be empty after normalization.");
 
             // Mount the NFS share if auto-mount is enabled
             if (_autoMount)
@@ -931,6 +940,22 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             }
 
             return path;
+        }
+
+        /// <summary>
+        /// Validates that a configuration value contains no shell metacharacters that could
+        /// enable command injection when the value is included in an OS mount command.
+        /// </summary>
+        private static void ValidateNoShellMetachars(string value, string paramName)
+        {
+            // Characters that can break out of argument context when joined with string.Join(" ") and passed as Arguments
+            ReadOnlySpan<char> forbidden = [';', '&', '|', '$', '`', '(', ')', '<', '>', '\n', '\r', '\0', '"', '\''];
+            foreach (var ch in forbidden)
+            {
+                if (value.Contains(ch))
+                    throw new ArgumentException(
+                        $"NfsStrategy: '{paramName}' contains the shell metacharacter '{ch}' which is not allowed.", paramName);
+            }
         }
 
         /// <summary>

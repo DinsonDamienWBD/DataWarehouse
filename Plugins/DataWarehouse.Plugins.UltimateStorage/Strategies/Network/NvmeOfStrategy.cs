@@ -69,8 +69,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         private string _discoveryServiceAddress = string.Empty;
         private int _discoveryServicePort = 8009;
 
-        // State tracking
-        private bool _isConnected = false;
+        // State tracking — volatile so reads/writes are visible across threads without lock
+        private volatile bool _isConnected = false;
         private DateTime _lastKeepAlive = DateTime.MinValue;
         private readonly ConcurrentDictionary<string, BlockDeviceMapping> _blockMappings = new();
         private CancellationTokenSource? _keepAliveCts;
@@ -80,6 +80,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         public override string StrategyId => "nvmeof";
         public override string Name => "NVMe over Fabrics Storage";
         public override StorageTier Tier => StorageTier.Hot;
+        /// <summary>
+        /// Returns false: data path uses HTTP REST simulation, not real NVMe-oF fabric protocol.
+        /// Requires nvme-fabrics kernel driver (Linux) or Windows NVMe-oF host driver with P/Invoke.
+        /// </summary>
+        public override bool IsProductionReady => false;
 
         public override StorageCapabilities Capabilities => new StorageCapabilities
         {
@@ -112,7 +117,19 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         /// </summary>
         /// <param name="ct">Cancellation token.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
-        protected override async Task InitializeCoreAsync(CancellationToken ct)
+        protected override Task InitializeCoreAsync(CancellationToken ct)
+        {
+            // NVMe-oF requires a kernel driver (nvme-fabrics) and low-level block I/O.
+            // Simulating NVMe-oF block commands over a REST management API does not provide
+            // the latency characteristics, queue depth, or protocol semantics of a real
+            // NVMe-oF fabric. This implementation cannot replace a proper kernel-driver integration.
+            throw new NotSupportedException(
+                "Requires NVMe-oF kernel driver (nvme-fabrics module on Linux, or NVMe-oF host driver on Windows). " +
+                "Implement using nvme-cli subprocess invocation, P/Invoke to the OS NVMe driver IOCTLs, " +
+                "or a managed NVMe-oF library. REST-based simulation does not provide NVMe-oF semantics.");
+        }
+
+        private async Task InitializeCoreAsyncImpl(CancellationToken ct)
         {
             // Load required configuration
             _targetAddress = GetConfiguration<string>("TargetAddress", string.Empty);
@@ -227,7 +244,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     Encoding.UTF8,
                     "application/json");
 
-                var response = await _httpClient.PostAsync(
+                using var response = await _httpClient.PostAsync(
                     $"{_managementApiUrl}/nvme/connect",
                     jsonContent,
                     ct);
@@ -286,7 +303,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
 
                 try
                 {
-                    var response = await _httpClient.PostAsync(
+                    using var response = await _httpClient.PostAsync(
                         $"{_managementApiUrl}/nvme/disconnect",
                         jsonContent,
                         ct);
@@ -345,7 +362,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                         Encoding.UTF8,
                         "application/json");
 
-                    var response = await _httpClient.PostAsync(
+                    using var response = await _httpClient.PostAsync(
                         $"{_managementApiUrl}/nvme/keepalive",
                         jsonContent,
                         ct);
@@ -402,7 +419,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     Encoding.UTF8,
                     "application/json");
 
-                var response = await _httpClient.PostAsync(
+                using var response = await _httpClient.PostAsync(
                     $"{_managementApiUrl}/nvme/discover",
                     jsonContent,
                     ct);
@@ -678,7 +695,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     Encoding.UTF8,
                     "application/json");
 
-                var response = await _httpClient.PostAsync(
+                using var response = await _httpClient.PostAsync(
                     $"{_managementApiUrl}/nvme/health",
                     jsonContent,
                     ct);
@@ -748,7 +765,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     Encoding.UTF8,
                     "application/json");
 
-                var response = await _httpClient.PostAsync(
+                using var response = await _httpClient.PostAsync(
                     $"{_managementApiUrl}/nvme/capacity",
                     jsonContent,
                     ct);
@@ -813,7 +830,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await _httpClient.PostAsync(
+            using var response = await _httpClient.PostAsync(
                 $"{_managementApiUrl}/nvme/write",
                 jsonContent,
                 ct);
@@ -855,7 +872,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await _httpClient.PostAsync(
+            using var response = await _httpClient.PostAsync(
                 $"{_managementApiUrl}/nvme/read",
                 jsonContent,
                 ct);
@@ -939,8 +956,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[NvmeOfStrategy.SaveBlockMappingsAsync] {ex.GetType().Name}: {ex.Message}");
-                // Ignore metadata save errors
+                // Block mapping persistence failure means in-memory state diverges from disk — rethrow so caller knows
+                System.Diagnostics.Debug.WriteLine($"[NvmeOfStrategy.SaveBlockMappingsAsync] FATAL: Failed to persist block mappings: {ex}");
+                throw;
             }
         }
 

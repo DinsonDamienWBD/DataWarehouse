@@ -44,6 +44,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
         private bool _verifyAfterStore = true;
         private readonly Dictionary<string, string> _keyToReferenceMap = new();
         private readonly object _mapLock = new();
+        private string? _localIndexPath;
         private string? _feedTopic;
         private string? _feedOwner;
         private bool _useSingleOwnerChunks = false;
@@ -91,6 +92,32 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             _feedTopic = GetConfiguration<string?>("FeedTopic", null);
             _feedOwner = GetConfiguration<string?>("FeedOwner", null);
             _useSingleOwnerChunks = GetConfiguration<bool>("UseSingleOwnerChunks", false);
+            _localIndexPath = GetConfiguration<string?>("LocalIndexPath", null);
+
+            // Load persisted key→reference map from disk to survive restarts
+            if (!string.IsNullOrEmpty(_localIndexPath))
+            {
+                try
+                {
+                    if (File.Exists(_localIndexPath))
+                    {
+                        var json = await File.ReadAllTextAsync(_localIndexPath, ct);
+                        var loaded = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+                        if (loaded != null)
+                        {
+                            lock (_mapLock)
+                            {
+                                foreach (var kvp in loaded)
+                                    _keyToReferenceMap[kvp.Key] = kvp.Value;
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[SwarmStrategy] Failed to load local index from '{_localIndexPath}': {ex.GetType().Name}: {ex.Message}");
+                }
+            }
 
             // Validate configuration
             if (string.IsNullOrWhiteSpace(_beeApiUrl))
@@ -135,8 +162,29 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
 
         protected override async ValueTask DisposeCoreAsync()
         {
+            // Flush the in-memory index to disk before closing.
+            await PersistLocalIndexAsync(CancellationToken.None);
             await base.DisposeCoreAsync();
             _httpClient?.Dispose();
+        }
+
+        /// <summary>Persists the key→reference map to LocalIndexPath if configured.</summary>
+        private async Task PersistLocalIndexAsync(CancellationToken ct)
+        {
+            if (string.IsNullOrEmpty(_localIndexPath)) return;
+            try
+            {
+                Dictionary<string, string> snapshot;
+                lock (_mapLock) { snapshot = new Dictionary<string, string>(_keyToReferenceMap); }
+                var json = JsonSerializer.Serialize(snapshot);
+                var dir = Path.GetDirectoryName(_localIndexPath);
+                if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                await File.WriteAllTextAsync(_localIndexPath, json, ct);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[SwarmStrategy] Failed to persist local index to '{_localIndexPath}': {ex.GetType().Name}: {ex.Message}");
+            }
         }
 
         #endregion
@@ -238,6 +286,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 throw new IOException($"Failed to store object '{key}' to Swarm: {ex.Message}", ex);
             }
 
+            // Persist the updated index so the mapping survives restarts.
+            await PersistLocalIndexAsync(ct);
+
             // Update statistics
             IncrementBytesStored(dataSize);
             IncrementOperationCounter(StorageOperationType.Store);
@@ -337,6 +388,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             {
                 _keyToReferenceMap.Remove(key);
             }
+
+            // Persist the updated index so the deletion survives restarts.
+            await PersistLocalIndexAsync(ct);
 
             // Update statistics
             IncrementBytesDeleted(size);
@@ -509,7 +563,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             response.EnsureSuccessStatusCode();
 
             var responseBody = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(responseBody);
+            using var jsonDoc = JsonDocument.Parse(responseBody);
             var reference = jsonDoc.RootElement.GetProperty("reference").GetString();
 
             return reference ?? throw new InvalidOperationException("Failed to get reference from Swarm upload response");
@@ -578,7 +632,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             response.EnsureSuccessStatusCode();
 
             var responseBody = await response.Content.ReadAsStringAsync(ct);
-            var jsonDoc = JsonDocument.Parse(responseBody);
+            using var jsonDoc = JsonDocument.Parse(responseBody);
             var uid = jsonDoc.RootElement.GetProperty("uid").GetInt32();
 
             return uid.ToString();
@@ -602,7 +656,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 }
 
                 var responseBody = await response.Content.ReadAsStringAsync(ct);
-                var jsonDoc = JsonDocument.Parse(responseBody);
+                using var jsonDoc = JsonDocument.Parse(responseBody);
 
                 var total = jsonDoc.RootElement.GetProperty("total").GetInt32();
                 var synced = jsonDoc.RootElement.GetProperty("synced").GetInt32();
@@ -650,7 +704,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 }
 
                 var responseBody = await response.Content.ReadAsStringAsync(ct);
-                var jsonDoc = JsonDocument.Parse(responseBody);
+                using var jsonDoc = JsonDocument.Parse(responseBody);
                 var reference = jsonDoc.RootElement.GetProperty("reference").GetString();
 
                 return reference;
@@ -663,19 +717,18 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
         }
 
         /// <summary>
-        /// Computes a feed topic from a key using fast non-crypto hashing.
-        /// AD-11: Cryptographic hashing delegated to UltimateDataIntegrity via bus.
-        /// Feed topics only need deterministic distribution, not security.
+        /// Computes a deterministic 64-bit hex feed topic from a key.
+        /// Uses the first 8 bytes of SHA-256 to avoid the 32-bit birthday collision
+        /// that occurs with HashCode.Combine (~65K keys).  SHA-256 truncated to 64 bits
+        /// has negligible collision probability at any realistic key count.
         /// </summary>
         private string ComputeFeedTopic(string key)
         {
-            if (!string.IsNullOrEmpty(_feedTopic))
-            {
-                var combined = $"{_feedTopic}/{key}";
-                return HashCode.Combine(combined).ToString("x16").PadLeft(16, '0');
-            }
-
-            return HashCode.Combine(key).ToString("x16").PadLeft(16, '0');
+            var input = !string.IsNullOrEmpty(_feedTopic) ? $"{_feedTopic}/{key}" : key;
+            var hashBytes = System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(input));
+            // Use first 8 bytes for a 64-bit identifier.
+            return Convert.ToHexString(hashBytes, 0, 8).ToLowerInvariant();
         }
 
         /// <summary>
@@ -696,7 +749,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 if (response.IsSuccessStatusCode)
                 {
                     var responseBody = await response.Content.ReadAsStringAsync(ct);
-                    var jsonDoc = JsonDocument.Parse(responseBody);
+                    using var jsonDoc = JsonDocument.Parse(responseBody);
 
                     if (jsonDoc.RootElement.TryGetProperty("stamps", out var stamps) && stamps.GetArrayLength() > 0)
                     {
@@ -733,7 +786,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 if (response.IsSuccessStatusCode)
                 {
                     var responseBody = await response.Content.ReadAsStringAsync(ct);
-                    var jsonDoc = JsonDocument.Parse(responseBody);
+                    using var jsonDoc = JsonDocument.Parse(responseBody);
                     var status = jsonDoc.RootElement.GetProperty("status").GetString();
 
                     return new StorageHealthInfo

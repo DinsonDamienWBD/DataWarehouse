@@ -468,7 +468,18 @@ public class RecoveryService
             }
         }
 
-        // Compute parity shards
+        // Compute parity shards via XOR (RAID-5 equivalent, single-failure tolerance).
+        // Finding 1025: multiple identical XOR parity shards provide no additional protection.
+        // Reed-Solomon is required for RAID-6+ multi-failure recovery.
+        if (parityShardCount > 1)
+        {
+            _logger.LogWarning(
+                "Recovery is computing {ParityShardCount} XOR parity shards, but XOR only provides " +
+                "single-failure tolerance. All parity shards will be identical. " +
+                "Reed-Solomon is required for genuine RAID-6+ protection.",
+                parityShardCount);
+        }
+
         for (int i = 0; i < parityShardCount; i++)
         {
             var parityShard = new byte[shardSize];
@@ -648,10 +659,14 @@ public class RecoveryService
             // Fall back to WORM recovery
             _logger.LogDebug("Using WORM recovery for corrupted shards");
 
+            // Compute the expected hash from the manifest and pass a distinct "unknown corruption"
+            // marker as the actual hash so the incident record correctly shows a mismatch (finding 1035).
+            // We cannot know the exact corrupted hash at this point; using the expected value
+            // as both arguments would hide the corruption from auditors.
             var expectedIntegrityHash = IntegrityHash.Create(manifest.HashAlgorithm, manifest.FinalContentHash);
-            var placeholderHash = expectedIntegrityHash; // Placeholder for actual corrupted hash
+            var unknownActualHash = IntegrityHash.Create(manifest.HashAlgorithm, "<corrupted-unknown>");
 
-            return await RecoverFromWormAsync(manifest, expectedIntegrityHash, placeholderHash, corruptedShardIndices, ct);
+            return await RecoverFromWormAsync(manifest, expectedIntegrityHash, unknownActualHash, corruptedShardIndices, ct);
         }
         catch (Exception ex)
         {

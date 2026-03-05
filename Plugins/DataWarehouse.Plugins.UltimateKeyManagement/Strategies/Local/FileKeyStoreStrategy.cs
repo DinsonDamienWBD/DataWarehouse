@@ -176,6 +176,27 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Local
             var keyPath = GetKeyPath(keyId);
             if (File.Exists(keyPath))
             {
+                // #3544: Overwrite with zeros before deletion to minimize data remanence on disk.
+                try
+                {
+                    var size = new FileInfo(keyPath).Length;
+                    if (size > 0)
+                    {
+                        await using var fs = new FileStream(keyPath, FileMode.Open, FileAccess.Write, FileShare.None);
+                        var zeros = new byte[Math.Min(size, 4096)];
+                        long remaining = size;
+                        while (remaining > 0)
+                        {
+                            var toWrite = (int)Math.Min(remaining, zeros.Length);
+                            await fs.WriteAsync(zeros.AsMemory(0, toWrite), cancellationToken);
+                            remaining -= toWrite;
+                        }
+                    }
+                }
+                catch
+                {
+                    // Best-effort zero-wipe; still proceed with deletion.
+                }
                 File.Delete(keyPath);
             }
 
@@ -215,7 +236,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Local
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 tiers.Add(new DpapiTier(_config));
-                tiers.Add(new CredentialManagerTier(_config));
+                tiers.Add(new MasterKeyDerivedTier(_config));
             }
 
             tiers.Add(new DatabaseTier(_config));
@@ -320,47 +341,65 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Local
 
         private byte[] DeriveMachineKey()
         {
-            // Derive a machine-specific key using multiple entropy sources
-            var entropyParts = new List<string>
-            {
-                Environment.MachineName,
-                Environment.UserName,
-                Environment.OSVersion.ToString(),
-                _config.DpapiEntropy ?? "DataWarehouse.KeyStore.MachineKey.v1"
-            };
+            // #3522: Use a stable persisted random salt rather than volatile machine attributes.
+            // MachineName/UserName/OSVersion can change, making the key unrecoverable.
+            // On first run: generate 32-byte random salt and persist it.
+            // On subsequent runs: load the persisted salt.
+            var salt = LoadOrCreateMachineSalt();
 
-            // Add hardware info if available
-            try
-            {
-                entropyParts.Add(Environment.ProcessorCount.ToString());
-                entropyParts.Add(Environment.SystemDirectory);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Trace.TraceWarning($"Failed to collect hardware entropy for key derivation: {ex.Message}");
-            }
-
-            var combinedEntropy = string.Join("|", entropyParts);
-            var entropyBytes = Encoding.UTF8.GetBytes(combinedEntropy);
-
-            // Use PBKDF2 to derive a strong key
-            return Rfc2898DeriveBytes.Pbkdf2(
-                entropyBytes,
-                SHA256.HashData(Encoding.UTF8.GetBytes("DataWarehouse.DPAPI.Salt.v1")),
-                100000,
+            // Use HKDF with the stable salt for deterministic key derivation.
+            // The context string prevents cross-purpose key reuse.
+            return HKDF.DeriveKey(
                 HashAlgorithmName.SHA256,
-                32); // 256-bit key
+                salt,
+                32,
+                salt: null,
+                info: Encoding.UTF8.GetBytes(_config.DpapiEntropy ?? "DataWarehouse.KeyStore.MachineKey.v1"));
+        }
+
+        private byte[] LoadOrCreateMachineSalt()
+        {
+            var saltPath = GetMachineSaltPath();
+            var saltDir = Path.GetDirectoryName(saltPath);
+            if (!string.IsNullOrEmpty(saltDir) && !Directory.Exists(saltDir))
+                Directory.CreateDirectory(saltDir);
+
+            if (File.Exists(saltPath))
+            {
+                var existing = File.ReadAllBytes(saltPath);
+                if (existing.Length == 32)
+                    return existing;
+            }
+
+            // Generate and persist a new stable random salt
+            var newSalt = new byte[32];
+            RandomNumberGenerator.Fill(newSalt);
+            File.WriteAllBytes(saltPath, newSalt);
+            return newSalt;
+        }
+
+        private string GetMachineSaltPath()
+        {
+            var storePath = _config.KeyStorePath;
+            if (string.IsNullOrEmpty(storePath))
+            {
+                var baseDir = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                storePath = Path.Combine(baseDir, "DataWarehouse", "KeyStore");
+            }
+            return Path.Combine(storePath, ".machine-salt");
         }
     }
 
-    internal class CredentialManagerTier : IKeyProtectionTier
+    internal class MasterKeyDerivedTier : IKeyProtectionTier
     {
         private readonly FileKeyStoreConfig _config;
 
-        public string Name => "CredentialManager";
+        // #3543: Renamed from CredentialManagerTier — this tier uses PBKDF2 key derivation,
+        // not the Windows Credential Manager API. Name updated to reflect actual behaviour.
+        public string Name => "MasterKeyDerived";
         public bool IsAvailable => RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
 
-        public CredentialManagerTier(FileKeyStoreConfig config)
+        public MasterKeyDerivedTier(FileKeyStoreConfig config)
         {
             _config = config;
         }

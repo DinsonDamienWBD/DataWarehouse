@@ -85,9 +85,18 @@ public sealed class BaremetalBootstrap
     /// existing pools from reserved sectors, recovers interrupted journal operations,
     /// and classifies unpooled devices.
     /// </summary>
+    /// <param name="physicalDevices">
+    /// Optional list of pre-opened <see cref="IPhysicalBlockDevice"/> handles corresponding to the
+    /// discovered devices. When provided, these are passed directly to
+    /// <see cref="DevicePoolManager.ScanForPoolsAsync"/> so block 0 metadata can be read and pools
+    /// restored. When null or empty the pool scan is skipped (no pools can be recovered from disk).
+    /// Callers should provide handles for every discovered device; unmatched devices remain unpooled.
+    /// </param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>A <see cref="BootstrapResult"/> with restored pools, unpooled devices, and recovered intents.</returns>
-    public async Task<BootstrapResult> BootstrapFromRawDevicesAsync(CancellationToken ct = default)
+    public async Task<BootstrapResult> BootstrapFromRawDevicesAsync(
+        IReadOnlyList<IPhysicalBlockDevice>? physicalDevices = null,
+        CancellationToken ct = default)
     {
         var warnings = new List<string>();
         var recoveredIntents = new List<JournalEntry>();
@@ -128,19 +137,32 @@ public sealed class BaremetalBootstrap
             }
         }
 
-        // Step 3: Scan pools from reserved sectors
-        // Note: ScanForPoolsAsync requires IPhysicalBlockDevice instances, but we only have
-        // PhysicalDeviceInfo at this stage. In a full implementation, the discovery service
-        // would return IPhysicalBlockDevice or we'd create adapters. For now, scan with
-        // an empty list and reconstruct from discovered device metadata.
+        // Step 3: Scan pools from reserved sectors.
+        // P2-2973: Pass caller-provided IPhysicalBlockDevice handles so ScanForPoolsAsync can
+        // read block 0 metadata and restore pools. When no handles are provided, skip the scan
+        // and report a warning so the caller knows pool restoration did not occur.
         IReadOnlyList<DevicePoolDescriptor> restoredPools;
         try
         {
-            restoredPools = await _poolManager.ScanForPoolsAsync(
-                Array.Empty<IPhysicalBlockDevice>(), ct).ConfigureAwait(false);
+            var devicesToScan = physicalDevices is { Count: > 0 }
+                ? physicalDevices
+                : Array.Empty<IPhysicalBlockDevice>();
 
-            _logger.LogInformation("Bare-metal bootstrap: restored {Count} pools from reserved sectors.",
-                restoredPools.Count);
+            if (devicesToScan.Count == 0)
+            {
+                warnings.Add(
+                    "No IPhysicalBlockDevice handles were supplied; pool metadata scan skipped. " +
+                    "Pass physicalDevices to BootstrapFromRawDevicesAsync to restore existing pools.");
+                _logger.LogWarning(
+                    "Bare-metal bootstrap: pool scan skipped — no IPhysicalBlockDevice handles provided.");
+                restoredPools = Array.Empty<DevicePoolDescriptor>();
+            }
+            else
+            {
+                restoredPools = await _poolManager.ScanForPoolsAsync(devicesToScan, ct).ConfigureAwait(false);
+                _logger.LogInformation("Bare-metal bootstrap: restored {Count} pools from reserved sectors.",
+                    restoredPools.Count);
+            }
         }
         catch (Exception ex)
         {
@@ -257,7 +279,9 @@ public sealed class BaremetalBootstrap
                 }
                 catch
                 {
+
                     // Best-effort rollback
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
 
@@ -277,16 +301,16 @@ public sealed class BaremetalBootstrap
             }
         }
 
-        // Initialize journal areas on all devices (write empty journal area)
+        // Initialize journal areas on all devices (write empty/zero journal area to blocks 1-8)
         foreach (var device in devices)
         {
             ct.ThrowIfCancellationRequested();
 
             try
             {
-                // Journal area is blocks 1-8 on 4K devices, already zero-initialized
-                // by the pool creation metadata write. This step ensures the journal
-                // area exists and is valid.
+                // Journal area occupies blocks 1-8 (reserved after block 0 which holds pool metadata).
+                // Write zero-initialized journal header to mark the area as initialized.
+                await _journal.InitializeJournalAreaAsync(device, ct).ConfigureAwait(false);
                 _logger.LogDebug("Bare-metal bootstrap: journal area initialized on device {DeviceId}.",
                     device.DeviceInfo.DeviceId);
             }

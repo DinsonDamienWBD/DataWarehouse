@@ -23,7 +23,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.ISO
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("iso27017.check");
+            IncrementCounter("iso27017.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -72,7 +72,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.ISO
             }
 
             // Check cloud data portability (CLD.8.1.4)
-            if (context.OperationType.Equals("export", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("export", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("DataPortabilitySupported", out var portabilityObj) || portabilityObj is not true)
                 {
@@ -102,9 +102,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.ISO
 
             recommendations.Add("Review cloud service provider's ISO 27017 compliance status and audit reports");
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -120,14 +121,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.ISO
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("iso27017.initialized");
+            IncrementCounter("iso27017.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("iso27017.shutdown");
+            IncrementCounter("iso27017.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

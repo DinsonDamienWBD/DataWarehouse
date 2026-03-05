@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -268,8 +269,31 @@ public sealed class Raid10Strategy : SdkRaidStrategyBase
         return (group, new byte[length]); // All mirrors failed
     }
 
-    private Task WriteToDiskAsync(DiskInfo disk, byte[] data, long offset, CancellationToken ct) => Task.CompletedTask;
-    private Task<byte[]> ReadFromDiskAsync(DiskInfo disk, long offset, int length, CancellationToken ct) => Task.FromResult(new byte[length]);
+    private async Task WriteToDiskAsync(DiskInfo disk, byte[] data, long offset, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(disk.Location))
+            throw new InvalidOperationException($"Disk {disk.DiskId} has no device path configured");
+        using var fs = new FileStream(disk.Location, FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read, 65536, useAsync: true);
+        fs.Seek(offset, SeekOrigin.Begin);
+        await fs.WriteAsync(data, ct);
+        await fs.FlushAsync(ct);
+    }
+
+    private async Task<byte[]> ReadFromDiskAsync(DiskInfo disk, long offset, int length, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(disk.Location))
+            throw new InvalidOperationException($"Disk {disk.DiskId} has no device path configured");
+        if (!File.Exists(disk.Location))
+            throw new FileNotFoundException($"Disk device not found: {disk.Location}", disk.Location);
+        using var fs = new FileStream(disk.Location, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 65536, useAsync: true);
+        if (offset + length > fs.Length) length = (int)Math.Max(0, fs.Length - offset);
+        fs.Seek(offset, SeekOrigin.Begin);
+        var buffer = new byte[length];
+        int totalRead = 0;
+        while (totalRead < length) { var read = await fs.ReadAsync(buffer.AsMemory(totalRead, length - totalRead), ct); if (read == 0) break; totalRead += read; }
+        if (totalRead < length) { var trimmed = new byte[totalRead]; Array.Copy(buffer, trimmed, totalRead); return trimmed; }
+        return buffer;
+    }
 }
 
 /// <summary>Tracks the state of an active RAID rebuild.</summary>
@@ -332,6 +356,8 @@ public sealed class Raid50Strategy : SdkRaidStrategyBase
 
     public override StripeInfo CalculateStripe(long blockIndex, int diskCount)
     {
+        if (diskCount <= 0)
+            throw new ArgumentException("Disk count must be > 0.", nameof(diskCount));
         if (diskCount % _disksPerRaid5Group != 0)
             throw new ArgumentException($"Disk count must be a multiple of {_disksPerRaid5Group} for RAID 50");
 
@@ -578,8 +604,31 @@ public sealed class Raid50Strategy : SdkRaidStrategyBase
         return parity;
     }
 
-    private Task WriteToDiskAsync(DiskInfo disk, byte[] data, long offset, CancellationToken ct) => Task.CompletedTask;
-    private Task<byte[]> ReadFromDiskAsync(DiskInfo disk, long offset, int length, CancellationToken ct) => Task.FromResult(new byte[length]);
+    private async Task WriteToDiskAsync(DiskInfo disk, byte[] data, long offset, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(disk.Location))
+            throw new InvalidOperationException($"Disk {disk.DiskId} has no device path configured");
+        using var fs = new FileStream(disk.Location, FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read, 65536, useAsync: true);
+        fs.Seek(offset, SeekOrigin.Begin);
+        await fs.WriteAsync(data, ct);
+        await fs.FlushAsync(ct);
+    }
+
+    private async Task<byte[]> ReadFromDiskAsync(DiskInfo disk, long offset, int length, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(disk.Location))
+            throw new InvalidOperationException($"Disk {disk.DiskId} has no device path configured");
+        if (!File.Exists(disk.Location))
+            throw new FileNotFoundException($"Disk device not found: {disk.Location}", disk.Location);
+        using var fs = new FileStream(disk.Location, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 65536, useAsync: true);
+        if (offset + length > fs.Length) length = (int)Math.Max(0, fs.Length - offset);
+        fs.Seek(offset, SeekOrigin.Begin);
+        var buffer = new byte[length];
+        int totalRead = 0;
+        while (totalRead < length) { var read = await fs.ReadAsync(buffer.AsMemory(totalRead, length - totalRead), ct); if (read == 0) break; totalRead += read; }
+        if (totalRead < length) { var trimmed = new byte[totalRead]; Array.Copy(buffer, trimmed, totalRead); return trimmed; }
+        return buffer;
+    }
 }
 
 #endregion
@@ -631,6 +680,8 @@ public sealed class Raid60Strategy : SdkRaidStrategyBase
 
     public override StripeInfo CalculateStripe(long blockIndex, int diskCount)
     {
+        if (diskCount <= 0)
+            throw new ArgumentException("Disk count must be > 0.", nameof(diskCount));
         if (diskCount % _disksPerRaid6Group != 0)
             throw new ArgumentException($"Disk count must be a multiple of {_disksPerRaid6Group} for RAID 60");
 
@@ -731,11 +782,13 @@ public sealed class Raid60Strategy : SdkRaidStrategyBase
         var bytesPerGroup = length / groupCount;
         if (bytesPerGroup == 0) bytesPerGroup = length;
 
+        // P2-3685: Actually read from disk groups rather than returning zeroed buffers.
         var readTasks = new List<Task<(int group, byte[] data)>>();
         for (int g = 0; g < groupCount; g++)
         {
             var gIdx = g;
-            readTasks.Add(Task.FromResult((gIdx, new byte[Math.Min(bytesPerGroup, length - gIdx * bytesPerGroup)])));
+            var readLen = Math.Min(bytesPerGroup, length - gIdx * bytesPerGroup);
+            readTasks.Add(ReadFromRaid6GroupAsync(diskList, gIdx, offset, readLen, cancellationToken));
         }
 
         var groupResults = await Task.WhenAll(readTasks);
@@ -886,8 +939,88 @@ public sealed class Raid60Strategy : SdkRaidStrategyBase
         return result;
     }
 
-    private Task WriteToDiskAsync(DiskInfo disk, byte[] data, long offset, CancellationToken ct) => Task.CompletedTask;
-    private Task<byte[]> ReadFromDiskAsync(DiskInfo disk, long offset, int length, CancellationToken ct) => Task.FromResult(new byte[length]);
+    private async Task WriteToDiskAsync(DiskInfo disk, byte[] data, long offset, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(disk.Location))
+            throw new InvalidOperationException($"Disk {disk.DiskId} has no device path configured");
+        using var fs = new FileStream(disk.Location, FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read, 65536, useAsync: true);
+        fs.Seek(offset, SeekOrigin.Begin);
+        await fs.WriteAsync(data, ct);
+        await fs.FlushAsync(ct);
+    }
+
+    // P2-3685: Read data-chunks from a RAID 6 group at the given offset.
+    // On single failure reconstruct from remaining data + P parity (XOR).
+    private async Task<(int group, byte[] data)> ReadFromRaid6GroupAsync(
+        List<DiskInfo> disks, int group, long offset, int length, CancellationToken ct)
+    {
+        var groupOffset = group * _disksPerRaid6Group;
+        var blockIndex = offset / _chunkSize;
+        var pDisk = (int)((blockIndex + group) % _disksPerRaid6Group);
+        var qDisk = (int)((blockIndex + group + 1) % _disksPerRaid6Group);
+        if (qDisk == pDisk) qDisk = (qDisk + 1) % _disksPerRaid6Group;
+
+        var chunks = new byte[_disksPerRaid6Group][];
+        var failed = new List<int>();
+
+        for (int i = 0; i < _disksPerRaid6Group; i++)
+        {
+            var diskIndex = groupOffset + i;
+            if (i == pDisk || i == qDisk || diskIndex >= disks.Count ||
+                disks[diskIndex].HealthStatus != SdkDiskHealthStatus.Healthy)
+            {
+                if (i != pDisk && i != qDisk) failed.Add(i);
+                chunks[i] = new byte[_chunkSize];
+            }
+            else
+            {
+                try { chunks[i] = await ReadFromDiskAsync(disks[diskIndex], offset, _chunkSize, ct); }
+                catch { failed.Add(i); chunks[i] = new byte[_chunkSize]; }
+            }
+        }
+
+        // Single-failure reconstruction: XOR all data chunks + P parity
+        var parityDiskIdx = groupOffset + pDisk;
+        if (failed.Count == 1 && parityDiskIdx < disks.Count &&
+            disks[parityDiskIdx].HealthStatus == SdkDiskHealthStatus.Healthy)
+        {
+            var pData = await ReadFromDiskAsync(disks[parityDiskIdx], offset, _chunkSize, ct);
+            var reconstructed = pData.ToArray();
+            for (int i = 0; i < _disksPerRaid6Group; i++)
+                if (i != pDisk && i != qDisk && i != failed[0])
+                    for (int j = 0; j < _chunkSize && j < chunks[i].Length; j++)
+                        reconstructed[j] ^= chunks[i][j];
+            chunks[failed[0]] = reconstructed;
+        }
+
+        // Concatenate data chunks (skip parity disks)
+        var result = new byte[length];
+        var pos = 0;
+        for (int i = 0; i < _disksPerRaid6Group && pos < length; i++)
+        {
+            if (i == pDisk || i == qDisk) continue;
+            var take = Math.Min(_chunkSize, length - pos);
+            Array.Copy(chunks[i], 0, result, pos, Math.Min(take, chunks[i].Length));
+            pos += take;
+        }
+        return (group, result);
+    }
+
+    private async Task<byte[]> ReadFromDiskAsync(DiskInfo disk, long offset, int length, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(disk.Location))
+            throw new InvalidOperationException($"Disk {disk.DiskId} has no device path configured");
+        if (!File.Exists(disk.Location))
+            throw new FileNotFoundException($"Disk device not found: {disk.Location}", disk.Location);
+        using var fs = new FileStream(disk.Location, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 65536, useAsync: true);
+        if (offset + length > fs.Length) length = (int)Math.Max(0, fs.Length - offset);
+        fs.Seek(offset, SeekOrigin.Begin);
+        var buffer = new byte[length];
+        int totalRead = 0;
+        while (totalRead < length) { var read = await fs.ReadAsync(buffer.AsMemory(totalRead, length - totalRead), ct); if (read == 0) break; totalRead += read; }
+        if (totalRead < length) { var trimmed = new byte[totalRead]; Array.Copy(buffer, trimmed, totalRead); return trimmed; }
+        return buffer;
+    }
 }
 
 /// <summary>Rebuild priority levels.</summary>

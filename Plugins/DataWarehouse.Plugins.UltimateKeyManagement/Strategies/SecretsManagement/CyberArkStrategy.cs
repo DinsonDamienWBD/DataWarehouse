@@ -114,7 +114,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
         {
             var secretPath = $"{_config.PolicyPath}/{keyId}";
             var request = CreateRequest(HttpMethod.Get, $"/secrets/{_config.Account}/variable/{Uri.EscapeDataString(secretPath)}");
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var keyBase64 = await response.Content.ReadAsStringAsync();
@@ -129,7 +129,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             var request = CreateRequest(HttpMethod.Post, $"/secrets/{_config.Account}/variable/{Uri.EscapeDataString(secretPath)}");
             request.Content = new StringContent(keyBase64, Encoding.UTF8, "application/octet-stream");
 
-            var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             _currentKeyId = keyId;
@@ -142,7 +142,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             try
             {
                 var request = CreateRequest(HttpMethod.Get, $"/resources/{_config.Account}/variable?search={Uri.EscapeDataString(_config.PolicyPath)}");
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                     return Array.Empty<string>();
@@ -188,7 +188,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             var resourceId = $"{_config.Account}:variable:{secretPath}";
 
             var request = CreateRequest(HttpMethod.Delete, $"/resources/{_config.Account}/{Uri.EscapeDataString(resourceId)}");
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
         }
 
@@ -202,7 +202,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
                 var resourceId = $"{_config.Account}:variable:{secretPath}";
 
                 var request = CreateRequest(HttpMethod.Get, $"/resources/{_config.Account}/{Uri.EscapeDataString(resourceId)}");
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                     return null;
@@ -251,7 +251,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
                 $"{_config.ApplianceUrl}/authn/{_config.Account}/{Uri.EscapeDataString(_config.Username)}/authenticate");
             request.Content = new StringContent(_config.ApiKey, Encoding.UTF8, "text/plain");
 
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             _authToken = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -262,7 +262,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             try
             {
                 var request = new HttpRequestMessage(HttpMethod.Get, $"{_config.ApplianceUrl}/health");
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
                 return response.IsSuccessStatusCode;
             }
             catch

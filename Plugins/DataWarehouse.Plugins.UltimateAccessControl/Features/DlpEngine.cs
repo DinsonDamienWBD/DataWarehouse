@@ -2,6 +2,8 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -59,6 +61,11 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
 
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
+
+            // Guard against unbounded inputs causing blocking regex on huge payloads (finding #1116)
+            const int MaxDlpScanBytes = 100 * 1024 * 1024; // 100 MB
+            if (content.Length > MaxDlpScanBytes)
+                throw new ArgumentException($"Content length {content.Length} bytes exceeds DLP scan limit of {MaxDlpScanBytes} bytes. Split input before scanning.", nameof(content));
 
             var violations = new List<DlpRuleViolation>();
             var applicablePolicies = _policies.Values
@@ -198,16 +205,9 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
 
         private string ComputeSimpleHash(string content)
         {
-            // Simple non-cryptographic hash for content matching
-            unchecked
-            {
-                int hash = 17;
-                foreach (char c in content)
-                {
-                    hash = hash * 31 + c;
-                }
-                return hash.ToString("X8");
-            }
+            // Use SHA-256 for reliable, collision-resistant content fingerprinting
+            var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(content));
+            return Convert.ToHexString(hashBytes);
         }
 
         /// <summary>

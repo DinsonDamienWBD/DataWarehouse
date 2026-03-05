@@ -57,6 +57,13 @@ public interface IBlockAllocator
     double FragmentationRatio { get; }
 
     /// <summary>
+    /// Returns true if the given block is currently allocated (not free).
+    /// </summary>
+    /// <param name="blockNumber">Block number to query.</param>
+    /// <returns><c>true</c> if allocated; <c>false</c> if free.</returns>
+    bool IsAllocated(long blockNumber);
+
+    /// <summary>
     /// Persists the allocation state to disk.
     /// </summary>
     /// <param name="device">Block device to write to.</param>

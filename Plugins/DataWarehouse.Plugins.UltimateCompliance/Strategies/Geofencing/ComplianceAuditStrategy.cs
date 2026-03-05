@@ -30,7 +30,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
     public sealed class ComplianceAuditStrategy : ComplianceStrategyBase
     {
         private readonly BoundedDictionary<string, AuditTrail> _auditTrails = new BoundedDictionary<string, AuditTrail>(1000);
-        private readonly ConcurrentBag<SovereigntyDecision> _decisions = new();
+        // ConcurrentQueue preserves insertion order so EnforceMemoryLimits can drop
+        // the oldest entries (front of queue) rather than random ones (ConcurrentBag).
+        private readonly System.Collections.Concurrent.ConcurrentQueue<SovereigntyDecision> _decisions = new();
         private readonly BoundedDictionary<string, AuditReport> _reports = new BoundedDictionary<string, AuditReport>(1000);
         private readonly BoundedDictionary<string, ComplianceMetrics> _metrics = new BoundedDictionary<string, ComplianceMetrics>(1000);
 
@@ -85,8 +87,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
             // Update chain hash
             _currentChainHash = recordedDecision.AuditHash;
 
-            // Store decision
-            _decisions.Add(recordedDecision);
+            // Store decision (FIFO queue maintains insertion order for correct eviction)
+            _decisions.Enqueue(recordedDecision);
 
             // Update metrics
             UpdateMetrics(recordedDecision);
@@ -327,7 +329,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("compliance_audit.check");
+            IncrementCounter("compliance_audit.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -378,9 +380,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
                 });
             }
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -484,22 +487,12 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
 
         private void EnforceMemoryLimits()
         {
-            // Archive old decisions if memory limit exceeded
-            if (_decisions.Count > _maxDecisionsInMemory)
+            // Drop the oldest entries (front of FIFO queue) when memory limit is exceeded.
+            // Each dequeue removes exactly one entry; we stop once we are at half capacity.
+            var targetCount = _maxDecisionsInMemory / 2;
+            while (_decisions.Count > targetCount)
             {
-                // In production, archive to persistent storage
-                // Here we just trim the oldest
-                var toKeep = _decisions
-                    .OrderByDescending(d => d.Timestamp)
-                    .Take(_maxDecisionsInMemory / 2)
-                    .ToList();
-
-                // Clear and re-add (simplified - production would use proper archiving)
-                while (_decisions.TryTake(out _)) { }
-                foreach (var decision in toKeep)
-                {
-                    _decisions.Add(decision);
-                }
+                _decisions.TryDequeue(out _);
             }
         }
 
@@ -652,14 +645,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("compliance_audit.initialized");
+            IncrementCounter("compliance_audit.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("compliance_audit.shutdown");
+            IncrementCounter("compliance_audit.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

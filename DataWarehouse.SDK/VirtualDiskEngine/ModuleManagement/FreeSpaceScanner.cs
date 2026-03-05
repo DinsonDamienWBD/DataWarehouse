@@ -1,4 +1,6 @@
 using System.Buffers;
+using System.Threading;
+using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.VirtualDiskEngine.Format;
 
@@ -214,5 +216,173 @@ public sealed class FreeSpaceScanner
         }
 
         return buffer;
+    }
+
+    /// <summary>
+    /// Async version of <see cref="ReadBitmapBytes"/> — avoids blocking thread-pool threads on
+    /// network-backed or async streams (P2-866). Returns a rented buffer; caller must return it.
+    /// </summary>
+    private async Task<byte[]> ReadBitmapBytesAsync(CancellationToken ct)
+    {
+        int payloadPerBlock = _blockSize - FormatConstants.UniversalBlockTrailerSize;
+        int totalPayload = checked((int)(_bitmapBlockCount * payloadPerBlock));
+        var buffer = ArrayPool<byte>.Shared.Rent(totalPayload);
+        Array.Clear(buffer, 0, buffer.Length);
+
+        var readBuffer = ArrayPool<byte>.Shared.Rent(_blockSize);
+        try
+        {
+            int payloadOffset = 0;
+            for (long blockIdx = 0; blockIdx < _bitmapBlockCount; blockIdx++)
+            {
+                ct.ThrowIfCancellationRequested();
+                long byteOffset = (_bitmapStartBlock + blockIdx) * _blockSize;
+                _vdeStream.Seek(byteOffset, SeekOrigin.Begin);
+
+                int totalRead = 0;
+                while (totalRead < _blockSize)
+                {
+                    int bytesRead = await _vdeStream
+                        .ReadAsync(readBuffer.AsMemory(totalRead, _blockSize - totalRead), ct)
+                        .ConfigureAwait(false);
+                    if (bytesRead == 0)
+                        throw new InvalidDataException(
+                            $"Unexpected end of stream reading bitmap block {_bitmapStartBlock + blockIdx}.");
+                    totalRead += bytesRead;
+                }
+
+                Array.Copy(readBuffer, 0, buffer, payloadOffset, payloadPerBlock);
+                payloadOffset += payloadPerBlock;
+            }
+        }
+        catch
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+            throw;
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(readBuffer);
+        }
+
+        return buffer;
+    }
+
+    /// <summary>
+    /// Async version of <see cref="FindContiguousFreeBlocks"/> — avoids blocking thread-pool
+    /// threads on network-backed streams (P2-866).
+    /// </summary>
+    public async Task<FreeBlockRange?> FindContiguousFreeBlocksAsync(long requiredBlocks, CancellationToken ct = default)
+    {
+        if (requiredBlocks <= 0)
+            throw new ArgumentOutOfRangeException(nameof(requiredBlocks), "Required blocks must be positive.");
+
+        var bitmapBytes = await ReadBitmapBytesAsync(ct).ConfigureAwait(false);
+        try
+        {
+            long runStart = -1;
+            long runLength = 0;
+            long totalBits = bitmapBytes.Length * 8L;
+
+            for (long bitIndex = 0; bitIndex < totalBits; bitIndex++)
+            {
+                int byteIndex = (int)(bitIndex >> 3);
+                int bitOffset = (int)(bitIndex & 7);
+                bool isAllocated = (bitmapBytes[byteIndex] & (1 << bitOffset)) != 0;
+
+                if (!isAllocated)
+                {
+                    if (runLength == 0) runStart = bitIndex;
+                    runLength++;
+                    if (runLength >= requiredBlocks)
+                        return new FreeBlockRange(runStart, runLength);
+                }
+                else
+                {
+                    runLength = 0;
+                }
+            }
+
+            return null;
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(bitmapBytes);
+        }
+    }
+
+    /// <summary>
+    /// Async version of <see cref="FindAllFreeRanges"/> — avoids blocking thread-pool
+    /// threads on network-backed streams (P2-866).
+    /// </summary>
+    public async Task<IReadOnlyList<FreeBlockRange>> FindAllFreeRangesAsync(long minimumBlocks = 1, CancellationToken ct = default)
+    {
+        if (minimumBlocks < 1)
+            throw new ArgumentOutOfRangeException(nameof(minimumBlocks), "Minimum blocks must be at least 1.");
+
+        var bitmapBytes = await ReadBitmapBytesAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var ranges = new List<FreeBlockRange>();
+            long runStart = -1;
+            long runLength = 0;
+            long totalBits = bitmapBytes.Length * 8L;
+
+            for (long bitIndex = 0; bitIndex < totalBits; bitIndex++)
+            {
+                int byteIndex = (int)(bitIndex >> 3);
+                int bitOffset = (int)(bitIndex & 7);
+                bool isAllocated = (bitmapBytes[byteIndex] & (1 << bitOffset)) != 0;
+
+                if (!isAllocated)
+                {
+                    if (runLength == 0) runStart = bitIndex;
+                    runLength++;
+                }
+                else
+                {
+                    if (runLength >= minimumBlocks)
+                        ranges.Add(new FreeBlockRange(runStart, runLength));
+                    runLength = 0;
+                }
+            }
+
+            if (runLength >= minimumBlocks)
+                ranges.Add(new FreeBlockRange(runStart, runLength));
+
+            return ranges;
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(bitmapBytes);
+        }
+    }
+
+    /// <summary>
+    /// Async version of <see cref="GetTotalFreeBlocks"/> — avoids blocking thread-pool
+    /// threads on network-backed streams (P2-866).
+    /// </summary>
+    public async Task<long> GetTotalFreeBlocksAsync(CancellationToken ct = default)
+    {
+        var bitmapBytes = await ReadBitmapBytesAsync(ct).ConfigureAwait(false);
+        try
+        {
+            long freeCount = 0;
+            long totalBits = bitmapBytes.Length * 8L;
+
+            for (long bitIndex = 0; bitIndex < totalBits; bitIndex++)
+            {
+                int byteIndex = (int)(bitIndex >> 3);
+                int bitOffset = (int)(bitIndex & 7);
+                bool isAllocated = (bitmapBytes[byteIndex] & (1 << bitOffset)) != 0;
+                if (!isAllocated) freeCount++;
+            }
+
+            return freeCount;
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(bitmapBytes);
+        }
     }
 }

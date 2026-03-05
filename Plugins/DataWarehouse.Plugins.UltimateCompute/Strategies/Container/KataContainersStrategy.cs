@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using DataWarehouse.SDK.Contracts.Compute;
 
 namespace DataWarehouse.Plugins.UltimateCompute.Strategies.Container;
@@ -9,6 +10,9 @@ namespace DataWarehouse.Plugins.UltimateCompute.Strategies.Container;
 /// </summary>
 internal sealed class KataContainersStrategy : ComputeRuntimeStrategyBase
 {
+    // Allowlist for container names — prevents command injection via name interpolation.
+    private static readonly Regex ContainerNameRegex = new(@"^[a-zA-Z0-9_.\-]+$", RegexOptions.Compiled);
+
     /// <inheritdoc/>
     public override string StrategyId => "compute.container.kata";
     /// <inheritdoc/>
@@ -46,6 +50,9 @@ internal sealed class KataContainersStrategy : ComputeRuntimeStrategyBase
                 image = imgs;
 
             var containerId = $"dw-kata-{task.Id[..Math.Min(12, task.Id.Length)]}";
+            // Validate container name to prevent command injection.
+            if (!ContainerNameRegex.IsMatch(containerId))
+                throw new ArgumentException($"Derived container name '{containerId}' contains invalid characters.");
             var maxMem = GetMaxMemoryBytes(task, 1024 * 1024 * 1024);
             var memMb = maxMem / (1024 * 1024);
 

@@ -494,12 +494,14 @@ internal class OrphanCleanupService : IDisposable, IAsyncDisposable
         {
             try
             {
-                // Call async dispose and block (safer than GetAwaiter().GetResult())
-                DisposeAsync().AsTask().Wait();
+                // Cancel background work synchronously — do NOT call async DisposeAsync
+                // from synchronous Dispose to avoid deadlocks. The CTS cancellation
+                // triggers cooperative shutdown of any running cleanup tasks.
+                _cts?.Cancel();
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Error stopping orphan cleanup service during disposal");
+                _logger.LogWarning(ex, "Error cancelling orphan cleanup service during disposal");
             }
 
             _cts?.Dispose();

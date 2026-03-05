@@ -77,11 +77,20 @@ public sealed class ChecksumTable : IAsyncDisposable
         long checksumTableBlock = blockNumber / _checksumsPerBlock;
         int offset = (int)(blockNumber % _checksumsPerBlock) * ChecksumSize;
 
-        // Get checksum table block (from cache or disk)
-        byte[] blockData = await GetChecksumTableBlockAsync(checksumTableBlock, ct);
+        // Acquire lock to prevent torn reads from concurrent SetChecksumAsync writes
+        await _lock.WaitAsync(ct);
+        try
+        {
+            // Get checksum table block (from cache or disk)
+            byte[] blockData = await GetChecksumTableBlockAsync(checksumTableBlock, ct);
 
-        // Extract checksum
-        return BinaryPrimitives.ReadUInt64LittleEndian(blockData.AsSpan(offset, ChecksumSize));
+            // Extract checksum
+            return BinaryPrimitives.ReadUInt64LittleEndian(blockData.AsSpan(offset, ChecksumSize));
+        }
+        finally
+        {
+            _lock.Release();
+        }
     }
 
     /// <summary>
@@ -177,20 +186,7 @@ public sealed class ChecksumTable : IAsyncDisposable
         long absoluteBlock = _checksumTableStartBlock + checksumTableBlock;
         await _device.ReadBlockAsync(absoluteBlock, blockData, ct);
 
-        // Add to cache (with eviction if needed)
-        if (_blockCache.Count >= MaxCacheEntries)
-        {
-            // Evict oldest entry (simplified: just evict first entry)
-            // In production, use LRU or similar
-            foreach (var key in _blockCache.Keys)
-            {
-                if (_blockCache.TryRemove(key, out _))
-                {
-                    break;
-                }
-            }
-        }
-
+        // BoundedDictionary handles LRU eviction at capacity automatically (finding P2-853).
         _blockCache[checksumTableBlock] = blockData;
         return blockData;
     }

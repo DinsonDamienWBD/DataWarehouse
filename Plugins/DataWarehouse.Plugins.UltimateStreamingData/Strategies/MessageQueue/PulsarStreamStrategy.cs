@@ -121,11 +121,23 @@ internal sealed class PulsarStreamStrategy : StreamingDataStrategyBase, IStreami
         if (!_topics.TryGetValue(streamName, out var topic))
             throw new StreamingException($"Topic '{streamName}' does not exist.");
 
-        // Message deduplication via producer sequence
+        // Finding 4357: deduplication key must be deterministic across retries.
+        // Including msgId (always unique) means the dedup can never fire for a retry.
+        // Use caller-provided MessageId if present; otherwise fall back to content hash for dedup.
         var msgId = Interlocked.Increment(ref _nextMessageId);
-        var deduplicationKey = $"{streamName}:{message.Key}:{msgId}";
+        string deduplicationKey;
+        if (!string.IsNullOrEmpty(message.MessageId))
+        {
+            // MessageId is caller-stable across retries — real dedup.
+            deduplicationKey = $"{streamName}:{message.MessageId}";
+        }
+        else
+        {
+            // No stable MessageId; use sequence for tracking only (no dedup benefit without stable key).
+            deduplicationKey = $"{streamName}:seq:{msgId}";
+        }
         if (!_deduplicationIds.TryAdd(deduplicationKey, msgId))
-            throw new StreamingException("Duplicate message detected (deduplication violation).");
+            throw new StreamingException($"Duplicate message detected (deduplication violation): key='{deduplicationKey}'.");
 
         // Assign partition using key-based consistent hashing
         int partition = 0;

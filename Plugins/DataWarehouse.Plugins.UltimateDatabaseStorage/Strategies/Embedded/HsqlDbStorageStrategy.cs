@@ -106,7 +106,9 @@ public sealed class HsqlDbStorageStrategy : DatabaseStorageStrategyBase
         }
         catch
         {
+
             // Table might already exist
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         try
@@ -117,7 +119,9 @@ public sealed class HsqlDbStorageStrategy : DatabaseStorageStrategyBase
         }
         catch
         {
+
             // Index might already exist
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 
@@ -136,7 +140,9 @@ public sealed class HsqlDbStorageStrategy : DatabaseStorageStrategyBase
                 }
                 catch
                 {
+
                     // Ignore shutdown errors
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
 
                 _connection.Dispose();

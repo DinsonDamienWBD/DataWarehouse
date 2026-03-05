@@ -73,9 +73,8 @@ public sealed class TamperIncidentReport
     /// <summary>
     /// Access log entries related to this incident.
     /// Used for attribution analysis and forensic investigation.
-    /// Note: This will reference AccessLogEntry when that type is available.
     /// </summary>
-    public List<object>? RelatedAccessLogs { get; init; }
+    public List<AccessLogEntry>? RelatedAccessLogs { get; init; }
 
     /// <summary>
     /// Estimated earliest time the tampering could have occurred.
@@ -272,9 +271,8 @@ public sealed class AttributionAnalysis
 
     /// <summary>
     /// Access log entries that contributed to this attribution.
-    /// Note: This will reference AccessLogEntry when that type is available.
     /// </summary>
-    public List<object>? RelatedAccessLogs { get; init; }
+    public List<AccessLogEntry>? RelatedAccessLogs { get; init; }
 
     /// <summary>
     /// Estimated earliest time the tampering could have occurred.
@@ -326,7 +324,7 @@ public sealed class AttributionAnalysis
     /// <returns>Attribution analysis with Suspected confidence.</returns>
     public static AttributionAnalysis CreateSuspected(
         string suspectedPrincipal,
-        List<object> relatedAccessLogs,
+        List<AccessLogEntry> relatedAccessLogs,
         string reasoning,
         DateTimeOffset? estimatedTimeFrom = null,
         DateTimeOffset? estimatedTimeTo = null)
@@ -354,7 +352,7 @@ public sealed class AttributionAnalysis
     /// <returns>Attribution analysis with Likely confidence.</returns>
     public static AttributionAnalysis CreateLikely(
         string suspectedPrincipal,
-        List<object> relatedAccessLogs,
+        List<AccessLogEntry> relatedAccessLogs,
         string reasoning,
         DateTimeOffset? estimatedTimeFrom = null,
         DateTimeOffset? estimatedTimeTo = null)
@@ -381,7 +379,7 @@ public sealed class AttributionAnalysis
     /// <returns>Attribution analysis with Confirmed confidence.</returns>
     public static AttributionAnalysis CreateConfirmed(
         string confirmedPrincipal,
-        List<object> relatedAccessLogs,
+        List<AccessLogEntry> relatedAccessLogs,
         string reasoning,
         DateTimeOffset tamperTime)
     {

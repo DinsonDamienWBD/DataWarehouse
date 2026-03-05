@@ -44,17 +44,16 @@ public sealed class AutoDetectStrategy : FilesystemStrategyBase
         });
     }
 
-    public override Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default)
+    // LOW-3039: Use async I/O with FileOptions.Asynchronous to avoid blocking the threadpool thread.
+    public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default)
     {
-        using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        await using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.Asynchronous);
         fs.Seek(offset, SeekOrigin.Begin);
         var buffer = new byte[length];
-#pragma warning disable CA2022 // Intentional partial read - bytesRead is checked and buffer resized
-        var bytesRead = fs.Read(buffer, 0, length);
-#pragma warning restore CA2022
+        var bytesRead = await fs.ReadAsync(buffer, 0, length, ct).ConfigureAwait(false);
         if (bytesRead < length)
             Array.Resize(ref buffer, bytesRead);
-        return Task.FromResult(buffer);
+        return buffer;
     }
 
     public override Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default)
@@ -122,18 +121,17 @@ public sealed class NtfsStrategy : FilesystemStrategyBase
         }
     }
 
-    public override Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default)
+    // LOW-3039: Use async I/O to avoid blocking the threadpool thread.
+    public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default)
     {
-        var fileOptions = options?.DirectIo == true ? FileOptions.WriteThrough : FileOptions.Asynchronous;
-        using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, options?.BufferSize ?? 4096, fileOptions);
+        var fileOptions = (options?.DirectIo == true ? FileOptions.WriteThrough : FileOptions.None) | FileOptions.Asynchronous;
+        await using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, options?.BufferSize ?? 4096, fileOptions);
         fs.Seek(offset, SeekOrigin.Begin);
         var buffer = new byte[length];
-#pragma warning disable CA2022 // Intentional partial read - bytesRead is checked and buffer resized
-        var bytesRead = fs.Read(buffer, 0, length);
-#pragma warning restore CA2022
+        var bytesRead = await fs.ReadAsync(buffer, 0, length, ct).ConfigureAwait(false);
         if (bytesRead < length)
             Array.Resize(ref buffer, bytesRead);
-        return Task.FromResult(buffer);
+        return buffer;
     }
 
     public override Task WriteBlockAsync(string path, long offset, byte[] data, BlockIoOptions? options = null, CancellationToken ct = default)

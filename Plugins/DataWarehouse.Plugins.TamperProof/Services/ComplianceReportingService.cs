@@ -763,23 +763,32 @@ public class ComplianceReportingService : IComplianceReportingService
 
     private string ComputeBlockHash(Guid blockId)
     {
-        // Placeholder - in production, would compute actual content hash
-        // Hash computed inline; bus delegation to UltimateDataIntegrity available for centralized policy enforcement
-        return Convert.ToHexString(SHA256.HashData(blockId.ToByteArray()));
+        // This fallback is used when block content hash was not recorded at write time.
+        // The resulting hash encodes the block ID and a known sentinel so verifiers can detect
+        // that actual content was not hashed (they will see "MISSING-CONTENT-HASH" in the prefix).
+        // Production callers should ensure ContentHash is always set at block registration.
+        _logger?.LogWarning(
+            "Block {BlockId} has no recorded ContentHash; attestation will use metadata-only fallback hash. " +
+            "Ensure ContentHash is provided when registering blocks for compliance reporting.",
+            blockId);
+        var sentinel = Encoding.UTF8.GetBytes($"MISSING-CONTENT-HASH:{blockId:D}");
+        return "00:" + Convert.ToHexString(SHA256.HashData(sentinel));
     }
+
+    /// <summary>
+    /// Per-instance HMAC signing key generated from a cryptographically random source at construction time.
+    /// This prevents attestation forgery from a deterministic enum-derived key (finding 1031).
+    /// In production, replace with HSM-backed or asymmetric key management.
+    /// </summary>
+    private readonly byte[] _attestationSigningKey = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
 
     private string SignAttestation(AttestationPayload payload)
     {
-        // In production, would use HSM or secure key management
-        // For now, use HMAC with a derived key
         var payloadJson = JsonSerializer.Serialize(payload);
         var payloadBytes = Encoding.UTF8.GetBytes(payloadJson);
 
-        // Derive signing key from config (in production, use proper key management)
-        var keyMaterial = Encoding.UTF8.GetBytes($"attestation-key-{_config.WormMode}");
-        // Hash computed inline; bus delegation to UltimateDataIntegrity available for centralized policy enforcement
-        using var hmac = new HMACSHA256(SHA256.HashData(keyMaterial));
-
+        // Use a per-instance random key — not derived from a deterministic config value (finding 1031).
+        using var hmac = new HMACSHA256(_attestationSigningKey);
         var signature = hmac.ComputeHash(payloadBytes);
         return Convert.ToBase64String(signature);
     }

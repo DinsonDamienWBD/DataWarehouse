@@ -486,7 +486,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("data_retention_policy.check");
+            IncrementCounter("data_retention_policy.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -534,9 +534,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
                 recommendations.Add($"{expiredHolds.Count} legal hold(s) have expired. Review and release if appropriate.");
             }
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -633,14 +634,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("data_retention_policy.initialized");
+            IncrementCounter("data_retention_policy.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("data_retention_policy.shutdown");
+            IncrementCounter("data_retention_policy.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

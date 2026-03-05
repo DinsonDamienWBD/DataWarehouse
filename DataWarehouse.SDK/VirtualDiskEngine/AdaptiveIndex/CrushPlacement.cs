@@ -264,8 +264,14 @@ public sealed class CrushBucket
 
     /// <summary>
     /// Gets or sets whether this node is marked as down (failed).
+    /// Thread-safe via volatile backing field — routing threads must see marking immediately.
     /// </summary>
-    public bool IsDown { get; set; }
+    private volatile bool _isDown;
+    public bool IsDown
+    {
+        get => _isDown;
+        set => _isDown = value;
+    }
 
     /// <summary>
     /// Gets the child buckets.

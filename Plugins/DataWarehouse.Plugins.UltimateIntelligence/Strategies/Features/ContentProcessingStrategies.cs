@@ -52,8 +52,8 @@ public sealed class ContentExtractionStrategy : FeatureStrategyBase
     {
         return await ExecuteWithTrackingAsync(async () =>
         {
-            var maxLength = int.Parse(GetConfig("MaxContentLength") ?? "1000000");
-            var extractMetadata = bool.Parse(GetConfig("ExtractMetadata") ?? "true");
+            var maxLength = GetConfigInt("MaxContentLength", 1000000);
+            var extractMetadata = GetConfigBool("ExtractMetadata", true);
 
             var result = new ContentExtractionResult
             {
@@ -276,7 +276,7 @@ public sealed class ContentExtractionStrategy : FeatureStrategyBase
 
     private async Task<string> ExtractImageTextAsync(byte[] content, string contentType, CancellationToken ct)
     {
-        var enableOcr = bool.Parse(GetConfig("EnableOCR") ?? "true");
+        var enableOcr = GetConfigBool("EnableOCR", true);
         if (!enableOcr)
             return "[Image - OCR disabled]";
 
@@ -536,8 +536,8 @@ public sealed class ContentSummarizationStrategy : FeatureStrategyBase
         return await ExecuteWithTrackingAsync(async () =>
         {
             var summaryStyle = style ?? ParseStyle(GetConfig("DefaultStyle") ?? "brief");
-            var maxTokens = int.Parse(GetConfig("MaxOutputTokens") ?? "500");
-            var preserveKeyFacts = bool.Parse(GetConfig("PreserveKeyFacts") ?? "true");
+            var maxTokens = GetConfigInt("MaxOutputTokens", 500);
+            var preserveKeyFacts = GetConfigBool("PreserveKeyFacts", true);
 
             var prompt = BuildSummarizationPrompt(content, summaryStyle, targetLength, preserveKeyFacts);
 
@@ -716,7 +716,7 @@ CONTENT TO SUMMARIZE:
             if (jsonStart >= 0 && jsonEnd > jsonStart)
             {
                 var json = response.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                var doc = System.Text.Json.JsonDocument.Parse(json);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
 
                 return new MultiLevelSummary
                 {
@@ -749,7 +749,7 @@ CONTENT TO SUMMARIZE:
             if (jsonStart >= 0 && jsonEnd > jsonStart)
             {
                 var json = response.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                var doc = System.Text.Json.JsonDocument.Parse(json);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
 
                 return new CollectionSummary
                 {

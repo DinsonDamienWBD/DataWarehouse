@@ -46,7 +46,10 @@ internal static class CliProcessHelper
 
         try
         {
-            process.Start();
+            if (!process.Start())
+                throw new InvalidOperationException(
+                    $"Failed to start process '{process.StartInfo.FileName}'. " +
+                    "Check that the executable exists and the system allows process creation.");
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
 
@@ -149,12 +152,23 @@ internal static class CliProcessHelper
     public static async IAsyncEnumerable<ProcessingResult> EnumerateProjectFiles(
         ProcessingQuery query, string[] extensions, Stopwatch sw, [EnumeratorCancellation] CancellationToken ct = default)
     {
-        if (!Directory.Exists(query.Source)) { await Task.CompletedTask; yield break; }
+        // Normalize and validate source to prevent path-traversal attacks.
+        string normalizedSource;
+        try
+        {
+            normalizedSource = Path.GetFullPath(query.Source);
+        }
+        catch
+        {
+            await Task.CompletedTask;
+            yield break;
+        }
+        if (!Directory.Exists(normalizedSource)) { await Task.CompletedTask; yield break; }
 
-        var limit = query.Limit ?? int.MaxValue;
+        var limit = query.Limit ?? 1000; // Cap at 1000 files to prevent OOM on unbounded walks (finding 4245)
         var offset = query.Offset ?? 0;
         var idx = 0;
-        foreach (var file in Directory.EnumerateFiles(query.Source, "*", SearchOption.AllDirectories))
+        foreach (var file in Directory.EnumerateFiles(normalizedSource, "*", SearchOption.AllDirectories))
         {
             ct.ThrowIfCancellationRequested();
             var ext = Path.GetExtension(file).ToLowerInvariant();
@@ -225,6 +239,66 @@ internal static class CliProcessHelper
     {
         if (query.Options?.TryGetValue(key, out var v) == true && v is T t) return t;
         return default;
+    }
+
+    /// <summary>
+    /// Validates that a string value does not contain shell metacharacters that could
+    /// enable command injection when the value is interpolated into CLI argument strings.
+    /// Throws <see cref="ArgumentException"/> if invalid characters are found.
+    /// </summary>
+    /// <param name="value">The value to validate.</param>
+    /// <param name="paramName">Parameter name for the exception message.</param>
+    public static void ValidateNoShellMetachars(string value, string paramName)
+    {
+        // Shell metacharacters that could inject additional commands or arguments
+        const string Forbidden = ";&|`$(){}[]<>!\\\"'\n\r\t";
+        foreach (var c in value)
+        {
+            if (Forbidden.Contains(c))
+            {
+                throw new ArgumentException(
+                    $"'{paramName}' contains forbidden character '{c}' (0x{(int)c:X2}) that could enable command injection.",
+                    paramName);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Validates that a string value matches an expected allowlist of safe values.
+    /// Throws <see cref="ArgumentException"/> if the value is not in the allowlist.
+    /// </summary>
+    /// <param name="value">The value to validate.</param>
+    /// <param name="paramName">Parameter name for the exception message.</param>
+    /// <param name="allowedValues">Case-sensitive set of permitted values.</param>
+    public static void ValidateAllowlist(string value, string paramName, IReadOnlySet<string> allowedValues)
+    {
+        if (!allowedValues.Contains(value))
+        {
+            throw new ArgumentException(
+                $"'{paramName}' value '{value}' is not in the allowlist. Permitted: {string.Join(", ", allowedValues)}",
+                paramName);
+        }
+    }
+
+    /// <summary>
+    /// Validates that a string value matches a safe identifier pattern (alphanumeric, hyphens, underscores, dots only).
+    /// </summary>
+    /// <param name="value">The value to validate.</param>
+    /// <param name="paramName">Parameter name for the exception message.</param>
+    public static void ValidateIdentifier(string value, string paramName)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            throw new ArgumentException($"'{paramName}' must not be null or whitespace.", paramName);
+
+        foreach (var c in value)
+        {
+            if (!char.IsLetterOrDigit(c) && c != '-' && c != '_' && c != '.' && c != ':')
+            {
+                throw new ArgumentException(
+                    $"'{paramName}' contains invalid character '{c}' (0x{(int)c:X2}). Only alphanumeric, hyphen, underscore, dot, and colon are allowed.",
+                    paramName);
+            }
+        }
     }
 }
 

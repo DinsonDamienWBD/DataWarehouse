@@ -249,7 +249,9 @@ public sealed class NumaAwareIoScheduler
         }
         catch
         {
+
             // Best-effort: if we can't set affinity, just continue
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 
@@ -268,8 +270,8 @@ public sealed class NumaAwareIoScheduler
             {
                 try
                 {
-                    // Set affinity on the current process thread as approximation
-                    if (thread.Id == currentThreadId || thread.ThreadState == System.Diagnostics.ThreadState.Running)
+                    // LOW-2984: match only the current managed thread; ThreadState.Running could be any thread.
+                    if (thread.Id == currentThreadId)
                     {
                         thread.ProcessorAffinity = new IntPtr(1L << coreId);
                         break;
@@ -277,13 +279,17 @@ public sealed class NumaAwareIoScheduler
                 }
                 catch
                 {
+
                     // Affinity setting failed; continue without affinity (best-effort)
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
         }
         catch
         {
+
             // Best-effort: if we can't set affinity, just continue
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 }

@@ -52,14 +52,14 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
             var soapEnvelope = @"<?xml version=""1.0"" encoding=""utf-8""?>
 <soap:Envelope xmlns:soap=""http://schemas.xmlsoap.org/soap/envelope/"">
   <soap:Body>
-    <GetStatus xmlns=""http://tempuri.org/""/>
+    <GetStatus xmlns=""""/>
   </soap:Body>
 </soap:Envelope>";
 
             var content = new StringContent(soapEnvelope, Encoding.UTF8, "text/xml");
-            content.Headers.Add("SOAPAction", "\"http://tempuri.org/GetStatus\"");
+            content.Headers.Add("SOAPAction", "\"GetStatus\"");
 
-            var response = await client.PostAsync("", content, ct);
+            using var response = await client.PostAsync("", content, ct);
             response.EnsureSuccessStatusCode();
 
             var info = new Dictionary<string, object>
@@ -76,7 +76,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             var client = handle.GetConnection<HttpClient>();
-            var response = await client.GetAsync("?wsdl", ct);
+            using var response = await client.GetAsync("?wsdl", ct);
             return response.IsSuccessStatusCode;
         }
 

@@ -54,7 +54,8 @@ public sealed class ClaudeProviderStrategy : AIProviderStrategyBase
         Tags = new[] { "anthropic", "claude", "claude-3", "opus", "sonnet", "haiku" }
     };
 
-    private static readonly HttpClient SharedHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+    private static readonly HttpClient SharedHttpClient = // Cat 15 (finding 3246): AI completions routinely take 60-120s; 30s causes spurious timeouts.
+new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
     public ClaudeProviderStrategy() : this(SharedHttpClient) { }
 
     public ClaudeProviderStrategy(HttpClient httpClient)

@@ -56,8 +56,14 @@ namespace DataWarehouse.SDK.Infrastructure.Authority
         private readonly ConcurrentDictionary<string, DateTimeOffset> _activityTimestamps =
             new(StringComparer.OrdinalIgnoreCase);
         private readonly DateTimeOffset _createdAt;
-        private volatile bool _isLocked;
+        private int _isLockedFlag; // 0=unlocked, 1=locked (atomic via Interlocked)
         private volatile bool _warningIssued;
+
+        private bool _isLocked
+        {
+            get => Volatile.Read(ref _isLockedFlag) != 0;
+            set => Interlocked.Exchange(ref _isLockedFlag, value ? 1 : 0);
+        }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="DeadManSwitch"/>.
@@ -172,7 +178,9 @@ namespace DataWarehouse.SDK.Infrastructure.Authority
 
             if (elapsed > _config.InactivityThreshold)
             {
-                _isLocked = true;
+                // Atomic CAS to prevent duplicate auto-lock decisions
+                if (Interlocked.CompareExchange(ref _isLockedFlag, 1, 0) != 0)
+                    return;
                 var daysSinceActivity = (int)elapsed.TotalDays;
 
                 await _authorityResolver.RecordDecisionAsync(
@@ -201,6 +209,11 @@ namespace DataWarehouse.SDK.Infrastructure.Authority
                 throw new ArgumentNullException(nameof(superAdminId));
 
             ct.ThrowIfCancellationRequested();
+
+            // Guard: only unlock if actually locked; calling UnlockAsync on an unlocked system
+            // is a no-op that should NOT reset warning state or produce a misleading audit entry.
+            if (!_isLocked)
+                return;
 
             _isLocked = false;
             _warningIssued = false;

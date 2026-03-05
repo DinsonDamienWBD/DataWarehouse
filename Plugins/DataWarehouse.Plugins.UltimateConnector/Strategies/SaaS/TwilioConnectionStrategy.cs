@@ -17,8 +17,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
     /// </summary>
     public class TwilioConnectionStrategy : SaaSConnectionStrategyBase
     {
-        private string _accountSid = "";
-        private string _authToken = "";
+        private volatile string _accountSid = "";
+        private volatile string _authToken = "";
 
         public override string StrategyId => "twilio";
         public override string DisplayName => "Twilio";
@@ -59,16 +59,13 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             {
                 var response = await handle.GetConnection<HttpClient>()
                     .GetAsync($"/2010-04-01/Accounts/{_accountSid}.json", ct);
-                return response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable;
+                return response.IsSuccessStatusCode;
             }
             catch { return false; }
         }
 
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
-        {
-            handle.GetConnection<HttpClient>()?.Dispose();
-            await Task.CompletedTask;
-        }
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) {
+            handle.GetConnection<HttpClient>()?.Dispose(); return Task.CompletedTask; }
 
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
@@ -104,9 +101,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             if (statusCallbackUrl != null)
                 formData["StatusCallback"] = statusCallbackUrl;
 
-            var response = await client.PostAsync(
+            using var response = await client.PostAsync(
                 $"/2010-04-01/Accounts/{_accountSid}/Messages.json",
                 new FormUrlEncodedContent(formData), ct);
+            response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
@@ -137,9 +135,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             if (statusCallbackUrl != null)
                 formData["StatusCallback"] = statusCallbackUrl;
 
-            var response = await client.PostAsync(
+            using var response = await client.PostAsync(
                 $"/2010-04-01/Accounts/{_accountSid}/Calls.json",
                 new FormUrlEncodedContent(formData), ct);
+            response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
@@ -166,7 +165,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                       $"?SmsEnabled={smsEnabled}&VoiceEnabled={voiceEnabled}";
             if (areaCode != null) url += $"&AreaCode={areaCode}";
 
-            var response = await client.GetAsync(url, ct);
+            using var response = await client.GetAsync(url, ct);
+            response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
@@ -202,7 +202,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             if (to != null) url += $"&To={Uri.EscapeDataString(to)}";
             if (from != null) url += $"&From={Uri.EscapeDataString(from)}";
 
-            var response = await client.GetAsync(url, ct);
+            using var response = await client.GetAsync(url, ct);
+            response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)

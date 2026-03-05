@@ -5,58 +5,6 @@
 
 ## Project: DataWarehouse.Plugins.UltimateDataPrivacy
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataPrivacy/DataPrivacyStrategyBase.cs
-```csharp
-public sealed record DataPrivacyCapabilities
-{
-}
-    public bool SupportsAsync { get; init; }
-    public bool SupportsBatch { get; init; }
-    public bool SupportsReversible { get; init; }
-    public bool SupportsFormatPreserving { get; init; }
-}
-```
-```csharp
-public interface IDataPrivacyStrategy
-{
-}
-    string StrategyId { get; }
-    string DisplayName { get; }
-    PrivacyCategory Category { get; }
-    DataPrivacyCapabilities Capabilities { get; }
-    string SemanticDescription { get; }
-    string[] Tags { get; }
-}
-```
-```csharp
-public abstract class DataPrivacyStrategyBase : StrategyBase, IDataPrivacyStrategy
-{
-}
-    public abstract override string StrategyId { get; }
-    public abstract string DisplayName { get; }
-    public override string Name;;
-    public abstract PrivacyCategory Category { get; }
-    public abstract DataPrivacyCapabilities Capabilities { get; }
-    public abstract string SemanticDescription { get; }
-    public abstract string[] Tags { get; }
-    protected override async Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public bool IsHealthy();
-    public IReadOnlyDictionary<string, long> GetCounters();;
-}
-```
-```csharp
-public sealed class DataPrivacyStrategyRegistry
-{
-}
-    public int Count;;
-    public int AutoDiscover(System.Reflection.Assembly assembly);
-    public IDataPrivacyStrategy? Get(string strategyId);;
-    public IReadOnlyList<IDataPrivacyStrategy> GetAll();;
-    public IReadOnlyList<IDataPrivacyStrategy> GetByCategory(PrivacyCategory category);;
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateDataPrivacy/UltimateDataPrivacyPlugin.cs
 ```csharp
 public sealed class UltimateDataPrivacyPlugin : SecurityPluginBase, IDisposable
@@ -132,6 +80,450 @@ public sealed record ConsentRecord
     public required string ConsentType { get; init; }
     public bool Granted { get; init; }
     public DateTimeOffset RecordedAt { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataPrivacy/DataPrivacyStrategyBase.cs
+```csharp
+public sealed record DataPrivacyCapabilities
+{
+}
+    public bool SupportsAsync { get; init; }
+    public bool SupportsBatch { get; init; }
+    public bool SupportsReversible { get; init; }
+    public bool SupportsFormatPreserving { get; init; }
+}
+```
+```csharp
+public interface IDataPrivacyStrategy
+{
+}
+    string StrategyId { get; }
+    string DisplayName { get; }
+    PrivacyCategory Category { get; }
+    DataPrivacyCapabilities Capabilities { get; }
+    string SemanticDescription { get; }
+    string[] Tags { get; }
+}
+```
+```csharp
+public abstract class DataPrivacyStrategyBase : StrategyBase, IDataPrivacyStrategy
+{
+}
+    public abstract override string StrategyId { get; }
+    public abstract string DisplayName { get; }
+    public override string Name;;
+    public abstract PrivacyCategory Category { get; }
+    public abstract DataPrivacyCapabilities Capabilities { get; }
+    public abstract string SemanticDescription { get; }
+    public abstract string[] Tags { get; }
+    protected override async Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public bool IsHealthy();;
+    public IReadOnlyDictionary<string, long> GetCounters();;
+}
+```
+```csharp
+public sealed class DataPrivacyStrategyRegistry
+{
+}
+    public int Count;;
+    public int AutoDiscover(System.Reflection.Assembly assembly);
+    public IDataPrivacyStrategy? Get(string strategyId);;
+    public IReadOnlyList<IDataPrivacyStrategy> GetAll();;
+    public IReadOnlyList<IDataPrivacyStrategy> GetByCategory(PrivacyCategory category);;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataPrivacy/Strategies/PrivacyPreservingAnalytics/PrivacyPreservingAnalyticsStrategies.cs
+```csharp
+public sealed class SecureAggregationStrategy : DataPrivacyStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override PrivacyCategory Category;;
+    public override DataPrivacyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class HomomorphicEncryptionAnalyticsStrategy : DataPrivacyStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override PrivacyCategory Category;;
+    public override DataPrivacyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class FederatedLearningStrategy : DataPrivacyStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override PrivacyCategory Category;;
+    public override DataPrivacyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class SecureMultiPartyComputationStrategy : DataPrivacyStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override PrivacyCategory Category;;
+    public override DataPrivacyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class SyntheticDataAnalyticsStrategy : DataPrivacyStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override PrivacyCategory Category;;
+    public override DataPrivacyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class PrivateInformationRetrievalStrategy : DataPrivacyStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override PrivacyCategory Category;;
+    public override DataPrivacyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class PrivateSetIntersectionStrategy : DataPrivacyStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override PrivacyCategory Category;;
+    public override DataPrivacyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class ConfidentialComputingStrategy : DataPrivacyStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override PrivacyCategory Category;;
+    public override DataPrivacyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataPrivacy/Strategies/PrivacyCompliance/PrivacyComplianceStrategies.cs
+```csharp
+public sealed class GDPRRightToErasureStrategy : DataPrivacyStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override PrivacyCategory Category;;
+    public override DataPrivacyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class GDPRRightToAccessStrategy : DataPrivacyStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override PrivacyCategory Category;;
+    public override DataPrivacyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class GDPRDataPortabilityStrategy : DataPrivacyStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override PrivacyCategory Category;;
+    public override DataPrivacyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class CCPAOptOutStrategy : DataPrivacyStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override PrivacyCategory Category;;
+    public override DataPrivacyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class ConsentCollectionStrategy : DataPrivacyStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override PrivacyCategory Category;;
+    public override DataPrivacyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class ConsentWithdrawalStrategy : DataPrivacyStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override PrivacyCategory Category;;
+    public override DataPrivacyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class DataProcessingRecordStrategy : DataPrivacyStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override PrivacyCategory Category;;
+    public override DataPrivacyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class PrivacyImpactAssessmentStrategy : DataPrivacyStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override PrivacyCategory Category;;
+    public override DataPrivacyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataPrivacy/Strategies/PrivacyMetrics/PrivacyMetricsStrategies.cs
+```csharp
+public sealed class ReIdentificationRiskStrategy : DataPrivacyStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override PrivacyCategory Category;;
+    public override DataPrivacyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class PrivacyScoringStrategy : DataPrivacyStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override PrivacyCategory Category;;
+    public override DataPrivacyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class DataUtilityMeasurementStrategy : DataPrivacyStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override PrivacyCategory Category;;
+    public override DataPrivacyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class PrivacyUtilityTradeoffStrategy : DataPrivacyStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override PrivacyCategory Category;;
+    public override DataPrivacyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class SensitivityAnalysisStrategy : DataPrivacyStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override PrivacyCategory Category;;
+    public override DataPrivacyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class LinkageRiskAssessmentStrategy : DataPrivacyStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override PrivacyCategory Category;;
+    public override DataPrivacyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class PrivacyBudgetConsumptionStrategy : DataPrivacyStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override PrivacyCategory Category;;
+    public override DataPrivacyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class AnonymityMeasurementStrategy : DataPrivacyStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override PrivacyCategory Category;;
+    public override DataPrivacyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataPrivacy/Strategies/Tokenization/TokenizationStrategies.cs
+```csharp
+public sealed class VaultedTokenizationStrategy : DataPrivacyStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override PrivacyCategory Category;;
+    public override DataPrivacyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class VaultlessTokenizationStrategy : DataPrivacyStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override PrivacyCategory Category;;
+    public override DataPrivacyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class FormatPreservingTokenizationStrategy : DataPrivacyStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override PrivacyCategory Category;;
+    public override DataPrivacyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class PCICompliantTokenizationStrategy : DataPrivacyStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override PrivacyCategory Category;;
+    public override DataPrivacyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class DeterministicTokenizationStrategy : DataPrivacyStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override PrivacyCategory Category;;
+    public override DataPrivacyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class RandomTokenizationStrategy : DataPrivacyStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override PrivacyCategory Category;;
+    public override DataPrivacyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class TokenLifecycleStrategy : DataPrivacyStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override PrivacyCategory Category;;
+    public override DataPrivacyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class HighValueTokenizationStrategy : DataPrivacyStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override PrivacyCategory Category;;
+    public override DataPrivacyCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
 }
 ```
 
@@ -565,398 +957,6 @@ public sealed class ApproximateDPStrategy : DataPrivacyStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataPrivacy/Strategies/Masking/MaskingStrategies.cs
-```csharp
-public sealed class StaticDataMaskingStrategy : DataPrivacyStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override PrivacyCategory Category;;
-    public override DataPrivacyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class DynamicDataMaskingStrategy : DataPrivacyStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override PrivacyCategory Category;;
-    public override DataPrivacyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class DeterministicMaskingStrategy : DataPrivacyStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override PrivacyCategory Category;;
-    public override DataPrivacyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class ConditionalMaskingStrategy : DataPrivacyStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override PrivacyCategory Category;;
-    public override DataPrivacyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class PartialMaskingStrategy : DataPrivacyStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override PrivacyCategory Category;;
-    public override DataPrivacyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class RedactionMaskingStrategy : DataPrivacyStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override PrivacyCategory Category;;
-    public override DataPrivacyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class SubstitutionMaskingStrategy : DataPrivacyStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override PrivacyCategory Category;;
-    public override DataPrivacyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class ShufflingMaskingStrategy : DataPrivacyStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override PrivacyCategory Category;;
-    public override DataPrivacyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataPrivacy/Strategies/PrivacyCompliance/PrivacyComplianceStrategies.cs
-```csharp
-public sealed class GDPRRightToErasureStrategy : DataPrivacyStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override PrivacyCategory Category;;
-    public override DataPrivacyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class GDPRRightToAccessStrategy : DataPrivacyStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override PrivacyCategory Category;;
-    public override DataPrivacyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class GDPRDataPortabilityStrategy : DataPrivacyStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override PrivacyCategory Category;;
-    public override DataPrivacyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class CCPAOptOutStrategy : DataPrivacyStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override PrivacyCategory Category;;
-    public override DataPrivacyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class ConsentCollectionStrategy : DataPrivacyStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override PrivacyCategory Category;;
-    public override DataPrivacyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class ConsentWithdrawalStrategy : DataPrivacyStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override PrivacyCategory Category;;
-    public override DataPrivacyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class DataProcessingRecordStrategy : DataPrivacyStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override PrivacyCategory Category;;
-    public override DataPrivacyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class PrivacyImpactAssessmentStrategy : DataPrivacyStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override PrivacyCategory Category;;
-    public override DataPrivacyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataPrivacy/Strategies/PrivacyMetrics/PrivacyMetricsStrategies.cs
-```csharp
-public sealed class ReIdentificationRiskStrategy : DataPrivacyStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override PrivacyCategory Category;;
-    public override DataPrivacyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class PrivacyScoringStrategy : DataPrivacyStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override PrivacyCategory Category;;
-    public override DataPrivacyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class DataUtilityMeasurementStrategy : DataPrivacyStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override PrivacyCategory Category;;
-    public override DataPrivacyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class PrivacyUtilityTradeoffStrategy : DataPrivacyStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override PrivacyCategory Category;;
-    public override DataPrivacyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class SensitivityAnalysisStrategy : DataPrivacyStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override PrivacyCategory Category;;
-    public override DataPrivacyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class LinkageRiskAssessmentStrategy : DataPrivacyStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override PrivacyCategory Category;;
-    public override DataPrivacyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class PrivacyBudgetConsumptionStrategy : DataPrivacyStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override PrivacyCategory Category;;
-    public override DataPrivacyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class AnonymityMeasurementStrategy : DataPrivacyStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override PrivacyCategory Category;;
-    public override DataPrivacyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataPrivacy/Strategies/PrivacyPreservingAnalytics/PrivacyPreservingAnalyticsStrategies.cs
-```csharp
-public sealed class SecureAggregationStrategy : DataPrivacyStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override PrivacyCategory Category;;
-    public override DataPrivacyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class HomomorphicEncryptionAnalyticsStrategy : DataPrivacyStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override PrivacyCategory Category;;
-    public override DataPrivacyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class FederatedLearningStrategy : DataPrivacyStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override PrivacyCategory Category;;
-    public override DataPrivacyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class SecureMultiPartyComputationStrategy : DataPrivacyStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override PrivacyCategory Category;;
-    public override DataPrivacyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class SyntheticDataAnalyticsStrategy : DataPrivacyStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override PrivacyCategory Category;;
-    public override DataPrivacyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class PrivateInformationRetrievalStrategy : DataPrivacyStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override PrivacyCategory Category;;
-    public override DataPrivacyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class PrivateSetIntersectionStrategy : DataPrivacyStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override PrivacyCategory Category;;
-    public override DataPrivacyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class ConfidentialComputingStrategy : DataPrivacyStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override PrivacyCategory Category;;
-    public override DataPrivacyCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateDataPrivacy/Strategies/Pseudonymization/PseudonymizationStrategies.cs
 ```csharp
 public sealed class DeterministicPseudonymizationStrategy : DataPrivacyStrategyBase
@@ -1055,9 +1055,9 @@ public sealed class CrossDatasetPseudonymizationStrategy : DataPrivacyStrategyBa
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataPrivacy/Strategies/Tokenization/TokenizationStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateDataPrivacy/Strategies/Masking/MaskingStrategies.cs
 ```csharp
-public sealed class VaultedTokenizationStrategy : DataPrivacyStrategyBase
+public sealed class StaticDataMaskingStrategy : DataPrivacyStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1069,7 +1069,7 @@ public sealed class VaultedTokenizationStrategy : DataPrivacyStrategyBase
 }
 ```
 ```csharp
-public sealed class VaultlessTokenizationStrategy : DataPrivacyStrategyBase
+public sealed class DynamicDataMaskingStrategy : DataPrivacyStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1081,7 +1081,7 @@ public sealed class VaultlessTokenizationStrategy : DataPrivacyStrategyBase
 }
 ```
 ```csharp
-public sealed class FormatPreservingTokenizationStrategy : DataPrivacyStrategyBase
+public sealed class DeterministicMaskingStrategy : DataPrivacyStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1093,7 +1093,7 @@ public sealed class FormatPreservingTokenizationStrategy : DataPrivacyStrategyBa
 }
 ```
 ```csharp
-public sealed class PCICompliantTokenizationStrategy : DataPrivacyStrategyBase
+public sealed class ConditionalMaskingStrategy : DataPrivacyStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1105,7 +1105,7 @@ public sealed class PCICompliantTokenizationStrategy : DataPrivacyStrategyBase
 }
 ```
 ```csharp
-public sealed class DeterministicTokenizationStrategy : DataPrivacyStrategyBase
+public sealed class PartialMaskingStrategy : DataPrivacyStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1117,7 +1117,7 @@ public sealed class DeterministicTokenizationStrategy : DataPrivacyStrategyBase
 }
 ```
 ```csharp
-public sealed class RandomTokenizationStrategy : DataPrivacyStrategyBase
+public sealed class RedactionMaskingStrategy : DataPrivacyStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1129,7 +1129,7 @@ public sealed class RandomTokenizationStrategy : DataPrivacyStrategyBase
 }
 ```
 ```csharp
-public sealed class TokenLifecycleStrategy : DataPrivacyStrategyBase
+public sealed class SubstitutionMaskingStrategy : DataPrivacyStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1141,7 +1141,7 @@ public sealed class TokenLifecycleStrategy : DataPrivacyStrategyBase
 }
 ```
 ```csharp
-public sealed class HighValueTokenizationStrategy : DataPrivacyStrategyBase
+public sealed class ShufflingMaskingStrategy : DataPrivacyStrategyBase
 {
 }
     public override string StrategyId;;

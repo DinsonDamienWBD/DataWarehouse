@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using DataWarehouse.SDK.Contracts.Compute;
 using DataWarehouse.SDK.Utilities;
 
@@ -44,7 +42,8 @@ internal sealed class PartitionedQueryStrategy : ComputeRuntimeStrategyBase
             foreach (var record in records)
             {
                 var key = record.Contains('\t') ? record[..record.IndexOf('\t')] : record;
-                var hash = BitConverter.ToUInt32(SHA256.HashData(Encoding.UTF8.GetBytes(key)), 0);
+                // Use StableHash to avoid per-record SHA256 allocation (O(n) allocations -> zero allocations).
+                var hash = (uint)StableHash.Compute(key);
                 partitions[hash % (uint)partitionCount].Add(record);
             }
 
@@ -70,6 +69,15 @@ internal sealed class PartitionedQueryStrategy : ComputeRuntimeStrategyBase
                     }
                     finally { try { File.Delete(codePath); } catch { /* Best-effort cleanup — failure is non-fatal */ } }
                 });
+
+            // Verify all partitions produced results; if any are missing, a partition task failed.
+            var missingPartitions = Enumerable.Range(0, partitionCount)
+                .Where(i => !partitionResults.ContainsKey(i))
+                .ToList();
+            if (missingPartitions.Count > 0)
+                throw new InvalidOperationException(
+                    $"Partitioned query failed: {missingPartitions.Count} partition(s) produced no output " +
+                    $"(indices: {string.Join(", ", missingPartitions)}).");
 
             // Merge-sort across partitions
             var merged = partitionResults.Values.SelectMany(v => v).OrderBy(l => l);

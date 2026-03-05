@@ -379,8 +379,20 @@ public sealed class Neo4jBoltProtocolStrategy : DatabaseProtocolStrategyBase
     {
         await SendMessageAsync(MsgRollback, new Dictionary<string, object>(), ct);
 
-        var (signature, metadata) = await ReadMessageAsync(ct);
-        _inTransaction = false;
+        var (signature, rollbackMeta) = await ReadMessageAsync(ct);
+        // P2-2708: only clear _inTransaction when rollback is confirmed. If the server
+        // returns a FAILURE response, the transaction may still be active on the server side.
+        if (signature == MsgSuccess)
+        {
+            _inTransaction = false;
+        }
+        else
+        {
+            // Rollback failed — transaction may still be active on the server.
+            // Throw so the caller does not reuse this connection silently.
+            var errMsg = rollbackMeta.TryGetValue("message", out var m) ? m?.ToString() : "Rollback rejected by server";
+            throw new InvalidOperationException($"[Neo4j] Rollback failed: {errMsg}. Connection must be discarded.");
+        }
     }
 
     /// <inheritdoc/>
@@ -392,7 +404,9 @@ public sealed class Neo4jBoltProtocolStrategy : DatabaseProtocolStrategyBase
         }
         catch
         {
+
             // Ignore errors during disconnect
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 
@@ -496,8 +510,13 @@ public sealed class Neo4jBoltProtocolStrategy : DatabaseProtocolStrategyBase
         var message = ms.ToArray();
         var offset = 0;
 
-        // Unpack structure
+        // Unpack structure — P2-2710: validate the marker is a Bolt struct marker (0xB0-0xBF).
+        // A non-struct marker means the message was malformed; reading the next byte as a signature
+        // would parse garbage. Throw a meaningful exception rather than silently misinterpreting.
         var marker = message[offset++];
+        if ((marker & 0xF0) != 0xB0)
+            throw new InvalidDataException(
+                $"Bolt protocol: expected struct marker (0xB0-0xBF) but got 0x{marker:X2}. Message may be malformed.");
         var fieldCount = marker & 0x0F;
         var signature = message[offset++];
 

@@ -489,7 +489,10 @@ public sealed class ParquetRegenerationStrategy : RegenerationStrategyBase
 
             var regeneratedContent = ReconstructParquetSchema(parquetInfo, options);
 
-            var structuralIntegrity = 0.9; // Parquet schema reconstruction
+            // Finding 3176: 0.9 was a hardcoded optimistic guess. Use a conservative heuristic based
+            // on how many columns and row groups were successfully parsed. Column schema is the primary
+            // structural value we reconstruct; actual binary row data is not regenerated.
+            var structuralIntegrity = parquetInfo.Columns.Count > 0 ? Math.Min(0.85, 0.5 + 0.05 * parquetInfo.Columns.Count) : 0.3;
             var semanticIntegrity = CalculateParquetSemanticIntegrity(parquetInfo, encodedData);
 
             var hash = ComputeHash(regeneratedContent);
@@ -572,11 +575,11 @@ public sealed class ParquetRegenerationStrategy : RegenerationStrategyBase
 
         // Parse row group info
         var rgMatch = Regex.Match(data, @"row_groups?\s*[:""]?\s*(\d+)");
-        info.RowGroupCount = rgMatch.Success ? int.Parse(rgMatch.Groups[1].Value) : 1;
+        info.RowGroupCount = rgMatch.Success && int.TryParse(rgMatch.Groups[1].Value, out var rgCount) ? rgCount : 1;
 
         // Parse row count
         var rowMatch = Regex.Match(data, @"(?:row_count|num_rows)\s*[:""]?\s*(\d+)");
-        info.RowCount = rowMatch.Success ? long.Parse(rowMatch.Groups[1].Value) : 0;
+        info.RowCount = rowMatch.Success && long.TryParse(rowMatch.Groups[1].Value, out var rowCount) ? rowCount : 0;
 
         return info;
     }

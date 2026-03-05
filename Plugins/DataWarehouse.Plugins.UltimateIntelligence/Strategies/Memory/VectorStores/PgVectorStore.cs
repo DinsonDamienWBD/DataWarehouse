@@ -83,7 +83,14 @@ public sealed class PgVectorStore : ProductionVectorStoreBase
 {
     private readonly PgVectorOptions _options;
     private int _dimensions;
-    private bool _initialized;
+    private volatile bool _initialized;
+    // Finding 3196: Guard _initialized check-and-set with a semaphore.
+    private readonly SemaphoreSlim _initLock = new(1, 1);
+
+    // Finding 3193: This implementation is an in-memory simulation.
+    // Production requires Npgsql + Npgsql.PgVector package with a real PostgreSQL connection.
+    /// <summary>Returns false because this implementation is an in-memory simulation only.</summary>
+    public bool IsProductionReady => false;
 
     // In-memory simulation for demonstration
     // In production, replace with Npgsql NpgsqlConnection
@@ -112,25 +119,32 @@ public sealed class PgVectorStore : ProductionVectorStoreBase
 
     private async Task EnsureInitializedAsync(CancellationToken ct)
     {
+        // Fast path — already initialized (volatile read).
         if (_initialized) return;
 
-        if (_options.AutoInitialize)
+        await _initLock.WaitAsync(ct);
+        try
         {
-            // In production, execute these SQL commands:
-            // CREATE EXTENSION IF NOT EXISTS vector;
-            // CREATE TABLE IF NOT EXISTS {table} (
-            //   id TEXT PRIMARY KEY,
-            //   embedding vector({dim}),
-            //   metadata JSONB,
-            //   created_at TIMESTAMPTZ DEFAULT NOW()
-            // );
-            // CREATE INDEX IF NOT EXISTS {table}_embedding_idx ON {table}
-            //   USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
+            // Finding 3196: Double-check inside the semaphore.
+            if (_initialized) return;
 
-            _initialized = true;
+            if (_options.AutoInitialize)
+            {
+                // In production, execute these SQL commands:
+                // CREATE EXTENSION IF NOT EXISTS vector;
+                // CREATE TABLE IF NOT EXISTS {table} (
+                //   id TEXT PRIMARY KEY,
+                //   embedding vector({dim}),
+                //   metadata JSONB,
+                //   created_at TIMESTAMPTZ DEFAULT NOW()
+                // );
+                // CREATE INDEX IF NOT EXISTS {table}_embedding_idx ON {table}
+                //   USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
+
+                _initialized = true;
+            }
         }
-
-        await Task.CompletedTask;
+        finally { _initLock.Release(); }
     }
 
     /// <inheritdoc/>

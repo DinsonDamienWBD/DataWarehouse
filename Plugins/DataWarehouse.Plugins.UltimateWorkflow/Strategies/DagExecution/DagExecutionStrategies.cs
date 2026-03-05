@@ -52,7 +52,10 @@ public sealed class TopologicalDagStrategy : WorkflowStrategyBase
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var readyTasks = GetReadyTasks(workflow, completed, running.Keys.ToHashSet())
+                // Re-use the running key set directly — BoundedDictionary.Keys is a snapshot-copy,
+                // so allocate it once per outer iteration rather than once per GetReadyTasks call.
+                var runningKeys = new HashSet<string>(running.Keys);
+                var readyTasks = GetReadyTasks(workflow, completed, runningKeys)
                     .OrderByDescending(t => (int)t.Priority)
                     .ToList();
 
@@ -78,9 +81,17 @@ public sealed class TopologicalDagStrategy : WorkflowStrategyBase
                 if (running.Count == 0 && completed.Count + failed.Count < workflow.Tasks.Count)
                     break;
 
-                var completedTask = await Task.WhenAny(running.Values);
+                await Task.WhenAny(running.Values);
 
-                foreach (var kvp in running.Where(kv => kv.Value.IsCompleted).ToList())
+                // Collect completed entries in one pass — avoids a second Where scan.
+                var toRemove = new List<KeyValuePair<string, Task<TaskResult>>>(running.Count);
+                foreach (var kvp in running)
+                {
+                    if (kvp.Value.IsCompleted)
+                        toRemove.Add(kvp);
+                }
+
+                foreach (var kvp in toRemove)
                 {
                     running.TryRemove(kvp.Key, out _);
                     var result = await kvp.Value;
@@ -198,6 +209,27 @@ public sealed class DynamicDagStrategy : WorkflowStrategyBase
 
                 if (readyTasks.Count == 0 && completed.Count + failed.Count >= allTasks.Count)
                     break;
+
+                // Guard against infinite spin when tasks are pending but none are ready — indicates
+                // an unresolvable dependency cycle introduced via AddDynamicTask. Fail fast rather
+                // than looping forever.
+                if (readyTasks.Count == 0)
+                {
+                    var pendingCount = allTasks.Count - completed.Count - failed.Count;
+                    if (pendingCount > 0)
+                    {
+                        return new WorkflowResult
+                        {
+                            WorkflowInstanceId = instanceId,
+                            Success = false,
+                            Status = WorkflowExecutionStatus.Failed,
+                            Duration = DateTime.UtcNow - startTime,
+                            TaskResults = context.TaskResults.ToDictionary(kv => kv.Key, kv => kv.Value),
+                            Error = $"Deadlock detected: {pendingCount} tasks pending but none are ready. Check for cyclic dependencies."
+                        };
+                    }
+                    break;
+                }
 
                 var executionTasks = readyTasks
                     .Take(workflow.MaxParallelism)

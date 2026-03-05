@@ -237,8 +237,11 @@ namespace DataWarehouse.SDK.Security.OsHardening
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Linux sandbox launch failed, attempting fallback for {Path}", pluginAssemblyPath);
-                return LaunchUnsupportedPlatform(pluginAssemblyPath, args);
+                // Fail-closed: do NOT fall back to unsandboxed execution
+                _logger.LogError(ex, "Linux sandbox launch failed for {Path}. Refusing to launch unsandboxed (fail-closed policy).", pluginAssemblyPath);
+                throw new InvalidOperationException(
+                    $"Plugin sandbox creation failed for '{pluginAssemblyPath}'. " +
+                    "Refusing to run plugin without isolation (fail-closed security policy).", ex);
             }
         }
 
@@ -301,8 +304,11 @@ namespace DataWarehouse.SDK.Security.OsHardening
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Windows sandbox launch failed for {Path}", pluginAssemblyPath);
-                return LaunchUnsupportedPlatform(pluginAssemblyPath, args);
+                // Fail-closed: do NOT fall back to unsandboxed execution
+                _logger.LogError(ex, "Windows sandbox launch failed for {Path}. Refusing to launch unsandboxed (fail-closed policy).", pluginAssemblyPath);
+                throw new InvalidOperationException(
+                    $"Plugin sandbox creation failed for '{pluginAssemblyPath}'. " +
+                    "Refusing to run plugin without isolation (fail-closed security policy).", ex);
             }
         }
 

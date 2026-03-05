@@ -12,7 +12,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
     /// GlusterFS connection strategy using REST management API (glusterd2).
     /// Connects to GlusterFS cluster via HTTP-based management API.
     /// </summary>
-    public class GlusterFsConnectionStrategy : ConnectionStrategyBase
+    public sealed class GlusterFsConnectionStrategy : ConnectionStrategyBase
     {
         /// <inheritdoc/>
         public override string StrategyId => "fs-glusterfs";
@@ -40,7 +40,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
 
         /// <summary>
         /// Establishes a connection to GlusterFS management API.
-        /// ConnectionString format: endpoint:port (e.g., "http://localhost:24007")
+        /// ConnectionString format: endpoint:port (e.g., "https://localhost:24007")
         /// Properties: "VolumeName" (optional, for volume-specific operations)
         /// </summary>
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
@@ -48,10 +48,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
             var endpoint = config.ConnectionString;
             var volumeName = GetConfiguration<string>(config, "VolumeName", "");
 
-            if (!endpoint.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+            if (!endpoint.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
                 !endpoint.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
             {
-                endpoint = $"http://{endpoint}";
+                endpoint = $"https://{endpoint}";
             }
 
             var httpClient = new HttpClient
@@ -61,7 +61,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
             };
 
             // Test connection by querying volumes endpoint
-            var response = await httpClient.GetAsync("/v1/volumes", ct);
+            using var response = await httpClient.GetAsync("/v1/volumes", ct);
             response.EnsureSuccessStatusCode();
 
             var connectionInfo = new Dictionary<string, object>
@@ -87,7 +87,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
             try
             {
                 var httpClient = handle.GetConnection<HttpClient>();
-                var response = await httpClient.GetAsync("/v1/volumes", ct);
+                using var response = await httpClient.GetAsync("/v1/volumes", ct);
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -110,7 +110,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
         /// </summary>
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
-            var startTime = DateTimeOffset.UtcNow;
+            // P2-1904: Use Stopwatch for latency — DateTimeOffset subtraction is susceptible
+            // to NTP/clock adjustments which can yield negative or wildly inaccurate latency.
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             try
             {
                 var httpClient = handle.GetConnection<HttpClient>();
@@ -118,7 +120,6 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
                     ? volName.ToString()
                     : null;
 
-                var start = DateTimeOffset.UtcNow;
                 HttpResponseMessage response;
 
                 // If a specific volume is configured, check its status
@@ -132,22 +133,22 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
                     response = await httpClient.GetAsync("/v1/volumes", ct);
                 }
 
-                var latency = DateTimeOffset.UtcNow - start;
-
+                sw.Stop();
                 return new ConnectionHealth(
                     IsHealthy: response.IsSuccessStatusCode,
                     StatusMessage: response.IsSuccessStatusCode
                         ? "GlusterFS cluster healthy"
                         : $"GlusterFS returned {response.StatusCode}",
-                    Latency: latency,
+                    Latency: sw.Elapsed,
                     CheckedAt: DateTimeOffset.UtcNow);
             }
             catch (Exception ex)
             {
+                sw.Stop();
                 return new ConnectionHealth(
                     IsHealthy: false,
                     StatusMessage: $"GlusterFS health check failed: {ex.Message}",
-                    Latency: DateTimeOffset.UtcNow - startTime,
+                    Latency: sw.Elapsed,
                     CheckedAt: DateTimeOffset.UtcNow);
             }
         }

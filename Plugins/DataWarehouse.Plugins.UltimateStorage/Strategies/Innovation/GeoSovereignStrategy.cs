@@ -38,6 +38,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private readonly BoundedDictionary<string, StorageRegion> _regions = new BoundedDictionary<string, StorageRegion>(1000);
         private readonly BoundedDictionary<string, DataResidencyRecord> _residencyRecords = new BoundedDictionary<string, DataResidencyRecord>(1000);
         private readonly BoundedDictionary<string, List<ComplianceAuditEntry>> _auditLog = new BoundedDictionary<string, List<ComplianceAuditEntry>>(1000);
+        private readonly object _auditLogLock = new object();
 
         public override string StrategyId => "geo-sovereign-storage";
         public override string Name => "Geo-Sovereign Compliance Storage";
@@ -216,9 +217,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Start with empty records
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -233,9 +236,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 var json = System.Text.Json.JsonSerializer.Serialize(_residencyRecords.ToDictionary(kvp => kvp.Key, kvp => kvp.Value));
                 await File.WriteAllTextAsync(recordsPath, json, ct);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Best effort save
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -261,9 +266,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Start with empty audit log
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -278,9 +285,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 var json = System.Text.Json.JsonSerializer.Serialize(_auditLog.ToDictionary(kvp => kvp.Key, kvp => kvp.Value));
                 await File.WriteAllTextAsync(auditPath, json, ct);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+
                 // Best effort save
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -333,7 +342,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 Created = DateTime.UtcNow,
                 StoragePath = filePath,
                 HasExplicitConsent = metadata?.ContainsKey("ExplicitConsent") == true
-                    ? bool.Parse(metadata["ExplicitConsent"])
+                    ? (bool.TryParse(metadata["ExplicitConsent"], out var consent) && consent)
                     : !region.RequiresExplicitConsent,
                 DataClassification = metadata?.ContainsKey("DataClassification") == true
                     ? metadata["DataClassification"]
@@ -622,7 +631,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             if (region.RequiresExplicitConsent && _requireExplicitConsent)
             {
                 var hasConsent = metadata?.ContainsKey("ExplicitConsent") == true
-                    && bool.Parse(metadata["ExplicitConsent"]);
+                    && bool.TryParse(metadata["ExplicitConsent"], out var consentVal)
+                    && consentVal;
 
                 if (!hasConsent)
                 {
@@ -649,18 +659,23 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         /// </summary>
         private void AddAuditEntry(string key, ComplianceAuditEntry entry)
         {
-            if (!_auditLog.TryGetValue(key, out var entries))
+            // _auditLog values are List<T> instances that may be mutated by concurrent callers.
+            // Lock around all read-check-write operations on both the dictionary and the list.
+            lock (_auditLogLock)
             {
-                entries = new List<ComplianceAuditEntry>();
-                _auditLog[key] = entries;
-            }
+                if (!_auditLog.TryGetValue(key, out var entries))
+                {
+                    entries = new List<ComplianceAuditEntry>();
+                    _auditLog[key] = entries;
+                }
 
-            entries.Add(entry);
+                entries.Add(entry);
 
-            // Keep only last 1000 entries per key
-            if (entries.Count > 1000)
-            {
-                entries.RemoveAt(0);
+                // Keep only last 1000 entries per key
+                if (entries.Count > 1000)
+                {
+                    entries.RemoveAt(0);
+                }
             }
         }
 

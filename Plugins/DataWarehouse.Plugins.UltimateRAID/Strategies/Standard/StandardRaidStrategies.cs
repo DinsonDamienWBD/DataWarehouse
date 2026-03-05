@@ -302,9 +302,11 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                 {
                     await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException ex)
                 {
+
                     // Graceful shutdown interrupted
+                    System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
                 }
                 _rebuildCancellation.Dispose();
                 _rebuildCancellation = null;
@@ -565,9 +567,11 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                 {
                     await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException ex)
                 {
+
                     // Graceful shutdown interrupted
+                    System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
                 }
                 _rebuildCancellation.Dispose();
                 _rebuildCancellation = null;
@@ -796,7 +800,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                 if (progressCallback != null)
                 {
                     var elapsed = DateTime.UtcNow - startTime;
-                    var speed = bytesRebuilt / elapsed.TotalSeconds;
+                    var speed = elapsed.TotalSeconds > 0 ? bytesRebuilt / elapsed.TotalSeconds : bytesRebuilt;
                     var remaining = (long)((totalBytes - bytesRebuilt) / speed);
 
                     progressCallback.Report(new RebuildProgress(
@@ -956,9 +960,11 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                 {
                     await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException ex)
                 {
+
                     // Graceful shutdown interrupted
+                    System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
                 }
                 _rebuildCancellation.Dispose();
                 _rebuildCancellation = null;
@@ -1226,7 +1232,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                 if (progressCallback != null)
                 {
                     var elapsed = DateTime.UtcNow - startTime;
-                    var speed = bytesRebuilt / elapsed.TotalSeconds;
+                    var speed = elapsed.TotalSeconds > 0 ? bytesRebuilt / elapsed.TotalSeconds : bytesRebuilt;
                     var remaining = (long)((totalBytes - bytesRebuilt) / speed);
 
                     progressCallback.Report(new RebuildProgress(
@@ -1344,9 +1350,11 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                 {
                     await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException ex)
                 {
+
                     // Graceful shutdown interrupted
+                    System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
                 }
                 _rebuildCancellation.Dispose();
                 _rebuildCancellation = null;
@@ -1536,7 +1544,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                 if (progressCallback != null)
                 {
                     var elapsed = DateTime.UtcNow - startTime;
-                    var speed = bytesRebuilt / elapsed.TotalSeconds;
+                    var speed = elapsed.TotalSeconds > 0 ? bytesRebuilt / elapsed.TotalSeconds : bytesRebuilt;
                     var remaining = (long)((totalBytes - bytesRebuilt) / speed);
 
                     progressCallback.Report(new RebuildProgress(

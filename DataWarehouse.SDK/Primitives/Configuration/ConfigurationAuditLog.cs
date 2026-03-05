@@ -28,7 +28,7 @@ public class ConfigurationAuditLog
     /// Current chain head hash for fast append validation.
     /// Initialized from existing log on construction or set to genesis hash.
     /// </summary>
-    private string _chainHeadHash;
+    private volatile string _chainHeadHash;
 
     /// <summary>
     /// Creates a new configuration audit log writing to the specified file.
@@ -72,38 +72,40 @@ public class ConfigurationAuditLog
     /// Log a configuration change with hash chain integrity protection.
     /// Append-only: never modifies existing entries.
     /// </summary>
-    public Task LogChangeAsync(string user, string settingPath, object? oldValue, object? newValue, string? reason = null)
+    public async Task LogChangeAsync(string user, string settingPath, object? oldValue, object? newValue, string? reason = null)
     {
+        string finalJson;
+        string integrityHash;
+
         lock (_lock)
         {
             var previousHash = _chainHeadHash;
 
             // Create entry without hash first to compute hash
+            // Finding 534: serialize complex objects to JSON rather than calling .ToString()
             var entryData = new AuditEntry(
                 DateTime.UtcNow,
                 user ?? "System",
                 settingPath,
-                oldValue?.ToString(),
-                newValue?.ToString(),
+                SerializeValue(oldValue),
+                SerializeValue(newValue),
                 reason,
                 IntegrityHash: null,
                 PreviousHash: previousHash);
 
             // Compute integrity hash: SHA-256(previousHash + entryData)
             var entryJson = JsonSerializer.Serialize(entryData);
-            var integrityHash = ComputeSha256(previousHash + entryJson);
+            integrityHash = ComputeSha256(previousHash + entryJson);
 
             // Create final entry with integrity hash
             var finalEntry = entryData with { IntegrityHash = integrityHash };
-            var finalJson = JsonSerializer.Serialize(finalEntry);
+            finalJson = JsonSerializer.Serialize(finalEntry);
 
-            File.AppendAllText(_auditFilePath, finalJson + Environment.NewLine);
-
-            // Update chain head
+            // Update chain head inside lock to maintain chain ordering
             _chainHeadHash = integrityHash;
         }
 
-        return Task.CompletedTask;
+        await File.AppendAllTextAsync(_auditFilePath, finalJson + Environment.NewLine).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -253,5 +255,22 @@ public class ConfigurationAuditLog
         }
 
         return GenesisHash;
+    }
+
+    /// <summary>
+    /// Serializes a value for audit recording.
+    /// Primitives use their string representation; complex objects are serialized to JSON
+    /// so the audit record contains actual content rather than type names.
+    /// </summary>
+    private static string? SerializeValue(object? value)
+    {
+        if (value is null) return null;
+        return value switch
+        {
+            string s => s,
+            bool or byte or sbyte or short or ushort or int or uint or long or ulong
+                or float or double or decimal => value.ToString(),
+            _ => JsonSerializer.Serialize(value)
+        };
     }
 }

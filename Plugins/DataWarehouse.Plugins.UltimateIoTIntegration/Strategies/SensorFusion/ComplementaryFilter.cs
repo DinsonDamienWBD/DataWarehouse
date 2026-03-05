@@ -11,6 +11,7 @@ namespace DataWarehouse.Plugins.UltimateIoTIntegration.Strategies.SensorFusion;
 public sealed class ComplementaryFilter
 {
     private readonly double _alpha;
+    private readonly object _stateLock = new();
     private double _roll;
     private double _pitch;
     private double _yaw;
@@ -45,6 +46,9 @@ public sealed class ComplementaryFilter
         if (gyroscope.Length != 3)
             throw new ArgumentException("Gyroscope must have 3 elements [gx, gy, gz]");
 
+        if (dt <= 0)
+            throw new ArgumentOutOfRangeException(nameof(dt), "Time step must be positive. Zero or negative dt from clock skew produces invalid orientation.");
+
         // Extract sensor readings
         double ax = accelerometer[0];
         double ay = accelerometer[1];
@@ -54,23 +58,25 @@ public sealed class ComplementaryFilter
         double gz = gyroscope[2];
 
         // Compute roll and pitch from accelerometer (tilt sensing)
-        // Roll: rotation around X-axis
-        // Pitch: rotation around Y-axis
+        // Roll: rotation around X-axis; Pitch: rotation around Y-axis
         double accelRoll = Math.Atan2(ay, az);
         double accelPitch = Math.Atan2(-ax, Math.Sqrt(ay * ay + az * az));
 
-        // Integrate gyroscope for high-frequency changes
-        double gyroRoll = _roll + gx * dt;
-        double gyroPitch = _pitch + gy * dt;
-        double gyroYaw = _yaw + gz * dt;
+        // Lock guards all reads and writes of _roll/_pitch/_yaw to prevent torn reads on
+        // 32-bit platforms where double writes are not guaranteed to be atomic.
+        lock (_stateLock)
+        {
+            // Integrate gyroscope for high-frequency changes (must be inside lock — reads _roll etc.)
+            double gyroRoll = _roll + gx * dt;
+            double gyroPitch = _pitch + gy * dt;
+            double gyroYaw = _yaw + gz * dt;
 
-        // Complementary filter: combine gyro (high-pass) with accel (low-pass)
-        // angle = alpha * (angle + gyro * dt) + (1-alpha) * accel_angle
-        _roll = _alpha * gyroRoll + (1.0 - _alpha) * accelRoll;
-        _pitch = _alpha * gyroPitch + (1.0 - _alpha) * accelPitch;
-        _yaw = gyroYaw; // Yaw from gyro only (accelerometer can't measure yaw)
-
-        return new double[] { _roll, _pitch, _yaw };
+            // Complementary filter: combine gyro (high-pass) with accel (low-pass)
+            _roll = _alpha * gyroRoll + (1.0 - _alpha) * accelRoll;
+            _pitch = _alpha * gyroPitch + (1.0 - _alpha) * accelPitch;
+            _yaw = gyroYaw; // Yaw from gyro only (accelerometer can't measure yaw)
+            return new double[] { _roll, _pitch, _yaw };
+        }
     }
 
     /// <summary>
@@ -78,9 +84,12 @@ public sealed class ComplementaryFilter
     /// </summary>
     public void Reset()
     {
-        _roll = 0.0;
-        _pitch = 0.0;
-        _yaw = 0.0;
+        lock (_stateLock)
+        {
+            _roll = 0.0;
+            _pitch = 0.0;
+            _yaw = 0.0;
+        }
     }
 
     /// <summary>
@@ -89,6 +98,9 @@ public sealed class ComplementaryFilter
     /// <returns>Current orientation [roll, pitch, yaw] in radians.</returns>
     public double[] GetOrientation()
     {
-        return new double[] { _roll, _pitch, _yaw };
+        lock (_stateLock)
+        {
+            return new double[] { _roll, _pitch, _yaw };
+        }
     }
 }

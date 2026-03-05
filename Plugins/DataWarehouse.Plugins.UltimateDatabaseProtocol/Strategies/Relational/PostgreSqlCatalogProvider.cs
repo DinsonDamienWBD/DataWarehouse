@@ -334,11 +334,15 @@ public sealed class PostgreSqlCatalogProvider
 
         var dataRows = new List<List<byte[]?>>();
         var tableNames = await GetTableNamesInternalAsync(ct);
-        int tableOid = 16384;
 
-        foreach (var tableName in tableNames)
+        // P2-2750: fetch all tables' columns in parallel instead of sequential N+1 awaits.
+        var columnTasks = tableNames.Select(t => GetTableColumnsInternalAsync(t, ct)).ToArray();
+        var allColumns = await Task.WhenAll(columnTasks);
+
+        int tableOid = 16384;
+        for (var ti = 0; ti < tableNames.Count; ti++)
         {
-            var columns = await GetTableColumnsInternalAsync(tableName, ct);
+            var columns = allColumns[ti];
             short attNum = 1;
 
             foreach (var col in columns)

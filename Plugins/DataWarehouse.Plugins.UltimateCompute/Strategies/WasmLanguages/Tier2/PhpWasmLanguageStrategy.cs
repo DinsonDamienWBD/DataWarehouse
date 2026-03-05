@@ -29,6 +29,9 @@ internal sealed class PhpWasmLanguageStrategy : WasmLanguageStrategyBase
     public override string StrategyId => "compute.wasm.lang.php";
 
     /// <inheritdoc/>
+    protected override string[] GetToolchainBinaryNames() => new[] { "php" };
+
+    /// <inheritdoc/>
     public override string StrategyName => "PHP WASM Language";
 
     /// <inheritdoc/>

@@ -17,6 +17,8 @@ public sealed class JaegerStrategy : ObservabilityStrategyBase
 {
     private readonly HttpClient _httpClient;
     private string _collectorUrl = "http://localhost:14268";
+    // LOW-4687: Separate query URL for Jaeger UI/query API (default port 16686).
+    private string _queryUrl = "http://localhost:16686";
     private string _serviceName = "datawarehouse";
 
     public override string StrategyId => "jaeger";
@@ -30,10 +32,13 @@ public sealed class JaegerStrategy : ObservabilityStrategyBase
         _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
     }
 
-    public void Configure(string collectorUrl, string serviceName = "datawarehouse")
+    public void Configure(string collectorUrl, string serviceName = "datawarehouse", string? queryUrl = null)
     {
         _collectorUrl = collectorUrl.TrimEnd('/');
         _serviceName = serviceName;
+        // LOW-4687: Accept explicit query URL to avoid fragile port substitution heuristics.
+        if (!string.IsNullOrEmpty(queryUrl))
+            _queryUrl = queryUrl.TrimEnd('/');
     }
 
     protected override async Task TracingAsyncCore(IEnumerable<SpanContext> spans, CancellationToken cancellationToken)
@@ -53,16 +58,18 @@ public sealed class JaegerStrategy : ObservabilityStrategyBase
             },
             spans = spans.Select(span => new
             {
-                traceIdLow = ConvertToLong(span.TraceId.Substring(0, Math.Min(16, span.TraceId.Length))),
-                traceIdHigh = span.TraceId.Length > 16 ? ConvertToLong(span.TraceId.Substring(16)) : 0L,
-                spanId = ConvertToLong(span.SpanId),
-                parentSpanId = span.ParentSpanId != null ? ConvertToLong(span.ParentSpanId) : 0L,
+                // P2-4671: Pad or truncate TraceId/SpanId to expected hex widths before conversion.
+                // An empty string would fall through ConvertToLong to GetHashCode() — unpredictable.
+                traceIdLow = ConvertToLong(NormalizeHexId(span.TraceId, 32).Substring(0, 16)),
+                traceIdHigh = ConvertToLong(NormalizeHexId(span.TraceId, 32).Substring(16)),
+                spanId = ConvertToLong(NormalizeHexId(span.SpanId, 16)),
+                parentSpanId = span.ParentSpanId != null ? ConvertToLong(NormalizeHexId(span.ParentSpanId, 16)) : 0L,
                 operationName = span.OperationName,
                 references = span.ParentSpanId != null ? new[]
                 {
-                    new { refType = "CHILD_OF", traceIdLow = ConvertToLong(span.TraceId.Substring(0, Math.Min(16, span.TraceId.Length))),
-                          traceIdHigh = span.TraceId.Length > 16 ? ConvertToLong(span.TraceId.Substring(16)) : 0L,
-                          spanId = ConvertToLong(span.ParentSpanId) }
+                    new { refType = "CHILD_OF", traceIdLow = ConvertToLong(NormalizeHexId(span.TraceId, 32).Substring(0, 16)),
+                          traceIdHigh = ConvertToLong(NormalizeHexId(span.TraceId, 32).Substring(16)),
+                          spanId = ConvertToLong(NormalizeHexId(span.ParentSpanId, 16)) }
                 } : Array.Empty<object>(),
                 flags = 1,
                 startTime = span.StartTime.ToUnixTimeMicroseconds(),
@@ -79,20 +86,51 @@ public sealed class JaegerStrategy : ObservabilityStrategyBase
 
         var json = JsonSerializer.Serialize(batch);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{_collectorUrl}/api/traces", content, cancellationToken);
+        using var response = await _httpClient.PostAsync($"{_collectorUrl}/api/traces", content, cancellationToken);
         response.EnsureSuccessStatusCode();
+    }
+
+    /// <summary>
+    /// Normalizes a hex string to exactly <paramref name="width"/> characters.
+    /// Pads with leading zeros if shorter; takes the last <paramref name="width"/> chars if longer.
+    /// If the string is null or empty, returns a zero-padded string of the required width.
+    /// </summary>
+    private static string NormalizeHexId(string? id, int width)
+    {
+        if (string.IsNullOrEmpty(id))
+            return new string('0', width);
+        if (id.Length == width)
+            return id;
+        if (id.Length < width)
+            return id.PadLeft(width, '0');
+        // Take the rightmost `width` characters (most-significant bits may be zero-padded upstream).
+        return id[^width..];
     }
 
     private static long ConvertToLong(string hexString)
     {
+        if (string.IsNullOrEmpty(hexString))
+            return 0L;
         if (long.TryParse(hexString, System.Globalization.NumberStyles.HexNumber, null, out var result))
             return result;
-        return hexString.GetHashCode();
+        // Non-hex content — return a stable deterministic value rather than a hash which varies per run.
+        return 0L;
     }
+
+    /// <summary>
+    /// Gets the Jaeger Query UI base URL.
+    /// Uses <see cref="_queryUrl"/> which is explicitly configured rather than port-substitution heuristics.
+    /// </summary>
+    private string QueryUrl => string.IsNullOrEmpty(_queryUrl)
+        ? _collectorUrl  // fallback if query URL not separately configured
+        : _queryUrl;
 
     public async Task<string> GetServicesAsync(CancellationToken ct = default)
     {
-        var response = await _httpClient.GetAsync($"{_collectorUrl.Replace("14268", "16686")}/api/services", ct);
+        // LOW-4687: Replaced brittle string.Replace("14268", "16686") with a properly
+        // configured query URL that doesn't break for non-default ports.
+        using var response = await _httpClient.GetAsync($"{QueryUrl}/api/services", ct);
+        response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(ct);
     }
 
@@ -100,7 +138,8 @@ public sealed class JaegerStrategy : ObservabilityStrategyBase
     {
         var query = $"service={Uri.EscapeDataString(service)}&limit={limit}";
         if (!string.IsNullOrEmpty(operation)) query += $"&operation={Uri.EscapeDataString(operation)}";
-        var response = await _httpClient.GetAsync($"{_collectorUrl.Replace("14268", "16686")}/api/traces?{query}", ct);
+        using var response = await _httpClient.GetAsync($"{QueryUrl}/api/traces?{query}", ct);
+        response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(ct);
     }
 
@@ -114,7 +153,7 @@ public sealed class JaegerStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{_collectorUrl}/", ct);
+            using var response = await _httpClient.GetAsync($"{_collectorUrl}/", ct);
             return new HealthCheckResult(response.IsSuccessStatusCode,
                 response.IsSuccessStatusCode ? "Jaeger collector is healthy" : "Jaeger unhealthy",
                 new Dictionary<string, object> { ["collectorUrl"] = _collectorUrl, ["serviceName"] = _serviceName });
@@ -134,17 +173,11 @@ public sealed class JaegerStrategy : ObservabilityStrategyBase
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("jaeger.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     protected override void Dispose(bool disposing) { if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }

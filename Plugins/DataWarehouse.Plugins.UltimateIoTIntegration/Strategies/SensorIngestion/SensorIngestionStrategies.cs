@@ -254,11 +254,16 @@ public class BufferedIngestionStrategy : SensorIngestionStrategyBase
             {
                 if (subscription.DeviceId == null || kvp.Key == subscription.DeviceId)
                 {
+                    // Copy under lock; yield outside the lock — C# does not allow
+                    // yield inside a lock block (compiler error) and holding a lock
+                    // across an async yield point would cause a deadlock anyway.
+                    List<TelemetryMessage> snapshot;
                     lock (kvp.Value)
                     {
-                        foreach (var message in kvp.Value)
-                            yield return message;
+                        snapshot = new List<TelemetryMessage>(kvp.Value);
                     }
+                    foreach (var message in snapshot)
+                        yield return message;
                 }
             }
             await Task.Delay(1000, ct);
@@ -334,13 +339,16 @@ public class TimeSeriesIngestionStrategy : SensorIngestionStrategyBase
             {
                 if (subscription.DeviceId == null || kvp.Key == subscription.DeviceId)
                 {
+                    // P2-3423: take snapshot under lock; yield outside lock (C# disallows yield-in-lock).
+                    List<TelemetryMessage> snapshot;
                     lock (kvp.Value)
                     {
-                        foreach (var message in kvp.Value.Values.Where(m => m.Timestamp > lastSeen))
-                        {
-                            lastSeen = message.Timestamp;
-                            yield return message;
-                        }
+                        snapshot = kvp.Value.Values.Where(m => m.Timestamp > lastSeen).ToList();
+                    }
+                    foreach (var message in snapshot)
+                    {
+                        lastSeen = message.Timestamp;
+                        yield return message;
                     }
                 }
             }
@@ -366,7 +374,7 @@ public class AggregatingIngestionStrategy : SensorIngestionStrategyBase
         var windowKey = $"{message.DeviceId}:{message.Timestamp:yyyy-MM-dd-HH-mm}";
         var window = _windows.GetOrAdd(windowKey, _ => new AggregationWindow());
 
-        window.Count++;
+        Interlocked.Increment(ref window.Count); // LOW-3429: atomic increment
         foreach (var kvp in message.Data)
         {
             if (kvp.Value is double value)
@@ -413,18 +421,45 @@ public class AggregatingIngestionStrategy : SensorIngestionStrategyBase
         {
             await Task.Delay(60000, ct); // Emit aggregated data every minute
 
-            // Yield aggregated telemetry
-            yield return new TelemetryMessage
+            // Snapshot all current windows and yield as aggregated messages
+            var windowKeys = _windows.Keys.ToList();
+            foreach (var windowKey in windowKeys)
             {
-                DeviceId = subscription.DeviceId ?? "*",
-                MessageId = Guid.NewGuid().ToString(),
-                Timestamp = DateTimeOffset.UtcNow,
-                Data = new Dictionary<string, object>
+                if (!_windows.TryGetValue(windowKey, out var window)) continue;
+
+                // Apply device filter if provided
+                var parts = windowKey.Split(':');
+                var deviceId = parts.Length > 0 ? parts[0] : windowKey;
+                if (subscription.DeviceId != null && subscription.DeviceId != "*" &&
+                    subscription.DeviceId != deviceId)
+                    continue;
+
+                var data = new Dictionary<string, object>
                 {
                     ["aggregation_type"] = "minute",
-                    ["window_count"] = 1
+                    ["window_count"] = window.Count
+                };
+
+                foreach (var key in window.Sum.Keys)
+                {
+                    if (window.Sum.TryGetValue(key, out var sum))
+                        data[$"{key}_sum"] = sum;
+                    if (window.Min.TryGetValue(key, out var min))
+                        data[$"{key}_min"] = min;
+                    if (window.Max.TryGetValue(key, out var max))
+                        data[$"{key}_max"] = max;
+                    if (window.Count > 0 && window.Sum.TryGetValue(key, out var s))
+                        data[$"{key}_avg"] = s / window.Count;
                 }
-            };
+
+                yield return new TelemetryMessage
+                {
+                    DeviceId = deviceId,
+                    MessageId = Guid.NewGuid().ToString(),
+                    Timestamp = DateTimeOffset.UtcNow,
+                    Data = data
+                };
+            }
         }
     }
 

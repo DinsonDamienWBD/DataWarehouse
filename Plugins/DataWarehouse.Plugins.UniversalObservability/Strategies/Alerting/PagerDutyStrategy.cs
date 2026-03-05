@@ -32,6 +32,7 @@ public sealed class PagerDutyStrategy : ObservabilityStrategyBase
         _apiToken = apiToken;
         if (!string.IsNullOrEmpty(_apiToken))
         {
+            _httpClient.DefaultRequestHeaders.Remove("Authorization");
             _httpClient.DefaultRequestHeaders.Add("Authorization", $"Token token={_apiToken}");
         }
     }
@@ -59,7 +60,7 @@ public sealed class PagerDutyStrategy : ObservabilityStrategyBase
 
         var json = JsonSerializer.Serialize(payload);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync("https://events.pagerduty.com/v2/enqueue", content, ct);
+        using var response = await _httpClient.PostAsync("https://events.pagerduty.com/v2/enqueue", content, ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -126,7 +127,7 @@ public sealed class PagerDutyStrategy : ObservabilityStrategyBase
 
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await _httpClient.PostAsync("https://events.pagerduty.com/v2/change/enqueue", content, ct);
+            using var response = await _httpClient.PostAsync("https://events.pagerduty.com/v2/change/enqueue", content, ct);
 
             return new HealthCheckResult(response.IsSuccessStatusCode,
                 response.IsSuccessStatusCode ? "PagerDuty is healthy" : "PagerDuty unhealthy",
@@ -146,17 +147,11 @@ public sealed class PagerDutyStrategy : ObservabilityStrategyBase
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("pager_duty.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     protected override void Dispose(bool disposing) { if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }

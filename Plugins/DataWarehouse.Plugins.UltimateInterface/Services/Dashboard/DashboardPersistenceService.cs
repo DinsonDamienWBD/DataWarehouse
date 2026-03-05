@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts.Dashboards;
 using DataWarehouse.SDK.Utilities;
@@ -29,6 +30,10 @@ public sealed class DashboardPersistenceService
     /// </summary>
     public PersistedDashboard Save(string tenantId, Dashboard dashboard, string userId)
     {
+        // P2-3263: guard null/empty to prevent key corruption across tenant boundaries
+        ArgumentException.ThrowIfNullOrEmpty(tenantId);
+        ArgumentNullException.ThrowIfNull(dashboard);
+        ArgumentException.ThrowIfNullOrEmpty(userId);
         var id = dashboard.Id ?? Guid.NewGuid().ToString("N");
         var persisted = new PersistedDashboard
         {
@@ -55,6 +60,8 @@ public sealed class DashboardPersistenceService
     /// </summary>
     public PersistedDashboard? Update(string tenantId, string dashboardId, Dashboard dashboard, string userId)
     {
+        ArgumentException.ThrowIfNullOrEmpty(tenantId);
+        ArgumentException.ThrowIfNullOrEmpty(dashboardId);
         var key = BuildKey(tenantId, dashboardId);
         if (!_dashboards.TryGetValue(key, out var existing)) return null;
 
@@ -76,6 +83,8 @@ public sealed class DashboardPersistenceService
     /// </summary>
     public PersistedDashboard? Get(string tenantId, string dashboardId)
     {
+        ArgumentException.ThrowIfNullOrEmpty(tenantId);
+        ArgumentException.ThrowIfNullOrEmpty(dashboardId);
         var key = BuildKey(tenantId, dashboardId);
         return _dashboards.TryGetValue(key, out var dashboard) ? dashboard : null;
     }
@@ -266,9 +275,16 @@ public sealed class DashboardPersistenceService
                     _dashboards[key] = dashboard;
                 }
             }
-            catch (JsonException)
+            catch (OperationCanceledException)
             {
-                // Skip corrupted files
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // P2-3259: Catch IOException and UnauthorizedAccessException in addition to
+                // JsonException so a single bad file doesn't abort the entire load.
+                // Trace is visible in Release builds; Debug.WriteLine is stripped.
+                Trace.TraceWarning($"[DashboardPersistenceService] Skipping file '{file}': {ex.GetType().Name}: {ex.Message}");
             }
         }
     }
@@ -281,7 +297,9 @@ public sealed class DashboardPersistenceService
             .GroupBy(d => d.TenantId)
             .ToDictionary(g => g.Key, g => g.Count());
 
-    private static string BuildKey(string tenantId, string dashboardId) => $"{tenantId}:{dashboardId}";
+    // P2-3262: Use U+001F (unit separator) as key separator to prevent collisions when
+    // tenantId or dashboardId contains a colon character.
+    private static string BuildKey(string tenantId, string dashboardId) => $"{tenantId}\x1F{dashboardId}";
 
     private void RecordVersion(string key, PersistedDashboard dashboard)
     {

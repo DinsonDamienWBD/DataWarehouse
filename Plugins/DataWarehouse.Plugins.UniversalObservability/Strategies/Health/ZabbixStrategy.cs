@@ -67,7 +67,7 @@ public sealed class ZabbixStrategy : ObservabilityStrategyBase
     {
         var json = JsonSerializer.Serialize(request);
         var content = new StringContent(json, Encoding.UTF8, "application/json-rpc");
-        var response = await _httpClient.PostAsync(_apiUrl, content, ct);
+        using var response = await _httpClient.PostAsync(_apiUrl, content, ct);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(ct);
     }
@@ -136,7 +136,10 @@ public sealed class ZabbixStrategy : ObservabilityStrategyBase
 
         if (!string.IsNullOrEmpty(severity))
         {
-            @params["severities"] = new[] { int.Parse(severity) };
+            // P2-4606: guard against non-numeric severity strings — FormatException on bare int.Parse.
+            if (!int.TryParse(severity, out var severityInt))
+                throw new ArgumentException($"Invalid severity value '{severity}': must be a numeric Zabbix severity level (0-5).", nameof(severity));
+            @params["severities"] = new[] { severityInt };
         }
 
         var request = new
@@ -211,18 +214,13 @@ public sealed class ZabbixStrategy : ObservabilityStrategyBase
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("zabbix.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
-    protected override void Dispose(bool disposing) { if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }
+    protected override void Dispose(bool disposing) {
+                _password = string.Empty; if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }
 }

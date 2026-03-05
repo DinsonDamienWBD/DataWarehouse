@@ -54,12 +54,23 @@ internal sealed class TransparentCompressionStrategy : StorageProcessingStrategy
             await using var input = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, true);
             await using var output = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
 
+            // Note: "zstd" and "lz4" magic bytes detected above are used for detection only.
+            // Real decompression for zstd/lz4 requires native libraries not in .NET BCL.
+            // Fall back to the underlying stream format that was actually used to create them.
+            if (detectedFormat is "zstd" or "lz4")
+            {
+                throw new NotSupportedException(
+                    $"Decompression of {detectedFormat.ToUpperInvariant()} format requires a native library " +
+                    $"(ZstdSharp/ZstdNet for Zstd; K4os.Compression.LZ4 for LZ4). " +
+                    $"Add the appropriate NuGet package reference.");
+            }
+
             Stream decompressor = detectedFormat switch
             {
                 "gzip" => new GZipStream(input, CompressionMode.Decompress),
                 "brotli" => new BrotliStream(input, CompressionMode.Decompress),
-                "zlib" or "zstd" => new ZLibStream(input, CompressionMode.Decompress),
-                "deflate" or "lz4" => new DeflateStream(input, CompressionMode.Decompress),
+                "zlib" => new ZLibStream(input, CompressionMode.Decompress),
+                "deflate" => new DeflateStream(input, CompressionMode.Decompress),
                 _ => new GZipStream(input, CompressionMode.Decompress)
             };
 
@@ -70,7 +81,16 @@ internal sealed class TransparentCompressionStrategy : StorageProcessingStrategy
         }
         else
         {
-            var extension = targetFormat switch { "brotli" => ".br", "gzip" => ".gz", "zstd" => ".zst", "lz4" => ".lz4", _ => ".gz" };
+            // zstd and lz4 require native libraries not in .NET BCL
+            if (targetFormat is "zstd" or "lz4")
+            {
+                throw new NotSupportedException(
+                    $"Compression to {targetFormat.ToUpperInvariant()} format requires a native library " +
+                    $"(ZstdSharp/ZstdNet for Zstd; K4os.Compression.LZ4 for LZ4). " +
+                    $"Add the appropriate NuGet package reference.");
+            }
+
+            var extension = targetFormat switch { "brotli" => ".br", "gzip" => ".gz", "deflate" => ".deflate", _ => ".gz" };
             outputPath = sourcePath + extension;
 
             await using var input = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, true);
@@ -79,8 +99,8 @@ internal sealed class TransparentCompressionStrategy : StorageProcessingStrategy
             Stream compressor = targetFormat switch
             {
                 "brotli" => new BrotliStream(output, CompressionLevel.Optimal, leaveOpen: true),
-                "zstd" or "zlib" => new ZLibStream(output, CompressionLevel.Optimal, leaveOpen: true),
-                "lz4" or "deflate" => new DeflateStream(output, CompressionLevel.Fastest, leaveOpen: true),
+                "zlib" => new ZLibStream(output, CompressionLevel.Optimal, leaveOpen: true),
+                "deflate" => new DeflateStream(output, CompressionLevel.Fastest, leaveOpen: true),
                 _ => new GZipStream(output, CompressionLevel.Optimal, leaveOpen: true)
             };
 

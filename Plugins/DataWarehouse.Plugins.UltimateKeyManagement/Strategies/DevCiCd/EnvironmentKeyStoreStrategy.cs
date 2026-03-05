@@ -107,9 +107,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
                     // Attempt to decode as base64
                     return Task.FromResult(Convert.FromBase64String(keyValue));
                 }
-                catch
+                catch (FormatException)
                 {
-                    // If not base64, derive key from the value
+                    // P2-3473: Only silently fall through for malformed base64 — re-throw all
+                    // other exceptions (OutOfMemoryException, etc.) to avoid masking real errors.
+                    // Trace the fall-through so operators know the env var is plain text, not base64.
+                    System.Diagnostics.Trace.TraceInformation(
+                        $"[EnvironmentKeyStoreStrategy] Key '{keyId}' env var is not valid base64; deriving key from string value.");
                     return Task.FromResult(DeriveKeyFromString(keyValue));
                 }
             }
@@ -138,12 +142,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
             _generatedKeys[keyId] = keyData;
             _currentKeyId = keyId;
 
-            // Optionally, we could suggest setting the environment variable
+            // Emit hint without exposing key material. The actual key value must never be logged.
             var envVarName = GetEnvironmentVariableName(keyId);
-            var keyBase64 = Convert.ToBase64String(keyData);
-
             System.Diagnostics.Trace.TraceInformation(
-                $"Key '{keyId}' generated. To persist, set environment variable: {envVarName}={keyBase64}");
+                $"Key '{keyId}' generated ({keyData.Length} bytes). To persist, set environment variable: {envVarName}=<base64-encoded-key>");
 
             return Task.CompletedTask;
         }

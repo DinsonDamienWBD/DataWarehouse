@@ -302,6 +302,12 @@ public abstract class ServerlessStrategyBase
     public virtual ServerlessPlatform? TargetPlatform => null;
 
     /// <summary>
+    /// Indicates whether this strategy is production-ready.
+    /// Override with <c>false</c> for strategies that require external runtimes or SDKs not present in-process.
+    /// </summary>
+    public virtual bool IsProductionReady => true;
+
+    /// <summary>
     /// Records an operation for statistics.
     /// </summary>
     protected void RecordOperation(string operationType = "default")

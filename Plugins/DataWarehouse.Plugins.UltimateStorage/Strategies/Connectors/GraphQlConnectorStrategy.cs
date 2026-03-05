@@ -87,6 +87,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                 Timeout = TimeSpan.FromSeconds(_timeoutSeconds)
             };
 
+            _httpClient.DefaultRequestHeaders.Remove("Accept");
             _httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
 
             if (!string.IsNullOrEmpty(_authToken))
@@ -300,7 +301,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
         protected override async Task DeleteAsyncCore(string key, CancellationToken ct)
         {
             // GraphQL doesn't have native delete - execute a delete mutation
-            var deleteMutation = $"mutation {{ delete{ParseGraphQLKey(key)} }}";
+            // Validate the parsed key component to prevent injection into the mutation
+            var parsedKey = ParseGraphQLKey(key);
+            if (!System.Text.RegularExpressions.Regex.IsMatch(parsedKey, @"^[A-Za-z_][A-Za-z0-9_()""':,\s]*$"))
+            {
+                throw new ArgumentException($"GraphQL delete key contains invalid characters: {parsedKey}");
+            }
+            var deleteMutation = $"mutation {{ delete{parsedKey} }}";
 
             var payload = new { query = deleteMutation };
 
@@ -359,7 +366,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                     yield break;
 
                 var json = await response.Content.ReadAsStringAsync(ct);
-                var doc = JsonDocument.Parse(json);
+                using var doc = JsonDocument.Parse(json);
 
                 if (!doc.RootElement.TryGetProperty("data", out var data) ||
                     !data.TryGetProperty("__schema", out var schema) ||
@@ -405,12 +412,39 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
 
             IncrementOperationCounter(StorageOperationType.GetMetadata);
 
+            // Execute a lightweight probe query to determine actual response size and connectivity.
+            // We use __typename which is always available and blocked only by full schema introspection controls.
+            long responseSize = 0;
+            var checkedAt = DateTime.UtcNow;
+            try
+            {
+                await _httpLock.WaitAsync(ct);
+                try
+                {
+                    var probePayload = new { query = "{ __typename }" };
+                    var response = await _httpClient!.PostAsJsonAsync("", probePayload, ct);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var content = await response.Content.ReadAsStringAsync(ct);
+                        responseSize = System.Text.Encoding.UTF8.GetByteCount(content);
+                    }
+                }
+                finally
+                {
+                    _httpLock.Release();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[GraphQlConnectorStrategy.GetMetadataAsyncCore] probe failed: {ex.GetType().Name}: {ex.Message}");
+            }
+
             return new StorageObjectMetadata
             {
                 Key = key,
-                Size = 0,
-                Created = DateTime.MinValue,
-                Modified = DateTime.UtcNow,
+                Size = responseSize,
+                Created = checkedAt,
+                Modified = checkedAt,
                 ETag = $"\"{Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(key))).Substring(0, 16)}\"",
                 ContentType = "application/graphql",
                 CustomMetadata = new Dictionary<string, string>

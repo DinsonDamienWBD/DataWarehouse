@@ -40,6 +40,7 @@ internal sealed class ClaudeMcpStrategy : SdkInterface.InterfaceStrategyBase, IP
     public string[] Tags => new[] { "claude", "mcp", "ai", "anthropic", "json-rpc", "tools", "resources" };
 
     // SDK contract properties
+    public override bool IsProductionReady => false;
     public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.Custom;
     public override SdkInterface.InterfaceCapabilities Capabilities => new SdkInterface.InterfaceCapabilities(
         SupportsStreaming: true, // SSE support
@@ -203,7 +204,22 @@ internal sealed class ClaudeMcpStrategy : SdkInterface.InterfaceStrategyBase, IP
         // Route tool execution via message bus
         if (IsIntelligenceAvailable)
         {
-            // In production, this would send to appropriate topic based on toolName
+            var topic = toolName switch
+            {
+                "query_data" => "data.query",
+                "write_data" => "data.write",
+                "analyze_data" => "intelligence.analyze",
+                _ => $"mcp.tool.{toolName}"
+            };
+            await MessageBus!.SendAsync(topic, new DataWarehouse.SDK.Utilities.PluginMessage
+            {
+                Type = topic,
+                Payload = new System.Collections.Generic.Dictionary<string, object>
+                {
+                    ["toolName"] = toolName,
+                    ["arguments"] = arguments.ValueKind != System.Text.Json.JsonValueKind.Undefined ? arguments.ToString() : "{}"
+                }
+            }, cancellationToken).ConfigureAwait(false);
         }
 
         // Execute tool and return content

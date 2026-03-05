@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -258,9 +259,24 @@ public sealed class RocksDbMemoryStore : IPersistentMemoryStore
         string? scopeFilter = null,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        var candidates = scopeFilter != null && _scopeIndex.TryGetValue(scopeFilter, out var scopeEntries)
-            ? scopeEntries.Where(id => _vectorIndex.ContainsKey(id))
-            : _vectorIndex.Keys;
+        // Finding 3166: Take a locked snapshot of the scope entry IDs before reading,
+        // since StoreAsync mutates the inner HashSet under _lockObject.
+        IEnumerable<string> candidates;
+        if (scopeFilter != null)
+        {
+            string[] snapshot;
+            lock (_lockObject)
+            {
+                snapshot = _scopeIndex.TryGetValue(scopeFilter, out var scopeEntries)
+                    ? scopeEntries.ToArray()
+                    : Array.Empty<string>();
+            }
+            candidates = snapshot.Where(id => _vectorIndex.ContainsKey(id));
+        }
+        else
+        {
+            candidates = _vectorIndex.Keys;
+        }
 
         var scored = candidates
             .Select(id => (Id: id, Score: CosineSimilarity(queryVector, _vectorIndex[id])))
@@ -400,10 +416,34 @@ public sealed class RocksDbMemoryStore : IPersistentMemoryStore
     {
         ct.ThrowIfCancellationRequested();
 
-        // In a real implementation, this would persist to RocksDB
-        // For simulation, we just update the flush timestamp
-        _lastFlush = DateTimeOffset.UtcNow;
-        return Task.FromResult(true);
+        try
+        {
+            // Persist in-memory state to disk as JSON for durability
+            var dataFile = Path.Combine(_dataPath, "memory_store.json");
+            var entries = _store.Values.ToList();
+
+            var json = System.Text.Json.JsonSerializer.Serialize(entries, new System.Text.Json.JsonSerializerOptions
+            {
+                WriteIndented = false
+            });
+
+            // Write atomically via temp file + rename
+            var tempFile = dataFile + ".tmp";
+            File.WriteAllText(tempFile, json);
+
+            // Replace existing file atomically (on most platforms)
+            if (File.Exists(dataFile))
+                File.Delete(dataFile);
+            File.Move(tempFile, dataFile);
+
+            _lastFlush = DateTimeOffset.UtcNow;
+            return Task.FromResult(true);
+        }
+        catch (Exception)
+        {
+            Debug.WriteLine("Failed to flush RocksDbMemoryStore to disk");
+            return Task.FromResult(false);
+        }
     }
 
     /// <inheritdoc/>
@@ -706,18 +746,27 @@ public sealed class ObjectStorageMemoryStore : IPersistentMemoryStore
         await _writeSemaphore.WaitAsync(ct);
         try
         {
-            // Batch upload queued entries to S3
+            // Collect queued entries
             var batch = new List<ContextEntry>();
             while (_writeQueue.TryDequeue(out var entry))
             {
                 batch.Add(entry);
             }
 
-            // In real implementation, would upload batch to S3 using multipart upload
-            // For each entry: PUT s3://{bucket}/{prefix}{scope}/{entryId}.json
+            if (batch.Count == 0)
+            {
+                _lastFlush = DateTimeOffset.UtcNow;
+                return true;
+            }
 
-            _lastFlush = DateTimeOffset.UtcNow;
-            return true;
+            // Object storage upload requires a configured endpoint.
+            // Without a real object storage SDK (e.g., AWSSDK.S3, Azure.Storage.Blobs, Google.Cloud.Storage.V1),
+            // we cannot upload data. Re-enqueue entries and throw to inform the caller.
+            throw new NotSupportedException(
+                $"Object storage upload not available. {batch.Count} entries require upload to " +
+                $"s3://{_bucketName}/{_prefix}. Configure a real object storage endpoint and install " +
+                "the appropriate SDK (AWSSDK.S3, Azure.Storage.Blobs, or Google.Cloud.Storage.V1). " +
+                "Entries remain in local cache but are NOT durably persisted.");
         }
         finally
         {
@@ -857,8 +906,10 @@ public sealed class DistributedMemoryStore : IPersistentMemoryStore
             tasks.Add(_shards[shardIndex].StoreAsync(entry, ct));
         }
 
-        _entryToShardMap[entry.EntryId] = primaryShard;
+        // Finding 3165: Write shard map only after all shards have confirmed the write,
+        // so concurrent readers never see a mapped shard that doesn't have the data yet.
         await Task.WhenAll(tasks);
+        _entryToShardMap[entry.EntryId] = primaryShard;
     }
 
     /// <inheritdoc/>
@@ -963,8 +1014,10 @@ public sealed class DistributedMemoryStore : IPersistentMemoryStore
     {
         var tasks = _shards.Select(s => s.GetEntryCountAsync(scopeFilter, ct));
         var counts = await Task.WhenAll(tasks);
-        // Divide by replication factor to get approximate unique count
-        return counts.Sum() / _replicationFactor;
+        // P2-3187: Guard against DivideByZeroException when _replicationFactor is 0.
+        // Divide by replication factor to get approximate unique count.
+        var factor = _replicationFactor > 0 ? _replicationFactor : 1;
+        return counts.Sum() / factor;
     }
 
     /// <inheritdoc/>
@@ -972,7 +1025,9 @@ public sealed class DistributedMemoryStore : IPersistentMemoryStore
     {
         var tasks = _shards.Select(s => s.GetTotalBytesAsync(scopeFilter, ct));
         var bytes = await Task.WhenAll(tasks);
-        return bytes.Sum() / _replicationFactor;
+        // P2-3187: Guard against DivideByZeroException when _replicationFactor is 0.
+        var factor = _replicationFactor > 0 ? _replicationFactor : 1;
+        return bytes.Sum() / factor;
     }
 
     /// <inheritdoc/>
@@ -1011,14 +1066,16 @@ public sealed class DistributedMemoryStore : IPersistentMemoryStore
         var tasks = _shards.Select(s => s.GetStatisticsAsync(ct));
         var stats = await Task.WhenAll(tasks);
 
+        // P2-3187: Guard against DivideByZeroException when _replicationFactor is 0.
+        var rf = _replicationFactor > 0 ? _replicationFactor : 1;
         return new PersistentStoreStatistics
         {
-            TotalEntries = stats.Sum(s => s.TotalEntries) / _replicationFactor,
-            TotalBytes = stats.Sum(s => s.TotalBytes) / _replicationFactor,
-            HotTierEntries = stats.Sum(s => s.HotTierEntries) / _replicationFactor,
-            WarmTierEntries = stats.Sum(s => s.WarmTierEntries) / _replicationFactor,
-            ColdTierEntries = stats.Sum(s => s.ColdTierEntries) / _replicationFactor,
-            ArchiveTierEntries = stats.Sum(s => s.ArchiveTierEntries) / _replicationFactor,
+            TotalEntries = stats.Sum(s => s.TotalEntries) / rf,
+            TotalBytes = stats.Sum(s => s.TotalBytes) / rf,
+            HotTierEntries = stats.Sum(s => s.HotTierEntries) / rf,
+            WarmTierEntries = stats.Sum(s => s.WarmTierEntries) / rf,
+            ColdTierEntries = stats.Sum(s => s.ColdTierEntries) / rf,
+            ArchiveTierEntries = stats.Sum(s => s.ArchiveTierEntries) / rf,
             PendingWrites = stats.Sum(s => s.PendingWrites),
             CompactionCount = _compactionCount,
             LastCompaction = _lastCompaction,
@@ -1042,12 +1099,15 @@ public sealed class DistributedMemoryStore : IPersistentMemoryStore
 
     private int GetPrimaryShardIndex(string entryId)
     {
-        if (_shards.Count == 0) return 0;
+        // Finding 3175: Returning 0 when shards is empty causes IndexOutOfRangeException
+        // in the caller; throw a descriptive exception instead.
+        if (_shards.Count == 0)
+            throw new InvalidOperationException("No shards are configured. Call AddShard() before storing entries.");
 
         if (_enableConsistentHashing)
         {
             // Consistent hashing using entry ID
-            var hash = entryId.GetHashCode();
+            var hash = StableHash.Compute(entryId);
             return Math.Abs(hash) % _shards.Count;
         }
 

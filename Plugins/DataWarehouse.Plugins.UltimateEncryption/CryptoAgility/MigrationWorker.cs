@@ -63,7 +63,11 @@ public sealed class MigrationWorker : IDisposable
     private long _successCount;
     private long _failureCount;
     private long _totalProcessed;
+    private volatile string? _lastFailureMessage;
     private bool _disposed;
+
+    /// <summary>Gets the last per-object migration failure message, or null if no failures.</summary>
+    public string? LastFailureMessage => _lastFailureMessage;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MigrationWorker"/> class.
@@ -155,9 +159,11 @@ public sealed class MigrationWorker : IDisposable
             {
                 _pauseGate.Release();
             }
-            catch (SemaphoreFullException)
+            catch (SemaphoreFullException ex)
             {
+
                 // Already released, no-op
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
 
@@ -231,9 +237,11 @@ public sealed class MigrationWorker : IDisposable
         {
             // Normal cancellation, do not propagate
         }
-        catch (ChannelClosedException)
+        catch (ChannelClosedException ex)
         {
+
             // Channel was completed, no more batches
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -259,10 +267,12 @@ public sealed class MigrationWorker : IDisposable
                     Interlocked.Increment(ref _successCount);
                     _plan.ObjectsMigrated = Interlocked.Read(ref _successCount);
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
                     Interlocked.Increment(ref _failureCount);
                     _plan.ObjectsFailed = Interlocked.Read(ref _failureCount);
+                    // Surface failure reason — visible via LastFailureMessage and plan metadata
+                    _lastFailureMessage = $"[{ex.GetType().Name}] {ex.Message}";
                 }
                 finally
                 {
@@ -426,7 +436,9 @@ public sealed class MigrationWorker : IDisposable
         }
         catch
         {
+
             // Progress reporting is best-effort; do not fail the migration
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 
@@ -453,7 +465,9 @@ public sealed class MigrationWorker : IDisposable
         }
         catch
         {
+
             // Best-effort notification
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

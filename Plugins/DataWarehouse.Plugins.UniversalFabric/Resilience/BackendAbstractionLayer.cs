@@ -46,6 +46,12 @@ public class BackendAbstractionLayer : IStorageStrategy
     private DateTime _circuitOpenUntil = DateTime.MinValue;
     private readonly object _circuitLock = new();
 
+    // Metrics state (only populated when EnableMetrics is true)
+    private long _totalOperations;
+    private long _totalSuccesses;
+    private long _totalFailures;
+    private long _totalLatencyMs;
+
     /// <summary>
     /// Initializes a new instance of <see cref="BackendAbstractionLayer"/> wrapping the given strategy.
     /// </summary>
@@ -133,7 +139,8 @@ public class BackendAbstractionLayer : IStorageStrategy
         // List is streaming -- circuit breaker check only, no timeout wrapping
         CheckCircuitBreaker();
 
-        IAsyncEnumerator<StorageObjectMetadata>? enumerator = null;
+        // Use await using to guarantee disposal even if the consumer abandons mid-iteration (finding 4533).
+        IAsyncEnumerator<StorageObjectMetadata> enumerator;
         try
         {
             enumerator = _inner.ListAsync(prefix, ct).GetAsyncEnumerator(ct);
@@ -144,24 +151,9 @@ public class BackendAbstractionLayer : IStorageStrategy
             throw _normalizer.Normalize(ex, _backendId, "List", prefix);
         }
 
-        bool hasNext;
-        try
+        await using (enumerator)
         {
-            hasNext = await enumerator.MoveNextAsync();
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            RecordFailure();
-            await enumerator.DisposeAsync();
-            throw _normalizer.Normalize(ex, _backendId, "List", prefix);
-        }
-
-        while (hasNext)
-        {
-            var current = enumerator.Current;
-            RecordSuccess();
-            yield return current;
-
+            bool hasNext;
             try
             {
                 hasNext = await enumerator.MoveNextAsync();
@@ -169,12 +161,26 @@ public class BackendAbstractionLayer : IStorageStrategy
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 RecordFailure();
-                await enumerator.DisposeAsync();
                 throw _normalizer.Normalize(ex, _backendId, "List", prefix);
             }
-        }
 
-        await enumerator.DisposeAsync();
+            while (hasNext)
+            {
+                var current = enumerator.Current;
+                RecordSuccess();
+                yield return current;
+
+                try
+                {
+                    hasNext = await enumerator.MoveNextAsync();
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    RecordFailure();
+                    throw _normalizer.Normalize(ex, _backendId, "List", prefix);
+                }
+            }
+        }
     }
 
     /// <inheritdoc/>
@@ -307,36 +313,71 @@ public class BackendAbstractionLayer : IStorageStrategy
     {
         CheckCircuitBreaker();
 
+        // Finding 4552: honour the EnableMetrics option — only track latency/counts when enabled.
+        var trackMetrics = _options.EnableMetrics;
+        var sw = trackMetrics ? System.Diagnostics.Stopwatch.StartNew() : null;
+
         try
         {
             var result = await ExecuteWithTimeoutAsync(operation, _options.OperationTimeout, ct);
             RecordSuccess();
+            if (trackMetrics)
+            {
+                sw!.Stop();
+                Interlocked.Increment(ref _totalOperations);
+                Interlocked.Increment(ref _totalSuccesses);
+                Interlocked.Add(ref _totalLatencyMs, sw.ElapsedMilliseconds);
+            }
             return result;
         }
         catch (OperationCanceledException)
         {
+            if (trackMetrics) Interlocked.Increment(ref _totalOperations);
             throw;
         }
         catch (Exception ex)
         {
             RecordFailure();
+            if (trackMetrics)
+            {
+                sw?.Stop();
+                Interlocked.Increment(ref _totalOperations);
+                Interlocked.Increment(ref _totalFailures);
+                if (sw != null) Interlocked.Add(ref _totalLatencyMs, sw.ElapsedMilliseconds);
+            }
             throw _normalizer.Normalize(ex, _backendId, operationName, key);
         }
     }
+
+    /// <summary>
+    /// Gets a metrics snapshot for this backend abstraction layer.
+    /// All values are zero when <see cref="BackendAbstractionOptions.EnableMetrics"/> is false.
+    /// </summary>
+    public BackendMetrics GetMetrics() => new(
+        TotalOperations: Interlocked.Read(ref _totalOperations),
+        TotalSuccesses: Interlocked.Read(ref _totalSuccesses),
+        TotalFailures: Interlocked.Read(ref _totalFailures),
+        AverageLatencyMs: _totalOperations > 0
+            ? Interlocked.Read(ref _totalLatencyMs) / (double)Interlocked.Read(ref _totalOperations)
+            : 0.0
+    );
 
     /// <summary>
     /// Wraps an operation with a timeout. If the operation does not complete within the specified
     /// timeout, an <see cref="OperationCanceledException"/> is thrown.
     /// </summary>
     private static async Task<T> ExecuteWithTimeoutAsync<T>(
-        Func<Task<T>> operation, TimeSpan timeout, CancellationToken ct)
+        Func<CancellationToken, Task<T>> operation, TimeSpan timeout, CancellationToken ct)
     {
+        // P2-4544: link timeout token into a combined CTS and pass it to the operation so
+        // inner async I/O (network, disk) actually cancels when the deadline fires.
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeoutCts.CancelAfter(timeout);
+        var linkedToken = timeoutCts.Token;
 
         try
         {
-            return await operation();
+            return await operation(linkedToken);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
@@ -345,6 +386,11 @@ public class BackendAbstractionLayer : IStorageStrategy
                 $"Operation timed out after {timeout.TotalSeconds:F1}s");
         }
     }
+
+    // Backward-compatible overload for callers that capture the token in a closure.
+    private static Task<T> ExecuteWithTimeoutAsync<T>(
+        Func<Task<T>> operation, TimeSpan timeout, CancellationToken ct)
+        => ExecuteWithTimeoutAsync<T>(_ => operation(), timeout, ct);
 
     #endregion
 }
@@ -384,3 +430,17 @@ public record BackendAbstractionOptions
     /// </summary>
     public static BackendAbstractionOptions Default { get; } = new();
 }
+
+/// <summary>
+/// Snapshot of operation metrics collected by <see cref="BackendAbstractionLayer"/>.
+/// </summary>
+/// <param name="TotalOperations">Total number of operations attempted (including cancelled).</param>
+/// <param name="TotalSuccesses">Number of operations that completed successfully.</param>
+/// <param name="TotalFailures">Number of operations that failed with an exception.</param>
+/// <param name="AverageLatencyMs">Average operation latency in milliseconds, or 0 when no operations recorded.</param>
+public sealed record BackendMetrics(
+    long TotalOperations,
+    long TotalSuccesses,
+    long TotalFailures,
+    double AverageLatencyMs
+);

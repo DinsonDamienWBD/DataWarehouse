@@ -140,9 +140,29 @@ namespace DataWarehouse.SDK.Replication
         /// <returns>True if this clock happens-before the other.</returns>
         public bool HappensBefore(VectorClock other)
         {
+            ArgumentNullException.ThrowIfNull(other);
+
+            // An empty vector clock is causally prior to any non-empty clock
+            // (universal predecessor: no events have been observed, so nothing can conflict).
+            if (Clocks.Count == 0)
+                return other.Clocks.Count > 0;
+
+            // A happens-before B iff:
+            //   1. Every entry in A is ≤ the corresponding entry in B, AND
+            //   2. At least one entry in A is strictly < B (or B has an extra node)
+            bool hasStrictlyLess = false;
             foreach (var (node, time) in Clocks)
-                if (time > other.Clocks.GetValueOrDefault(node, 0)) return false;
-            return Clocks.Count > 0;
+            {
+                long otherTime = other.Clocks.GetValueOrDefault(node, 0);
+                if (time > otherTime) return false;
+                if (time < otherTime) hasStrictlyLess = true;
+            }
+
+            // B may also have nodes not in A (makes B causally later)
+            if (!hasStrictlyLess)
+                hasStrictlyLess = other.Clocks.Keys.Any(n => !Clocks.ContainsKey(n));
+
+            return hasStrictlyLess;
         }
 
         /// <summary>

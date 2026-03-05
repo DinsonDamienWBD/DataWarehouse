@@ -474,9 +474,15 @@ public sealed class BlockLevelTieringStrategy : TieringStrategyBase
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(objectId);
 
+        // P2-2488: Throw instead of silently returning when the object is too small for
+        // block-level tiering. Callers that expect an entry in _blockMaps after this
+        // call will get null/empty results and NREs with no indication of the root cause.
         if (totalSize < _config.MinObjectSizeForBlocking)
         {
-            return; // Too small for block-level tiering
+            throw new ArgumentOutOfRangeException(nameof(totalSize),
+                $"Object '{objectId}' (size={totalSize}) is smaller than the minimum " +
+                $"block-tiering threshold ({_config.MinObjectSizeForBlocking}). " +
+                "Use IsEligibleForBlockTiering() to pre-check before calling InitializeBlockMap.");
         }
 
         var blockCount = (int)Math.Ceiling((double)totalSize / _config.DefaultBlockSize);
@@ -1155,7 +1161,9 @@ public sealed class BlockLevelTieringStrategy : TieringStrategyBase
             }
             catch
             {
+
                 // Prefetch failures are non-critical
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             return new BlockReassemblyResult
@@ -1377,7 +1385,9 @@ public sealed class BlockLevelTieringStrategy : TieringStrategyBase
                     }
                     catch
                     {
+
                         // Prefetch failures are non-critical
+                        System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                     }
                 }, ct));
             }

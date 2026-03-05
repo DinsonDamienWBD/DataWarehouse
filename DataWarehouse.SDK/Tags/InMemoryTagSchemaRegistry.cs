@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts;
@@ -20,12 +21,30 @@ namespace DataWarehouse.SDK.Tags
     {
         private readonly BoundedDictionary<string, TagSchema> _schemas = new BoundedDictionary<string, TagSchema>(1000);
         private readonly BoundedDictionary<TagKey, string> _tagKeyIndex = new BoundedDictionary<TagKey, string>(1000);
+        private readonly object _versionLock = new();
 
         /// <inheritdoc />
         public Task RegisterAsync(TagSchema schema, CancellationToken ct = default)
         {
             ArgumentNullException.ThrowIfNull(schema);
             ArgumentException.ThrowIfNullOrWhiteSpace(schema.SchemaId);
+
+            // Validate that any Pattern constraints are syntactically valid regexes at registration time
+            // so consumers don't encounter ArgumentException at query time (finding 682).
+            foreach (var version in schema.Versions)
+            {
+                var pattern = version.Constraints.Pattern;
+                if (pattern is not null)
+                {
+                    try { _ = new Regex(pattern, RegexOptions.None, TimeSpan.FromSeconds(1)); }
+                    catch (ArgumentException ex)
+                    {
+                        throw new ArgumentException(
+                            $"TagSchema '{schema.SchemaId}' version '{version.Version}' has an invalid Pattern regex: {ex.Message}",
+                            nameof(schema), ex);
+                    }
+                }
+            }
 
             if (!_schemas.TryAdd(schema.SchemaId, schema))
             {
@@ -84,53 +103,56 @@ namespace DataWarehouse.SDK.Tags
         {
             ArgumentNullException.ThrowIfNull(version);
 
-            if (!_schemas.TryGetValue(schemaId, out var existing))
+            lock (_versionLock)
             {
-                return Task.FromResult(false);
-            }
-
-            // Enforce evolution rules
-            var current = existing.CurrentVersion;
-
-            switch (rule)
-            {
-                case TagSchemaEvolutionRule.None:
-                    // No evolution allowed
+                if (!_schemas.TryGetValue(schemaId, out var existing))
+                {
                     return Task.FromResult(false);
+                }
 
-                case TagSchemaEvolutionRule.Compatible:
-                    // New version must not change RequiredKind
-                    if (version.RequiredKind != current.RequiredKind)
-                    {
+                // Enforce evolution rules
+                var current = existing.CurrentVersion;
+
+                switch (rule)
+                {
+                    case TagSchemaEvolutionRule.None:
+                        // No evolution allowed
                         return Task.FromResult(false);
-                    }
-                    break;
 
-                case TagSchemaEvolutionRule.Additive:
-                    // Must not change RequiredKind, and constraints must only add (no removals/tightening)
-                    if (version.RequiredKind != current.RequiredKind)
-                    {
-                        return Task.FromResult(false);
-                    }
+                    case TagSchemaEvolutionRule.Compatible:
+                        // New version must not change RequiredKind
+                        if (version.RequiredKind != current.RequiredKind)
+                        {
+                            return Task.FromResult(false);
+                        }
+                        break;
 
-                    if (!IsAdditiveChange(current.Constraints, version.Constraints))
-                    {
-                        return Task.FromResult(false);
-                    }
-                    break;
+                    case TagSchemaEvolutionRule.Additive:
+                        // Must not change RequiredKind, and constraints must only add (no removals/tightening)
+                        if (version.RequiredKind != current.RequiredKind)
+                        {
+                            return Task.FromResult(false);
+                        }
 
-                case TagSchemaEvolutionRule.Breaking:
-                    // Breaking changes allowed -- no validation needed
-                    break;
+                        if (!IsAdditiveChange(current.Constraints, version.Constraints))
+                        {
+                            return Task.FromResult(false);
+                        }
+                        break;
+
+                    case TagSchemaEvolutionRule.Breaking:
+                        // Breaking changes allowed -- no validation needed
+                        break;
+                }
+
+                // Build new versions list (atomic under lock — no lost update)
+                var newVersions = new List<TagSchemaVersion>(existing.Versions) { version };
+
+                var updated = existing with { Versions = newVersions };
+
+                _schemas[schemaId] = updated;
+                return Task.FromResult(true);
             }
-
-            // Build new versions list
-            var newVersions = new List<TagSchemaVersion>(existing.Versions) { version };
-
-            var updated = existing with { Versions = newVersions };
-
-            _schemas[schemaId] = updated;
-            return Task.FromResult(true);
         }
 
         /// <inheritdoc />

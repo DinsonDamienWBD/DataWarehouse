@@ -34,8 +34,8 @@ public sealed class ArcCacheL3NVMe : IArcCache, IDisposable
 
     private FileStream? _fileStream;
     private readonly SemaphoreSlim _ioLock = new(1, 1);
-    private bool _initialized;
-    private bool _disposed;
+    private volatile bool _initialized;
+    private volatile bool _disposed;
 
     // Statistics
     private long _hits;

@@ -158,8 +158,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                     $"Data transfer blocked by sovereignty rules: {sourceJurisdiction} -> {destinationJurisdiction}. " +
                     $"Regulations: {string.Join(", ", applicableRegulations)}");
 
+            client.DefaultRequestHeaders.Remove("X-Sovereignty-Route");
             client.DefaultRequestHeaders.Add("X-Sovereignty-Route", routeId);
+            client.DefaultRequestHeaders.Remove("X-Data-Classification");
             client.DefaultRequestHeaders.Add("X-Data-Classification", dataClassification);
+            client.DefaultRequestHeaders.Remove("X-Source-Jurisdiction");
             client.DefaultRequestHeaders.Add("X-Source-Jurisdiction", sourceJurisdiction);
 
             var verifyResponse = await client.GetAsync($"/api/v1/sovereignty/routes/{routeId}/verify", ct);
@@ -189,7 +192,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             var client = handle.GetConnection<HttpClient>();
             var routeId = handle.ConnectionInfo["route_id"]?.ToString();
 
-            var response = await client.GetAsync($"/api/v1/sovereignty/routes/{routeId}/status", ct);
+            using var response = await client.GetAsync($"/api/v1/sovereignty/routes/{routeId}/status", ct);
             if (!response.IsSuccessStatusCode) return false;
 
             var status = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
@@ -231,7 +234,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             var client = handle.GetConnection<HttpClient>();
             var routeId = handle.ConnectionInfo["route_id"]?.ToString();
 
-            var response = await client.GetAsync($"/api/v1/sovereignty/routes/{routeId}/health", ct);
+            using var response = await client.GetAsync($"/api/v1/sovereignty/routes/{routeId}/health", ct);
             sw.Stop();
 
             if (!response.IsSuccessStatusCode)

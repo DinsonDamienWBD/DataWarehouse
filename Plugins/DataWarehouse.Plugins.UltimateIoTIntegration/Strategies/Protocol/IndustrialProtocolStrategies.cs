@@ -223,13 +223,19 @@ public class Dnp3ProtocolStrategy : ProtocolStrategyBase
 /// <summary>
 /// DNP3 function codes.
 /// </summary>
+/// <remarks>
+/// LOW-3402: DNP3 protocol spec assigns fc=0x03 to both DirectOperate and SBO-Select.
+/// Context is determined by the object variation (Group 12 Var 1 CROB), not the function code.
+/// Remove the ambiguous <c>SelectBeforeOperate</c> alias; callers that need SBO use DirectOperate
+/// and set the appropriate CROB control code (TCC field) in the application object.
+/// </remarks>
 public enum Dnp3FunctionCode : byte
 {
     Read = 0x01,
     Write = 0x02,
+    /// <summary>Function code 0x03. Used for both Direct Operate and SBO-Select per DNP3 spec.</summary>
     DirectOperate = 0x03,
     DirectOperateNoAck = 0x04,
-    SelectBeforeOperate = 0x03, // Select uses same code, context-dependent
     FreezeAndClear = 0x07,
     ImmediateFreeze = 0x08,
     Response = 0x81,
@@ -438,7 +444,10 @@ public class Iec104ProtocolStrategy : ProtocolStrategyBase
 
     private byte[] BuildIFrame(byte[] asdu)
     {
-        var sendSeq = Interlocked.Increment(ref _sendSequence) - 1;
+        // IEC 60870-5-104 sequence numbers are 15-bit (0-32767). Mask after increment
+        // to wrap correctly; without the mask an unbounded int overflows into negative
+        // values which produce invalid APCI control-field bytes.
+        var sendSeq = Interlocked.Increment(ref _sendSequence) & 0x7FFF;
         var recvSeq = _recvSequence;
 
         var frame = new List<byte>
@@ -976,19 +985,17 @@ public class EnhancedModbusStrategy : ProtocolStrategyBase
     /// </summary>
     public byte[] BuildRtuFrame(int slaveId, byte functionCode, byte[] data)
     {
-        var frame = new byte[data.Length + 3]; // slave + fc + data + CRC(2)
+        // P2-3399: single allocation — slave(1) + fc(1) + data(N) + CRC(2) = N+4
+        var frame = new byte[data.Length + 4];
         frame[0] = (byte)slaveId;
         frame[1] = functionCode;
         Array.Copy(data, 0, frame, 2, data.Length);
 
-        // Append CRC-16/Modbus
+        // Compute CRC over slave + fc + data (all bytes except the last 2 CRC bytes)
         var crc = ComputeModbusCrc(frame, 0, frame.Length - 2);
-        // Note: frame doesn't have space for CRC - we need to resize
-        var fullFrame = new byte[frame.Length + 2];
-        Array.Copy(frame, fullFrame, frame.Length);
-        fullFrame[^2] = (byte)(crc & 0xFF);
-        fullFrame[^1] = (byte)(crc >> 8);
-        return fullFrame;
+        frame[^2] = (byte)(crc & 0xFF);
+        frame[^1] = (byte)(crc >> 8);
+        return frame;
     }
 
     /// <summary>

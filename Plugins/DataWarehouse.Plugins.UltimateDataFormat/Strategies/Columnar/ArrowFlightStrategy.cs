@@ -94,7 +94,10 @@ public sealed record FlightCriteria(byte[]? Expression);
 public sealed class ArrowFlightStrategy : DataFormatStrategyBase
 {
     // Flight registry: descriptor -> (schema, row count, total bytes)
-    private readonly Dictionary<string, FlightRegistration> _flights = new(StringComparer.OrdinalIgnoreCase);
+    // P2-2235: Use ConcurrentDictionary to prevent data corruption / InvalidOperationException
+    // from concurrent DoPut (write) and GetFlightInfo/DoGet/ListFlights (reads).
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, FlightRegistration>
+        _flights = new(StringComparer.OrdinalIgnoreCase);
 
     /// <inheritdoc/>
     public override string StrategyId => "arrow-flight";
@@ -382,7 +385,7 @@ public sealed class ArrowFlightStrategy : DataFormatStrategyBase
     /// <summary>
     /// Serializes data as Arrow IPC stream with Flight metadata framing.
     /// </summary>
-    public override Task<DataFormatResult> SerializeAsync(
+    public override async Task<DataFormatResult> SerializeAsync(
         object data, Stream output, DataFormatContext context, CancellationToken ct = default)
     {
         try
@@ -400,21 +403,21 @@ public sealed class ArrowFlightStrategy : DataFormatStrategyBase
             }
 
             if (batch == null)
-                return Task.FromResult(DataFormatResult.Fail(
-                    "Arrow Flight serialization requires ArrowRecordBatch or ColumnarBatch data."));
+                return DataFormatResult.Fail(
+                    "Arrow Flight serialization requires ArrowRecordBatch or ColumnarBatch data.");
 
-            // Delegate to ArrowStrategy for IPC format writing, adding Flight framing
+            // P2-2237: Use WriteAsync to avoid blocking the thread pool on large Arrow payloads.
             var arrowStrategy = new ArrowStrategy();
             var payload = arrowStrategy.AsArrowFlightPayload(batch);
-            output.Write(payload, 0, payload.Length);
+            await output.WriteAsync(payload, 0, payload.Length, ct).ConfigureAwait(false);
 
-            return Task.FromResult(DataFormatResult.Ok(
+            return DataFormatResult.Ok(
                 bytesProcessed: payload.Length,
-                recordsProcessed: batch.RowCount));
+                recordsProcessed: batch.RowCount);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return Task.FromResult(DataFormatResult.Fail($"Arrow Flight serialize error: {ex.Message}"));
+            return DataFormatResult.Fail($"Arrow Flight serialize error: {ex.Message}");
         }
     }
 

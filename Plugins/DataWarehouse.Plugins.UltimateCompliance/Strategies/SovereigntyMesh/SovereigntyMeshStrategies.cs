@@ -56,7 +56,7 @@ public sealed class JurisdictionalAiStrategy : ComplianceStrategyBase
     /// <inheritdoc/>
     protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken ct)
     {
-        IncrementCounter("jurisdictional_ai.check");
+            IncrementCounter("jurisdictional_ai.check");
         var violations = new List<ComplianceViolation>();
         var recommendations = new List<string>();
 
@@ -100,14 +100,17 @@ public sealed class JurisdictionalAiStrategy : ComplianceStrategyBase
             }
         }
 
-        var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+        var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+
+
+        var isCompliant = !hasHighViolations;
 
         return Task.FromResult(new ComplianceResult
         {
             IsCompliant = isCompliant,
             Framework = Framework,
             Status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                    violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                    hasHighViolations ? ComplianceStatus.NonCompliant :
                     ComplianceStatus.PartiallyCompliant,
             Violations = violations,
             Recommendations = recommendations,
@@ -347,14 +350,14 @@ public sealed class JurisdictionalAiStrategy : ComplianceStrategyBase
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("jurisdictional_ai.initialized");
+            IncrementCounter("jurisdictional_ai.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("jurisdictional_ai.shutdown");
+            IncrementCounter("jurisdictional_ai.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }
@@ -448,7 +451,7 @@ public sealed class DataEmbassyStrategy : ComplianceStrategyBase
     /// <inheritdoc/>
     protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken ct)
     {
-        IncrementCounter("data_embassy.check");
+            IncrementCounter("data_embassy.check");
         var violations = new List<ComplianceViolation>();
         var recommendations = new List<string>();
 
@@ -495,14 +498,17 @@ public sealed class DataEmbassyStrategy : ComplianceStrategyBase
             recommendations.Add("Consider establishing a data embassy for enhanced protection");
         }
 
-        var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+        var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+
+
+        var isCompliant = !hasHighViolations;
 
         return Task.FromResult(new ComplianceResult
         {
             IsCompliant = isCompliant,
             Framework = Framework,
             Status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                    violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                    hasHighViolations ? ComplianceStatus.NonCompliant :
                     ComplianceStatus.PartiallyCompliant,
             Violations = violations,
             Recommendations = recommendations,
@@ -517,7 +523,7 @@ public sealed class DataEmbassyStrategy : ComplianceStrategyBase
     /// <summary>
     /// Establishes a data embassy.
     /// </summary>
-    public async Task<DataEmbassy> EstablishEmbassyAsync(
+    public Task<DataEmbassy> EstablishEmbassyAsync(
         string embassyId,
         string hostJurisdiction,
         string sovereignJurisdiction,
@@ -550,13 +556,13 @@ public sealed class DataEmbassyStrategy : ComplianceStrategyBase
 
         _embassies[embassyId] = embassy;
 
-        return await Task.FromResult(embassy);
+        return Task.FromResult(embassy);
     }
 
     /// <summary>
     /// Creates a secure channel between embassies.
     /// </summary>
-    public async Task<EmbassyChannel> CreateSecureChannelAsync(
+    public Task<EmbassyChannel> CreateSecureChannelAsync(
         string sourceEmbassyId,
         string destinationEmbassyId,
         CancellationToken ct = default)
@@ -570,11 +576,20 @@ public sealed class DataEmbassyStrategy : ComplianceStrategyBase
         var channelId = $"ch:{sourceEmbassyId}:{destinationEmbassyId}:{Guid.NewGuid():N}";
 
         // Derive shared key from both sovereign keys
-        var sourceKey = _sovereignKeys[source.SovereignKeyId].KeyMaterial;
-        var destKey = _sovereignKeys[destination.SovereignKeyId].KeyMaterial;
+        if (!_sovereignKeys.TryGetValue(source.SovereignKeyId, out var sourceKeyEntry))
+            throw new InvalidOperationException($"Sovereign key not found for embassy '{sourceEmbassyId}'.");
+        if (!_sovereignKeys.TryGetValue(destination.SovereignKeyId, out var destKeyEntry))
+            throw new InvalidOperationException($"Sovereign key not found for embassy '{destinationEmbassyId}'.");
 
-        using var hmac = new HMACSHA256(sourceKey);
-        var sharedKey = hmac.ComputeHash(destKey);
+        var sourceKey = sourceKeyEntry.KeyMaterial;
+        var destKey = destKeyEntry.KeyMaterial;
+
+        // XOR both keys then HMAC to produce a symmetric (bidirectional) shared secret:
+        // Sort keys so A→B and B→A derive the same channel key regardless of call order.
+        var (firstKey, secondKey) = CompareKeyArrays(sourceKey, destKey) <= 0
+            ? (sourceKey, destKey) : (destKey, sourceKey);
+        using var hmac = new HMACSHA256(firstKey);
+        var sharedKey = hmac.ComputeHash(secondKey);
 
         var channel = new EmbassyChannel
         {
@@ -588,13 +603,13 @@ public sealed class DataEmbassyStrategy : ComplianceStrategyBase
 
         _channels[channelId] = channel;
 
-        return await Task.FromResult(channel);
+        return Task.FromResult(channel);
     }
 
     /// <summary>
     /// Transfers data through embassy channel.
     /// </summary>
-    public async Task<byte[]> TransferThroughChannelAsync(
+    public Task<byte[]> TransferThroughChannelAsync(
         string channelId,
         byte[] data,
         CancellationToken ct = default)
@@ -621,24 +636,39 @@ public sealed class DataEmbassyStrategy : ComplianceStrategyBase
         Buffer.BlockCopy(aes.IV, 0, result, 0, aes.IV.Length);
         Buffer.BlockCopy(encrypted, 0, result, aes.IV.Length, encrypted.Length);
 
-        channel.TransferCount++;
+        channel.IncrementTransferCount(); // atomic increment via Interlocked
         channel.LastTransferAt = DateTimeOffset.UtcNow;
 
-        return await Task.FromResult(result);
+        return Task.FromResult(result);
     }
 
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("data_embassy.initialized");
+            IncrementCounter("data_embassy.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("data_embassy.shutdown");
+            IncrementCounter("data_embassy.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
+    }
+
+    /// <summary>
+    /// Compares two byte arrays lexicographically, used to produce a canonical key order
+    /// so A→B and B→A channels derive the same shared secret.
+    /// </summary>
+    private static int CompareKeyArrays(byte[] a, byte[] b)
+    {
+        int len = Math.Min(a.Length, b.Length);
+        for (int i = 0; i < len; i++)
+        {
+            int diff = a[i] - b[i];
+            if (diff != 0) return diff;
+        }
+        return a.Length - b.Length;
     }
 }
 
@@ -668,8 +698,17 @@ public record EmbassyChannel
     public required byte[] SharedKey { get; init; }
     public DateTimeOffset EstablishedAt { get; init; }
     public bool IsActive { get; set; }
-    public long TransferCount { get; set; }
-    public DateTimeOffset? LastTransferAt { get; set; }
+    // Backing field allows Interlocked.Increment for thread-safe counter
+    private long _transferCount;
+    public long TransferCount => Interlocked.Read(ref _transferCount);
+    public long IncrementTransferCount() => Interlocked.Increment(ref _transferCount);
+    // LastTransferAt encoded as UTC ticks for Interlocked-safe write
+    private long _lastTransferAtTicks;
+    public DateTimeOffset? LastTransferAt
+    {
+        get { var t = Interlocked.Read(ref _lastTransferAtTicks); return t == 0 ? null : new DateTimeOffset(t, TimeSpan.Zero); }
+        set { Interlocked.Exchange(ref _lastTransferAtTicks, value.HasValue ? value.Value.UtcTicks : 0); }
+    }
 }
 
 /// <summary>
@@ -734,7 +773,7 @@ public sealed class DataResidencyEnforcementStrategy : ComplianceStrategyBase
     /// <inheritdoc/>
     protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken ct)
     {
-        IncrementCounter("data_residency_enforcement.check");
+            IncrementCounter("data_residency_enforcement.check");
         var violations = new List<ComplianceViolation>();
         var recommendations = new List<string>();
 
@@ -791,14 +830,17 @@ public sealed class DataResidencyEnforcementStrategy : ComplianceStrategyBase
             UpdateDataLocation(resourceId, destinationLocation, context);
         }
 
-        var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+        var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+
+
+        var isCompliant = !hasHighViolations;
 
         return Task.FromResult(new ComplianceResult
         {
             IsCompliant = isCompliant,
             Framework = Framework,
             Status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                    violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                    hasHighViolations ? ComplianceStatus.NonCompliant :
                     ComplianceStatus.PartiallyCompliant,
             Violations = violations,
             Recommendations = recommendations,
@@ -813,7 +855,7 @@ public sealed class DataResidencyEnforcementStrategy : ComplianceStrategyBase
     /// <summary>
     /// Creates a data residency policy.
     /// </summary>
-    public async Task<DataResidencyPolicy> CreatePolicyAsync(
+    public Task<DataResidencyPolicy> CreatePolicyAsync(
         string policyId,
         IEnumerable<string> allowedLocations,
         string? primaryLocation = null,
@@ -835,7 +877,7 @@ public sealed class DataResidencyEnforcementStrategy : ComplianceStrategyBase
 
         _policies[policyId] = policy;
 
-        return await Task.FromResult(policy);
+        return Task.FromResult(policy);
     }
 
     /// <summary>
@@ -856,17 +898,31 @@ public sealed class DataResidencyEnforcementStrategy : ComplianceStrategyBase
 
     private DataResidencyPolicy? GetApplicablePolicy(string? resourceId, string dataClassification)
     {
-        // Find policy by data classification
-        foreach (var policy in _policies.Values.Where(p => p.IsActive))
+        // P2-1536: deterministic selection — prefer policies with explicit classification lists
+        // (most specific) over wildcard policies; break ties by PolicyId for stable ordering.
+        DataResidencyPolicy? best = null;
+        int bestScore = -1;
+
+        foreach (var policy in _policies.Values)
         {
-            if (policy.ApplicableDataClassifications.Count == 0 ||
-                policy.ApplicableDataClassifications.Contains(dataClassification))
+            if (!policy.IsActive) continue;
+
+            bool matches = policy.ApplicableDataClassifications.Count == 0 ||
+                           policy.ApplicableDataClassifications.Contains(dataClassification);
+            if (!matches) continue;
+
+            // Higher score for explicit classification match (more specific wins)
+            int score = policy.ApplicableDataClassifications.Count > 0 ? 1 : 0;
+            if (score > bestScore ||
+                (score == bestScore && best != null &&
+                 string.Compare(policy.PolicyId, best.PolicyId, StringComparison.Ordinal) < 0))
             {
-                return policy;
+                best = policy;
+                bestScore = score;
             }
         }
 
-        return null;
+        return best;
     }
 
     private bool IsLocationAllowed(DataResidencyPolicy policy, string location)
@@ -912,14 +968,14 @@ public sealed class DataResidencyEnforcementStrategy : ComplianceStrategyBase
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("data_residency_enforcement.initialized");
+            IncrementCounter("data_residency_enforcement.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("data_residency_enforcement.shutdown");
+            IncrementCounter("data_residency_enforcement.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }
@@ -988,7 +1044,7 @@ public sealed class CrossBorderTransferControlStrategy : ComplianceStrategyBase
     /// <inheritdoc/>
     protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken ct)
     {
-        IncrementCounter("cross_border_transfer_control.check");
+            IncrementCounter("cross_border_transfer_control.check");
         var violations = new List<ComplianceViolation>();
         var recommendations = new List<string>();
 
@@ -1033,13 +1089,18 @@ public sealed class CrossBorderTransferControlStrategy : ComplianceStrategyBase
             }
         }
 
-        var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+        var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+        var isCompliant = !hasHighViolations;
+        // LOW-1541: Use PartiallyCompliant when only medium-or-lower violations exist.
+        var status = violations.Count == 0 ? ComplianceStatus.Compliant :
+                    hasHighViolations ? ComplianceStatus.NonCompliant :
+                    ComplianceStatus.PartiallyCompliant;
 
         return Task.FromResult(new ComplianceResult
         {
             IsCompliant = isCompliant,
             Framework = Framework,
-            Status = violations.Count == 0 ? ComplianceStatus.Compliant : ComplianceStatus.NonCompliant,
+            Status = status,
             Violations = violations,
             Recommendations = recommendations
         });
@@ -1048,7 +1109,7 @@ public sealed class CrossBorderTransferControlStrategy : ComplianceStrategyBase
     /// <summary>
     /// Creates a transfer agreement.
     /// </summary>
-    public async Task<TransferAgreement> CreateAgreementAsync(
+    public Task<TransferAgreement> CreateAgreementAsync(
         string sourceJurisdiction,
         string destinationJurisdiction,
         string agreementType,
@@ -1070,7 +1131,7 @@ public sealed class CrossBorderTransferControlStrategy : ComplianceStrategyBase
 
         _agreements[key] = agreement;
 
-        return await Task.FromResult(agreement);
+        return Task.FromResult(agreement);
     }
 
     private void LogTransfer(string source, string destination, ComplianceContext context, TransferAgreement agreement)
@@ -1090,14 +1151,14 @@ public sealed class CrossBorderTransferControlStrategy : ComplianceStrategyBase
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("cross_border_transfer_control.initialized");
+            IncrementCounter("cross_border_transfer_control.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("cross_border_transfer_control.shutdown");
+            IncrementCounter("cross_border_transfer_control.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

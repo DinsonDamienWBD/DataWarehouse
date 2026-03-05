@@ -131,9 +131,13 @@ public class BackgroundIntegrityScanner : IBackgroundIntegrityScanner, IDisposab
             "Starting background integrity scanner with interval {Interval} and batch size {BatchSize}",
             _scanInterval, _batchSize);
 
-        _scanTask = Task.Run(() => ScanLoopAsync(_cts.Token), _cts.Token);
-
-        await Task.CompletedTask;
+        // Observe launch-time faults by attaching a continuation that logs them (finding 1027).
+        // We store the task so StopAsync can await it; the continuation fires synchronously on fault.
+        var scanCts = _cts; // Capture for the continuation closure.
+        _scanTask = Task.Run(() => ScanLoopAsync(scanCts.Token), scanCts.Token)
+            .ContinueWith(
+                t => _logger.LogError(t.Exception, "Background integrity scanner terminated with unhandled exception"),
+                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously);
     }
 
     /// <inheritdoc/>
@@ -319,7 +323,9 @@ public class BackgroundIntegrityScanner : IBackgroundIntegrityScanner, IDisposab
             _scanProgressPercent = 0;
         }
 
+        // Lock-protected list so parallel-scan refactors remain safe
         var corruptedBlockDetails = new List<ScanResult>();
+        var corruptedBlockDetailsLock = new object();
         long totalBlocks = 0;
         long validBlocks = 0;
         long corruptedBlocks = 0;
@@ -358,7 +364,7 @@ public class BackgroundIntegrityScanner : IBackgroundIntegrityScanner, IDisposab
                     else
                     {
                         corruptedBlocks++;
-                        corruptedBlockDetails.Add(result);
+                        lock (corruptedBlockDetailsLock) { corruptedBlockDetails.Add(result); }
                     }
 
                     // Update progress
@@ -472,7 +478,9 @@ public class BackgroundIntegrityScanner : IBackgroundIntegrityScanner, IDisposab
                 using var stream = await _metadataStorage.LoadAsync(indexUri);
                 if (stream != null)
                 {
-                    var indexJson = await new StreamReader(stream).ReadToEndAsync(ct);
+                    string indexJson;
+                    using (var r = new StreamReader(stream, leaveOpen: true))
+                        indexJson = await r.ReadToEndAsync(ct);
                     var index = System.Text.Json.JsonSerializer.Deserialize<BlockIndex>(indexJson);
                     if (index?.BlockIds != null)
                     {
@@ -484,7 +492,9 @@ public class BackgroundIntegrityScanner : IBackgroundIntegrityScanner, IDisposab
             }
             catch
             {
+
                 // Index doesn't exist, fall through to scanning
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             // Fall back to scanning metadata storage
@@ -492,10 +502,11 @@ public class BackgroundIntegrityScanner : IBackgroundIntegrityScanner, IDisposab
             // For now, we'll use the scanned blocks dictionary as a source
             blockIds.AddRange(_scannedBlocks.Keys);
 
-            // Also check pending blocks queue
+            // Also check pending blocks queue — use HashSet for O(1) Contains instead of O(n)
+            var blockIdSet = new HashSet<Guid>(blockIds);
             while (_pendingBlocks.TryDequeue(out var pendingId))
             {
-                if (!blockIds.Contains(pendingId))
+                if (blockIdSet.Add(pendingId))
                 {
                     blockIds.Add(pendingId);
                 }
@@ -534,7 +545,9 @@ public class BackgroundIntegrityScanner : IBackgroundIntegrityScanner, IDisposab
                             using var prevStream = await _metadataStorage.LoadAsync(prevUri);
                             if (prevStream != null)
                             {
-                                var json = await new StreamReader(prevStream).ReadToEndAsync(ct);
+                                string json;
+                                using (var r = new StreamReader(prevStream, leaveOpen: true))
+                                    json = await r.ReadToEndAsync(ct);
                                 return System.Text.Json.JsonSerializer.Deserialize<TamperProofManifest>(json);
                             }
                         }
@@ -551,7 +564,9 @@ public class BackgroundIntegrityScanner : IBackgroundIntegrityScanner, IDisposab
                         using var prevStream = await _metadataStorage.LoadAsync(prevUri);
                         if (prevStream != null)
                         {
-                            var json = await new StreamReader(prevStream).ReadToEndAsync(ct);
+                            string json;
+                            using (var r = new StreamReader(prevStream, leaveOpen: true))
+                                json = await r.ReadToEndAsync(ct);
                             return System.Text.Json.JsonSerializer.Deserialize<TamperProofManifest>(json);
                         }
                     }
@@ -564,7 +579,9 @@ public class BackgroundIntegrityScanner : IBackgroundIntegrityScanner, IDisposab
             using var v1Stream = await _metadataStorage.LoadAsync(v1Uri);
             if (v1Stream != null)
             {
-                var json = await new StreamReader(v1Stream).ReadToEndAsync(ct);
+                string json;
+                using (var r = new StreamReader(v1Stream, leaveOpen: true))
+                    json = await r.ReadToEndAsync(ct);
                 return System.Text.Json.JsonSerializer.Deserialize<TamperProofManifest>(json);
             }
         }

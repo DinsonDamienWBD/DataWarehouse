@@ -55,6 +55,7 @@ public sealed class DatadogProfilerStrategy : ObservabilityStrategyBase
         _serviceName = serviceName;
         _environment = environment;
 
+        _httpClient.DefaultRequestHeaders.Remove("DD-API-KEY");
         _httpClient.DefaultRequestHeaders.Add("DD-API-KEY", apiKey);
     }
 
@@ -124,12 +125,14 @@ public sealed class DatadogProfilerStrategy : ObservabilityStrategyBase
             };
 
             var url = $"https://intake.profile.{_site}/v1/input";
-            var response = await _httpClient.PostAsync(url, content, ct);
+            using var response = await _httpClient.PostAsync(url, content, ct);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Datadog unavailable
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -141,12 +144,14 @@ public sealed class DatadogProfilerStrategy : ObservabilityStrategyBase
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             var url = $"https://intake.profile.{_site}/v1/input";
-            var response = await _httpClient.PostAsync(url, content, ct);
+            using var response = await _httpClient.PostAsync(url, content, ct);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Datadog unavailable
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -172,7 +177,7 @@ public sealed class DatadogProfilerStrategy : ObservabilityStrategyBase
             var testContent = new StringContent("{}", Encoding.UTF8, "application/json");
             var url = $"https://api.{_site}/api/v1/validate";
 
-            var response = await _httpClient.PostAsync(url, testContent, cancellationToken);
+            using var response = await _httpClient.PostAsync(url, testContent, cancellationToken);
 
             return new HealthCheckResult(
                 IsHealthy: response.IsSuccessStatusCode,
@@ -206,21 +211,16 @@ public sealed class DatadogProfilerStrategy : ObservabilityStrategyBase
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("datadog_profiler.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     protected override void Dispose(bool disposing)
     {
+                _apiKey = string.Empty;
         if (disposing)
         {
             _httpClient.Dispose();

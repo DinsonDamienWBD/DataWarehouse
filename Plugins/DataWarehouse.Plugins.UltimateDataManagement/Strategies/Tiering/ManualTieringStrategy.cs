@@ -312,9 +312,12 @@ public sealed class ManualTieringStrategy : TieringStrategyBase
             {
                 if (data.CurrentTier != tierLock.LockedTier)
                 {
-                    // Object should be at locked tier
-                    return Task.FromResult(Demote(data, tierLock.LockedTier,
-                        $"Tier locked to {tierLock.LockedTier} by {tierLock.LockedBy ?? "admin"}", 1.0, 1.0));
+                    // P2-2489: Use Promote when moving to a higher tier (lower enum value, e.g., Archive->Hot),
+                    // and Demote when moving to a lower tier (higher enum value, e.g., Hot->Archive).
+                    var lockReason = $"Tier locked to {tierLock.LockedTier} by {tierLock.LockedBy ?? "admin"}";
+                    return Task.FromResult(tierLock.LockedTier < data.CurrentTier
+                        ? Promote(data, tierLock.LockedTier, lockReason, 1.0, 1.0)
+                        : Demote(data, tierLock.LockedTier, lockReason, 1.0, 1.0));
                 }
 
                 return Task.FromResult(NoChange(data, $"Tier locked to {tierLock.LockedTier}"));

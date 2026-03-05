@@ -50,6 +50,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
 
             var apiKey = GetConfiguration(config, "ApiKey", string.Empty);
             if (!string.IsNullOrEmpty(apiKey))
+                client.DefaultRequestHeaders.Remove("Authorization");
                 client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
 
             var metadataResponse = await client.GetAsync("$metadata", ct);
@@ -72,7 +73,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             var client = handle.GetConnection<HttpClient>();
-            var response = await client.GetAsync("$metadata", ct);
+            using var response = await client.GetAsync("$metadata", ct);
             return response.IsSuccessStatusCode;
         }
 

@@ -32,9 +32,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
         public override string Framework => "Monitoring-Based";
 
         /// <inheritdoc/>
-        public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
+        public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
         {
-            base.InitializeAsync(configuration, cancellationToken);
+            await base.InitializeAsync(configuration, cancellationToken);
 
             // Load monitoring configuration
             if (configuration.TryGetValue("MonitoringConfig", out var configObj) && configObj is MonitoringConfiguration config)
@@ -60,7 +60,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
 
             // Start monitoring timer
             _monitoringTimer = new Timer(
-                async _ => await PerformMonitoringCycleAsync(cancellationToken),
+                async _ => { try { await PerformMonitoringCycleAsync(cancellationToken); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } },
                 null,
                 TimeSpan.FromSeconds(_config.MonitoringIntervalSeconds),
                 TimeSpan.FromSeconds(_config.MonitoringIntervalSeconds)
@@ -68,7 +68,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
 
             // Start snapshot timer
             _snapshotTimer = new Timer(
-                async _ => await TakeComplianceSnapshotAsync(cancellationToken),
+                async _ => { try { await TakeComplianceSnapshotAsync(cancellationToken); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } },
                 null,
                 TimeSpan.FromSeconds(_config.SnapshotIntervalSeconds),
                 TimeSpan.FromSeconds(_config.SnapshotIntervalSeconds)
@@ -77,13 +77,12 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
             // Initialize metrics for known frameworks
             InitializeMetrics();
 
-            return Task.CompletedTask;
         }
 
         /// <inheritdoc/>
         protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("continuous_compliance_monitoring.check");
+            IncrementCounter("continuous_compliance_monitoring.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -171,23 +170,25 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
                     _metrics[framework] = metric;
                 }
 
-                metric.TotalChecks++;
+                var totalChecks = Interlocked.Increment(ref metric.TotalChecks);
                 metric.LastCheckAt = DateTime.UtcNow;
 
                 // Update compliance status based on context
+                long compliantCount;
                 if (HasViolation(context))
                 {
-                    metric.ViolationCount++;
+                    Interlocked.Increment(ref metric.ViolationCount);
                     metric.LastViolationAt = DateTime.UtcNow;
+                    compliantCount = Interlocked.Read(ref metric.CompliantCount);
                 }
                 else
                 {
-                    metric.CompliantCount++;
+                    compliantCount = Interlocked.Increment(ref metric.CompliantCount);
                 }
 
-                // Update compliance score
-                metric.ComplianceScore = metric.TotalChecks > 0
-                    ? (double)metric.CompliantCount / metric.TotalChecks
+                // Update compliance score (volatile write; slight stale read acceptable)
+                metric.ComplianceScore = totalChecks > 0
+                    ? (double)compliantCount / totalChecks
                     : 1.0;
             }
 
@@ -372,10 +373,17 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
         private sealed class ComplianceMetric
         {
             public required string Framework { get; init; }
-            public long TotalChecks { get; set; }
-            public long ViolationCount { get; set; }
-            public long CompliantCount { get; set; }
-            public double ComplianceScore { get; set; } = 1.0;
+            // Use long fields for Interlocked.Increment/Read
+            public long TotalChecks;
+            public long ViolationCount;
+            public long CompliantCount;
+            // ComplianceScore stored as long bits for Interlocked-safe access
+            private long _complianceScoreBits = BitConverter.DoubleToInt64Bits(1.0);
+            public double ComplianceScore
+            {
+                get => BitConverter.Int64BitsToDouble(Interlocked.Read(ref _complianceScoreBits));
+                set => Interlocked.Exchange(ref _complianceScoreBits, BitConverter.DoubleToInt64Bits(value));
+            }
             public DateTime FirstCheckAt { get; set; }
             public DateTime? LastCheckAt { get; set; }
             public DateTime? LastViolationAt { get; set; }
@@ -414,15 +422,32 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("continuous_compliance_monitoring.initialized");
+            IncrementCounter("continuous_compliance_monitoring.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("continuous_compliance_monitoring.shutdown");
+            IncrementCounter("continuous_compliance_monitoring.shutdown");
+            _monitoringTimer?.Dispose();
+            _monitoringTimer = null;
+            _snapshotTimer?.Dispose();
+            _snapshotTimer = null;
         return base.ShutdownAsyncCore(cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _monitoringTimer?.Dispose();
+            _monitoringTimer = null;
+            _snapshotTimer?.Dispose();
+            _snapshotTimer = null;
+        }
+        base.Dispose(disposing);
     }
 }
 

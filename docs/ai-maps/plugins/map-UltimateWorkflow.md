@@ -103,6 +103,8 @@ public sealed record TaskResult
     public Dictionary<string, double> Metrics { get; init; };
     public static TaskResult Succeeded(object? output = null, TimeSpan? duration = null);;
     public static TaskResult Failed(string error, TimeSpan? duration = null);;
+    public static TaskResult NoHandler();;
+    public bool IsNoHandlerError { get; init; }
 }
 ```
 ```csharp
@@ -172,53 +174,6 @@ public abstract class WorkflowStrategyBase
     public virtual bool Validate(WorkflowDefinition workflow, out List<string> errors);
     protected IEnumerable<WorkflowTask> GetReadyTasks(WorkflowDefinition workflow, HashSet<string> completed, HashSet<string> running);
     protected async Task<TaskResult> ExecuteTaskAsync(WorkflowTask task, WorkflowContext context, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateWorkflow/Scaling/PipelineScalingManager.cs
-```csharp
-[SdkCompatibility("6.0.0", Notes = "Phase 88-10: Pipeline stage captured state with spill support")]
-public sealed record PipelineStageCapturedState(string PipelineId, int StageIndex, string StageName, byte[]? StateData, bool IsSpilled, IReadOnlyList<int> DependsOnStages)
-{
-}
-    public long SizeBytes;;
-}
-```
-```csharp
-[SdkCompatibility("6.0.0", Notes = "Phase 88-10: Pipeline scaling manager with depth limits and parallel rollback")]
-public sealed class PipelineScalingManager : IScalableSubsystem, IDisposable
-{
-}
-    public PipelineScalingManager(IPersistentBackingStore? backingStore = null, ScalingLimits? limits = null);
-    public int MaxPipelineDepth { get => _maxPipelineDepth; set => _maxPipelineDepth = Math.Max(1, value); }
-    public long MaxStateBytesPerStage { get => Interlocked.Read(ref _maxStateBytesPerStage); set => Interlocked.Exchange(ref _maxStateBytesPerStage, Math.Max(1024, value)); }
-    public bool ValidatePipelineDepth(int stageCount);
-    public async Task<bool> AcquireTransactionSlotAsync(CancellationToken ct = default);
-    public void ReleaseTransactionSlot();
-    public async Task CaptureStageStateAsync(string pipelineId, int stageIndex, string stageName, byte[] stateData, IReadOnlyList<int>? dependsOnStages = null, CancellationToken ct = default);
-    public async Task<byte[]?> LoadSpilledStateAsync(string pipelineId, int stageIndex, CancellationToken ct = default);
-    public async Task<PipelineRollbackResult> RollbackAsync(string pipelineId, Func<PipelineStageCapturedState, CancellationToken, Task> rollbackAction, CancellationToken ct = default);
-    public IReadOnlyDictionary<string, object> GetScalingMetrics();
-    public async Task ReconfigureLimitsAsync(ScalingLimits limits, CancellationToken ct = default);
-    public ScalingLimits CurrentLimits;;
-    public BackpressureState CurrentBackpressureState
-{
-    get
-    {
-        long pending = Interlocked.Read(ref _pendingTransactions);
-        int maxQueue = _currentLimits.MaxQueueDepth;
-        if (pending <= 0)
-            return BackpressureState.Normal;
-        if (pending < maxQueue * 0.5)
-            return BackpressureState.Normal;
-        if (pending < maxQueue * 0.8)
-            return BackpressureState.Warning;
-        if (pending < maxQueue)
-            return BackpressureState.Critical;
-        return BackpressureState.Shedding;
-    }
-}
-    public void Dispose();
 }
 ```
 
@@ -306,6 +261,8 @@ public sealed class ChildWorkflowRecord
     public DateTime? CompletedAt { get; set; }
     public WorkflowResult? Result { get; set; }
     public ParentClosePolicy CancellationOnParentClose { get; init; }
+    public CancellationTokenSource Cts { get; };
+    public CancellationToken CancellationToken;;
 }
 ```
 ```csharp
@@ -476,130 +433,50 @@ public sealed record SearchAttributeValue
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateWorkflow/Strategies/AIEnhanced/AIEnhancedStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateWorkflow/Scaling/PipelineScalingManager.cs
 ```csharp
-public sealed class AIOptimizedWorkflowStrategy : WorkflowStrategyBase
+[SdkCompatibility("6.0.0", Notes = "Phase 88-10: Pipeline stage captured state with spill support")]
+public sealed record PipelineStageCapturedState(string PipelineId, int StageIndex, string StageName, byte[]? StateData, bool IsSpilled, IReadOnlyList<int> DependsOnStages)
 {
 }
-    public override WorkflowCharacteristics Characteristics { get; };
-    public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
+    public long SizeBytes;;
 }
 ```
 ```csharp
-public sealed class SelfLearningWorkflowStrategy : WorkflowStrategyBase
+[SdkCompatibility("6.0.0", Notes = "Phase 88-10: Pipeline scaling manager with depth limits and parallel rollback")]
+public sealed class PipelineScalingManager : IScalableSubsystem, IDisposable
 {
 }
-    public override WorkflowCharacteristics Characteristics { get; };
-    public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
-}
-```
-```csharp
-public sealed class AnomalyDetectionWorkflowStrategy : WorkflowStrategyBase
+    public PipelineScalingManager(IPersistentBackingStore? backingStore = null, ScalingLimits? limits = null);
+    public int MaxPipelineDepth { get => _maxPipelineDepth; set => _maxPipelineDepth = Math.Max(1, value); }
+    public long MaxStateBytesPerStage { get => Interlocked.Read(ref _maxStateBytesPerStage); set => Interlocked.Exchange(ref _maxStateBytesPerStage, Math.Max(1024, value)); }
+    public bool ValidatePipelineDepth(int stageCount);
+    public async Task<bool> AcquireTransactionSlotAsync(CancellationToken ct = default);
+    public void ReleaseTransactionSlot();
+    public async Task CaptureStageStateAsync(string pipelineId, int stageIndex, string stageName, byte[] stateData, IReadOnlyList<int>? dependsOnStages = null, CancellationToken ct = default);
+    public async Task<byte[]?> LoadSpilledStateAsync(string pipelineId, int stageIndex, CancellationToken ct = default);
+    public async Task<PipelineRollbackResult> RollbackAsync(string pipelineId, Func<PipelineStageCapturedState, CancellationToken, Task> rollbackAction, CancellationToken ct = default);
+    public IReadOnlyDictionary<string, object> GetScalingMetrics();
+    public async Task ReconfigureLimitsAsync(ScalingLimits limits, CancellationToken ct = default);
+    public ScalingLimits CurrentLimits;;
+    public BackpressureState CurrentBackpressureState
 {
+    get
+    {
+        long pending = Interlocked.Read(ref _pendingTransactions);
+        int maxQueue = _currentLimits.MaxQueueDepth;
+        if (pending <= 0)
+            return BackpressureState.Normal;
+        if (pending < maxQueue * 0.5)
+            return BackpressureState.Normal;
+        if (pending < maxQueue * 0.8)
+            return BackpressureState.Warning;
+        if (pending < maxQueue)
+            return BackpressureState.Critical;
+        return BackpressureState.Shedding;
+    }
 }
-    public override WorkflowCharacteristics Characteristics { get; };
-    public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
-}
-```
-```csharp
-public sealed class PredictiveScalingStrategy : WorkflowStrategyBase
-{
-}
-    public override WorkflowCharacteristics Characteristics { get; };
-    public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
-}
-```
-```csharp
-public sealed class IntelligentRetryStrategy : WorkflowStrategyBase
-{
-}
-    public override WorkflowCharacteristics Characteristics { get; };
-    public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateWorkflow/Strategies/DagExecution/DagExecutionStrategies.cs
-```csharp
-public sealed class TopologicalDagStrategy : WorkflowStrategyBase
-{
-}
-    public override WorkflowCharacteristics Characteristics { get; };
-    public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
-}
-```
-```csharp
-public sealed class DynamicDagStrategy : WorkflowStrategyBase
-{
-}
-    public override WorkflowCharacteristics Characteristics { get; };
-    public void AddDynamicTask(string workflowInstanceId, WorkflowTask task);
-    public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
-}
-```
-```csharp
-public sealed class LayeredDagStrategy : WorkflowStrategyBase
-{
-}
-    public override WorkflowCharacteristics Characteristics { get; };
-    public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
-}
-```
-```csharp
-public sealed class CriticalPathDagStrategy : WorkflowStrategyBase
-{
-}
-    public override WorkflowCharacteristics Characteristics { get; };
-    public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
-}
-```
-```csharp
-public sealed class StreamingDagStrategy : WorkflowStrategyBase
-{
-}
-    public override WorkflowCharacteristics Characteristics { get; };
-    public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateWorkflow/Strategies/Distributed/DistributedStrategies.cs
-```csharp
-public sealed class DistributedExecutionStrategy : WorkflowStrategyBase
-{
-}
-    public override WorkflowCharacteristics Characteristics { get; };
-    public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
-}
-```
-```csharp
-public sealed class LeaderFollowerStrategy : WorkflowStrategyBase
-{
-}
-    public override WorkflowCharacteristics Characteristics { get; };
-    public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
-}
-```
-```csharp
-public sealed class ShardedExecutionStrategy : WorkflowStrategyBase
-{
-}
-    public override WorkflowCharacteristics Characteristics { get; };
-    public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
-}
-```
-```csharp
-public sealed class GossipCoordinationStrategy : WorkflowStrategyBase
-{
-}
-    public override WorkflowCharacteristics Characteristics { get; };
-    public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
-}
-```
-```csharp
-public sealed class RaftConsensusStrategy : WorkflowStrategyBase
-{
-}
-    public override WorkflowCharacteristics Characteristics { get; };
-    public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
+    public void Dispose();
 }
 ```
 
@@ -638,11 +515,12 @@ public sealed class FallbackStrategy : WorkflowStrategyBase
 }
 ```
 ```csharp
-public sealed class BulkheadIsolationStrategy : WorkflowStrategyBase
+public sealed class BulkheadIsolationStrategy : WorkflowStrategyBase, IDisposable
 {
 }
     public override WorkflowCharacteristics Characteristics { get; };
     public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
+    public void Dispose();
 }
 ```
 ```csharp
@@ -714,6 +592,56 @@ public sealed class SpeculativeParallelStrategy : WorkflowStrategyBase
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateWorkflow/Strategies/TaskScheduling/TaskSchedulingStrategies.cs
+```csharp
+public sealed class FifoSchedulingStrategy : WorkflowStrategyBase
+{
+}
+    public override WorkflowCharacteristics Characteristics { get; };
+    public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
+}
+```
+```csharp
+public sealed class PrioritySchedulingStrategy : WorkflowStrategyBase
+{
+}
+    public override WorkflowCharacteristics Characteristics { get; };
+    public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
+}
+```
+```csharp
+public sealed class RoundRobinSchedulingStrategy : WorkflowStrategyBase
+{
+}
+    public override WorkflowCharacteristics Characteristics { get; };
+    public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
+}
+```
+```csharp
+public sealed class ShortestJobFirstStrategy : WorkflowStrategyBase
+{
+}
+    public override WorkflowCharacteristics Characteristics { get; };
+    public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
+}
+```
+```csharp
+public sealed class DeadlineSchedulingStrategy : WorkflowStrategyBase
+{
+}
+    public override WorkflowCharacteristics Characteristics { get; };
+    public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
+}
+```
+```csharp
+public sealed class MultilevelFeedbackQueueStrategy : WorkflowStrategyBase
+{
+}
+    public override WorkflowCharacteristics Characteristics { get; };
+    public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateWorkflow/Strategies/StateManagement/StateManagementStrategies.cs
 ```csharp
 public sealed class CheckpointStateStrategy : WorkflowStrategyBase
@@ -767,9 +695,9 @@ public sealed class DistributedStateStrategy : WorkflowStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateWorkflow/Strategies/TaskScheduling/TaskSchedulingStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateWorkflow/Strategies/AIEnhanced/AIEnhancedStrategies.cs
 ```csharp
-public sealed class FifoSchedulingStrategy : WorkflowStrategyBase
+public sealed class AIOptimizedWorkflowStrategy : WorkflowStrategyBase
 {
 }
     public override WorkflowCharacteristics Characteristics { get; };
@@ -777,7 +705,7 @@ public sealed class FifoSchedulingStrategy : WorkflowStrategyBase
 }
 ```
 ```csharp
-public sealed class PrioritySchedulingStrategy : WorkflowStrategyBase
+public sealed class SelfLearningWorkflowStrategy : WorkflowStrategyBase
 {
 }
     public override WorkflowCharacteristics Characteristics { get; };
@@ -785,7 +713,7 @@ public sealed class PrioritySchedulingStrategy : WorkflowStrategyBase
 }
 ```
 ```csharp
-public sealed class RoundRobinSchedulingStrategy : WorkflowStrategyBase
+public sealed class AnomalyDetectionWorkflowStrategy : WorkflowStrategyBase
 {
 }
     public override WorkflowCharacteristics Characteristics { get; };
@@ -793,7 +721,7 @@ public sealed class RoundRobinSchedulingStrategy : WorkflowStrategyBase
 }
 ```
 ```csharp
-public sealed class ShortestJobFirstStrategy : WorkflowStrategyBase
+public sealed class PredictiveScalingStrategy : WorkflowStrategyBase
 {
 }
     public override WorkflowCharacteristics Characteristics { get; };
@@ -801,7 +729,35 @@ public sealed class ShortestJobFirstStrategy : WorkflowStrategyBase
 }
 ```
 ```csharp
-public sealed class DeadlineSchedulingStrategy : WorkflowStrategyBase
+public sealed class IntelligentRetryStrategy : WorkflowStrategyBase
+{
+}
+    public override WorkflowCharacteristics Characteristics { get; };
+    public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateWorkflow/Strategies/Distributed/DistributedStrategies.cs
+```csharp
+public sealed class DistributedExecutionStrategy : WorkflowStrategyBase
+{
+}
+    public override WorkflowCharacteristics Characteristics { get; };
+    public void ConfigureNodes(IReadOnlyList<string> nodeAddresses);
+    public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
+}
+```
+```csharp
+public sealed class LeaderFollowerStrategy : WorkflowStrategyBase
+{
+}
+    public override WorkflowCharacteristics Characteristics { get; };
+    public void ConfigureTopology(string leaderAddress, IReadOnlyList<string> followerAddresses);
+    public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
+}
+```
+```csharp
+public sealed class ShardedExecutionStrategy : WorkflowStrategyBase
 {
 }
     public override WorkflowCharacteristics Characteristics { get; };
@@ -809,7 +765,60 @@ public sealed class DeadlineSchedulingStrategy : WorkflowStrategyBase
 }
 ```
 ```csharp
-public sealed class MultilevelFeedbackQueueStrategy : WorkflowStrategyBase
+public sealed class GossipCoordinationStrategy : WorkflowStrategyBase
+{
+}
+    public void ConfigureGossipPeers(IReadOnlyList<string> peerEndpoints);
+    public override WorkflowCharacteristics Characteristics { get; };
+    public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
+}
+```
+```csharp
+public sealed class RaftConsensusStrategy : WorkflowStrategyBase
+{
+}
+    public void ConfigureRaftCluster(IReadOnlyList<string> nodeEndpoints, long initialTerm = 1);
+    public override WorkflowCharacteristics Characteristics { get; };
+    public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateWorkflow/Strategies/DagExecution/DagExecutionStrategies.cs
+```csharp
+public sealed class TopologicalDagStrategy : WorkflowStrategyBase
+{
+}
+    public override WorkflowCharacteristics Characteristics { get; };
+    public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
+}
+```
+```csharp
+public sealed class DynamicDagStrategy : WorkflowStrategyBase
+{
+}
+    public override WorkflowCharacteristics Characteristics { get; };
+    public void AddDynamicTask(string workflowInstanceId, WorkflowTask task);
+    public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
+}
+```
+```csharp
+public sealed class LayeredDagStrategy : WorkflowStrategyBase
+{
+}
+    public override WorkflowCharacteristics Characteristics { get; };
+    public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
+}
+```
+```csharp
+public sealed class CriticalPathDagStrategy : WorkflowStrategyBase
+{
+}
+    public override WorkflowCharacteristics Characteristics { get; };
+    public override async Task<WorkflowResult> ExecuteAsync(WorkflowDefinition workflow, Dictionary<string, object>? parameters = null, CancellationToken cancellationToken = default);
+}
+```
+```csharp
+public sealed class StreamingDagStrategy : WorkflowStrategyBase
 {
 }
     public override WorkflowCharacteristics Characteristics { get; };

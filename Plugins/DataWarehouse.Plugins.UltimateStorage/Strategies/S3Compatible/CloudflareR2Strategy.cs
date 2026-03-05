@@ -117,7 +117,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
                 throw new InvalidOperationException("Multipart chunk size must be at least 5MB for R2");
             }
 
-            // Create HTTP client
+            // Dispose prior HttpClient instance before creating a new one to prevent socket leaks on re-initialization
+            _httpClient?.Dispose();
             _httpClient = new HttpClient
             {
                 Timeout = TimeSpan.FromSeconds(_timeoutSeconds)
@@ -218,7 +219,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
                 // Step 2: Upload parts in parallel
                 var partCount = (int)Math.Ceiling((double)dataLength / _multipartChunkSizeBytes);
                 var completedParts = new List<CompletedPart>();
-                var semaphore = new SemaphoreSlim(_maxConcurrentParts, _maxConcurrentParts);
+                using var semaphore = new SemaphoreSlim(_maxConcurrentParts, _maxConcurrentParts);
 
                 var uploadTasks = new List<Task<CompletedPart>>();
 
@@ -599,11 +600,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
 
             if (!string.IsNullOrEmpty(_customDomain))
             {
-                return $"https://{_customDomain}/{key}";
+                return $"https://{_customDomain}/{Uri.EscapeDataString(key)}";
             }
             else if (!string.IsNullOrEmpty(_r2DevDomain))
             {
-                return $"https://{_r2DevDomain}/{key}";
+                return $"https://{_r2DevDomain}/{Uri.EscapeDataString(key)}";
             }
 
             return null;

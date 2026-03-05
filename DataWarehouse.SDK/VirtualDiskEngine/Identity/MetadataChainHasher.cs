@@ -44,7 +44,8 @@ public static class MetadataChainHasher
     public static (byte[] ChainHash, long Generation, long Timestamp) ComputeChainHash(
         Stream vdeStream,
         int blockSize,
-        IReadOnlyDictionary<string, (long StartBlock, long BlockCount)> regions)
+        IReadOnlyDictionary<string, (long StartBlock, long BlockCount)> regions,
+        long previousGeneration = 0L)
     {
         ArgumentNullException.ThrowIfNull(vdeStream);
         ArgumentNullException.ThrowIfNull(regions);
@@ -86,7 +87,9 @@ public static class MetadataChainHasher
             previousHash = sha256.GetHashAndReset();
         }
 
-        return (previousHash, 1L, DateTimeOffset.UtcNow.Ticks);
+        // Cat 1 (finding 840): return previousGeneration+1 so successive calls produce
+        // monotonically increasing generation numbers for chain versioning.
+        return (previousHash, previousGeneration + 1L, DateTimeOffset.UtcNow.Ticks);
     }
 
     /// <summary>

@@ -270,7 +270,7 @@ public sealed class EvolvingExpertStrategy : FeatureStrategyBase
                 (_, list) => { list.Add((query, response, success)); return list; });
 
             // Trigger consolidation if threshold reached
-            var threshold = int.Parse(GetConfig("ConsolidationThreshold") ?? "100");
+            var threshold = GetConfigInt("ConsolidationThreshold", 100);
             if (_experienceBuffer[domain].Count >= threshold)
             {
                 await EvolveExpertiseAsync(domain, ct);
@@ -386,9 +386,14 @@ public sealed class EvolvingExpertStrategy : FeatureStrategyBase
     private async Task PersistMetricsAsync(string domain, EvolutionMetrics metrics, CancellationToken ct)
     {
         _storagePath ??= GetConfig("StoragePath") ?? "./evolution-data/expert";
-        Directory.CreateDirectory(_storagePath);
+        // Finding 3102: Validate StoragePath to prevent path traversal attacks.
+        var safeBase = Path.GetFullPath(_storagePath);
+        Directory.CreateDirectory(safeBase);
 
-        var filePath = Path.Combine(_storagePath, $"{domain}.json");
+        var filePath = Path.GetFullPath(Path.Combine(safeBase, $"{domain}.json"));
+        if (!filePath.StartsWith(safeBase, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"Domain name '{domain}' resolves outside StoragePath.");
+
         var json = JsonSerializer.Serialize(metrics, new JsonSerializerOptions { WriteIndented = true });
         await File.WriteAllTextAsync(filePath, json, ct);
     }
@@ -518,7 +523,7 @@ public sealed class AdaptiveModelStrategy : FeatureStrategyBase
         return await ExecuteWithTrackingAsync(async () =>
         {
             var profile = await GetUserProfileAsync(userId, ct);
-            var minInteractions = int.Parse(GetConfig("MinInteractions") ?? "10");
+            var minInteractions = GetConfigInt("MinInteractions", 10);
 
             // Not enough data yet
             if (profile.InteractionCount < minInteractions)
@@ -565,10 +570,16 @@ public sealed class AdaptiveModelStrategy : FeatureStrategyBase
 public sealed class ContinualLearningStrategy : FeatureStrategyBase
 {
     private readonly BoundedDictionary<string, TaskMetrics> _taskMetrics = new BoundedDictionary<string, TaskMetrics>(1000);
-    private readonly List<string> _learnedTasks = new();
+    // Use ConcurrentBag for _learnedTasks to allow thread-safe concurrent enumeration and add (finding 3093).
+    private readonly System.Collections.Concurrent.ConcurrentBag<string> _learnedTasks = new();
 
     /// <inheritdoc/>
     public override string StrategyId => "evolution-continual";
+
+    /// <inheritdoc/>
+    // EWC model training, Fisher information matrix, and knowledge consolidation are not yet
+    // integrated with an ML runtime. Mark not production-ready until T118 (ML runtime) lands.
+    public override bool IsProductionReady => false;
 
     /// <inheritdoc/>
     public override string StrategyName => "Continual Learning";
@@ -640,9 +651,12 @@ public sealed class ContinualLearningStrategy : FeatureStrategyBase
 
             foreach (var task in _learnedTasks)
             {
-                // In production: Evaluate model on task-specific test set
-                // For now, return simulated accuracy
-                results[task] = 0.85 + Random.Shared.NextDouble() * 0.1;
+                // Actual evaluation requires running the EWC model against a held-out test set.
+                // Return per-task metric from stored training statistics until ML runtime is integrated.
+                var metrics = _taskMetrics.TryGetValue(task, out var m) ? m : null;
+                results[task] = metrics != null && metrics.ExampleCount > 0
+                    ? Math.Min(1.0, 0.5 + metrics.ExampleCount * 0.001) // rough convergence heuristic
+                    : 0.0;
             }
 
             await Task.CompletedTask;
@@ -703,6 +717,10 @@ public sealed class CollectiveIntelligenceStrategy : FeatureStrategyBase
     public override string StrategyName => "Collective Intelligence";
 
     /// <inheritdoc/>
+    // Federated learning aggregation and knowledge distillation require an ML runtime.
+    public override bool IsProductionReady => false;
+
+    /// <inheritdoc/>
     public override IntelligenceStrategyInfo Info => new()
     {
         ProviderName = "Collective Intelligence",
@@ -731,7 +749,7 @@ public sealed class CollectiveIntelligenceStrategy : FeatureStrategyBase
     {
         await ExecuteWithTrackingAsync(async () =>
         {
-            var minConfidence = double.Parse(GetConfig("MinConfidence") ?? "0.8");
+            var minConfidence = GetConfigDouble("MinConfidence", 0.8);
 
             // Only share high-confidence knowledge
             if (knowledgePackage.ConfidenceScore < minConfidence)
@@ -741,10 +759,15 @@ public sealed class CollectiveIntelligenceStrategy : FeatureStrategyBase
             _sharedKnowledge[knowledgePackage.PackageId] = knowledgePackage;
 
             // Persist to storage for other agents
-            var storagePath = GetConfig("StoragePath") ?? "./evolution-data/collective";
-            Directory.CreateDirectory(storagePath);
+            // P2-3102: Validate StoragePath and PackageId to prevent path traversal attacks.
+            var rawPath = GetConfig("StoragePath") ?? "./evolution-data/collective";
+            var safeBase = Path.GetFullPath(rawPath);
+            Directory.CreateDirectory(safeBase);
 
-            var filePath = Path.Combine(storagePath, $"{knowledgePackage.PackageId}.json");
+            var filePath = Path.GetFullPath(Path.Combine(safeBase, $"{knowledgePackage.PackageId}.json"));
+            if (!filePath.StartsWith(safeBase, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException($"PackageId '{knowledgePackage.PackageId}' resolves outside StoragePath.");
+
             var json = JsonSerializer.Serialize(knowledgePackage, new JsonSerializerOptions { WriteIndented = true });
             await File.WriteAllTextAsync(filePath, json, ct);
 
@@ -848,13 +871,19 @@ public sealed class CollectiveIntelligenceStrategy : FeatureStrategyBase
 public sealed class MetaLearningStrategy : FeatureStrategyBase
 {
     private readonly BoundedDictionary<string, MetaKnowledge> _metaKnowledge = new BoundedDictionary<string, MetaKnowledge>(1000);
+    // P2-3096: Use a lock for read-modify-write to prevent torn updates on concurrent calls.
     private double _learningEfficiency = 0.5;
+    private readonly object _efficiencyLock = new();
 
     /// <inheritdoc/>
     public override string StrategyId => "evolution-metalearning";
 
     /// <inheritdoc/>
     public override string StrategyName => "Meta-Learning";
+
+    /// <inheritdoc/>
+    // MAML and transfer learning require an ML runtime integration.
+    public override bool IsProductionReady => false;
 
     /// <inheritdoc/>
     public override IntelligenceStrategyInfo Info => new()
@@ -887,7 +916,7 @@ public sealed class MetaLearningStrategy : FeatureStrategyBase
         return await ExecuteWithTrackingAsync(async () =>
         {
             var exampleList = examples.ToList();
-            var minExamples = int.Parse(GetConfig("MinExamplesForFewShot") ?? "5");
+            var minExamples = GetConfigInt("MinExamplesForFewShot", 5);
 
             if (exampleList.Count < minExamples)
                 throw new InvalidOperationException($"Need at least {minExamples} examples for few-shot learning");
@@ -914,8 +943,11 @@ public sealed class MetaLearningStrategy : FeatureStrategyBase
 
             _metaKnowledge[taskType] = updated;
 
-            // Improve learning efficiency
-            _learningEfficiency = Math.Min(0.95, _learningEfficiency + 0.01);
+            // Improve learning efficiency (P2-3096: lock prevents torn read-modify-write).
+            lock (_efficiencyLock)
+            {
+                _learningEfficiency = Math.Min(0.95, _learningEfficiency + 0.01);
+            }
 
             await Task.CompletedTask;
             return modelId;

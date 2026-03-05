@@ -421,9 +421,9 @@ public sealed class WebSocketApiGenerator
             };
 
             sb.AppendLine($"  '{key}': {{");
-            sb.AppendLine($"    path: '{channel.Path}',");
-            sb.AppendLine($"    pluginId: '{channel.PluginId}',");
-            sb.AppendLine($"    capabilityName: '{channel.CapabilityName}',");
+            sb.AppendLine($"    path: '{EscapeForTs(channel.Path)}',");
+            sb.AppendLine($"    pluginId: '{EscapeForTs(channel.PluginId)}',");
+            sb.AppendLine($"    capabilityName: '{EscapeForTs(channel.CapabilityName)}',");
             sb.AppendLine($"    description: '{EscapeForTs(channel.Description ?? channel.CapabilityName)}',");
             sb.AppendLine($"    direction: '{direction}',");
             sb.AppendLine($"    messageTypes: [{string.Join(", ", channel.MessageTypes.Select(t => $"'{t}'"))}],");

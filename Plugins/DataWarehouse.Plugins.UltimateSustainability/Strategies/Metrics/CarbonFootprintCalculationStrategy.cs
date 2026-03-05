@@ -52,7 +52,7 @@ public sealed class CarbonFootprintCalculationStrategy : SustainabilityStrategyB
     /// <inheritdoc/>
     protected override Task InitializeCoreAsync(CancellationToken ct)
     {
-        _calcTimer = new Timer(async _ => await CalculateEmissionsAsync(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
+        _calcTimer = new Timer(async _ => { try { await CalculateEmissionsAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } }, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
         return Task.CompletedTask;
     }
 

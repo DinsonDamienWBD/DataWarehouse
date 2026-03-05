@@ -467,6 +467,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection
 
         /// <summary>Current file being restored.</summary>
         public string? CurrentItem { get; init; }
+
+        /// <summary>Non-fatal warning message for this progress event, if any.</summary>
+        public string? Warning { get; init; }
     }
 
     /// <summary>

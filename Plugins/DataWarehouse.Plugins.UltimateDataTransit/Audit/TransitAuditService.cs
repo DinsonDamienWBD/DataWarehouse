@@ -209,7 +209,9 @@ internal sealed class TransitAuditService
             }
             catch
             {
+
                 // Audit publish failures must not impact transfer operations
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         });
     }

@@ -136,7 +136,8 @@ internal sealed class SemanticSyncOrchestrator : IAsyncDisposable, IDisposable
     /// <summary>
     /// Starts the background worker loop that processes sync requests from the channel.
     /// </summary>
-    public void StartAsync()
+    // Cat 15 (finding 1003): renamed from StartAsync() to Start() — void return type makes "Async" suffix a naming lie.
+    public void Start()
     {
         if (_workerTask is not null) return;
 
@@ -158,9 +159,11 @@ internal sealed class SemanticSyncOrchestrator : IAsyncDisposable, IDisposable
             {
                 await _workerTask.ConfigureAwait(false);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException ex)
             {
+
                 // Expected during shutdown
+                System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
             }
         }
     }
@@ -236,7 +239,9 @@ internal sealed class SemanticSyncOrchestrator : IAsyncDisposable, IDisposable
                 }
                 catch
                 {
+
                     // Best-effort: don't throw during shutdown
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
         }

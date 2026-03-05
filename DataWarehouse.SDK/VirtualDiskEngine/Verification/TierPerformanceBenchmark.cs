@@ -387,6 +387,12 @@ public static class TierPerformanceBenchmark
             operation();
         }
 
+        // Cat 13 (finding 938): trigger full GC collection and wait for finalizers before measuring
+        // so that GC pauses from warmup allocations do not skew the measured timings.
+        GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+        GC.WaitForPendingFinalizers();
+        GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+
         // Measured iterations
         var sw = Stopwatch.StartNew();
         for (int i = 0; i < MeasuredIterations; i++)
@@ -418,13 +424,17 @@ public static class TierPerformanceBenchmark
 
         if (tier1vs2 > 1.0)
             analysis.Append($"Tier 1 is {tier1vs2:F1}x faster than Tier 2. ");
-        else
+        else if (tier1vs2 > 0.0)
             analysis.Append($"Tier 2 is {1.0 / tier1vs2:F1}x faster than Tier 1. ");
+        else
+            analysis.Append("Tier 2 ratio unavailable (Tier 1 zero latency). ");
 
         if (tier1vs3 > 1.0)
             analysis.Append($"Tier 1 is {tier1vs3:F1}x faster than Tier 3 (Tier 3 loses persistence). ");
-        else
+        else if (tier1vs3 > 0.0)
             analysis.Append($"Tier 3 is {1.0 / tier1vs3:F1}x faster than Tier 1 (Tier 3 trades persistence for speed). ");
+        else
+            analysis.Append("Tier 3 ratio unavailable (Tier 1 zero latency). ");
 
         return new BenchmarkResult
         {

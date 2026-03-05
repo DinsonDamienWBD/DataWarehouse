@@ -82,11 +82,14 @@ public sealed class TagConsciousnessWiring
                 return;
             }
 
-            var scoreValue = message.Payload.TryGetValue("score", out var sv) && sv is double dScore
-                ? dScore
-                : message.Payload.TryGetValue("score", out sv) && sv is int iScore
-                    ? (double)iScore
-                    : 0.0;
+            // P2-2260: Single TryGetValue lookup — sv from the first call already holds the value.
+            double scoreValue = 0.0;
+            if (message.Payload.TryGetValue("score", out var sv))
+            {
+                if (sv is double dScore) scoreValue = dScore;
+                else if (sv is int iScore) scoreValue = (double)iScore;
+                else if (sv is long lScore) scoreValue = (double)lScore;
+            }
 
             var grade = DeriveGrade(scoreValue);
             var liabilityScore = message.Payload.TryGetValue("liability", out var ls) && ls is double dLiability

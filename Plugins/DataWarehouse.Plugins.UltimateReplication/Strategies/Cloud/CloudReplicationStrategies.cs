@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -179,9 +180,11 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Cloud
                     await Task.Delay(latency, cancellationToken);
                     RecordReplicationLag(targetRegion, DateTime.UtcNow - startTime);
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException ex)
                 {
+
                     // Cancelled - don't record lag
+                    System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
                 }
             });
 
@@ -228,6 +231,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Cloud
         private ConsistencyModel _cosmosConsistencyLevel = ConsistencyModel.SessionConsistent;
         private string? _writeRegion;
         private readonly List<string> _readRegions = new();
+        private readonly object _readRegionsLock = new();
 
         /// <inheritdoc/>
         public override ReplicationCharacteristics Characteristics { get; } = new()
@@ -289,7 +293,10 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Cloud
             }
             else
             {
-                _readRegions.Add(regionName);
+                lock (_readRegionsLock)
+                {
+                    _readRegions.Add(regionName);
+                }
             }
         }
 
@@ -842,7 +849,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Cloud
     public sealed class EdgeReplicationStrategy : EnhancedReplicationStrategyBase
     {
         private readonly BoundedDictionary<string, EdgeNode> _edgeNodes = new BoundedDictionary<string, EdgeNode>(1000);
-        private readonly BoundedDictionary<string, Queue<PendingSync>> _pendingSyncs = new BoundedDictionary<string, Queue<PendingSync>>(1000);
+        private readonly BoundedDictionary<string, ConcurrentQueue<PendingSync>> _pendingSyncs = new BoundedDictionary<string, ConcurrentQueue<PendingSync>>(1000);
         private readonly BoundedDictionary<string, (byte[] Data, DateTimeOffset Timestamp)> _edgeStore = new BoundedDictionary<string, (byte[] Data, DateTimeOffset Timestamp)>(1000);
         private int _maxQueueSize = 10000;
 
@@ -908,7 +915,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Cloud
         public void AddEdgeNode(EdgeNode node)
         {
             _edgeNodes[node.NodeId] = node;
-            _pendingSyncs[node.NodeId] = new Queue<PendingSync>();
+            _pendingSyncs[node.NodeId] = new ConcurrentQueue<PendingSync>();
         }
 
         /// <summary>

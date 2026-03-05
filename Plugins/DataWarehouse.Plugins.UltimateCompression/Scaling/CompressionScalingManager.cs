@@ -90,6 +90,7 @@ public sealed class CompressionScalingManager : IScalableSubsystem, IDisposable
     // Concurrency control for parallel chunk compression
     private SemaphoreSlim _chunkSemaphore;
     private ScalingLimits _currentLimits;
+    private readonly object _limitsLock = new();
     private int _chunkSize;
     private CompressionQualityLevel _defaultQuality;
     private long _pendingOperations;
@@ -366,17 +367,23 @@ public sealed class CompressionScalingManager : IScalableSubsystem, IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(limits);
 
-        var oldLimits = _currentLimits;
-        _currentLimits = limits;
+        SemaphoreSlim? oldSemaphore = null;
 
-        if (limits.MaxConcurrentOperations != oldLimits.MaxConcurrentOperations)
+        lock (_limitsLock)
         {
-            var oldSemaphore = _chunkSemaphore;
-            _chunkSemaphore = new SemaphoreSlim(
-                limits.MaxConcurrentOperations,
-                limits.MaxConcurrentOperations);
-            oldSemaphore.Dispose();
+            var oldLimits = _currentLimits;
+            _currentLimits = limits;
+
+            if (limits.MaxConcurrentOperations != oldLimits.MaxConcurrentOperations)
+            {
+                oldSemaphore = _chunkSemaphore;
+                _chunkSemaphore = new SemaphoreSlim(
+                    limits.MaxConcurrentOperations,
+                    limits.MaxConcurrentOperations);
+            }
         }
+
+        oldSemaphore?.Dispose();
 
         _logger.LogInformation(
             "Compression scaling limits reconfigured: MaxCache={MaxCache}, MaxConcurrent={MaxConcurrent}",

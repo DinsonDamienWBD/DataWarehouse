@@ -13,6 +13,8 @@ public sealed class TableauStrategy : DashboardStrategyBase
 {
     private string? _siteId;
     private string? _authToken;
+    // P2-3299: serialize sign-in to prevent concurrent callers from racing on _authToken/_siteId.
+    private readonly System.Threading.SemaphoreSlim _authLock = new(1, 1);
     private string _apiVersion = "3.21";
 
     /// <inheritdoc/>
@@ -282,10 +284,10 @@ public sealed class TableauStrategy : DashboardStrategyBase
                 ? ownerName.GetString()
                 : null,
             CreatedAt: wb.TryGetProperty("createdAt", out var created)
-                ? DateTimeOffset.Parse(created.GetString() ?? DateTimeOffset.UtcNow.ToString("O"))
+                ? DateTimeOffset.Parse(created.GetString() ?? DateTimeOffset.UtcNow.ToString("O"), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind)
                 : DateTimeOffset.UtcNow,
             UpdatedAt: wb.TryGetProperty("updatedAt", out var updated)
-                ? DateTimeOffset.Parse(updated.GetString() ?? DateTimeOffset.UtcNow.ToString("O"))
+                ? DateTimeOffset.Parse(updated.GetString() ?? DateTimeOffset.UtcNow.ToString("O"), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind)
                 : DateTimeOffset.UtcNow,
             Version: 1
         );
@@ -369,10 +371,10 @@ public sealed class TableauStrategy : DashboardStrategyBase
                         ? ownerName.GetString()
                         : null,
                     CreatedAt: wb.TryGetProperty("createdAt", out var created)
-                        ? DateTimeOffset.Parse(created.GetString() ?? DateTimeOffset.UtcNow.ToString("O"))
+                        ? DateTimeOffset.Parse(created.GetString() ?? DateTimeOffset.UtcNow.ToString("O"), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind)
                         : null,
                     UpdatedAt: wb.TryGetProperty("updatedAt", out var updated)
-                        ? DateTimeOffset.Parse(updated.GetString() ?? DateTimeOffset.UtcNow.ToString("O"))
+                        ? DateTimeOffset.Parse(updated.GetString() ?? DateTimeOffset.UtcNow.ToString("O"), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind)
                         : null,
                     Version: 1
                 ));
@@ -459,8 +461,8 @@ public sealed class TableauStrategy : DashboardStrategyBase
             }
         };
 
-        using var client = new HttpClient { BaseAddress = new Uri(Config.BaseUrl) };
-        var response = await client.PostAsync(
+        var client = GetHttpClient();
+        using var response = await client.PostAsync(
             $"/api/{_apiVersion}/auth/signin",
             CreateJsonContent(credentials),
             cancellationToken);
@@ -475,9 +477,20 @@ public sealed class TableauStrategy : DashboardStrategyBase
 
     private async Task EnsureAuthenticatedAsync(CancellationToken cancellationToken)
     {
-        if (string.IsNullOrEmpty(_authToken))
+        // Fast-path: already authenticated.
+        if (!string.IsNullOrEmpty(_authToken)) return;
+
+        // P2-3299: serialize sign-in to prevent concurrent callers from double-signing-in
+        // and losing each other's _siteId assignment.
+        await _authLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            await SignInAsync(cancellationToken);
+            if (string.IsNullOrEmpty(_authToken))
+                await SignInAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _authLock.Release();
         }
     }
 

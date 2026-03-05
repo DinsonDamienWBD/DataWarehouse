@@ -83,6 +83,7 @@ public abstract class ComplianceStrategyBase : SdkStrategyBase, IComplianceStrat
     public async Task<ComplianceResult> CheckComplianceAsync(ComplianceContext context, CancellationToken cancellationToken = default);
     protected abstract Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);;
     public ComplianceStatistics GetStatistics();
+    protected T GetConfigValue<T>(string key, T defaultValue);
 }
 ```
 
@@ -166,403 +167,6 @@ public sealed class ComplianceCheckResponse
     public string OverallStatus { get; init; };
     public int TotalViolations { get; init; }
     public DateTime CheckedAt { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Features/AccessControlPolicyBridge.cs
-```csharp
-public sealed class AccessControlPolicyBridge
-{
-}
-    public void RegisterPolicy(string policyId, ComplianceAccessPolicy policy);
-    public async Task<PolicySyncResult> SyncPoliciesAsync(CancellationToken cancellationToken = default);
-    public AccessEvaluationResult EvaluateAccess(string userId, string resourceId, string operation, Dictionary<string, object> context);
-    public IReadOnlyList<PolicySyncResult> GetSyncHistory();
-}
-```
-```csharp
-public sealed class ComplianceAccessPolicy
-{
-}
-    public required string PolicyName { get; init; }
-    public required string Framework { get; init; }
-    public IReadOnlyList<string> ResourcePatterns { get; init; };
-    public IReadOnlyList<string> AllowedOperations { get; init; };
-    public IReadOnlyList<string> AllowedDataClassifications { get; init; };
-    public Dictionary<string, object> Constraints { get; init; };
-    public bool RequireEncryption { get; init; }
-    public bool RequireAuditLog { get; init; };
-}
-```
-```csharp
-public sealed class PolicySyncResult
-{
-}
-    public required DateTime SyncTime { get; init; }
-    public required int TotalPolicies { get; init; }
-    public required int SyncedCount { get; init; }
-    public required int FailedCount { get; init; }
-    public required bool Success { get; init; }
-    public required List<string> Errors { get; init; }
-}
-```
-```csharp
-public sealed class AccessEvaluationResult
-{
-}
-    public required bool IsAllowed { get; init; }
-    public required List<string> ApplicablePolicies { get; init; }
-    public required List<string> DenialReasons { get; init; }
-    public required DateTime EvaluationTime { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Features/AutomatedRemediationEngine.cs
-```csharp
-public sealed class AutomatedRemediationEngine
-{
-}
-    public void RegisterRemediationAction(string violationCode, Func<ComplianceViolation, Task<RemediationResult>> action, Func<string, Task<bool>>? rollbackAction = null);
-    public async Task<RemediationResult> RemediateAsync(ComplianceViolation violation, CancellationToken cancellationToken = default);
-    public async Task<bool> RollbackAsync(string remediationId, CancellationToken cancellationToken = default);
-    public RemediationHistory? GetHistory(string remediationId);
-    public IReadOnlyList<RemediationHistory> GetAllHistory();
-    public double GetSuccessRate(string violationCode);
-}
-```
-```csharp
-public sealed class RemediationAction
-{
-}
-    public required string ViolationCode { get; init; }
-    public required Func<ComplianceViolation, Task<RemediationResult>> Action { get; init; }
-    public Func<string, Task<bool>>? RollbackAction { get; init; }
-}
-```
-```csharp
-public sealed class RemediationResult
-{
-}
-    public required bool Success { get; init; }
-    public required string Message { get; init; }
-    public string? RemediationId { get; set; }
-    public IReadOnlyDictionary<string, object> Metadata { get; init; };
-}
-```
-```csharp
-public sealed class RemediationHistory
-{
-}
-    public required string RemediationId { get; init; }
-    public required string ViolationCode { get; init; }
-    public required string ViolationDescription { get; init; }
-    public required bool Success { get; init; }
-    public required string Message { get; init; }
-    public required DateTime StartTime { get; init; }
-    public required DateTime EndTime { get; init; }
-    public string? AffectedResource { get; init; }
-    public bool RolledBack { get; set; }
-    public DateTime? RollbackTime { get; set; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Features/ComplianceGapAnalyzer.cs
-```csharp
-public sealed class ComplianceGapAnalyzer
-{
-}
-    public bool UseAiAnalysis { get => _useAiAnalysis; set => _useAiAnalysis = value; }
-    public void RegisterFramework(string frameworkId, FrameworkRequirements requirements);
-    public async Task<GapAnalysisResult> AnalyzeGapsAsync(string frameworkId, CurrentImplementation currentState, CancellationToken cancellationToken = default);
-    public IReadOnlyList<RemediationRecommendation> GenerateRecommendations(GapAnalysisResult analysisResult);
-}
-```
-```csharp
-public sealed class FrameworkRequirements
-{
-}
-    public required string FrameworkId { get; init; }
-    public required string FrameworkName { get; init; }
-    public required List<ControlRequirement> Requirements { get; init; }
-}
-```
-```csharp
-public sealed class ControlRequirement
-{
-}
-    public required string ControlId { get; init; }
-    public required string Description { get; init; }
-    public required bool Mandatory { get; init; }
-    public string? Reference { get; init; }
-}
-```
-```csharp
-public sealed class CurrentImplementation
-{
-}
-    public required HashSet<string> ImplementedControls { get; init; }
-    public required HashSet<string> PartiallyImplementedControls { get; init; }
-}
-```
-```csharp
-public sealed class ComplianceGap
-{
-}
-    public required string RequirementId { get; init; }
-    public required string RequirementDescription { get; init; }
-    public required string CurrentState { get; init; }
-    public required string ExpectedState { get; init; }
-    public required GapSeverity Severity { get; init; }
-    public string? RegulatoryReference { get; init; }
-}
-```
-```csharp
-public sealed class GapAnalysisResult
-{
-}
-    public required string FrameworkId { get; init; }
-    public required bool Success { get; init; }
-    public required string Message { get; init; }
-    public required IReadOnlyList<ComplianceGap> Gaps { get; init; }
-    public double ComplianceScore { get; init; }
-    public int CriticalGaps { get; init; }
-    public int HighGaps { get; init; }
-    public int MediumGaps { get; init; }
-    public int LowGaps { get; init; }
-    public DateTime AnalysisTime { get; init; }
-}
-```
-```csharp
-public sealed class RemediationRecommendation
-{
-}
-    public required string GapId { get; init; }
-    public required string Priority { get; init; }
-    public required string EstimatedEffort { get; init; }
-    public required List<string> SuggestedActions { get; init; }
-    public required string ExpectedImpact { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Features/ContinuousComplianceMonitor.cs
-```csharp
-public sealed class ContinuousComplianceMonitor
-{
-}
-    public int MonitoringIntervalSeconds { get; set; };
-    public double DriftThresholdPercent { get; set; };
-    public void StartMonitoring(IReadOnlyList<IComplianceStrategy> strategies);
-    public void StopMonitoring();
-    public IReadOnlyList<ComplianceAlert> GetPendingAlerts();
-    public ComplianceSnapshot? GetSnapshot(string strategyId);
-}
-```
-```csharp
-public sealed class ComplianceSnapshot
-{
-}
-    public required string StrategyId { get; init; }
-    public required DateTime Timestamp { get; init; }
-    public required long TotalChecks { get; init; }
-    public required long CompliantCount { get; init; }
-    public required long NonCompliantCount { get; init; }
-    public required long ViolationsFound { get; init; }
-}
-```
-```csharp
-public sealed class ComplianceAlert
-{
-}
-    public required string StrategyId { get; init; }
-    public required AlertType AlertType { get; init; }
-    public required string Message { get; init; }
-    public required DateTime Timestamp { get; init; }
-    public required AlertSeverity Severity { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Features/CrossFrameworkMapper.cs
-```csharp
-public sealed class CrossFrameworkMapper
-{
-}
-    public CrossFrameworkMapper();
-    public void AddEquivalence(string framework1, string control1, string framework2, string control2, double similarityScore = 1.0);
-    public IReadOnlyList<FrameworkControl> GetEquivalentControls(string framework, string control);
-    public OverlapAnalysis AnalyzeOverlap(string framework1, string framework2);
-    public IReadOnlyList<string> GetRelatedFrameworks(string framework);
-}
-```
-```csharp
-public sealed class FrameworkControl
-{
-}
-    public required string Framework { get; init; }
-    public required string ControlId { get; init; }
-}
-```
-```csharp
-public sealed class ControlEquivalence
-{
-}
-    public required string Framework1 { get; init; }
-    public required string Control1 { get; init; }
-    public required string Framework2 { get; init; }
-    public required string Control2 { get; init; }
-    public required double SimilarityScore { get; init; }
-    public override bool Equals(object? obj);
-    public override int GetHashCode();
-}
-```
-```csharp
-public sealed class OverlapAnalysis
-{
-}
-    public required string Framework1 { get; init; }
-    public required string Framework2 { get; init; }
-    public required int Framework1ControlCount { get; init; }
-    public required int Framework2ControlCount { get; init; }
-    public required int MappedControlCount { get; init; }
-    public required double OverlapPercentage { get; init; }
-    public required double AverageSimilarity { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Features/DataSovereigntyEnforcer.cs
-```csharp
-public sealed class DataSovereigntyEnforcer
-{
-}
-    public void AddRegionPolicy(string region, RegionPolicy policy);
-    public void AllowTransfer(string sourceRegion, string destinationRegion, TransferMechanism mechanism);
-    public TransferValidationResult ValidateTransfer(string sourceRegion, string destinationRegion, string dataClassification, TransferMechanism mechanism);
-    public IReadOnlyList<string> GetAllowedDestinations(string sourceRegion);
-    public RegionPolicy? GetRegionPolicy(string region);
-}
-```
-```csharp
-public sealed class RegionPolicy
-{
-}
-    public required string Region { get; init; }
-    public required string RegulatoryFramework { get; init; }
-    public IReadOnlyList<string> ProhibitedDestinations { get; init; };
-    public IReadOnlyList<string> RequiredMechanisms { get; init; };
-    public IReadOnlyList<string> AllowedClassifications { get; init; };
-    public bool RequiresLocalProcessing { get; init; }
-    public bool AllowsCloudStorage { get; init; };
-}
-```
-```csharp
-public sealed class TransferValidationResult
-{
-}
-    public required bool IsAllowed { get; init; }
-    public required string Message { get; init; }
-    public required string[] RequiredMechanisms { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Features/RightToBeForgottenEngine.cs
-```csharp
-public sealed class RightToBeForgottenEngine
-{
-}
-    public void RegisterDataStore(IDataStore dataStore);
-    public async Task<string> InitiateErasureRequestAsync(string dataSubjectId, string requestReason, CancellationToken cancellationToken = default);
-    public async Task<ErasureExecutionResult> ExecuteErasureAsync(string requestId, CancellationToken cancellationToken = default);
-    public async Task<ErasureVerificationResult> VerifyErasureAsync(string requestId, CancellationToken cancellationToken = default);
-    public ErasureRequest? GetRequestStatus(string requestId);
-}
-```
-```csharp
-public interface IDataStore
-{
-}
-    string Name { get; }
-    Task<int> FindDataAsync(string dataSubjectId, CancellationToken cancellationToken);;
-    Task<DataStoreErasureResult> EraseDataAsync(string dataSubjectId, CancellationToken cancellationToken);;
-}
-```
-```csharp
-public sealed class ErasureRequest
-{
-}
-    public required string RequestId { get; init; }
-    public required string DataSubjectId { get; init; }
-    public required string RequestReason { get; init; }
-    public required DateTime RequestTime { get; init; }
-    public ErasureStatus Status { get; set; }
-    public int TotalRecordsFound { get; set; }
-    public DateTime? CompletionTime { get; set; }
-    public required ConcurrentBag<DataStoreErasureResult> DataStoreResults { get; init; }
-}
-```
-```csharp
-public sealed class DataStoreErasureResult
-{
-}
-    public required string DataStoreName { get; init; }
-    public required bool Success { get; init; }
-    public required int RecordsErased { get; init; }
-    public required string Message { get; init; }
-}
-```
-```csharp
-public sealed class ErasureExecutionResult
-{
-}
-    public required bool Success { get; init; }
-    public required string Message { get; init; }
-    public int TotalRecordsErased { get; init; }
-    public IReadOnlyList<DataStoreErasureResult> DataStoreResults { get; init; };
-}
-```
-```csharp
-public sealed class ErasureVerificationResult
-{
-}
-    public required bool IsVerified { get; init; }
-    public required string Message { get; init; }
-    public int RemainingRecords { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Features/TamperProofAuditLog.cs
-```csharp
-public sealed class TamperProofAuditLog
-{
-}
-    public string AppendEntry(string eventType, string userId, string resourceId, Dictionary<string, object> metadata);
-    public AuditVerificationResult VerifyIntegrity();
-    public string ComputeMerkleRoot(int startIndex = 0, int count = -1);
-    public AuditEntry? GetEntry(string entryId);
-    public IReadOnlyList<AuditEntry> GetEntriesInRange(DateTime startTime, DateTime endTime);
-    public int EntryCount;;
-}
-```
-```csharp
-public sealed class AuditEntry
-{
-}
-    public required string EntryId { get; init; }
-    public required string EventType { get; init; }
-    public required string UserId { get; init; }
-    public required string ResourceId { get; init; }
-    public required DateTime Timestamp { get; init; }
-    public required Dictionary<string, object> Metadata { get; init; }
-    public required string PreviousHash { get; init; }
-    public string Hash { get; set; };
-}
-```
-```csharp
-public sealed class AuditVerificationResult
-{
-}
-    public required bool IsValid { get; init; }
-    public required string Message { get; init; }
-    public required int VerifiedEntries { get; init; }
-    public string? TamperedEntryId { get; init; }
 }
 ```
 
@@ -663,6 +267,452 @@ AFTER (UltimateCompliance):
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Features/ComplianceGapAnalyzer.cs
+```csharp
+public sealed class ComplianceGapAnalyzer
+{
+}
+    public bool UseAiAnalysis { get => _useAiAnalysis; set => _useAiAnalysis = value; }
+    public void RegisterFramework(string frameworkId, FrameworkRequirements requirements);
+    public async Task<GapAnalysisResult> AnalyzeGapsAsync(string frameworkId, CurrentImplementation currentState, CancellationToken cancellationToken = default);
+    public IReadOnlyList<RemediationRecommendation> GenerateRecommendations(GapAnalysisResult analysisResult);
+}
+```
+```csharp
+public sealed class FrameworkRequirements
+{
+}
+    public required string FrameworkId { get; init; }
+    public required string FrameworkName { get; init; }
+    public required List<ControlRequirement> Requirements { get; init; }
+}
+```
+```csharp
+public sealed class ControlRequirement
+{
+}
+    public required string ControlId { get; init; }
+    public required string Description { get; init; }
+    public required bool Mandatory { get; init; }
+    public string? Reference { get; init; }
+}
+```
+```csharp
+public sealed class CurrentImplementation
+{
+}
+    public required HashSet<string> ImplementedControls { get; init; }
+    public required HashSet<string> PartiallyImplementedControls { get; init; }
+}
+```
+```csharp
+public sealed class ComplianceGap
+{
+}
+    public required string RequirementId { get; init; }
+    public required string RequirementDescription { get; init; }
+    public required string CurrentState { get; init; }
+    public required string ExpectedState { get; init; }
+    public required GapSeverity Severity { get; init; }
+    public string? RegulatoryReference { get; init; }
+}
+```
+```csharp
+public sealed class GapAnalysisResult
+{
+}
+    public required string FrameworkId { get; init; }
+    public required bool Success { get; init; }
+    public required string Message { get; init; }
+    public required IReadOnlyList<ComplianceGap> Gaps { get; init; }
+    public double ComplianceScore { get; init; }
+    public int CriticalGaps { get; init; }
+    public int HighGaps { get; init; }
+    public int MediumGaps { get; init; }
+    public int LowGaps { get; init; }
+    public DateTime AnalysisTime { get; init; }
+}
+```
+```csharp
+public sealed class RemediationRecommendation
+{
+}
+    public required string GapId { get; init; }
+    public required string Priority { get; init; }
+    public required string EstimatedEffort { get; init; }
+    public required List<string> SuggestedActions { get; init; }
+    public required string ExpectedImpact { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Features/RightToBeForgottenEngine.cs
+```csharp
+public sealed class RightToBeForgottenEngine
+{
+}
+    public void RegisterDataStore(IDataStore dataStore);
+    public async Task<string> InitiateErasureRequestAsync(string dataSubjectId, string requestReason, CancellationToken cancellationToken = default);
+    public async Task<ErasureExecutionResult> ExecuteErasureAsync(string requestId, CancellationToken cancellationToken = default);
+    public async Task<ErasureVerificationResult> VerifyErasureAsync(string requestId, CancellationToken cancellationToken = default);
+    public ErasureRequest? GetRequestStatus(string requestId);
+}
+```
+```csharp
+public interface IDataStore
+{
+}
+    string Name { get; }
+    Task<int> FindDataAsync(string dataSubjectId, CancellationToken cancellationToken);;
+    Task<DataStoreErasureResult> EraseDataAsync(string dataSubjectId, CancellationToken cancellationToken);;
+}
+```
+```csharp
+public sealed class ErasureRequest
+{
+}
+    public required string RequestId { get; init; }
+    public required string DataSubjectId { get; init; }
+    public required string RequestReason { get; init; }
+    public required DateTime RequestTime { get; init; }
+    public ErasureStatus Status { get; set; }
+    public int TotalRecordsFound { get; set; }
+    public DateTime? CompletionTime { get; set; }
+    public required ConcurrentBag<DataStoreErasureResult> DataStoreResults { get; init; }
+}
+```
+```csharp
+public sealed class DataStoreErasureResult
+{
+}
+    public required string DataStoreName { get; init; }
+    public required bool Success { get; init; }
+    public required int RecordsErased { get; init; }
+    public required string Message { get; init; }
+}
+```
+```csharp
+public sealed class ErasureExecutionResult
+{
+}
+    public required bool Success { get; init; }
+    public required string Message { get; init; }
+    public int TotalRecordsErased { get; init; }
+    public IReadOnlyList<DataStoreErasureResult> DataStoreResults { get; init; };
+}
+```
+```csharp
+public sealed class ErasureVerificationResult
+{
+}
+    public required bool IsVerified { get; init; }
+    public required string Message { get; init; }
+    public int RemainingRecords { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Features/CrossFrameworkMapper.cs
+```csharp
+public sealed class CrossFrameworkMapper
+{
+}
+    public CrossFrameworkMapper();
+    public void AddEquivalence(string framework1, string control1, string framework2, string control2, double similarityScore = 1.0);
+    public IReadOnlyList<FrameworkControl> GetEquivalentControls(string framework, string control);
+    public OverlapAnalysis AnalyzeOverlap(string framework1, string framework2);
+    public IReadOnlyList<string> GetRelatedFrameworks(string framework);
+}
+```
+```csharp
+public sealed class FrameworkControl
+{
+}
+    public required string Framework { get; init; }
+    public required string ControlId { get; init; }
+}
+```
+```csharp
+public sealed class ControlEquivalence
+{
+}
+    public required string Framework1 { get; init; }
+    public required string Control1 { get; init; }
+    public required string Framework2 { get; init; }
+    public required string Control2 { get; init; }
+    public required double SimilarityScore { get; init; }
+    public override bool Equals(object? obj);
+    public override int GetHashCode();
+}
+```
+```csharp
+public sealed class OverlapAnalysis
+{
+}
+    public required string Framework1 { get; init; }
+    public required string Framework2 { get; init; }
+    public required int Framework1ControlCount { get; init; }
+    public required int Framework2ControlCount { get; init; }
+    public required int MappedControlCount { get; init; }
+    public required double OverlapPercentage { get; init; }
+    public required double AverageSimilarity { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Features/AutomatedRemediationEngine.cs
+```csharp
+public sealed class AutomatedRemediationEngine
+{
+}
+    public void RegisterRemediationAction(string violationCode, Func<ComplianceViolation, Task<RemediationResult>> action, Func<string, Task<bool>>? rollbackAction = null);
+    public async Task<RemediationResult> RemediateAsync(ComplianceViolation violation, CancellationToken cancellationToken = default);
+    public async Task<bool> RollbackAsync(string remediationId, CancellationToken cancellationToken = default);
+    public RemediationHistory? GetHistory(string remediationId);
+    public IReadOnlyList<RemediationHistory> GetAllHistory();
+    public double GetSuccessRate(string violationCode);
+}
+```
+```csharp
+public sealed class RemediationAction
+{
+}
+    public required string ViolationCode { get; init; }
+    public required Func<ComplianceViolation, Task<RemediationResult>> Action { get; init; }
+    public Func<string, Task<bool>>? RollbackAction { get; init; }
+}
+```
+```csharp
+public sealed class RemediationResult
+{
+}
+    public required bool Success { get; init; }
+    public required string Message { get; init; }
+    public string? RemediationId { get; set; }
+    public IReadOnlyDictionary<string, object> Metadata { get; init; };
+}
+```
+```csharp
+public sealed class RemediationHistory
+{
+}
+    public required string RemediationId { get; init; }
+    public required string ViolationCode { get; init; }
+    public required string ViolationDescription { get; init; }
+    public required bool Success { get; init; }
+    public required string Message { get; init; }
+    public required DateTime StartTime { get; init; }
+    public required DateTime EndTime { get; init; }
+    public string? AffectedResource { get; init; }
+    public bool RolledBack { get; set; }
+    public DateTime? RollbackTime { get; set; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Features/ContinuousComplianceMonitor.cs
+```csharp
+public sealed class ContinuousComplianceMonitor
+{
+}
+    public int MonitoringIntervalSeconds { get; set; };
+    public double DriftThresholdPercent { get; set; };
+    public void StartMonitoring(IReadOnlyList<IComplianceStrategy> strategies);
+    public void StopMonitoring();
+    public IReadOnlyList<ComplianceAlert> GetPendingAlerts();
+    public ComplianceSnapshot? GetSnapshot(string strategyId);
+}
+```
+```csharp
+public sealed class ComplianceSnapshot
+{
+}
+    public required string StrategyId { get; init; }
+    public required DateTime Timestamp { get; init; }
+    public required long TotalChecks { get; init; }
+    public required long CompliantCount { get; init; }
+    public required long NonCompliantCount { get; init; }
+    public required long ViolationsFound { get; init; }
+}
+```
+```csharp
+public sealed class ComplianceAlert
+{
+}
+    public required string StrategyId { get; init; }
+    public required AlertType AlertType { get; init; }
+    public required string Message { get; init; }
+    public required DateTime Timestamp { get; init; }
+    public required AlertSeverity Severity { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Features/TamperProofAuditLog.cs
+```csharp
+public sealed class TamperProofAuditLog
+{
+}
+    public string AppendEntry(string eventType, string userId, string resourceId, Dictionary<string, object> metadata);
+    public AuditVerificationResult VerifyIntegrity();
+    public string ComputeMerkleRoot(int startIndex = 0, int count = -1);
+    public AuditEntry? GetEntry(string entryId);
+    public IReadOnlyList<AuditEntry> GetEntriesInRange(DateTime startTime, DateTime endTime);
+    public int EntryCount
+{
+    get
+    {
+        lock (_lock)
+        {
+            return _entries.Count;
+        }
+    }
+}
+}
+```
+```csharp
+public sealed class AuditEntry
+{
+}
+    public required string EntryId { get; init; }
+    public required string EventType { get; init; }
+    public required string UserId { get; init; }
+    public required string ResourceId { get; init; }
+    public required DateTime Timestamp { get; init; }
+    public required Dictionary<string, object> Metadata { get; init; }
+    public required string PreviousHash { get; init; }
+    public string Hash { get; set; };
+}
+```
+```csharp
+public sealed class AuditVerificationResult
+{
+}
+    public required bool IsValid { get; init; }
+    public required string Message { get; init; }
+    public required int VerifiedEntries { get; init; }
+    public string? TamperedEntryId { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Features/DataSovereigntyEnforcer.cs
+```csharp
+public sealed class DataSovereigntyEnforcer
+{
+}
+    public void AddRegionPolicy(string region, RegionPolicy policy);
+    public void AllowTransfer(string sourceRegion, string destinationRegion, TransferMechanism mechanism);
+    public TransferValidationResult ValidateTransfer(string sourceRegion, string destinationRegion, string dataClassification, TransferMechanism mechanism);
+    public IReadOnlyList<string> GetAllowedDestinations(string sourceRegion);
+    public RegionPolicy? GetRegionPolicy(string region);
+}
+```
+```csharp
+public sealed class RegionPolicy
+{
+}
+    public required string Region { get; init; }
+    public required string RegulatoryFramework { get; init; }
+    public IReadOnlyList<string> ProhibitedDestinations { get; init; };
+    public IReadOnlyList<string> RequiredMechanisms { get; init; };
+    public IReadOnlyList<string> AllowedClassifications { get; init; };
+    public bool RequiresLocalProcessing { get; init; }
+    public bool AllowsCloudStorage { get; init; };
+}
+```
+```csharp
+public sealed class TransferValidationResult
+{
+}
+    public required bool IsAllowed { get; init; }
+    public required string Message { get; init; }
+    public required string[] RequiredMechanisms { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Features/AccessControlPolicyBridge.cs
+```csharp
+public sealed class AccessControlPolicyBridge
+{
+}
+    public void RegisterPolicy(string policyId, ComplianceAccessPolicy policy);
+    public async Task<PolicySyncResult> SyncPoliciesAsync(CancellationToken cancellationToken = default);
+    public AccessEvaluationResult EvaluateAccess(string userId, string resourceId, string operation, Dictionary<string, object> context);
+    public IReadOnlyList<PolicySyncResult> GetSyncHistory();
+}
+```
+```csharp
+public sealed class ComplianceAccessPolicy
+{
+}
+    public required string PolicyName { get; init; }
+    public required string Framework { get; init; }
+    public IReadOnlyList<string> ResourcePatterns { get; init; };
+    public IReadOnlyList<string> AllowedOperations { get; init; };
+    public IReadOnlyList<string> AllowedDataClassifications { get; init; };
+    public Dictionary<string, object> Constraints { get; init; };
+    public bool RequireEncryption { get; init; }
+    public bool RequireAuditLog { get; init; };
+}
+```
+```csharp
+public sealed class PolicySyncResult
+{
+}
+    public required DateTime SyncTime { get; init; }
+    public required int TotalPolicies { get; init; }
+    public required int SyncedCount { get; init; }
+    public required int FailedCount { get; init; }
+    public required bool Success { get; init; }
+    public required List<string> Errors { get; init; }
+}
+```
+```csharp
+public sealed class AccessEvaluationResult
+{
+}
+    public required bool IsAllowed { get; init; }
+    public required List<string> ApplicablePolicies { get; init; }
+    public required List<string> DenialReasons { get; init; }
+    public required DateTime EvaluationTime { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Reporting/ComplianceReportGenerator.cs
+```csharp
+public sealed class ComplianceReportGenerator
+{
+}
+    public string GenerateHtmlReport(ComplianceReportData data);
+    public async Task<PdfExportResult> ExportToPdfAsync(ComplianceReportData data, string outputPath, CancellationToken cancellationToken = default);
+}
+```
+```csharp
+public sealed class ComplianceReportData
+{
+}
+    public string? Title { get; init; }
+    public string? Framework { get; init; }
+    public DateTime GeneratedAt { get; init; };
+    public string? OverallStatus { get; init; }
+    public IReadOnlyList<ReportFinding>? Findings { get; init; }
+}
+```
+```csharp
+public sealed class ReportFinding
+{
+}
+    public string? Code { get; init; }
+    public string? Description { get; init; }
+    public string? Severity { get; init; }
+}
+```
+```csharp
+public sealed class PdfExportResult
+{
+}
+    public required bool Success { get; init; }
+    public string? OutputPath { get; init; }
+    public DateTime GeneratedAt { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Scaling/ComplianceScalingManager.cs
 ```csharp
 [SdkCompatibility("6.0.0", Notes = "Phase 88-09: Compliance scaling with parallel checks, TTL cache, configurable concurrency")]
@@ -707,12 +757,250 @@ public sealed class ComplianceScalingManager : IScalableSubsystem, IDisposable
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Services/ComplianceReportService.cs
+```csharp
+public sealed class ComplianceReportService
+{
+}
+    public ComplianceReportService(IReadOnlyCollection<IComplianceStrategy> strategies, IMessageBus? messageBus, string pluginId);
+    public async Task<FrameworkComplianceReport> GenerateReportAsync(string framework, ComplianceReportPeriod period, CancellationToken cancellationToken = default);
+    public async Task<List<EvidenceItem>> CollectEvidenceAsync(string framework, ComplianceReportPeriod period, CancellationToken cancellationToken = default);
+    public Task<List<ControlMapping>> MapControlsAsync(string framework, List<EvidenceItem> evidence, CancellationToken cancellationToken = default);
+    public List<ComplianceGap> AnalyzeGaps(string framework, List<ControlMapping> controlMappings);
+    public FrameworkComplianceReport? GetCachedReport(string reportId);
+}
+```
+```csharp
+public record ComplianceReportPeriod
+{
+}
+    public DateTime Start { get; }
+    public DateTime End { get; }
+    public ComplianceReportPeriod(DateTime start, DateTime end);
+}
+```
+```csharp
+public sealed class FrameworkComplianceReport
+{
+}
+    public required string ReportId { get; init; }
+    public required string Framework { get; init; }
+    public required ComplianceReportPeriod Period { get; init; }
+    public required DateTime GeneratedAtUtc { get; init; }
+    public required List<EvidenceItem> Evidence { get; init; }
+    public required List<ControlMapping> ControlMappings { get; init; }
+    public required List<ComplianceGap> Gaps { get; init; }
+    public required ComplianceStatus OverallStatus { get; init; }
+    public required double ComplianceScore { get; init; }
+    public required int TotalControls { get; init; }
+    public required int CoveredControls { get; init; }
+    public required string Summary { get; init; }
+}
+```
+```csharp
+public sealed class EvidenceItem
+{
+}
+    public required string EvidenceId { get; init; }
+    public required string StrategyId { get; init; }
+    public required string StrategyName { get; init; }
+    public required string SourceFramework { get; init; }
+    public required DateTime CollectedAtUtc { get; init; }
+    public required bool IsCompliant { get; init; }
+    public required ComplianceStatus Status { get; init; }
+    public required int ViolationCount { get; init; }
+    public required List<ComplianceViolation> Violations { get; init; }
+    public required List<string> Recommendations { get; init; }
+    public required long TotalChecksPerformed { get; init; }
+    public required double ComplianceRate { get; init; }
+    public required List<string> ApplicableFrameworks { get; init; }
+}
+```
+```csharp
+public sealed class ControlMapping
+{
+}
+    public required string ControlId { get; init; }
+    public required string ControlName { get; init; }
+    public required string Category { get; init; }
+    public required string Description { get; init; }
+    public required string Framework { get; init; }
+    public required ControlStatus Status { get; init; }
+    public required List<string> EvidenceItems { get; init; }
+    public required int EvidenceCount { get; init; }
+    public required double ComplianceRate { get; init; }
+}
+```
+```csharp
+public sealed class ComplianceGap
+{
+}
+    public required string ControlId { get; init; }
+    public required string ControlName { get; init; }
+    public required string Framework { get; init; }
+    public required string Category { get; init; }
+    public required GapSeverity Severity { get; init; }
+    public required string Description { get; init; }
+    public required string Remediation { get; init; }
+    public required DateTime DetectedAtUtc { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Services/ComplianceAlertService.cs
+```csharp
+public sealed class ComplianceAlertService
+{
+}
+    public ComplianceAlertService(IMessageBus? messageBus, string pluginId, TimeSpan? deduplicationWindow = null, TimeSpan? escalationTimeout = null);
+    public async Task<AlertResult> SendAlertAsync(ComplianceAlert alert, CancellationToken cancellationToken = default);
+    public bool AcknowledgeAlert(string alertId, string acknowledgedBy);
+    public IReadOnlyList<AlertRecord> GetRecentAlerts(int count = 50);
+}
+```
+```csharp
+private static class NotificationTopics
+{
+}
+    public const string Email = "notification.email.send";
+    public const string Slack = "notification.slack.send";
+    public const string PagerDuty = "notification.pagerduty.send";
+    public const string OpsGenie = "notification.opsgenie.send";
+}
+```
+```csharp
+public sealed class ComplianceAlert
+{
+}
+    public required string AlertId { get; init; }
+    public required string Title { get; init; }
+    public required string Message { get; init; }
+    public required ComplianceAlertSeverity Severity { get; init; }
+    public string? Framework { get; init; }
+    public required string Source { get; init; }
+    public required DateTime CreatedAtUtc { get; init; }
+    public string? EscalatedFromAlertId { get; init; }
+}
+```
+```csharp
+public sealed class AlertResult
+{
+}
+    public required string AlertId { get; init; }
+    public required AlertDeliveryStatus Status { get; init; }
+    public required string Message { get; init; }
+    public required List<string> ChannelsNotified { get; init; }
+    public required DateTime SentAtUtc { get; init; }
+}
+```
+```csharp
+public sealed class AlertRecord
+{
+}
+    public required ComplianceAlert Alert { get; init; }
+    public required long SequenceNumber { get; init; }
+    public required DateTime SentAtUtc { get; init; }
+    public required List<string> ChannelsNotified { get; init; }
+    public bool Acknowledged { get; set; }
+    public string? AcknowledgedBy { get; set; }
+    public DateTime? AcknowledgedAtUtc { get; set; }
+    public bool EscalationScheduled { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Services/TamperIncidentWorkflowService.cs
+```csharp
+public sealed class TamperIncidentWorkflowService
+{
+}
+    public TamperIncidentWorkflowService(ComplianceAlertService alertService, IMessageBus? messageBus, string pluginId);
+    public async Task<IncidentTicket> CreateIncidentAsync(TamperEvent tamperEvent, CancellationToken cancellationToken = default);
+    public async Task<bool> TransitionStatusAsync(string incidentId, IncidentStatus newStatus, string transitionedBy, string reason, CancellationToken cancellationToken = default);
+    public bool AttachEvidence(string incidentId, IncidentEvidence evidence);
+    public IncidentTicket? GetIncident(string incidentId);
+    public IReadOnlyList<IncidentTicket> GetOpenIncidents();
+    public IncidentMetrics GetMetrics();
+}
+```
+```csharp
+public sealed class TamperEvent
+{
+}
+    public required string EventId { get; init; }
+    public required DateTime DetectedAtUtc { get; init; }
+    public required ComplianceAlertSeverity Severity { get; init; }
+    public required string Description { get; init; }
+    public string? AffectedResource { get; init; }
+    public required string DetectedBy { get; init; }
+    public string? HashBefore { get; init; }
+    public string? HashAfter { get; init; }
+}
+```
+```csharp
+public sealed class IncidentTicket
+{
+}
+    public required string IncidentId { get; init; }
+    public required string Title { get; init; }
+    public required string Description { get; init; }
+    public IncidentStatus Status { get; set; }
+    public required IncidentPriority Priority { get; init; }
+    public required ComplianceAlertSeverity Severity { get; init; }
+    public required DateTime CreatedAtUtc { get; init; }
+    public required DateTime DetectedAtUtc { get; init; }
+    public string? AffectedResource { get; init; }
+    public required string DetectedBy { get; init; }
+    public required string SourceEventId { get; init; }
+    public required List<IncidentEvidence> EvidenceAttachments { get; init; }
+    public required List<StatusTransition> StatusHistory { get; init; }
+    public required List<string> NotificationsSent { get; init; }
+    public DateTime? ClosedAtUtc { get; set; }
+    public string? ClosedBy { get; set; }
+}
+```
+```csharp
+public sealed class IncidentEvidence
+{
+}
+    public required string EvidenceId { get; init; }
+    public required EvidenceType Type { get; init; }
+    public required string Description { get; init; }
+    public required DateTime CollectedAtUtc { get; init; }
+    public required string SourceSystem { get; init; }
+    public required Dictionary<string, string> Metadata { get; init; }
+}
+```
+```csharp
+public sealed class StatusTransition
+{
+}
+    public required IncidentStatus FromStatus { get; init; }
+    public required IncidentStatus ToStatus { get; init; }
+    public required DateTime TransitionedAtUtc { get; init; }
+    public required string TransitionedBy { get; init; }
+    public required string Reason { get; init; }
+}
+```
+```csharp
+public sealed class IncidentMetrics
+{
+}
+    public required int TotalIncidents { get; init; }
+    public required int OpenIncidents { get; init; }
+    public required int InvestigatingIncidents { get; init; }
+    public required int RemediatedIncidents { get; init; }
+    public required int ClosedIncidents { get; init; }
+    public required double AverageResolutionTime { get; init; }
+    public required Dictionary<IncidentPriority, int> IncidentsByPriority { get; init; }
+    public required Dictionary<ComplianceAlertSeverity, int> IncidentsBySeverity { get; init; }
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Services/ChainOfCustodyExporter.cs
 ```csharp
 public sealed class ChainOfCustodyExporter
 {
 }
-    public ChainOfCustodyExporter(IMessageBus? messageBus, string pluginId);
+    public ChainOfCustodyExporter(IMessageBus? messageBus, string pluginId, byte[]? hmacKey = null);
     public async Task<ChainOfCustodyDocument> ExportAsync(ChainOfCustodyRequest request, CancellationToken cancellationToken = default);
     public bool VerifyDocument(ChainOfCustodyDocument document);
 }
@@ -813,67 +1101,6 @@ public sealed class ChainIntegritySummary
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Services/ComplianceAlertService.cs
-```csharp
-public sealed class ComplianceAlertService
-{
-}
-    public ComplianceAlertService(IMessageBus? messageBus, string pluginId, TimeSpan? deduplicationWindow = null, TimeSpan? escalationTimeout = null);
-    public async Task<AlertResult> SendAlertAsync(ComplianceAlert alert, CancellationToken cancellationToken = default);
-    public bool AcknowledgeAlert(string alertId, string acknowledgedBy);
-    public IReadOnlyList<AlertRecord> GetRecentAlerts(int count = 50);
-}
-```
-```csharp
-private static class NotificationTopics
-{
-}
-    public const string Email = "notification.email.send";
-    public const string Slack = "notification.slack.send";
-    public const string PagerDuty = "notification.pagerduty.send";
-    public const string OpsGenie = "notification.opsgenie.send";
-}
-```
-```csharp
-public sealed class ComplianceAlert
-{
-}
-    public required string AlertId { get; init; }
-    public required string Title { get; init; }
-    public required string Message { get; init; }
-    public required ComplianceAlertSeverity Severity { get; init; }
-    public string? Framework { get; init; }
-    public required string Source { get; init; }
-    public required DateTime CreatedAtUtc { get; init; }
-    public string? EscalatedFromAlertId { get; init; }
-}
-```
-```csharp
-public sealed class AlertResult
-{
-}
-    public required string AlertId { get; init; }
-    public required AlertDeliveryStatus Status { get; init; }
-    public required string Message { get; init; }
-    public required List<string> ChannelsNotified { get; init; }
-    public required DateTime SentAtUtc { get; init; }
-}
-```
-```csharp
-public sealed class AlertRecord
-{
-}
-    public required ComplianceAlert Alert { get; init; }
-    public required long SequenceNumber { get; init; }
-    public required DateTime SentAtUtc { get; init; }
-    public required List<string> ChannelsNotified { get; init; }
-    public bool Acknowledged { get; set; }
-    public string? AcknowledgedBy { get; set; }
-    public DateTime? AcknowledgedAtUtc { get; set; }
-    public bool EscalationScheduled { get; init; }
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Services/ComplianceDashboardProvider.cs
 ```csharp
 public sealed class ComplianceDashboardProvider
@@ -961,177 +1188,9 @@ public sealed class ComplianceTrendPoint
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Services/ComplianceReportService.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/ISO/Iso27018Strategy.cs
 ```csharp
-public sealed class ComplianceReportService
-{
-}
-    public ComplianceReportService(IReadOnlyCollection<IComplianceStrategy> strategies, IMessageBus? messageBus, string pluginId);
-    public async Task<FrameworkComplianceReport> GenerateReportAsync(string framework, ComplianceReportPeriod period, CancellationToken cancellationToken = default);
-    public async Task<List<EvidenceItem>> CollectEvidenceAsync(string framework, ComplianceReportPeriod period, CancellationToken cancellationToken = default);
-    public Task<List<ControlMapping>> MapControlsAsync(string framework, List<EvidenceItem> evidence, CancellationToken cancellationToken = default);
-    public List<ComplianceGap> AnalyzeGaps(string framework, List<ControlMapping> controlMappings);
-    public FrameworkComplianceReport? GetCachedReport(string reportId);
-}
-```
-```csharp
-public sealed class FrameworkComplianceReport
-{
-}
-    public required string ReportId { get; init; }
-    public required string Framework { get; init; }
-    public required ComplianceReportPeriod Period { get; init; }
-    public required DateTime GeneratedAtUtc { get; init; }
-    public required List<EvidenceItem> Evidence { get; init; }
-    public required List<ControlMapping> ControlMappings { get; init; }
-    public required List<ComplianceGap> Gaps { get; init; }
-    public required ComplianceStatus OverallStatus { get; init; }
-    public required double ComplianceScore { get; init; }
-    public required int TotalControls { get; init; }
-    public required int CoveredControls { get; init; }
-    public required string Summary { get; init; }
-}
-```
-```csharp
-public sealed class EvidenceItem
-{
-}
-    public required string EvidenceId { get; init; }
-    public required string StrategyId { get; init; }
-    public required string StrategyName { get; init; }
-    public required string SourceFramework { get; init; }
-    public required DateTime CollectedAtUtc { get; init; }
-    public required bool IsCompliant { get; init; }
-    public required ComplianceStatus Status { get; init; }
-    public required int ViolationCount { get; init; }
-    public required List<ComplianceViolation> Violations { get; init; }
-    public required List<string> Recommendations { get; init; }
-    public required long TotalChecksPerformed { get; init; }
-    public required double ComplianceRate { get; init; }
-    public required List<string> ApplicableFrameworks { get; init; }
-}
-```
-```csharp
-public sealed class ControlMapping
-{
-}
-    public required string ControlId { get; init; }
-    public required string ControlName { get; init; }
-    public required string Category { get; init; }
-    public required string Description { get; init; }
-    public required string Framework { get; init; }
-    public required ControlStatus Status { get; init; }
-    public required List<string> EvidenceItems { get; init; }
-    public required int EvidenceCount { get; init; }
-    public required double ComplianceRate { get; init; }
-}
-```
-```csharp
-public sealed class ComplianceGap
-{
-}
-    public required string ControlId { get; init; }
-    public required string ControlName { get; init; }
-    public required string Framework { get; init; }
-    public required string Category { get; init; }
-    public required GapSeverity Severity { get; init; }
-    public required string Description { get; init; }
-    public required string Remediation { get; init; }
-    public required DateTime DetectedAtUtc { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Services/TamperIncidentWorkflowService.cs
-```csharp
-public sealed class TamperIncidentWorkflowService
-{
-}
-    public TamperIncidentWorkflowService(ComplianceAlertService alertService, IMessageBus? messageBus, string pluginId);
-    public async Task<IncidentTicket> CreateIncidentAsync(TamperEvent tamperEvent, CancellationToken cancellationToken = default);
-    public async Task<bool> TransitionStatusAsync(string incidentId, IncidentStatus newStatus, string transitionedBy, string reason, CancellationToken cancellationToken = default);
-    public bool AttachEvidence(string incidentId, IncidentEvidence evidence);
-    public IncidentTicket? GetIncident(string incidentId);
-    public IReadOnlyList<IncidentTicket> GetOpenIncidents();
-    public IncidentMetrics GetMetrics();
-}
-```
-```csharp
-public sealed class TamperEvent
-{
-}
-    public required string EventId { get; init; }
-    public required DateTime DetectedAtUtc { get; init; }
-    public required ComplianceAlertSeverity Severity { get; init; }
-    public required string Description { get; init; }
-    public string? AffectedResource { get; init; }
-    public required string DetectedBy { get; init; }
-    public string? HashBefore { get; init; }
-    public string? HashAfter { get; init; }
-}
-```
-```csharp
-public sealed class IncidentTicket
-{
-}
-    public required string IncidentId { get; init; }
-    public required string Title { get; init; }
-    public required string Description { get; init; }
-    public IncidentStatus Status { get; set; }
-    public required IncidentPriority Priority { get; init; }
-    public required ComplianceAlertSeverity Severity { get; init; }
-    public required DateTime CreatedAtUtc { get; init; }
-    public required DateTime DetectedAtUtc { get; init; }
-    public string? AffectedResource { get; init; }
-    public required string DetectedBy { get; init; }
-    public required string SourceEventId { get; init; }
-    public required List<IncidentEvidence> EvidenceAttachments { get; init; }
-    public required List<StatusTransition> StatusHistory { get; init; }
-    public required List<string> NotificationsSent { get; init; }
-    public DateTime? ClosedAtUtc { get; set; }
-    public string? ClosedBy { get; set; }
-}
-```
-```csharp
-public sealed class IncidentEvidence
-{
-}
-    public required string EvidenceId { get; init; }
-    public required EvidenceType Type { get; init; }
-    public required string Description { get; init; }
-    public required DateTime CollectedAtUtc { get; init; }
-    public required string SourceSystem { get; init; }
-    public required Dictionary<string, string> Metadata { get; init; }
-}
-```
-```csharp
-public sealed class StatusTransition
-{
-}
-    public required IncidentStatus FromStatus { get; init; }
-    public required IncidentStatus ToStatus { get; init; }
-    public required DateTime TransitionedAtUtc { get; init; }
-    public required string TransitionedBy { get; init; }
-    public required string Reason { get; init; }
-}
-```
-```csharp
-public sealed class IncidentMetrics
-{
-}
-    public required int TotalIncidents { get; init; }
-    public required int OpenIncidents { get; init; }
-    public required int InvestigatingIncidents { get; init; }
-    public required int RemediatedIncidents { get; init; }
-    public required int ClosedIncidents { get; init; }
-    public required double AverageResolutionTime { get; init; }
-    public required Dictionary<IncidentPriority, int> IncidentsByPriority { get; init; }
-    public required Dictionary<ComplianceAlertSeverity, int> IncidentsBySeverity { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Americas/ChileDataStrategy.cs
-```csharp
-public sealed class ChileDataStrategy : ComplianceStrategyBase
+public sealed class Iso27018Strategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1143,9 +1202,332 @@ public sealed class ChileDataStrategy : ComplianceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Americas/ColombiaDataStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/ISO/Iso27017Strategy.cs
 ```csharp
-public sealed class ColombiaDataStrategy : ComplianceStrategyBase
+public sealed class Iso27017Strategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/ISO/Iso27701Strategy.cs
+```csharp
+public sealed class Iso27701Strategy : ComplianceStrategyBase
+{
+}
+    public int DataMinimizationFieldThreshold { get; set; };
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/ISO/Iso27001Strategy.cs
+```csharp
+public sealed class Iso27001Strategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/ISO/Iso27002Strategy.cs
+```csharp
+public sealed class Iso27002Strategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/ISO/Iso42001Strategy.cs
+```csharp
+public sealed class Iso42001Strategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/ISO/Iso22301Strategy.cs
+```csharp
+public sealed class Iso22301Strategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/ISO/Iso31000Strategy.cs
+```csharp
+public sealed class Iso31000Strategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/WORM/WormVerificationStrategy.cs
+```csharp
+public sealed class WormVerificationStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/WORM/FinraWormStrategy.cs
+```csharp
+public sealed class FinraWormStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/WORM/WormRetentionStrategy.cs
+```csharp
+public sealed class WormRetentionStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/WORM/Sec17a4WormStrategy.cs
+```csharp
+public sealed class Sec17a4WormStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/WORM/WormStorageStrategy.cs
+```csharp
+public sealed class WormStorageStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USState/MontanaStrategy.cs
+```csharp
+public sealed class MontanaStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USState/CpaStrategy.cs
+```csharp
+public sealed class CpaStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USState/IowaPrivacyStrategy.cs
+```csharp
+public sealed class IowaPrivacyStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USState/CtdpaStrategy.cs
+```csharp
+public sealed class CtdpaStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USState/TennesseeStrategy.cs
+```csharp
+public sealed class TennesseeStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USState/NyShieldStrategy.cs
+```csharp
+public sealed class NyShieldStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USState/UtcpaStrategy.cs
+```csharp
+public sealed class UtcpaStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USState/VcdpaStrategy.cs
+```csharp
+public sealed class VcdpaStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USState/TexasPrivacyStrategy.cs
+```csharp
+public sealed class TexasPrivacyStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USState/OregonStrategy.cs
+```csharp
+public sealed class OregonStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USState/DelawareStrategy.cs
+```csharp
+public sealed class DelawareStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USState/CcpaStrategy.cs
+```csharp
+public sealed class CcpaStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1160,6 +1542,34 @@ public sealed class ColombiaDataStrategy : ComplianceStrategyBase
 ### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Americas/Law25Strategy.cs
 ```csharp
 public sealed class Law25Strategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Americas/LgpdStrategy.cs
+```csharp
+public sealed class LgpdStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Americas/ChileDataStrategy.cs
+```csharp
+public sealed class ChileDataStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1199,9 +1609,9 @@ public sealed class LfpdpppStrategy : ComplianceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Americas/LgpdStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Americas/ColombiaDataStrategy.cs
 ```csharp
-public sealed class LgpdStrategy : ComplianceStrategyBase
+public sealed class ColombiaDataStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1227,9 +1637,9 @@ public sealed class PipedaStrategy : ComplianceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/AsiaPacific/AppiStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/AsiaPacific/PdpaSgStrategy.cs
 ```csharp
-public sealed class AppiStrategy : ComplianceStrategyBase
+public sealed class PdpaSgStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1255,93 +1665,9 @@ public sealed class CslStrategy : ComplianceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/AsiaPacific/DslStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/AsiaPacific/PdpoHkStrategy.cs
 ```csharp
-public sealed class DslStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/AsiaPacific/KPipaStrategy.cs
-```csharp
-public sealed class KPipaStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/AsiaPacific/NzPrivacyStrategy.cs
-```csharp
-public sealed class NzPrivacyStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/AsiaPacific/PdpaIdStrategy.cs
-```csharp
-public sealed class PdpaIdStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/AsiaPacific/PdpaMyStrategy.cs
-```csharp
-public sealed class PdpaMyStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/AsiaPacific/PdpaPhStrategy.cs
-```csharp
-public sealed class PdpaPhStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/AsiaPacific/PdpaSgStrategy.cs
-```csharp
-public sealed class PdpaSgStrategy : ComplianceStrategyBase
+public sealed class PdpoHkStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1367,9 +1693,9 @@ public sealed class PdpaThStrategy : ComplianceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/AsiaPacific/PdpaTwStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/AsiaPacific/KPipaStrategy.cs
 ```csharp
-public sealed class PdpaTwStrategy : ComplianceStrategyBase
+public sealed class KPipaStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1395,9 +1721,9 @@ public sealed class PdpaVnStrategy : ComplianceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/AsiaPacific/PdpbStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/AsiaPacific/NzPrivacyStrategy.cs
 ```csharp
-public sealed class PdpbStrategy : ComplianceStrategyBase
+public sealed class NzPrivacyStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1409,9 +1735,9 @@ public sealed class PdpbStrategy : ComplianceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/AsiaPacific/PdpoHkStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/AsiaPacific/PdpaPhStrategy.cs
 ```csharp
-public sealed class PdpoHkStrategy : ComplianceStrategyBase
+public sealed class PdpaPhStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1423,9 +1749,51 @@ public sealed class PdpoHkStrategy : ComplianceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/AsiaPacific/PiplStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/AsiaPacific/AppiStrategy.cs
 ```csharp
-public sealed class PiplStrategy : ComplianceStrategyBase
+public sealed class AppiStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/AsiaPacific/DslStrategy.cs
+```csharp
+public sealed class DslStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/AsiaPacific/PdpaTwStrategy.cs
+```csharp
+public sealed class PdpaTwStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/AsiaPacific/PdpaIdStrategy.cs
+```csharp
+public sealed class PdpaIdStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1451,97 +1819,650 @@ public sealed class PrivacyActAuStrategy : ComplianceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Automation/AuditTrailGenerationStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/AsiaPacific/PdpaMyStrategy.cs
 ```csharp
-public sealed class AuditTrailGenerationStrategy : ComplianceStrategyBase
+public sealed class PdpaMyStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Framework;;
-    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
-    protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-```csharp
-private sealed class AuditEntry
-{
-}
-    public required string EntryId { get; init; }
-    public required long SequenceNumber { get; init; }
-    public required DateTime Timestamp { get; init; }
-    public required string Actor { get; init; }
-    public required string Action { get; init; }
-    public required string Resource { get; init; }
-    public required string DataClassification { get; init; }
-    public string? SourceLocation { get; init; }
-    public string? DestinationLocation { get; init; }
-    public List<string>? ProcessingPurposes { get; init; }
-    public Dictionary<string, object>? Attributes { get; init; }
-    public List<string>? ComplianceFrameworks { get; init; }
-    public string? Hash { get; set; }
-    public string? PreviousHash { get; set; }
-}
-```
-```csharp
-private sealed class AuditChain
-{
-}
-    public required string ChainId { get; init; }
-    public required ConcurrentQueue<AuditEntry> Entries { get; init; }
-    public required DateTime CreatedAt { get; init; }
-    public DateTime LastUpdated { get; set; }
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Automation/AutomatedComplianceCheckingStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/AsiaPacific/PdpbStrategy.cs
 ```csharp
-public sealed class AutomatedComplianceCheckingStrategy : ComplianceStrategyBase
+public sealed class PdpbStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Framework;;
-    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
-    protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
 }
 ```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/AsiaPacific/PiplStrategy.cs
 ```csharp
-private sealed class CheckResult
+public sealed class PiplStrategy : ComplianceStrategyBase
 {
 }
-    public required string CheckId { get; init; }
-    public required ComplianceContext Context { get; init; }
-    public required List<ComplianceViolation> Violations { get; init; }
-    public required DateTime Timestamp { get; init; }
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USFederal/Dfars252Strategy.cs
+```csharp
+public sealed class Dfars252Strategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USFederal/StateRampStrategy.cs
+```csharp
+public sealed class StateRampStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USFederal/EarStrategy.cs
+```csharp
+public sealed class EarStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USFederal/CjisStrategy.cs
+```csharp
+public sealed class CjisStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USFederal/FismaStrategy.cs
+```csharp
+public sealed class FismaStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USFederal/TxRampStrategy.cs
+```csharp
+public sealed class TxRampStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USFederal/FerpaStrategy.cs
+```csharp
+public sealed class FerpaStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USFederal/ItarStrategy.cs
+```csharp
+public sealed class ItarStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USFederal/CmmcStrategy.cs
+```csharp
+public sealed class CmmcStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USFederal/SoxComplianceStrategy.cs
+```csharp
+public sealed class SoxComplianceStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USFederal/GlbaStrategy.cs
+```csharp
+public sealed class GlbaStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USFederal/CoppaStrategy.cs
+```csharp
+public sealed class CoppaStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Passport/PassportVerificationApiStrategy.cs
+```csharp
+public sealed class PassportVerificationApiStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
+    public Task<PassportVerificationResult> VerifyPassportAsync(CompliancePassport passport, CancellationToken ct = default);
+    public async Task<PassportVerificationResult> VerifyPassportForZoneAsync(CompliancePassport passport, string zoneId, IReadOnlyList<string> zoneRegulations, CancellationToken ct = default);
+    public async Task<PassportVerificationResult> VerifyPassportChainAsync(IReadOnlyList<CompliancePassport> passportChain, CancellationToken ct = default);
+    public VerificationStatistics GetVerificationStatistics();
+    protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
 }
 ```
 ```csharp
-private sealed class RuleCheckResult
+public sealed record VerificationStatistics
 {
 }
-    public required bool IsCompliant { get; init; }
-    public string? ViolationMessage { get; init; }
-    public string? Remediation { get; init; }
-    public List<string>? Recommendations { get; init; }
+    public long TotalVerifications { get; init; }
+    public long ValidVerifications { get; init; }
+    public long InvalidVerifications { get; init; }
+    public IReadOnlyDictionary<string, long> FailureReasonCounts { get; init; };
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Passport/PassportLifecycleStrategy.cs
+```csharp
+public sealed class PassportLifecycleStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    public Task<PassportRegistryEntry> RegisterPassportAsync(CompliancePassport passport, CancellationToken ct = default);
+    public Task<PassportRegistryEntry?> RevokePassportAsync(string passportId, PassportRevocationReason reason, string revokedBy, CancellationToken ct = default);
+    public Task<PassportRegistryEntry?> SuspendPassportAsync(string passportId, string reason, CancellationToken ct = default);
+    public Task<PassportRegistryEntry?> ReinstatePassportAsync(string passportId, CancellationToken ct = default);
+    public Task<IReadOnlyList<PassportRegistryEntry>> GetExpiredPassportsAsync(CancellationToken ct = default);
+    public Task<IReadOnlyList<PassportStatusChange>> GetPassportHistoryAsync(string passportId, CancellationToken ct = default);
+    public PassportRegistryEntry? GetRegistryEntry(string passportId);
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    public sealed record PassportStatusChange;
+    public sealed record PassportRegistryEntry;
 }
 ```
 ```csharp
-public sealed class ComplianceRule
+public sealed record PassportStatusChange
 {
 }
-    public required string RuleId { get; init; }
-    public required string Framework { get; init; }
-    public required string ViolationMessage { get; init; }
-    public required string Severity { get; init; }
-    public string? RegulatoryReference { get; init; }
-    public string? RemediationAction { get; init; }
-    public List<string>? Recommendations { get; init; }
-    public Func<ComplianceContext, bool>? Condition { get; init; }
+    public required PassportStatus? OldStatus { get; init; }
+    public required PassportStatus NewStatus { get; init; }
+    public required string Reason { get; init; }
+    public required string ChangedBy { get; init; }
+    public required DateTimeOffset Timestamp { get; init; }
+}
+```
+```csharp
+public sealed record PassportRegistryEntry
+{
+}
+    public required string PassportId { get; init; }
+    public required string ObjectId { get; init; }
+    public required PassportStatus Status { get; init; }
+    public required DateTimeOffset IssuedAt { get; init; }
+    public required DateTimeOffset ExpiresAt { get; init; }
+    public PassportRevocationReason? RevocationReason { get; init; }
+    public string? SuspensionReason { get; init; }
+    public required List<PassportStatusChange> History { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Passport/PassportTagIntegrationStrategy.cs
+```csharp
+public sealed class PassportTagIntegrationStrategy : ComplianceStrategyBase
+{
+}
+    public const string TagPrefix = "compliance.passport.";
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    public IReadOnlyDictionary<string, object> PassportToTags(CompliancePassport passport);
+    public CompliancePassport? TagsToPassport(IReadOnlyDictionary<string, object> tags);
+    public IReadOnlyDictionary<string, object> GetPassportTagsForObject(string objectId);
+    public void SetPassportTagsForObject(string objectId, CompliancePassport passport);
+    public bool RemovePassportTagsForObject(string objectId);
+    public IReadOnlyList<string> FindObjectsByRegulation(string regulationId);
+    public IReadOnlyList<string> FindObjectsByStatus(PassportStatus status);
+    public IReadOnlyList<string> FindObjectsExpiringSoon(TimeSpan within);
+    public IReadOnlyList<string> FindNonCompliantObjects();
+    public int CachedObjectCount;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Passport/PassportIssuanceStrategy.cs
+```csharp
+public sealed class PassportIssuanceStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
+    public Task<CompliancePassport> IssuePassportAsync(string objectId, IReadOnlyList<string> regulationIds, ComplianceContext context, CancellationToken ct = default);
+    public Task<CompliancePassport> RenewPassportAsync(CompliancePassport existing, CancellationToken ct = default);
+    public bool VerifySignature(CompliancePassport passport);
+    public CompliancePassport? GetCachedPassport(string objectId);
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Passport/ZeroKnowledgePassportVerificationStrategy.cs
+```csharp
+public sealed class ZeroKnowledgePassportVerificationStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
+    public Task<ZkPassportProof> GenerateProofAsync(CompliancePassport passport, string claim, CancellationToken ct = default);
+    public Task<ZkVerificationResult> VerifyProofAsync(ZkPassportProof proof, CancellationToken ct = default);
+    public async Task<IReadOnlyList<ZkPassportProof>> GenerateBatchProofsAsync(CompliancePassport passport, IReadOnlyList<string> claims, CancellationToken ct = default);
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+}
+```
+```csharp
+public sealed record ZkPassportProof
+{
+}
+    public required string ProofId { get; init; }
+    public required string PassportId { get; init; }
+    public required string Claim { get; init; }
+    public required byte[] Commitment { get; init; }
+    public required byte[] Challenge { get; init; }
+    public required byte[] Response { get; init; }
+    public DateTimeOffset GeneratedAt { get; init; }
+    public DateTimeOffset ExpiresAt { get; init; }
+    public required byte[] Nonce { get; init; }
+    public long TimestampTicks { get; init; }
+}
+```
+```csharp
+public sealed record ZkVerificationResult
+{
+}
+    public required bool IsValid { get; init; }
+    public required string Claim { get; init; }
+    public string? FailureReason { get; init; }
+    public DateTimeOffset VerifiedAt { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Passport/CrossBorderTransferProtocolStrategy.cs
+```csharp
+public sealed class CrossBorderTransferProtocolStrategy : ComplianceStrategyBase, ICrossBorderProtocol
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    public Task<TransferAgreementRecord> NegotiateTransferAsync(string sourceJurisdiction, string destJurisdiction, CompliancePassport passport, CancellationToken ct);
+    public Task<TransferDecision> EvaluateTransferAsync(string transferId, CancellationToken ct);
+    public Task LogTransferAsync(CrossBorderTransferLog log, CancellationToken ct);
+    public Task<IReadOnlyList<CrossBorderTransferLog>> GetTransferHistoryAsync(string objectId, int limit, CancellationToken ct);
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    internal sealed record TransferNegotiation;
+    internal enum NegotiationStatus;
+}
+```
+```csharp
+private static class AdequacyDecisionRegistry
+{
+}
+    public static bool IsAdequate(string fromJurisdiction, string toJurisdiction);
+}
+```
+```csharp
+internal sealed record TransferNegotiation
+{
+}
+    public required string NegotiationId { get; init; }
+    public required string SourceJurisdiction { get; init; }
+    public required string DestinationJurisdiction { get; init; }
+    public required DateTimeOffset RequestedAt { get; init; }
+    public required NegotiationStatus Status { get; init; }
+    public required IReadOnlyList<string> LegalBasisOptions { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Passport/TransferAgreementManagerStrategy.cs
+```csharp
+public sealed class TransferAgreementManagerStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
+    public Task<TransferAgreementRecord> CreateAgreementAsync(string sourceJurisdiction, string destJurisdiction, string legalBasis, IReadOnlyList<string> conditions, TimeSpan validity, CancellationToken ct = default);
+    public Task<TransferAgreementRecord> RenewAgreementAsync(string agreementId, TimeSpan extension, CancellationToken ct = default);
+    public Task RevokeAgreementAsync(string agreementId, string reason, CancellationToken ct = default);
+    public Task<TransferAgreementRecord?> GetAgreementAsync(string sourceJurisdiction, string destJurisdiction, CancellationToken ct = default);
+    public Task<IReadOnlyList<TransferAgreementRecord>> GetAllAgreementsAsync(CancellationToken ct = default);
+    public Task<IReadOnlyList<TransferAgreementRecord>> GetExpiredAgreementsAsync(CancellationToken ct = default);
+    public Task<bool> ValidateAgreementAsync(string agreementId, CancellationToken ct = default);
+    public AgreementManagerStatistics GetAgreementStatistics();
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    public IReadOnlyList<AgreementAuditEntry> GetAuditTrail(string agreementId);
+    public sealed record AgreementAuditEntry;
+    public sealed class AgreementManagerStatistics;
+}
+```
+```csharp
+public sealed record AgreementAuditEntry
+{
+}
+    public required string AuditId { get; init; }
+    public required string AgreementId { get; init; }
+    public required string Action { get; init; }
+    public required string Details { get; init; }
+    public required DateTimeOffset Timestamp { get; init; }
+}
+```
+```csharp
+public sealed class AgreementManagerStatistics
+{
+}
+    public long AgreementsCreated { get; init; }
+    public long AgreementsRenewed { get; init; }
+    public long AgreementsRevoked { get; init; }
+    public long AgreementsExpired { get; init; }
+    public int TotalActiveAgreements { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Passport/PassportAuditStrategy.cs
+```csharp
+public sealed class PassportAuditStrategy : ComplianceStrategyBase
+{
+}
+    public const string PassportIssued = "PassportIssued";
+    public const string PassportVerified = "PassportVerified";
+    public const string PassportRenewed = "PassportRenewed";
+    public const string PassportRevoked = "PassportRevoked";
+    public const string PassportSuspended = "PassportSuspended";
+    public const string PassportReinstated = "PassportReinstated";
+    public const string PassportExpired = "PassportExpired";
+    public const string ZoneEnforcementDecision = "ZoneEnforcementDecision";
+    public const string CrossBorderTransferRequested = "CrossBorderTransferRequested";
+    public const string CrossBorderTransferApproved = "CrossBorderTransferApproved";
+    public const string CrossBorderTransferDenied = "CrossBorderTransferDenied";
+    public const string AgreementCreated = "AgreementCreated";
+    public const string AgreementExpired = "AgreementExpired";
+    public const string AgreementRevoked = "AgreementRevoked";
+    public const string ZkProofGenerated = "ZkProofGenerated";
+    public const string ZkProofVerified = "ZkProofVerified";
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    public Task LogEventAsync(PassportAuditEvent evt, CancellationToken ct = default);
+    public Task<IReadOnlyList<PassportAuditEvent>> GetPassportAuditTrailAsync(string passportId, CancellationToken ct = default);
+    public Task<IReadOnlyList<PassportAuditEvent>> GetAuditTrailByTimeRangeAsync(DateTimeOffset start, DateTimeOffset end, CancellationToken ct = default);
+    public Task<IReadOnlyList<PassportAuditEvent>> GetAuditTrailByTypeAsync(string eventType, int limit = 100, CancellationToken ct = default);
+    public Task<PassportAuditReport> GenerateAuditReportAsync(DateTimeOffset start, DateTimeOffset end, CancellationToken ct = default);
+    public Task LogPassportIssuedAsync(CompliancePassport passport, string actorId, CancellationToken ct = default);
+    public Task LogPassportVerifiedAsync(string passportId, string objectId, bool isValid, CancellationToken ct = default);
+    public Task LogEnforcementDecisionAsync(string passportId, string objectId, string sourceZone, string destZone, ZoneAction decision, CancellationToken ct = default);
+    public Task LogCrossBorderTransferAsync(string passportId, string objectId, string sourceJurisdiction, string destJurisdiction, TransferDecision decision, CancellationToken ct = default);
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+}
+```
+```csharp
+public sealed record PassportAuditEvent
+{
+}
+    public required string EventId { get; init; }
+    public required string EventType { get; init; }
+    public required string PassportId { get; init; }
+    public required string ObjectId { get; init; }
+    public string? ActorId { get; init; }
+    public required DateTimeOffset Timestamp { get; init; }
+    public IReadOnlyDictionary<string, object>? Details { get; init; }
+    public string? SourceJurisdiction { get; init; }
+    public string? DestinationJurisdiction { get; init; }
+    public string? Decision { get; init; }
+    public string? Reason { get; init; }
+}
+```
+```csharp
+public sealed record PassportAuditReport
+{
+}
+    public required string ReportId { get; init; }
+    public required DateTimeOffset StartDate { get; init; }
+    public required DateTimeOffset EndDate { get; init; }
+    public int TotalEvents { get; init; }
+    public IReadOnlyDictionary<string, int> EventsByType { get; init; };
+    public int PassportsIssued { get; init; }
+    public int PassportsRevoked { get; init; }
+    public int PassportsExpired { get; init; }
+    public int TransfersApproved { get; init; }
+    public int TransfersDenied { get; init; }
+    public IReadOnlyDictionary<string, int> EnforcementDecisions { get; init; };
+    public IReadOnlyDictionary<string, int> TopObjectsByEvents { get; init; };
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/SecurityFrameworks/BsiC5Strategy.cs
+```csharp
+public sealed class BsiC5Strategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/SecurityFrameworks/CisTop18Strategy.cs
+```csharp
+public sealed class CisTop18Strategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/SecurityFrameworks/ItilStrategy.cs
+```csharp
+public sealed class ItilStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/SecurityFrameworks/IsoIec15408Strategy.cs
+```csharp
+public sealed class IsoIec15408Strategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/SecurityFrameworks/CsaStarStrategy.cs
+```csharp
+public sealed class CsaStarStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/SecurityFrameworks/EnsStrategy.cs
+```csharp
+public sealed class EnsStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/SecurityFrameworks/IsraelNcsStrategy.cs
+```csharp
+public sealed class IsraelNcsStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/SecurityFrameworks/CobitStrategy.cs
+```csharp
+public sealed class CobitStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/SecurityFrameworks/CisControlsStrategy.cs
+```csharp
+public sealed class CisControlsStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
 }
 ```
 
@@ -1553,10 +2474,11 @@ public sealed class ComplianceReportingStrategy : ComplianceStrategyBase
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Framework;;
-    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
+    public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
     protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override void Dispose(bool disposing);
 }
 ```
 ```csharp
@@ -1592,91 +2514,6 @@ private sealed class ComplianceReport
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Automation/ContinuousComplianceMonitoringStrategy.cs
-```csharp
-public sealed class ContinuousComplianceMonitoringStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
-    protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-```csharp
-private sealed class ComplianceMetric
-{
-}
-    public required string Framework { get; init; }
-    public long TotalChecks { get; set; }
-    public long ViolationCount { get; set; }
-    public long CompliantCount { get; set; }
-    public double ComplianceScore { get; set; };
-    public DateTime FirstCheckAt { get; set; }
-    public DateTime? LastCheckAt { get; set; }
-    public DateTime? LastViolationAt { get; set; }
-}
-```
-```csharp
-private sealed class ComplianceAlert
-{
-}
-    public required string AlertId { get; init; }
-    public required string Framework { get; init; }
-    public required AlertSeverity Severity { get; init; }
-    public required string Message { get; init; }
-    public required string RecommendedAction { get; init; }
-    public required DateTime CreatedAt { get; init; }
-    public bool Acknowledged { get; set; }
-    public DateTime? AcknowledgedAt { get; set; }
-    public string? AcknowledgedBy { get; set; }
-}
-```
-```csharp
-private sealed class ComplianceSnapshot
-{
-}
-    public required string SnapshotId { get; init; }
-    public required DateTime Timestamp { get; init; }
-    public required double OverallComplianceScore { get; init; }
-    public required Dictionary<string, FrameworkSnapshot> FrameworkMetrics { get; init; }
-}
-```
-```csharp
-private sealed class FrameworkSnapshot
-{
-}
-    public required string Framework { get; init; }
-    public required double ComplianceScore { get; init; }
-    public required long TotalChecks { get; init; }
-    public required long ViolationCount { get; init; }
-    public required long CompliantCount { get; init; }
-}
-```
-```csharp
-public sealed class MonitoringConfiguration
-{
-}
-    public int MonitoringIntervalSeconds { get; init; };
-    public int SnapshotIntervalSeconds { get; init; };
-    public AlertThresholds AlertThresholds { get; init; };
-}
-```
-```csharp
-public sealed class AlertThresholds
-{
-}
-    public int CriticalViolationCount { get; init; };
-    public int HighViolationCount { get; init; };
-    public double ComplianceScoreThreshold { get; init; };
-    public bool DriftDetectionEnabled { get; init; };
-    public double DriftThresholdPercent { get; init; };
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Automation/PolicyEnforcementStrategy.cs
 ```csharp
 public sealed class PolicyEnforcementStrategy : ComplianceStrategyBase
@@ -1685,7 +2522,7 @@ public sealed class PolicyEnforcementStrategy : ComplianceStrategyBase
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Framework;;
-    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
+    public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
     protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
@@ -1749,6 +2586,102 @@ public sealed class PolicyCondition
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Automation/AuditTrailGenerationStrategy.cs
+```csharp
+public sealed class AuditTrailGenerationStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
+    protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override void Dispose(bool disposing);
+}
+```
+```csharp
+private sealed class AuditEntry
+{
+}
+    public required string EntryId { get; init; }
+    public required long SequenceNumber { get; init; }
+    public required DateTime Timestamp { get; init; }
+    public required string Actor { get; init; }
+    public required string Action { get; init; }
+    public required string Resource { get; init; }
+    public required string DataClassification { get; init; }
+    public string? SourceLocation { get; init; }
+    public string? DestinationLocation { get; init; }
+    public List<string>? ProcessingPurposes { get; init; }
+    public Dictionary<string, object>? Attributes { get; init; }
+    public List<string>? ComplianceFrameworks { get; init; }
+    public string? Hash { get; init; }
+    public string? PreviousHash { get; init; }
+}
+```
+```csharp
+private sealed class AuditChain
+{
+}
+    public required string ChainId { get; init; }
+    public required ConcurrentQueue<AuditEntry> Entries { get; init; }
+    public required DateTime CreatedAt { get; init; }
+    public DateTime LastUpdated { get; set; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Automation/AutomatedComplianceCheckingStrategy.cs
+```csharp
+public sealed class AutomatedComplianceCheckingStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
+    protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override void Dispose(bool disposing);
+}
+```
+```csharp
+private sealed class CheckResult
+{
+}
+    public required string CheckId { get; init; }
+    public required ComplianceContext Context { get; init; }
+    public required List<ComplianceViolation> Violations { get; init; }
+    public required DateTime Timestamp { get; init; }
+}
+```
+```csharp
+private sealed class RuleCheckResult
+{
+}
+    public required bool IsCompliant { get; init; }
+    public string? ViolationMessage { get; init; }
+    public string? Remediation { get; init; }
+    public List<string>? Recommendations { get; init; }
+}
+```
+```csharp
+public sealed class ComplianceRule
+{
+}
+    public required string RuleId { get; init; }
+    public required string Framework { get; init; }
+    public required string ViolationMessage { get; init; }
+    public required string Severity { get; init; }
+    public string? RegulatoryReference { get; init; }
+    public string? RemediationAction { get; init; }
+    public List<string>? Recommendations { get; init; }
+    public Func<ComplianceContext, bool>? Condition { get; init; }
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Automation/RemediationWorkflowsStrategy.cs
 ```csharp
 public sealed class RemediationWorkflowsStrategy : ComplianceStrategyBase
@@ -1757,10 +2690,11 @@ public sealed class RemediationWorkflowsStrategy : ComplianceStrategyBase
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Framework;;
-    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
+    public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
     protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override void Dispose(bool disposing);
 }
 ```
 ```csharp
@@ -1814,6 +2748,1318 @@ public sealed class StepResult
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Automation/ContinuousComplianceMonitoringStrategy.cs
+```csharp
+public sealed class ContinuousComplianceMonitoringStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
+    protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override void Dispose(bool disposing);
+}
+```
+```csharp
+private sealed class ComplianceMetric
+{
+}
+    public required string Framework { get; init; }
+    public long TotalChecks;
+    public long ViolationCount;
+    public long CompliantCount;
+    public double ComplianceScore { get => BitConverter.Int64BitsToDouble(Interlocked.Read(ref _complianceScoreBits)); set => Interlocked.Exchange(ref _complianceScoreBits, BitConverter.DoubleToInt64Bits(value)); }
+    public DateTime FirstCheckAt { get; set; }
+    public DateTime? LastCheckAt { get; set; }
+    public DateTime? LastViolationAt { get; set; }
+}
+```
+```csharp
+private sealed class ComplianceAlert
+{
+}
+    public required string AlertId { get; init; }
+    public required string Framework { get; init; }
+    public required AlertSeverity Severity { get; init; }
+    public required string Message { get; init; }
+    public required string RecommendedAction { get; init; }
+    public required DateTime CreatedAt { get; init; }
+    public bool Acknowledged { get; set; }
+    public DateTime? AcknowledgedAt { get; set; }
+    public string? AcknowledgedBy { get; set; }
+}
+```
+```csharp
+private sealed class ComplianceSnapshot
+{
+}
+    public required string SnapshotId { get; init; }
+    public required DateTime Timestamp { get; init; }
+    public required double OverallComplianceScore { get; init; }
+    public required Dictionary<string, FrameworkSnapshot> FrameworkMetrics { get; init; }
+}
+```
+```csharp
+private sealed class FrameworkSnapshot
+{
+}
+    public required string Framework { get; init; }
+    public required double ComplianceScore { get; init; }
+    public required long TotalChecks { get; init; }
+    public required long ViolationCount { get; init; }
+    public required long CompliantCount { get; init; }
+}
+```
+```csharp
+public sealed class MonitoringConfiguration
+{
+}
+    public int MonitoringIntervalSeconds { get; init; };
+    public int SnapshotIntervalSeconds { get; init; };
+    public AlertThresholds AlertThresholds { get; init; };
+}
+```
+```csharp
+public sealed class AlertThresholds
+{
+}
+    public int CriticalViolationCount { get; init; };
+    public int HighViolationCount { get; init; };
+    public double ComplianceScoreThreshold { get; init; };
+    public bool DriftDetectionEnabled { get; init; };
+    public double DriftThresholdPercent { get; init; };
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/MiddleEastAfrica/QatarPdplStrategy.cs
+```csharp
+public sealed class QatarPdplStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/MiddleEastAfrica/EgyptPdpStrategy.cs
+```csharp
+public sealed class EgyptPdpStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/MiddleEastAfrica/AdgmStrategy.cs
+```csharp
+public sealed class AdgmStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/MiddleEastAfrica/KdpaStrategy.cs
+```csharp
+public sealed class KdpaStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/MiddleEastAfrica/BahrainPdpStrategy.cs
+```csharp
+public sealed class BahrainPdpStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/MiddleEastAfrica/PopiaStrategy.cs
+```csharp
+public sealed class PopiaStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/MiddleEastAfrica/DipdStrategy.cs
+```csharp
+public sealed class DipdStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/MiddleEastAfrica/NdprStrategy.cs
+```csharp
+public sealed class NdprStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/MiddleEastAfrica/PdplSaStrategy.cs
+```csharp
+public sealed class PdplSaStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Regulations/DataActStrategy.cs
+```csharp
+public sealed class DataActStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Regulations/DoraStrategy.cs
+```csharp
+public sealed class DoraStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Regulations/EPrivacyStrategy.cs
+```csharp
+public sealed class EPrivacyStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Regulations/Sox2Strategy.cs
+```csharp
+public sealed class Sox2Strategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Regulations/CyberResilienceActStrategy.cs
+```csharp
+public sealed class CyberResilienceActStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Regulations/FedRampStrategy.cs
+```csharp
+public sealed class FedRampStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Regulations/Soc2Strategy.cs
+```csharp
+public sealed class Soc2Strategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Regulations/AiActStrategy.cs
+```csharp
+public sealed class AiActStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Regulations/PciDssStrategy.cs
+```csharp
+public sealed class PciDssStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Regulations/Nis2Strategy.cs
+```csharp
+public sealed class Nis2Strategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Regulations/HipaaStrategy.cs
+```csharp
+public sealed class HipaaStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Regulations/DataGovernanceActStrategy.cs
+```csharp
+public sealed class DataGovernanceActStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Regulations/GdprStrategy.cs
+```csharp
+public sealed class GdprStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Geofencing/DynamicReconfigurationStrategy.cs
+```csharp
+public sealed class DynamicReconfigurationStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
+    public void RegisterNode(string nodeId, string location, string region, NodeType nodeType = NodeType.Storage);
+    public LocationChangeResult RequestLocationChange(LocationChangeRequest request);
+    public ApplyChangeResult ApplyLocationChange(string requestId);
+    public RollbackResult RollbackLocationChange(string requestId, string reason);
+    public NodeLocationRecord? GetNodeLocation(string nodeId);
+    public IReadOnlyList<NodeLocationRecord> GetNodesInRegion(string region);
+    public IReadOnlyList<LocationChangeRequest> GetPendingChanges();
+    public MigrationPlan? GetMigrationPlan(string requestId);
+    public void UpdateMigrationProgress(string requestId, MigrationProgress progress);
+    public void RegisterListener(IReconfigurationListener listener);
+    public IReadOnlyList<ReconfigurationEvent> GetEvents(int count = 100);
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+```csharp
+public sealed record NodeLocationRecord
+{
+}
+    public required string NodeId { get; init; }
+    public required string CurrentLocation { get; init; }
+    public required string CurrentRegion { get; init; }
+    public NodeType NodeType { get; init; }
+    public DateTime RegisteredAt { get; init; }
+    public DateTime LastVerifiedAt { get; init; }
+    public bool IsActive { get; init; }
+}
+```
+```csharp
+public sealed record LocationChangeRequest
+{
+}
+    public string? RequestId { get; init; }
+    public required string NodeId { get; init; }
+    public required string NewLocation { get; init; }
+    public required string NewRegion { get; init; }
+    public string? PreviousLocation { get; init; }
+    public string? PreviousRegion { get; init; }
+    public string? Reason { get; init; }
+    public TimeSpan? GracePeriod { get; init; }
+    public DateTime RequestedAt { get; init; }
+    public DateTime? AppliedAt { get; init; }
+    public DateTime? GracePeriodEnd { get; init; }
+    public ChangeStatus Status { get; init; }
+    public ComplianceImpactAssessment? ImpactAssessment { get; init; }
+    public bool IsRollback { get; init; }
+    public string? RollbackOfRequestId { get; init; }
+}
+```
+```csharp
+public sealed record ComplianceImpactAssessment
+{
+}
+    public ComplianceImpact ComplianceImpact { get; init; }
+    public bool HasBlockingIssues { get; init; }
+    public List<string> BlockingIssues { get; init; };
+    public List<string> Warnings { get; init; };
+    public bool RequiresMigration { get; init; }
+    public int AffectedDataCount { get; init; }
+}
+```
+```csharp
+public sealed record LocationChangeResult
+{
+}
+    public required bool Success { get; init; }
+    public string? RequestId { get; init; }
+    public string? ErrorMessage { get; init; }
+    public DateTime? GracePeriodEnd { get; init; }
+    public ComplianceImpactAssessment? ImpactAssessment { get; init; }
+    public string? MigrationPlanId { get; init; }
+}
+```
+```csharp
+public sealed record ApplyChangeResult
+{
+}
+    public required bool Success { get; init; }
+    public string? RequestId { get; init; }
+    public string? ErrorMessage { get; init; }
+    public DateTime? AppliedAt { get; init; }
+    public MigrationStatus? MigrationStatus { get; init; }
+}
+```
+```csharp
+public sealed record RollbackResult
+{
+}
+    public required bool Success { get; init; }
+    public string? OriginalRequestId { get; init; }
+    public string? RollbackRequestId { get; init; }
+    public string? ErrorMessage { get; init; }
+    public DateTime? RolledBackAt { get; init; }
+}
+```
+```csharp
+public sealed record MigrationPlan
+{
+}
+    public required string PlanId { get; init; }
+    public required string NodeId { get; init; }
+    public required string FromLocation { get; init; }
+    public required string FromRegion { get; init; }
+    public required string ToLocation { get; init; }
+    public required string ToRegion { get; init; }
+    public int EstimatedDataObjects { get; init; }
+    public MigrationStatus Status { get; init; }
+    public MigrationProgress? CurrentProgress { get; init; }
+    public DateTime CreatedAt { get; init; }
+    public DateTime? StartedAt { get; init; }
+    public DateTime? LastUpdated { get; init; }
+    public bool IsComplete { get; init; }
+}
+```
+```csharp
+public sealed record MigrationProgress
+{
+}
+    public int TotalObjects { get; init; }
+    public int MigratedObjects { get; init; }
+    public int FailedObjects { get; init; }
+    public double PercentComplete;;
+    public TimeSpan? EstimatedTimeRemaining { get; init; }
+}
+```
+```csharp
+public sealed record LocationChangeHistory
+{
+}
+    public required string RequestId { get; init; }
+    public required LocationChangeRequest ChangeRequest { get; init; }
+    public DateTime RecordedAt { get; init; }
+}
+```
+```csharp
+public sealed record ReconfigurationEvent
+{
+}
+    public required ReconfigurationEventType EventType { get; init; }
+    public required string NodeId { get; init; }
+    public string? PreviousLocation { get; init; }
+    public string? NewLocation { get; init; }
+    public string? PreviousRegion { get; init; }
+    public string? NewRegion { get; init; }
+    public DateTime Timestamp { get; init; }
+    public string? RequestId { get; init; }
+    public string? Reason { get; init; }
+}
+```
+```csharp
+public sealed record LocationChangeNotification
+{
+}
+    public required NotificationType NotificationType { get; init; }
+    public LocationChangeRequest? ChangeRequest { get; init; }
+    public MigrationPlan? MigrationPlan { get; init; }
+}
+```
+```csharp
+public interface IReconfigurationListener
+{
+}
+    void OnLocationChange(LocationChangeNotification notification);;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Geofencing/CrossBorderExceptionsStrategy.cs
+```csharp
+public sealed class CrossBorderExceptionsStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
+    public ExceptionRequestResult SubmitRequest(ExceptionRequest request);
+    public ExceptionRequestResult SubmitFromTemplate(string templateId, string sourceRegion, string destinationRegion, string requesterId, Dictionary<string, string>? parameters = null);
+    public ReviewResult ReviewRequest(string requestId, string reviewerId, ReviewDecision decision, string comments);
+    public ReviewResult LegalReview(string requestId, string legalReviewerId, ReviewDecision decision, string legalOpinion, List<string>? additionalConditions = null);
+    public ExceptionCheckResult CheckException(string sourceRegion, string destinationRegion, string dataClassification, string? resourceId = null);
+    public RevokeResult RevokeException(string exceptionId, string revokedBy, string reason);
+    public RenewalResult RenewException(string exceptionId, string requesterId, TimeSpan? newDuration = null);
+    public IReadOnlyList<GrantedExcep> GetActiveExceptions(string? sourceRegion = null, string? destinationRegion = null);
+    public IReadOnlyList<GrantedExcep> GetExpiringSoon(int daysAhead = 30);
+    public IReadOnlyList<ExceptionRequest> GetPendingRequests();
+    public IReadOnlyList<ExceptionAuditEntry> GetAuditLog(string? exceptionId = null, int count = 100);
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+```csharp
+public sealed record ExceptionRequest
+{
+}
+    public string? RequestId { get; init; }
+    public required string SourceRegion { get; init; }
+    public required string DestinationRegion { get; init; }
+    public List<string> DataClassifications { get; init; };
+    public required string LegalBasis { get; init; }
+    public required string Justification { get; init; }
+    public TimeSpan RequestedDuration { get; init; }
+    public required string RequesterId { get; init; }
+    public List<string> SafeguardsInPlace { get; init; };
+    public List<string> Conditions { get; init; };
+    public string? TemplateId { get; init; }
+    public DateTime SubmittedAt { get; init; }
+    public ExceptionStatus Status { get; init; }
+    public int RequiredApprovals { get; init; }
+    public List<ExceptionApproval> Approvals { get; init; };
+}
+```
+```csharp
+public sealed record ExceptionApproval
+{
+}
+    public required string ReviewerId { get; init; }
+    public required ReviewDecision Decision { get; init; }
+    public required string Comments { get; init; }
+    public required DateTime ReviewedAt { get; init; }
+    public bool IsLegalReview { get; init; }
+    public List<string> AdditionalConditions { get; init; };
+}
+```
+```csharp
+public sealed record GrantedExcep
+{
+}
+    public required string ExceptionId { get; init; }
+    public required string RequestId { get; init; }
+    public required string SourceRegion { get; init; }
+    public required string DestinationRegion { get; init; }
+    public List<string> DataClassifications { get; init; };
+    public required string LegalBasis { get; init; }
+    public required string Justification { get; init; }
+    public List<string> Conditions { get; init; };
+    public List<string> SafeguardsRequired { get; init; };
+    public List<string> ApplicableResources { get; init; };
+    public ExceptionStatus Status { get; init; }
+    public DateTime GrantedAt { get; init; }
+    public DateTime ExpiresAt { get; init; }
+    public int MaxRenewals { get; init; }
+    public int RenewalCount { get; init; }
+    public DateTime? LastRenewedAt { get; init; }
+    public string? LastRenewedBy { get; init; }
+    public DateTime? RevokedAt { get; init; }
+    public string? RevokedBy { get; init; }
+    public string? RevocationReason { get; init; }
+}
+```
+```csharp
+public sealed record ExceptionTemplate
+{
+}
+    public required string TemplateId { get; init; }
+    public required string TemplateName { get; init; }
+    public required string TemplateDescription { get; init; }
+    public required string DefaultLegalBasis { get; init; }
+    public List<string> AllowedClassifications { get; init; };
+    public List<string> RequiredSafeguards { get; init; };
+    public TimeSpan DefaultDuration { get; init; }
+    public bool RequiresLegalReview { get; init; }
+}
+```
+```csharp
+public sealed record ExceptionRequestResult
+{
+}
+    public required bool Success { get; init; }
+    public string? RequestId { get; init; }
+    public string? ErrorMessage { get; init; }
+    public int RequiredApprovals { get; init; }
+    public TimeSpan? EstimatedReviewTime { get; init; }
+}
+```
+```csharp
+public sealed record ReviewResult
+{
+}
+    public required bool Success { get; init; }
+    public string? RequestId { get; init; }
+    public string? ExceptionId { get; init; }
+    public string? ErrorMessage { get; init; }
+    public int CurrentApprovals { get; init; }
+    public int RequiredApprovals { get; init; }
+    public ExceptionStatus NewStatus { get; init; }
+    public DateTime? ExpiresAt { get; init; }
+    public string? Message { get; init; }
+}
+```
+```csharp
+public sealed record ExceptionCheckResult
+{
+}
+    public required bool HasException { get; init; }
+    public string? ExceptionId { get; init; }
+    public string? LegalBasis { get; init; }
+    public DateTime? ExpiresAt { get; init; }
+    public List<string> Conditions { get; init; };
+    public required string Message { get; init; }
+}
+```
+```csharp
+public sealed record RevokeResult
+{
+}
+    public required bool Success { get; init; }
+    public string? ExceptionId { get; init; }
+    public string? ErrorMessage { get; init; }
+    public DateTime? RevokedAt { get; init; }
+}
+```
+```csharp
+public sealed record RenewalResult
+{
+}
+    public required bool Success { get; init; }
+    public string? ExceptionId { get; init; }
+    public string? ErrorMessage { get; init; }
+    public DateTime? NewExpiryDate { get; init; }
+    public int RenewalCount { get; init; }
+    public int RemainingRenewals { get; init; }
+}
+```
+```csharp
+public sealed record ExceptionAuditEntry
+{
+}
+    public required string EntryId { get; init; }
+    public required string ExceptionId { get; init; }
+    public required AuditAction Action { get; init; }
+    public required string ActorId { get; init; }
+    public required string Details { get; init; }
+    public required DateTime Timestamp { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Geofencing/WriteInterceptionStrategy.cs
+```csharp
+public sealed class WriteInterceptionStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
+    public void RegisterStorageNode(StorageNodeInfo node);
+    public bool UnregisterStorageNode(string nodeId);
+    public WriteInterceptionResult ValidateWrite(WriteRequest request);
+    public async Task<IReadOnlyList<WriteInterceptionResult>> ValidateWriteBatchAsync(IEnumerable<WriteRequest> requests, CancellationToken cancellationToken = default);
+    public IReadOnlyList<StorageNodeInfo> FindCompliantNodes(string dataClassification, long requiredCapacity);
+    public StorageNodeInfo? GetNodeInfo(string nodeId);
+    public IReadOnlyCollection<StorageNodeInfo> GetAllNodes();
+    public WriteInterceptionStats? GetNodeStats(string nodeId);
+    public AggregatedWriteStats GetAggregatedStats();
+    public IReadOnlyList<WriteInterceptionEvent> GetRecentEvents(int count = 100);
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+```csharp
+public sealed record StorageNodeInfo
+{
+}
+    public required string NodeId { get; init; }
+    public required string Location { get; init; }
+    public string? Region { get; init; }
+    public bool IsActive { get; init; }
+    public bool AcceptingWrites { get; init; }
+    public long AvailableCapacityBytes { get; init; }
+    public double CurrentLoad { get; init; }
+    public bool SupportsEncryptionAtRest { get; init; }
+    public int NodeTier { get; init; }
+    public List<string> Certifications { get; init; };
+    public DateTime LastVerifiedAt { get; init; }
+}
+```
+```csharp
+public sealed record WritePolicy
+{
+}
+    public required string PolicyId { get; init; }
+    public required string PolicyName { get; init; }
+    public List<string> AllowedRegions { get; init; };
+    public List<string> ProhibitedRegions { get; init; };
+    public bool RequiresEncryption { get; init; }
+    public List<string> RequiredCertifications { get; init; };
+    public int? MinimumNodeTier { get; init; }
+}
+```
+```csharp
+public sealed record WriteRequest
+{
+}
+    public required string RequestId { get; init; }
+    public required string TargetNodeId { get; init; }
+    public required string DataClassification { get; init; }
+    public long RequiredCapacity { get; init; }
+    public SovereigntyRequirements? SovereigntyRequirements { get; init; }
+    public string? RequesterId { get; init; }
+}
+```
+```csharp
+public sealed record SovereigntyRequirements
+{
+}
+    public List<string> RequiredRegions { get; init; };
+    public List<string> ProhibitedRegions { get; init; };
+    public bool RequiresEncryption { get; init; }
+}
+```
+```csharp
+public sealed record WriteInterceptionResult
+{
+}
+    public required bool IsAllowed { get; init; }
+    public required string RequestId { get; init; }
+    public required string TargetNodeId { get; init; }
+    public string? RejectionReason { get; init; }
+    public double ValidationTimeMs { get; init; }
+    public string? PolicyApplied { get; init; }
+    public IReadOnlyList<StorageNodeInfo>? SuggestedNodes { get; init; }
+    public DateTime? ApprovedAt { get; init; }
+    public DateTime? RejectedAt { get; init; }
+    public bool IsAuditOnly { get; init; }
+}
+```
+```csharp
+public sealed class WriteInterceptionStats
+{
+}
+    public required string NodeId { get; init; }
+    public long TotalWritesValidated;
+    public long WritesApproved;
+    public long WritesRejected;
+    public double AverageValidationTimeMs { get; set; }
+}
+```
+```csharp
+public sealed record AggregatedWriteStats
+{
+}
+    public long TotalWritesValidated { get; init; }
+    public long TotalWritesApproved { get; init; }
+    public long TotalWritesRejected { get; init; }
+    public double AverageValidationTimeMs { get; init; }
+    public int NodeCount { get; init; }
+    public int ActiveNodeCount { get; init; }
+}
+```
+```csharp
+public sealed record WriteInterceptionEvent
+{
+}
+    public required string EventId { get; init; }
+    public required DateTime Timestamp { get; init; }
+    public required string RequestId { get; init; }
+    public required string TargetNodeId { get; init; }
+    public required string DataClassification { get; init; }
+    public required string Action { get; init; }
+    public string? Reason { get; init; }
+    public double ValidationTimeMs { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Geofencing/GeolocationServiceStrategy.cs
+```csharp
+public sealed class GeolocationServiceStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
+    public async Task<GeolocationResult> ResolveLocationAsync(string ipAddress, CancellationToken cancellationToken = default);
+    public async Task<LocationVerificationResult> VerifyNodeLocationAsync(string nodeId, string ipAddress, string claimedCountryCode, CancellationToken cancellationToken = default);
+    public async Task<IReadOnlyDictionary<string, GeolocationResult>> BatchResolveAsync(IEnumerable<string> ipAddresses, CancellationToken cancellationToken = default);
+    public void ClearCache();
+    public GeolocationCacheStats GetCacheStats();
+    protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override void Dispose(bool disposing);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+```csharp
+private sealed class CachedLocation
+{
+}
+    public required GeolocationResult Location { get; init; }
+    public required DateTime ExpiresAt { get; init; }
+}
+```
+```csharp
+public sealed record GeolocationResult
+{
+}
+    public required string IpAddress { get; init; }
+    public required string CountryCode { get; init; }
+    public string? CountryName { get; init; }
+    public string? Region { get; init; }
+    public string? City { get; init; }
+    public double? Latitude { get; init; }
+    public double? Longitude { get; init; }
+    public required double Confidence { get; init; }
+    public required string ProviderName { get; init; }
+    public required bool IsReliable { get; init; }
+    public IReadOnlyList<string> Errors { get; init; };
+}
+```
+```csharp
+public sealed record LocationVerificationResult
+{
+}
+    public required string NodeId { get; init; }
+    public required string IpAddress { get; init; }
+    public required string ClaimedLocation { get; init; }
+    public required string ResolvedLocation { get; init; }
+    public required bool IsValid { get; init; }
+    public required double Confidence { get; init; }
+    public required DateTime VerificationTime { get; init; }
+    public string? Discrepancy { get; init; }
+    public IReadOnlyList<string> Recommendations { get; init; };
+}
+```
+```csharp
+public sealed record GeolocationCacheStats
+{
+}
+    public int TotalEntries { get; init; }
+    public int ValidEntries { get; init; }
+    public int ExpiredEntries { get; init; }
+    public DateTime? OldestEntry { get; init; }
+    public DateTime? NewestEntry { get; init; }
+}
+```
+```csharp
+public interface IGeolocationProvider
+{
+}
+    string ProviderName { get; }
+    bool IsEnabled { get; set; }
+    Task<GeolocationResult?> LookupAsync(string ipAddress, CancellationToken cancellationToken = default);;
+    void Configure(Dictionary<string, object> configuration);;
+}
+```
+```csharp
+internal sealed class MaxMindProvider : IGeolocationProvider, IDisposable
+{
+}
+    public string ProviderName;;
+    public bool IsEnabled { get; set; };
+    public void Configure(Dictionary<string, object> configuration);
+    public Task<GeolocationResult?> LookupAsync(string ipAddress, CancellationToken cancellationToken = default);
+    public void Dispose();
+}
+```
+```csharp
+internal sealed class Ip2LocationProvider : IGeolocationProvider
+{
+}
+    public string ProviderName;;
+    public bool IsEnabled { get; set; };
+    public void Configure(Dictionary<string, object> configuration);
+    public Task<GeolocationResult?> LookupAsync(string ipAddress, CancellationToken cancellationToken = default);
+}
+```
+```csharp
+internal sealed class IpStackProvider : IGeolocationProvider, IDisposable
+{
+}
+    public string ProviderName;;
+    public bool IsEnabled { get; set; };
+    public void Configure(Dictionary<string, object> configuration);
+    public async Task<GeolocationResult?> LookupAsync(string ipAddress, CancellationToken cancellationToken = default);
+    public void Dispose();
+}
+```
+```csharp
+internal sealed class LocalDatabaseProvider : IGeolocationProvider
+{
+}
+    public string ProviderName;;
+    public bool IsEnabled { get; set; };
+    public void Configure(Dictionary<string, object> configuration);
+    public Task<GeolocationResult?> LookupAsync(string ipAddress, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Geofencing/RegionRegistryStrategy.cs
+```csharp
+public sealed class RegionRegistryStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
+    public void RegisterRegion(RegionDefinition region);
+    public RegionDefinition? GetRegion(string regionCode);
+    public IReadOnlyList<RegionDefinition> GetRegionsForCountry(string countryCode);
+    public bool IsCountryInRegion(string countryCode, string regionCode);
+    public IReadOnlySet<string> GetCountriesInRegion(string regionCode);
+    public DataTransferAssessment AssessDataTransfer(string sourceCountry, string destCountry, string dataType);
+    public CountryInfo? GetCountryInfo(string countryCode);
+    public IReadOnlyCollection<RegionDefinition> GetAllRegions();;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+```csharp
+public sealed record RegionDefinition
+{
+}
+    public required string RegionCode { get; init; }
+    public required string RegionName { get; init; }
+    public RegionType RegionType { get; init; };
+    public List<string> MemberCountries { get; init; };
+    public List<string> ParentRegions { get; init; };
+    public List<string> ChildRegions { get; init; };
+    public List<string> RegulatoryFrameworks { get; init; };
+    public DateTime? ValidFrom { get; init; }
+    public DateTime? ValidUntil { get; init; }
+    public string? Notes { get; init; }
+}
+```
+```csharp
+public sealed record CountryInfo
+{
+}
+    public required string CountryCode { get; init; }
+    public required string CountryName { get; init; }
+    public string[] DataProtectionLaws { get; init; };
+    public bool HasAdequacyDecision { get; init; }
+    public bool RequiresLocalStorage { get; init; }
+}
+```
+```csharp
+public sealed record DataSharingAgreement
+{
+}
+    public required string AgreementId { get; init; }
+    public required string AgreementName { get; init; }
+    public List<string> ParticipatingEntities { get; init; };
+    public DateTime? EffectiveDate { get; init; }
+    public DateTime? ExpirationDate { get; init; }
+    public bool IsActive { get; init; }
+    public bool RequiresSafeguards { get; init; }
+    public string[] RequiredSafeguards { get; init; };
+    public List<string> CoveredDataTypes { get; init; };
+}
+```
+```csharp
+public sealed record DataTransferAssessment
+{
+}
+    public required bool IsAllowed { get; init; }
+    public required string Basis { get; init; }
+    public required bool RequiresAdditionalSafeguards { get; init; }
+    public string[]? SafeguardsRequired { get; init; }
+    public IReadOnlyList<string> ApplicableAgreements { get; init; };
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Geofencing/SovereigntyClassificationStrategy.cs
+```csharp
+public sealed class SovereigntyClassificationStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
+    public async Task<SovereigntyClassification> ClassifyDataAsync(ClassificationInput input, CancellationToken cancellationToken = default);
+    public async Task<IReadOnlyList<SovereigntyClassification>> BatchClassifyAsync(IEnumerable<ClassificationInput> inputs, CancellationToken cancellationToken = default);
+    public void ClearCache();
+    public ClassificationCacheStats GetCacheStats();
+    protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+```csharp
+private sealed class ClassificationCache
+{
+}
+    public required SovereigntyClassification Classification { get; init; }
+    public required DateTime ExpiresAt { get; init; }
+}
+```
+```csharp
+public sealed record ClassificationInput
+{
+}
+    public required string ResourceId { get; init; }
+    public string? SourceIp { get; init; }
+    public string? StorageLocation { get; init; }
+    public string? UserJurisdiction { get; init; }
+    public string? ExplicitJurisdiction { get; init; }
+    public string? DataContent { get; init; }
+}
+```
+```csharp
+public sealed record SovereigntyClassification
+{
+}
+    public required string ResourceId { get; init; }
+    public required string PrimaryJurisdiction { get; init; }
+    public required IReadOnlyList<string> ApplicableRegulations { get; init; }
+    public required DataSensitivity DataSensitivity { get; init; }
+    public required double ClassificationConfidence { get; init; }
+    public required ClassificationSource ClassificationSource { get; init; }
+    public required DateTime ClassifiedAt { get; init; }
+    public required IReadOnlyList<ClassificationSignal> Signals { get; init; }
+}
+```
+```csharp
+public sealed record ClassificationSignal
+{
+}
+    public required ClassificationSource Source { get; init; }
+    public required string Jurisdiction { get; init; }
+    public required double Confidence { get; init; }
+    public required string Reason { get; init; }
+}
+```
+```csharp
+public sealed record ClassificationCacheStats
+{
+}
+    public int TotalEntries { get; init; }
+    public int ValidEntries { get; init; }
+    public int ExpiredEntries { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Geofencing/AttestationStrategy.cs
+```csharp
+public sealed class AttestationStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
+    public async Task<AttestationResult> RequestAttestationAsync(string nodeId, AttestationRequest request, CancellationToken cancellationToken = default);
+    public AttestationVerificationResult VerifyAttestation(string nodeId);
+    public NodeAttestation? GetAttestation(string nodeId);
+    public bool HasValidAttestation(string nodeId, string location);
+    public bool RevokeAttestation(string nodeId, string reason, string revokedBy);
+    public void RegisterTrustAnchor(TrustAnchor anchor);
+    public new AttestationStatistics GetStatistics();
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+```csharp
+public sealed record AttestationRequest
+{
+}
+    public required string ClaimedLocation { get; init; }
+    public string? PolicyId { get; init; }
+    public bool IncludeTpm { get; init; }
+    public bool IncludeSecureEnclave { get; init; }
+    public bool IncludeGps { get; init; }
+    public bool IncludeNetworkLocation { get; init; }
+}
+```
+```csharp
+public sealed record AttestationResult
+{
+}
+    public required bool Success { get; init; }
+    public required string AttestationId { get; init; }
+    public string? ErrorMessage { get; init; }
+    public NodeAttestation? Attestation { get; init; }
+    public List<AttestationFactor> Factors { get; init; };
+    public double Confidence { get; init; }
+    public DateTime? ExpiresAt { get; init; }
+    public List<string> CollectionErrors { get; init; };
+}
+```
+```csharp
+public sealed record NodeAttestation
+{
+}
+    public required string AttestationId { get; init; }
+    public required string NodeId { get; init; }
+    public required string ClaimedLocation { get; init; }
+    public required string VerifiedLocation { get; init; }
+    public List<AttestationFactor> Factors { get; init; };
+    public required double Confidence { get; init; }
+    public required string PolicyId { get; init; }
+    public required DateTime IssuedAt { get; init; }
+    public required DateTime ExpiresAt { get; init; }
+    public required string AttestationHash { get; init; }
+    public List<TrustChainLink> ChainOfTrust { get; init; };
+}
+```
+```csharp
+public sealed record AttestationFactor
+{
+}
+    public required AttestationFactorType FactorType { get; init; }
+    public required string FactorId { get; init; }
+    public required string Evidence { get; init; }
+    public required double Confidence { get; init; }
+    public required DateTime CollectedAt { get; init; }
+    public string? VerifiedLocation { get; init; }
+    public GeoCoordinates? Coordinates { get; init; }
+}
+```
+```csharp
+public sealed record GeoCoordinates
+{
+}
+    public double Latitude { get; init; }
+    public double Longitude { get; init; }
+    public double? Accuracy { get; init; }
+}
+```
+```csharp
+public sealed record FactorCollectionResult
+{
+}
+    public required bool Success { get; init; }
+    public AttestationFactor? Factor { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+```
+```csharp
+public sealed record AttestationVerificationResult
+{
+}
+    public required bool IsValid { get; init; }
+    public string? Reason { get; init; }
+    public NodeAttestation? Attestation { get; init; }
+    public string? VerifiedLocation { get; init; }
+    public double? Confidence { get; init; }
+    public DateTime? ExpiresAt { get; init; }
+    public DateTime? ExpiredAt { get; init; }
+}
+```
+```csharp
+public sealed record AttestationPolicy
+{
+}
+    public required string PolicyId { get; init; }
+    public required string PolicyName { get; init; }
+    public int MinimumFactors { get; init; };
+    public double MinimumConfidence { get; init; };
+    public bool RequiresTpm { get; init; }
+    public bool RequiresSecureEnclave { get; init; }
+    public bool RequiresGps { get; init; }
+    public bool RequiresNetworkLocation { get; init; }
+}
+```
+```csharp
+public sealed record TrustAnchor
+{
+}
+    public required string AnchorId { get; init; }
+    public required string AnchorName { get; init; }
+    public List<AttestationFactorType> FactorTypes { get; init; };
+    public TrustLevel TrustLevel { get; init; }
+    public string? PublicKey { get; init; }
+    public DateTime? ExpiresAt { get; init; }
+}
+```
+```csharp
+public sealed record TrustChainLink
+{
+}
+    public required string FactorId { get; init; }
+    public required AttestationFactorType FactorType { get; init; }
+    public required string TrustAnchorId { get; init; }
+    public TrustLevel TrustLevel { get; init; }
+    public bool Verified { get; init; }
+}
+```
+```csharp
+public sealed record AttestationStatistics
+{
+}
+    public int TotalAttestations { get; init; }
+    public int ValidAttestations { get; init; }
+    public int ExpiredAttestations { get; init; }
+    public double AverageConfidence { get; init; }
+    public Dictionary<string, int> AttestationsByLocation { get; init; };
+    public int ExpiringWithin24Hours { get; init; }
+}
+```
+```csharp
+public sealed record AttestationEvent
+{
+}
+    public required string EventId { get; init; }
+    public required AttestationEventType EventType { get; init; }
+    public required string NodeId { get; init; }
+    public required string AttestationId { get; init; }
+    public required string Details { get; init; }
+    public required DateTime Timestamp { get; init; }
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Geofencing/AdminOverridePreventionStrategy.cs
 ```csharp
 public sealed class AdminOverridePreventionStrategy : ComplianceStrategyBase
@@ -1832,6 +4078,7 @@ public sealed class AdminOverridePreventionStrategy : ComplianceStrategyBase
     public IReadOnlyList<TamperEvidentAuditEntry> GetAuditLog(int count = 100);
     public AuditIntegrityResult VerifyAuditIntegrity();
     protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    public string ComputeApprovalSignature(string authorizationId, string approverId, string commitmentHash);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
 }
@@ -2007,173 +4254,156 @@ public sealed record AuditIntegrityResult
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Geofencing/AttestationStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Geofencing/ReplicationFenceStrategy.cs
 ```csharp
-public sealed class AttestationStrategy : ComplianceStrategyBase
+public sealed class ReplicationFenceStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Framework;;
     public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
-    public async Task<AttestationResult> RequestAttestationAsync(string nodeId, AttestationRequest request, CancellationToken cancellationToken = default);
-    public AttestationVerificationResult VerifyAttestation(string nodeId);
-    public NodeAttestation? GetAttestation(string nodeId);
-    public bool HasValidAttestation(string nodeId, string location);
-    public bool RevokeAttestation(string nodeId, string reason, string revokedBy);
-    public void RegisterTrustAnchor(TrustAnchor anchor);
-    public new AttestationStatistics GetStatistics();
+    public void RegisterTopology(ReplicationTopology topology);
+    public ReplicationValidationResult ValidateReplication(ReplicationRequest request);
+    public TopologyValidationResult ValidateTopology(string topologyId);
+    public EmergencyIsolationResult IsolateRegion(string region, string reason, string authorizedBy);
+    public bool RemoveEmergencyIsolation(string boundaryId, string authorizedBy);
+    public IReadOnlyList<SovereigntyBoundary> GetActiveBoundaries();
     protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
 }
 ```
 ```csharp
-public sealed record AttestationRequest
+public sealed record SovereigntyBoundary
 {
 }
-    public required string ClaimedLocation { get; init; }
-    public string? PolicyId { get; init; }
-    public bool IncludeTpm { get; init; }
-    public bool IncludeSecureEnclave { get; init; }
-    public bool IncludeGps { get; init; }
-    public bool IncludeNetworkLocation { get; init; }
-}
-```
-```csharp
-public sealed record AttestationResult
-{
-}
-    public required bool Success { get; init; }
-    public required string AttestationId { get; init; }
-    public string? ErrorMessage { get; init; }
-    public NodeAttestation? Attestation { get; init; }
-    public List<AttestationFactor> Factors { get; init; };
-    public double Confidence { get; init; }
+    public required string BoundaryId { get; init; }
+    public required string BoundaryName { get; init; }
+    public List<string> IncludedRegions { get; init; };
+    public bool IsHardBoundary { get; init; }
+    public bool IsTemporary { get; init; }
     public DateTime? ExpiresAt { get; init; }
-    public List<string> CollectionErrors { get; init; };
+    public DateTime CreatedAt { get; init; };
+    public string? Reason { get; init; }
+    public string? AuthorizedBy { get; init; }
 }
 ```
 ```csharp
-public sealed record NodeAttestation
+public sealed record ReplicationFenceRule
 {
 }
-    public required string AttestationId { get; init; }
-    public required string NodeId { get; init; }
-    public required string ClaimedLocation { get; init; }
-    public required string VerifiedLocation { get; init; }
-    public List<AttestationFactor> Factors { get; init; };
-    public required double Confidence { get; init; }
-    public required string PolicyId { get; init; }
-    public required DateTime IssuedAt { get; init; }
-    public required DateTime ExpiresAt { get; init; }
-    public required string AttestationHash { get; init; }
-    public List<TrustChainLink> ChainOfTrust { get; init; };
+    public required string RuleId { get; init; }
+    public required string RuleName { get; init; }
+    public List<string> AppliesToClassifications { get; init; };
+    public List<ReplicationPath> AllowedPaths { get; init; };
+    public List<ReplicationPath> ProhibitedPaths { get; init; };
+    public List<ReplicationPath> WarnPaths { get; init; };
+    public ViolationSeverity Severity { get; init; };
 }
 ```
 ```csharp
-public sealed record AttestationFactor
+public sealed record ReplicationPath
 {
 }
-    public required AttestationFactorType FactorType { get; init; }
-    public required string FactorId { get; init; }
-    public required string Evidence { get; init; }
-    public required double Confidence { get; init; }
-    public required DateTime CollectedAt { get; init; }
-    public string? VerifiedLocation { get; init; }
-    public GeoCoordinates? Coordinates { get; init; }
+    public required string SourceRegion { get; init; }
+    public required string DestinationRegion { get; init; }
+    public string? SourceNode { get; init; }
+    public string? DestinationNode { get; init; }
 }
 ```
 ```csharp
-public sealed record GeoCoordinates
+public sealed record ReplicationTopology
 {
 }
-    public double Latitude { get; init; }
-    public double Longitude { get; init; }
-    public double? Accuracy { get; init; }
+    public required string TopologyId { get; init; }
+    public required string TopologyName { get; init; }
+    public List<ReplicationPath> ReplicationPaths { get; init; };
+    public Dictionary<string, int> MinimumRegionalQuorum { get; init; };
+    public bool StrictTopology { get; init; }
 }
 ```
 ```csharp
-public sealed record FactorCollectionResult
+public sealed record ReplicationRequest
 {
 }
-    public required bool Success { get; init; }
-    public AttestationFactor? Factor { get; init; }
-    public string? ErrorMessage { get; init; }
+    public required string RequestId { get; init; }
+    public required string SourceRegion { get; init; }
+    public required string DestinationRegion { get; init; }
+    public required string DataClassification { get; init; }
+    public string? TopologyId { get; init; }
+    public int? RequiredQuorum { get; init; }
+    public int CurrentReplicaCount { get; init; }
 }
 ```
 ```csharp
-public sealed record AttestationVerificationResult
+public sealed record ReplicationValidationResult
+{
+}
+    public required bool IsAllowed { get; init; }
+    public required string RequestId { get; init; }
+    public List<ReplicationViolation> Violations { get; init; };
+    public List<string> Warnings { get; init; };
+    public List<string> CrossedBoundaries { get; init; };
+    public bool IsAuditOnly { get; init; }
+}
+```
+```csharp
+public sealed record ReplicationViolation
+{
+}
+    public required ReplicationViolationType ViolationType { get; init; }
+    public required string Description { get; init; }
+    public string? BoundaryId { get; init; }
+    public string? RuleId { get; init; }
+    public required ViolationSeverity Severity { get; init; }
+}
+```
+```csharp
+public sealed record TopologyValidationResult
 {
 }
     public required bool IsValid { get; init; }
-    public string? Reason { get; init; }
-    public NodeAttestation? Attestation { get; init; }
-    public string? VerifiedLocation { get; init; }
-    public double? Confidence { get; init; }
-    public DateTime? ExpiresAt { get; init; }
-    public DateTime? ExpiredAt { get; init; }
+    public string? TopologyId { get; init; }
+    public string? ErrorMessage { get; init; }
+    public List<TopologyIssue> Issues { get; init; };
 }
 ```
 ```csharp
-public sealed record AttestationPolicy
+public sealed record TopologyIssue
 {
 }
-    public required string PolicyId { get; init; }
-    public required string PolicyName { get; init; }
-    public int MinimumFactors { get; init; };
-    public double MinimumConfidence { get; init; };
-    public bool RequiresTpm { get; init; }
-    public bool RequiresSecureEnclave { get; init; }
-    public bool RequiresGps { get; init; }
-    public bool RequiresNetworkLocation { get; init; }
+    public required TopologyIssueType IssueType { get; init; }
+    public required string Description { get; init; }
+    public string? SourceNode { get; init; }
+    public string? DestinationNode { get; init; }
+    public required ViolationSeverity Severity { get; init; }
 }
 ```
 ```csharp
-public sealed record TrustAnchor
+public sealed record EmergencyIsolationResult
 {
 }
-    public required string AnchorId { get; init; }
-    public required string AnchorName { get; init; }
-    public List<AttestationFactorType> FactorTypes { get; init; };
-    public TrustLevel TrustLevel { get; init; }
-    public string? PublicKey { get; init; }
+    public required bool Success { get; init; }
+    public string? IsolationBoundaryId { get; init; }
+    public string? ErrorMessage { get; init; }
+    public List<string> AffectedTopologies { get; init; };
     public DateTime? ExpiresAt { get; init; }
 }
 ```
 ```csharp
-public sealed record TrustChainLink
-{
-}
-    public required string FactorId { get; init; }
-    public required AttestationFactorType FactorType { get; init; }
-    public required string TrustAnchorId { get; init; }
-    public TrustLevel TrustLevel { get; init; }
-    public bool Verified { get; init; }
-}
-```
-```csharp
-public sealed record AttestationStatistics
-{
-}
-    public int TotalAttestations { get; init; }
-    public int ValidAttestations { get; init; }
-    public int ExpiredAttestations { get; init; }
-    public double AverageConfidence { get; init; }
-    public Dictionary<string, int> AttestationsByLocation { get; init; };
-    public int ExpiringWithin24Hours { get; init; }
-}
-```
-```csharp
-public sealed record AttestationEvent
+public sealed record ReplicationFenceEvent
 {
 }
     public required string EventId { get; init; }
-    public required AttestationEventType EventType { get; init; }
-    public required string NodeId { get; init; }
-    public required string AttestationId { get; init; }
-    public required string Details { get; init; }
     public required DateTime Timestamp { get; init; }
+    public required string RequestId { get; init; }
+    public required string SourceRegion { get; init; }
+    public required string DestinationRegion { get; init; }
+    public required string DataClassification { get; init; }
+    public required bool WasAllowed { get; init; }
+    public int ViolationCount { get; init; }
+    public List<string> ViolationTypes { get; init; };
 }
 ```
 
@@ -2389,174 +4619,47 @@ public sealed record ChainVerificationResult
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Geofencing/CrossBorderExceptionsStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Geofencing/GeofencingStrategy.cs
 ```csharp
-public sealed class CrossBorderExceptionsStrategy : ComplianceStrategyBase
+public sealed class GeofencingStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Framework;;
     public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
-    public ExceptionRequestResult SubmitRequest(ExceptionRequest request);
-    public ExceptionRequestResult SubmitFromTemplate(string templateId, string sourceRegion, string destinationRegion, string requesterId, Dictionary<string, string>? parameters = null);
-    public ReviewResult ReviewRequest(string requestId, string reviewerId, ReviewDecision decision, string comments);
-    public ReviewResult LegalReview(string requestId, string legalReviewerId, ReviewDecision decision, string legalOpinion, List<string>? additionalConditions = null);
-    public ExceptionCheckResult CheckException(string sourceRegion, string destinationRegion, string dataClassification, string? resourceId = null);
-    public RevokeResult RevokeException(string exceptionId, string revokedBy, string reason);
-    public RenewalResult RenewException(string exceptionId, string requesterId, TimeSpan? newDuration = null);
-    public IReadOnlyList<GrantedExcep> GetActiveExceptions(string? sourceRegion = null, string? destinationRegion = null);
-    public IReadOnlyList<GrantedExcep> GetExpiringSoon(int daysAhead = 30);
-    public IReadOnlyList<ExceptionRequest> GetPendingRequests();
-    public IReadOnlyList<ExceptionAuditEntry> GetAuditLog(string? exceptionId = null, int count = 100);
+    public void DefineZone(GeofenceZone zone);
+    public void DefinePolicy(DataClassificationPolicy policy);
+    public void SetResidencyRequirement(string resourceId, IEnumerable<string> allowedRegions);
+    public bool IsInRegulatoryZone(string countryCode, string zoneName);
     protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
 }
 ```
 ```csharp
-public sealed record ExceptionRequest
+public record GeofenceZone
 {
 }
-    public string? RequestId { get; init; }
-    public required string SourceRegion { get; init; }
-    public required string DestinationRegion { get; init; }
-    public List<string> DataClassifications { get; init; };
-    public required string LegalBasis { get; init; }
-    public required string Justification { get; init; }
-    public TimeSpan RequestedDuration { get; init; }
-    public required string RequesterId { get; init; }
-    public List<string> SafeguardsInPlace { get; init; };
-    public List<string> Conditions { get; init; };
-    public string? TemplateId { get; init; }
-    public DateTime SubmittedAt { get; init; }
-    public ExceptionStatus Status { get; init; }
-    public int RequiredApprovals { get; init; }
-    public List<ExceptionApproval> Approvals { get; init; };
+    public required string Id { get; init; }
+    public required string Name { get; init; }
+    public List<string> Countries { get; init; };
+    public string? Description { get; init; }
 }
 ```
 ```csharp
-public sealed record ExceptionApproval
+public record DataClassificationPolicy
 {
 }
-    public required string ReviewerId { get; init; }
-    public required ReviewDecision Decision { get; init; }
-    public required string Comments { get; init; }
-    public required DateTime ReviewedAt { get; init; }
-    public bool IsLegalReview { get; init; }
-    public List<string> AdditionalConditions { get; init; };
-}
-```
-```csharp
-public sealed record GrantedExcep
-{
-}
-    public required string ExceptionId { get; init; }
-    public required string RequestId { get; init; }
-    public required string SourceRegion { get; init; }
-    public required string DestinationRegion { get; init; }
-    public List<string> DataClassifications { get; init; };
-    public required string LegalBasis { get; init; }
-    public required string Justification { get; init; }
-    public List<string> Conditions { get; init; };
-    public List<string> SafeguardsRequired { get; init; };
-    public List<string> ApplicableResources { get; init; };
-    public ExceptionStatus Status { get; init; }
-    public DateTime GrantedAt { get; init; }
-    public DateTime ExpiresAt { get; init; }
-    public int MaxRenewals { get; init; }
-    public int RenewalCount { get; init; }
-    public DateTime? LastRenewedAt { get; init; }
-    public string? LastRenewedBy { get; init; }
-    public DateTime? RevokedAt { get; init; }
-    public string? RevokedBy { get; init; }
-    public string? RevocationReason { get; init; }
-}
-```
-```csharp
-public sealed record ExceptionTemplate
-{
-}
-    public required string TemplateId { get; init; }
-    public required string TemplateName { get; init; }
-    public required string TemplateDescription { get; init; }
-    public required string DefaultLegalBasis { get; init; }
-    public List<string> AllowedClassifications { get; init; };
-    public List<string> RequiredSafeguards { get; init; };
-    public TimeSpan DefaultDuration { get; init; }
-    public bool RequiresLegalReview { get; init; }
-}
-```
-```csharp
-public sealed record ExceptionRequestResult
-{
-}
-    public required bool Success { get; init; }
-    public string? RequestId { get; init; }
-    public string? ErrorMessage { get; init; }
-    public int RequiredApprovals { get; init; }
-    public TimeSpan? EstimatedReviewTime { get; init; }
-}
-```
-```csharp
-public sealed record ReviewResult
-{
-}
-    public required bool Success { get; init; }
-    public string? RequestId { get; init; }
-    public string? ExceptionId { get; init; }
-    public string? ErrorMessage { get; init; }
-    public int CurrentApprovals { get; init; }
-    public int RequiredApprovals { get; init; }
-    public ExceptionStatus NewStatus { get; init; }
-    public DateTime? ExpiresAt { get; init; }
-    public string? Message { get; init; }
-}
-```
-```csharp
-public sealed record ExceptionCheckResult
-{
-}
-    public required bool HasException { get; init; }
-    public string? ExceptionId { get; init; }
-    public string? LegalBasis { get; init; }
-    public DateTime? ExpiresAt { get; init; }
-    public List<string> Conditions { get; init; };
-    public required string Message { get; init; }
-}
-```
-```csharp
-public sealed record RevokeResult
-{
-}
-    public required bool Success { get; init; }
-    public string? ExceptionId { get; init; }
-    public string? ErrorMessage { get; init; }
-    public DateTime? RevokedAt { get; init; }
-}
-```
-```csharp
-public sealed record RenewalResult
-{
-}
-    public required bool Success { get; init; }
-    public string? ExceptionId { get; init; }
-    public string? ErrorMessage { get; init; }
-    public DateTime? NewExpiryDate { get; init; }
-    public int RenewalCount { get; init; }
-    public int RemainingRenewals { get; init; }
-}
-```
-```csharp
-public sealed record ExceptionAuditEntry
-{
-}
-    public required string EntryId { get; init; }
-    public required string ExceptionId { get; init; }
-    public required AuditAction Action { get; init; }
-    public required string ActorId { get; init; }
-    public required string Details { get; init; }
-    public required DateTime Timestamp { get; init; }
+    public required string DataClassification { get; init; }
+    public List<string> AllowedRegions { get; init; };
+    public List<string> ProhibitedRegions { get; init; };
+    public List<string> RequiredRegulatoryZones { get; init; };
+    public List<string> ProhibitedRegulatoryZones { get; init; };
+    public bool AllowCrossBorderTransfer { get; init; }
+    public bool HasAdequacyDecision { get; init; }
+    public bool HasStandardContractualClauses { get; init; }
+    public List<string> RegulatoryReferences { get; init; };
 }
 ```
 
@@ -2653,1370 +4756,9 @@ public sealed record TagTemplate
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Geofencing/DynamicReconfigurationStrategy.cs
-```csharp
-public sealed class DynamicReconfigurationStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
-    public void RegisterNode(string nodeId, string location, string region, NodeType nodeType = NodeType.Storage);
-    public LocationChangeResult RequestLocationChange(LocationChangeRequest request);
-    public ApplyChangeResult ApplyLocationChange(string requestId);
-    public RollbackResult RollbackLocationChange(string requestId, string reason);
-    public NodeLocationRecord? GetNodeLocation(string nodeId);
-    public IReadOnlyList<NodeLocationRecord> GetNodesInRegion(string region);
-    public IReadOnlyList<LocationChangeRequest> GetPendingChanges();
-    public MigrationPlan? GetMigrationPlan(string requestId);
-    public void UpdateMigrationProgress(string requestId, MigrationProgress progress);
-    public void RegisterListener(IReconfigurationListener listener);
-    public IReadOnlyList<ReconfigurationEvent> GetEvents(int count = 100);
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-```csharp
-public sealed record NodeLocationRecord
-{
-}
-    public required string NodeId { get; init; }
-    public required string CurrentLocation { get; init; }
-    public required string CurrentRegion { get; init; }
-    public NodeType NodeType { get; init; }
-    public DateTime RegisteredAt { get; init; }
-    public DateTime LastVerifiedAt { get; init; }
-    public bool IsActive { get; init; }
-}
-```
-```csharp
-public sealed record LocationChangeRequest
-{
-}
-    public string? RequestId { get; init; }
-    public required string NodeId { get; init; }
-    public required string NewLocation { get; init; }
-    public required string NewRegion { get; init; }
-    public string? PreviousLocation { get; init; }
-    public string? PreviousRegion { get; init; }
-    public string? Reason { get; init; }
-    public TimeSpan? GracePeriod { get; init; }
-    public DateTime RequestedAt { get; init; }
-    public DateTime? AppliedAt { get; init; }
-    public DateTime? GracePeriodEnd { get; init; }
-    public ChangeStatus Status { get; init; }
-    public ComplianceImpactAssessment? ImpactAssessment { get; init; }
-    public bool IsRollback { get; init; }
-    public string? RollbackOfRequestId { get; init; }
-}
-```
-```csharp
-public sealed record ComplianceImpactAssessment
-{
-}
-    public ComplianceImpact ComplianceImpact { get; init; }
-    public bool HasBlockingIssues { get; init; }
-    public List<string> BlockingIssues { get; init; };
-    public List<string> Warnings { get; init; };
-    public bool RequiresMigration { get; init; }
-    public int AffectedDataCount { get; init; }
-}
-```
-```csharp
-public sealed record LocationChangeResult
-{
-}
-    public required bool Success { get; init; }
-    public string? RequestId { get; init; }
-    public string? ErrorMessage { get; init; }
-    public DateTime? GracePeriodEnd { get; init; }
-    public ComplianceImpactAssessment? ImpactAssessment { get; init; }
-    public string? MigrationPlanId { get; init; }
-}
-```
-```csharp
-public sealed record ApplyChangeResult
-{
-}
-    public required bool Success { get; init; }
-    public string? RequestId { get; init; }
-    public string? ErrorMessage { get; init; }
-    public DateTime? AppliedAt { get; init; }
-    public MigrationStatus? MigrationStatus { get; init; }
-}
-```
-```csharp
-public sealed record RollbackResult
-{
-}
-    public required bool Success { get; init; }
-    public string? OriginalRequestId { get; init; }
-    public string? RollbackRequestId { get; init; }
-    public string? ErrorMessage { get; init; }
-    public DateTime? RolledBackAt { get; init; }
-}
-```
-```csharp
-public sealed record MigrationPlan
-{
-}
-    public required string PlanId { get; init; }
-    public required string NodeId { get; init; }
-    public required string FromLocation { get; init; }
-    public required string FromRegion { get; init; }
-    public required string ToLocation { get; init; }
-    public required string ToRegion { get; init; }
-    public int EstimatedDataObjects { get; init; }
-    public MigrationStatus Status { get; init; }
-    public MigrationProgress? CurrentProgress { get; init; }
-    public DateTime CreatedAt { get; init; }
-    public DateTime? StartedAt { get; init; }
-    public DateTime? LastUpdated { get; init; }
-    public bool IsComplete { get; init; }
-}
-```
-```csharp
-public sealed record MigrationProgress
-{
-}
-    public int TotalObjects { get; init; }
-    public int MigratedObjects { get; init; }
-    public int FailedObjects { get; init; }
-    public double PercentComplete;;
-    public TimeSpan? EstimatedTimeRemaining { get; init; }
-}
-```
-```csharp
-public sealed record LocationChangeHistory
-{
-}
-    public required string RequestId { get; init; }
-    public required LocationChangeRequest ChangeRequest { get; init; }
-    public DateTime RecordedAt { get; init; }
-}
-```
-```csharp
-public sealed record ReconfigurationEvent
-{
-}
-    public required ReconfigurationEventType EventType { get; init; }
-    public required string NodeId { get; init; }
-    public string? PreviousLocation { get; init; }
-    public string? NewLocation { get; init; }
-    public string? PreviousRegion { get; init; }
-    public string? NewRegion { get; init; }
-    public DateTime Timestamp { get; init; }
-    public string? RequestId { get; init; }
-    public string? Reason { get; init; }
-}
-```
-```csharp
-public sealed record LocationChangeNotification
-{
-}
-    public required NotificationType NotificationType { get; init; }
-    public LocationChangeRequest? ChangeRequest { get; init; }
-    public MigrationPlan? MigrationPlan { get; init; }
-}
-```
-```csharp
-public interface IReconfigurationListener
-{
-}
-    void OnLocationChange(LocationChangeNotification notification);;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Geofencing/GeofencingStrategy.cs
-```csharp
-public sealed class GeofencingStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
-    public void DefineZone(GeofenceZone zone);
-    public void DefinePolicy(DataClassificationPolicy policy);
-    public void SetResidencyRequirement(string resourceId, IEnumerable<string> allowedRegions);
-    public bool IsInRegulatoryZone(string countryCode, string zoneName);
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-```csharp
-public record GeofenceZone
-{
-}
-    public required string Id { get; init; }
-    public required string Name { get; init; }
-    public List<string> Countries { get; init; };
-    public string? Description { get; init; }
-}
-```
-```csharp
-public record DataClassificationPolicy
-{
-}
-    public required string DataClassification { get; init; }
-    public List<string> AllowedRegions { get; init; };
-    public List<string> ProhibitedRegions { get; init; };
-    public List<string> RequiredRegulatoryZones { get; init; };
-    public List<string> ProhibitedRegulatoryZones { get; init; };
-    public bool AllowCrossBorderTransfer { get; init; }
-    public bool HasAdequacyDecision { get; init; }
-    public bool HasStandardContractualClauses { get; init; }
-    public List<string> RegulatoryReferences { get; init; };
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Geofencing/GeolocationServiceStrategy.cs
-```csharp
-public sealed class GeolocationServiceStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
-    public async Task<GeolocationResult> ResolveLocationAsync(string ipAddress, CancellationToken cancellationToken = default);
-    public async Task<LocationVerificationResult> VerifyNodeLocationAsync(string nodeId, string ipAddress, string claimedCountryCode, CancellationToken cancellationToken = default);
-    public async Task<IReadOnlyDictionary<string, GeolocationResult>> BatchResolveAsync(IEnumerable<string> ipAddresses, CancellationToken cancellationToken = default);
-    public void ClearCache();
-    public GeolocationCacheStats GetCacheStats();
-    protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override void Dispose(bool disposing);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-```csharp
-private sealed class CachedLocation
-{
-}
-    public required GeolocationResult Location { get; init; }
-    public required DateTime ExpiresAt { get; init; }
-}
-```
-```csharp
-public sealed record GeolocationResult
-{
-}
-    public required string IpAddress { get; init; }
-    public required string CountryCode { get; init; }
-    public string? CountryName { get; init; }
-    public string? Region { get; init; }
-    public string? City { get; init; }
-    public double? Latitude { get; init; }
-    public double? Longitude { get; init; }
-    public required double Confidence { get; init; }
-    public required string ProviderName { get; init; }
-    public required bool IsReliable { get; init; }
-    public IReadOnlyList<string> Errors { get; init; };
-}
-```
-```csharp
-public sealed record LocationVerificationResult
-{
-}
-    public required string NodeId { get; init; }
-    public required string IpAddress { get; init; }
-    public required string ClaimedLocation { get; init; }
-    public required string ResolvedLocation { get; init; }
-    public required bool IsValid { get; init; }
-    public required double Confidence { get; init; }
-    public required DateTime VerificationTime { get; init; }
-    public string? Discrepancy { get; init; }
-    public IReadOnlyList<string> Recommendations { get; init; };
-}
-```
-```csharp
-public sealed record GeolocationCacheStats
-{
-}
-    public int TotalEntries { get; init; }
-    public int ValidEntries { get; init; }
-    public int ExpiredEntries { get; init; }
-    public DateTime? OldestEntry { get; init; }
-    public DateTime? NewestEntry { get; init; }
-}
-```
-```csharp
-public interface IGeolocationProvider
-{
-}
-    string ProviderName { get; }
-    bool IsEnabled { get; set; }
-    Task<GeolocationResult?> LookupAsync(string ipAddress, CancellationToken cancellationToken = default);;
-    void Configure(Dictionary<string, object> configuration);;
-}
-```
-```csharp
-internal sealed class MaxMindProvider : IGeolocationProvider, IDisposable
-{
-}
-    public string ProviderName;;
-    public bool IsEnabled { get; set; };
-    public void Configure(Dictionary<string, object> configuration);
-    public Task<GeolocationResult?> LookupAsync(string ipAddress, CancellationToken cancellationToken = default);
-    public void Dispose();
-}
-```
-```csharp
-internal sealed class Ip2LocationProvider : IGeolocationProvider
-{
-}
-    public string ProviderName;;
-    public bool IsEnabled { get; set; };
-    public void Configure(Dictionary<string, object> configuration);
-    public Task<GeolocationResult?> LookupAsync(string ipAddress, CancellationToken cancellationToken = default);
-}
-```
-```csharp
-internal sealed class IpStackProvider : IGeolocationProvider
-{
-}
-    public string ProviderName;;
-    public bool IsEnabled { get; set; };
-    public void Configure(Dictionary<string, object> configuration);
-    public async Task<GeolocationResult?> LookupAsync(string ipAddress, CancellationToken cancellationToken = default);
-}
-```
-```csharp
-internal sealed class LocalDatabaseProvider : IGeolocationProvider
-{
-}
-    public string ProviderName;;
-    public bool IsEnabled { get; set; };
-    public void Configure(Dictionary<string, object> configuration);
-    public Task<GeolocationResult?> LookupAsync(string ipAddress, CancellationToken cancellationToken = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Geofencing/RegionRegistryStrategy.cs
-```csharp
-public sealed class RegionRegistryStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
-    public void RegisterRegion(RegionDefinition region);
-    public RegionDefinition? GetRegion(string regionCode);
-    public IReadOnlyList<RegionDefinition> GetRegionsForCountry(string countryCode);
-    public bool IsCountryInRegion(string countryCode, string regionCode);
-    public IReadOnlySet<string> GetCountriesInRegion(string regionCode);
-    public DataTransferAssessment AssessDataTransfer(string sourceCountry, string destCountry, string dataType);
-    public CountryInfo? GetCountryInfo(string countryCode);
-    public IReadOnlyCollection<RegionDefinition> GetAllRegions();;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-```csharp
-public sealed record RegionDefinition
-{
-}
-    public required string RegionCode { get; init; }
-    public required string RegionName { get; init; }
-    public RegionType RegionType { get; init; };
-    public List<string> MemberCountries { get; init; };
-    public List<string> ParentRegions { get; init; };
-    public List<string> ChildRegions { get; init; };
-    public List<string> RegulatoryFrameworks { get; init; };
-    public DateTime? ValidFrom { get; init; }
-    public DateTime? ValidUntil { get; init; }
-    public string? Notes { get; init; }
-}
-```
-```csharp
-public sealed record CountryInfo
-{
-}
-    public required string CountryCode { get; init; }
-    public required string CountryName { get; init; }
-    public string[] DataProtectionLaws { get; init; };
-    public bool HasAdequacyDecision { get; init; }
-    public bool RequiresLocalStorage { get; init; }
-}
-```
-```csharp
-public sealed record DataSharingAgreement
-{
-}
-    public required string AgreementId { get; init; }
-    public required string AgreementName { get; init; }
-    public List<string> ParticipatingEntities { get; init; };
-    public DateTime? EffectiveDate { get; init; }
-    public DateTime? ExpirationDate { get; init; }
-    public bool IsActive { get; init; }
-    public bool RequiresSafeguards { get; init; }
-    public string[] RequiredSafeguards { get; init; };
-    public List<string> CoveredDataTypes { get; init; };
-}
-```
-```csharp
-public sealed record DataTransferAssessment
-{
-}
-    public required bool IsAllowed { get; init; }
-    public required string Basis { get; init; }
-    public required bool RequiresAdditionalSafeguards { get; init; }
-    public string[]? SafeguardsRequired { get; init; }
-    public IReadOnlyList<string> ApplicableAgreements { get; init; };
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Geofencing/ReplicationFenceStrategy.cs
-```csharp
-public sealed class ReplicationFenceStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
-    public void RegisterTopology(ReplicationTopology topology);
-    public ReplicationValidationResult ValidateReplication(ReplicationRequest request);
-    public TopologyValidationResult ValidateTopology(string topologyId);
-    public EmergencyIsolationResult IsolateRegion(string region, string reason, string authorizedBy);
-    public bool RemoveEmergencyIsolation(string boundaryId, string authorizedBy);
-    public IReadOnlyList<SovereigntyBoundary> GetActiveBoundaries();
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-```csharp
-public sealed record SovereigntyBoundary
-{
-}
-    public required string BoundaryId { get; init; }
-    public required string BoundaryName { get; init; }
-    public List<string> IncludedRegions { get; init; };
-    public bool IsHardBoundary { get; init; }
-    public bool IsTemporary { get; init; }
-    public DateTime? ExpiresAt { get; init; }
-    public DateTime CreatedAt { get; init; };
-    public string? Reason { get; init; }
-    public string? AuthorizedBy { get; init; }
-}
-```
-```csharp
-public sealed record ReplicationFenceRule
-{
-}
-    public required string RuleId { get; init; }
-    public required string RuleName { get; init; }
-    public List<string> AppliesToClassifications { get; init; };
-    public List<ReplicationPath> AllowedPaths { get; init; };
-    public List<ReplicationPath> ProhibitedPaths { get; init; };
-    public List<ReplicationPath> WarnPaths { get; init; };
-    public ViolationSeverity Severity { get; init; };
-}
-```
-```csharp
-public sealed record ReplicationPath
-{
-}
-    public required string SourceRegion { get; init; }
-    public required string DestinationRegion { get; init; }
-    public string? SourceNode { get; init; }
-    public string? DestinationNode { get; init; }
-}
-```
-```csharp
-public sealed record ReplicationTopology
-{
-}
-    public required string TopologyId { get; init; }
-    public required string TopologyName { get; init; }
-    public List<ReplicationPath> ReplicationPaths { get; init; };
-    public Dictionary<string, int> MinimumRegionalQuorum { get; init; };
-    public bool StrictTopology { get; init; }
-}
-```
-```csharp
-public sealed record ReplicationRequest
-{
-}
-    public required string RequestId { get; init; }
-    public required string SourceRegion { get; init; }
-    public required string DestinationRegion { get; init; }
-    public required string DataClassification { get; init; }
-    public string? TopologyId { get; init; }
-    public int? RequiredQuorum { get; init; }
-    public int CurrentReplicaCount { get; init; }
-}
-```
-```csharp
-public sealed record ReplicationValidationResult
-{
-}
-    public required bool IsAllowed { get; init; }
-    public required string RequestId { get; init; }
-    public List<ReplicationViolation> Violations { get; init; };
-    public List<string> Warnings { get; init; };
-    public List<string> CrossedBoundaries { get; init; };
-    public bool IsAuditOnly { get; init; }
-}
-```
-```csharp
-public sealed record ReplicationViolation
-{
-}
-    public required ReplicationViolationType ViolationType { get; init; }
-    public required string Description { get; init; }
-    public string? BoundaryId { get; init; }
-    public string? RuleId { get; init; }
-    public required ViolationSeverity Severity { get; init; }
-}
-```
-```csharp
-public sealed record TopologyValidationResult
-{
-}
-    public required bool IsValid { get; init; }
-    public string? TopologyId { get; init; }
-    public string? ErrorMessage { get; init; }
-    public List<TopologyIssue> Issues { get; init; };
-}
-```
-```csharp
-public sealed record TopologyIssue
-{
-}
-    public required TopologyIssueType IssueType { get; init; }
-    public required string Description { get; init; }
-    public string? SourceNode { get; init; }
-    public string? DestinationNode { get; init; }
-    public required ViolationSeverity Severity { get; init; }
-}
-```
-```csharp
-public sealed record EmergencyIsolationResult
-{
-}
-    public required bool Success { get; init; }
-    public string? IsolationBoundaryId { get; init; }
-    public string? ErrorMessage { get; init; }
-    public List<string> AffectedTopologies { get; init; };
-    public DateTime? ExpiresAt { get; init; }
-}
-```
-```csharp
-public sealed record ReplicationFenceEvent
-{
-}
-    public required string EventId { get; init; }
-    public required DateTime Timestamp { get; init; }
-    public required string RequestId { get; init; }
-    public required string SourceRegion { get; init; }
-    public required string DestinationRegion { get; init; }
-    public required string DataClassification { get; init; }
-    public required bool WasAllowed { get; init; }
-    public int ViolationCount { get; init; }
-    public List<string> ViolationTypes { get; init; };
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Geofencing/SovereigntyClassificationStrategy.cs
-```csharp
-public sealed class SovereigntyClassificationStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
-    public async Task<SovereigntyClassification> ClassifyDataAsync(ClassificationInput input, CancellationToken cancellationToken = default);
-    public async Task<IReadOnlyList<SovereigntyClassification>> BatchClassifyAsync(IEnumerable<ClassificationInput> inputs, CancellationToken cancellationToken = default);
-    public void ClearCache();
-    public ClassificationCacheStats GetCacheStats();
-    protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-```csharp
-private sealed class ClassificationCache
-{
-}
-    public required SovereigntyClassification Classification { get; init; }
-    public required DateTime ExpiresAt { get; init; }
-}
-```
-```csharp
-public sealed record ClassificationInput
-{
-}
-    public required string ResourceId { get; init; }
-    public string? SourceIp { get; init; }
-    public string? StorageLocation { get; init; }
-    public string? UserJurisdiction { get; init; }
-    public string? ExplicitJurisdiction { get; init; }
-    public string? DataContent { get; init; }
-}
-```
-```csharp
-public sealed record SovereigntyClassification
-{
-}
-    public required string ResourceId { get; init; }
-    public required string PrimaryJurisdiction { get; init; }
-    public required IReadOnlyList<string> ApplicableRegulations { get; init; }
-    public required DataSensitivity DataSensitivity { get; init; }
-    public required double ClassificationConfidence { get; init; }
-    public required ClassificationSource ClassificationSource { get; init; }
-    public required DateTime ClassifiedAt { get; init; }
-    public required IReadOnlyList<ClassificationSignal> Signals { get; init; }
-}
-```
-```csharp
-public sealed record ClassificationSignal
-{
-}
-    public required ClassificationSource Source { get; init; }
-    public required string Jurisdiction { get; init; }
-    public required double Confidence { get; init; }
-    public required string Reason { get; init; }
-}
-```
-```csharp
-public sealed record ClassificationCacheStats
-{
-}
-    public int TotalEntries { get; init; }
-    public int ValidEntries { get; init; }
-    public int ExpiredEntries { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Geofencing/WriteInterceptionStrategy.cs
-```csharp
-public sealed class WriteInterceptionStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
-    public void RegisterStorageNode(StorageNodeInfo node);
-    public bool UnregisterStorageNode(string nodeId);
-    public WriteInterceptionResult ValidateWrite(WriteRequest request);
-    public async Task<IReadOnlyList<WriteInterceptionResult>> ValidateWriteBatchAsync(IEnumerable<WriteRequest> requests, CancellationToken cancellationToken = default);
-    public IReadOnlyList<StorageNodeInfo> FindCompliantNodes(string dataClassification, long requiredCapacity);
-    public StorageNodeInfo? GetNodeInfo(string nodeId);
-    public IReadOnlyCollection<StorageNodeInfo> GetAllNodes();
-    public WriteInterceptionStats? GetNodeStats(string nodeId);
-    public AggregatedWriteStats GetAggregatedStats();
-    public IReadOnlyList<WriteInterceptionEvent> GetRecentEvents(int count = 100);
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-```csharp
-public sealed record StorageNodeInfo
-{
-}
-    public required string NodeId { get; init; }
-    public required string Location { get; init; }
-    public string? Region { get; init; }
-    public bool IsActive { get; init; }
-    public bool AcceptingWrites { get; init; }
-    public long AvailableCapacityBytes { get; init; }
-    public double CurrentLoad { get; init; }
-    public bool SupportsEncryptionAtRest { get; init; }
-    public int NodeTier { get; init; }
-    public List<string> Certifications { get; init; };
-    public DateTime LastVerifiedAt { get; init; }
-}
-```
-```csharp
-public sealed record WritePolicy
-{
-}
-    public required string PolicyId { get; init; }
-    public required string PolicyName { get; init; }
-    public List<string> AllowedRegions { get; init; };
-    public List<string> ProhibitedRegions { get; init; };
-    public bool RequiresEncryption { get; init; }
-    public List<string> RequiredCertifications { get; init; };
-    public int? MinimumNodeTier { get; init; }
-}
-```
-```csharp
-public sealed record WriteRequest
-{
-}
-    public required string RequestId { get; init; }
-    public required string TargetNodeId { get; init; }
-    public required string DataClassification { get; init; }
-    public long RequiredCapacity { get; init; }
-    public SovereigntyRequirements? SovereigntyRequirements { get; init; }
-    public string? RequesterId { get; init; }
-}
-```
-```csharp
-public sealed record SovereigntyRequirements
-{
-}
-    public List<string> RequiredRegions { get; init; };
-    public List<string> ProhibitedRegions { get; init; };
-    public bool RequiresEncryption { get; init; }
-}
-```
-```csharp
-public sealed record WriteInterceptionResult
-{
-}
-    public required bool IsAllowed { get; init; }
-    public required string RequestId { get; init; }
-    public required string TargetNodeId { get; init; }
-    public string? RejectionReason { get; init; }
-    public double ValidationTimeMs { get; init; }
-    public string? PolicyApplied { get; init; }
-    public IReadOnlyList<StorageNodeInfo>? SuggestedNodes { get; init; }
-    public DateTime? ApprovedAt { get; init; }
-    public DateTime? RejectedAt { get; init; }
-    public bool IsAuditOnly { get; init; }
-}
-```
-```csharp
-public sealed class WriteInterceptionStats
-{
-}
-    public required string NodeId { get; init; }
-    public long TotalWritesValidated;
-    public long WritesApproved;
-    public long WritesRejected;
-    public double AverageValidationTimeMs { get; set; }
-}
-```
-```csharp
-public sealed record AggregatedWriteStats
-{
-}
-    public long TotalWritesValidated { get; init; }
-    public long TotalWritesApproved { get; init; }
-    public long TotalWritesRejected { get; init; }
-    public double AverageValidationTimeMs { get; init; }
-    public int NodeCount { get; init; }
-    public int ActiveNodeCount { get; init; }
-}
-```
-```csharp
-public sealed record WriteInterceptionEvent
-{
-}
-    public required string EventId { get; init; }
-    public required DateTime Timestamp { get; init; }
-    public required string RequestId { get; init; }
-    public required string TargetNodeId { get; init; }
-    public required string DataClassification { get; init; }
-    public required string Action { get; init; }
-    public string? Reason { get; init; }
-    public double ValidationTimeMs { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Industry/HitrustStrategy.cs
-```csharp
-public sealed class HitrustStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Industry/MasStrategy.cs
-```csharp
-public sealed class MasStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Industry/NercCipStrategy.cs
-```csharp
-public sealed class NercCipStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Industry/NydfsStrategy.cs
-```csharp
-public sealed class NydfsStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Industry/Soc1Strategy.cs
-```csharp
-public sealed class Soc1Strategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Industry/Soc3Strategy.cs
-```csharp
-public sealed class Soc3Strategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Industry/SwiftCscfStrategy.cs
-```csharp
-public sealed class SwiftCscfStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Innovation/AiAssistedAuditStrategy.cs
-```csharp
-public sealed class AiAssistedAuditStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Innovation/AutomatedDsarStrategy.cs
-```csharp
-public sealed class AutomatedDsarStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Innovation/BlockchainAuditTrailStrategy.cs
-```csharp
-public sealed class BlockchainAuditTrailStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Innovation/ComplianceAsCodeStrategy.cs
-```csharp
-public sealed class ComplianceAsCodeStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Innovation/CrossBorderDataFlowStrategy.cs
-```csharp
-public sealed class CrossBorderDataFlowStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Innovation/DigitalTwinComplianceStrategy.cs
-```csharp
-public sealed class DigitalTwinComplianceStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Innovation/NaturalLanguagePolicyStrategy.cs
-```csharp
-public sealed class NaturalLanguagePolicyStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Innovation/PredictiveComplianceStrategy.cs
-```csharp
-public sealed class PredictiveComplianceStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Innovation/PrivacyPreservingAuditStrategy.cs
-```csharp
-public sealed class PrivacyPreservingAuditStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Innovation/QuantumProofAuditStrategy.cs
-```csharp
-public sealed class QuantumProofAuditStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Innovation/RealTimeComplianceStrategy.cs
-```csharp
-public sealed class RealTimeComplianceStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Innovation/RegTechIntegrationStrategy.cs
-```csharp
-public sealed class RegTechIntegrationStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Innovation/SelfHealingComplianceStrategy.cs
-```csharp
-public sealed class SelfHealingComplianceStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Innovation/SmartContractComplianceStrategy.cs
-```csharp
-public sealed class SmartContractComplianceStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Innovation/UnifiedComplianceOntologyStrategy.cs
-```csharp
-public sealed class UnifiedComplianceOntologyStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Innovation/ZeroTrustComplianceStrategy.cs
-```csharp
-public sealed class ZeroTrustComplianceStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/ISO/Iso22301Strategy.cs
-```csharp
-public sealed class Iso22301Strategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/ISO/Iso27001Strategy.cs
-```csharp
-public sealed class Iso27001Strategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/ISO/Iso27002Strategy.cs
-```csharp
-public sealed class Iso27002Strategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/ISO/Iso27017Strategy.cs
-```csharp
-public sealed class Iso27017Strategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/ISO/Iso27018Strategy.cs
-```csharp
-public sealed class Iso27018Strategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/ISO/Iso27701Strategy.cs
-```csharp
-public sealed class Iso27701Strategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/ISO/Iso31000Strategy.cs
-```csharp
-public sealed class Iso31000Strategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/ISO/Iso42001Strategy.cs
-```csharp
-public sealed class Iso42001Strategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/MiddleEastAfrica/AdgmStrategy.cs
-```csharp
-public sealed class AdgmStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/MiddleEastAfrica/BahrainPdpStrategy.cs
-```csharp
-public sealed class BahrainPdpStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/MiddleEastAfrica/DipdStrategy.cs
-```csharp
-public sealed class DipdStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/MiddleEastAfrica/EgyptPdpStrategy.cs
-```csharp
-public sealed class EgyptPdpStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/MiddleEastAfrica/KdpaStrategy.cs
-```csharp
-public sealed class KdpaStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/MiddleEastAfrica/NdprStrategy.cs
-```csharp
-public sealed class NdprStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/MiddleEastAfrica/PdplSaStrategy.cs
-```csharp
-public sealed class PdplSaStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/MiddleEastAfrica/PopiaStrategy.cs
-```csharp
-public sealed class PopiaStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/MiddleEastAfrica/QatarPdplStrategy.cs
-```csharp
-public sealed class QatarPdplStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/NIST/Nist800171Strategy.cs
-```csharp
-public sealed class Nist800171Strategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/NIST/Nist800172Strategy.cs
 ```csharp
 public sealed class Nist800172Strategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/NIST/Nist80053Strategy.cs
-```csharp
-public sealed class Nist80053Strategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -4056,6 +4798,34 @@ public sealed class NistCsfStrategy : ComplianceStrategyBase
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/NIST/Nist800171Strategy.cs
+```csharp
+public sealed class Nist800171Strategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/NIST/Nist80053Strategy.cs
+```csharp
+public sealed class Nist80053Strategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/NIST/NistPrivacyStrategy.cs
 ```csharp
 public sealed class NistPrivacyStrategy : ComplianceStrategyBase
@@ -4070,488 +4840,499 @@ public sealed class NistPrivacyStrategy : ComplianceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Passport/CrossBorderTransferProtocolStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Privacy/PiiDetectionMaskingStrategy.cs
 ```csharp
-public sealed class CrossBorderTransferProtocolStrategy : ComplianceStrategyBase, ICrossBorderProtocol
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    public Task<TransferAgreementRecord> NegotiateTransferAsync(string sourceJurisdiction, string destJurisdiction, CompliancePassport passport, CancellationToken ct);
-    public Task<TransferDecision> EvaluateTransferAsync(string transferId, CancellationToken ct);
-    public Task LogTransferAsync(CrossBorderTransferLog log, CancellationToken ct);
-    public Task<IReadOnlyList<CrossBorderTransferLog>> GetTransferHistoryAsync(string objectId, int limit, CancellationToken ct);
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    internal sealed record TransferNegotiation;
-    internal enum NegotiationStatus;
-}
-```
-```csharp
-private static class AdequacyDecisionRegistry
-{
-}
-    public static bool IsAdequate(string fromJurisdiction, string toJurisdiction);
-}
-```
-```csharp
-internal sealed record TransferNegotiation
-{
-}
-    public required string NegotiationId { get; init; }
-    public required string SourceJurisdiction { get; init; }
-    public required string DestinationJurisdiction { get; init; }
-    public required DateTimeOffset RequestedAt { get; init; }
-    public required NegotiationStatus Status { get; init; }
-    public required IReadOnlyList<string> LegalBasisOptions { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Passport/PassportAuditStrategy.cs
-```csharp
-public sealed class PassportAuditStrategy : ComplianceStrategyBase
-{
-}
-    public const string PassportIssued = "PassportIssued";
-    public const string PassportVerified = "PassportVerified";
-    public const string PassportRenewed = "PassportRenewed";
-    public const string PassportRevoked = "PassportRevoked";
-    public const string PassportSuspended = "PassportSuspended";
-    public const string PassportReinstated = "PassportReinstated";
-    public const string PassportExpired = "PassportExpired";
-    public const string ZoneEnforcementDecision = "ZoneEnforcementDecision";
-    public const string CrossBorderTransferRequested = "CrossBorderTransferRequested";
-    public const string CrossBorderTransferApproved = "CrossBorderTransferApproved";
-    public const string CrossBorderTransferDenied = "CrossBorderTransferDenied";
-    public const string AgreementCreated = "AgreementCreated";
-    public const string AgreementExpired = "AgreementExpired";
-    public const string AgreementRevoked = "AgreementRevoked";
-    public const string ZkProofGenerated = "ZkProofGenerated";
-    public const string ZkProofVerified = "ZkProofVerified";
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    public Task LogEventAsync(PassportAuditEvent evt, CancellationToken ct = default);
-    public Task<IReadOnlyList<PassportAuditEvent>> GetPassportAuditTrailAsync(string passportId, CancellationToken ct = default);
-    public Task<IReadOnlyList<PassportAuditEvent>> GetAuditTrailByTimeRangeAsync(DateTimeOffset start, DateTimeOffset end, CancellationToken ct = default);
-    public Task<IReadOnlyList<PassportAuditEvent>> GetAuditTrailByTypeAsync(string eventType, int limit = 100, CancellationToken ct = default);
-    public Task<PassportAuditReport> GenerateAuditReportAsync(DateTimeOffset start, DateTimeOffset end, CancellationToken ct = default);
-    public Task LogPassportIssuedAsync(CompliancePassport passport, string actorId, CancellationToken ct = default);
-    public Task LogPassportVerifiedAsync(string passportId, string objectId, bool isValid, CancellationToken ct = default);
-    public Task LogEnforcementDecisionAsync(string passportId, string objectId, string sourceZone, string destZone, ZoneAction decision, CancellationToken ct = default);
-    public Task LogCrossBorderTransferAsync(string passportId, string objectId, string sourceJurisdiction, string destJurisdiction, TransferDecision decision, CancellationToken ct = default);
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-}
-```
-```csharp
-public sealed record PassportAuditEvent
-{
-}
-    public required string EventId { get; init; }
-    public required string EventType { get; init; }
-    public required string PassportId { get; init; }
-    public required string ObjectId { get; init; }
-    public string? ActorId { get; init; }
-    public required DateTimeOffset Timestamp { get; init; }
-    public IReadOnlyDictionary<string, object>? Details { get; init; }
-    public string? SourceJurisdiction { get; init; }
-    public string? DestinationJurisdiction { get; init; }
-    public string? Decision { get; init; }
-    public string? Reason { get; init; }
-}
-```
-```csharp
-public sealed record PassportAuditReport
-{
-}
-    public required string ReportId { get; init; }
-    public required DateTimeOffset StartDate { get; init; }
-    public required DateTimeOffset EndDate { get; init; }
-    public int TotalEvents { get; init; }
-    public IReadOnlyDictionary<string, int> EventsByType { get; init; };
-    public int PassportsIssued { get; init; }
-    public int PassportsRevoked { get; init; }
-    public int PassportsExpired { get; init; }
-    public int TransfersApproved { get; init; }
-    public int TransfersDenied { get; init; }
-    public IReadOnlyDictionary<string, int> EnforcementDecisions { get; init; };
-    public IReadOnlyDictionary<string, int> TopObjectsByEvents { get; init; };
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Passport/PassportIssuanceStrategy.cs
-```csharp
-public sealed class PassportIssuanceStrategy : ComplianceStrategyBase
+public sealed class PiiDetectionMaskingStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Framework;;
     public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
-    public Task<CompliancePassport> IssuePassportAsync(string objectId, IReadOnlyList<string> regulationIds, ComplianceContext context, CancellationToken ct = default);
-    public Task<CompliancePassport> RenewPassportAsync(CompliancePassport existing, CancellationToken ct = default);
-    public bool VerifySignature(CompliancePassport passport);
-    public CompliancePassport? GetCachedPassport(string objectId);
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Passport/PassportLifecycleStrategy.cs
-```csharp
-public sealed class PassportLifecycleStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    public Task<PassportRegistryEntry> RegisterPassportAsync(CompliancePassport passport, CancellationToken ct = default);
-    public Task<PassportRegistryEntry?> RevokePassportAsync(string passportId, PassportRevocationReason reason, string revokedBy, CancellationToken ct = default);
-    public Task<PassportRegistryEntry?> SuspendPassportAsync(string passportId, string reason, CancellationToken ct = default);
-    public Task<PassportRegistryEntry?> ReinstatePassportAsync(string passportId, CancellationToken ct = default);
-    public Task<IReadOnlyList<PassportRegistryEntry>> GetExpiredPassportsAsync(CancellationToken ct = default);
-    public Task<IReadOnlyList<PassportStatusChange>> GetPassportHistoryAsync(string passportId, CancellationToken ct = default);
-    public PassportRegistryEntry? GetRegistryEntry(string passportId);
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    public sealed record PassportStatusChange;
-    public sealed record PassportRegistryEntry;
-}
-```
-```csharp
-public sealed record PassportStatusChange
-{
-}
-    public required PassportStatus? OldStatus { get; init; }
-    public required PassportStatus NewStatus { get; init; }
-    public required string Reason { get; init; }
-    public required string ChangedBy { get; init; }
-    public required DateTimeOffset Timestamp { get; init; }
-}
-```
-```csharp
-public sealed record PassportRegistryEntry
-{
-}
-    public required string PassportId { get; init; }
-    public required string ObjectId { get; init; }
-    public required PassportStatus Status { get; init; }
-    public required DateTimeOffset IssuedAt { get; init; }
-    public required DateTimeOffset ExpiresAt { get; init; }
-    public PassportRevocationReason? RevocationReason { get; init; }
-    public string? SuspensionReason { get; init; }
-    public required List<PassportStatusChange> History { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Passport/PassportTagIntegrationStrategy.cs
-```csharp
-public sealed class PassportTagIntegrationStrategy : ComplianceStrategyBase
-{
-}
-    public const string TagPrefix = "compliance.passport.";
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    public IReadOnlyDictionary<string, object> PassportToTags(CompliancePassport passport);
-    public CompliancePassport? TagsToPassport(IReadOnlyDictionary<string, object> tags);
-    public IReadOnlyDictionary<string, object> GetPassportTagsForObject(string objectId);
-    public void SetPassportTagsForObject(string objectId, CompliancePassport passport);
-    public bool RemovePassportTagsForObject(string objectId);
-    public IReadOnlyList<string> FindObjectsByRegulation(string regulationId);
-    public IReadOnlyList<string> FindObjectsByStatus(PassportStatus status);
-    public IReadOnlyList<string> FindObjectsExpiringSoon(TimeSpan within);
-    public IReadOnlyList<string> FindNonCompliantObjects();
-    public int CachedObjectCount;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Passport/PassportVerificationApiStrategy.cs
-```csharp
-public sealed class PassportVerificationApiStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
-    public Task<PassportVerificationResult> VerifyPassportAsync(CompliancePassport passport, CancellationToken ct = default);
-    public async Task<PassportVerificationResult> VerifyPassportForZoneAsync(CompliancePassport passport, string zoneId, IReadOnlyList<string> zoneRegulations, CancellationToken ct = default);
-    public async Task<PassportVerificationResult> VerifyPassportChainAsync(IReadOnlyList<CompliancePassport> passportChain, CancellationToken ct = default);
-    public VerificationStatistics GetVerificationStatistics();
-    protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-}
-```
-```csharp
-public sealed record VerificationStatistics
-{
-}
-    public long TotalVerifications { get; init; }
-    public long ValidVerifications { get; init; }
-    public long InvalidVerifications { get; init; }
-    public IReadOnlyDictionary<string, long> FailureReasonCounts { get; init; };
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Passport/TransferAgreementManagerStrategy.cs
-```csharp
-public sealed class TransferAgreementManagerStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
-    public Task<TransferAgreementRecord> CreateAgreementAsync(string sourceJurisdiction, string destJurisdiction, string legalBasis, IReadOnlyList<string> conditions, TimeSpan validity, CancellationToken ct = default);
-    public Task<TransferAgreementRecord> RenewAgreementAsync(string agreementId, TimeSpan extension, CancellationToken ct = default);
-    public Task RevokeAgreementAsync(string agreementId, string reason, CancellationToken ct = default);
-    public Task<TransferAgreementRecord?> GetAgreementAsync(string sourceJurisdiction, string destJurisdiction, CancellationToken ct = default);
-    public Task<IReadOnlyList<TransferAgreementRecord>> GetAllAgreementsAsync(CancellationToken ct = default);
-    public Task<IReadOnlyList<TransferAgreementRecord>> GetExpiredAgreementsAsync(CancellationToken ct = default);
-    public Task<bool> ValidateAgreementAsync(string agreementId, CancellationToken ct = default);
-    public AgreementManagerStatistics GetAgreementStatistics();
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    public IReadOnlyList<AgreementAuditEntry> GetAuditTrail(string agreementId);
-    public sealed record AgreementAuditEntry;
-    public sealed class AgreementManagerStatistics;
-}
-```
-```csharp
-public sealed record AgreementAuditEntry
-{
-}
-    public required string AuditId { get; init; }
-    public required string AgreementId { get; init; }
-    public required string Action { get; init; }
-    public required string Details { get; init; }
-    public required DateTimeOffset Timestamp { get; init; }
-}
-```
-```csharp
-public sealed class AgreementManagerStatistics
-{
-}
-    public long AgreementsCreated { get; init; }
-    public long AgreementsRenewed { get; init; }
-    public long AgreementsRevoked { get; init; }
-    public long AgreementsExpired { get; init; }
-    public int TotalActiveAgreements { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Passport/ZeroKnowledgePassportVerificationStrategy.cs
-```csharp
-public sealed class ZeroKnowledgePassportVerificationStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
-    public Task<ZkPassportProof> GenerateProofAsync(CompliancePassport passport, string claim, CancellationToken ct = default);
-    public Task<ZkVerificationResult> VerifyProofAsync(ZkPassportProof proof, CancellationToken ct = default);
-    public async Task<IReadOnlyList<ZkPassportProof>> GenerateBatchProofsAsync(CompliancePassport passport, IReadOnlyList<string> claims, CancellationToken ct = default);
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-}
-```
-```csharp
-public sealed record ZkPassportProof
-{
-}
-    public required string ProofId { get; init; }
-    public required string PassportId { get; init; }
-    public required string Claim { get; init; }
-    public required byte[] Commitment { get; init; }
-    public required byte[] Challenge { get; init; }
-    public required byte[] Response { get; init; }
-    public DateTimeOffset GeneratedAt { get; init; }
-    public DateTimeOffset ExpiresAt { get; init; }
-    public required byte[] Nonce { get; init; }
-    public long TimestampTicks { get; init; }
-}
-```
-```csharp
-public sealed record ZkVerificationResult
-{
-}
-    public required bool IsValid { get; init; }
-    public required string Claim { get; init; }
-    public string? FailureReason { get; init; }
-    public DateTimeOffset VerifiedAt { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Privacy/ConsentManagementStrategy.cs
-```csharp
-public sealed class ConsentManagementStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
-    public void RegisterPurpose(ConsentPurpose purpose);
-    public ConsentRecordResult RecordConsent(ConsentRequest request);
-    public ConsentRecordResult ConfirmDoubleOptIn(string pendingConsentId, string confirmationToken);
-    public WithdrawConsentResult WithdrawConsent(string subjectId, string purposeId, string? reason = null);
-    public ConsentCheckResult CheckConsent(string subjectId, string purposeId);
-    public IReadOnlyList<ConsentRecord> GetConsentHistory(string subjectId, string? purposeId = null);
-    public ConsentPreference? GetPreferences(string subjectId);
-    public IReadOnlyList<ConsentRecord> GetExpiringSoon(int daysAhead = 30);
-    public ConsentExport ExportConsentProof(string subjectId);
-    public IReadOnlyList<ConsentPurpose> GetPurposes();
-    public IReadOnlyList<ConsentAuditEntry> GetAuditLog(string? subjectId = null, int count = 100);
+    public void RegisterDetector(PiiDetector detector);
+    public void RegisterMaskingProfile(MaskingProfile profile);
+    public PiiScanResult ScanForPii(string text, PiiScanOptions? options = null);
+    public PiiMaskResult ScanAndMask(string text, string? maskingProfileId = null, PiiScanOptions? options = null);
+    public StructuredPiiScanResult ScanStructuredData(Dictionary<string, object> data, PiiScanOptions? options = null);
+    public IReadOnlyList<PiiDetector> GetDetectors();
+    public IReadOnlyList<PiiDetectionAuditEntry> GetAuditLog(int count = 100);
     protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
 }
 ```
 ```csharp
-public sealed record ConsentPurpose
+public sealed class PiiDetector
 {
 }
-    public required string PurposeId { get; init; }
+    public required string DetectorId { get; init; }
+    public required string PiiType { get; init; }
+    public required PiiCategory Category { get; init; }
+    public required Regex Pattern { get; init; }
+    public double BaseConfidence { get; init; };
+    public PiiSensitivityLevel SensitivityLevel { get; init; };
+    public Func<string, bool>? Validator { get; init; }
+    public int? ExpectedMinLength { get; init; }
+    public int? ExpectedMaxLength { get; init; }
+    public bool Enabled { get; init; };
+}
+```
+```csharp
+public sealed record MaskingProfile
+{
+}
+    public required string ProfileId { get; init; }
     public required string Name { get; init; }
-    public required string Description { get; init; }
-    public required string LegalBasis { get; init; }
-    public bool IsEssential { get; init; }
-    public bool RequiresExplicitConsent { get; init; }
-    public bool RequiresDoubleOptIn { get; init; }
-    public bool AllowsOptOut { get; init; }
-    public string? CurrentVersionId { get; init; }
-    public string[]? DependsOnPurposes { get; init; }
+    public string? Description { get; init; }
+    public required MaskingRule DefaultRule { get; init; }
+    public MaskingRule[] Rules { get; init; };
+    public MaskingRule? GetRule(string piiType);
 }
 ```
 ```csharp
-public sealed record ConsentRecord
+public sealed record MaskingRule
 {
 }
-    public required string ConsentId { get; init; }
-    public required string SubjectId { get; init; }
-    public required string PurposeId { get; init; }
-    public required ConsentStatus Status { get; init; }
-    public bool ConsentGiven { get; init; }
-    public string? VersionId { get; init; }
+    public required string RuleId { get; init; }
+    public string? PiiType { get; init; }
+    public required MaskingType MaskingType { get; init; }
+    public char MaskCharacter { get; init; };
+    public int? KeepFirst { get; init; }
+    public int? KeepLast { get; init; }
+    public string? RedactionText { get; init; }
+}
+```
+```csharp
+public sealed record PiiScanOptions
+{
+}
+    public PiiSensitivityLevel SensitivityLevel { get; init; };
+    public double MinConfidence { get; init; };
+    public bool IncludeContextualAnalysis { get; init; };
+    public string[]? PiiTypesToInclude { get; init; }
+    public string[]? PiiTypesToExclude { get; init; }
+}
+```
+```csharp
+public sealed record PiiDetection
+{
+}
+    public required string DetectionId { get; init; }
+    public required string PiiType { get; init; }
+    public required PiiCategory Category { get; init; }
+    public required string Value { get; init; }
+    public required int StartIndex { get; init; }
+    public required int EndIndex { get; init; }
+    public required double Confidence { get; init; }
+    public required string DetectorId { get; init; }
+    public bool? IsValidFormat { get; init; }
+    public bool HasContextualSupport { get; init; }
+    public string? FieldName { get; init; }
+}
+```
+```csharp
+public sealed record PiiScanResult
+{
+}
+    public required bool Success { get; init; }
+    public required string ScanId { get; init; }
+    public int TextLength { get; init; }
+    public required IReadOnlyList<PiiDetection> Detections { get; init; }
+    public bool PiiFound { get; init; }
+    public Dictionary<PiiCategory, int>? CategorySummary { get; init; }
+    public PiiRiskLevel HighestRiskLevel { get; init; }
+    public DateTime ScannedAt { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+```
+```csharp
+public sealed record PiiMaskResult
+{
+}
+    public required bool Success { get; init; }
+    public string? OriginalText { get; init; }
+    public required string MaskedText { get; init; }
+    public bool PiiFound { get; init; }
+    public int MaskingsApplied { get; init; }
+    public IReadOnlyList<MaskingDetail>? MaskingDetails { get; init; }
+    public PiiScanResult? ScanResult { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+```
+```csharp
+public sealed record MaskingDetail
+{
+}
+    public required string PiiType { get; init; }
+    public int OriginalLength { get; init; }
+    public int MaskedLength { get; init; }
+    public required string MaskingRule { get; init; }
+}
+```
+```csharp
+public sealed record StructuredPiiScanResult
+{
+}
+    public required bool Success { get; init; }
+    public int FieldsScanned { get; init; }
+    public required Dictionary<string, PiiScanResult> FieldResults { get; init; }
+    public int TotalDetections { get; init; }
+    public required IReadOnlyList<PiiDetection> AllDetections { get; init; }
+    public required IReadOnlyList<string> HighRiskFields { get; init; }
+}
+```
+```csharp
+public sealed record PiiDetectionAuditEntry
+{
+}
+    public required string EntryId { get; init; }
+    public required string ScanId { get; init; }
+    public int TextLength { get; init; }
+    public required string[] PiiTypesFound { get; init; }
+    public int DetectionCount { get; init; }
+    public required DateTime Timestamp { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Privacy/DataAnonymizationStrategy.cs
+```csharp
+public sealed class DataAnonymizationStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
+    public void RegisterProfile(AnonymizationProfile profile);
+    public async Task<AnonymizationResult> AnonymizeAsync(DataRecord[] records, string profileId, AnonymizationOptions? options = null, CancellationToken ct = default);
+    public string AnonymizeField(string value, FieldAnonymizationRule rule);
+    public IReadOnlyList<AnonymizationProfile> GetProfiles();
+    public IReadOnlyList<AnonymizationAuditEntry> GetAuditLog(int count = 100);
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+```csharp
+public sealed record AnonymizationProfile
+{
+}
+    public required string ProfileId { get; init; }
+    public required string Name { get; init; }
+    public string? Description { get; init; }
+    public AnonymizationTechnique PrimaryTechnique { get; init; }
+    public PrivacyModel PrivacyModel { get; init; }
+    public int? KAnonymityValue { get; init; }
+    public int? LDiversityValue { get; init; }
+    public double? DifferentialPrivacyEpsilon { get; init; }
+    public string[]? QuasiIdentifiers { get; init; }
+    public string[]? SensitiveAttributes { get; init; }
+    public FieldAnonymizationRule[] FieldRules { get; init; };
+}
+```
+```csharp
+public sealed record FieldAnonymizationRule
+{
+}
+    public required string FieldName { get; init; }
+    public required AnonymizationTechnique Technique { get; init; }
+    public FieldDataType DataType { get; init; };
+    public int? GeneralizationLevel { get; init; }
+    public string? SuppressionReplacement { get; init; }
+    public string? HashSalt { get; init; }
+    public char? MaskCharacter { get; init; }
+    public int? MaskKeepFirst { get; init; }
+    public int? MaskKeepLast { get; init; }
+    public BucketDefinition[]? Buckets { get; init; }
+    public double? NoiseScale { get; init; }
+    public int? TruncationLength { get; init; }
+    public string[]? ReplacementPool { get; init; }
+}
+```
+```csharp
+public sealed record BucketDefinition
+{
+}
+    public required double UpperBound { get; init; }
+    public required string Label { get; init; }
+}
+```
+```csharp
+public sealed record DataRecord
+{
+}
+    public required string RecordId { get; init; }
+    public required Dictionary<string, object> Fields { get; init; }
+}
+```
+```csharp
+public sealed record AnonymizationOptions
+{
+}
+    public bool PreserveRecordIds { get; init; }
+    public int? KAnonymityValue { get; init; }
+    public int? LDiversityValue { get; init; }
+    public double? DifferentialPrivacyEpsilon { get; init; }
+}
+```
+```csharp
+public sealed record AnonymizationResult
+{
+}
+    public required bool Success { get; init; }
+    public string? ResultId { get; init; }
+    public string? ProfileId { get; init; }
+    public string? ErrorMessage { get; init; }
+    public int RecordsProcessed { get; init; }
+    public int RecordsAnonymized { get; init; }
+    public Dictionary<string, FieldAnonymizationStats>? FieldStats { get; init; }
+    public PrivacyVerificationResult? PrivacyVerification { get; init; }
+    public DataRecord[]? AnonymizedRecords { get; init; }
+    public DateTime ProcessedAt { get; init; }
+}
+```
+```csharp
+public sealed class FieldAnonymizationStats
+{
+}
+    public required string FieldName { get; init; }
+    public int ValuesProcessed { get; set; }
+    public int ValuesModified { get; set; }
+    public string? TechniqueUsed { get; set; }
+}
+```
+```csharp
+public sealed record PrivacyVerificationResult
+{
+}
+    public bool MeetsRequirements { get; set; }
+    public int? RequiredK { get; set; }
+    public int? AchievedK { get; set; }
+    public bool? MeetsKAnonymity { get; set; }
+    public int? RequiredL { get; set; }
+    public int? AchievedL { get; set; }
+    public bool? MeetsLDiversity { get; set; }
+    public double? EpsilonUsed { get; set; }
+    public bool? MeetsDifferentialPrivacy { get; set; }
+}
+```
+```csharp
+public sealed record AnonymizationAuditEntry
+{
+}
+    public required string EntryId { get; init; }
+    public required string ResultId { get; init; }
+    public required string ProfileId { get; init; }
+    public required int RecordsProcessed { get; init; }
+    public required string Technique { get; init; }
+    public required string PrivacyModel { get; init; }
+    public required DateTime Timestamp { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Privacy/DataRetentionPolicyStrategy.cs
+```csharp
+public sealed class DataRetentionPolicyStrategy : ComplianceStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
+    public void RegisterPolicy(RetentionPolicy policy);
+    public ApplyPolicyResult ApplyPolicy(string dataId, string policyId, ApplyPolicyOptions? options = null);
+    public HoldResult PlaceHold(PlaceHoldRequest request);
+    public HoldResult ReleaseHold(string holdId, string releasedBy, string? reason = null);
+    public ExtendRetentionResult ExtendRetention(string dataId, TimeSpan extension, string reason, string extendedBy);
+    public IReadOnlyList<DataRetentionRecord> GetExpiringData(int daysAhead);
+    public IReadOnlyList<DataRetentionRecord> GetExpiredData();
+    public async Task<ProcessDeletionsResult> ProcessScheduledDeletionsAsync(CancellationToken ct = default);
+    public IReadOnlyList<RetentionPolicy> GetPolicies();
+    public IReadOnlyList<RetentionHold> GetActiveHolds();
+    public new RetentionStatistics GetStatistics();
+    public IReadOnlyList<RetentionAuditEntry> GetAuditLog(string? dataId = null, int count = 100);
+    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+```csharp
+public sealed record RetentionPolicy
+{
+}
+    public required string PolicyId { get; init; }
+    public required string Name { get; init; }
+    public string? Description { get; init; }
+    public required TimeSpan RetentionPeriod { get; init; }
+    public string? DefaultCategory { get; init; }
+    public string? LegalBasis { get; init; }
+    public bool AutoDelete { get; init; }
+    public string[]? ApplicableCategories { get; init; }
+}
+```
+```csharp
+public sealed record DataRetentionRecord
+{
+}
+    public required string RecordId { get; init; }
+    public required string DataId { get; init; }
+    public required string PolicyId { get; init; }
+    public required string PolicyName { get; init; }
+    public string? DataCategory { get; init; }
+    public required DateTime RetentionStartedAt { get; init; }
+    public required DateTime RetentionEndsAt { get; init; }
+    public required string CreatedBy { get; init; }
+    public bool IsOnHold { get; init; }
+    public string? HoldId { get; init; }
+    public DateTime? ExtendedAt { get; init; }
+    public string? ExtendedBy { get; init; }
+    public string? ExtensionReason { get; init; }
+}
+```
+```csharp
+public sealed record RetentionHold
+{
+}
+    public required string HoldId { get; init; }
+    public required string Name { get; init; }
+    public string? Description { get; init; }
+    public required HoldType HoldType { get; init; }
+    public required string CreatedBy { get; init; }
     public required DateTime CreatedAt { get; init; }
-    public DateTime? ConfirmedAt { get; init; }
     public DateTime? ExpiresAt { get; init; }
-    public DateTime? WithdrawnAt { get; init; }
-    public string? WithdrawalReason { get; init; }
-    public string? CollectionMethod { get; init; }
-    public string? CollectionContext { get; init; }
-    public string? IpAddress { get; init; }
-    public string? UserAgent { get; init; }
-    public string? ParentalConsentId { get; init; }
-    public string? ProofOfConsent { get; init; }
+    public required HashSet<string> AffectedDataIds { get; init; }
+    public HoldScope? Scope { get; init; }
+    public required bool IsActive { get; init; }
+    public DateTime? ReleasedAt { get; init; }
+    public string? ReleasedBy { get; init; }
+    public string? ReleaseReason { get; init; }
 }
 ```
 ```csharp
-public sealed record ConsentRequest
+public sealed record HoldScope
 {
 }
-    public required string SubjectId { get; init; }
-    public required string PurposeId { get; init; }
-    public required bool ConsentGiven { get; init; }
-    public required string CollectionMethod { get; init; }
-    public string? CollectionContext { get; init; }
-    public string? IpAddress { get; init; }
-    public string? UserAgent { get; init; }
-    public int? SubjectAge { get; init; }
-    public bool ParentalConsentProvided { get; init; }
-    public string? ParentalConsentId { get; init; }
-    public bool DoubleOptInConfirmed { get; init; }
-    public DateTime? CustomExpiry { get; init; }
+    public string? CategoryPattern { get; init; }
+    public string? DateRange { get; init; }
+    public string? OwnerPattern { get; init; }
 }
 ```
 ```csharp
-public sealed record ConsentRecordResult
+public sealed record RetentionSchedule
+{
+}
+    public required string ScheduleId { get; init; }
+    public required string DataId { get; init; }
+    public required DateTime ScheduledDeletionAt { get; init; }
+    public required DateTime CreatedAt { get; init; }
+    public bool IsSuspended { get; init; }
+    public string? SuspendedBy { get; init; }
+    public bool IsCompleted { get; init; }
+    public DateTime? CompletedAt { get; init; }
+}
+```
+```csharp
+public sealed record ApplyPolicyOptions
+{
+}
+    public string? DataCategory { get; init; }
+    public string? CreatedBy { get; init; }
+    public DateTime? CustomRetentionEnd { get; init; }
+    public bool OverrideExisting { get; init; }
+    public bool ForceOverride { get; init; }
+}
+```
+```csharp
+public sealed record ApplyPolicyResult
 {
 }
     public required bool Success { get; init; }
-    public string? ConsentId { get; init; }
-    public DateTime? ExpiresAt { get; init; }
-    public string? ProofOfConsent { get; init; }
+    public string? RecordId { get; init; }
+    public string? DataId { get; init; }
+    public string? PolicyId { get; init; }
+    public DateTime RetentionEndsAt { get; init; }
     public string? ErrorMessage { get; init; }
-    public bool RequiresParentalConsent { get; init; }
-    public bool RequiresDoubleOptIn { get; init; }
-    public string? PendingConsentId { get; init; }
+    public string? ExistingPolicyId { get; init; }
 }
 ```
 ```csharp
-public sealed record WithdrawConsentResult
+public sealed record PlaceHoldRequest
+{
+}
+    public required string Name { get; init; }
+    public string? Description { get; init; }
+    public required HoldType HoldType { get; init; }
+    public required string CreatedBy { get; init; }
+    public DateTime? ExpiresAt { get; init; }
+    public string[]? DataIds { get; init; }
+    public HoldScope? Scope { get; init; }
+}
+```
+```csharp
+public sealed record HoldResult
 {
 }
     public required bool Success { get; init; }
-    public string? ConsentId { get; init; }
-    public DateTime WithdrawnAt { get; init; }
-    public IReadOnlyList<string>? AffectedPurposes { get; init; }
+    public string? HoldId { get; init; }
+    public int AffectedCount { get; init; }
     public string? ErrorMessage { get; init; }
 }
 ```
 ```csharp
-public sealed record ConsentCheckResult
+public sealed record ExtendRetentionResult
 {
 }
-    public required bool HasConsent { get; init; }
-    public string? ConsentId { get; init; }
-    public required ConsentStatus Status { get; init; }
-    public string? VersionId { get; init; }
-    public DateTime? ExpiresAt { get; init; }
+    public required bool Success { get; init; }
+    public string? DataId { get; init; }
+    public DateTime NewRetentionEndDate { get; init; }
+    public TimeSpan ExtendedBy { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+```
+```csharp
+public sealed record DeletionResult
+{
+}
+    public required string DataId { get; init; }
+    public required bool Success { get; init; }
+    public DateTime DeletedAt { get; init; }
     public string? Reason { get; init; }
 }
 ```
 ```csharp
-public sealed class ConsentPreference
+public sealed record ProcessDeletionsResult
 {
 }
-    public required string SubjectId { get; init; }
-    public Dictionary<string, bool> PurposeConsents { get; init; };
-    public DateTime LastUpdated { get; set; }
+    public int TotalProcessed { get; init; }
+    public int SuccessfulDeletions { get; init; }
+    public int FailedDeletions { get; init; }
+    public required IReadOnlyList<DeletionResult> Results { get; init; }
 }
 ```
 ```csharp
-public sealed record ConsentVersion
+public sealed record RetentionStatistics
 {
 }
-    public required string VersionId { get; init; }
-    public required string PurposeId { get; init; }
-    public required string PolicyText { get; init; }
-    public required DateTime EffectiveDate { get; init; }
-    public string? PreviousVersionId { get; init; }
+    public int TotalRecords { get; init; }
+    public int RecordsOnHold { get; init; }
+    public int RecordsExpired { get; init; }
+    public int RecordsExpiringWithin30Days { get; init; }
+    public int ActiveHolds { get; init; }
+    public int ScheduledDeletions { get; init; }
+    public required Dictionary<string, int> PolicyDistribution { get; init; }
 }
 ```
 ```csharp
-public sealed record ConsentAuditEntry
+public sealed record RetentionAuditEntry
 {
 }
     public required string EntryId { get; init; }
-    public required string ConsentId { get; init; }
-    public required string SubjectId { get; init; }
-    public required string PurposeId { get; init; }
-    public required ConsentAction Action { get; init; }
+    public string? DataId { get; init; }
+    public string? PolicyId { get; init; }
+    public string? HoldId { get; init; }
+    public required RetentionAction Action { get; init; }
     public required DateTime Timestamp { get; init; }
     public string? Details { get; init; }
-}
-```
-```csharp
-public sealed record ConsentExport
-{
-}
-    public required string SubjectId { get; init; }
-    public required DateTime ExportedAt { get; init; }
-    public required IReadOnlyList<ConsentRecord> Consents { get; init; }
-    public required IReadOnlyList<ConsentAuditEntry> AuditTrail { get; init; }
-    public required IReadOnlyList<ConsentPurpose> Purposes { get; init; }
-    public required ConsentSummary Summary { get; init; }
-}
-```
-```csharp
-public sealed record ConsentSummary
-{
-}
-    public int TotalConsents { get; init; }
-    public int ActiveConsents { get; init; }
-    public int WithdrawnConsents { get; init; }
-    public int ExpiredConsents { get; init; }
 }
 ```
 
@@ -4773,139 +5554,180 @@ public sealed record TransferAuditEntry
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Privacy/DataAnonymizationStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Privacy/ConsentManagementStrategy.cs
 ```csharp
-public sealed class DataAnonymizationStrategy : ComplianceStrategyBase
+public sealed class ConsentManagementStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Framework;;
     public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
-    public void RegisterProfile(AnonymizationProfile profile);
-    public async Task<AnonymizationResult> AnonymizeAsync(DataRecord[] records, string profileId, AnonymizationOptions? options = null, CancellationToken ct = default);
-    public string AnonymizeField(string value, FieldAnonymizationRule rule);
-    public IReadOnlyList<AnonymizationProfile> GetProfiles();
-    public IReadOnlyList<AnonymizationAuditEntry> GetAuditLog(int count = 100);
+    public void RegisterPurpose(ConsentPurpose purpose);
+    public ConsentRecordResult RecordConsent(ConsentRequest request);
+    public ConsentRecordResult ConfirmDoubleOptIn(string pendingConsentId, string confirmationToken);
+    public WithdrawConsentResult WithdrawConsent(string subjectId, string purposeId, string? reason = null);
+    public ConsentCheckResult CheckConsent(string subjectId, string purposeId);
+    public IReadOnlyList<ConsentRecord> GetConsentHistory(string subjectId, string? purposeId = null);
+    public ConsentPreference? GetPreferences(string subjectId);
+    public IReadOnlyList<ConsentRecord> GetExpiringSoon(int daysAhead = 30);
+    public ConsentExport ExportConsentProof(string subjectId);
+    public IReadOnlyList<ConsentPurpose> GetPurposes();
+    public IReadOnlyList<ConsentAuditEntry> GetAuditLog(string? subjectId = null, int count = 100);
     protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
 }
 ```
 ```csharp
-public sealed record AnonymizationProfile
+public sealed record ConsentPurpose
 {
 }
-    public required string ProfileId { get; init; }
+    public required string PurposeId { get; init; }
     public required string Name { get; init; }
-    public string? Description { get; init; }
-    public AnonymizationTechnique PrimaryTechnique { get; init; }
-    public PrivacyModel PrivacyModel { get; init; }
-    public int? KAnonymityValue { get; init; }
-    public int? LDiversityValue { get; init; }
-    public double? DifferentialPrivacyEpsilon { get; init; }
-    public string[]? QuasiIdentifiers { get; init; }
-    public string[]? SensitiveAttributes { get; init; }
-    public FieldAnonymizationRule[] FieldRules { get; init; };
+    public required string Description { get; init; }
+    public required string LegalBasis { get; init; }
+    public bool IsEssential { get; init; }
+    public bool RequiresExplicitConsent { get; init; }
+    public bool RequiresDoubleOptIn { get; init; }
+    public bool AllowsOptOut { get; init; }
+    public string? CurrentVersionId { get; init; }
+    public string[]? DependsOnPurposes { get; init; }
 }
 ```
 ```csharp
-public sealed record FieldAnonymizationRule
+public sealed record ConsentRecord
 {
 }
-    public required string FieldName { get; init; }
-    public required AnonymizationTechnique Technique { get; init; }
-    public FieldDataType DataType { get; init; };
-    public int? GeneralizationLevel { get; init; }
-    public string? SuppressionReplacement { get; init; }
-    public string? HashSalt { get; init; }
-    public char? MaskCharacter { get; init; }
-    public int? MaskKeepFirst { get; init; }
-    public int? MaskKeepLast { get; init; }
-    public BucketDefinition[]? Buckets { get; init; }
-    public double? NoiseScale { get; init; }
-    public int? TruncationLength { get; init; }
-    public string[]? ReplacementPool { get; init; }
+    public required string ConsentId { get; init; }
+    public required string SubjectId { get; init; }
+    public required string PurposeId { get; init; }
+    public required ConsentStatus Status { get; init; }
+    public bool ConsentGiven { get; init; }
+    public string? VersionId { get; init; }
+    public required DateTime CreatedAt { get; init; }
+    public DateTime? ConfirmedAt { get; init; }
+    public DateTime? ExpiresAt { get; init; }
+    public DateTime? WithdrawnAt { get; init; }
+    public string? WithdrawalReason { get; init; }
+    public string? CollectionMethod { get; init; }
+    public string? CollectionContext { get; init; }
+    public string? IpAddress { get; init; }
+    public string? UserAgent { get; init; }
+    public string? ParentalConsentId { get; init; }
+    public string? ProofOfConsent { get; init; }
+    public string? DoubleOptInToken { get; init; }
 }
 ```
 ```csharp
-public sealed record BucketDefinition
+public sealed record ConsentRequest
 {
 }
-    public required double UpperBound { get; init; }
-    public required string Label { get; init; }
+    public required string SubjectId { get; init; }
+    public required string PurposeId { get; init; }
+    public required bool ConsentGiven { get; init; }
+    public required string CollectionMethod { get; init; }
+    public string? CollectionContext { get; init; }
+    public string? IpAddress { get; init; }
+    public string? UserAgent { get; init; }
+    public int? SubjectAge { get; init; }
+    public bool ParentalConsentProvided { get; init; }
+    public string? ParentalConsentId { get; init; }
+    public bool DoubleOptInConfirmed { get; init; }
+    public DateTime? CustomExpiry { get; init; }
 }
 ```
 ```csharp
-public sealed record DataRecord
-{
-}
-    public required string RecordId { get; init; }
-    public required Dictionary<string, object> Fields { get; init; }
-}
-```
-```csharp
-public sealed record AnonymizationOptions
-{
-}
-    public bool PreserveRecordIds { get; init; }
-    public int? KAnonymityValue { get; init; }
-    public int? LDiversityValue { get; init; }
-    public double? DifferentialPrivacyEpsilon { get; init; }
-}
-```
-```csharp
-public sealed record AnonymizationResult
+public sealed record ConsentRecordResult
 {
 }
     public required bool Success { get; init; }
-    public string? ResultId { get; init; }
-    public string? ProfileId { get; init; }
+    public string? ConsentId { get; init; }
+    public DateTime? ExpiresAt { get; init; }
+    public string? ProofOfConsent { get; init; }
     public string? ErrorMessage { get; init; }
-    public int RecordsProcessed { get; init; }
-    public int RecordsAnonymized { get; init; }
-    public Dictionary<string, FieldAnonymizationStats>? FieldStats { get; init; }
-    public PrivacyVerificationResult? PrivacyVerification { get; init; }
-    public DataRecord[]? AnonymizedRecords { get; init; }
-    public DateTime ProcessedAt { get; init; }
+    public bool RequiresParentalConsent { get; init; }
+    public bool RequiresDoubleOptIn { get; init; }
+    public string? PendingConsentId { get; init; }
+    public string? ConfirmationToken { get; init; }
 }
 ```
 ```csharp
-public sealed class FieldAnonymizationStats
+public sealed record WithdrawConsentResult
 {
 }
-    public required string FieldName { get; init; }
-    public int ValuesProcessed { get; set; }
-    public int ValuesModified { get; set; }
-    public string? TechniqueUsed { get; set; }
+    public required bool Success { get; init; }
+    public string? ConsentId { get; init; }
+    public DateTime WithdrawnAt { get; init; }
+    public IReadOnlyList<string>? AffectedPurposes { get; init; }
+    public string? ErrorMessage { get; init; }
 }
 ```
 ```csharp
-public sealed record PrivacyVerificationResult
+public sealed record ConsentCheckResult
 {
 }
-    public bool MeetsRequirements { get; set; }
-    public int? RequiredK { get; set; }
-    public int? AchievedK { get; set; }
-    public bool? MeetsKAnonymity { get; set; }
-    public int? RequiredL { get; set; }
-    public int? AchievedL { get; set; }
-    public bool? MeetsLDiversity { get; set; }
-    public double? EpsilonUsed { get; set; }
-    public bool? MeetsDifferentialPrivacy { get; set; }
+    public required bool HasConsent { get; init; }
+    public string? ConsentId { get; init; }
+    public required ConsentStatus Status { get; init; }
+    public string? VersionId { get; init; }
+    public DateTime? ExpiresAt { get; init; }
+    public string? Reason { get; init; }
 }
 ```
 ```csharp
-public sealed record AnonymizationAuditEntry
+public sealed class ConsentPreference
+{
+}
+    public required string SubjectId { get; init; }
+    public Dictionary<string, bool> PurposeConsents { get; init; };
+    public DateTime LastUpdated { get; set; }
+}
+```
+```csharp
+public sealed record ConsentVersion
+{
+}
+    public required string VersionId { get; init; }
+    public required string PurposeId { get; init; }
+    public required string PolicyText { get; init; }
+    public required DateTime EffectiveDate { get; init; }
+    public string? PreviousVersionId { get; init; }
+}
+```
+```csharp
+public sealed record ConsentAuditEntry
 {
 }
     public required string EntryId { get; init; }
-    public required string ResultId { get; init; }
-    public required string ProfileId { get; init; }
-    public required int RecordsProcessed { get; init; }
-    public required string Technique { get; init; }
-    public required string PrivacyModel { get; init; }
+    public required string ConsentId { get; init; }
+    public required string SubjectId { get; init; }
+    public required string PurposeId { get; init; }
+    public required ConsentAction Action { get; init; }
     public required DateTime Timestamp { get; init; }
+    public string? Details { get; init; }
+}
+```
+```csharp
+public sealed record ConsentExport
+{
+}
+    public required string SubjectId { get; init; }
+    public required DateTime ExportedAt { get; init; }
+    public required IReadOnlyList<ConsentRecord> Consents { get; init; }
+    public required IReadOnlyList<ConsentAuditEntry> AuditTrail { get; init; }
+    public required IReadOnlyList<ConsentPurpose> Purposes { get; init; }
+    public required ConsentSummary Summary { get; init; }
+}
+```
+```csharp
+public sealed record ConsentSummary
+{
+}
+    public int TotalConsents { get; init; }
+    public int ActiveConsents { get; init; }
+    public int WithdrawnConsents { get; init; }
+    public int ExpiredConsents { get; init; }
 }
 ```
 
@@ -5042,366 +5864,6 @@ public sealed record PseudonymizationAuditEntry
     public string? ActorId { get; init; }
     public string? Reason { get; init; }
     public string? Details { get; init; }
-    public required DateTime Timestamp { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Privacy/DataRetentionPolicyStrategy.cs
-```csharp
-public sealed class DataRetentionPolicyStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
-    public void RegisterPolicy(RetentionPolicy policy);
-    public ApplyPolicyResult ApplyPolicy(string dataId, string policyId, ApplyPolicyOptions? options = null);
-    public HoldResult PlaceHold(PlaceHoldRequest request);
-    public HoldResult ReleaseHold(string holdId, string releasedBy, string? reason = null);
-    public ExtendRetentionResult ExtendRetention(string dataId, TimeSpan extension, string reason, string extendedBy);
-    public IReadOnlyList<DataRetentionRecord> GetExpiringData(int daysAhead);
-    public IReadOnlyList<DataRetentionRecord> GetExpiredData();
-    public async Task<ProcessDeletionsResult> ProcessScheduledDeletionsAsync(CancellationToken ct = default);
-    public IReadOnlyList<RetentionPolicy> GetPolicies();
-    public IReadOnlyList<RetentionHold> GetActiveHolds();
-    public new RetentionStatistics GetStatistics();
-    public IReadOnlyList<RetentionAuditEntry> GetAuditLog(string? dataId = null, int count = 100);
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-```csharp
-public sealed record RetentionPolicy
-{
-}
-    public required string PolicyId { get; init; }
-    public required string Name { get; init; }
-    public string? Description { get; init; }
-    public required TimeSpan RetentionPeriod { get; init; }
-    public string? DefaultCategory { get; init; }
-    public string? LegalBasis { get; init; }
-    public bool AutoDelete { get; init; }
-    public string[]? ApplicableCategories { get; init; }
-}
-```
-```csharp
-public sealed record DataRetentionRecord
-{
-}
-    public required string RecordId { get; init; }
-    public required string DataId { get; init; }
-    public required string PolicyId { get; init; }
-    public required string PolicyName { get; init; }
-    public string? DataCategory { get; init; }
-    public required DateTime RetentionStartedAt { get; init; }
-    public required DateTime RetentionEndsAt { get; init; }
-    public required string CreatedBy { get; init; }
-    public bool IsOnHold { get; init; }
-    public string? HoldId { get; init; }
-    public DateTime? ExtendedAt { get; init; }
-    public string? ExtendedBy { get; init; }
-    public string? ExtensionReason { get; init; }
-}
-```
-```csharp
-public sealed record RetentionHold
-{
-}
-    public required string HoldId { get; init; }
-    public required string Name { get; init; }
-    public string? Description { get; init; }
-    public required HoldType HoldType { get; init; }
-    public required string CreatedBy { get; init; }
-    public required DateTime CreatedAt { get; init; }
-    public DateTime? ExpiresAt { get; init; }
-    public required HashSet<string> AffectedDataIds { get; init; }
-    public HoldScope? Scope { get; init; }
-    public required bool IsActive { get; init; }
-    public DateTime? ReleasedAt { get; init; }
-    public string? ReleasedBy { get; init; }
-    public string? ReleaseReason { get; init; }
-}
-```
-```csharp
-public sealed record HoldScope
-{
-}
-    public string? CategoryPattern { get; init; }
-    public string? DateRange { get; init; }
-    public string? OwnerPattern { get; init; }
-}
-```
-```csharp
-public sealed record RetentionSchedule
-{
-}
-    public required string ScheduleId { get; init; }
-    public required string DataId { get; init; }
-    public required DateTime ScheduledDeletionAt { get; init; }
-    public required DateTime CreatedAt { get; init; }
-    public bool IsSuspended { get; init; }
-    public string? SuspendedBy { get; init; }
-    public bool IsCompleted { get; init; }
-    public DateTime? CompletedAt { get; init; }
-}
-```
-```csharp
-public sealed record ApplyPolicyOptions
-{
-}
-    public string? DataCategory { get; init; }
-    public string? CreatedBy { get; init; }
-    public DateTime? CustomRetentionEnd { get; init; }
-    public bool OverrideExisting { get; init; }
-    public bool ForceOverride { get; init; }
-}
-```
-```csharp
-public sealed record ApplyPolicyResult
-{
-}
-    public required bool Success { get; init; }
-    public string? RecordId { get; init; }
-    public string? DataId { get; init; }
-    public string? PolicyId { get; init; }
-    public DateTime RetentionEndsAt { get; init; }
-    public string? ErrorMessage { get; init; }
-    public string? ExistingPolicyId { get; init; }
-}
-```
-```csharp
-public sealed record PlaceHoldRequest
-{
-}
-    public required string Name { get; init; }
-    public string? Description { get; init; }
-    public required HoldType HoldType { get; init; }
-    public required string CreatedBy { get; init; }
-    public DateTime? ExpiresAt { get; init; }
-    public string[]? DataIds { get; init; }
-    public HoldScope? Scope { get; init; }
-}
-```
-```csharp
-public sealed record HoldResult
-{
-}
-    public required bool Success { get; init; }
-    public string? HoldId { get; init; }
-    public int AffectedCount { get; init; }
-    public string? ErrorMessage { get; init; }
-}
-```
-```csharp
-public sealed record ExtendRetentionResult
-{
-}
-    public required bool Success { get; init; }
-    public string? DataId { get; init; }
-    public DateTime NewRetentionEndDate { get; init; }
-    public TimeSpan ExtendedBy { get; init; }
-    public string? ErrorMessage { get; init; }
-}
-```
-```csharp
-public sealed record DeletionResult
-{
-}
-    public required string DataId { get; init; }
-    public required bool Success { get; init; }
-    public DateTime DeletedAt { get; init; }
-    public string? Reason { get; init; }
-}
-```
-```csharp
-public sealed record ProcessDeletionsResult
-{
-}
-    public int TotalProcessed { get; init; }
-    public int SuccessfulDeletions { get; init; }
-    public int FailedDeletions { get; init; }
-    public required IReadOnlyList<DeletionResult> Results { get; init; }
-}
-```
-```csharp
-public sealed record RetentionStatistics
-{
-}
-    public int TotalRecords { get; init; }
-    public int RecordsOnHold { get; init; }
-    public int RecordsExpired { get; init; }
-    public int RecordsExpiringWithin30Days { get; init; }
-    public int ActiveHolds { get; init; }
-    public int ScheduledDeletions { get; init; }
-    public required Dictionary<string, int> PolicyDistribution { get; init; }
-}
-```
-```csharp
-public sealed record RetentionAuditEntry
-{
-}
-    public required string EntryId { get; init; }
-    public string? DataId { get; init; }
-    public string? PolicyId { get; init; }
-    public string? HoldId { get; init; }
-    public required RetentionAction Action { get; init; }
-    public required DateTime Timestamp { get; init; }
-    public string? Details { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Privacy/PiiDetectionMaskingStrategy.cs
-```csharp
-public sealed class PiiDetectionMaskingStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
-    public void RegisterDetector(PiiDetector detector);
-    public void RegisterMaskingProfile(MaskingProfile profile);
-    public PiiScanResult ScanForPii(string text, PiiScanOptions? options = null);
-    public PiiMaskResult ScanAndMask(string text, string? maskingProfileId = null, PiiScanOptions? options = null);
-    public StructuredPiiScanResult ScanStructuredData(Dictionary<string, object> data, PiiScanOptions? options = null);
-    public IReadOnlyList<PiiDetector> GetDetectors();
-    public IReadOnlyList<PiiDetectionAuditEntry> GetAuditLog(int count = 100);
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-```csharp
-public sealed class PiiDetector
-{
-}
-    public required string DetectorId { get; init; }
-    public required string PiiType { get; init; }
-    public required PiiCategory Category { get; init; }
-    public required Regex Pattern { get; init; }
-    public double BaseConfidence { get; init; };
-    public PiiSensitivityLevel SensitivityLevel { get; init; };
-    public Func<string, bool>? Validator { get; init; }
-    public int? ExpectedMinLength { get; init; }
-    public int? ExpectedMaxLength { get; init; }
-    public bool Enabled { get; init; };
-}
-```
-```csharp
-public sealed record MaskingProfile
-{
-}
-    public required string ProfileId { get; init; }
-    public required string Name { get; init; }
-    public string? Description { get; init; }
-    public required MaskingRule DefaultRule { get; init; }
-    public MaskingRule[] Rules { get; init; };
-    public MaskingRule? GetRule(string piiType);
-}
-```
-```csharp
-public sealed record MaskingRule
-{
-}
-    public required string RuleId { get; init; }
-    public string? PiiType { get; init; }
-    public required MaskingType MaskingType { get; init; }
-    public char MaskCharacter { get; init; };
-    public int? KeepFirst { get; init; }
-    public int? KeepLast { get; init; }
-    public string? RedactionText { get; init; }
-}
-```
-```csharp
-public sealed record PiiScanOptions
-{
-}
-    public PiiSensitivityLevel SensitivityLevel { get; init; };
-    public double MinConfidence { get; init; };
-    public bool IncludeContextualAnalysis { get; init; };
-    public string[]? PiiTypesToInclude { get; init; }
-    public string[]? PiiTypesToExclude { get; init; }
-}
-```
-```csharp
-public sealed record PiiDetection
-{
-}
-    public required string DetectionId { get; init; }
-    public required string PiiType { get; init; }
-    public required PiiCategory Category { get; init; }
-    public required string Value { get; init; }
-    public required int StartIndex { get; init; }
-    public required int EndIndex { get; init; }
-    public required double Confidence { get; init; }
-    public required string DetectorId { get; init; }
-    public bool? IsValidFormat { get; init; }
-    public bool HasContextualSupport { get; init; }
-    public string? FieldName { get; init; }
-}
-```
-```csharp
-public sealed record PiiScanResult
-{
-}
-    public required bool Success { get; init; }
-    public required string ScanId { get; init; }
-    public int TextLength { get; init; }
-    public required IReadOnlyList<PiiDetection> Detections { get; init; }
-    public bool PiiFound { get; init; }
-    public Dictionary<PiiCategory, int>? CategorySummary { get; init; }
-    public PiiRiskLevel HighestRiskLevel { get; init; }
-    public DateTime ScannedAt { get; init; }
-    public string? ErrorMessage { get; init; }
-}
-```
-```csharp
-public sealed record PiiMaskResult
-{
-}
-    public required bool Success { get; init; }
-    public string? OriginalText { get; init; }
-    public required string MaskedText { get; init; }
-    public bool PiiFound { get; init; }
-    public int MaskingsApplied { get; init; }
-    public IReadOnlyList<MaskingDetail>? MaskingDetails { get; init; }
-    public PiiScanResult? ScanResult { get; init; }
-    public string? ErrorMessage { get; init; }
-}
-```
-```csharp
-public sealed record MaskingDetail
-{
-}
-    public required string PiiType { get; init; }
-    public int OriginalLength { get; init; }
-    public int MaskedLength { get; init; }
-    public required string MaskingRule { get; init; }
-}
-```
-```csharp
-public sealed record StructuredPiiScanResult
-{
-}
-    public required bool Success { get; init; }
-    public int FieldsScanned { get; init; }
-    public required Dictionary<string, PiiScanResult> FieldResults { get; init; }
-    public int TotalDetections { get; init; }
-    public required IReadOnlyList<PiiDetection> AllDetections { get; init; }
-    public required IReadOnlyList<string> HighRiskFields { get; init; }
-}
-```
-```csharp
-public sealed record PiiDetectionAuditEntry
-{
-}
-    public required string EntryId { get; init; }
-    public required string ScanId { get; init; }
-    public int TextLength { get; init; }
-    public required string[] PiiTypesFound { get; init; }
-    public int DetectionCount { get; init; }
     public required DateTime Timestamp { get; init; }
 }
 ```
@@ -5730,6 +6192,7 @@ public sealed record ErasureRequestInput
 }
     public required string SubjectId { get; init; }
     public required string SubjectEmail { get; init; }
+    public string? LegalBasis { get; init; }
     public ErasureScope? Scope { get; init; }
     public string[]? DataCategories { get; init; }
     public string? Reason { get; init; }
@@ -5879,9 +6342,9 @@ public sealed record ErasureAuditEntry
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Regulations/AiActStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Innovation/CrossBorderDataFlowStrategy.cs
 ```csharp
-public sealed class AiActStrategy : ComplianceStrategyBase
+public sealed class CrossBorderDataFlowStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -5893,9 +6356,9 @@ public sealed class AiActStrategy : ComplianceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Regulations/CyberResilienceActStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Innovation/AutomatedDsarStrategy.cs
 ```csharp
-public sealed class CyberResilienceActStrategy : ComplianceStrategyBase
+public sealed class AutomatedDsarStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -5907,9 +6370,9 @@ public sealed class CyberResilienceActStrategy : ComplianceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Regulations/DataActStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Innovation/PredictiveComplianceStrategy.cs
 ```csharp
-public sealed class DataActStrategy : ComplianceStrategyBase
+public sealed class PredictiveComplianceStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -5921,9 +6384,9 @@ public sealed class DataActStrategy : ComplianceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Regulations/DataGovernanceActStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Innovation/DigitalTwinComplianceStrategy.cs
 ```csharp
-public sealed class DataGovernanceActStrategy : ComplianceStrategyBase
+public sealed class DigitalTwinComplianceStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -5935,9 +6398,9 @@ public sealed class DataGovernanceActStrategy : ComplianceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Regulations/DoraStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Innovation/UnifiedComplianceOntologyStrategy.cs
 ```csharp
-public sealed class DoraStrategy : ComplianceStrategyBase
+public sealed class UnifiedComplianceOntologyStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -5949,9 +6412,9 @@ public sealed class DoraStrategy : ComplianceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Regulations/EPrivacyStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Innovation/ComplianceAsCodeStrategy.cs
 ```csharp
-public sealed class EPrivacyStrategy : ComplianceStrategyBase
+public sealed class ComplianceAsCodeStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -5963,9 +6426,9 @@ public sealed class EPrivacyStrategy : ComplianceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Regulations/FedRampStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Innovation/RegTechIntegrationStrategy.cs
 ```csharp
-public sealed class FedRampStrategy : ComplianceStrategyBase
+public sealed class RegTechIntegrationStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -5977,9 +6440,9 @@ public sealed class FedRampStrategy : ComplianceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Regulations/GdprStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Innovation/QuantumProofAuditStrategy.cs
 ```csharp
-public sealed class GdprStrategy : ComplianceStrategyBase
+public sealed class QuantumProofAuditStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -5991,9 +6454,9 @@ public sealed class GdprStrategy : ComplianceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Regulations/HipaaStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Innovation/AiAssistedAuditStrategy.cs
 ```csharp
-public sealed class HipaaStrategy : ComplianceStrategyBase
+public sealed class AiAssistedAuditStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -6005,9 +6468,9 @@ public sealed class HipaaStrategy : ComplianceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Regulations/Nis2Strategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Innovation/ZeroTrustComplianceStrategy.cs
 ```csharp
-public sealed class Nis2Strategy : ComplianceStrategyBase
+public sealed class ZeroTrustComplianceStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -6019,9 +6482,9 @@ public sealed class Nis2Strategy : ComplianceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Regulations/PciDssStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Innovation/SmartContractComplianceStrategy.cs
 ```csharp
-public sealed class PciDssStrategy : ComplianceStrategyBase
+public sealed class SmartContractComplianceStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -6033,9 +6496,9 @@ public sealed class PciDssStrategy : ComplianceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Regulations/Soc2Strategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Innovation/BlockchainAuditTrailStrategy.cs
 ```csharp
-public sealed class Soc2Strategy : ComplianceStrategyBase
+public sealed class BlockchainAuditTrailStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -6047,9 +6510,9 @@ public sealed class Soc2Strategy : ComplianceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Regulations/Sox2Strategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Innovation/PrivacyPreservingAuditStrategy.cs
 ```csharp
-public sealed class Sox2Strategy : ComplianceStrategyBase
+public sealed class PrivacyPreservingAuditStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -6061,9 +6524,9 @@ public sealed class Sox2Strategy : ComplianceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/SecurityFrameworks/BsiC5Strategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Innovation/NaturalLanguagePolicyStrategy.cs
 ```csharp
-public sealed class BsiC5Strategy : ComplianceStrategyBase
+public sealed class NaturalLanguagePolicyStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -6075,9 +6538,9 @@ public sealed class BsiC5Strategy : ComplianceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/SecurityFrameworks/CisControlsStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Innovation/SelfHealingComplianceStrategy.cs
 ```csharp
-public sealed class CisControlsStrategy : ComplianceStrategyBase
+public sealed class SelfHealingComplianceStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -6089,9 +6552,9 @@ public sealed class CisControlsStrategy : ComplianceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/SecurityFrameworks/CisTop18Strategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Innovation/RealTimeComplianceStrategy.cs
 ```csharp
-public sealed class CisTop18Strategy : ComplianceStrategyBase
+public sealed class RealTimeComplianceStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -6103,87 +6566,80 @@ public sealed class CisTop18Strategy : ComplianceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/SecurityFrameworks/CobitStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/SovereigntyMesh/SovereigntyZoneStrategy.cs
 ```csharp
-public sealed class CobitStrategy : ComplianceStrategyBase
+public sealed class SovereigntyZone : ISovereigntyZone
+{
+}
+    public string ZoneId { get; }
+    public string Name { get; }
+    public IReadOnlyList<string> Jurisdictions { get; }
+    public IReadOnlyList<string> RequiredRegulations { get; }
+    public IReadOnlyDictionary<string, ZoneAction> ActionRules { get; }
+    public bool IsActive { get; internal set; }
+    public SovereigntyZone(string zoneId, string name, IReadOnlyList<string> jurisdictions, IReadOnlyList<string> requiredRegulations, IReadOnlyDictionary<string, ZoneAction> actionRules, bool isActive = true);
+    public Task<ZoneAction> EvaluateAsync(string objectId, CompliancePassport? passport, IReadOnlyDictionary<string, object> context, CancellationToken ct);
+}
+```
+```csharp
+internal static class TagPatternMatcher
+{
+}
+    public static bool Matches(string pattern, string tag);
+}
+```
+```csharp
+public sealed class SovereigntyZoneBuilder
+{
+}
+    public SovereigntyZoneBuilder WithId(string zoneId);
+    public SovereigntyZoneBuilder WithName(string name);
+    public SovereigntyZoneBuilder InJurisdictions(params string[] jurisdictions);
+    public SovereigntyZoneBuilder Requiring(params string[] regulations);
+    public SovereigntyZoneBuilder WithRule(string tagPattern, ZoneAction action);
+    public SovereigntyZoneBuilder Active(bool isActive);
+    public SovereigntyZone Build();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/SovereigntyMesh/ZoneEnforcerStrategy.cs
+```csharp
+public sealed class ZoneEnforcerStrategy : ComplianceStrategyBase, IZoneEnforcer
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    public ZoneEnforcerStrategy(DeclarativeZoneRegistry registry);
+    public async Task<ZoneEnforcementResult> EnforceAsync(string objectId, string sourceZoneId, string destinationZoneId, CompliancePassport? passport, CancellationToken ct);
+    public async Task<IReadOnlyList<ISovereigntyZone>> GetZonesForJurisdictionAsync(string jurisdictionCode, CancellationToken ct);
+    public async Task<ISovereigntyZone?> GetZoneAsync(string zoneId, CancellationToken ct);
+    public async Task RegisterZoneAsync(ISovereigntyZone zone, CancellationToken ct);
+    public async Task DeactivateZoneAsync(string zoneId, CancellationToken ct);
+    public IReadOnlyList<EnforcementAuditEntry> GetEnforcementAudit(string objectId);
+    protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
 }
 ```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/SecurityFrameworks/CsaStarStrategy.cs
 ```csharp
-public sealed class CsaStarStrategy : ComplianceStrategyBase
+private sealed record CachedEnforcementResult(ZoneEnforcementResult Result, DateTimeOffset ExpiresAt)
 {
 }
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public bool IsExpired;;
 }
 ```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/SecurityFrameworks/EnsStrategy.cs
 ```csharp
-public sealed class EnsStrategy : ComplianceStrategyBase
+public sealed record EnforcementAuditEntry
 {
 }
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/SecurityFrameworks/IsoIec15408Strategy.cs
-```csharp
-public sealed class IsoIec15408Strategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/SecurityFrameworks/IsraelNcsStrategy.cs
-```csharp
-public sealed class IsraelNcsStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/SecurityFrameworks/ItilStrategy.cs
-```csharp
-public sealed class ItilStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public required string ObjectId { get; init; }
+    public required string SourceZoneId { get; init; }
+    public required string DestZoneId { get; init; }
+    public required ZoneAction Decision { get; init; }
+    public string? PassportId { get; init; }
+    public required DateTimeOffset Timestamp { get; init; }
+    public required string Details { get; init; }
 }
 ```
 
@@ -6196,7 +6652,7 @@ public sealed class DeclarativeZoneRegistry : ComplianceStrategyBase
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Framework;;
-    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
+    public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
     public Task RegisterZoneAsync(SovereigntyZone zone, CancellationToken ct = default);
     public Task<SovereigntyZone?> GetZoneAsync(string zoneId, CancellationToken ct = default);
     public Task<IReadOnlyList<SovereigntyZone>> GetZonesForJurisdictionAsync(string jurisdictionCode, CancellationToken ct = default);
@@ -6206,6 +6662,146 @@ public sealed class DeclarativeZoneRegistry : ComplianceStrategyBase
     protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/SovereigntyMesh/SovereigntyObservabilityStrategy.cs
+```csharp
+public sealed class SovereigntyObservabilityStrategy : ComplianceStrategyBase
+{
+}
+    public const string PassportsIssuedTotal = "passports_issued_total";
+    public const string PassportsVerifiedTotal = "passports_verified_total";
+    public const string PassportsValidTotal = "passports_valid_total";
+    public const string PassportsInvalidTotal = "passports_invalid_total";
+    public const string PassportsExpiredTotal = "passports_expired_total";
+    public const string PassportsRevokedTotal = "passports_revoked_total";
+    public const string ZoneEnforcementTotal = "zone_enforcement_total";
+    public const string ZoneEnforcementAllowedTotal = "zone_enforcement_allowed_total";
+    public const string ZoneEnforcementDeniedTotal = "zone_enforcement_denied_total";
+    public const string ZoneEnforcementConditionalTotal = "zone_enforcement_conditional_total";
+    public const string TransfersTotal = "transfers_total";
+    public const string TransfersApprovedTotal = "transfers_approved_total";
+    public const string TransfersDeniedTotal = "transfers_denied_total";
+    public const string ZkProofsGeneratedTotal = "zk_proofs_generated_total";
+    public const string ZkProofsVerifiedTotal = "zk_proofs_verified_total";
+    public const string ActivePassports = "active_passports";
+    public const string ActiveZones = "active_zones";
+    public const string ActiveAgreements = "active_agreements";
+    public const string PassportIssuanceDurationMs = "passport_issuance_duration_ms";
+    public const string ZoneEnforcementDurationMs = "zone_enforcement_duration_ms";
+    public const string TransferNegotiationDurationMs = "transfer_negotiation_duration_ms";
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
+    public Task IncrementCounterAsync(string metricName, long value = 1);
+    public Task SetGaugeAsync(string metricName, long value);
+    public Task RecordDurationAsync(string metricName, double durationMs);
+    public Task<SovereigntyMetricsSnapshot> GetMetricsSnapshotAsync(CancellationToken ct = default);
+    public Task<IReadOnlyList<SovereigntyAlert>> GetAlertsAsync(CancellationToken ct = default);
+    public async Task<SovereigntyHealth> GetHealthAsync(CancellationToken ct = default);
+    protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+}
+```
+```csharp
+internal sealed class RollingWindow
+{
+}
+    public RollingWindow(int capacity);
+    public void Add(double value);
+    public DistributionSummary GetSummary();
+}
+```
+```csharp
+public sealed record SovereigntyMetricsSnapshot
+{
+}
+    public required IReadOnlyDictionary<string, long> Counters { get; init; }
+    public required IReadOnlyDictionary<string, long> Gauges { get; init; }
+    public required IReadOnlyDictionary<string, DistributionSummary> Distributions { get; init; }
+    public required DateTimeOffset Timestamp { get; init; }
+}
+```
+```csharp
+public sealed record DistributionSummary
+{
+}
+    public int Count { get; init; }
+    public double Min { get; init; }
+    public double Max { get; init; }
+    public double Average { get; init; }
+    public double P50 { get; init; }
+    public double P95 { get; init; }
+    public double P99 { get; init; }
+}
+```
+```csharp
+public sealed record SovereigntyAlert
+{
+}
+    public required string AlertId { get; init; }
+    public required AlertSeverity Severity { get; init; }
+    public required string Message { get; init; }
+    public required string MetricName { get; init; }
+    public required double CurrentValue { get; init; }
+    public required double Threshold { get; init; }
+    public required DateTimeOffset Timestamp { get; init; }
+}
+```
+```csharp
+public sealed record SovereigntyHealth
+{
+}
+    public required HealthStatus Status { get; init; }
+    public required IReadOnlyList<SovereigntyAlert> ActiveAlerts { get; init; }
+    public required SovereigntyMetricsSnapshot MetricsSnapshot { get; init; }
+    public required DateTimeOffset Timestamp { get; init; }
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/SovereigntyMesh/SovereigntyMeshOrchestratorStrategy.cs
+```csharp
+public sealed class SovereigntyMeshOrchestratorStrategy : ComplianceStrategyBase, ISovereigntyMesh
+{
+}
+    public const string TopicPassportIssued = "compliance.passport.issued";
+    public const string TopicPassportRevoked = "compliance.passport.revoked";
+    public const string TopicPassportExpired = "compliance.passport.expired";
+    public const string TopicSovereigntyViolation = "compliance.sovereignty.violation";
+    public const string TopicCrossBorderTransfer = "compliance.crossborder.transfer";
+    public const string TopicZoneActivated = "compliance.zone.activated";
+    public const string TopicZoneDeactivated = "compliance.zone.deactivated";
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override string Framework;;
+    public IZoneEnforcer ZoneEnforcer;;
+    public ICrossBorderProtocol CrossBorderProtocol;;
+    public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
+    public async Task<CompliancePassport> IssuePassportAsync(string objectId, IReadOnlyList<string> regulations, CancellationToken ct);
+    public async Task<PassportVerificationResult> VerifyPassportAsync(string passportId, CancellationToken ct);
+    public async Task<ZoneEnforcementResult> CheckSovereigntyAsync(string objectId, string sourceLocation, string destLocation, CancellationToken ct);
+    public async Task<(CompliancePassport Passport, ZoneEnforcementResult Enforcement)> CheckAndIssueAsync(string objectId, string sourceLocation, string destLocation, IReadOnlyList<string> regulations, CancellationToken ct);
+    public async Task<ZkPassportProof> GenerateZkProofAsync(string passportId, string claim, CancellationToken ct);
+    public async Task<ZkVerificationResult> VerifyZkProofAsync(ZkPassportProof proof, CancellationToken ct);
+    public async Task<MeshStatus> GetMeshStatusAsync(CancellationToken ct);
+    public static async Task<SovereigntyMeshOrchestratorStrategy> CreateDefaultAsync(CancellationToken ct = default);
+    protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
+    public ComplianceStatistics GetAggregateStatistics();
+}
+```
+```csharp
+public sealed record MeshStatus
+{
+}
+    public required int TotalZones { get; init; }
+    public required int ActiveZones { get; init; }
+    public required long TotalPassports { get; init; }
+    public required long ValidPassports { get; init; }
+    public required int ExpiredPassports { get; init; }
+    public required long RecentTransfers { get; init; }
+    public required long RecentViolations { get; init; }
+    public required DateTimeOffset Timestamp { get; init; }
 }
 ```
 
@@ -6253,48 +6849,57 @@ public sealed class InterceptionStatistics
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/SovereigntyMesh/SovereigntyMeshOrchestratorStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/SovereigntyMesh/SovereigntyRoutingStrategy.cs
 ```csharp
-public sealed class SovereigntyMeshOrchestratorStrategy : ComplianceStrategyBase, ISovereigntyMesh
+public sealed class SovereigntyRoutingStrategy : ComplianceStrategyBase
 {
 }
-    public const string TopicPassportIssued = "compliance.passport.issued";
-    public const string TopicPassportRevoked = "compliance.passport.revoked";
-    public const string TopicPassportExpired = "compliance.passport.expired";
-    public const string TopicSovereigntyViolation = "compliance.sovereignty.violation";
-    public const string TopicCrossBorderTransfer = "compliance.crossborder.transfer";
-    public const string TopicZoneActivated = "compliance.zone.activated";
-    public const string TopicZoneDeactivated = "compliance.zone.deactivated";
+    public sealed record RoutingDecision;
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Framework;;
-    public IZoneEnforcer ZoneEnforcer;;
-    public ICrossBorderProtocol CrossBorderProtocol;;
-    public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
-    public async Task<CompliancePassport> IssuePassportAsync(string objectId, IReadOnlyList<string> regulations, CancellationToken ct);
-    public async Task<PassportVerificationResult> VerifyPassportAsync(string passportId, CancellationToken ct);
-    public async Task<ZoneEnforcementResult> CheckSovereigntyAsync(string objectId, string sourceLocation, string destLocation, CancellationToken ct);
-    public async Task<(CompliancePassport Passport, ZoneEnforcementResult Enforcement)> CheckAndIssueAsync(string objectId, string sourceLocation, string destLocation, IReadOnlyList<string> regulations, CancellationToken ct);
-    public async Task<ZkPassportProof> GenerateZkProofAsync(string passportId, string claim, CancellationToken ct);
-    public async Task<ZkVerificationResult> VerifyZkProofAsync(ZkPassportProof proof, CancellationToken ct);
-    public async Task<MeshStatus> GetMeshStatusAsync(CancellationToken ct);
-    public static async Task<SovereigntyMeshOrchestratorStrategy> CreateDefaultAsync(CancellationToken ct = default);
+    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
+    public void SetSovereigntyMesh(ISovereigntyMesh mesh);
+    public async Task<RoutingDecision> CheckRoutingAsync(string objectId, string intendedDestination, IReadOnlyDictionary<string, object> objectTags, CancellationToken ct);
+    public string MapStorageBackendToJurisdiction(string backendId);
+    public void RegisterBackendJurisdiction(string backendId, string jurisdictionCode);
+    public async Task<IReadOnlyList<string>> GetCompliantStorageLocations(string objectId, IReadOnlyDictionary<string, object> objectTags, CancellationToken ct);
+    public RoutingStatistics GetRoutingStatistics();
+    public int EvictExpiredCacheEntries();
     protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    public ComplianceStatistics GetAggregateStatistics();
 }
 ```
 ```csharp
-public sealed record MeshStatus
+public sealed record RoutingDecision
 {
 }
-    public required int TotalZones { get; init; }
-    public required int ActiveZones { get; init; }
-    public required long TotalPassports { get; init; }
-    public required long ValidPassports { get; init; }
-    public required int ExpiredPassports { get; init; }
-    public required long RecentTransfers { get; init; }
-    public required long RecentViolations { get; init; }
-    public required DateTimeOffset Timestamp { get; init; }
+    public required bool Allowed { get; init; }
+    public string? RecommendedLocation { get; init; }
+    public IReadOnlyList<string>? BlockedLocations { get; init; }
+    public IReadOnlyList<string>? AllowedLocations { get; init; }
+    public string? Reason { get; init; }
+    public ZoneEnforcementResult? EnforcementResult { get; init; }
+}
+```
+```csharp
+private sealed class CacheEntry
+{
+}
+    public required RoutingDecision Decision { get; init; }
+    public required long CreatedAtTicks { get; init; }
+}
+```
+```csharp
+public sealed record RoutingStatistics
+{
+}
+    public required long RoutingChecksTotal { get; init; }
+    public required long RoutingAllowed { get; init; }
+    public required long RoutingDenied { get; init; }
+    public required long RoutingRedirected { get; init; }
+    public required long CacheHits { get; init; }
+    public required int CacheSize { get; init; }
+    public required int RegisteredBackends { get; init; }
 }
 ```
 
@@ -6373,9 +6978,9 @@ public sealed class DataEmbassyStrategy : ComplianceStrategyBase
     public override string StrategyName;;
     public override string Framework;;
     protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken ct);
-    public async Task<DataEmbassy> EstablishEmbassyAsync(string embassyId, string hostJurisdiction, string sovereignJurisdiction, IEnumerable<string> protectedJurisdictions, CancellationToken ct = default);
-    public async Task<EmbassyChannel> CreateSecureChannelAsync(string sourceEmbassyId, string destinationEmbassyId, CancellationToken ct = default);
-    public async Task<byte[]> TransferThroughChannelAsync(string channelId, byte[] data, CancellationToken ct = default);
+    public Task<DataEmbassy> EstablishEmbassyAsync(string embassyId, string hostJurisdiction, string sovereignJurisdiction, IEnumerable<string> protectedJurisdictions, CancellationToken ct = default);
+    public Task<EmbassyChannel> CreateSecureChannelAsync(string sourceEmbassyId, string destinationEmbassyId, CancellationToken ct = default);
+    public Task<byte[]> TransferThroughChannelAsync(string channelId, byte[] data, CancellationToken ct = default);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
 }
@@ -6404,8 +7009,21 @@ public record EmbassyChannel
     public required byte[] SharedKey { get; init; }
     public DateTimeOffset EstablishedAt { get; init; }
     public bool IsActive { get; set; }
-    public long TransferCount { get; set; }
-    public DateTimeOffset? LastTransferAt { get; set; }
+    public long TransferCount;;
+    public long IncrementTransferCount();;
+    public DateTimeOffset? LastTransferAt
+{
+    get
+    {
+        var t = Interlocked.Read(ref _lastTransferAtTicks);
+        return t == 0 ? null : new DateTimeOffset(t, TimeSpan.Zero);
+    }
+
+    set
+    {
+        Interlocked.Exchange(ref _lastTransferAtTicks, value.HasValue ? value.Value.UtcTicks : 0);
+    }
+}
 }
 ```
 ```csharp
@@ -6427,7 +7045,7 @@ public sealed class DataResidencyEnforcementStrategy : ComplianceStrategyBase
     public override string StrategyName;;
     public override string Framework;;
     protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken ct);
-    public async Task<DataResidencyPolicy> CreatePolicyAsync(string policyId, IEnumerable<string> allowedLocations, string? primaryLocation = null, IEnumerable<string>? allowedBackupLocations = null, IEnumerable<string>? dataClassifications = null, CancellationToken ct = default);
+    public Task<DataResidencyPolicy> CreatePolicyAsync(string policyId, IEnumerable<string> allowedLocations, string? primaryLocation = null, IEnumerable<string>? allowedBackupLocations = null, IEnumerable<string>? dataClassifications = null, CancellationToken ct = default);
     public DataLocationRecord? GetDataLocation(string resourceId);
     public IList<ResidencyViolation> GetViolations(string resourceId);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
@@ -6478,7 +7096,7 @@ public sealed class CrossBorderTransferControlStrategy : ComplianceStrategyBase
     public override string StrategyName;;
     public override string Framework;;
     protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken ct);
-    public async Task<TransferAgreement> CreateAgreementAsync(string sourceJurisdiction, string destinationJurisdiction, string agreementType, bool requiresEncryption = true, CancellationToken ct = default);
+    public Task<TransferAgreement> CreateAgreementAsync(string sourceJurisdiction, string destinationJurisdiction, string agreementType, bool requiresEncryption = true, CancellationToken ct = default);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
 }
@@ -6509,235 +7127,9 @@ public record TransferRecord
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/SovereigntyMesh/SovereigntyObservabilityStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Industry/NydfsStrategy.cs
 ```csharp
-public sealed class SovereigntyObservabilityStrategy : ComplianceStrategyBase
-{
-}
-    public const string PassportsIssuedTotal = "passports_issued_total";
-    public const string PassportsVerifiedTotal = "passports_verified_total";
-    public const string PassportsValidTotal = "passports_valid_total";
-    public const string PassportsInvalidTotal = "passports_invalid_total";
-    public const string PassportsExpiredTotal = "passports_expired_total";
-    public const string PassportsRevokedTotal = "passports_revoked_total";
-    public const string ZoneEnforcementTotal = "zone_enforcement_total";
-    public const string ZoneEnforcementAllowedTotal = "zone_enforcement_allowed_total";
-    public const string ZoneEnforcementDeniedTotal = "zone_enforcement_denied_total";
-    public const string ZoneEnforcementConditionalTotal = "zone_enforcement_conditional_total";
-    public const string TransfersTotal = "transfers_total";
-    public const string TransfersApprovedTotal = "transfers_approved_total";
-    public const string TransfersDeniedTotal = "transfers_denied_total";
-    public const string ZkProofsGeneratedTotal = "zk_proofs_generated_total";
-    public const string ZkProofsVerifiedTotal = "zk_proofs_verified_total";
-    public const string ActivePassports = "active_passports";
-    public const string ActiveZones = "active_zones";
-    public const string ActiveAgreements = "active_agreements";
-    public const string PassportIssuanceDurationMs = "passport_issuance_duration_ms";
-    public const string ZoneEnforcementDurationMs = "zone_enforcement_duration_ms";
-    public const string TransferNegotiationDurationMs = "transfer_negotiation_duration_ms";
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
-    public Task IncrementCounterAsync(string metricName, long value = 1);
-    public Task SetGaugeAsync(string metricName, long value);
-    public Task RecordDurationAsync(string metricName, double durationMs);
-    public Task<SovereigntyMetricsSnapshot> GetMetricsSnapshotAsync(CancellationToken ct = default);
-    public Task<IReadOnlyList<SovereigntyAlert>> GetAlertsAsync(CancellationToken ct = default);
-    public async Task<SovereigntyHealth> GetHealthAsync(CancellationToken ct = default);
-    protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-}
-```
-```csharp
-internal sealed class RollingWindow
-{
-}
-    public RollingWindow(int capacity);
-    public void Add(double value);
-    public DistributionSummary GetSummary();
-}
-```
-```csharp
-public sealed record SovereigntyMetricsSnapshot
-{
-}
-    public required IReadOnlyDictionary<string, long> Counters { get; init; }
-    public required IReadOnlyDictionary<string, long> Gauges { get; init; }
-    public required IReadOnlyDictionary<string, DistributionSummary> Distributions { get; init; }
-    public required DateTimeOffset Timestamp { get; init; }
-}
-```
-```csharp
-public sealed record DistributionSummary
-{
-}
-    public int Count { get; init; }
-    public double Min { get; init; }
-    public double Max { get; init; }
-    public double Average { get; init; }
-    public double P50 { get; init; }
-    public double P95 { get; init; }
-    public double P99 { get; init; }
-}
-```
-```csharp
-public sealed record SovereigntyAlert
-{
-}
-    public required string AlertId { get; init; }
-    public required AlertSeverity Severity { get; init; }
-    public required string Message { get; init; }
-    public required string MetricName { get; init; }
-    public required double CurrentValue { get; init; }
-    public required double Threshold { get; init; }
-    public required DateTimeOffset Timestamp { get; init; }
-}
-```
-```csharp
-public sealed record SovereigntyHealth
-{
-}
-    public required HealthStatus Status { get; init; }
-    public required IReadOnlyList<SovereigntyAlert> ActiveAlerts { get; init; }
-    public required SovereigntyMetricsSnapshot MetricsSnapshot { get; init; }
-    public required DateTimeOffset Timestamp { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/SovereigntyMesh/SovereigntyRoutingStrategy.cs
-```csharp
-public sealed class SovereigntyRoutingStrategy : ComplianceStrategyBase
-{
-}
-    public sealed record RoutingDecision;
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
-    public void SetSovereigntyMesh(ISovereigntyMesh mesh);
-    public async Task<RoutingDecision> CheckRoutingAsync(string objectId, string intendedDestination, IReadOnlyDictionary<string, object> objectTags, CancellationToken ct);
-    public string MapStorageBackendToJurisdiction(string backendId);
-    public void RegisterBackendJurisdiction(string backendId, string jurisdictionCode);
-    public async Task<IReadOnlyList<string>> GetCompliantStorageLocations(string objectId, IReadOnlyDictionary<string, object> objectTags, CancellationToken ct);
-    public RoutingStatistics GetRoutingStatistics();
-    public int EvictExpiredCacheEntries();
-    protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-}
-```
-```csharp
-public sealed record RoutingDecision
-{
-}
-    public required bool Allowed { get; init; }
-    public string? RecommendedLocation { get; init; }
-    public IReadOnlyList<string>? BlockedLocations { get; init; }
-    public IReadOnlyList<string>? AllowedLocations { get; init; }
-    public string? Reason { get; init; }
-    public ZoneEnforcementResult? EnforcementResult { get; init; }
-}
-```
-```csharp
-private sealed class CacheEntry
-{
-}
-    public required RoutingDecision Decision { get; init; }
-    public required long CreatedAtTicks { get; init; }
-}
-```
-```csharp
-public sealed record RoutingStatistics
-{
-}
-    public required long RoutingChecksTotal { get; init; }
-    public required long RoutingAllowed { get; init; }
-    public required long RoutingDenied { get; init; }
-    public required long RoutingRedirected { get; init; }
-    public required long CacheHits { get; init; }
-    public required int CacheSize { get; init; }
-    public required int RegisteredBackends { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/SovereigntyMesh/SovereigntyZoneStrategy.cs
-```csharp
-public sealed class SovereigntyZone : ISovereigntyZone
-{
-}
-    public string ZoneId { get; }
-    public string Name { get; }
-    public IReadOnlyList<string> Jurisdictions { get; }
-    public IReadOnlyList<string> RequiredRegulations { get; }
-    public IReadOnlyDictionary<string, ZoneAction> ActionRules { get; }
-    public bool IsActive { get; internal set; }
-    public SovereigntyZone(string zoneId, string name, IReadOnlyList<string> jurisdictions, IReadOnlyList<string> requiredRegulations, IReadOnlyDictionary<string, ZoneAction> actionRules, bool isActive = true);
-    public Task<ZoneAction> EvaluateAsync(string objectId, CompliancePassport? passport, IReadOnlyDictionary<string, object> context, CancellationToken ct);
-}
-```
-```csharp
-internal static class TagPatternMatcher
-{
-}
-    public static bool Matches(string pattern, string tag);
-}
-```
-```csharp
-public sealed class SovereigntyZoneBuilder
-{
-}
-    public SovereigntyZoneBuilder WithId(string zoneId);
-    public SovereigntyZoneBuilder WithName(string name);
-    public SovereigntyZoneBuilder InJurisdictions(params string[] jurisdictions);
-    public SovereigntyZoneBuilder Requiring(params string[] regulations);
-    public SovereigntyZoneBuilder WithRule(string tagPattern, ZoneAction action);
-    public SovereigntyZoneBuilder Active(bool isActive);
-    public SovereigntyZone Build();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/SovereigntyMesh/ZoneEnforcerStrategy.cs
-```csharp
-public sealed class ZoneEnforcerStrategy : ComplianceStrategyBase, IZoneEnforcer
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    public ZoneEnforcerStrategy(DeclarativeZoneRegistry registry);
-    public async Task<ZoneEnforcementResult> EnforceAsync(string objectId, string sourceZoneId, string destinationZoneId, CompliancePassport? passport, CancellationToken ct);
-    public async Task<IReadOnlyList<ISovereigntyZone>> GetZonesForJurisdictionAsync(string jurisdictionCode, CancellationToken ct);
-    public async Task<ISovereigntyZone?> GetZoneAsync(string zoneId, CancellationToken ct);
-    public async Task RegisterZoneAsync(ISovereigntyZone zone, CancellationToken ct);
-    public async Task DeactivateZoneAsync(string zoneId, CancellationToken ct);
-    public IReadOnlyList<EnforcementAuditEntry> GetEnforcementAuditAsync(string objectId);
-    protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-```csharp
-private sealed record CachedEnforcementResult(ZoneEnforcementResult Result, DateTimeOffset ExpiresAt)
-{
-}
-    public bool IsExpired;;
-}
-```
-```csharp
-public sealed record EnforcementAuditEntry
-{
-}
-    public required string ObjectId { get; init; }
-    public required string SourceZoneId { get; init; }
-    public required string DestZoneId { get; init; }
-    public required ZoneAction Decision { get; init; }
-    public string? PassportId { get; init; }
-    public required DateTimeOffset Timestamp { get; init; }
-    public required string Details { get; init; }
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USFederal/CjisStrategy.cs
-```csharp
-public sealed class CjisStrategy : ComplianceStrategyBase
+public sealed class NydfsStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -6749,9 +7141,9 @@ public sealed class CjisStrategy : ComplianceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USFederal/CmmcStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Industry/Soc3Strategy.cs
 ```csharp
-public sealed class CmmcStrategy : ComplianceStrategyBase
+public sealed class Soc3Strategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -6763,9 +7155,9 @@ public sealed class CmmcStrategy : ComplianceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USFederal/CoppaStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Industry/Soc1Strategy.cs
 ```csharp
-public sealed class CoppaStrategy : ComplianceStrategyBase
+public sealed class Soc1Strategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -6777,9 +7169,9 @@ public sealed class CoppaStrategy : ComplianceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USFederal/Dfars252Strategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Industry/HitrustStrategy.cs
 ```csharp
-public sealed class Dfars252Strategy : ComplianceStrategyBase
+public sealed class HitrustStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -6791,9 +7183,9 @@ public sealed class Dfars252Strategy : ComplianceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USFederal/EarStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Industry/NercCipStrategy.cs
 ```csharp
-public sealed class EarStrategy : ComplianceStrategyBase
+public sealed class NercCipStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -6805,9 +7197,9 @@ public sealed class EarStrategy : ComplianceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USFederal/FerpaStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Industry/MasStrategy.cs
 ```csharp
-public sealed class FerpaStrategy : ComplianceStrategyBase
+public sealed class MasStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -6819,317 +7211,9 @@ public sealed class FerpaStrategy : ComplianceStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USFederal/FismaStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/Industry/SwiftCscfStrategy.cs
 ```csharp
-public sealed class FismaStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USFederal/GlbaStrategy.cs
-```csharp
-public sealed class GlbaStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USFederal/ItarStrategy.cs
-```csharp
-public sealed class ItarStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USFederal/SoxComplianceStrategy.cs
-```csharp
-public sealed class SoxComplianceStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USFederal/StateRampStrategy.cs
-```csharp
-public sealed class StateRampStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USFederal/TxRampStrategy.cs
-```csharp
-public sealed class TxRampStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USState/CcpaStrategy.cs
-```csharp
-public sealed class CcpaStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USState/CpaStrategy.cs
-```csharp
-public sealed class CpaStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USState/CtdpaStrategy.cs
-```csharp
-public sealed class CtdpaStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USState/DelawareStrategy.cs
-```csharp
-public sealed class DelawareStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USState/IowaPrivacyStrategy.cs
-```csharp
-public sealed class IowaPrivacyStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USState/MontanaStrategy.cs
-```csharp
-public sealed class MontanaStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USState/NyShieldStrategy.cs
-```csharp
-public sealed class NyShieldStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USState/OregonStrategy.cs
-```csharp
-public sealed class OregonStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USState/TennesseeStrategy.cs
-```csharp
-public sealed class TennesseeStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USState/TexasPrivacyStrategy.cs
-```csharp
-public sealed class TexasPrivacyStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USState/UtcpaStrategy.cs
-```csharp
-public sealed class UtcpaStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/USState/VcdpaStrategy.cs
-```csharp
-public sealed class VcdpaStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/WORM/FinraWormStrategy.cs
-```csharp
-public sealed class FinraWormStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/WORM/Sec17a4WormStrategy.cs
-```csharp
-public sealed class Sec17a4WormStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/WORM/WormRetentionStrategy.cs
-```csharp
-public sealed class WormRetentionStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/WORM/WormStorageStrategy.cs
-```csharp
-public sealed class WormStorageStrategy : ComplianceStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override string Framework;;
-    protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateCompliance/Strategies/WORM/WormVerificationStrategy.cs
-```csharp
-public sealed class WormVerificationStrategy : ComplianceStrategyBase
+public sealed class SwiftCscfStrategy : ComplianceStrategyBase
 {
 }
     public override string StrategyId;;

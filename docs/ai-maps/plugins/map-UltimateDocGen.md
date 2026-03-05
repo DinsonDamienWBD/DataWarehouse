@@ -47,6 +47,8 @@ public abstract class DocGenStrategyBase
     public abstract DocGenCharacteristics Characteristics { get; }
     public string StrategyId;;
     public abstract Task<DocGenResult> GenerateAsync(DocGenRequest request, CancellationToken ct = default);;
+    protected static void ValidateRequest(DocGenRequest request);
+    protected static string? ExtractSourceTitle(DocGenRequest request);
     protected string FormatAsMarkdown(string title, List<(string Name, string Type, string Description)> items);
     protected string FormatAsHtml(string title, List<(string Name, string Type, string Description)> items);
 }

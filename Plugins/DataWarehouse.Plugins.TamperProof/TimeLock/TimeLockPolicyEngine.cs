@@ -18,13 +18,16 @@ namespace DataWarehouse.Plugins.TamperProof.TimeLock;
 [SdkCompatibility("5.0.0", Notes = "Phase 59: Time-lock engine")]
 public sealed class TimeLockPolicyEngine
 {
-    private readonly ConcurrentBag<TimeLockRule> _rules = new();
+    // ConcurrentDictionary gives atomic TryAdd semantics for duplicate-name check (finding 1046).
+    // Key: rule name (case-insensitive), Value: rule.
+    private readonly ConcurrentDictionary<string, TimeLockRule> _rules =
+        new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Gets all currently registered rules, ordered by priority descending.
     /// </summary>
     public IReadOnlyList<TimeLockRule> Rules =>
-        _rules.OrderByDescending(r => r.Priority).ToList().AsReadOnly();
+        _rules.Values.OrderByDescending(r => r.Priority).ToList().AsReadOnly();
 
     /// <summary>
     /// Initializes a new TimeLockPolicyEngine with the built-in compliance rules.
@@ -48,7 +51,7 @@ public sealed class TimeLockPolicyEngine
         string? complianceFramework,
         string? contentType)
     {
-        var orderedRules = _rules.OrderByDescending(r => r.Priority);
+        var orderedRules = _rules.Values.OrderByDescending(r => r.Priority);
 
         foreach (var rule in orderedRules)
         {
@@ -75,7 +78,7 @@ public sealed class TimeLockPolicyEngine
         string? complianceFramework,
         string? contentType)
     {
-        var orderedRules = _rules.OrderByDescending(r => r.Priority);
+        var orderedRules = _rules.Values.OrderByDescending(r => r.Priority);
 
         foreach (var rule in orderedRules)
         {
@@ -98,12 +101,11 @@ public sealed class TimeLockPolicyEngine
     {
         ArgumentNullException.ThrowIfNull(rule);
 
-        if (_rules.Any(r => r.Name.Equals(rule.Name, StringComparison.OrdinalIgnoreCase)))
+        // TryAdd is atomic — eliminates TOCTOU race between duplicate-name check and insert (finding 1046).
+        if (!_rules.TryAdd(rule.Name, rule))
         {
             throw new ArgumentException($"A rule with name '{rule.Name}' already exists.", nameof(rule));
         }
-
-        _rules.Add(rule);
     }
 
     /// <summary>
@@ -115,20 +117,8 @@ public sealed class TimeLockPolicyEngine
     {
         if (string.IsNullOrWhiteSpace(ruleName)) return false;
 
-        // ConcurrentBag does not support removal by predicate, so rebuild
-        var snapshot = _rules.ToArray();
-        var toKeep = snapshot.Where(r => !r.Name.Equals(ruleName, StringComparison.OrdinalIgnoreCase)).ToArray();
-
-        if (toKeep.Length == snapshot.Length) return false;
-
-        // Clear and re-add
-        while (_rules.TryTake(out _)) { }
-        foreach (var rule in toKeep)
-        {
-            _rules.Add(rule);
-        }
-
-        return true;
+        // TryRemove is atomic — no rebuild required (finding 1046).
+        return _rules.TryRemove(ruleName, out _);
     }
 
     /// <summary>
@@ -248,7 +238,7 @@ public sealed class TimeLockPolicyEngine
     private void InitializeBuiltInRules()
     {
         // Priority 100: Classified/Secret -- highest priority, most restrictive
-        _rules.Add(new TimeLockRule
+        AddRule(new TimeLockRule
         {
             Name = "Classified-Secret",
             Priority = 100,
@@ -263,7 +253,7 @@ public sealed class TimeLockPolicyEngine
         });
 
         // Priority 90: SOX Financial -- 7-year retention with Maximum vaccination
-        _rules.Add(new TimeLockRule
+        AddRule(new TimeLockRule
         {
             Name = "SOX-Financial",
             Priority = 90,
@@ -278,7 +268,7 @@ public sealed class TimeLockPolicyEngine
         });
 
         // Priority 80: HIPAA PHI -- 7-year retention with Enhanced vaccination
-        _rules.Add(new TimeLockRule
+        AddRule(new TimeLockRule
         {
             Name = "HIPAA-PHI",
             Priority = 80,
@@ -293,7 +283,7 @@ public sealed class TimeLockPolicyEngine
         });
 
         // Priority 70: PCI-DSS -- 1-year retention with Enhanced vaccination
-        _rules.Add(new TimeLockRule
+        AddRule(new TimeLockRule
         {
             Name = "PCI-DSS",
             Priority = 70,
@@ -308,7 +298,7 @@ public sealed class TimeLockPolicyEngine
         });
 
         // Priority 50: GDPR Personal -- 30-day lock with Basic vaccination
-        _rules.Add(new TimeLockRule
+        AddRule(new TimeLockRule
         {
             Name = "GDPR-Personal",
             Priority = 50,
@@ -323,7 +313,7 @@ public sealed class TimeLockPolicyEngine
         });
 
         // Priority 0: Default -- catch-all with 7-day lock
-        _rules.Add(new TimeLockRule
+        AddRule(new TimeLockRule
         {
             Name = "Default",
             Priority = 0,

@@ -132,13 +132,15 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Retention
             {
                 if (!policy.IsEnabled) continue;
 
+                // P2-2528: Materialize query once to avoid double-enumeration (backups.Count()
+                // re-executes the deferred LINQ query after ApplyPolicy already consumed it).
                 var backups = _catalog.Query(new BackupListQuery
                 {
                     MaxResults = int.MaxValue
-                }).Where(b => MatchesPolicy(b, policy));
+                }).Where(b => MatchesPolicy(b, policy)).ToList();
 
                 var expired = ApplyPolicy(policy, backups).ToList();
-                result.EvaluatedBackups += backups.Count();
+                result.EvaluatedBackups += backups.Count;
                 result.ExpiredBackups += expired.Count;
 
                 foreach (var backup in expired)

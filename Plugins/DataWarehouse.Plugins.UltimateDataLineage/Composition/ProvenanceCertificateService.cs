@@ -302,7 +302,12 @@ namespace DataWarehouse.Plugins.UltimateDataLineage.Composition
         {
             try
             {
-                var objectId = message.Payload["objectId"]?.ToString();
+                if (!message.Payload.TryGetValue("objectId", out var rawObjectId))
+                {
+                    _logger?.LogWarning("Certificate request missing 'objectId' key in payload");
+                    return;
+                }
+                var objectId = rawObjectId?.ToString();
                 if (string.IsNullOrEmpty(objectId))
                 {
                     _logger?.LogWarning("Certificate request missing objectId");

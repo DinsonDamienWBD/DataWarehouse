@@ -30,6 +30,9 @@ internal sealed class RubyWasmLanguageStrategy : WasmLanguageStrategyBase
     public override string StrategyId => "compute.wasm.lang.ruby";
 
     /// <inheritdoc/>
+    protected override string[] GetToolchainBinaryNames() => new[] { "ruby.wasm" };
+
+    /// <inheritdoc/>
     public override string StrategyName => "Ruby WASM Language";
 
     /// <inheritdoc/>

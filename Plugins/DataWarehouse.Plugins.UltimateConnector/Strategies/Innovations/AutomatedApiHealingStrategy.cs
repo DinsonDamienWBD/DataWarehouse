@@ -134,15 +134,17 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await client.PostAsync("/api/v1/healing/sessions", content, ct);
+            using var response = await client.PostAsync("/api/v1/healing/sessions", content, ct);
             response.EnsureSuccessStatusCode();
 
             var result = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
             var sessionId = result.GetProperty("session_id").GetString()
                 ?? throw new InvalidOperationException("API healing endpoint did not return a session_id.");
 
+            client.DefaultRequestHeaders.Remove("X-Healing-Session");
             client.DefaultRequestHeaders.Add("X-Healing-Session", sessionId);
             if (!string.IsNullOrEmpty(versionInfo.ActiveVersion))
+                client.DefaultRequestHeaders.Remove("X-API-Version");
                 client.DefaultRequestHeaders.Add("X-API-Version", versionInfo.ActiveVersion);
 
             var info = new Dictionary<string, object>
@@ -169,9 +171,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             var client = handle.GetConnection<HttpClient>();
-            var sessionId = handle.ConnectionInfo["session_id"]?.ToString();
+            var sessionId = handle.ConnectionInfo.GetValueOrDefault("session_id")?.ToString() ?? throw new InvalidOperationException("session_id is required in ConnectionInfo");
 
-            var response = await client.GetAsync($"/api/v1/healing/sessions/{sessionId}/status", ct);
+            using var response = await client.GetAsync($"/api/v1/healing/sessions/{sessionId}/status", ct);
             if (!response.IsSuccessStatusCode) return false;
 
             var status = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
@@ -182,14 +184,16 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             var client = handle.GetConnection<HttpClient>();
-            var sessionId = handle.ConnectionInfo["session_id"]?.ToString();
+            var sessionId = handle.ConnectionInfo.GetValueOrDefault("session_id")?.ToString() ?? throw new InvalidOperationException("session_id is required in ConnectionInfo");
 
             try
             {
-                var reportResponse = await client.GetAsync(
+                // Finding 1925: Dispose the response to avoid resource leaks.
+                using var reportResponse = await client.GetAsync(
                     $"/api/v1/healing/sessions/{sessionId}/report", ct);
 
-                await client.DeleteAsync($"/api/v1/healing/sessions/{sessionId}", ct);
+                // Also dispose the DELETE response
+                using var deleteResponse = await client.DeleteAsync($"/api/v1/healing/sessions/{sessionId}", ct);
             }
             finally
             {
@@ -202,9 +206,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
         {
             var sw = Stopwatch.StartNew();
             var client = handle.GetConnection<HttpClient>();
-            var sessionId = handle.ConnectionInfo["session_id"]?.ToString();
+            var sessionId = handle.ConnectionInfo.GetValueOrDefault("session_id")?.ToString() ?? throw new InvalidOperationException("session_id is required in ConnectionInfo");
 
-            var response = await client.GetAsync($"/api/v1/healing/sessions/{sessionId}/health", ct);
+            using var response = await client.GetAsync($"/api/v1/healing/sessions/{sessionId}/health", ct);
             sw.Stop();
 
             if (!response.IsSuccessStatusCode)
@@ -260,7 +264,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
 
             try
             {
-                var response = await client.GetAsync("/api/versions", ct);
+                using var response = await client.GetAsync("/api/versions", ct);
                 if (response.IsSuccessStatusCode)
                 {
                     var versionsData = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
@@ -283,7 +287,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             }
             catch
             {
+
                 // Version detection is best-effort
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             if (availableVersions.Count == 0)
@@ -299,7 +305,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
         {
             try
             {
-                var response = await client.SendAsync(
+                using var response = await client.SendAsync(
                     new HttpRequestMessage(HttpMethod.Head, "/"), ct);
 
                 DateTimeOffset? sunsetDate = null;
@@ -337,7 +343,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
         {
             try
             {
-                var response = await client.GetAsync("/api/v1/schema", ct);
+                using var response = await client.GetAsync("/api/v1/schema", ct);
                 if (!response.IsSuccessStatusCode) return null;
 
                 var body = await response.Content.ReadAsByteArrayAsync(ct);

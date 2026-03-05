@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using System.Text;
 using DataWarehouse.SDK.Contracts.Compute;
 using DataWarehouse.SDK.Utilities;
@@ -53,13 +52,13 @@ internal sealed class ShuffleStrategy : ComputeRuntimeStrategyBase
                 if (shuffleMode == "sort-merge")
                 {
                     // Range-based partitioning via sort key comparison
-                    var keyHash = key.GetHashCode();
+                    var keyHash = StableHash.Compute(key);
                     partitionIdx = ((keyHash % targetPartitions) + targetPartitions) % targetPartitions;
                 }
                 else
                 {
-                    // Hash-based partitioning
-                    var hash = BitConverter.ToUInt32(SHA256.HashData(Encoding.UTF8.GetBytes(key)), 0);
+                    // Hash-based partitioning — use StableHash to avoid per-record SHA256 allocation.
+                    var hash = (uint)StableHash.Compute(key);
                     partitionIdx = (int)(hash % (uint)targetPartitions);
                 }
 

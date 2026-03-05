@@ -15,7 +15,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
     public sealed class DuressMultiChannelStrategy : AccessControlStrategyBase
     {
         private readonly ILogger _logger;
-        private readonly List<IAccessControlStrategy> _alertStrategies = new();
+        private readonly System.Collections.Concurrent.ConcurrentBag<IAccessControlStrategy> _alertStrategies = new();
 
         public DuressMultiChannelStrategy(ILogger? logger = null)
         {

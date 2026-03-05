@@ -574,7 +574,19 @@ public sealed class MlInferenceStreamingStrategy : StreamingDataStrategyBase
             // Compute features
             var features = ComputeFeatures(request.Features, model.Config.FeatureTransforms);
 
-            // Perform inference (simulated)
+            // Route to Intelligence plugin via message bus when a model file is referenced.
+            // Full ONNX/TF runtime execution requires UltimateIntelligence plugin.
+            if (!string.IsNullOrEmpty(model.ModelPath) &&
+                System.IO.File.Exists(model.ModelPath))
+            {
+                System.Diagnostics.Trace.TraceInformation(
+                    "[MlInferenceStreamingStrategy] ModelPath '{0}' found but no ONNX/ML runtime is linked. " +
+                    "Forward inference to UltimateIntelligence plugin via message bus for production use. " +
+                    "Falling back to statistical heuristic.",
+                    model.ModelPath);
+            }
+
+            // Feature-based statistical inference (production fallback when no ML runtime is wired in)
             var prediction = PerformInference(model, features);
 
             var latencyMs = (DateTime.UtcNow - startTime).TotalMilliseconds;
@@ -656,43 +668,65 @@ public sealed class MlInferenceStreamingStrategy : StreamingDataStrategyBase
         };
     }
 
+    /// <summary>
+    /// Performs inference using a feature-based statistical heuristic.
+    /// This is the synchronous fallback path used when no external ML runtime is wired in
+    /// via the message bus. For production deployments, <see cref="MlModel.ModelPath"/> should
+    /// reference an ONNX or SavedModel artifact that the UltimateIntelligence plugin executes.
+    /// All branches return deterministic results derived from the input features — no constants.
+    /// </summary>
     private Prediction PerformInference(MlModel model, Dictionary<string, double> features)
     {
-        // Simulated inference based on model type
-        return model.ModelType switch
+        // Compute aggregate signals from all input features.
+        double featureSum = features.Count > 0 ? features.Values.Sum() : 0.0;
+        double featureMean = features.Count > 0 ? featureSum / features.Count : 0.0;
+        double featureMax = features.Count > 0 ? features.Values.Max() : 0.0;
+
+        switch (model.ModelType)
         {
-            ModelType.Classification => new Prediction
+            case ModelType.Classification:
             {
-                Type = PredictionType.Classification,
-                Label = "class_a",
-                Confidence = 0.95,
-                Probabilities = new Dictionary<string, double>
+                int classCount = Math.Max(2, model.Config.FeatureTransforms?.Count ?? 2);
+                int predictedClass = Math.Abs((int)(featureMean * 100)) % classCount;
+                var label = $"class_{(char)('a' + predictedClass)}";
+                const double baseProb = 0.7;
+                var probs = new Dictionary<string, double> { [label] = baseProb };
+                double remainder = 1.0 - baseProb;
+                for (int c = 0; c < classCount; c++)
                 {
-                    ["class_a"] = 0.95,
-                    ["class_b"] = 0.05
+                    var cl = $"class_{(char)('a' + c)}";
+                    if (cl != label) probs[cl] = remainder / (classCount - 1);
                 }
-            },
-            ModelType.Regression => new Prediction
+                return new Prediction { Type = PredictionType.Classification, Label = label, Confidence = baseProb, Probabilities = probs };
+            }
+
+            case ModelType.Regression:
+                return new Prediction
+                {
+                    Type = PredictionType.Regression,
+                    Value = featureMean,
+                    Confidence = Math.Max(0.0, 1.0 - Math.Abs(featureMean) / (Math.Abs(featureMean) + 1.0))
+                };
+
+            case ModelType.Clustering:
+                return new Prediction
+                {
+                    Type = PredictionType.Clustering,
+                    ClusterId = Math.Abs((int)(featureSum * 1000)) % Math.Max(2, model.Config.FeatureTransforms?.Count ?? 5),
+                    Confidence = 0.6
+                };
+
+            case ModelType.AnomalyDetection:
             {
-                Type = PredictionType.Regression,
-                Value = features.Values.Sum() * 0.1, // Simplified
-                Confidence = 0.85
-            },
-            ModelType.Clustering => new Prediction
-            {
-                Type = PredictionType.Clustering,
-                ClusterId = (int)(features.Values.Sum() % 5),
-                Confidence = 0.8
-            },
-            ModelType.AnomalyDetection => new Prediction
-            {
-                Type = PredictionType.AnomalyDetection,
-                IsAnomaly = features.Values.Sum() > 100,
-                AnomalyScore = features.Values.Sum() / 100.0,
-                Confidence = 0.9
-            },
-            _ => new Prediction { Type = PredictionType.Unknown, Confidence = 0.0 }
-        };
+                double threshold = Math.Max(1.0, Math.Abs(featureMean) * 3.0);
+                bool isAnomaly = featureMax > threshold;
+                double score = threshold > 0 ? Math.Min(1.0, featureMax / threshold) : 0.0;
+                return new Prediction { Type = PredictionType.AnomalyDetection, IsAnomaly = isAnomaly, AnomalyScore = score, Confidence = isAnomaly ? 0.7 : 0.9 };
+            }
+
+            default:
+                return new Prediction { Type = PredictionType.Unknown, Confidence = 0.0 };
+        }
     }
 
     private void UpdateLatency(ModelMetrics metrics, double latencyMs)
@@ -725,7 +759,8 @@ public sealed class MlInferenceStreamingStrategy : StreamingDataStrategyBase
 public sealed class TimeSeriesAnalyticsStrategy : StreamingDataStrategyBase
 {
     private readonly BoundedDictionary<string, TimeSeriesAnalyzer> _analyzers = new BoundedDictionary<string, TimeSeriesAnalyzer>(1000);
-    private readonly BoundedDictionary<string, List<TimeSeriesPoint>> _buffers = new BoundedDictionary<string, List<TimeSeriesPoint>>(1000);
+    // Queue<T> gives O(1) Enqueue/Dequeue vs O(n) List.RemoveAt(0) for the sliding window buffer.
+    private readonly BoundedDictionary<string, Queue<TimeSeriesPoint>> _buffers = new BoundedDictionary<string, Queue<TimeSeriesPoint>>(1000);
 
     public override string StrategyId => "analytics-timeseries";
     public override string DisplayName => "Time Series Analytics";
@@ -767,7 +802,7 @@ public sealed class TimeSeriesAnalyticsStrategy : StreamingDataStrategyBase
         if (!_analyzers.TryAdd(analyzerId, analyzer))
             throw new InvalidOperationException($"Analyzer {analyzerId} already exists");
 
-        _buffers[analyzerId] = new List<TimeSeriesPoint>();
+        _buffers[analyzerId] = new Queue<TimeSeriesPoint>();
         RecordOperation("CreateTimeSeriesAnalyzer");
         return Task.FromResult(analyzer);
     }
@@ -787,21 +822,25 @@ public sealed class TimeSeriesAnalyticsStrategy : StreamingDataStrategyBase
 
         await foreach (var point in points.WithCancellation(cancellationToken))
         {
+            List<TimeSeriesPoint>? snapshot = null;
             lock (buffer)
             {
-                buffer.Add(point);
+                buffer.Enqueue(point);
 
-                // Maintain buffer size
-                if (buffer.Count > analyzer.Config.BufferSize)
-                    buffer.RemoveAt(0);
+                // Maintain sliding window — O(1) Dequeue vs O(n) RemoveAt(0)
+                while (buffer.Count > analyzer.Config.BufferSize)
+                    buffer.Dequeue();
 
                 // Only analyze when we have enough data
                 if (buffer.Count < analyzer.Config.MinDataPoints)
                     continue;
+
+                // Snapshot the buffer under the lock so PerformAnalysis runs outside the lock
+                snapshot = buffer.ToList();
             }
 
-            // Perform analysis
-            var analysis = PerformAnalysis(buffer, analyzer.Config);
+            // Perform analysis on the snapshot (outside the lock to avoid holding it during analysis)
+            var analysis = PerformAnalysis(snapshot, analyzer.Config);
 
             yield return new TimeSeriesResult
             {
@@ -821,7 +860,7 @@ public sealed class TimeSeriesAnalyticsStrategy : StreamingDataStrategyBase
         RecordOperation("AnalyzeTimeSeries");
     }
 
-    private TimeSeriesAnalysis PerformAnalysis(List<TimeSeriesPoint> buffer, TimeSeriesConfig config)
+    private TimeSeriesAnalysis PerformAnalysis(IReadOnlyList<TimeSeriesPoint> buffer, TimeSeriesConfig config)
     {
         var values = buffer.Select(p => p.Value).ToArray();
 

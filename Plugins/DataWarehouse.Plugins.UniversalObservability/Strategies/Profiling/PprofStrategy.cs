@@ -46,7 +46,8 @@ public sealed class PprofStrategy : ObservabilityStrategyBase
     public void Configure(string endpoint, string outputDirectory = "./profiles")
     {
         _endpoint = endpoint;
-        _outputDirectory = outputDirectory;
+        // Resolve and canonicalize the output directory to prevent path traversal attacks.
+        _outputDirectory = Path.GetFullPath(outputDirectory);
 
         if (!Directory.Exists(_outputDirectory))
         {
@@ -140,16 +141,27 @@ public sealed class PprofStrategy : ObservabilityStrategyBase
         try
         {
             var url = $"{_endpoint}/{profileType}";
-            var response = await _httpClient.GetAsync(url, ct);
+            using var response = await _httpClient.GetAsync(url, ct);
             response.EnsureSuccessStatusCode();
 
             var profileData = await response.Content.ReadAsByteArrayAsync(ct);
 
-            // Save to file
-            var timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd_HHmmss");
-            var filename = Path.Combine(_outputDirectory, $"{profileType}_{timestamp}.pb.gz");
-            await File.WriteAllBytesAsync(filename, profileData, ct);
+            // Sanitize profileType to a safe filename component: strip query string and path separators.
+            var safeTypeName = profileType
+                .Split('?')[0] // drop query string (e.g. "profile?seconds=30" → "profile")
+                .Replace(Path.DirectorySeparatorChar, '_')
+                .Replace(Path.AltDirectorySeparatorChar, '_')
+                .Replace("..", "_");
 
+            var timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd_HHmmss");
+            var filename = $"{safeTypeName}_{timestamp}.pb.gz";
+
+            // Verify the resolved path is still within the configured output directory.
+            var fullPath = Path.GetFullPath(Path.Combine(_outputDirectory, filename));
+            if (!fullPath.StartsWith(_outputDirectory, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException($"Resolved profile path '{fullPath}' is outside the configured output directory.");
+
+            await File.WriteAllBytesAsync(fullPath, profileData, ct);
             return profileData;
         }
         catch (HttpRequestException)
@@ -171,7 +183,7 @@ public sealed class PprofStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{_endpoint}/", cancellationToken);
+            using var response = await _httpClient.GetAsync($"{_endpoint}/", cancellationToken);
 
             var directoryExists = Directory.Exists(_outputDirectory);
 
@@ -209,17 +221,11 @@ public sealed class PprofStrategy : ObservabilityStrategyBase
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("pprof.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     protected override void Dispose(bool disposing)

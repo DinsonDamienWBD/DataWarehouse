@@ -66,14 +66,15 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
             var authHeader = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{accessKey}:{secretKey}"));
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", authHeader);
 
-            var response = await httpClient.SendAsync(request, ct);
+            using var response = await httpClient.SendAsync(request, ct);
             response.EnsureSuccessStatusCode();
 
+            // Finding 1920: Do NOT store access key in ConnectionInfo — it is visible via health
+            // check serialization and logging. Keep credentials in private fields only.
             var connectionInfo = new Dictionary<string, object>
             {
                 ["protocol"] = "S3",
                 ["endpoint"] = endpoint,
-                ["accessKey"] = accessKey,
                 ["provider"] = "MinIO"
             };
 
@@ -88,7 +89,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
             try
             {
                 var httpClient = handle.GetConnection<HttpClient>();
-                var response = await httpClient.GetAsync("/minio/health/live", ct);
+                using var response = await httpClient.GetAsync("/minio/health/live", ct);
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -111,26 +112,27 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
         /// </summary>
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
-            var startTime = DateTimeOffset.UtcNow;
+            // P2-1904: Use Stopwatch for latency — DateTimeOffset subtraction is susceptible to NTP clock adjustments.
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             try
             {
                 var httpClient = handle.GetConnection<HttpClient>();
-                var start = DateTimeOffset.UtcNow;
-                var response = await httpClient.GetAsync("/minio/health/live", ct);
-                var latency = DateTimeOffset.UtcNow - start;
+                using var response = await httpClient.GetAsync("/minio/health/live", ct);
+                sw.Stop();
 
                 return new ConnectionHealth(
                     IsHealthy: response.IsSuccessStatusCode,
                     StatusMessage: response.IsSuccessStatusCode ? "MinIO server healthy" : $"MinIO server returned {response.StatusCode}",
-                    Latency: latency,
+                    Latency: sw.Elapsed,
                     CheckedAt: DateTimeOffset.UtcNow);
             }
             catch (Exception ex)
             {
+                sw.Stop();
                 return new ConnectionHealth(
                     IsHealthy: false,
                     StatusMessage: $"MinIO health check failed: {ex.Message}",
-                    Latency: DateTimeOffset.UtcNow - startTime,
+                    Latency: sw.Elapsed,
                     CheckedAt: DateTimeOffset.UtcNow);
             }
         }

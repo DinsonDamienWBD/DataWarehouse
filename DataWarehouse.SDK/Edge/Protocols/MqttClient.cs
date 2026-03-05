@@ -39,7 +39,8 @@ namespace DataWarehouse.SDK.Edge.Protocols
         private MqttConnectionSettings? _currentSettings;
         private CancellationTokenSource? _reconnectCts;
         private readonly SemaphoreSlim _connectLock = new(1, 1);
-        private readonly List<string> _subscribedTopics = new();
+        // Maps topic → QoS so subscriptions are restored with the original QoS level (finding P2-312).
+        private readonly Dictionary<string, MqttQualityOfServiceLevel> _subscribedTopics = new(StringComparer.OrdinalIgnoreCase);
         private readonly object _topicsLock = new();
         private bool _disposed;
 
@@ -144,9 +145,10 @@ namespace DataWarehouse.SDK.Edge.Protocols
         /// <inheritdoc/>
         public async Task DisconnectAsync(CancellationToken ct = default)
         {
-            // Cancel auto-reconnect
-            _reconnectCts?.Cancel();
-            _reconnectCts = null;
+            // Cancel auto-reconnect — atomically swap out CTS to avoid race with reconnect handler
+            var cts = Interlocked.Exchange(ref _reconnectCts, null);
+            cts?.Cancel();
+            cts?.Dispose();
 
             if (_client.IsConnected)
             {
@@ -162,6 +164,19 @@ namespace DataWarehouse.SDK.Edge.Protocols
         public async Task PublishAsync(MqttMessage message, CancellationToken ct = default)
         {
             ArgumentNullException.ThrowIfNull(message);
+
+            // Validate MQTT topic: must not be null/empty, must not contain wildcards ('+', '#')
+            // or null characters (\0), which are rejected by brokers with cryptic errors.
+            if (string.IsNullOrEmpty(message.Topic))
+                throw new ArgumentException("MQTT topic must not be null or empty.", nameof(message));
+            if (message.Topic.Contains('+') || message.Topic.Contains('#'))
+                throw new ArgumentException(
+                    $"MQTT publish topic '{message.Topic}' must not contain wildcard characters ('+' or '#').",
+                    nameof(message));
+            if (message.Topic.Contains('\0'))
+                throw new ArgumentException(
+                    "MQTT publish topic must not contain null characters.",
+                    nameof(message));
 
             if (!IsConnected)
             {
@@ -227,16 +242,11 @@ namespace DataWarehouse.SDK.Edge.Protocols
 
             await _client.SubscribeAsync(subscribeOptionsBuilder.Build(), ct);
 
-            // Track subscriptions for restoration after reconnect
+            // Track subscriptions for restoration after reconnect (store per-topic QoS).
             lock (_topicsLock)
             {
                 foreach (var topic in topicList)
-                {
-                    if (!_subscribedTopics.Contains(topic))
-                    {
-                        _subscribedTopics.Add(topic);
-                    }
-                }
+                    _subscribedTopics[topic] = qos; // overwrite with latest QoS if already tracked
             }
         }
 
@@ -368,17 +378,21 @@ namespace DataWarehouse.SDK.Edge.Protocols
         /// </summary>
         private async Task RestoreSubscriptionsAsync(CancellationToken ct)
         {
-            List<string> topicsToRestore;
+            // Snapshot topic→QoS map under lock, then restore each QoS group separately.
+            Dictionary<string, MqttQualityOfServiceLevel> snapshot;
             lock (_topicsLock)
             {
-                topicsToRestore = _subscribedTopics.ToList();
+                snapshot = new Dictionary<string, MqttQualityOfServiceLevel>(
+                    _subscribedTopics, StringComparer.OrdinalIgnoreCase);
             }
 
-            if (topicsToRestore.Count > 0)
+            if (snapshot.Count == 0) return;
+
+            // Group by QoS level so each group is subscribed with the correct QoS (finding P2-312).
+            foreach (var group in snapshot.GroupBy(kv => kv.Value))
             {
-                // Restore all subscriptions with QoS 1 (default)
-                // Note: Accurate restoration requires tracking per-topic QoS levels
-                await SubscribeAsync(topicsToRestore, MqttQualityOfServiceLevel.AtLeastOnce, ct);
+                var topics = group.Select(kv => kv.Key).ToList();
+                await SubscribeAsync(topics, group.Key, ct).ConfigureAwait(false);
             }
         }
 

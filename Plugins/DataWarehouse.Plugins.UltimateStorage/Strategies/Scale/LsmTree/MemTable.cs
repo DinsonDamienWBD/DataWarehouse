@@ -146,13 +146,18 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
             {
                 if (_data.TryGetValue(key, out var oldValue))
                 {
+                    // Existing entry: subtract the old value size (tombstone itself has zero value bytes).
                     var sizeDelta = -(oldValue?.Length ?? 0);
                     Interlocked.Add(ref _estimatedSize, sizeDelta);
                 }
                 else
                 {
-                    var sizeDelta = key.Length + 16;
-                    Interlocked.Add(ref _estimatedSize, sizeDelta);
+                    // New tombstone for a key not previously in the MemTable.
+                    // Add only the key overhead (16 bytes node overhead, no value bytes for tombstone).
+                    // Do NOT add key.Length here since there was no prior entry to account for.
+                    // This prevents repeated deletes of non-existent keys from inflating size
+                    // and triggering premature flushes.
+                    Interlocked.Add(ref _estimatedSize, 16L);
                 }
 
                 _data[key] = null; // Tombstone marker

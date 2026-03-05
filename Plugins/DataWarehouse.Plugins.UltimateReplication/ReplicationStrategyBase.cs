@@ -534,7 +534,7 @@ namespace DataWarehouse.Plugins.UltimateReplication
             {
                 ConflictResolutionMethod.LastWriteWins => ResolveByTimestamp(conflict, mergedClock),
                 ConflictResolutionMethod.Crdt => await ResolveByCrdtAsync(conflict, mergedClock, cancellationToken),
-                ConflictResolutionMethod.Merge => await ResolveBytMergeAsync(conflict, mergedClock, cancellationToken),
+                ConflictResolutionMethod.Merge => await ResolveByMergeAsync(conflict, mergedClock, cancellationToken),
                 _ => (conflict.LocalData, mergedClock)
             };
         }
@@ -570,7 +570,8 @@ namespace DataWarehouse.Plugins.UltimateReplication
         /// <summary>
         /// Override to implement merge-based conflict resolution.
         /// </summary>
-        protected virtual Task<(ReadOnlyMemory<byte>, EnhancedVectorClock)> ResolveBytMergeAsync(
+        // LOW-3713: renamed from ResolveBytMergeAsync (typo "Byt") to ResolveByMergeAsync.
+        protected virtual Task<(ReadOnlyMemory<byte>, EnhancedVectorClock)> ResolveByMergeAsync(
             EnhancedReplicationConflict conflict,
             EnhancedVectorClock mergedClock,
             CancellationToken ct)
@@ -808,7 +809,9 @@ namespace DataWarehouse.Plugins.UltimateReplication
             }
             catch
             {
+
                 // Silently ignore - feedback is best-effort
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
@@ -932,7 +935,9 @@ namespace DataWarehouse.Plugins.UltimateReplication
             }
             catch
             {
+
                 // Silently ignore - feedback is best-effort
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
     }

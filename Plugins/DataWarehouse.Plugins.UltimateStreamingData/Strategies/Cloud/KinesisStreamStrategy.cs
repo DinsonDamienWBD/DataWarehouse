@@ -78,6 +78,12 @@ public sealed record KinesisStream
     /// <summary>Whether enhanced fan-out is enabled.</summary>
     public bool EnhancedFanOutEnabled { get; init; }
 
+    /// <summary>
+    /// AWS account ID that owns this stream (12-digit numeric string).
+    /// Required for constructing accurate consumer ARNs for enhanced fan-out.
+    /// </summary>
+    public string? AwsAccountId { get; init; }
+
     /// <summary>Stream mode: ON_DEMAND or PROVISIONED.</summary>
     public string StreamMode { get; init; } = "PROVISIONED";
 }
@@ -347,7 +353,7 @@ internal sealed class KinesisStreamStrategy : StreamingDataStrategyBase
             throw new InvalidOperationException($"Stream '{streamName}' not found.");
 
         // Route to shard using MD5 hash of partition key
-        var shard = RoutToShard(streamName, partitionKey, explicitHashKey);
+        var shard = RouteToShard(streamName, partitionKey, explicitHashKey);
         var shardKey = $"{streamName}:{shard.ShardId}";
 
         // Generate sequence number
@@ -516,7 +522,10 @@ internal sealed class KinesisStreamStrategy : StreamingDataStrategyBase
         if (!_streams.TryGetValue(streamName, out var stream))
             throw new InvalidOperationException($"Stream '{streamName}' not found.");
 
-        var consumerArn = $"arn:aws:kinesis:{stream.Region}:123456789012:stream/{streamName}/consumer/{consumerName}";
+        // Use the configured AWS account ID from the stream; fall back to a placeholder
+        // that is clearly not a valid AWS account number (all-zeros).
+        var accountId = string.IsNullOrWhiteSpace(stream.AwsAccountId) ? "000000000000" : stream.AwsAccountId;
+        var consumerArn = $"arn:aws:kinesis:{stream.Region}:{accountId}:stream/{streamName}/consumer/{consumerName}";
 
         var consumer = new KinesisConsumer
         {
@@ -703,7 +712,8 @@ internal sealed class KinesisStreamStrategy : StreamingDataStrategyBase
         return shards;
     }
 
-    private KinesisShard RoutToShard(string streamName, string partitionKey, string? explicitHashKey)
+    // Finding 4396: fixed method name typo RoutToShard -> RouteToShard.
+    private KinesisShard RouteToShard(string streamName, string partitionKey, string? explicitHashKey)
     {
         if (!_shards.TryGetValue(streamName, out var shards))
             throw new InvalidOperationException($"Stream '{streamName}' not found.");
@@ -720,19 +730,22 @@ internal sealed class KinesisStreamStrategy : StreamingDataStrategyBase
 
     private static string ComputeMidpoint(string startKey, string endKey)
     {
-        // Simplified midpoint calculation for hash key ranges
-        if (decimal.TryParse(startKey, out var start) && decimal.TryParse(endKey, out var end))
+        // Finding 4380: Kinesis hash key space is 128-bit (0 to 2^128-1). decimal has 96-bit mantissa
+        // and loses precision near extremes. Use BigInteger for exact integer arithmetic.
+        if (System.Numerics.BigInteger.TryParse(startKey, out var start) &&
+            System.Numerics.BigInteger.TryParse(endKey, out var end))
         {
-            return Math.Floor((start + end) / 2).ToString("F0");
+            return ((start + end) / 2).ToString();
         }
         return "170141183460469231731687303715884105727"; // 2^127 - 1
     }
 
     private static string IncrementHashKey(string key)
     {
-        if (decimal.TryParse(key, out var value))
+        // Finding 4380: use BigInteger to avoid decimal precision loss on 128-bit values.
+        if (System.Numerics.BigInteger.TryParse(key, out var value))
         {
-            return (value + 1).ToString("F0");
+            return (value + 1).ToString();
         }
         return "170141183460469231731687303715884105728";
     }

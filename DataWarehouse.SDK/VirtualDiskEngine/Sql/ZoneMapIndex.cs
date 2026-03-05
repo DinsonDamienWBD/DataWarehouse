@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.VirtualDiskEngine.Format;
@@ -176,8 +177,8 @@ public sealed class ZoneMapIndex
     private readonly long _zoneMapRegionStart;
     private readonly int _blockSize;
 
-    // In-memory cache: extent start block -> zone map entry
-    private readonly Dictionary<long, ZoneMapEntry> _entries = new();
+    // In-memory cache: extent start block -> zone map entry (ConcurrentDictionary for thread safety)
+    private readonly ConcurrentDictionary<long, ZoneMapEntry> _entries = new();
 
     /// <summary>Number of entries that fit in a single block.</summary>
     private int EntriesPerBlock => (_blockSize - 4) / ZoneMapEntry.SerializedSize; // 4 bytes for entry count header
@@ -336,6 +337,11 @@ public sealed class ZoneMapIndex
 
         int entryCount = BinaryPrimitives.ReadInt32LittleEndian(blockData.AsSpan(0, 4));
         if (entryCount <= 0) return;
+
+        // Cap entryCount to a reasonable upper bound to prevent corrupt-disk runaway I/O
+        const int MaxEntryCount = 1_000_000;
+        if (entryCount > MaxEntryCount)
+            throw new InvalidDataException($"Zone map entry count {entryCount} exceeds maximum {MaxEntryCount}. Possible data corruption.");
 
         int entriesPerBlock = EntriesPerBlock;
         int blocksNeeded = (entryCount + entriesPerBlock - 1) / Math.Max(entriesPerBlock, 1);

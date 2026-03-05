@@ -18,7 +18,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
 
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("quantum_proof_audit.check");
+            IncrementCounter("quantum_proof_audit.check");
             var violations = new List<ComplianceViolation>();
 
             // Check 1: Verify post-quantum signature algorithm
@@ -111,10 +111,11 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
                 });
             }
 
-            var isCompliant = violations.Count == 0;
-            var status = isCompliant ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.PartiallyCompliant :
-                        ComplianceStatus.RequiresReview;
+            var status = violations.Count == 0 ? ComplianceStatus.Compliant :
+                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        ComplianceStatus.PartiallyCompliant;
+            // isCompliant derived from status for consistency
+            var isCompliant = status == ComplianceStatus.Compliant;
 
             return Task.FromResult(new ComplianceResult
             {
@@ -126,13 +127,16 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
             });
         }
 
+        // Static readonly arrays avoid per-call heap allocations (finding 1458)
+        private static readonly string[] _pqSignatures = { "Dilithium", "CRYSTALS-Dilithium", "Falcon", "SPHINCS+", "SPHINCS" };
+        private static readonly string[] _pqKEMs = { "Kyber", "CRYSTALS-Kyber", "NTRU", "SABER" };
+
         private static bool IsPostQuantumSignature(string? algorithm)
         {
             if (string.IsNullOrEmpty(algorithm))
                 return false;
 
-            var pqSignatures = new[] { "Dilithium", "CRYSTALS-Dilithium", "Falcon", "SPHINCS+", "SPHINCS" };
-            return pqSignatures.Any(a => algorithm.Contains(a, StringComparison.OrdinalIgnoreCase));
+            return _pqSignatures.Any(a => algorithm.Contains(a, StringComparison.OrdinalIgnoreCase));
         }
 
         private static bool IsPostQuantumKEM(string? algorithm)
@@ -140,8 +144,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
             if (string.IsNullOrEmpty(algorithm))
                 return false;
 
-            var pqKEMs = new[] { "Kyber", "CRYSTALS-Kyber", "NTRU", "SABER" };
-            return pqKEMs.Any(a => algorithm.Contains(a, StringComparison.OrdinalIgnoreCase));
+            return _pqKEMs.Any(a => algorithm.Contains(a, StringComparison.OrdinalIgnoreCase));
         }
 
         private static bool IsQuantumResistantHash(string? algorithm)
@@ -155,12 +158,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
                    algorithm.Contains("SHA-512", StringComparison.OrdinalIgnoreCase);
         }
 
-        private T GetConfigValue<T>(string key, T defaultValue)
-        {
-            if (Configuration.TryGetValue(key, out var value) && value is T typedValue)
-                return typedValue;
-            return defaultValue;
-        }
+        // LOW-1459: GetConfigValue<T> is now on ComplianceStrategyBase — removed duplicate.
 
         private static List<string> GenerateRecommendations(List<ComplianceViolation> violations)
         {
@@ -187,14 +185,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("quantum_proof_audit.initialized");
+            IncrementCounter("quantum_proof_audit.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("quantum_proof_audit.shutdown");
+            IncrementCounter("quantum_proof_audit.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

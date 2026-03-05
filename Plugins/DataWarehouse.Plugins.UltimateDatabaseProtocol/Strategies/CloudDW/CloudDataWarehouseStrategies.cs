@@ -69,6 +69,7 @@ public sealed class SnowflakeProtocolStrategy : DatabaseProtocolStrategyBase
         };
 
         _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        _httpClient.DefaultRequestHeaders.Remove("User-Agent");
         _httpClient.DefaultRequestHeaders.Add("User-Agent", "DataWarehouse/1.0");
 
         _database = parameters.Database ?? "";
@@ -109,7 +110,7 @@ public sealed class SnowflakeProtocolStrategy : DatabaseProtocolStrategyBase
             Encoding.UTF8,
             "application/json");
 
-        var response = await _httpClient.PostAsync("/session/v1/login-request", content, ct);
+        using var response = await _httpClient.PostAsync("/session/v1/login-request", content, ct);
         response.EnsureSuccessStatusCode();
 
         var responseJson = await response.Content.ReadAsStringAsync(ct);
@@ -153,11 +154,12 @@ public sealed class SnowflakeProtocolStrategy : DatabaseProtocolStrategyBase
             Encoding.UTF8,
             "application/json");
 
-        var response = await _httpClient.PostAsync(
+        using var response = await _httpClient.PostAsync(
             "/queries/v1/query-request?requestId=" + Guid.NewGuid().ToString(),
             content,
             ct);
 
+        response.EnsureSuccessStatusCode();
         var responseJson = await response.Content.ReadAsStringAsync(ct);
         using var doc = JsonDocument.Parse(responseJson);
 
@@ -400,11 +402,12 @@ public sealed class BigQueryProtocolStrategy : DatabaseProtocolStrategyBase
             Encoding.UTF8,
             "application/json");
 
-        var response = await _httpClient.PostAsync(
+        using var response = await _httpClient.PostAsync(
             $"/bigquery/v2/projects/{_projectId}/queries",
             content,
             ct);
 
+        response.EnsureSuccessStatusCode();
         var responseJson = await response.Content.ReadAsStringAsync(ct);
         using var doc = JsonDocument.Parse(responseJson);
 
@@ -1020,7 +1023,8 @@ public sealed class DatabricksProtocolStrategy : DatabaseProtocolStrategyBase
             Encoding.UTF8,
             "application/json");
 
-        var response = await _httpClient.PostAsync("/api/2.0/sql/statements", content, ct);
+        using var response = await _httpClient.PostAsync("/api/2.0/sql/statements", content, ct);
+        response.EnsureSuccessStatusCode();
         var responseJson = await response.Content.ReadAsStringAsync(ct);
         using var doc = JsonDocument.Parse(responseJson);
 

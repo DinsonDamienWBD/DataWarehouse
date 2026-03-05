@@ -138,7 +138,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
                 // Send check request to Permify
-                var response = await _httpClient.PostAsync($"{_permifyEndpoint}/v1/tenants/{_tenantId}/permissions/check", content, cancellationToken);
+                using var response = await _httpClient.PostAsync($"{_permifyEndpoint}/v1/tenants/{_tenantId}/permissions/check", content, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -234,7 +234,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
                 var json = JsonSerializer.Serialize(request);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                var response = await _httpClient.PostAsync($"{_permifyEndpoint}/v1/tenants/{_tenantId}/permissions/lookup-entity", content, cancellationToken);
+                using var response = await _httpClient.PostAsync($"{_permifyEndpoint}/v1/tenants/{_tenantId}/permissions/lookup-entity", content, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                 {

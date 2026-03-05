@@ -30,6 +30,12 @@ namespace DataWarehouse.SDK.Infrastructure.Policy.Performance
         private long _fallThroughCount;
 
         /// <summary>
+        /// Exposes the underlying bloom filter for tier classification in <see cref="FastPathPolicyEngine"/>.
+        /// Internal use only.
+        /// </summary>
+        internal BloomFilterSkipIndex BloomFilter => _bloomFilter;
+
+        /// <summary>
         /// Initializes a new skip optimizer wrapping the given store with bloom filter pre-checks.
         /// </summary>
         /// <param name="innerStore">The real policy store to delegate to on bloom filter hits.</param>

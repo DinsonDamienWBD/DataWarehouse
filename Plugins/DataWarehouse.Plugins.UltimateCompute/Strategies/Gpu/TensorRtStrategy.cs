@@ -37,8 +37,13 @@ internal sealed class TensorRtStrategy : ComputeRuntimeStrategyBase
         ValidateTask(task);
         return await MeasureExecutionAsync(task.Id, async () =>
         {
-            var modelPath = Path.GetTempFileName() + ".onnx";
-            var enginePath = Path.GetTempFileName() + ".engine";
+            var _onnxBase = Path.GetTempFileName();
+            var modelPath = Path.ChangeExtension(_onnxBase, ".onnx");
+            File.Move(_onnxBase, modelPath);
+            var _engineBase = Path.GetTempFileName();
+            var enginePath = Path.ChangeExtension(_engineBase, ".engine");
+            File.Move(_engineBase, enginePath);
+            string? inputPath = null; // hoisted so finally block can delete it
             try
             {
                 await File.WriteAllBytesAsync(modelPath, task.Code.ToArray(), cancellationToken);
@@ -84,7 +89,9 @@ internal sealed class TensorRtStrategy : ComputeRuntimeStrategyBase
 
                 if (task.InputData.Length > 0)
                 {
-                    var inputPath = Path.GetTempFileName() + ".bin";
+                    var _binBase = Path.GetTempFileName();
+                    inputPath = Path.ChangeExtension(_binBase, ".bin");
+                    File.Move(_binBase, inputPath);
                     await File.WriteAllBytesAsync(inputPath, task.InputData.ToArray(), cancellationToken);
                     inferArgs.Append($"--loadInputs={inputPath} ");
                 }
@@ -103,7 +110,7 @@ internal sealed class TensorRtStrategy : ComputeRuntimeStrategyBase
             }
             finally
             {
-                try { File.Delete(modelPath); File.Delete(enginePath); } catch { /* Best-effort cleanup */ }
+                try { File.Delete(modelPath); File.Delete(enginePath); if (inputPath != null) File.Delete(inputPath); } catch { /* Best-effort cleanup */ }
             }
         }, cancellationToken);
     }

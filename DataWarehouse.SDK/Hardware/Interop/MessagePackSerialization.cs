@@ -212,9 +212,6 @@ public sealed class MessagePackWriter
     /// </summary>
     public void WriteStorageAddress(string scheme, string host, int port, string path)
     {
-        using var inner = new MemoryStream();
-        using var w = new BinaryWriter(inner, Encoding.UTF8, leaveOpen: true);
-
         // Encode as a 4-element map with string keys for schema evolution
         var innerWriter = new MessagePackWriter(new MemoryStream());
         innerWriter.WriteMapHeader(4);

@@ -1,7 +1,13 @@
-# Requirements: DataWarehouse v6.0
+# Requirements: DataWarehouse
 
-**Defined:** 2026-02-20
-**Core Value:** Every feature has a multi-level, cascade-aware, AI-tunable policy with format-native VDE integration — no feature is "dumb" or "one-size-fits-all."
+**Defined:** 2026-02-20 (v6.0), 2026-03-03 (v7.0)
+**Core Value:** Every feature production-ready — no stubs, no simulations, no known issues
+
+## v6.0 Requirements (SHIPPED)
+
+> v6.0 requirements below are historical. See v7.0 section for active work.
+
+**Original Core Value:** Every feature has a multi-level, cascade-aware, AI-tunable policy with format-native VDE integration — no feature is "dumb" or "one-size-fits-all."
 
 ## v6.0 Requirements
 
@@ -800,5 +806,171 @@ Requirements for v6.0 Intelligent Policy Engine & Composable VDE. Each maps to r
 - Unmapped: 0
 
 ---
-*Requirements defined: 2026-02-20*
-*Last updated: 2026-02-22 after VDE 2.0B Federation, Device-Level RAID, and Hardware-to-Storage Flow*
+
+## v7.0 Requirements
+
+Requirements for military-grade production readiness milestone. Maps to roadmap phases 96-111 across 4 stages.
+Single source of truth: `Metadata/production-audit-2026-03-05/CONSOLIDATED-FINDINGS.md` (11,128 findings).
+
+### Component-Level Hardening (HARD) — Phases 96-101
+
+- [ ] **HARD-01**: Every finding in CONSOLIDATED-FINDINGS.md (11,128 total) has a corresponding failing test in `DataWarehouse.Hardening.Tests/` proving the vulnerability exists (Coyote for concurrency, xUnit for logic/memory)
+- [ ] **HARD-02**: Every finding has a production code fix that makes its test pass — no finding skipped regardless of severity, type, or style
+- [ ] **HARD-03**: Processing is strictly sequential: project by project, file by file, line by line through CONSOLIDATED-FINDINGS.md — no reordering
+- [ ] **HARD-04**: Solution builds with 0 errors after each commit; `dotnet test` passes after each commit (post-commit sanity)
+- [ ] **HARD-05**: Commits batched per project (≤150 findings = 1 commit) or per file group (larger projects)
+
+### Full Audit (AUDT) — Phase 102
+
+- [ ] **AUDT-01**: Coyote concurrency testing finds 0 new bugs across all `DataWarehouse.Hardening.Tests`
+- [ ] **AUDT-02**: dotCover confirms hardening tests execute the vulnerable lines identified in CONSOLIDATED-FINDINGS.md
+- [ ] **AUDT-03**: Coverage report exported to `Metadata/dotcover-hardening-report/`; any gaps addressed with additional tests
+
+### Profiling (PROF) — Phase 103
+
+- [ ] **PROF-01**: dotTrace shows no new hot-path lock contention introduced by hardening fixes
+- [ ] **PROF-02**: dotMemory shows no new large object heap allocations on formerly zero-allocation paths; no GC pressure regression
+
+### Mutation Testing (MUTN) — Phase 104
+
+- [ ] **MUTN-01**: Stryker.NET mutation score ≥ 95% across all hardening test projects
+- [ ] **MUTN-02**: Surviving mutants documented with justification (equivalent mutants, etc.)
+
+### Integration Profiling (SOAK) — Phases 105-106
+
+- [ ] **SOAK-01**: Test harness boots entire Kernel + all 52 plugins and streams 100GB synthetic payload through VDE pipeline
+- [ ] **SOAK-02**: dotTrace cross-boundary analysis shows no single bottleneck exceeding 5% of total execution time
+- [ ] **SOAK-03**: Soak test harness with configurable duration (CI: 10min, manual: 24-72hr) and GC event counter monitoring
+- [ ] **SOAK-04**: Gen2 collection rate stays below threshold; working set does not grow monotonically over soak duration
+
+### Chaos Engineering (CHAOS) — Phases 107-110
+
+- [ ] **CHAOS-01**: Plugin fault injection (fatal exceptions mid-operation) → Kernel isolates faulted plugin, other plugins continue
+- [ ] **CHAOS-02**: Concurrent plugin load/unload during active I/O → no torn state, no orphaned subscriptions
+- [ ] **CHAOS-03**: Torn-write recovery via Coyote-controlled crash mid-VDE chain → WAL/RAID parity rebuilds correctly
+- [ ] **CHAOS-04**: Resource exhaustion (ThreadPool, MemoryPool, disk-full) → graceful degradation, no hangs or corruption
+- [ ] **CHAOS-05**: Message bus disruption (loss, duplication, reorder) → idempotency verified, no data corruption
+- [ ] **CHAOS-06**: Federation network partition mid-replication → CRDT convergence after partition heals
+- [ ] **CHAOS-07**: Malicious payloads (zip bombs, malformed IVs, path traversal) → instant rejection without OOM/hang
+- [ ] **CHAOS-08**: Clock skew (±24hr TimeProvider manipulation) → no auth bypass, no stale cache, no policy errors
+
+### CI/CD Fortress (CICD) — Phase 111
+
+- [ ] **CICD-01**: `.github/workflows/audit.yml` updated with all hardened gates
+- [ ] **CICD-02**: Coyote: 1,000 iterations per PR; any non-deterministic failure blocks merge
+- [ ] **CICD-03**: BenchmarkDotNet: Gen2 heap allocation on zero-allocation path blocks merge
+- [ ] **CICD-04**: Stryker: mutation score drop below v7.0 baseline blocks merge
+
+## v7.1 Requirements (Next Milestone — Companion Sync)
+
+Deferred to separate milestone. Tracked but not in current roadmap.
+
+### CLI Sync
+
+- **CSYNC-01**: CLI has commands for PolicyEngine, Federation, Authority, Shards, DeviceRAID, AIAdvisor, CRDT, DualLevel
+- **CSYNC-02**: CLI migrated from static classes to DI-driven command handlers
+- **CSYNC-03**: CLI integrates with Kernel capability registry for dynamic command discovery
+- **CSYNC-04**: InteractiveMode/NLP updated for v3.0-v6.0 concepts
+
+### GUI Sync
+
+- **GSYNC-01**: GUI has pages for PolicyEngine, AuthorityChain, ShardLifecycle, AIAdvisor, DeviceRAID
+- **GSYNC-02**: Inline Razor logic extracted to testable service classes
+- **GSYNC-03**: DI service layer matches full plugin capability set
+
+### Dashboard Sync
+
+- **DSYNC-01**: Dashboard has controllers for Policy, Federation, Authority, Shards, RAID, AI, Compliance, Performance, VDE
+- **DSYNC-02**: Real-time SignalR channels for federation status, RAID health, shard migration progress
+- **DSYNC-03**: Full REST API parity with CLI capabilities
+
+### Launcher Sync
+
+- **LSYNC-01**: Federation-aware deployment topology
+- **LSYNC-02**: Policy-based startup configuration
+- **LSYNC-03**: Health check endpoints for all subsystems
+- **LSYNC-04**: Graceful shutdown with CRDT sync
+
+### Shared Alignment
+
+- **SHRD-01**: All 53 .cs files verified against current SDK contracts
+- **SHRD-02**: Stale types superseded by SDK removed
+- **SHRD-03**: InstanceManager and MessageBridge work with federation topology
+
+## Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| SDUP (Semantic Dedup) | v8.0+ reserved — requires latent-space ML pipeline |
+| ZKPA (zk-SNARK Compliance) | v8.0+ reserved — requires zk-SNARK proving system |
+| Ghost Enclaves | v8.0+ reserved |
+| New plugins beyond 52 | Hardening milestone — stabilize what exists |
+| New SDK features/architecture | v7.0 is strictly hardening, no new capabilities |
+| UI/UX redesign | v7.1 syncs existing architecture, not new design |
+
+## v7.0 Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| AFIX-01 | Phase 96 | Pending |
+| AFIX-02 | Phase 96 | Pending |
+| AFIX-03 | Phase 96 | Pending |
+| AFIX-04 | Phase 97 | Pending |
+| AFIX-05 | Phase 97 | Pending |
+| AFIX-06 | Phase 97 | Pending |
+| AFIX-07 | Phase 97 | Pending |
+| AFIX-08 | Phase 97 | Pending |
+| PILR-01 | Phase 96+97 | Pending |
+| PILR-02 | Phase 96+97 | Pending |
+| PILR-03 | Phase 96+97 | Pending |
+| PILR-04 | Phase 99 | Pending |
+| PILR-05 | Phase 99 | Pending |
+| PILR-06 | Phase 99 | Pending |
+| PILR-07 | Phase 99 | Pending |
+| PILR-08 | Phase 99 | Pending |
+| TEST-01 | Phase 98 | Pending |
+| TEST-02 | Phase 98 | Pending |
+| TEST-03 | Phase 98 | Pending |
+| TEST-04 | Phase 98 | Pending |
+| TEST-05 | Phase 99 | Pending |
+| TEST-06 | Phase 99 | Pending |
+| TEST-07 | Phase 99 | Pending |
+| TEST-08 | Phase 99 | Pending |
+| TEST-09 | Phase 99 | Pending |
+| TEST-10 | Phase 99 | Pending |
+| TEST-11 | Phase 100 | Pending |
+| TEST-12 | Phase 100 | Pending |
+| TEST-13 | Phase 100 | Pending |
+| TEST-14 | Phase 100 | Pending |
+| TEST-15 | Phase 100 | Pending |
+| TEST-16 | Phase 101 | Pending |
+| TEST-17 | Phase 101 | Pending |
+| TEST-18 | Phase 101 | Pending |
+| TEST-19 | Phase 101 | Pending |
+| TEST-20 | Phase 101 | Pending |
+| TEST-21 | Phase 101 | Pending |
+| PERF-01 | Phase 102 | Pending |
+| PERF-02 | Phase 102 | Pending |
+| PERF-03 | Phase 102 | Pending |
+| HOST-01 | Phase 103 | Pending |
+| HOST-02 | Phase 103 | Pending |
+| HOST-03 | Phase 103 | Pending |
+| HOST-04 | Phase 103 | Pending |
+| HOST-05 | Phase 103 | Pending |
+| HOST-06 | Phase 103 | Pending |
+| HOST-07 | Phase 104 | Pending |
+| HOST-08 | Phase 103 | Pending |
+| GATE-01 | Phase 104 | Pending |
+| GATE-02 | Phase 104 | Pending |
+| GATE-03 | Phase 104 | Pending |
+| GATE-04 | Phase 104 | Pending |
+| GATE-05 | Phase 104 | Pending |
+
+**Coverage:**
+- v7.0 requirements: 51 total (AFIX:8, PILR:8, TEST:21, PERF:3, HOST:8, GATE:5)
+- Mapped to phases: 51
+- Unmapped: 0
+
+---
+*Requirements defined: 2026-02-20 (v6.0), 2026-03-03 (v7.0)*
+*Last updated: 2026-03-03 after v7.0 milestone definition*

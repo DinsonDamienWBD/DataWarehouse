@@ -98,6 +98,11 @@ public sealed class AzureAISearchVectorStore : ProductionVectorStoreBase
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
 
+        // Finding 3224: Validate endpoint and API key on construction.
+        if (string.IsNullOrWhiteSpace(options.Endpoint))
+            throw new ArgumentException("Azure AI Search endpoint URL is required", nameof(options));
+        if (!Uri.TryCreate(options.Endpoint, UriKind.Absolute, out _))
+            throw new ArgumentException($"Azure AI Search endpoint is not a valid absolute URI: '{options.Endpoint}'", nameof(options));
         if (string.IsNullOrWhiteSpace(options.ApiKey))
             throw new ArgumentException("API key is required", nameof(options));
     }

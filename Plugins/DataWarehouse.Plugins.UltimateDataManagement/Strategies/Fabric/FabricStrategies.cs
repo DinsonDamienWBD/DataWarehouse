@@ -190,8 +190,15 @@ public sealed class SemanticLayerStrategy : DataManagementStrategyBase
 }
 
 /// <summary>
-/// Data Catalog Strategy - Metadata management and discovery for fabric.
+/// Data Catalog Strategy - Metadata management and discovery for data fabric.
 /// Merged from UltimateDataFabric plugin (T137).
+/// <para>
+/// CONSOLIDATION (Phase 94): This strategy is a capability descriptor only.
+/// All actual catalog operations (register, search, discover) are handled by
+/// UltimateDataCatalog as the authoritative catalog store. Fabric components
+/// that need catalog access should send messages to topics: catalog.register,
+/// catalog.search, catalog.discover via the message bus.
+/// </para>
 /// </summary>
 public sealed class FabricDataCatalogStrategy : DataManagementStrategyBase
 {
@@ -213,6 +220,13 @@ public sealed class FabricDataCatalogStrategy : DataManagementStrategyBase
 /// <summary>
 /// Lineage Tracking Strategy - Source-to-consumption data lineage.
 /// Merged from UltimateDataFabric plugin (T137).
+/// <para>
+/// CONSOLIDATION (Phase 94): This strategy is a capability descriptor only.
+/// All actual lineage operations (track, upstream, downstream, impact) are handled by
+/// UltimateDataLineage as the authoritative lineage store. Fabric components
+/// that need lineage access should send messages to topics: lineage.track,
+/// lineage.upstream, lineage.downstream, lineage.impact via the message bus.
+/// </para>
 /// </summary>
 public sealed class LineageTrackingStrategy : DataManagementStrategyBase
 {

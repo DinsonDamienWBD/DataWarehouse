@@ -16,7 +16,9 @@ public sealed class NfsStrategy : FilesystemStrategyBase
     {
         SupportsDirectIo = false, SupportsAsyncIo = true, SupportsMmap = true,
         SupportsKernelBypass = false, SupportsVectoredIo = false, SupportsSparse = false,
-        SupportsAutoDetect = true, MaxFileSize = 8L * 1024 * 1024 * 1024 * 1024 // 8TB NFS max
+        // LOW-3037: NFSv3 without LFS is limited to 4 GB. MaxFileSize = 8TB applies to NFSv4 only.
+        // Version detection is performed at runtime in DetectAsync via /proc/mounts fstype (nfs vs nfs4).
+        SupportsAutoDetect = true, MaxFileSize = 8L * 1024 * 1024 * 1024 * 1024 // 8TB (NFSv4); NFSv3 enforces 4GB at protocol level
     };
     public override string SemanticDescription =>
         "Detects and provides metadata for NFS network filesystems with mount parsing, " +
@@ -34,7 +36,7 @@ public sealed class NfsStrategy : FilesystemStrategyBase
             if (!File.Exists("/proc/mounts"))
                 return Task.FromResult<FilesystemMetadata?>(null);
 
-            var mounts = File.ReadAllLines("/proc/mounts");
+            var mounts = File.ReadLines("/proc/mounts");
             var normalizedPath = Path.GetFullPath(path);
 
             foreach (var line in mounts)
@@ -154,7 +156,7 @@ public sealed class SmbStrategy : FilesystemStrategyBase
                 // Parse /proc/mounts for cifs/smb
                 if (File.Exists("/proc/mounts"))
                 {
-                    var mounts = File.ReadAllLines("/proc/mounts");
+                    var mounts = File.ReadLines("/proc/mounts");
                     var normalizedPath = Path.GetFullPath(path);
 
                     foreach (var line in mounts)
@@ -248,7 +250,7 @@ public sealed class GlusterFsStrategy : FilesystemStrategyBase
             if (!File.Exists("/proc/mounts"))
                 return Task.FromResult<FilesystemMetadata?>(null);
 
-            var mounts = File.ReadAllLines("/proc/mounts");
+            var mounts = File.ReadLines("/proc/mounts");
             var normalizedPath = Path.GetFullPath(path);
 
             foreach (var line in mounts)
@@ -335,7 +337,7 @@ public sealed class CephFsStrategy : FilesystemStrategyBase
             if (!File.Exists("/proc/mounts"))
                 return Task.FromResult<FilesystemMetadata?>(null);
 
-            var mounts = File.ReadAllLines("/proc/mounts");
+            var mounts = File.ReadLines("/proc/mounts");
             var normalizedPath = Path.GetFullPath(path);
 
             foreach (var line in mounts)
@@ -423,7 +425,7 @@ public sealed class LustreStrategy : FilesystemStrategyBase
             if (!File.Exists("/proc/mounts"))
                 return Task.FromResult<FilesystemMetadata?>(null);
 
-            var mounts = File.ReadAllLines("/proc/mounts");
+            var mounts = File.ReadLines("/proc/mounts");
             var normalizedPath = Path.GetFullPath(path);
 
             foreach (var line in mounts)
@@ -511,7 +513,7 @@ public sealed class GpfsStrategy : FilesystemStrategyBase
             if (!File.Exists("/proc/mounts"))
                 return Task.FromResult<FilesystemMetadata?>(null);
 
-            var mounts = File.ReadAllLines("/proc/mounts");
+            var mounts = File.ReadLines("/proc/mounts");
             var normalizedPath = Path.GetFullPath(path);
 
             foreach (var line in mounts)
@@ -599,7 +601,7 @@ public sealed class BeeGfsStrategy : FilesystemStrategyBase
             if (!File.Exists("/proc/mounts"))
                 return Task.FromResult<FilesystemMetadata?>(null);
 
-            var mounts = File.ReadAllLines("/proc/mounts");
+            var mounts = File.ReadLines("/proc/mounts");
             var normalizedPath = Path.GetFullPath(path);
 
             foreach (var line in mounts)

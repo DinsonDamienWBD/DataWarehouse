@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Runtime.InteropServices;
 
 namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.Metrics;
 
@@ -77,9 +78,13 @@ public sealed class EnergyConsumptionTrackingStrategy : SustainabilityStrategyBa
         };
     }
 
+    // Track previous RAPL reading for delta calculation
+    private long _lastRaplEnergyUj;
+    private DateTimeOffset _lastRaplReadTime = DateTimeOffset.MinValue;
+
     private void SampleEnergy()
     {
-        var power = ReadCurrentPower();
+        var (power, source) = ReadCurrentPower();
         var energyWh = power * SamplingInterval.TotalHours;
 
         lock (_lock)
@@ -93,7 +98,7 @@ public sealed class EnergyConsumptionTrackingStrategy : SustainabilityStrategyBa
             Timestamp = DateTimeOffset.UtcNow,
             PowerWatts = power,
             EnergyWh = energyWh,
-            Source = "Estimation"
+            Source = source
         };
 
         _history.Enqueue(dataPoint);
@@ -102,13 +107,77 @@ public sealed class EnergyConsumptionTrackingStrategy : SustainabilityStrategyBa
         RecordSample(power, 0);
     }
 
-    private double ReadCurrentPower()
+    private (double PowerWatts, string Source) ReadCurrentPower()
     {
-        // Would read from RAPL on Linux
-        // Simulating based on system activity
-        var basePower = 30.0; // Idle power
-        var loadPower = Environment.ProcessorCount * 5.0 * Random.Shared.NextDouble();
-        return basePower + loadPower;
+        // Priority 1: Intel RAPL on Linux (most accurate)
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            try
+            {
+                var energyPath = "/sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj";
+                if (File.Exists(energyPath))
+                {
+                    var energyUj = long.Parse(File.ReadAllText(energyPath).Trim());
+                    var now = DateTimeOffset.UtcNow;
+
+                    if (_lastRaplReadTime != DateTimeOffset.MinValue)
+                    {
+                        var deltaUj = energyUj - _lastRaplEnergyUj;
+                        // Handle RAPL counter wrap-around
+                        if (deltaUj < 0)
+                        {
+                            var maxEnergyPath = "/sys/class/powercap/intel-rapl/intel-rapl:0/max_energy_range_uj";
+                            if (File.Exists(maxEnergyPath) && long.TryParse(File.ReadAllText(maxEnergyPath).Trim(), out var maxUj))
+                                deltaUj += maxUj;
+                            else
+                                deltaUj = 0;
+                        }
+                        var deltaSec = (now - _lastRaplReadTime).TotalSeconds;
+                        if (deltaSec > 0)
+                        {
+                            _lastRaplEnergyUj = energyUj;
+                            _lastRaplReadTime = now;
+                            return (deltaUj / 1_000_000.0 / deltaSec, "RAPL");
+                        }
+                    }
+
+                    _lastRaplEnergyUj = energyUj;
+                    _lastRaplReadTime = now;
+                }
+            }
+            catch { /* Fall through to estimation */ }
+        }
+
+        // Priority 2: Estimate from real CPU load using Process.TotalProcessorTime
+        try
+        {
+            var proc = System.Diagnostics.Process.GetCurrentProcess();
+            var cpuTime1 = proc.TotalProcessorTime;
+            var wall1 = DateTimeOffset.UtcNow;
+            System.Threading.Thread.Sleep(100);
+            proc.Refresh();
+            var cpuTime2 = proc.TotalProcessorTime;
+            var wall2 = DateTimeOffset.UtcNow;
+
+            var cpuFraction = (cpuTime2 - cpuTime1).TotalSeconds /
+                              ((wall2 - wall1).TotalSeconds * Environment.ProcessorCount);
+            cpuFraction = Math.Max(0, Math.Min(1, cpuFraction));
+
+            // Estimate from process-count-scaled TDP: idle ~15%, max load ~100%
+            var tdp = Environment.ProcessorCount switch
+            {
+                <= 4 => 65.0,
+                <= 8 => 95.0,
+                <= 16 => 125.0,
+                _ => 180.0
+            };
+            var estimatedPower = tdp * 0.15 + tdp * 0.85 * cpuFraction;
+            return (estimatedPower, "CPUTimeEstimation");
+        }
+        catch { }
+
+        // Fallback: conservative idle estimate
+        return (30.0 + Environment.ProcessorCount * 2.0, "StaticEstimation");
     }
 }
 

@@ -53,8 +53,8 @@ public sealed class PsychometricIndexingStrategy : FeatureStrategyBase
         {
             var depth = GetConfig("AnalysisDepth") ?? "standard";
             var emotionModel = GetConfig("EmotionModel") ?? "plutchik";
-            var enablePersonality = bool.Parse(GetConfig("EnablePersonality") ?? "false");
-            var enableDeception = bool.Parse(GetConfig("EnableDeception") ?? "false");
+            var enablePersonality = GetConfigBool("EnablePersonality", false);
+            var enableDeception = GetConfigBool("EnableDeception", false);
 
             var prompt = BuildAnalysisPrompt(content, depth, emotionModel, enablePersonality, enableDeception);
 
@@ -190,7 +190,7 @@ public sealed class PsychometricIndexingStrategy : FeatureStrategyBase
 
             // Use AI for personality inference if enabled
             BigFiveScores? personality = null;
-            if (bool.Parse(GetConfig("EnablePersonality") ?? "false"))
+            if (GetConfigBool("EnablePersonality", false))
             {
                 var prompt = $@"Based on these aggregated content analyses, infer Big Five personality traits:
 
@@ -319,7 +319,7 @@ Return JSON:
             if (jsonStart >= 0 && jsonEnd > jsonStart)
             {
                 var json = response.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                var doc = System.Text.Json.JsonDocument.Parse(json);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
 
                 if (doc.RootElement.TryGetProperty("sentiment", out var sent))
                 {
@@ -389,7 +389,7 @@ Return JSON:
             if (jsonStart >= 0 && jsonEnd > jsonStart)
             {
                 var json = response.Substring(jsonStart, jsonEnd - jsonStart + 1);
-                var doc = System.Text.Json.JsonDocument.Parse(json);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
 
                 return new BigFiveScores
                 {

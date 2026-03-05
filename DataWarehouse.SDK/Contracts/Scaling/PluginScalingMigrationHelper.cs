@@ -309,7 +309,10 @@ namespace DataWarehouse.SDK.Contracts.Scaling
         /// <returns>The deserialized value.</returns>
         public static TValue DefaultDeserialize<TValue>(byte[] data)
         {
-            return JsonSerializer.Deserialize<TValue>(data, _jsonOptions)!;
+            return JsonSerializer.Deserialize<TValue>(data, _jsonOptions)
+                ?? throw new InvalidOperationException(
+                    $"Deserialization returned null for type {typeof(TValue).FullName}. " +
+                    "Ensure the JSON is valid and matches the expected type.");
         }
     }
 }

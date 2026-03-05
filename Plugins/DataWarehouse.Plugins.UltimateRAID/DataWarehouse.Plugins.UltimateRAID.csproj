@@ -39,6 +39,10 @@
     <Compile Include="Strategies\ErasureCoding\ErasureCodingStrategies.cs" />
     <Compile Include="Strategies\ErasureCoding\ErasureCodingStrategiesB7.cs" />
     <Compile Include="Strategies\Adaptive\AdaptiveRaidStrategies.cs" />
+    <Compile Include="Strategies\DeviceLevel\DeviceLevelRaidStrategies.cs" />
+    <Compile Include="Strategies\DeviceLevel\DeviceErasureCodingStrategies.cs" />
+    <Compile Include="Strategies\DeviceLevel\InMemoryPhysicalBlockDevice.cs" />
+    <Compile Include="Strategies\DeviceLevel\DualRaidIntegrationTests.cs" />
   </ItemGroup>
 
 </Project>

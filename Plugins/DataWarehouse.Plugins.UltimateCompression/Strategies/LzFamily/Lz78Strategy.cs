@@ -206,13 +206,14 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
             if (uncompressedLen < 0 || uncompressedLen > MaxInputSize)
                 throw new InvalidDataException($"Invalid LZ78 uncompressed length: {uncompressedLen}");
 
-            var output = new List<byte>(uncompressedLen);
+            // P2-1621: Use MemoryStream instead of List<byte> to avoid O(n) AddRange copies per entry.
+            using var output = new MemoryStream(uncompressedLen);
             var bitReader = new BitReader(stream);
 
             // Dictionary: index -> string (stored as byte arrays)
             var dict = new List<byte[]> { Array.Empty<byte>() }; // index 0 = empty
 
-            while (output.Count < uncompressedLen)
+            while (output.Length < uncompressedLen)
             {
                 int code = bitReader.ReadBits(CodeBits);
 
@@ -238,17 +239,17 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
                 if (symbolOrSentinel >= 256)
                 {
                     // The symbol was a sentinel; just output the prefix
-                    output.AddRange(prefix);
+                    output.Write(prefix, 0, prefix.Length);
                     break;
                 }
 
                 byte symbol = (byte)symbolOrSentinel;
 
                 // Output: prefix + symbol
-                output.AddRange(prefix);
-                if (output.Count < uncompressedLen)
+                output.Write(prefix, 0, prefix.Length);
+                if (output.Length < uncompressedLen)
                 {
-                    output.Add(symbol);
+                    output.WriteByte(symbol);
                 }
 
                 // Build new dictionary entry
@@ -267,11 +268,11 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
                 }
             }
 
-            // Truncate to exact uncompressed length
-            if (output.Count > uncompressedLen)
-                output.RemoveRange(uncompressedLen, output.Count - uncompressedLen);
-
-            return output.ToArray();
+            // Truncate to exact uncompressed length if we wrote more than expected
+            var result = output.ToArray();
+            return result.Length > uncompressedLen
+                ? result[..uncompressedLen]
+                : result;
         }
 
         /// <inheritdoc/>

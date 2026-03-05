@@ -42,7 +42,7 @@ public sealed class WaterUsageTrackingStrategy : SustainabilityStrategyBase
     /// <inheritdoc/>
     protected override Task InitializeCoreAsync(CancellationToken ct)
     {
-        _trackingTimer = new Timer(async _ => await TrackWaterAsync(), null, TimeSpan.Zero, TimeSpan.FromMinutes(15));
+        _trackingTimer = new Timer(async _ => { try { await TrackWaterAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } }, null, TimeSpan.Zero, TimeSpan.FromMinutes(15));
         return Task.CompletedTask;
     }
 

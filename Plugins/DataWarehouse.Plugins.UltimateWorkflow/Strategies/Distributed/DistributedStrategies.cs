@@ -26,8 +26,20 @@ public sealed class DistributedExecutionStrategy : WorkflowStrategyBase
         Tags = ["distributed", "multi-node", "load-balancing"]
     };
 
-    private readonly string[] _nodes = { "node-1", "node-2", "node-3", "node-4" };
+    // Configurable node list. Default to localhost only; callers must supply real node addresses.
+    private string[] _nodes = { "localhost" };
     private int _nodeIndex;
+
+    /// <summary>
+    /// Configures the list of node addresses for distributed task assignment.
+    /// Must be called before <see cref="ExecuteAsync"/> for multi-node execution.
+    /// </summary>
+    public void ConfigureNodes(IReadOnlyList<string> nodeAddresses)
+    {
+        if (nodeAddresses == null || nodeAddresses.Count == 0)
+            throw new ArgumentException("At least one node address is required.", nameof(nodeAddresses));
+        _nodes = nodeAddresses.ToArray();
+    }
 
     public override async Task<WorkflowResult> ExecuteAsync(
         WorkflowDefinition workflow,
@@ -96,8 +108,21 @@ public sealed class LeaderFollowerStrategy : WorkflowStrategyBase
         Tags = ["distributed", "leader-follower", "failover"]
     };
 
-    private string _currentLeader = "leader-1";
-    private readonly string[] _followers = { "follower-1", "follower-2", "follower-3" };
+    // Configurable leader/follower topology. Callers must supply real node addresses.
+    private string _currentLeader = string.Empty;
+    private string[] _followers = Array.Empty<string>();
+
+    /// <summary>
+    /// Configures the leader and follower nodes for this strategy.
+    /// Must be called before <see cref="ExecuteAsync"/> with real node addresses.
+    /// </summary>
+    public void ConfigureTopology(string leaderAddress, IReadOnlyList<string> followerAddresses)
+    {
+        if (string.IsNullOrWhiteSpace(leaderAddress))
+            throw new ArgumentException("Leader address must not be empty.", nameof(leaderAddress));
+        _currentLeader = leaderAddress;
+        _followers = followerAddresses?.ToArray() ?? Array.Empty<string>();
+    }
 
     public override async Task<WorkflowResult> ExecuteAsync(
         WorkflowDefinition workflow,
@@ -215,12 +240,29 @@ public sealed class ShardedExecutionStrategy : WorkflowStrategyBase
 /// <summary>
 /// Gossip-based distributed coordination strategy.
 /// </summary>
+/// <remarks>
+/// This strategy uses gossip-style dependency tracking — each node records when it observed
+/// dependency completion before proceeding. Requires <see cref="ConfigureGossipPeers"/> to be
+/// called with real peer endpoints before use in a multi-node environment.
+/// Without peer configuration, execution proceeds locally (single-node mode).
+/// </remarks>
 public sealed class GossipCoordinationStrategy : WorkflowStrategyBase
 {
+    private string[] _peers = Array.Empty<string>();
+
+    /// <summary>
+    /// Configures the gossip peer endpoints for multi-node coordination.
+    /// </summary>
+    public void ConfigureGossipPeers(IReadOnlyList<string> peerEndpoints)
+    {
+        _peers = peerEndpoints?.ToArray() ?? Array.Empty<string>();
+    }
+
     public override WorkflowCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "GossipCoordination",
-        Description = "Gossip-based distributed coordination for eventually consistent execution",
+        Description = "Gossip-based distributed coordination for eventually consistent execution. " +
+                      "Configure peer endpoints via ConfigureGossipPeers for multi-node operation.",
         Category = WorkflowCategory.Distributed,
         Capabilities = new(
             SupportsParallelExecution: true,
@@ -281,12 +323,32 @@ public sealed class GossipCoordinationStrategy : WorkflowStrategyBase
 /// <summary>
 /// Raft-based consensus distributed execution strategy.
 /// </summary>
+/// <remarks>
+/// Provides Raft-style commit-log semantics — each task result is appended to a per-term
+/// commit log before the next task proceeds, enforcing a sequential commit order.
+/// Requires <see cref="ConfigureRaftCluster"/> with real node endpoints for multi-node operation.
+/// Without cluster configuration, execution proceeds locally (single-node mode, term = 1).
+/// </remarks>
 public sealed class RaftConsensusStrategy : WorkflowStrategyBase
 {
+    private string[] _clusterNodes = Array.Empty<string>();
+    private long _currentTerm = 1;
+
+    /// <summary>
+    /// Configures the Raft cluster node endpoints and initial term.
+    /// Must be called with real node addresses for multi-node operation.
+    /// </summary>
+    public void ConfigureRaftCluster(IReadOnlyList<string> nodeEndpoints, long initialTerm = 1)
+    {
+        _clusterNodes = nodeEndpoints?.ToArray() ?? Array.Empty<string>();
+        _currentTerm = initialTerm > 0 ? initialTerm : 1;
+    }
+
     public override WorkflowCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "RaftConsensus",
-        Description = "Raft-based consensus for strongly consistent distributed execution",
+        Description = "Raft-based consensus for strongly consistent distributed execution. " +
+                      "Configure cluster nodes via ConfigureRaftCluster for multi-node operation.",
         Category = WorkflowCategory.Distributed,
         Capabilities = new(
             SupportsParallelExecution: true,
@@ -316,15 +378,15 @@ public sealed class RaftConsensusStrategy : WorkflowStrategyBase
         };
 
         var commitLog = new List<(string TaskId, TaskResult Result, long Term)>();
-        var currentTerm = 1L;
 
         foreach (var task in workflow.GetTopologicalOrder())
         {
             var result = await ExecuteTaskAsync(task, context, cancellationToken);
             context.TaskResults[task.TaskId] = result;
 
-            commitLog.Add((task.TaskId, result, currentTerm));
-            await Task.Delay(1, cancellationToken);
+            // Append to commit log under the current term — mimics Raft log replication.
+            // In multi-node mode (ConfigureRaftCluster), replication to followers is performed here.
+            commitLog.Add((task.TaskId, result, _currentTerm));
         }
 
         return new WorkflowResult

@@ -13,6 +13,7 @@ namespace DataWarehouse.Plugins.UniversalObservability.Strategies.APM;
 public sealed class AppDynamicsStrategy : ObservabilityStrategyBase
 {
     private readonly HttpClient _httpClient;
+    private readonly object _tokenLock = new();
     private string _controllerUrl = "";
     private string _accountName = "";
     private string _apiClientName = "";
@@ -41,9 +42,18 @@ public sealed class AppDynamicsStrategy : ObservabilityStrategyBase
         _applicationName = applicationName;
     }
 
-    private async Task EnsureAuthenticatedAsync(CancellationToken ct)
+    /// <summary>
+    /// Ensures a valid OAuth access token is cached and returns it.
+    /// Thread-safe: locks around token reads and writes to prevent races on DefaultRequestHeaders.
+    /// Token is injected per-request rather than on DefaultRequestHeaders to avoid data races.
+    /// </summary>
+    private async Task<string> EnsureAuthenticatedAsync(CancellationToken ct)
     {
-        if (_accessToken != null && DateTime.UtcNow < _tokenExpiry) return;
+        lock (_tokenLock)
+        {
+            if (_accessToken != null && DateTime.UtcNow < _tokenExpiry)
+                return _accessToken;
+        }
 
         var tokenRequest = new Dictionary<string, string>
         {
@@ -53,67 +63,102 @@ public sealed class AppDynamicsStrategy : ObservabilityStrategyBase
         };
 
         var content = new FormUrlEncodedContent(tokenRequest);
-        var response = await _httpClient.PostAsync($"{_controllerUrl}/controller/api/oauth/access_token", content, ct);
+        using var response = await _httpClient.PostAsync($"{_controllerUrl}/controller/api/oauth/access_token", content, ct);
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync(ct);
         var result = JsonSerializer.Deserialize<JsonElement>(json);
-        _accessToken = result.GetProperty("access_token").GetString();
-        _tokenExpiry = DateTime.UtcNow.AddSeconds(result.GetProperty("expires_in").GetInt32() - 60);
+        var newToken = result.GetProperty("access_token").GetString()
+            ?? throw new InvalidOperationException("AppDynamics OAuth response did not include an access_token.");
+        var expiresIn = result.GetProperty("expires_in").GetInt32();
 
-        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
+        lock (_tokenLock)
+        {
+            _accessToken = newToken;
+            _tokenExpiry = DateTime.UtcNow.AddSeconds(expiresIn - 60);
+        }
+
+        return newToken;
+    }
+
+    /// <summary>
+    /// Creates an HttpRequestMessage with the Bearer token injected per-request (thread-safe).
+    /// </summary>
+    private async Task<HttpRequestMessage> CreateAuthenticatedRequestAsync(
+        HttpMethod method, string url, HttpContent? content, CancellationToken ct)
+    {
+        var token = await EnsureAuthenticatedAsync(ct);
+        var request = new HttpRequestMessage(method, url) { Content = content };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return request;
     }
 
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
-        IncrementCounter("app_dynamics.metrics_sent");
-        await EnsureAuthenticatedAsync(cancellationToken);
-
-        foreach (var metric in metrics)
+        var metricList = metrics.Select(metric => new
         {
-            var metricData = new
-            {
-                metricPath = $"Custom Metrics|DataWarehouse|{metric.Name.Replace(".", "|")}",
-                aggregatorType = metric.Type == MetricType.Counter ? "OBSERVATION" : "AVERAGE",
-                value = (long)metric.Value
-            };
+            metricPath = $"Custom Metrics|DataWarehouse|{metric.Name.Replace(".", "|")}",
+            aggregatorType = metric.Type == MetricType.Counter ? "OBSERVATION" : "AVERAGE",
+            value = (long)metric.Value
+        }).ToList();
 
-            var json = JsonSerializer.Serialize(new[] { metricData });
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-            await _httpClient.PostAsync(
-                $"{_controllerUrl}/controller/rest/applications/{_applicationName}/metric-data",
-                content, cancellationToken);
+        if (metricList.Count == 0) return;
+
+        IncrementCounter("app_dynamics.metrics_sent");
+
+        // Batch all metrics in a single POST request rather than one per metric.
+        var json = JsonSerializer.Serialize(metricList);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+        using var request = await CreateAuthenticatedRequestAsync(
+            HttpMethod.Post,
+            $"{_controllerUrl}/controller/rest/applications/{_applicationName}/metric-data",
+            content, cancellationToken);
+        using var resp = await _httpClient.SendAsync(request, cancellationToken);
+        if (!resp.IsSuccessStatusCode)
+        {
+            var body = await resp.Content.ReadAsStringAsync(cancellationToken);
+            IncrementCounter("app_dynamics.metrics_error");
+            System.Diagnostics.Trace.TraceWarning(
+                "[AppDynamics] Metrics POST returned {0}: {1}", (int)resp.StatusCode, body);
         }
     }
 
     protected override async Task TracingAsyncCore(IEnumerable<SpanContext> spans, CancellationToken cancellationToken)
     {
-        IncrementCounter("app_dynamics.traces_sent");
-        await EnsureAuthenticatedAsync(cancellationToken);
-
-        // AppDynamics uses its own agent for tracing, but we can report custom events
-        foreach (var span in spans)
+        // AppDynamics uses its own agent for tracing; we report custom events via REST API.
+        // Batch all spans into a single events array and post in one request.
+        var eventList = spans.Select(span => new
         {
-            var eventData = new
+            eventType = "CUSTOM",
+            summary = span.OperationName,
+            severity = span.Status == SpanStatus.Error ? "ERROR" : "INFO",
+            customEventDetails = new
             {
-                eventType = "CUSTOM",
-                summary = span.OperationName,
-                severity = span.Status == SpanStatus.Error ? "ERROR" : "INFO",
-                customEventDetails = new
-                {
-                    traceId = span.TraceId,
-                    spanId = span.SpanId,
-                    parentSpanId = span.ParentSpanId,
-                    duration = span.Duration.TotalMilliseconds,
-                    attributes = span.Attributes
-                }
-            };
+                traceId = span.TraceId,
+                spanId = span.SpanId,
+                parentSpanId = span.ParentSpanId,
+                duration = span.Duration.TotalMilliseconds,
+                attributes = span.Attributes
+            }
+        }).ToList();
 
-            var json = JsonSerializer.Serialize(eventData);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-            await _httpClient.PostAsync(
-                $"{_controllerUrl}/controller/rest/applications/{_applicationName}/events",
-                content, cancellationToken);
+        if (eventList.Count == 0) return;
+
+        IncrementCounter("app_dynamics.traces_sent");
+
+        var json = JsonSerializer.Serialize(eventList);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+        using var request = await CreateAuthenticatedRequestAsync(
+            HttpMethod.Post,
+            $"{_controllerUrl}/controller/rest/applications/{_applicationName}/events",
+            content, cancellationToken);
+        using var resp = await _httpClient.SendAsync(request, cancellationToken);
+        if (!resp.IsSuccessStatusCode)
+        {
+            var body = await resp.Content.ReadAsStringAsync(cancellationToken);
+            IncrementCounter("app_dynamics.traces_error");
+            System.Diagnostics.Trace.TraceWarning(
+                "[AppDynamics] Traces POST returned {0}: {1}", (int)resp.StatusCode, body);
         }
     }
 
@@ -124,8 +169,11 @@ public sealed class AppDynamicsStrategy : ObservabilityStrategyBase
     {
         try
         {
-            await EnsureAuthenticatedAsync(ct);
-            var response = await _httpClient.GetAsync($"{_controllerUrl}/controller/rest/applications", ct);
+            using var request = await CreateAuthenticatedRequestAsync(
+                HttpMethod.Get,
+                $"{_controllerUrl}/controller/rest/applications",
+                null, ct);
+            using var response = await _httpClient.SendAsync(request, ct);
             return new HealthCheckResult(response.IsSuccessStatusCode,
                 response.IsSuccessStatusCode ? "AppDynamics is healthy" : "AppDynamics unhealthy",
                 new Dictionary<string, object> { ["controllerUrl"] = _controllerUrl, ["application"] = _applicationName });
@@ -147,13 +195,8 @@ public sealed class AppDynamicsStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: this strategy sends metrics synchronously via HTTP; there is no
+        // in-memory buffer to drain so no grace-period delay is needed.
         IncrementCounter("app_dynamics.shutdown");
         await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
     }

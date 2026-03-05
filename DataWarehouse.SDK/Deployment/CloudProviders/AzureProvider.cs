@@ -9,14 +9,15 @@ using System.Threading.Tasks;
 namespace DataWarehouse.SDK.Deployment.CloudProviders;
 
 /// <summary>
-/// Azure cloud provider implementation (placeholder).
-/// Production uses Azure SDK (ResourceManager, Compute, Blob, Monitor).
+/// Azure cloud provider stub. Fails fast with <see cref="NotSupportedException"/> on all operations.
+/// Production deployment requires registering a real ICloudProvider backed by Azure.ResourceManager,
+/// Azure.Compute, Azure.Storage.Blobs, and Azure.Monitor via CloudProviderFactory.
 /// </summary>
 [SdkCompatibility("3.0.0", Notes = "Phase 37: Azure provisioning provider (ENV-04)")]
 public sealed class AzureProvider : ICloudProvider
 {
     private readonly ILogger<AzureProvider> _logger;
-    private bool _disposed;
+    private int _disposed;
 
     public string Name => "Azure";
 
@@ -27,43 +28,41 @@ public sealed class AzureProvider : ICloudProvider
 
     public Task<string> ProvisionVmAsync(VmSpec spec, CancellationToken ct = default)
     {
-        _logger.LogInformation("Azure: Provisioning VM (size: {InstanceType}, location: {Region})",
-            spec.InstanceType, spec.Region);
-        return Task.FromResult($"vm-{Guid.NewGuid():N}");
+        throw new NotSupportedException(
+            "Azure VM provisioning requires the Azure.ResourceManager.Compute package. " +
+            "Register a real ICloudProvider implementation via CloudProviderFactory.");
     }
 
     public Task<string> ProvisionStorageAsync(StorageSpec spec, CancellationToken ct = default)
     {
-        _logger.LogInformation("Azure: Provisioning storage ({Type}, {SizeGb} GB)",
-            spec.StorageType, spec.SizeGb);
-        return Task.FromResult($"disk-{Guid.NewGuid():N}");
+        throw new NotSupportedException(
+            "Azure storage provisioning requires the Azure.ResourceManager.Compute/Storage package. " +
+            "Register a real ICloudProvider implementation via CloudProviderFactory.");
     }
 
     public Task<bool> DeprovisionAsync(string resourceId, CancellationToken ct = default)
     {
-        _logger.LogInformation("Azure: Deprovisioning resource {ResourceId}", resourceId);
-        return Task.FromResult(true);
+        throw new NotSupportedException(
+            "Azure deprovisioning requires the Azure.ResourceManager package. " +
+            "Register a real ICloudProvider implementation via CloudProviderFactory.");
     }
 
     public Task<CloudResourceMetrics?> GetMetricsAsync(string resourceId, CancellationToken ct = default)
     {
-        return Task.FromResult<CloudResourceMetrics?>(new CloudResourceMetrics
-        {
-            ResourceId = resourceId,
-            CpuUtilizationPercent = 50.0,
-            StorageUtilizationPercent = 70.0,
-            Timestamp = DateTimeOffset.UtcNow
-        });
+        throw new NotSupportedException(
+            "Azure metrics retrieval requires the Azure.Monitor.Query package. " +
+            "Register a real ICloudProvider implementation via CloudProviderFactory.");
     }
 
     public Task<IReadOnlyList<string>> ListManagedResourcesAsync(CancellationToken ct = default)
     {
-        return Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
+        throw new NotSupportedException(
+            "Azure resource listing requires the Azure.ResourceManager package. " +
+            "Register a real ICloudProvider implementation via CloudProviderFactory.");
     }
 
     public void Dispose()
     {
-        if (_disposed) return;
-        _disposed = true;
+        Interlocked.CompareExchange(ref _disposed, 1, 0);
     }
 }

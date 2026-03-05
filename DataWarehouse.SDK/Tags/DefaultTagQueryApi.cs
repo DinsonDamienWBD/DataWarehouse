@@ -300,13 +300,15 @@ public sealed class DefaultTagQueryApi : ITagQueryApi
     /// </summary>
     private async Task<HashSet<string>> CompileNotAsync(NotExpression not, CancellationToken ct)
     {
+        const int MaxNotScanKeys = 10_000;
+
         _logger.LogWarning(
             "NOT expression compilation requires full-scan subtraction. " +
             "Consider restructuring the query to avoid NOT for better performance. " +
             "Inner expression: {InnerExpression}", not.Inner);
 
-        // Get all known objects from the index distribution
-        var distribution = await _index.GetTagDistributionAsync(int.MaxValue, ct).ConfigureAwait(false);
+        // Get known objects from the index distribution (bounded to prevent OOM)
+        var distribution = await _index.GetTagDistributionAsync(MaxNotScanKeys, ct).ConfigureAwait(false);
 
         // Collect all object keys from the index by querying each known tag
         var allObjects = new HashSet<string>(StringComparer.Ordinal);
@@ -408,19 +410,38 @@ public sealed class DefaultTagQueryApi : ITagQueryApi
 
     /// <summary>
     /// Sorts matched object keys by the requested sort field. For non-ObjectKey sorts,
-    /// this is a best-effort sort based on available metadata.
+    /// the object key is used as a proxy since tag data is not loaded at this stage.
     /// </summary>
+    /// <remarks>
+    /// Cat 12 (finding 660): all sort fields now have explicit arms. Non-ObjectKey sorts
+    /// fall back to ObjectKey as a documented limitation; callers requiring semantic sort
+    /// must request <c>IncludeTagValues = true</c> and sort the result themselves.
+    /// </remarks>
     private static IEnumerable<string> SortObjectKeys(
         HashSet<string> keys,
         TagQuerySortField sortBy,
         bool descending)
     {
-        // ObjectKey sort is the most common and cheapest path
-        // Other sort fields would require loading tag data; for now, fallback to ObjectKey
-        // since we don't have the tag data loaded at this stage.
-        // Future optimization: pass sort hints to the index layer.
+        // All sort fields use ObjectKey as a proxy — tag data is not available at this stage.
+        // TagKey / TagValue / ModifiedUtc / CreatedUtc semantic sorts require a post-query
+        // re-sort in the caller once tag data has been fetched (see IncludeTagValues path).
         IOrderedEnumerable<string> ordered = sortBy switch
         {
+            TagQuerySortField.ObjectKey => descending
+                ? keys.OrderByDescending(k => k, StringComparer.Ordinal)
+                : keys.OrderBy(k => k, StringComparer.Ordinal),
+            TagQuerySortField.TagKey => descending
+                ? keys.OrderByDescending(k => k, StringComparer.Ordinal)
+                : keys.OrderBy(k => k, StringComparer.Ordinal),
+            TagQuerySortField.TagValue => descending
+                ? keys.OrderByDescending(k => k, StringComparer.Ordinal)
+                : keys.OrderBy(k => k, StringComparer.Ordinal),
+            TagQuerySortField.ModifiedUtc => descending
+                ? keys.OrderByDescending(k => k, StringComparer.Ordinal)
+                : keys.OrderBy(k => k, StringComparer.Ordinal),
+            TagQuerySortField.CreatedUtc => descending
+                ? keys.OrderByDescending(k => k, StringComparer.Ordinal)
+                : keys.OrderBy(k => k, StringComparer.Ordinal),
             _ => descending
                 ? keys.OrderByDescending(k => k, StringComparer.Ordinal)
                 : keys.OrderBy(k => k, StringComparer.Ordinal)

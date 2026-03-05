@@ -222,7 +222,10 @@ internal sealed class NatsStreamStrategy : StreamingDataStrategyBase, IStreaming
             .OrderBy(m => m.Offset ?? 0)
             .ToList();
 
-        // Queue group: distribute messages round-robin among consumers
+        // Queue group: distribute messages round-robin among consumers.
+        // Finding 4363: read the stable consumer index AFTER registering this consumer so the
+        // snapshot count is consistent. Use the registered consumerId as a lookup key to get
+        // a deterministic index rather than relying on Count which can race.
         var consumerIndex = 0;
         if (groupId != null)
         {
@@ -234,7 +237,10 @@ internal sealed class NatsStreamStrategy : StreamingDataStrategyBase, IStreaming
                 GroupId = groupId,
                 LastDeliveredSeq = startSeq
             });
-            consumerIndex = streamConsumers.Count - 1;
+            // Snapshot keys once to get a stable, ordered index for this consumer.
+            var consumerIds = streamConsumers.Keys.OrderBy(k => k).ToList();
+            consumerIndex = consumerIds.IndexOf(consumerId);
+            if (consumerIndex < 0) consumerIndex = 0;
         }
 
         for (int i = 0; i < ordered.Count; i++)

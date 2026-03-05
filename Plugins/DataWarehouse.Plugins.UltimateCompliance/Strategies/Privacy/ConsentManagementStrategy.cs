@@ -113,14 +113,19 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
             {
                 if (!request.DoubleOptInConfirmed)
                 {
+                    // P2-1492: Generate a cryptographically random token for the pending
+                    // consent so that ConfirmDoubleOptIn can validate it is authentic.
                     var pendingId = Guid.NewGuid().ToString();
+                    var optInToken = Convert.ToBase64String(
+                        System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
                     _consents[pendingId] = new ConsentRecord
                     {
                         ConsentId = pendingId,
                         SubjectId = request.SubjectId,
                         PurposeId = request.PurposeId,
                         Status = ConsentStatus.PendingConfirmation,
-                        CreatedAt = DateTime.UtcNow
+                        CreatedAt = DateTime.UtcNow,
+                        DoubleOptInToken = optInToken
                     };
 
                     return new ConsentRecordResult
@@ -128,6 +133,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
                         Success = false,
                         RequiresDoubleOptIn = true,
                         PendingConsentId = pendingId,
+                        // Surface the token so the caller can embed it in the confirmation email/link.
+                        ConfirmationToken = optInToken,
                         ErrorMessage = "Double opt-in confirmation required"
                     };
                 }
@@ -204,13 +211,15 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
                 };
             }
 
-            // Verify token (simplified - in production would validate cryptographically)
-            if (string.IsNullOrEmpty(confirmationToken))
+            // P2-1492: Validate the token against the one stored when the pending consent was created.
+            // Use constant-time comparison to avoid timing attacks on the token.
+            if (string.IsNullOrEmpty(confirmationToken) ||
+                !CryptographicEquals(confirmationToken, consent.DoubleOptInToken))
             {
                 return new ConsentRecordResult
                 {
                     Success = false,
-                    ErrorMessage = "Invalid confirmation token"
+                    ErrorMessage = "Invalid or missing confirmation token"
                 };
             }
 
@@ -252,6 +261,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
         /// </summary>
         public WithdrawConsentResult WithdrawConsent(string subjectId, string purposeId, string? reason = null)
         {
+            // Snapshot the values to find the target consent, then use AddOrUpdate for atomic update
             var consent = _consents.Values
                 .FirstOrDefault(c => c.SubjectId == subjectId &&
                                     c.PurposeId == purposeId &&
@@ -266,15 +276,28 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
                 };
             }
 
-            // Update consent status
-            var withdrawnConsent = consent with
-            {
-                Status = ConsentStatus.Withdrawn,
-                WithdrawnAt = DateTime.UtcNow,
-                WithdrawalReason = reason
-            };
+            // Atomically replace: if concurrent withdrawal already changed status, the factory won't re-withdraw
+            ConsentRecord? withdrawnConsent = null;
+            _consents.AddOrUpdate(
+                consent.ConsentId,
+                _ => consent, // should not happen; key already exists
+                (_, existing) =>
+                {
+                    if (existing.Status != ConsentStatus.Active)
+                        return existing; // Already withdrawn concurrently; no-op
+                    withdrawnConsent = existing with
+                    {
+                        Status = ConsentStatus.Withdrawn,
+                        WithdrawnAt = DateTime.UtcNow,
+                        WithdrawalReason = reason
+                    };
+                    return withdrawnConsent;
+                });
 
-            _consents[consent.ConsentId] = withdrawnConsent;
+            if (withdrawnConsent == null)
+            {
+                return new WithdrawConsentResult { Success = false, ErrorMessage = "Consent already withdrawn" };
+            }
 
             // Update preferences
             UpdatePreferences(subjectId, purposeId, false);
@@ -468,7 +491,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("consent_management.check");
+            IncrementCounter("consent_management.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -527,9 +550,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
                 }
             }
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -564,6 +588,17 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
                     existing.LastUpdated = DateTime.UtcNow;
                     return existing;
                 });
+        }
+
+        /// <summary>
+        /// P2-1492: Constant-time string comparison to prevent timing-oracle attacks on tokens.
+        /// </summary>
+        private static bool CryptographicEquals(string a, string? b)
+        {
+            if (b is null) return false;
+            return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+                System.Text.Encoding.UTF8.GetBytes(a),
+                System.Text.Encoding.UTF8.GetBytes(b));
         }
 
         private string GenerateProofOfConsent(ConsentRequest request)
@@ -638,14 +673,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("consent_management.initialized");
+            IncrementCounter("consent_management.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("consent_management.shutdown");
+            IncrementCounter("consent_management.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }
@@ -716,6 +751,11 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
         public string? UserAgent { get; init; }
         public string? ParentalConsentId { get; init; }
         public string? ProofOfConsent { get; init; }
+        /// <summary>
+        /// P2-1492: Cryptographically random token stored when pending double opt-in is created.
+        /// Must be presented verbatim in <see cref="ConsentManagementStrategy.ConfirmDoubleOptIn"/>.
+        /// </summary>
+        public string? DoubleOptInToken { get; init; }
     }
 
     /// <summary>
@@ -750,6 +790,12 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
         public bool RequiresParentalConsent { get; init; }
         public bool RequiresDoubleOptIn { get; init; }
         public string? PendingConsentId { get; init; }
+        /// <summary>
+        /// P2-1492: When <see cref="RequiresDoubleOptIn"/> is true this contains the
+        /// one-time token that must be passed back to <see cref="ConsentManagementStrategy.ConfirmDoubleOptIn"/>.
+        /// Callers should embed this in the confirmation link/email rather than storing it.
+        /// </summary>
+        public string? ConfirmationToken { get; init; }
     }
 
     /// <summary>

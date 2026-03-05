@@ -2,7 +2,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -268,28 +267,31 @@ public sealed class WeightedRoundRobinLoadBalancingStrategy : LoadBalancingStrat
 
     public override LoadBalancerEndpoint? SelectEndpoint(ResilienceContext? context = null)
     {
-        var healthy = GetHealthyEndpoints();
-        if (healthy.Count == 0) return null;
-
-        // Weighted round-robin algorithm
-        while (true)
+        lock (_endpointsLock)
         {
-            _currentIndex = (_currentIndex + 1) % healthy.Count;
+            var healthy = GetHealthyEndpoints();
+            if (healthy.Count == 0) return null;
 
-            if (_currentIndex == 0)
+            // Weighted round-robin algorithm
+            while (true)
             {
-                _currentWeight -= _gcd;
-                if (_currentWeight <= 0)
+                _currentIndex = (_currentIndex + 1) % healthy.Count;
+
+                if (_currentIndex == 0)
                 {
-                    _currentWeight = _maxWeight;
-                    if (_currentWeight == 0)
-                        return null;
+                    _currentWeight -= _gcd;
+                    if (_currentWeight <= 0)
+                    {
+                        _currentWeight = _maxWeight;
+                        if (_currentWeight == 0)
+                            return null;
+                    }
                 }
-            }
 
-            if (healthy[_currentIndex].Weight >= _currentWeight)
-            {
-                return healthy[_currentIndex];
+                if (healthy[_currentIndex].Weight >= _currentWeight)
+                {
+                    return healthy[_currentIndex];
+                }
             }
         }
     }
@@ -367,7 +369,14 @@ public sealed class LeastConnectionsLoadBalancingStrategy : LoadBalancingStrateg
         var healthy = GetHealthyEndpoints();
         if (healthy.Count == 0) return null;
 
-        return healthy.OrderBy(e => e.ActiveConnections).First();
+        // Linear O(n) min scan — avoids O(n log n) sort + enumerator allocation on hot path
+        LoadBalancerEndpoint? best = null;
+        foreach (var e in healthy)
+        {
+            if (best is null || e.ActiveConnections < best.ActiveConnections)
+                best = e;
+        }
+        return best;
     }
 
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(
@@ -428,7 +437,7 @@ public sealed class LeastConnectionsLoadBalancingStrategy : LoadBalancingStrateg
 /// </summary>
 public sealed class RandomLoadBalancingStrategy : LoadBalancingStrategyBase
 {
-    private readonly Random _random = new();
+    private static readonly Random _random = Random.Shared;
 
     public override string StrategyId => "lb-random";
     public override string StrategyName => "Random Load Balancer";
@@ -541,9 +550,17 @@ public sealed class IpHashLoadBalancingStrategy : LoadBalancingStrategyBase
 
     private static uint ComputeHash(string key)
     {
+        // FNV-1a 32-bit — safe for distribution, no security-scanner false positives
+        const uint FnvPrime = 16777619u;
+        const uint FnvOffsetBasis = 2166136261u;
         var bytes = Encoding.UTF8.GetBytes(key);
-        var hash = MD5.HashData(bytes);
-        return BitConverter.ToUInt32(hash, 0);
+        uint hash = FnvOffsetBasis;
+        foreach (var b in bytes)
+        {
+            hash ^= b;
+            hash *= FnvPrime;
+        }
+        return hash;
     }
 
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(
@@ -693,9 +710,17 @@ public sealed class ConsistentHashingLoadBalancingStrategy : LoadBalancingStrate
 
     private static uint ComputeHash(string key)
     {
+        // FNV-1a 32-bit — safe for distribution, no security-scanner false positives
+        const uint FnvPrime = 16777619u;
+        const uint FnvOffsetBasis = 2166136261u;
         var bytes = Encoding.UTF8.GetBytes(key);
-        var hash = MD5.HashData(bytes);
-        return BitConverter.ToUInt32(hash, 0);
+        uint hash = FnvOffsetBasis;
+        foreach (var b in bytes)
+        {
+            hash ^= b;
+            hash *= FnvPrime;
+        }
+        return hash;
     }
 
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(
@@ -771,7 +796,14 @@ public sealed class LeastResponseTimeLoadBalancingStrategy : LoadBalancingStrate
         var healthy = GetHealthyEndpoints();
         if (healthy.Count == 0) return null;
 
-        return healthy.OrderBy(e => e.LastResponseTime).First();
+        // Linear O(n) min scan — avoids O(n log n) sort + enumerator allocation on hot path
+        LoadBalancerEndpoint? best = null;
+        foreach (var e in healthy)
+        {
+            if (best is null || e.LastResponseTime < best.LastResponseTime)
+                best = e;
+        }
+        return best;
     }
 
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(
@@ -840,7 +872,7 @@ public sealed class LeastResponseTimeLoadBalancingStrategy : LoadBalancingStrate
 /// </summary>
 public sealed class PowerOfTwoChoicesLoadBalancingStrategy : LoadBalancingStrategyBase
 {
-    private readonly Random _random = new();
+    private static readonly Random _random = Random.Shared;
 
     public override string StrategyId => "lb-power-of-two";
     public override string StrategyName => "Power of Two Choices Load Balancer";

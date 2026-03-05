@@ -139,13 +139,28 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Integrity
             var currentHash = await ComputeHashAsync(data, cancellationToken);
             var isValid = ConstantTimeCompare(currentHash, record.Hash);
 
-            // Update verification timestamp
-            record = record with
+            // Atomic update of verification count using lock to prevent race condition
+            lock (_integrityRecords)
             {
-                LastVerifiedAt = DateTime.UtcNow,
-                VerificationCount = record.VerificationCount + 1
-            };
-            _integrityRecords[resourceId] = record;
+                // Re-read to get latest count
+                if (_integrityRecords.TryGetValue(resourceId, out var latestRecord))
+                {
+                    record = latestRecord with
+                    {
+                        LastVerifiedAt = DateTime.UtcNow,
+                        VerificationCount = latestRecord.VerificationCount + 1
+                    };
+                }
+                else
+                {
+                    record = record with
+                    {
+                        LastVerifiedAt = DateTime.UtcNow,
+                        VerificationCount = record.VerificationCount + 1
+                    };
+                }
+                _integrityRecords[resourceId] = record;
+            }
 
             return new IntegrityVerificationResult
             {

@@ -149,17 +149,21 @@ public abstract class ReplicationPluginBase : DataPipelinePluginBase
                 ["key"] = key,
                 ["targetNodeCount"] = targetNodes.Length
             },
-            strategy => strategy.ReplicateAsync(
-                Id,
-                targetNodes,
-                ReadOnlyMemory<byte>.Empty,
-                new Dictionary<string, string> { ["key"] = key },
-                ct).ContinueWith(_ => new Dictionary<string, object>
+            async strategy =>
+            {
+                await strategy.ReplicateAsync(
+                    Id,
+                    targetNodes,
+                    ReadOnlyMemory<byte>.Empty,
+                    new Dictionary<string, string> { ["key"] = key },
+                    ct).ConfigureAwait(false);
+                return new Dictionary<string, object>
                 {
                     ["key"] = key,
                     ["targetNodes"] = targetNodes,
                     ["status"] = "replicated"
-                }, ct, System.Threading.Tasks.TaskContinuationOptions.OnlyOnRanToCompletion, System.Threading.Tasks.TaskScheduler.Default),
+                };
+            },
             ct);
     }
 
@@ -189,13 +193,16 @@ public abstract class ReplicationPluginBase : DataPipelinePluginBase
                 ["operation"] = "syncStatus",
                 ["key"] = key
             },
-            strategy => strategy.VerifyConsistencyAsync(Array.Empty<string>(), key, ct)
-                .ContinueWith(t => new Dictionary<string, object>
+            async strategy =>
+            {
+                var consistent = await strategy.VerifyConsistencyAsync(Array.Empty<string>(), key, ct).ConfigureAwait(false);
+                return new Dictionary<string, object>
                 {
                     ["key"] = key,
-                    ["consistent"] = t.Result,
+                    ["consistent"] = consistent,
                     ["strategy"] = strategyId ?? DefaultReplicationMode
-                }, ct, System.Threading.Tasks.TaskContinuationOptions.OnlyOnRanToCompletion, System.Threading.Tasks.TaskScheduler.Default),
+                };
+            },
             ct);
     }
 

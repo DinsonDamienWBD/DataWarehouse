@@ -163,6 +163,8 @@ public sealed class MixedInodeAllocator
     /// <returns>Packing info with counts per format per block.</returns>
     public InodePackingInfo GetPackingInfo(int blockSize)
     {
+        if (blockSize <= 0)
+            throw new ArgumentOutOfRangeException(nameof(blockSize), "Block size must be positive.");
         return new InodePackingInfo(
             compact64PerBlock: blockSize / (int)InodeFormat.Compact64,       // 4096/64 = 64
             standard256PerBlock: blockSize / (int)InodeFormat.Standard256,   // 4096/256 = 16

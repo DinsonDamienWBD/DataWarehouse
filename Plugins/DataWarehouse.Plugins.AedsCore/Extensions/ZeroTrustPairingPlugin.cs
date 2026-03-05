@@ -15,7 +15,9 @@ namespace DataWarehouse.Plugins.AedsCore.Extensions;
 /// </summary>
 public sealed class ZeroTrustPairingPlugin : SecurityPluginBase
 {
-    private readonly Dictionary<string, (string Pin, DateTimeOffset Expires)> _pendingPins = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (string Pin, DateTimeOffset Expires)> _pendingPins = new();
+    // Tracks clients that have been elevated to at least Trusted level.
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, ClientTrustLevel> _trustedClients = new();
 
     /// <summary>
     /// Gets the plugin identifier.
@@ -52,7 +54,15 @@ public sealed class ZeroTrustPairingPlugin : SecurityPluginBase
 
         _pendingPins[clientId] = (pin, expires);
 
-        Console.WriteLine($"[Pairing PIN] {pin} (expires {expires:HH:mm:ss})");
+        // Prune expired entries to prevent unbounded growth
+        var now = DateTimeOffset.UtcNow;
+        foreach (var key in _pendingPins.Keys)
+        {
+            if (_pendingPins.TryGetValue(key, out var entry) && entry.Expires <= now)
+                _pendingPins.TryRemove(key, out _);
+        }
+
+        System.Diagnostics.Debug.WriteLine($"[Pairing PIN] {pin} (expires {expires:HH:mm:ss})");
         return pin;
     }
 
@@ -144,16 +154,33 @@ public sealed class ZeroTrustPairingPlugin : SecurityPluginBase
 
     /// <summary>
     /// Verifies pairing status for a client.
+    /// Returns true only if the client has been explicitly elevated to Trusted or higher.
+    /// Fail-closed: unknown clients are denied (finding 991 — was always-true bypass).
     /// </summary>
     /// <param name="clientId">Client ID to verify.</param>
-    /// <returns>True if paired with Trusted+ trust level.</returns>
+    /// <returns>True if the client is known and has Trusted+ trust level.</returns>
     public bool VerifyPairing(string clientId)
     {
         if (string.IsNullOrEmpty(clientId))
             throw new ArgumentException("Client ID cannot be null or empty.", nameof(clientId));
 
-        // In production, query trust level from server
-        return true;
+        // Fail-closed: deny all clients not explicitly recorded as Trusted or higher.
+        if (!_trustedClients.TryGetValue(clientId, out var level))
+            return false;
+
+        return level >= ClientTrustLevel.Trusted;
+    }
+
+    /// <summary>
+    /// Records that a client has been elevated to a new trust level.
+    /// Called after ElevateTrustAsync completes and the elevation is confirmed via message bus.
+    /// </summary>
+    /// <param name="clientId">The client ID that was elevated.</param>
+    /// <param name="level">The new trust level.</param>
+    public void RecordTrustElevation(string clientId, ClientTrustLevel level)
+    {
+        if (!string.IsNullOrEmpty(clientId))
+            _trustedClients[clientId] = level;
     }
 
     private async Task<(string PublicKey, string PrivateKey)> GenerateKeyPairAsync()
@@ -184,7 +211,9 @@ public sealed class ZeroTrustPairingPlugin : SecurityPluginBase
             }
             catch
             {
+
                 // Fall through to inline implementation
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

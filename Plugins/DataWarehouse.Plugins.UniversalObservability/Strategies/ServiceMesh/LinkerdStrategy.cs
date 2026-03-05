@@ -71,7 +71,7 @@ public sealed class LinkerdStrategy : ObservabilityStrategyBase
         try
         {
             // Get metrics from local proxy admin endpoint (Prometheus format)
-            var response = await _httpClient.GetAsync($"http://localhost:{_proxyAdminPort}/metrics", ct);
+            using var response = await _httpClient.GetAsync($"http://localhost:{_proxyAdminPort}/metrics", ct);
 
             if (response.IsSuccessStatusCode)
             {
@@ -82,7 +82,9 @@ public sealed class LinkerdStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // Proxy admin not accessible
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return metrics;
@@ -98,7 +100,7 @@ public sealed class LinkerdStrategy : ObservabilityStrategyBase
 
         try
         {
-            var response = await _httpClient.GetAsync(
+            using var response = await _httpClient.GetAsync(
                 $"{_vizUrl}/api/stat?resource_type=deployment&resource_name={_serviceName}&namespace={_namespace}&time_window=1m", ct);
 
             if (response.IsSuccessStatusCode)
@@ -137,7 +139,9 @@ public sealed class LinkerdStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // Viz not accessible
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return stats;
@@ -153,7 +157,7 @@ public sealed class LinkerdStrategy : ObservabilityStrategyBase
 
         try
         {
-            var response = await _httpClient.GetAsync(
+            using var response = await _httpClient.GetAsync(
                 $"{_vizUrl}/api/trafficsplits?namespace={_namespace}", ct);
 
             if (response.IsSuccessStatusCode)
@@ -188,7 +192,9 @@ public sealed class LinkerdStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // Viz not accessible
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return splits;
@@ -204,7 +210,7 @@ public sealed class LinkerdStrategy : ObservabilityStrategyBase
 
         try
         {
-            var response = await _httpClient.GetAsync(
+            using var response = await _httpClient.GetAsync(
                 $"{_vizUrl}/api/edges?resource_type=deployment&namespace={_namespace}", ct);
 
             if (response.IsSuccessStatusCode)
@@ -235,7 +241,9 @@ public sealed class LinkerdStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // Viz not accessible
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return edges;
@@ -301,10 +309,14 @@ public sealed class LinkerdStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
-        IncrementCounter("linkerd.metrics_sent");
+        // Collect live Linkerd proxy metrics and merge with caller-supplied metrics
         var proxyMetrics = await CollectProxyMetricsAsync(cancellationToken);
-        // Both sets would be forwarded
-        await Task.CompletedTask;
+        var combined = metrics.Concat(proxyMetrics).ToList();
+        IncrementCounter("linkerd.metrics_sent");
+        foreach (var m in combined)
+        {
+            IncrementCounter($"linkerd.metric.{m.Name.Replace('.', '_')}");
+        }
     }
 
     /// <inheritdoc/>
@@ -361,17 +373,11 @@ public sealed class LinkerdStrategy : ObservabilityStrategyBase
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("linkerd.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     protected override void Dispose(bool disposing)

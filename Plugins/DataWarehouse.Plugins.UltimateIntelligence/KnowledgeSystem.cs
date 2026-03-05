@@ -228,10 +228,12 @@ public sealed class KnowledgeAggregator : IDisposable
                 {
                     throw;
                 }
-                catch
+                catch (Exception ex)
                 {
-                    Debug.WriteLine($"Caught exception in KnowledgeSystem.cs");
-                    // Source failed, skip but continue with others
+                    // P2-3082: Include source ID and exception details in warning so failures are
+                    // actionable in production (Trace is visible in Release; Debug.WriteLine is not).
+                    Trace.TraceWarning($"[KnowledgeSystem] GetAllKnowledgeAsync: source '{source.SourceId}' failed: {ex.GetType().Name}: {ex.Message}");
+                    // Continue collecting from remaining sources
                 }
             }
 
@@ -853,7 +855,7 @@ public sealed class CapabilityMatrix
     {
         ArgumentException.ThrowIfNullOrEmpty(pattern);
 
-        var regex = new Regex("^" + Regex.Escape(pattern).Replace("\\*", ".*") + "$", RegexOptions.IgnoreCase);
+        var regex = new Regex("^" + Regex.Escape(pattern).Replace("\\*", ".*") + "$", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5));
 
         return _matrix.Values
             .SelectMany(caps => caps)
@@ -2395,7 +2397,9 @@ public sealed class CommandExecutor
                 }
                 catch
                 {
+
                     // Rollback failed
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
 

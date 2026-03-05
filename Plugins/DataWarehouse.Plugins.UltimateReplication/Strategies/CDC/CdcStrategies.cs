@@ -83,7 +83,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.CDC
         private readonly BoundedDictionary<string, long> _consumerOffsets = new BoundedDictionary<string, long>(1000);
         private readonly BoundedDictionary<string, (byte[] Data, long Offset)> _dataStore = new BoundedDictionary<string, (byte[] Data, long Offset)>(1000);
         private int _partitionCount = 8;
-        private string _bootstrapServers = "localhost:9092";
+        // LOW-3775: no default — callers must call Configure(...) before producing/consuming.
+        // Using localhost default silently fails in non-local deployments.
+        private string? _bootstrapServers;
         private bool _enableExactlyOnce = true;
 
         /// <inheritdoc/>
@@ -143,7 +145,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.CDC
         /// </summary>
         public string GetPartition(string key)
         {
-            var hash = key.GetHashCode();
+            var hash = StableHash.Compute(key);
             var partitionIndex = Math.Abs(hash) % _partitionCount;
             return $"partition-{partitionIndex}";
         }
@@ -534,7 +536,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.CDC
             var table = metadata?.GetValueOrDefault("table") ?? "data";
             var key = $"{database}.{table}";
 
-            _currentPosition++;
+            var position = Interlocked.Increment(ref _currentPosition);
 
             var maxwellEvent = new MaxwellEvent
             {
@@ -544,7 +546,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.CDC
                 Ts = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
                 Data = new Dictionary<string, object> { ["payload"] = Convert.ToBase64String(data.ToArray()) },
                 BinlogFile = _currentBinlog ?? "mysql-bin.000001",
-                BinlogPosition = _currentPosition
+                BinlogPosition = position
             };
 
             if (_streams.TryGetValue(key, out var stream))
@@ -556,7 +558,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.CDC
             {
                 var startTime = DateTime.UtcNow;
                 await Task.Delay(15, cancellationToken);
-                _dataStore[$"{key}:{_currentPosition}"] = (data.ToArray(), _currentPosition);
+                _dataStore[$"{key}:{position}"] = (data.ToArray(), position);
                 RecordReplicationLag(targetId, DateTime.UtcNow - startTime);
             });
 

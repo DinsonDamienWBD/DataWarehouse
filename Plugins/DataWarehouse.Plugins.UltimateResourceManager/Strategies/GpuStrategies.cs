@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+
 namespace DataWarehouse.Plugins.UltimateResourceManager.Strategies;
 
 /// <summary>
@@ -6,7 +8,8 @@ namespace DataWarehouse.Plugins.UltimateResourceManager.Strategies;
 /// </summary>
 public sealed class TimeSlicingGpuStrategy : ResourceStrategyBase
 {
-    private double _allocatedPercent;
+    private long _allocatedPercentMilliunits; // Stored as milliunits for Interlocked (1% = 1000)
+    private readonly ConcurrentDictionary<string, long> _handlePercents = new();
 
     public override string StrategyId => "gpu-time-slicing";
     public override string DisplayName => "GPU Time-Slicing Manager";
@@ -26,7 +29,7 @@ public sealed class TimeSlicingGpuStrategy : ResourceStrategyBase
     {
         return Task.FromResult(new ResourceMetrics
         {
-            GpuPercent = _allocatedPercent,
+            GpuPercent = Interlocked.Read(ref _allocatedPercentMilliunits) / 1000.0,
             GpuMemoryBytes = 0,
             Timestamp = DateTime.UtcNow
         });
@@ -35,18 +38,29 @@ public sealed class TimeSlicingGpuStrategy : ResourceStrategyBase
     protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct)
     {
         var handle = Guid.NewGuid().ToString("N");
+        var requestMilliunits = (long)(request.GpuPercent * 1000);
+        const long maxMilliunits = 100_000; // 100%
 
-        if (_allocatedPercent + request.GpuPercent > 100)
+        // Atomic compare-and-add loop to avoid TOCTOU race
+        long current;
+        long updated;
+        do
         {
-            return Task.FromResult(new ResourceAllocation
+            current = Interlocked.Read(ref _allocatedPercentMilliunits);
+            if (current + requestMilliunits > maxMilliunits)
             {
-                RequestId = request.RequestId,
-                Success = false,
-                FailureReason = "GPU capacity exceeded"
-            });
+                return Task.FromResult(new ResourceAllocation
+                {
+                    RequestId = request.RequestId,
+                    Success = false,
+                    FailureReason = "GPU capacity exceeded"
+                });
+            }
+            updated = current + requestMilliunits;
         }
+        while (Interlocked.CompareExchange(ref _allocatedPercentMilliunits, updated, current) != current);
 
-        _allocatedPercent += request.GpuPercent;
+        _handlePercents[handle] = requestMilliunits;
 
         return Task.FromResult(new ResourceAllocation
         {
@@ -59,8 +73,14 @@ public sealed class TimeSlicingGpuStrategy : ResourceStrategyBase
 
     protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct)
     {
-        _allocatedPercent -= allocation.AllocatedGpuPercent;
-        if (_allocatedPercent < 0) _allocatedPercent = 0;
+        if (allocation.AllocationHandle != null &&
+            _handlePercents.TryRemove(allocation.AllocationHandle, out var milliunits))
+        {
+            Interlocked.Add(ref _allocatedPercentMilliunits, -milliunits);
+            // Clamp to 0 in case of rounding
+            if (Interlocked.Read(ref _allocatedPercentMilliunits) < 0)
+                Interlocked.Exchange(ref _allocatedPercentMilliunits, 0);
+        }
         return Task.FromResult(true);
     }
 }
@@ -138,6 +158,9 @@ public sealed class MigGpuStrategy : ResourceStrategyBase
 /// </summary>
 public sealed class MpsGpuStrategy : ResourceStrategyBase
 {
+    private long _allocatedPercentMilliunits;
+    private readonly ConcurrentDictionary<string, long> _handlePercents = new();
+
     public override string StrategyId => "gpu-mps";
     public override string DisplayName => "Multi-Process Service (MPS) Manager";
     public override ResourceCategory Category => ResourceCategory.Gpu;
@@ -156,7 +179,7 @@ public sealed class MpsGpuStrategy : ResourceStrategyBase
     {
         return Task.FromResult(new ResourceMetrics
         {
-            GpuPercent = 60.0,
+            GpuPercent = Interlocked.Read(ref _allocatedPercentMilliunits) / 1000.0,
             Timestamp = DateTime.UtcNow
         });
     }
@@ -164,6 +187,9 @@ public sealed class MpsGpuStrategy : ResourceStrategyBase
     protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct)
     {
         var handle = Guid.NewGuid().ToString("N");
+        var milliunits = (long)(request.GpuPercent * 1000);
+        _handlePercents[handle] = milliunits;
+        Interlocked.Add(ref _allocatedPercentMilliunits, milliunits);
 
         return Task.FromResult(new ResourceAllocation
         {
@@ -173,6 +199,13 @@ public sealed class MpsGpuStrategy : ResourceStrategyBase
             AllocatedGpuPercent = request.GpuPercent
         });
     }
+
+    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct)
+    {
+        if (allocation.AllocationHandle != null && _handlePercents.TryRemove(allocation.AllocationHandle, out var milliunits))
+            Interlocked.Add(ref _allocatedPercentMilliunits, -milliunits);
+        return Task.FromResult(true);
+    }
 }
 
 /// <summary>
@@ -180,6 +213,9 @@ public sealed class MpsGpuStrategy : ResourceStrategyBase
 /// </summary>
 public sealed class VgpuStrategy : ResourceStrategyBase
 {
+    private long _allocatedPercentMilliunits;
+    private readonly ConcurrentDictionary<string, long> _handlePercents = new();
+
     public override string StrategyId => "gpu-vgpu";
     public override string DisplayName => "Virtual GPU (vGPU) Manager";
     public override ResourceCategory Category => ResourceCategory.Gpu;
@@ -198,8 +234,7 @@ public sealed class VgpuStrategy : ResourceStrategyBase
     {
         return Task.FromResult(new ResourceMetrics
         {
-            GpuPercent = 50.0,
-            GpuMemoryBytes = 4L * 1024 * 1024 * 1024, // 4GB vGPU
+            GpuPercent = Interlocked.Read(ref _allocatedPercentMilliunits) / 1000.0,
             Timestamp = DateTime.UtcNow
         });
     }
@@ -207,6 +242,9 @@ public sealed class VgpuStrategy : ResourceStrategyBase
     protected override Task<ResourceAllocation> AllocateCoreAsync(ResourceRequest request, CancellationToken ct)
     {
         var handle = Guid.NewGuid().ToString("N");
+        var percentMilliunits = (long)(request.GpuPercent * 1000);
+        _handlePercents[handle] = percentMilliunits;
+        Interlocked.Add(ref _allocatedPercentMilliunits, percentMilliunits);
 
         return Task.FromResult(new ResourceAllocation
         {
@@ -215,5 +253,12 @@ public sealed class VgpuStrategy : ResourceStrategyBase
             AllocationHandle = handle,
             AllocatedGpuPercent = request.GpuPercent
         });
+    }
+
+    protected override Task<bool> ReleaseCoreAsync(ResourceAllocation allocation, CancellationToken ct)
+    {
+        if (allocation.AllocationHandle != null && _handlePercents.TryRemove(allocation.AllocationHandle, out var milliunits))
+            Interlocked.Add(ref _allocatedPercentMilliunits, -milliunits);
+        return Task.FromResult(true);
     }
 }

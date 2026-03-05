@@ -460,14 +460,18 @@ public sealed class RsaPkcs1Strategy : EncryptionStrategyBase
                 using var rsa = RSA.Create(_keySize);
                 var testData = new byte[32];
                 RandomNumberGenerator.Fill(testData);
-                var encrypted = rsa.Encrypt(testData, RSAEncryptionPadding.OaepSHA256);
-                var decrypted = rsa.Decrypt(encrypted, RSAEncryptionPadding.OaepSHA256);
+                // Use PKCS1 padding — this IS the RsaPkcs1Strategy health check,
+                // so we must verify the PKCS1 code path, not OAEP (#2942).
+#pragma warning disable S5542 // PKCS1 is intentionally used here to validate the PKCS1 code path
+                var encrypted = rsa.Encrypt(testData, RSAEncryptionPadding.Pkcs1);
+                var decrypted = rsa.Decrypt(encrypted, RSAEncryptionPadding.Pkcs1);
+#pragma warning restore S5542
                 var isHealthy = testData.AsSpan().SequenceEqual(decrypted);
                 CryptographicOperations.ZeroMemory(testData);
                 CryptographicOperations.ZeroMemory(decrypted);
                 return new StrategyHealthCheckResult(
                     isHealthy,
-                    isHealthy ? $"RSA-{_keySize}-OAEP healthy" : "Round-trip failed",
+                    isHealthy ? $"RSA-{_keySize}-PKCS1 healthy" : "Round-trip failed",
                     new Dictionary<string, object>
                     {
                         ["KeySize"] = _keySize,

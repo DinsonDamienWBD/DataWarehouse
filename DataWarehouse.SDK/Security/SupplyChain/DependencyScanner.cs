@@ -99,6 +99,18 @@ namespace DataWarehouse.SDK.Security.SupplyChain
 
         /// <summary>Whether any Critical or High vulnerabilities were found.</summary>
         public bool HasHighOrCritical => CriticalCount > 0 || HighCount > 0;
+
+        /// <summary>
+        /// Number of components where vulnerability lookup failed and were skipped.
+        /// A non-zero value means the scan result may under-report vulnerabilities.
+        /// </summary>
+        public int SkippedComponents { get; init; }
+
+        /// <summary>
+        /// False when at least one component lookup failed and was skipped (finding P2-601).
+        /// Callers should treat partial results with appropriate caution.
+        /// </summary>
+        public bool IsComplete => SkippedComponents == 0;
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -717,15 +729,27 @@ namespace DataWarehouse.SDK.Security.SupplyChain
                 sbom.ComponentCount);
 
             var allFindings = new List<VulnerabilityFinding>();
+            int skippedComponents = 0; // tracks lookup failures (finding P2-601)
 
             foreach (var component in sbom.Components)
             {
                 ct.ThrowIfCancellationRequested();
 
                 // Always check offline DB
-                var offlineFindings = await _offlineDb
-                    .QueryAsync(component.Name, component.Version, ct)
-                    .ConfigureAwait(false);
+                IReadOnlyList<VulnerabilityFinding> offlineFindings;
+                try
+                {
+                    offlineFindings = await _offlineDb
+                        .QueryAsync(component.Name, component.Version, ct)
+                        .ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    _logger?.LogWarning(ex, "Offline DB lookup failed for {Package}@{Version} — component skipped",
+                        component.Name, component.Version);
+                    skippedComponents++;
+                    continue;
+                }
                 allFindings.AddRange(offlineFindings);
 
                 // Optionally check online DBs with rate limiting
@@ -764,11 +788,20 @@ namespace DataWarehouse.SDK.Security.SupplyChain
                 }
             }
 
+            if (skippedComponents > 0)
+            {
+                _logger?.LogWarning(
+                    "Dependency scan incomplete: {Skipped}/{Total} components skipped due to lookup failures. " +
+                    "Results may under-report vulnerabilities.",
+                    skippedComponents, sbom.ComponentCount);
+            }
+
             var result = new DependencyScanResult
             {
                 ScannedAt = DateTimeOffset.UtcNow,
                 ComponentsScanned = sbom.ComponentCount,
                 VulnerabilitiesFound = allFindings.Count,
+                SkippedComponents = skippedComponents,
                 Vulnerabilities = allFindings
                     .OrderByDescending(v => v.Severity)
                     .ThenBy(v => v.PackageName)

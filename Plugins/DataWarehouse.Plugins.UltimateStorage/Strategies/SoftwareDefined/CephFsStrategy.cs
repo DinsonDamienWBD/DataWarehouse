@@ -83,6 +83,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         public override string StrategyId => "cephfs";
         public override string Name => "Ceph Distributed File System (CephFS)";
         public override StorageTier Tier => StorageTier.Hot;
+        public override bool IsProductionReady => false; // Metadata stored in sidecar JSON files; requires actual CephFS POSIX mount and libcephfs/ceph-fuse integration for xattr and snapshot support
 
         public override StorageCapabilities Capabilities => new StorageCapabilities
         {
@@ -91,7 +92,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             SupportsLocking = true, // POSIX distributed locking
             SupportsVersioning = true, // Via snapshots
             SupportsTiering = true, // Via multiple data pools
-            SupportsEncryption = false, // Encryption at rest handled at OSD level
+            SupportsEncryption = false, // POSIX layer does not encrypt; enable OSD-level dmcrypt at the Ceph OSD layer independently of this strategy
             SupportsCompression = false, // Compression handled at BlueStore level
             SupportsMultipart = false, // Striping is transparent
             MaxObjectSize = null, // Limited only by available space
@@ -590,21 +591,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 return;
             }
 
-            // File layout is typically set via extended attributes or ceph commands
-            // Example: setfattr -n ceph.file.layout.stripe_unit -v 4194304 /path
-            // For simplicity, we store layout intention as metadata
-            var layoutMetadata = new Dictionary<string, string>
-            {
-                ["ceph.file.layout.stripe_unit"] = _stripeUnitBytes.ToString(),
-                ["ceph.file.layout.stripe_count"] = _stripeCount.ToString(),
-                ["ceph.file.layout.object_size"] = _objectSizeBytes.ToString(),
-                ["ceph.file.layout.pool"] = _dataPoolName
-            };
-
-            // In a real implementation, this would use setfattr or libcephfs API
-            // For now, store as marker file
-            var layoutFile = Path.Combine(directoryPath, ".ceph_layout");
-            await File.WriteAllTextAsync(layoutFile, JsonSerializer.Serialize(layoutMetadata), ct);
+            // CephFS file layout applied via setfattr extended attributes
+            await RunSetFattrAsync($"-n ceph.file.layout.stripe_unit -v {_stripeUnitBytes} \"{directoryPath}\"", ct);
+            await RunSetFattrAsync($"-n ceph.file.layout.stripe_count -v {_stripeCount} \"{directoryPath}\"", ct);
+            await RunSetFattrAsync($"-n ceph.file.layout.object_size -v {_objectSizeBytes} \"{directoryPath}\"", ct);
+            await RunSetFattrAsync($"-n ceph.file.layout.pool -v \"{_dataPoolName}\" \"{directoryPath}\"", ct);
         }
 
         /// <summary>
@@ -612,11 +603,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// </summary>
         private async Task ApplyDirectoryPinningAsync(string directoryPath, int mdsRank, CancellationToken ct)
         {
-            // Directory pinning is set via extended attribute: ceph.dir.pin
-            // Example: setfattr -n ceph.dir.pin -v 0 /path
-            // For simplicity, store as metadata marker
-            var pinFile = Path.Combine(directoryPath, ".ceph_pin");
-            await File.WriteAllTextAsync(pinFile, mdsRank.ToString(), ct);
+            // Directory pinning applied via: setfattr -n ceph.dir.pin -v <rank> <path>
+            await RunSetFattrAsync($"-n ceph.dir.pin -v {mdsRank} \"{directoryPath}\"", ct);
         }
 
         /// <summary>
@@ -624,18 +612,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// </summary>
         private async Task ApplyQuotaAsync(string directoryPath, long maxBytes, long maxFiles, CancellationToken ct)
         {
-            // Quota is set via extended attributes:
-            // - ceph.quota.max_bytes
-            // - ceph.quota.max_files
-            // For simplicity, store as metadata marker
-            var quotaMetadata = new Dictionary<string, string>
-            {
-                ["ceph.quota.max_bytes"] = maxBytes.ToString(),
-                ["ceph.quota.max_files"] = maxFiles.ToString()
-            };
-
-            var quotaFile = Path.Combine(directoryPath, ".ceph_quota");
-            await File.WriteAllTextAsync(quotaFile, JsonSerializer.Serialize(quotaMetadata), ct);
+            // CephFS quotas applied via setfattr extended attributes
+            if (maxBytes > 0)
+                await RunSetFattrAsync($"-n ceph.quota.max_bytes -v {maxBytes} \"{directoryPath}\"", ct);
+            if (maxFiles > 0)
+                await RunSetFattrAsync($"-n ceph.quota.max_files -v {maxFiles} \"{directoryPath}\"", ct);
         }
 
         /// <summary>
@@ -749,18 +730,43 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 long usedBytes = totalBytes - driveInfo.AvailableFreeSpace;
                 long availableBytes = driveInfo.AvailableFreeSpace;
 
-                // Count files (respecting quota if set)
+                // Count files via ceph df (or xattr quota.max_files) to avoid O(N) directory walk.
+                // stat() on CephFS mount returns st_nlink which counts directory entries,
+                // but the most portable approach is the quota inode counter when quota is set.
                 long fileCount = 0;
                 try
                 {
-                    fileCount = Directory.GetFiles(_mountPath, "*", SearchOption.AllDirectories)
-                        .Where(f => !IsMetadataFile(f) && !IsSnapshotPath(f))
-                        .Count();
+                    // Try ceph df for inode count — available on CephFS ≥ Pacific
+                    using var process = new System.Diagnostics.Process
+                    {
+                        StartInfo = new System.Diagnostics.ProcessStartInfo
+                        {
+                            FileName = "ceph",
+                            Arguments = $"df detail -f json",
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                            UseShellExecute = false,
+                            CreateNoWindow = true
+                        }
+                    };
+                    process.Start();
+                    var stdout = await process.StandardOutput.ReadToEndAsync(ct).ConfigureAwait(false);
+                    await process.WaitForExitAsync(ct).ConfigureAwait(false);
+                    if (process.ExitCode == 0 && !string.IsNullOrWhiteSpace(stdout))
+                    {
+                        using var doc = System.Text.Json.JsonDocument.Parse(stdout);
+                        if (doc.RootElement.TryGetProperty("stats", out var statsEl) &&
+                            statsEl.TryGetProperty("total_objects", out var objEl) &&
+                            objEl.TryGetInt64(out var n))
+                        {
+                            fileCount = n;
+                        }
+                    }
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[CephFsStrategy.GetFilesystemUsageAsync] {ex.GetType().Name}: {ex.Message}");
-                    // File count may fail if permissions insufficient
+                    System.Diagnostics.Trace.TraceWarning($"[CephFsStrategy.GetFilesystemUsageAsync] ceph df failed: {ex.Message}");
+                    // File count unavailable — leave as 0
                 }
 
                 return new CephFsUsageInfo
@@ -965,6 +971,35 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                     lockObj?.Dispose();
                 }
                 _fileLocks.Clear();
+            }
+        }
+
+        #endregion
+
+        #region CLI Helpers
+
+        /// <summary>Runs setfattr with the given arguments; throws on non-zero exit.</summary>
+        private static async Task RunSetFattrAsync(string arguments, CancellationToken ct)
+        {
+            using var process = new System.Diagnostics.Process
+            {
+                StartInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "setfattr",
+                    Arguments = arguments,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+            };
+            process.Start();
+            await process.WaitForExitAsync(ct).ConfigureAwait(false);
+            if (process.ExitCode != 0)
+            {
+                var stderr = await process.StandardError.ReadToEndAsync(ct).ConfigureAwait(false);
+                throw new InvalidOperationException(
+                    $"setfattr {arguments} failed with exit code {process.ExitCode}: {stderr}");
             }
         }
 

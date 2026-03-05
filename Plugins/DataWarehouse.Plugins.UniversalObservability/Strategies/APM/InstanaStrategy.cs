@@ -50,8 +50,12 @@ public sealed class InstanaStrategy : ObservabilityStrategyBase
     {
         _agentEndpoint = endpoint;
         _agentKey = agentKey;
-        _httpClient.DefaultRequestHeaders.Add("X-Instana-Key", agentKey);
+        // Do NOT set DefaultRequestHeaders — inject per-request to avoid thread-safety issues.
     }
+
+    /// <summary>Adds the Instana agent key to the request headers (per-request, thread-safe).</summary>
+    private void AddAgentKey(HttpRequestMessage request) =>
+        request.Headers.Add("X-Instana-Key", _agentKey);
 
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
@@ -130,12 +134,16 @@ public sealed class InstanaStrategy : ObservabilityStrategyBase
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             var url = $"{_agentEndpoint}{endpoint}";
 
-            var response = await _httpClient.PostAsync(url, content, ct);
+            using var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = content };
+            AddAgentKey(request);
+            using var response = await _httpClient.SendAsync(request, ct);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Agent unavailable - data buffered locally
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -144,7 +152,9 @@ public sealed class InstanaStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{_agentEndpoint}/", cancellationToken);
+            using var hcRequest = new HttpRequestMessage(HttpMethod.Get, $"{_agentEndpoint}/");
+            AddAgentKey(hcRequest);
+            using var response = await _httpClient.SendAsync(hcRequest, cancellationToken);
 
             return new HealthCheckResult(
                 IsHealthy: response.IsSuccessStatusCode,
@@ -178,17 +188,12 @@ public sealed class InstanaStrategy : ObservabilityStrategyBase
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
+        // HttpClient in-flight requests are abandoned on Dispose; the 100ms added no real grace.
         IncrementCounter("instana.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     protected override void Dispose(bool disposing)

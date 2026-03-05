@@ -87,6 +87,33 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             var targetProtocol = GetConfiguration<string>(config, "target_protocol", "")
                 ?? throw new ArgumentException("target_protocol property is required.");
             var llmEndpoint = GetConfiguration<string>(config, "llm_endpoint", "");
+            // Finding 1948: Validate llm_endpoint to block SSRF to cloud metadata services and
+            // other internal addresses before it is sent to the translation endpoint.
+            if (!string.IsNullOrEmpty(llmEndpoint))
+            {
+                if (!Uri.TryCreate(llmEndpoint, UriKind.Absolute, out var llmUri) ||
+                    llmUri.Scheme is not "http" and not "https")
+                    throw new ArgumentException("llm_endpoint must be an absolute http/https URL.");
+
+                var host = llmUri.Host.ToLowerInvariant();
+                if (host is "169.254.169.254" or "metadata.google.internal" or
+                    "169.254.170.2" or "fd00:ec2::254" or
+                    "localhost" or "127.0.0.1" or "::1" or
+                    "[::1]")
+                    throw new ArgumentException("llm_endpoint points to a blocked internal address (SSRF protection).");
+
+                // Block any link-local or loopback range beyond the exact entries above
+                if (System.Net.IPAddress.TryParse(host, out var ip))
+                {
+                    if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                    {
+                        var bytes = ip.GetAddressBytes();
+                        // 169.254.0.0/16 (APIPA) and 127.0.0.0/8
+                        if (bytes[0] == 127 || (bytes[0] == 169 && bytes[1] == 254))
+                            throw new ArgumentException("llm_endpoint resolves to a blocked IP range (SSRF protection).");
+                    }
+                }
+            }
             var useLlmTranslation = GetConfiguration<bool>(config, "use_llm_translation", true);
             var fallbackToRules = GetConfiguration<bool>(config, "fallback_to_rules", true);
             var cacheTranslations = GetConfiguration<bool>(config, "cache_translations", true);
@@ -148,7 +175,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await client.PostAsync("/api/v1/translate/sessions", content, ct);
+            using var response = await client.PostAsync("/api/v1/translate/sessions", content, ct);
             response.EnsureSuccessStatusCode();
 
             var result = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
@@ -158,8 +185,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 ? em.GetString() ?? "rule_based" : "rule_based";
             var llmAvailable = result.TryGetProperty("llm_available", out var la) && la.GetBoolean();
 
+            client.DefaultRequestHeaders.Remove("X-Translation-Session");
             client.DefaultRequestHeaders.Add("X-Translation-Session", sessionId);
+            client.DefaultRequestHeaders.Remove("X-Source-Protocol");
             client.DefaultRequestHeaders.Add("X-Source-Protocol", sourceProtocol);
+            client.DefaultRequestHeaders.Remove("X-Target-Protocol");
             client.DefaultRequestHeaders.Add("X-Target-Protocol", targetProtocol);
 
             var info = new Dictionary<string, object>
@@ -184,7 +214,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             var client = handle.GetConnection<HttpClient>();
             var sessionId = handle.ConnectionInfo["session_id"]?.ToString();
 
-            var response = await client.GetAsync($"/api/v1/translate/sessions/{sessionId}/status", ct);
+            using var response = await client.GetAsync($"/api/v1/translate/sessions/{sessionId}/status", ct);
             if (!response.IsSuccessStatusCode) return false;
 
             var status = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
@@ -214,7 +244,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             var client = handle.GetConnection<HttpClient>();
             var sessionId = handle.ConnectionInfo["session_id"]?.ToString();
 
-            var response = await client.GetAsync($"/api/v1/translate/sessions/{sessionId}/health", ct);
+            using var response = await client.GetAsync($"/api/v1/translate/sessions/{sessionId}/health", ct);
             sw.Stop();
 
             if (!response.IsSuccessStatusCode)

@@ -126,10 +126,16 @@ public sealed class CitusConnectionStrategy : DatabaseConnectionStrategyBase
             }
 
             await using var cmd = new NpgsqlCommand("SELECT extversion FROM pg_extension WHERE extname='citus'", connection);
-            var citusVersion = await cmd.ExecuteScalarAsync(ct) as string ?? "Unknown";
+            // Finding 1900: Null result means extension not installed — report as unhealthy.
+            var citusVersionObj = await cmd.ExecuteScalarAsync(ct);
             sw.Stop();
 
-            return new ConnectionHealth(true, $"Citus {citusVersion} (PostgreSQL {connection.ServerVersion}) - Database: {connection.Database}", sw.Elapsed, DateTimeOffset.UtcNow);
+            if (citusVersionObj == null || citusVersionObj == DBNull.Value)
+            {
+                return new ConnectionHealth(false, "Citus extension not installed on this PostgreSQL server", sw.Elapsed, DateTimeOffset.UtcNow);
+            }
+
+            return new ConnectionHealth(true, $"Citus {citusVersionObj} (PostgreSQL {connection.ServerVersion}) - Database: {connection.Database}", sw.Elapsed, DateTimeOffset.UtcNow);
         }
         catch (Exception ex)
         {

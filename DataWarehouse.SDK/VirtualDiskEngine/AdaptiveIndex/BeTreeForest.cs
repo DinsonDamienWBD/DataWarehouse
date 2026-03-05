@@ -51,7 +51,16 @@ public sealed class BeTreeForest : IAdaptiveIndex, IAsyncDisposable
     public long ObjectCount => Interlocked.Read(ref _totalObjectCount);
 
     /// <inheritdoc />
-    public long RootBlockNumber => _shards.Count > 0 ? _shards[0].Index.RootBlockNumber : -1;
+    // Cat 2 (finding 714): acquire read lock before accessing _shards.Count — concurrent shard creation races
+    public long RootBlockNumber
+    {
+        get
+        {
+            _forestLock.EnterReadLock();
+            try { return _shards.Count > 0 ? _shards[0].Index.RootBlockNumber : -1; }
+            finally { _forestLock.ExitReadLock(); }
+        }
+    }
 
     /// <inheritdoc />
 #pragma warning disable CS0067 // Event is declared by IAdaptiveIndex; raised by AdaptiveIndexEngine orchestrator

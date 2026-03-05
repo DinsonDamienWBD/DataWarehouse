@@ -29,17 +29,17 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
         /// <summary>
         /// Maximum allowed query depth. Queries exceeding this depth are rejected (NET-08).
         /// </summary>
-        private int _maxQueryDepth = 10;
+        private volatile int _maxQueryDepth = 10;
 
         /// <summary>
         /// Maximum allowed query complexity cost. Queries exceeding this cost are rejected.
         /// </summary>
-        private int _maxQueryComplexity = 1000;
+        private volatile int _maxQueryComplexity = 1000;
 
         /// <summary>
         /// Whether introspection queries are allowed. Should be false in production (NET-08).
         /// </summary>
-        private bool _enableIntrospection;
+        private volatile bool _enableIntrospection;
 
         /// <inheritdoc/>
         public override string StrategyId => "graphql";
@@ -87,6 +87,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
 
             var apiKey = GetConfiguration(config, "ApiKey", string.Empty);
             if (!string.IsNullOrEmpty(apiKey))
+                client.DefaultRequestHeaders.Remove("Authorization");
                 client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
 
             // Only test with introspection if enabled; otherwise use a safe health check query
@@ -94,7 +95,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
             {
                 var introspectionQuery = @"{""query"":""{__schema { queryType { name } }}""}";
                 var content = new StringContent(introspectionQuery, Encoding.UTF8, "application/json");
-                var response = await client.PostAsync("", content, ct);
+                using var response = await client.PostAsync("", content, ct);
                 response.EnsureSuccessStatusCode();
             }
             else
@@ -102,7 +103,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
                 // Use __typename as a lightweight connectivity test (does not expose schema)
                 var healthQuery = @"{""query"":""{__typename}""}";
                 var content = new StringContent(healthQuery, Encoding.UTF8, "application/json");
-                var response = await client.PostAsync("", content, ct);
+                using var response = await client.PostAsync("", content, ct);
                 response.EnsureSuccessStatusCode();
             }
 
@@ -259,7 +260,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
             // Use __typename for health check (safe even with introspection disabled)
             var query = @"{""query"":""{__typename}""}";
             var content = new StringContent(query, Encoding.UTF8, "application/json");
-            var response = await client.PostAsync("", content, ct);
+            using var response = await client.PostAsync("", content, ct);
             return response.IsSuccessStatusCode;
         }
 

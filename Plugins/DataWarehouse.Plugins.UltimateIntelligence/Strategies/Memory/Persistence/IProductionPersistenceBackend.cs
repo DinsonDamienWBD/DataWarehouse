@@ -475,6 +475,13 @@ public abstract record PersistenceBackendConfig
 
     /// <summary>Operation timeout in milliseconds.</summary>
     public int OperationTimeoutMs { get; init; } = 30000;
+
+    /// <summary>
+    /// When true, the backend will throw <see cref="PlatformNotSupportedException"/> if the
+    /// real client library is not available, rather than falling back to in-memory simulation.
+    /// Set to true in production environments to prevent silent data loss.
+    /// </summary>
+    public bool RequireRealBackend { get; init; }
 }
 
 /// <summary>

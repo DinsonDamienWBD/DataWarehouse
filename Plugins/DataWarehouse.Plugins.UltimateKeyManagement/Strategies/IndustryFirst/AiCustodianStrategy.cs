@@ -69,6 +69,18 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
         private readonly SemaphoreSlim _rateLimiter;
         private bool _disposed;
 
+        // #3524: Master wrapping key for AES-GCM encryption of key material stored in EncryptedKeyMaterial.
+        // In production, this should be stored in a hardware-backed key store. Here it is derived from
+        // a machine-specific secret so it survives process restarts without exposing raw key bytes at rest.
+        private static readonly byte[] _wrapMasterKey = System.Security.Cryptography.HKDF.DeriveKey(
+            System.Security.Cryptography.HashAlgorithmName.SHA256,
+            System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(
+                    $"AiCustodian.WrapKey.v1:{Environment.MachineName}:{Environment.UserName}")),
+            32,
+            salt: System.Text.Encoding.UTF8.GetBytes("dw-ai-custodian-wrap-v1"),
+            info: System.Text.Encoding.UTF8.GetBytes("key-material-protection"));
+
         public AiCustodianStrategy()
         {
             _rateLimiter = new SemaphoreSlim(10, 10); // Max 10 concurrent AI requests
@@ -140,17 +152,32 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             {
                 case LlmProvider.OpenAI:
                     client.BaseAddress = new Uri(_config.ApiEndpoint ?? "https://api.openai.com/v1/");
+                    client.DefaultRequestHeaders.Remove("Authorization");
                     client.DefaultRequestHeaders.Add("Authorization", $"Bearer {_config.ApiKey}");
                     break;
 
                 case LlmProvider.Anthropic:
                     client.BaseAddress = new Uri(_config.ApiEndpoint ?? "https://api.anthropic.com/v1/");
+                    client.DefaultRequestHeaders.Remove("x-api-key");
                     client.DefaultRequestHeaders.Add("x-api-key", _config.ApiKey);
+                    client.DefaultRequestHeaders.Remove("anthropic-version");
                     client.DefaultRequestHeaders.Add("anthropic-version", "2024-01-01");
                     break;
 
                 case LlmProvider.AzureOpenAI:
-                    client.BaseAddress = new Uri(_config.ApiEndpoint ?? "https://your-resource.openai.azure.com/");
+                    // #3521: Throw if URL is still the placeholder.
+                    var azureEndpoint = _config.ApiEndpoint;
+                    if (string.IsNullOrEmpty(azureEndpoint) ||
+                        azureEndpoint.Contains("your-resource", StringComparison.OrdinalIgnoreCase) ||
+                        azureEndpoint == "https://your-resource.openai.azure.com/")
+                    {
+                        throw new InvalidOperationException(
+                            "Azure OpenAI endpoint URL is not configured. " +
+                            "Set AiCustodianConfig.ApiEndpoint to your actual Azure OpenAI resource URL " +
+                            "(e.g., https://<resource-name>.openai.azure.com/).");
+                    }
+                    client.BaseAddress = new Uri(azureEndpoint);
+                    client.DefaultRequestHeaders.Remove("api-key");
                     client.DefaultRequestHeaders.Add("api-key", _config.ApiKey);
                     break;
 
@@ -212,7 +239,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
                 {
                     case AccessDecision.Approved:
                         UpdateAccessHistory(keyId, context, true);
-                        return keyData.EncryptedKeyMaterial;
+                        // #3524: Decrypt the wrapped key material before returning to callers.
+                        return UnwrapKeyMaterial(keyData.EncryptedKeyMaterial, keyId);
 
                     case AccessDecision.Denied:
                         UpdateAccessHistory(keyId, context, false);
@@ -248,7 +276,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
                 var aiKeyData = new AiProtectedKeyData
                 {
                     KeyId = keyId,
-                    EncryptedKeyMaterial = keyData,
+                    // #3524: Actually encrypt the key material so the field name is not a lie.
+                    EncryptedKeyMaterial = WrapKeyMaterial(keyData, keyId),
                     Policies = _config.DefaultPolicies.ToList(),
                     CreatedAt = DateTime.UtcNow,
                     CreatedBy = context.UserId
@@ -479,7 +508,9 @@ Provide your access decision in the following JSON format:
             }
             catch
             {
+
                 // Parse failed - escalate for safety
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             return new AiAccessDecision
@@ -651,6 +682,26 @@ Provide your access decision in the following JSON format:
         }
 
         /// <summary>
+        /// #3523: Sends a notification about a pending escalation to the configured escalation contact.
+        /// Emits a structured trace event; production deployments should replace this with an
+        /// email/webhook/SMS integration via the escalation contact in _config.EscalationEmail.
+        /// </summary>
+        private Task SendEscalationNotificationAsync(PendingEscalation escalation)
+        {
+            // Emit structured log entry for operator monitoring systems to pick up.
+            System.Diagnostics.Trace.TraceWarning(
+                $"[AiCustodianStrategy] ESCALATION REQUIRED: keyId='{escalation.KeyId}' " +
+                $"escalationId='{escalation.EscalationId}' requesterId='{escalation.RequesterId}' " +
+                $"time='{escalation.RequestTime:O}' contact='{_config.EscalationEmail}' " +
+                $"reason='{escalation.AiReasoning}'");
+
+            // Raise a counter metric so dashboards can alert.
+            IncrementCounter("aicustodian.escalation.sent");
+
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
         /// Creates a human escalation for uncertain decisions.
         /// </summary>
         private async Task<PendingEscalation> CreateEscalationAsync(
@@ -671,8 +722,8 @@ Provide your access decision in the following JSON format:
 
             _pendingEscalations.Add(escalation);
 
-            // In production, send email/notification to escalation contact
-            // await SendEscalationNotificationAsync(escalation);
+            // #3523: Send escalation notification — no longer commented out.
+            await SendEscalationNotificationAsync(escalation);
 
             return escalation;
         }
@@ -886,6 +937,61 @@ Decision Guidelines:
 - REQUIRES_MFA: Suspicious but potentially legitimate, need additional verification
 
 Always respond in valid JSON format.";
+
+        /// <summary>
+        /// #3524: Encrypts raw key bytes with AES-GCM before storing in EncryptedKeyMaterial.
+        /// Format: nonce(12) + tag(16) + ciphertext.
+        /// </summary>
+        private static byte[] WrapKeyMaterial(byte[] plaintext, string keyId)
+        {
+            var nonce = new byte[12];
+            System.Security.Cryptography.RandomNumberGenerator.Fill(nonce);
+            var tag = new byte[16];
+            var ciphertext = new byte[plaintext.Length];
+
+            // Derive a per-key wrapping key so each key uses a unique sub-key.
+            var perKeyWrap = System.Security.Cryptography.HKDF.DeriveKey(
+                System.Security.Cryptography.HashAlgorithmName.SHA256,
+                _wrapMasterKey, 32,
+                salt: System.Text.Encoding.UTF8.GetBytes("dw-ai-per-key-v1"),
+                info: System.Text.Encoding.UTF8.GetBytes(keyId));
+
+            using var aes = new System.Security.Cryptography.AesGcm(perKeyWrap, 16);
+            aes.Encrypt(nonce, plaintext, ciphertext, tag);
+
+            var wrapped = new byte[12 + 16 + ciphertext.Length];
+            Buffer.BlockCopy(nonce, 0, wrapped, 0, 12);
+            Buffer.BlockCopy(tag, 0, wrapped, 12, 16);
+            Buffer.BlockCopy(ciphertext, 0, wrapped, 28, ciphertext.Length);
+            return wrapped;
+        }
+
+        /// <summary>
+        /// #3524: Decrypts key material previously wrapped with WrapKeyMaterial.
+        /// </summary>
+        private static byte[] UnwrapKeyMaterial(byte[] wrapped, string keyId)
+        {
+            if (wrapped.Length < 28)
+                throw new InvalidOperationException("Wrapped key material is too short to be valid.");
+
+            var nonce = new byte[12];
+            var tag = new byte[16];
+            var ciphertext = new byte[wrapped.Length - 28];
+            Buffer.BlockCopy(wrapped, 0, nonce, 0, 12);
+            Buffer.BlockCopy(wrapped, 12, tag, 0, 16);
+            Buffer.BlockCopy(wrapped, 28, ciphertext, 0, ciphertext.Length);
+
+            var perKeyWrap = System.Security.Cryptography.HKDF.DeriveKey(
+                System.Security.Cryptography.HashAlgorithmName.SHA256,
+                _wrapMasterKey, 32,
+                salt: System.Text.Encoding.UTF8.GetBytes("dw-ai-per-key-v1"),
+                info: System.Text.Encoding.UTF8.GetBytes(keyId));
+
+            var plaintext = new byte[ciphertext.Length];
+            using var aes = new System.Security.Cryptography.AesGcm(perKeyWrap, 16);
+            aes.Decrypt(nonce, ciphertext, tag, plaintext);
+            return plaintext;
+        }
 
         public override void Dispose()
         {

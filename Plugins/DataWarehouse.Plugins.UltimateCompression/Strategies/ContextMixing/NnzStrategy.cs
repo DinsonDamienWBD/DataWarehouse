@@ -242,6 +242,24 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.ContextMixing
         /// </summary>
         private sealed class Perceptron
         {
+            // P2-1575: Pre-compute feature arrays for all 256 context bytes once to
+            // eliminate ~8M per-MB heap allocations from GetFeatures() hot path.
+            private static readonly double[][] _featureCache = BuildFeatureCache();
+
+            private static double[][] BuildFeatureCache()
+            {
+                var cache = new double[256][];
+                for (int b = 0; b < 256; b++)
+                {
+                    var f = new double[NumInputs];
+                    for (int i = 0; i < 8; i++)
+                        f[i] = ((b >> i) & 1) == 1 ? 1.0 : -1.0;
+                    f[8] = 1.0; // bias
+                    cache[b] = f;
+                }
+                return cache;
+            }
+
             // Per-context-byte weights: _weights[contextByte][feature]
             private readonly double[][] _weights;
 
@@ -263,7 +281,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.ContextMixing
             /// </summary>
             public int Predict(byte contextByte)
             {
-                double[] features = GetFeatures(contextByte);
+                double[] features = _featureCache[contextByte];
                 double[] w = _weights[contextByte];
 
                 // Compute weighted sum (linear activation)
@@ -282,7 +300,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.ContextMixing
             /// </summary>
             public void Update(byte contextByte, int actualBit)
             {
-                double[] features = GetFeatures(contextByte);
+                double[] features = _featureCache[contextByte];
                 double[] w = _weights[contextByte];
 
                 // Current prediction
@@ -299,19 +317,6 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.ContextMixing
                     // Clip weights to prevent overflow
                     w[i] = Math.Clamp(w[i], -10.0, 10.0);
                 }
-            }
-
-            /// <summary>
-            /// Extracts feature vector from a context byte.
-            /// Features are the 8 individual bits (normalized to -1/+1) plus a bias of 1.0.
-            /// </summary>
-            private static double[] GetFeatures(byte contextByte)
-            {
-                var features = new double[NumInputs];
-                for (int i = 0; i < 8; i++)
-                    features[i] = ((contextByte >> i) & 1) == 1 ? 1.0 : -1.0;
-                features[8] = 1.0; // bias
-                return features;
             }
 
             /// <summary>

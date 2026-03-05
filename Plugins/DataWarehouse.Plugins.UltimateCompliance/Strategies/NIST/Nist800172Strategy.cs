@@ -23,7 +23,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.NIST
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("nist800172.check");
+            IncrementCounter("nist800172.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -47,11 +47,11 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.NIST
             {
                 violations.Add(new ComplianceViolation
                 {
-                    Code = "NIST800172-3.1e",
+                    Code = "NIST800172-3.1.1e",
                     Description = "Dynamic access control not implemented for enhanced CUI",
                     Severity = ViolationSeverity.High,
-                    Remediation = "Implement attribute-based or context-aware access control (3.1e)",
-                    RegulatoryReference = "NIST SP 800-172 3.1e"
+                    Remediation = "Implement attribute-based or context-aware access control (3.1.1e)",
+                    RegulatoryReference = "NIST SP 800-172 3.1.1e"
                 });
             }
 
@@ -60,11 +60,11 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.NIST
             {
                 violations.Add(new ComplianceViolation
                 {
-                    Code = "NIST800172-3.5e",
+                    Code = "NIST800172-3.5.3e",
                     Description = "Multifactor cryptographic authentication not used",
                     Severity = ViolationSeverity.Critical,
-                    Remediation = "Implement PKI-based or hardware token MFA for enhanced CUI (3.5e)",
-                    RegulatoryReference = "NIST SP 800-172 3.5e"
+                    Remediation = "Implement PKI-based or hardware token MFA for enhanced CUI (3.5.3e)",
+                    RegulatoryReference = "NIST SP 800-172 3.5.3e"
                 });
             }
 
@@ -73,11 +73,11 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.NIST
             {
                 violations.Add(new ComplianceViolation
                 {
-                    Code = "NIST800172-3.14e",
+                    Code = "NIST800172-3.14.1e",
                     Description = "Advanced threat analytics not deployed",
                     Severity = ViolationSeverity.High,
-                    Remediation = "Deploy behavioral analytics and threat intelligence integration (3.14e)",
-                    RegulatoryReference = "NIST SP 800-172 3.14e"
+                    Remediation = "Deploy behavioral analytics and threat intelligence integration (3.14.1e)",
+                    RegulatoryReference = "NIST SP 800-172 3.14.1e"
                 });
             }
 
@@ -86,11 +86,11 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.NIST
             {
                 violations.Add(new ComplianceViolation
                 {
-                    Code = "NIST800172-3.11e",
+                    Code = "NIST800172-3.11.1e",
                     Description = "Insider threat program not established",
                     Severity = ViolationSeverity.Medium,
-                    Remediation = "Implement insider threat detection and mitigation program (3.11e)",
-                    RegulatoryReference = "NIST SP 800-172 3.11e"
+                    Remediation = "Implement insider threat detection and mitigation program (3.11.1e)",
+                    RegulatoryReference = "NIST SP 800-172 3.11.1e"
                 });
             }
 
@@ -99,19 +99,20 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.NIST
             {
                 violations.Add(new ComplianceViolation
                 {
-                    Code = "NIST800172-3.13e",
+                    Code = "NIST800172-3.13.1e",
                     Description = "Supply chain risk management not implemented",
                     Severity = ViolationSeverity.Medium,
-                    Remediation = "Assess and manage supply chain risks for system components (3.13e)",
-                    RegulatoryReference = "NIST SP 800-172 3.13e"
+                    Remediation = "Assess and manage supply chain risks for system components (3.13.1e)",
+                    RegulatoryReference = "NIST SP 800-172 3.13.1e"
                 });
             }
 
             recommendations.Add("Enhanced controls require significant investment in advanced security technologies");
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -127,14 +128,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.NIST
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("nist800172.initialized");
+            IncrementCounter("nist800172.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("nist800172.shutdown");
+            IncrementCounter("nist800172.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

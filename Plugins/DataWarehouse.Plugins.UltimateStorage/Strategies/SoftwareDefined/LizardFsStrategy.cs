@@ -68,7 +68,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
         // Global locks
         private bool _enableGlobalLocks = true;
-        private readonly Dictionary<string, SemaphoreSlim> _globalLocks = new();
+        private readonly Dictionary<string, (SemaphoreSlim Semaphore, int RefCount)> _globalLocks = new();
         private readonly object _lockDictionaryLock = new();
 
         // Special purpose chunkservers
@@ -1029,12 +1029,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
             lock (_lockDictionaryLock)
             {
-                if (!_globalLocks.TryGetValue(lockKey, out var existingLock))
+                if (_globalLocks.TryGetValue(lockKey, out var existing))
                 {
-                    existingLock = new SemaphoreSlim(1, 1);
-                    _globalLocks[lockKey] = existingLock;
+                    lockObj = existing.Semaphore;
+                    _globalLocks[lockKey] = (existing.Semaphore, existing.RefCount + 1);
                 }
-                lockObj = existingLock;
+                else
+                {
+                    lockObj = new SemaphoreSlim(1, 1);
+                    _globalLocks[lockKey] = (lockObj, 1);
+                }
             }
 
             await lockObj.WaitAsync(ct);
@@ -1042,6 +1046,23 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             return new LockReleaser(() =>
             {
                 lockObj.Release();
+                // Evict the semaphore entry when no more waiters hold a reference
+                lock (_lockDictionaryLock)
+                {
+                    if (_globalLocks.TryGetValue(lockKey, out var current))
+                    {
+                        var newRef = current.RefCount - 1;
+                        if (newRef <= 0)
+                        {
+                            _globalLocks.Remove(lockKey);
+                            current.Semaphore.Dispose();
+                        }
+                        else
+                        {
+                            _globalLocks[lockKey] = (current.Semaphore, newRef);
+                        }
+                    }
+                }
             });
         }
 
@@ -1257,9 +1278,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             // Clean up global locks
             lock (_lockDictionaryLock)
             {
-                foreach (var lockObj in _globalLocks.Values)
+                foreach (var entry in _globalLocks.Values)
                 {
-                    lockObj?.Dispose();
+                    entry.Semaphore?.Dispose();
                 }
                 _globalLocks.Clear();
             }

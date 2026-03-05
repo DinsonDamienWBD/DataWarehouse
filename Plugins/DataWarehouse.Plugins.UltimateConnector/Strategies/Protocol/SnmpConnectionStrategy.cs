@@ -42,14 +42,38 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
         /// <inheritdoc/>
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var parts = config.ConnectionString.Split(':');
-            var host = parts[0];
-            var port = parts.Length > 1 ? int.Parse(parts[1]) : 161;
+            // P2-2132: Use IPv6-safe host/port parser (handles [::1]:161 bracket notation).
+            var (host, port) = ParseHostPort(
+                config.ConnectionString ?? throw new ArgumentException("Connection string required"),
+                161, "SNMP");
 
             var client = new UdpClient();
             client.Connect(host, port);
 
-            await Task.Delay(10, ct);
+            // Send an SNMP GetRequest PDU for sysDescr (OID 1.3.6.1.2.1.1.1.0) to verify reachability.
+            // Minimal SNMP v1 GetRequest: community "public", OID 1.3.6.1.2.1.1.1.0
+            var probePacket = new byte[]
+            {
+                0x30, 0x26, // SEQUENCE
+                0x02, 0x01, 0x00, // version: INTEGER 0 (v1)
+                0x04, 0x06, 0x70, 0x75, 0x62, 0x6c, 0x69, 0x63, // community: OCTET STRING "public"
+                0xa0, 0x19, // GetRequest-PDU
+                0x02, 0x04, 0x00, 0x00, 0x00, 0x01, // request-id: INTEGER 1
+                0x02, 0x01, 0x00, // error-status: 0
+                0x02, 0x01, 0x00, // error-index: 0
+                0x30, 0x0b, // VarBindList SEQUENCE
+                0x30, 0x09, // VarBind SEQUENCE
+                0x06, 0x05, 0x2b, 0x06, 0x01, 0x02, 0x01, // OID 1.3.6.1.2.1 (enterprises)
+                0x05, 0x00  // Null value
+            };
+            try
+            {
+                await client.SendAsync(probePacket, probePacket.Length).ConfigureAwait(false);
+            }
+            catch
+            {
+                // UDP send failure is non-fatal at connect time; agent may be firewalled
+            }
 
             var info = new Dictionary<string, object>
             {
@@ -65,8 +89,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
         /// <inheritdoc/>
         protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
+            // UdpClient.Client.Connected is always true after Connect() — not a liveness indicator.
+            // Verify the socket is open and bound (not disposed/closed).
             var client = handle.GetConnection<UdpClient>();
-            return Task.FromResult(client.Client?.Connected ?? false);
+            return Task.FromResult(client.Client != null && client.Client.IsBound);
         }
 
         /// <inheritdoc/>
@@ -82,13 +108,43 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
         protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             var client = handle.GetConnection<UdpClient>();
-            var isHealthy = client.Client?.Connected ?? false;
+            var isHealthy = client.Client != null && client.Client.IsBound;
 
             return Task.FromResult(new ConnectionHealth(
                 IsHealthy: isHealthy,
-                StatusMessage: isHealthy ? "SNMP agent connected" : "SNMP agent disconnected",
+                StatusMessage: isHealthy ? "SNMP agent socket bound" : "SNMP agent socket closed",
                 Latency: TimeSpan.Zero,
                 CheckedAt: DateTimeOffset.UtcNow));
+        }
+        // P2-2132: IPv6-safe host/port parser. Handles "[::1]:port", "host:port", and "host" forms.
+        private static (string host, int port) ParseHostPort(string cs, int defaultPort, string protocol)
+        {
+            cs = cs.Trim();
+            if (cs.StartsWith('['))
+            {
+                // IPv6 bracket notation: [addr]:port or [addr]
+                var closeBracket = cs.IndexOf(']');
+                if (closeBracket < 0)
+                    throw new ArgumentException($"Malformed IPv6 address in {protocol} connection string: missing ']'.", nameof(cs));
+                var ipv6Host = cs.Substring(1, closeBracket - 1);
+                if (closeBracket + 1 < cs.Length && cs[closeBracket + 1] == ':')
+                {
+                    var portStr = cs.Substring(closeBracket + 2);
+                    if (!int.TryParse(portStr, out var p6) || p6 < 1 || p6 > 65535)
+                        throw new ArgumentException($"Invalid port '{portStr}' in {protocol} connection string.", nameof(cs));
+                    return (ipv6Host, p6);
+                }
+                return (ipv6Host, defaultPort);
+            }
+            var colonIdx = cs.IndexOf(':');
+            if (colonIdx >= 0)
+            {
+                var portPart = cs.Substring(colonIdx + 1);
+                if (!int.TryParse(portPart, out var p) || p < 1 || p > 65535)
+                    throw new ArgumentException($"Invalid port '{portPart}' in {protocol} connection string. Expected a number between 1 and 65535.", nameof(cs));
+                return (cs.Substring(0, colonIdx), p);
+            }
+            return (cs, defaultPort);
         }
     }
 }

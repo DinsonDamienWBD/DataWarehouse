@@ -467,7 +467,20 @@ public static class WritePhaseHandlers
                 }
             }
 
-            // Create parity shards (simple XOR for now, would use Reed-Solomon in production)
+            // Create parity shards using XOR (RAID-5 equivalent).
+            // Finding 1025: XOR parity provides single-failure tolerance only.
+            // For RAID-6+ (ParityShards > 1) Reed-Solomon is required for distinct parity;
+            // creating multiple identical XOR parities adds no additional fault tolerance.
+            // We warn here so operators know to integrate a Reed-Solomon library for RAID-6+.
+            if (raidConfig.ParityShards > 1)
+            {
+                logger.LogWarning(
+                    "RAID configuration requests {ParityShards} parity shards but XOR parity only provides " +
+                    "single-failure tolerance. Multi-failure (RAID-6+) protection requires Reed-Solomon encoding. " +
+                    "All {ParityShardCount} parity shards will be identical XOR results.",
+                    raidConfig.ParityShards, raidConfig.ParityShards);
+            }
+
             for (int i = 0; i < raidConfig.ParityShards; i++)
             {
                 var parityShard = new byte[shardSize];

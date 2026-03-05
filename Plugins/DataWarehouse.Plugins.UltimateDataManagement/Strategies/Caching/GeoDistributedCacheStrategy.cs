@@ -1,4 +1,10 @@
+using System;
 using System.Collections.Concurrent;
+using System.Net.Http;
+using System.Text;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement.Strategies.Caching;
@@ -146,15 +152,24 @@ public sealed class GeoDistributedCacheStrategy : CachingStrategyBase
     private readonly object _tagLock = new();
 
     private readonly GeoDistributedCacheConfig _config;
+    private readonly HttpClient _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
     private long _currentSize;
-    private readonly Timer _healthCheckTimer;
-    private readonly Timer _invalidationTimer;
+    private Timer? _healthCheckTimer;
+    private Timer? _invalidationTimer;
 
     private sealed class CacheEntry
     {
+        private long _lastAccessTicks;
+
         public byte[] Value { get; }
         public DateTime? ExpiresAt { get; set; }
-        public DateTime LastAccess { get; set; }
+
+        public DateTime LastAccess
+        {
+            get => new DateTime(Interlocked.Read(ref _lastAccessTicks), DateTimeKind.Utc);
+            set => Interlocked.Exchange(ref _lastAccessTicks, value.Ticks);
+        }
+
         public CachePriority Priority { get; }
         public string[]? Tags { get; }
         public string OriginRegion { get; init; }
@@ -165,7 +180,7 @@ public sealed class GeoDistributedCacheStrategy : CachingStrategyBase
             Value = value;
             Priority = options.Priority;
             Tags = options.Tags;
-            LastAccess = DateTime.UtcNow;
+            _lastAccessTicks = DateTime.UtcNow.Ticks;
             OriginRegion = originRegion;
             Version = DateTime.UtcNow.Ticks;
 
@@ -189,9 +204,15 @@ public sealed class GeoDistributedCacheStrategy : CachingStrategyBase
     public GeoDistributedCacheStrategy(GeoDistributedCacheConfig config)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
+        // Timers are started in InitializeCoreAsync to avoid accessing uninitialized state.
+    }
 
+    /// <inheritdoc/>
+    protected override Task InitializeCoreAsync(CancellationToken ct)
+    {
         _healthCheckTimer = new Timer(PerformHealthChecks, null, TimeSpan.FromSeconds(10), _config.HealthCheckInterval);
         _invalidationTimer = new Timer(ProcessInvalidations, null, _config.InvalidationDelay, _config.InvalidationDelay);
+        return Task.CompletedTask;
     }
 
     /// <inheritdoc/>
@@ -281,7 +302,7 @@ public sealed class GeoDistributedCacheStrategy : CachingStrategyBase
     }
 
     /// <inheritdoc/>
-    protected override Task<CacheResult<byte[]>> GetCoreAsync(string key, CancellationToken ct)
+    protected override async Task<CacheResult<byte[]>> GetCoreAsync(string key, CancellationToken ct)
     {
         // Try local cache first
         if (_localCache.TryGetValue(key, out var entry))
@@ -289,20 +310,44 @@ public sealed class GeoDistributedCacheStrategy : CachingStrategyBase
             if (entry.IsExpired)
             {
                 RemoveEntry(key, entry);
-                return Task.FromResult(CacheResult<byte[]>.Miss());
+                return CacheResult<byte[]>.Miss();
             }
 
             entry.LastAccess = DateTime.UtcNow;
-            return Task.FromResult(CacheResult<byte[]>.Hit(entry.Value, entry.GetTimeToExpiration()));
+            return CacheResult<byte[]>.Hit(entry.Value, entry.GetTimeToExpiration());
         }
 
-        // In a real implementation, we would try remote regions here
-        // For now, just return miss
-        return Task.FromResult(CacheResult<byte[]>.Miss());
+        // Try remote regions ordered by proximity (healthy regions, lowest latency first)
+        var remoteRegions = _regions.Values
+            .Where(r => !r.IsLocal && r.IsHealthy && !string.IsNullOrEmpty(r.Endpoint))
+            .OrderBy(r => r.AverageLatencyMs)
+            .ToList();
+        foreach (var region in remoteRegions)
+        {
+            try
+            {
+                using var response = await _httpClient.GetAsync(
+                    $"{region.Endpoint.TrimEnd('/')}/cache/{Uri.EscapeDataString(key)}", ct).ConfigureAwait(false);
+                if (response.IsSuccessStatusCode)
+                {
+                    var bytes = await response.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false);
+                    if (bytes.Length > 0)
+                    {
+                        // Populate local cache from remote hit
+                        var remoteEntry = new CacheEntry(bytes, new CacheOptions(), region.RegionId);
+                        _localCache[key] = remoteEntry;
+                        Interlocked.Add(ref _currentSize, bytes.Length);
+                        return CacheResult<byte[]>.Hit(bytes, remoteEntry.GetTimeToExpiration());
+                    }
+                }
+            }
+            catch { /* Best-effort remote fetch; continue to next region */ }
+        }
+        return CacheResult<byte[]>.Miss();
     }
 
     /// <inheritdoc/>
-    protected override Task SetCoreAsync(string key, byte[] value, CacheOptions options, CancellationToken ct)
+    protected override async Task SetCoreAsync(string key, byte[] value, CacheOptions options, CancellationToken ct)
     {
         EnsureCapacity(value.Length);
 
@@ -329,13 +374,25 @@ public sealed class GeoDistributedCacheStrategy : CachingStrategyBase
             }
         }
 
-        // Replicate to other regions if enabled
+        // Replicate to other regions if enabled — fire-and-forget with best-effort delivery
         if (_config.ReplicateWrites)
         {
-            // In a real implementation, replicate to remote regions asynchronously
+            var payload = JsonSerializer.Serialize(new { key, value = Convert.ToBase64String(value), ttlSeconds = (long)(options.TTL?.TotalSeconds ?? 0) });
+            foreach (var region in _regions.Values.Where(r => !r.IsLocal && r.IsHealthy && !string.IsNullOrEmpty(r.Endpoint)))
+            {
+                var regionEndpoint = region.Endpoint;
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        using var content = new StringContent(payload, Encoding.UTF8, "application/json");
+                        await _httpClient.PutAsync($"{regionEndpoint.TrimEnd('/')}/cache/{Uri.EscapeDataString(key)}", content).ConfigureAwait(false);
+                    }
+                    catch { /* Best-effort replication; region health check will mark it unhealthy */ }
+                });
+            }
         }
 
-        return Task.CompletedTask;
     }
 
     /// <inheritdoc/>
@@ -422,8 +479,9 @@ public sealed class GeoDistributedCacheStrategy : CachingStrategyBase
     /// <inheritdoc/>
     protected override Task DisposeCoreAsync()
     {
-        _healthCheckTimer.Dispose();
-        _invalidationTimer.Dispose();
+        _healthCheckTimer?.Dispose();
+        _invalidationTimer?.Dispose();
+        _httpClient.Dispose();
         _localCache.Clear();
         _tagIndex.Clear();
         _regions.Clear();
@@ -483,16 +541,26 @@ public sealed class GeoDistributedCacheStrategy : CachingStrategyBase
     {
         foreach (var region in _regions.Values)
         {
+            if (string.IsNullOrEmpty(region.Endpoint))
+            {
+                region.LastHealthCheck = DateTime.UtcNow;
+                continue;
+            }
             try
             {
-                // In a real implementation, ping the region endpoint
-                // For now, simulate health check
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                var task = _httpClient.GetAsync($"{region.Endpoint.TrimEnd('/')}/health", cts.Token);
+                task.Wait(cts.Token);
+                sw.Stop();
                 region.LastHealthCheck = DateTime.UtcNow;
-                region.IsHealthy = true;
+                region.IsHealthy = task.IsCompletedSuccessfully && task.Result.IsSuccessStatusCode;
+                region.AverageLatencyMs = (region.AverageLatencyMs * 0.8) + (sw.Elapsed.TotalMilliseconds * 0.2);
             }
             catch
             {
                 region.IsHealthy = false;
+                region.LastHealthCheck = DateTime.UtcNow;
             }
         }
     }
@@ -501,10 +569,27 @@ public sealed class GeoDistributedCacheStrategy : CachingStrategyBase
     {
         while (_invalidationQueue.TryDequeue(out var evt))
         {
-            // In a real implementation, send invalidation to other regions
-            // For now, just apply locally if from another region
-            if (evt.OriginRegion != _config.LocalRegionId)
+            if (evt.OriginRegion == _config.LocalRegionId)
             {
+                // Propagate to all healthy remote regions
+                var payload = JsonSerializer.Serialize(new { eventId = evt.EventId, keys = evt.Keys, tags = evt.Tags, originRegion = evt.OriginRegion });
+                foreach (var region in _regions.Values.Where(r => !r.IsLocal && r.IsHealthy && !string.IsNullOrEmpty(r.Endpoint)))
+                {
+                    var regionEndpoint = region.Endpoint;
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            using var content = new StringContent(payload, Encoding.UTF8, "application/json");
+                            await _httpClient.PostAsync($"{regionEndpoint.TrimEnd('/')}/cache/invalidate", content).ConfigureAwait(false);
+                        }
+                        catch { /* Best-effort; unhealthy region will be detected by health check */ }
+                    });
+                }
+            }
+            else
+            {
+                // Apply locally for events from other regions
                 foreach (var key in evt.Keys)
                 {
                     if (_localCache.TryRemove(key, out var entry))

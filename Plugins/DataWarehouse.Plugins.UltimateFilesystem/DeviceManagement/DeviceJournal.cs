@@ -245,15 +245,20 @@ public sealed class DeviceJournal : IAsyncDisposable
 
         entries.Sort((a, b) => a.SequenceNumber.CompareTo(b.SequenceNumber));
 
-        // Update next sequence number based on max found
+        // Update next sequence number based on max found.
+        // P2-2975: Use a CompareExchange loop so we only advance _nextSequenceNumber forward.
+        // A plain Read→check→Exchange is a TOCTOU race: a concurrent writer could increment
+        // the counter between our Read and Exchange, and Exchange would regress it to maxSeq.
         if (entries.Count > 0)
         {
             var maxSeq = entries[entries.Count - 1].SequenceNumber;
-            var current = Interlocked.Read(ref _nextSequenceNumber);
-            if (maxSeq >= current)
+            long current;
+            do
             {
-                Interlocked.Exchange(ref _nextSequenceNumber, maxSeq);
+                current = Interlocked.Read(ref _nextSequenceNumber);
+                if (maxSeq < current) break; // Already at or past this value — nothing to do.
             }
+            while (Interlocked.CompareExchange(ref _nextSequenceNumber, maxSeq, current) != current);
         }
 
         return entries.AsReadOnly();
@@ -284,6 +289,18 @@ public sealed class DeviceJournal : IAsyncDisposable
     }
 
     /// <inheritdoc/>
+    /// <summary>
+    /// Initializes the journal area on a device by writing a zeroed 32KB block
+    /// (blocks 1-8). This marks the journal as empty and valid for use.
+    /// Called during first-time pool creation to ensure a clean journal state.
+    /// </summary>
+    public async Task InitializeJournalAreaAsync(IPhysicalBlockDevice device, CancellationToken ct)
+    {
+        ThrowIfDisposed();
+        var zeroedJournal = new byte[JournalAreaSize]; // zero-initialized by CLR
+        await WriteJournalAreaAsync(zeroedJournal, device, ct).ConfigureAwait(false);
+    }
+
     public ValueTask DisposeAsync()
     {
         if (!_disposed)
@@ -466,6 +483,13 @@ public sealed class DeviceJournal : IAsyncDisposable
                 return;
             }
         }
+
+        // Entry not found — it was evicted from the circular buffer before commit/rollback.
+        // Silently succeeding here would leave a dangling Intent on recovery.
+        throw new InvalidOperationException(
+            $"Journal entry {sequenceNumber} not found in journal area — " +
+            $"it may have been evicted by the circular buffer before the phase transition. " +
+            $"Recovery must treat this transaction as uncommitted and roll it back.");
     }
 
     /// <summary>

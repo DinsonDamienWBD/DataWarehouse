@@ -181,7 +181,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
 
             if (!VerifyPassword(password, user.PasswordHash, user.PasswordSalt))
             {
-                user.FailedLoginAttempts++;
+                lock (user) { user.FailedLoginAttempts++; }
                 user.LastFailedLoginAt = DateTime.UtcNow;
 
                 if (user.FailedLoginAttempts >= 5)
@@ -420,8 +420,9 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
                 System.Security.Cryptography.HashAlgorithmName.SHA256,
                 32);
 
-            var computedHash = Convert.ToBase64String(computedHashBytes);
-            return computedHash == hash;
+            // Use constant-time comparison to prevent timing-attack enumeration of valid hashes
+            var storedHashBytes = Convert.FromBase64String(hash);
+            return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(computedHashBytes, storedHashBytes);
         }
 
         private bool VerifyMfaCode(IamUser user, string code)
@@ -477,7 +478,10 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
             var key = userId ?? "anonymous";
             _auditLog.AddOrUpdate(key, new List<AuditEvent> { evt }, (k, list) =>
             {
-                list.Add(evt);
+                lock (list)
+                {
+                    list.Add(evt);
+                }
                 return list;
             });
         }

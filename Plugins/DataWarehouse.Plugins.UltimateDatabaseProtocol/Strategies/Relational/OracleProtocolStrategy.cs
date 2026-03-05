@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 
 namespace DataWarehouse.Plugins.UltimateDatabaseProtocol.Strategies.Relational;
 
@@ -28,10 +29,10 @@ public sealed class OracleTnsProtocolStrategy : DatabaseProtocolStrategyBase
     private const ushort DataFlagSendNti = 0x0001;
     private const ushort DataFlagResetMarker = 0x0002;
 
-    private int _sdu = 8192;
-    private int _tdu = 32767;
+    private volatile int _sdu = 8192;
+    private volatile int _tdu = 32767;
     private byte[] _sessionKey = [];
-    private int _sequenceNumber;
+    private int _sequenceNumber; // Access via Interlocked (finding 2731)
 
     /// <inheritdoc/>
     public override string StrategyId => "oracle-tns";
@@ -117,6 +118,14 @@ public sealed class OracleTnsProtocolStrategy : DatabaseProtocolStrategyBase
         var host = parameters.Host;
         var port = parameters.Port;
 
+        // Validate parameters to prevent TNS descriptor injection.
+        // TNS descriptors use parentheses as delimiters; values containing '(' or ')'
+        // would allow an attacker to inject arbitrary TNS parameters.
+        if (host.IndexOfAny(['(', ')', '\0']) >= 0)
+            throw new ArgumentException($"Invalid Oracle host '{host}': must not contain TNS delimiter characters '(' or ')'.");
+        if (serviceName.IndexOfAny(['(', ')', '\0']) >= 0)
+            throw new ArgumentException($"Invalid Oracle service name '{serviceName}': must not contain TNS delimiter characters '(' or ')'.");
+
         return $"(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST={host})(PORT={port}))" +
                $"(CONNECT_DATA=(SERVICE_NAME={serviceName})(CID=(PROGRAM=DataWarehouse)(HOST=client))))";
     }
@@ -173,6 +182,11 @@ public sealed class OracleTnsProtocolStrategy : DatabaseProtocolStrategyBase
         offset += 2;
 
         _tdu = BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(offset));
+        offset += 2;
+
+        // Remaining fields (protocol characteristics, max connect data, etc.) are
+        // currently unused but the offset is maintained for future extensibility.
+        _ = offset;
     }
 
     private static string ParseRefusePacket(byte[] data)
@@ -193,7 +207,12 @@ public sealed class OracleTnsProtocolStrategy : DatabaseProtocolStrategyBase
         var length = BinaryPrimitives.ReadUInt16BigEndian(header);
         var type = header[4];
 
-        var data = new byte[length - 8];
+        // P2-2745: guard against malformed packets where length < 8 (header-only or truncated).
+        var dataLength = (int)length - 8;
+        if (dataLength < 0)
+            throw new InvalidOperationException($"[Oracle TNS] Malformed packet: declared length {length} is less than header size 8.");
+
+        var data = new byte[dataLength];
         if (data.Length > 0)
         {
             await ActiveStream.ReadExactlyAsync(data, 0, data.Length, ct);
@@ -315,22 +334,18 @@ public sealed class OracleTnsProtocolStrategy : DatabaseProtocolStrategyBase
     private static byte[] ComputePasswordVerifier(string username, string password,
         byte[] serverSessionKey, byte[] authVfrData)
     {
-        // Simplified Oracle password verification
-        // Real implementation uses DES/AES with session keys
-
-        using var sha1 = SHA1.Create();
-        var combined = Encoding.UTF8.GetBytes(password + username);
-        var hash1 = sha1.ComputeHash(combined);
-
-        using var sha256 = SHA256.Create();
-        var hash2 = sha256.ComputeHash(hash1.Concat(serverSessionKey).Concat(authVfrData).ToArray());
-
-        return hash2[..32];
+        // O5LOGON authentication requires the Oracle client library for proper
+        // PBKDF2-based key derivation and DES-CBC-encrypted verifier computation.
+        // A simplified hash-based approach would be rejected by the server.
+        throw new NotSupportedException(
+            "O5LOGON authentication requires Oracle client library. " +
+            "The password verifier computation uses proprietary PBKDF2+DES-CBC key derivation " +
+            "that cannot be correctly implemented without the Oracle OCI/ODP.NET client.");
     }
 
     private async Task SendDataPacketAsync(byte[] data, CancellationToken ct)
     {
-        _sequenceNumber++;
+        Interlocked.Increment(ref _sequenceNumber);
 
         using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
@@ -533,7 +548,9 @@ public sealed class OracleTnsProtocolStrategy : DatabaseProtocolStrategyBase
         }
         catch
         {
+
             // Ignore disconnect errors
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 
@@ -965,14 +982,14 @@ public sealed class Db2DrdaProtocolStrategy : DatabaseProtocolStrategyBase
 
     private static List<Dictionary<string, object?>> ParseQueryData(byte[] data)
     {
-        var rows = new List<Dictionary<string, object?>>();
-        // Simplified - actual parsing depends on column metadata
-        var row = new Dictionary<string, object?>
-        {
-            ["data"] = Encoding.GetEncoding("IBM037").GetString(data)
-        };
-        rows.Add(row);
-        return rows;
+        // Oracle TNS wire protocol data packets have a complex format that depends on
+        // column metadata (DESCRIBE response) to determine column count, types, and sizes.
+        // Dumping the entire packet into a single key corrupts the result set.
+        // A proper implementation requires tracking column descriptors from the preceding
+        // DESCRIBE response to parse individual column values.
+        throw new NotSupportedException(
+            "Oracle wire protocol result set parsing requires column metadata from the DESCRIBE response. " +
+            "Use Oracle OCI/ODP.NET client library for proper data packet deserialization.");
     }
 
     /// <inheritdoc/>

@@ -300,8 +300,10 @@ internal sealed class EventHubsStreamStrategy : StreamingDataStrategyBase
         ThrowIfNotInitialized();
         ArgumentNullException.ThrowIfNull(config);
 
+        if (string.IsNullOrWhiteSpace(config.NamespaceFqdn))
+            throw new ArgumentException("Event Hubs namespace FQDN is required.", nameof(config));
         if (string.IsNullOrWhiteSpace(config.EventHubName))
-            throw new ArgumentException("Event Hub name is required.");
+            throw new ArgumentException("Event Hub name is required.", nameof(config));
         if (config.PartitionCount < 1 || config.PartitionCount > 2048)
             throw new ArgumentOutOfRangeException(nameof(config), "Partition count must be between 1 and 2048.");
         if (config.RetentionDays < 1 || config.RetentionDays > 90)
@@ -360,10 +362,23 @@ internal sealed class EventHubsStreamStrategy : StreamingDataStrategyBase
         CancellationToken ct = default)
     {
         ThrowIfNotInitialized();
+        if (string.IsNullOrWhiteSpace(namespaceFqdn))
+            throw new ArgumentException("Event Hubs namespace FQDN is required.", nameof(namespaceFqdn));
+        if (string.IsNullOrWhiteSpace(eventHubName))
+            throw new ArgumentException("Event Hub name is required.", nameof(eventHubName));
         ArgumentNullException.ThrowIfNull(events);
 
         if (events.Count == 0)
             throw new ArgumentException("At least one event is required.", nameof(events));
+
+        // Validate all event bodies before any mutations to avoid partial state updates.
+        for (int i = 0; i < events.Count; i++)
+        {
+            if (events[i] == null)
+                throw new ArgumentException($"Event at index {i} is null.", nameof(events));
+            if (events[i].Body == null)
+                throw new ArgumentException($"Event at index {i} has a null Body.", nameof(events));
+        }
 
         var hubKey = $"{namespaceFqdn}/{eventHubName}";
         if (!_hubs.TryGetValue(hubKey, out var config))

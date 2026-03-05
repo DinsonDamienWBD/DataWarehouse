@@ -35,20 +35,27 @@ namespace DataWarehouse.SDK.Edge.Protocols
     [SdkCompatibility("3.0.0", Notes = "Phase 36: CoAP client implementation (EDGE-03)")]
     public sealed class CoApClient : ICoApClient
     {
-        private UdpClient? _udpClient;
+        private volatile UdpClient? _udpClient;
+        private readonly object _udpInitLock = new();
         private readonly BoundedDictionary<ushort, TaskCompletionSource<CoApResponse>> _pendingRequests = new BoundedDictionary<ushort, TaskCompletionSource<CoApResponse>>(1000);
         private readonly BoundedDictionary<string, Action<CoApResponse>> _observations = new BoundedDictionary<string, Action<CoApResponse>>(1000);
-        private ushort _nextMessageId;
+        private int _nextMessageId; // use int for Interlocked, cast to ushort
         private CancellationTokenSource? _receiveCts;
         private Task? _receiveTask;
         private bool _disposed;
+        private readonly TimeSpan _requestTimeout;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="CoApClient"/> class.
         /// </summary>
-        public CoApClient()
+        /// <param name="requestTimeout">
+        /// Per-request timeout. Defaults to 5 seconds.
+        /// Increase for high-latency networks such as LoRa (2-20s RTT) or satellite (finding P1-300).
+        /// </param>
+        public CoApClient(TimeSpan? requestTimeout = null)
         {
-            _nextMessageId = (ushort)Random.Shared.Next(1, 65535);
+            _nextMessageId = Random.Shared.Next(1, 65535);
+            _requestTimeout = requestTimeout ?? TimeSpan.FromSeconds(5);
         }
 
         /// <summary>
@@ -63,17 +70,30 @@ namespace DataWarehouse.SDK.Edge.Protocols
             if (uri.Scheme != "coap" && uri.Scheme != "coaps")
                 throw new ArgumentException("URI must use coap:// or coaps:// scheme", nameof(request));
 
+            // DTLS is not yet implemented. Reject coaps:// requests explicitly so callers
+            // do not send sensitive IoT payloads in cleartext (finding P1-287).
+            if (uri.Scheme == "coaps")
+                throw new PlatformNotSupportedException(
+                    "DTLS 1.2 for coaps:// is not yet implemented. " +
+                    "Use a TLS-terminating CoAP proxy, or use coap:// on a private network until DTLS support is added.");
+
             var port = uri.Port > 0 ? uri.Port : (uri.Scheme == "coaps" ? 5684 : 5683);
 
-            // Lazy-initialize UDP client
+            // Lazy-initialize UDP client (thread-safe: only one UdpClient created)
             if (_udpClient is null)
             {
-                _udpClient = new UdpClient();
-                StartReceiveLoop();
+                lock (_udpInitLock)
+                {
+                    if (_udpClient is null)
+                    {
+                        _udpClient = new UdpClient();
+                        StartReceiveLoop();
+                    }
+                }
             }
 
             // Build CoAP message (binary encoding)
-            var messageId = _nextMessageId++;
+            var messageId = (ushort)(Interlocked.Increment(ref _nextMessageId) & 0xFFFF);
             var message = BuildCoApMessage(request, messageId);
 
             // Register pending request
@@ -83,9 +103,9 @@ namespace DataWarehouse.SDK.Edge.Protocols
             // Send message
             await _udpClient.SendAsync(message, message.Length, uri.Host, port);
 
-            // Wait for response with timeout
+            // Wait for response with configurable timeout (finding P1-300: was hardcoded 5 s)
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            cts.CancelAfter(TimeSpan.FromSeconds(5)); // 5-second timeout
+            cts.CancelAfter(_requestTimeout);
 
             try
             {
@@ -128,16 +148,10 @@ namespace DataWarehouse.SDK.Edge.Protocols
         /// and periodic notifications from server. Full implementation is deferred.
         /// Returns a no-op IDisposable for now.
         /// </remarks>
-        public Task<IDisposable> ObserveAsync(string resourceUri, Action<CoApResponse> onNotification, CancellationToken ct = default)
-        {
-            // Full Observe implementation requires:
-            // 1. Send GET request with Observe option (option 6, value 0)
-            // 2. Store observation in _observations dictionary
-            // 3. Server sends periodic notifications with incremented Observe option value
-            // 4. Return IDisposable that sends Observe=1 (deregister) on disposal
-
-            return Task.FromResult<IDisposable>(new NoOpDisposable());
-        }
+        public Task<IDisposable> ObserveAsync(string resourceUri, Action<CoApResponse> onNotification, CancellationToken ct = default) =>
+            throw new PlatformNotSupportedException(
+                "CoAP Observe (RFC 7641) requires a CoAP server endpoint that supports the Observe option. " +
+                "Configure the CoAP server endpoint via CoApOptions.");
 
         /// <summary>
         /// Convenience method for GET requests.
@@ -212,13 +226,14 @@ namespace DataWarehouse.SDK.Edge.Protocols
             ms.WriteByte((byte)(messageId >> 8));
             ms.WriteByte((byte)(messageId & 0xFF));
 
-            // Options (Uri-Path, Content-Format, etc.)
+            // Options (Uri-Path, Content-Format, etc.) — encoded with RFC 7252 §3.1 delta encoding.
             var uri = new Uri(request.Uri);
             var pathSegments = uri.AbsolutePath.Trim('/').Split('/');
+            int prevOption = 0; // delta accumulator per message
             foreach (var segment in pathSegments)
             {
                 if (string.IsNullOrEmpty(segment)) continue;
-                WriteOption(ms, 11, System.Text.Encoding.UTF8.GetBytes(segment)); // Uri-Path option
+                WriteOption(ms, 11, System.Text.Encoding.UTF8.GetBytes(segment), ref prevOption); // Uri-Path option
             }
 
             if (request.Payload.Length > 0)
@@ -232,16 +247,39 @@ namespace DataWarehouse.SDK.Edge.Protocols
         }
 
         /// <summary>
-        /// Writes a CoAP option to the message stream.
+        /// Writes a CoAP option using RFC 7252 §3.1 delta encoding (finding P1-299).
         /// </summary>
         /// <remarks>
-        /// Simplified option encoding (no delta encoding for brevity).
-        /// Real implementation should use delta encoding per RFC 7252 section 3.1.
+        /// Each option header encodes the *delta* (difference) from the previous option number,
+        /// not the absolute option number. The previous fix used the absolute number which
+        /// makes all requests with options non-conforming against real CoAP servers.
         /// </remarks>
-        private void WriteOption(Stream stream, int optionNumber, byte[] value)
+        private static void WriteOption(Stream stream, int optionNumber, byte[] value, ref int prevOption)
         {
-            stream.WriteByte((byte)optionNumber);
-            stream.WriteByte((byte)value.Length);
+            int delta = optionNumber - prevOption;
+            prevOption = optionNumber;
+
+            int deltaIndicator = delta <= 12 ? delta : delta <= 255 + 13 ? 13 : 14;
+            int lengthIndicator = value.Length <= 12 ? value.Length : value.Length <= 255 + 13 ? 13 : 14;
+
+            stream.WriteByte((byte)((deltaIndicator << 4) | lengthIndicator));
+
+            if (deltaIndicator == 13)
+                stream.WriteByte((byte)(delta - 13));
+            else if (deltaIndicator == 14)
+            {
+                stream.WriteByte((byte)((delta - 269) >> 8));
+                stream.WriteByte((byte)((delta - 269) & 0xFF));
+            }
+
+            if (lengthIndicator == 13)
+                stream.WriteByte((byte)(value.Length - 13));
+            else if (lengthIndicator == 14)
+            {
+                stream.WriteByte((byte)((value.Length - 269) >> 8));
+                stream.WriteByte((byte)((value.Length - 269) & 0xFF));
+            }
+
             stream.Write(value);
         }
 
@@ -251,18 +289,36 @@ namespace DataWarehouse.SDK.Edge.Protocols
         private void StartReceiveLoop()
         {
             _receiveCts = new CancellationTokenSource();
+            var loopCts = _receiveCts;
             _receiveTask = Task.Run(async () =>
             {
-                while (!_receiveCts.Token.IsCancellationRequested && !_disposed)
+                while (!loopCts.Token.IsCancellationRequested && !_disposed)
                 {
                     try
                     {
-                        var result = await _udpClient!.ReceiveAsync();
+                        // Pass cancellation token so DisposeAsync is not blocked waiting for
+                        // a UDP packet that never arrives on quiet networks (finding P1-292).
+                        var result = await _udpClient!.ReceiveAsync(loopCts.Token).ConfigureAwait(false);
                         ProcessCoApMessage(result.Buffer);
                     }
-                    catch (Exception)
+                    catch (OperationCanceledException)
                     {
-                        // Ignore receive errors (network issues, cancellation, etc.)
+                        // Expected when DisposeAsync cancels the loop
+                        break;
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        // UdpClient disposed — exit loop cleanly
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        // Propagate fault to all pending requests so they get a meaningful error
+                        // rather than waiting until their individual timeouts expire (finding P1-292).
+                        var error = ex;
+                        var pending = _pendingRequests.Values.ToList();
+                        foreach (var tcs in pending)
+                            tcs.TrySetException(error);
                     }
                 }
             });

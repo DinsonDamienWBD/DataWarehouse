@@ -159,18 +159,11 @@ public sealed class BareMetalOptimizer
         //
         // await nvmePassthroughStrategy.InitializeAsync(config, ct);
 
-        _logger.LogInformation(
-            "In production, Phase 35 NvmePassthroughStrategy would: " +
-            "1. Unbind kernel NVMe driver from {DevicePath} " +
-            "2. Bind SPDK user-space driver " +
-            "3. Initialize NVMe controller via SPDK library " +
-            "4. Set up queue pairs for I/O",
+        _logger.LogWarning(
+            "SPDK binding for {DevicePath} requires Phase 35 NvmePassthroughStrategy integration. " +
+            "Until integrated: kernel NVMe driver remains active (lower performance vs user-space SPDK). " +
+            "Steps needed: unbind kernel driver, bind SPDK, init controller, set up queue pairs.",
             selectedNamespace.DevicePath);
-
-        // Step 5: Verify SPDK initialization (production check)
-        _logger.LogInformation(
-            "SPDK user-space NVMe ACTIVE (simulated). " +
-            "Expected performance: Sequential write: 90%+ of hardware spec, 4K random read: 90%+ IOPS.");
 
         // Step 6: Configure I/O optimizations for SPDK
         ConfigureSpdkOptimizations(selectedNamespace);

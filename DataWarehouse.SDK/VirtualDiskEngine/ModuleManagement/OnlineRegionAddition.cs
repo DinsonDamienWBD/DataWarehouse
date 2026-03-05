@@ -47,6 +47,9 @@ public sealed class OnlineRegionAddition
 {
     private readonly Stream _vdeStream;
     private readonly int _blockSize;
+    // Serializes concurrent AddModuleRegionsAsync calls to prevent TOCTOU race on
+    // superblock slot and bitmap allocation (finding P2-877).
+    private readonly System.Threading.SemaphoreSlim _writeLock = new(1, 1);
 
     /// <summary>
     /// Creates a new OnlineRegionAddition orchestrator for the given VDE stream.
@@ -74,6 +77,18 @@ public sealed class OnlineRegionAddition
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Result indicating success/failure with region location details.</returns>
     public async Task<RegionAdditionResult> AddModuleRegionsAsync(ModuleId module, CancellationToken ct)
+    {
+        // Serialize to prevent concurrent callers from reading the same free-space state and
+        // allocating the same blocks (finding P2-877).
+        await _writeLock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+        return await AddModuleRegionsInternalAsync(module, ct).ConfigureAwait(false);
+        }
+        finally { _writeLock.Release(); }
+    }
+
+    private async Task<RegionAdditionResult> AddModuleRegionsInternalAsync(ModuleId module, CancellationToken ct)
     {
         // Step 1: Read current superblock group
         var superblockGroup = ReadSuperblockGroup();
@@ -109,7 +124,8 @@ public sealed class OnlineRegionAddition
         foreach (var regionName in moduleDef.RegionNames)
         {
             long requiredBlocks = CalculateRegionBlocks(moduleDef, superblock.TotalBlocks);
-            var freeRange = scanner.FindContiguousFreeBlocks(requiredBlocks);
+            // P2-866: Use async overload to avoid blocking thread-pool on network-backed streams.
+            var freeRange = await scanner.FindContiguousFreeBlocksAsync(requiredBlocks, ct).ConfigureAwait(false);
             if (freeRange is null)
                 return RegionAdditionResult.Failed(
                     $"Insufficient contiguous free space for region '{regionName}' " +
@@ -251,12 +267,12 @@ public sealed class OnlineRegionAddition
         foreach (var regionName in moduleDef.RegionNames)
         {
             long requiredBlocks = CalculateRegionBlocks(moduleDef, superblock.TotalBlocks);
-            var freeRange = scanner.FindContiguousFreeBlocks(requiredBlocks);
+            // P2-866: Use async overload to avoid blocking thread-pool on network-backed streams.
+            var freeRange = await scanner.FindContiguousFreeBlocksAsync(requiredBlocks, ct).ConfigureAwait(false);
             if (freeRange is null)
                 return false;
         }
 
-        await Task.CompletedTask; // Satisfy async signature
         return true;
     }
 
@@ -295,7 +311,7 @@ public sealed class OnlineRegionAddition
     /// Updates the allocation bitmap to mark the specified block range as allocated.
     /// Flips bits from 0 (free) to 1 (allocated) for each block in the range.
     /// </summary>
-    private async Task UpdateBitmapAllocationAsync(
+    private Task UpdateBitmapAllocationAsync(
         WalJournaledRegionWriter walWriter,
         WalTransaction txn,
         RegionPointer bmapPointer,
@@ -340,7 +356,7 @@ public sealed class OnlineRegionAddition
             walWriter.AddBitmapUpdate(txn, absoluteBlock, oldBits, newBits);
         }
 
-        await Task.CompletedTask; // All WAL entries added synchronously
+        return Task.CompletedTask;
     }
 
     /// <summary>

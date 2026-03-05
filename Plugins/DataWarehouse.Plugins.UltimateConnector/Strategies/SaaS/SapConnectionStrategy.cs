@@ -19,9 +19,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
     /// </summary>
     public class SapConnectionStrategy : SaaSConnectionStrategyBase
     {
-        private string _host = "";
-        private string _client = "100";
-        private string _csrfToken = "";
+        private volatile string _host = "";
+        private volatile string _client = "100";
+        private volatile string _csrfToken = "";
+        private volatile string _username = "";
+        private volatile string _password = "";
 
         public override string StrategyId => "sap";
         public override string DisplayName => "SAP";
@@ -35,9 +37,12 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
             _host = GetConfiguration<string>(config, "Host", "");
+            if (string.IsNullOrEmpty(_host)) throw new ArgumentException("SAP host is required in Properties[Host]");
             _client = GetConfiguration<string>(config, "SapClient", "100");
-            var username = GetConfiguration<string>(config, "Username", "");
-            var password = GetConfiguration<string>(config, "Password", "");
+            _username = GetConfiguration<string>(config, "Username", "");
+            _password = GetConfiguration<string>(config, "Password", "");
+            var username = _username;
+            var password = _password;
 
             var endpoint = _host.Contains("://") ? _host : $"https://{_host}";
             var httpClient = new HttpClient
@@ -51,6 +56,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                 var creds = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{username}:{password}"));
                 httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", creds);
             }
+            httpClient.DefaultRequestHeaders.Remove("sap-client");
             httpClient.DefaultRequestHeaders.Add("sap-client", _client);
             httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
@@ -68,16 +74,13 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             {
                 var response = await handle.GetConnection<HttpClient>()
                     .GetAsync("/sap/opu/odata/sap/", ct);
-                return response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable;
+                return response.IsSuccessStatusCode;
             }
             catch { return false; }
         }
 
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
-        {
-            handle.GetConnection<HttpClient>()?.Dispose();
-            await Task.CompletedTask;
-        }
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) {
+            handle.GetConnection<HttpClient>()?.Dispose(); return Task.CompletedTask; }
 
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
@@ -90,8 +93,16 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
         }
 
         protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(
-            IConnectionHandle handle, CancellationToken ct = default) =>
-            Task.FromResult((Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow.AddHours(8)));
+            IConnectionHandle handle, CancellationToken ct = default)
+        {
+            // SAP uses HTTP Basic auth (username:password). Return the encoded Basic credential.
+            if (!string.IsNullOrEmpty(_username))
+            {
+                var encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_username}:{_password}"));
+                return Task.FromResult((encoded, DateTimeOffset.UtcNow.AddHours(8)));
+            }
+            return Task.FromResult((string.Empty, DateTimeOffset.UtcNow));
+        }
 
         protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(
             IConnectionHandle handle, string currentToken, CancellationToken ct = default) =>
@@ -106,7 +117,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             using var request = new HttpRequestMessage(HttpMethod.Head, "/sap/opu/odata/sap/");
             request.Headers.Add("X-CSRF-Token", "Fetch");
 
-            var response = await client.SendAsync(request, ct);
+            using var response = await client.SendAsync(request, ct);
             if (response.Headers.TryGetValues("x-csrf-token", out var tokens))
             {
                 _csrfToken = tokens.FirstOrDefault() ?? "";
@@ -126,15 +137,17 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
 
             if (!string.IsNullOrEmpty(filter))
                 queryParams.Add($"$filter={Uri.EscapeDataString(filter)}");
+            // Finding 2163: URL-encode $select just like $filter — special chars produce malformed OData query.
             if (!string.IsNullOrEmpty(select))
-                queryParams.Add($"$select={select}");
+                queryParams.Add($"$select={Uri.EscapeDataString(select)}");
             if (top.HasValue)
                 queryParams.Add($"$top={top.Value}");
             if (skip.HasValue)
                 queryParams.Add($"$skip={skip.Value}");
 
             var url = $"/sap/opu/odata/sap/{servicePath}/{entitySet}?{string.Join("&", queryParams)}";
-            var response = await client.GetAsync(url, ct);
+            using var response = await client.GetAsync(url, ct);
+            response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
@@ -186,7 +199,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             };
             request.Headers.Add("X-CSRF-Token", _csrfToken);
 
-            var response = await client.SendAsync(request, ct);
+            using var response = await client.SendAsync(request, ct);
             return new SapODataResult
             {
                 Success = response.IsSuccessStatusCode,
@@ -205,8 +218,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                 ? "?" + string.Join("&", parameters.Select(p => $"{p.Key}='{Uri.EscapeDataString(p.Value)}'"))
                 : "";
 
-            var url = $"/sap/opu/odata/sap/{servicePath}/{functionName}{paramString}&$format=json";
-            var response = await client.GetAsync(url, ct);
+            // Finding 2157: Use '?' when no parameters are present, '&' only when appending to existing query string.
+            var separator = paramString.Length > 0 ? "&" : "?";
+            var url = $"/sap/opu/odata/sap/{servicePath}/{functionName}{paramString}{separator}$format=json";
+            using var response = await client.GetAsync(url, ct);
+            response.EnsureSuccessStatusCode();
             var responseJson = await response.Content.ReadAsStringAsync(ct);
 
             return new SapODataResult
@@ -234,7 +250,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             };
             request.Headers.Add("X-CSRF-Token", _csrfToken);
 
-            var response = await client.SendAsync(request, ct);
+            using var response = await client.SendAsync(request, ct);
             return new SapIdocResult
             {
                 Success = response.IsSuccessStatusCode,

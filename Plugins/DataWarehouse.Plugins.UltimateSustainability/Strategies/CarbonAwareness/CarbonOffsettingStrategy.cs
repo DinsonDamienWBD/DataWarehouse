@@ -41,6 +41,14 @@ public sealed class CarbonOffsettingStrategy : SustainabilityStrategyBase
     public override string[] Tags => new[] { "carbon", "offset", "neutrality", "verra", "gold-standard" };
 
     /// <summary>
+    /// Optional user-supplied delegate that fetches live offset project data from a marketplace API.
+    /// P2-4416: When set, <see cref="GetRecommendedProjects"/> calls this provider and returns its results
+    /// instead of the built-in reference catalog. The delegate receives the preferred project types and
+    /// the total offset tons needed; it should return a sorted list of <see cref="OffsetProjectRecommendation"/>.
+    /// </summary>
+    public Func<IReadOnlyList<OffsetProjectType>, double, IReadOnlyList<OffsetProjectRecommendation>>? ProjectCatalogProvider { get; set; }
+
+    /// <summary>
     /// Gets total emissions tracked (gCO2e).
     /// </summary>
     public double TotalEmissionsGrams
@@ -239,11 +247,29 @@ public sealed class CarbonOffsettingStrategy : SustainabilityStrategyBase
 
     /// <summary>
     /// Gets recommended offset projects based on preferences.
+    /// P2-4416: Uses <see cref="ProjectCatalogProvider"/> when set for live marketplace data;
+    /// falls back to the built-in reference catalog for offline/air-gapped environments.
     /// </summary>
     public IReadOnlyList<OffsetProjectRecommendation> GetRecommendedProjects(double offsetGramsNeeded)
     {
-        var recommendations = new List<OffsetProjectRecommendation>();
         var offsetTons = offsetGramsNeeded / 1_000_000;
+
+        // Prefer user-supplied live marketplace provider when configured.
+        if (ProjectCatalogProvider != null)
+        {
+            try
+            {
+                return ProjectCatalogProvider(PreferredProjectTypes, offsetTons);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.TraceWarning(
+                    "[CarbonOffsettingStrategy] ProjectCatalogProvider threw: {0}. Falling back to built-in catalog.", ex.Message);
+            }
+        }
+
+        // Built-in reference catalog (Verra/Gold Standard reference prices as of 2024).
+        var recommendations = new List<OffsetProjectRecommendation>();
 
         foreach (var projectType in PreferredProjectTypes)
         {

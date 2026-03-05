@@ -18,20 +18,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale
     public class ExascaleMetadataStrategy : UltimateStorageStrategyBase
     {
         private LsmTreeEngine? _lsmTree;
-        private readonly Lazy<string> _dataDirectory;
+        private string? _dataDirectory;
 
         /// <summary>
         /// Initializes a new instance of the ExascaleMetadataStrategy.
         /// </summary>
         public ExascaleMetadataStrategy()
         {
-            _dataDirectory = new Lazy<string>(() =>
-            {
-                var tempPath = Path.GetTempPath();
-                var enginePath = Path.Combine(tempPath, "DataWarehouse", "ExascaleMetadata", Guid.NewGuid().ToString("N"));
-                Directory.CreateDirectory(enginePath);
-                return enginePath;
-            });
         }
 
         public override string StrategyId => "exascale-metadata";
@@ -51,6 +44,17 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale
         /// </summary>
         protected override async Task InitializeCoreAsync(CancellationToken ct)
         {
+            // DataDirectory is configurable; defaults to a persistent application-data path.
+            // Using temp path was unreliable (wiped on reboot). Callers should set DataDirectory
+            // in configuration to a persistent volume path.
+            var configured = GetConfiguration<string?>("DataDirectory", null);
+            _dataDirectory = string.IsNullOrWhiteSpace(configured)
+                ? Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                    "DataWarehouse", "ExascaleMetadata")
+                : configured;
+            Directory.CreateDirectory(_dataDirectory);
+
             var options = new LsmTreeOptions
             {
                 MemTableMaxSize = 4 * 1024 * 1024,
@@ -60,7 +64,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale
                 EnableBackgroundCompaction = true
             };
 
-            _lsmTree = new LsmTreeEngine(_dataDirectory.Value, options);
+            _lsmTree = new LsmTreeEngine(_dataDirectory!, options);
             await _lsmTree.InitializeAsync(ct);
         }
 

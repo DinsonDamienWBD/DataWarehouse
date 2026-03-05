@@ -48,7 +48,11 @@ internal sealed class FlinkStrategy : ComputeRuntimeStrategyBase
                 var args = new StringBuilder();
                 args.Append($"run ");
 
-                if (task.Metadata?.TryGetValue("detached", out var d) == true && d is true)
+                // P2-1693: JSON deserialization can produce JsonElement(true) or string "true",
+                // not boxed bool. Use Convert.ToBoolean for robust cross-type truthiness check.
+                if (task.Metadata?.TryGetValue("detached", out var d) == true
+                    && (d is true || (d is string ds && string.Equals(ds, "true", StringComparison.OrdinalIgnoreCase))
+                        || (d is System.Text.Json.JsonElement je && je.ValueKind == System.Text.Json.JsonValueKind.True)))
                     args.Append("-d ");
 
                 args.Append($"-p {parallelism} ");

@@ -170,18 +170,30 @@ internal sealed class XmlRpcStrategy : SdkInterface.InterfaceStrategyBase, IPlug
         var typeElement = valueElement.Elements().First();
         var typeName = typeElement.Name.LocalName;
 
+        // P2-3370: int.Parse/double.Parse/Convert.FromBase64String all throw on malformed values.
+        // Wrap each in a try/catch and return the raw string on parse failure rather than propagating.
         return typeName switch
         {
-            "int" or "i4" => int.Parse(typeElement.Value, CultureInfo.InvariantCulture),
-            "double" => double.Parse(typeElement.Value, CultureInfo.InvariantCulture),
+            "int" or "i4" => int.TryParse(typeElement.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var intVal)
+                ? (object)intVal : typeElement.Value,
+            "double" => double.TryParse(typeElement.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var dblVal)
+                ? (object)dblVal : typeElement.Value,
             "boolean" => typeElement.Value == "1" || typeElement.Value.Equals("true", StringComparison.OrdinalIgnoreCase),
             "string" => typeElement.Value,
-            "dateTime.iso8601" => DateTime.Parse(typeElement.Value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
-            "base64" => Convert.FromBase64String(typeElement.Value),
+            "dateTime.iso8601" => DateTime.TryParse(typeElement.Value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var dtVal)
+                ? (object)dtVal : typeElement.Value,
+            "base64" => TryFromBase64(typeElement.Value),
             "struct" => ParseXmlRpcStruct(typeElement),
             "array" => ParseXmlRpcArray(typeElement),
             _ => typeElement.Value
         };
+    }
+
+    // P2-3370: Safe base64 decode helper — returns empty byte[] on malformed input.
+    private static object TryFromBase64(string value)
+    {
+        try { return Convert.FromBase64String(value); }
+        catch (FormatException) { return Array.Empty<byte>(); }
     }
 
     /// <summary>

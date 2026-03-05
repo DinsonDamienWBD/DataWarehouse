@@ -182,24 +182,98 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// PKCS#11 function list structure returned by C_GetFunctionList.
         /// </summary>
         /// <remarks>
-        /// This structure contains function pointers to all PKCS#11 functions.
-        /// For Phase 35, we include only the functions we need. The full PKCS#11
-        /// function list has 70+ function pointers.
+        /// <para>
+        /// Per the PKCS#11 v2.40 specification (section 3.1), CK_FUNCTION_LIST is a structure
+        /// containing a CK_VERSION followed by exactly 70 function pointers in a fixed, defined order.
+        /// Each function pointer is one native pointer width (4 bytes on 32-bit, 8 bytes on 64-bit).
+        /// </para>
+        /// <para>
+        /// We use <see cref="LayoutKind.Explicit"/> with byte offsets computed as:
+        ///   offset = sizeof(CK_VERSION padded to pointer alignment) + (index * IntPtr.Size)
+        /// CK_VERSION is 2 bytes (major + minor), padded to IntPtr.Size alignment = IntPtr.Size bytes.
+        /// Function pointer index (0-based) per PKCS#11 v2.40 spec:
+        ///   0=C_Initialize, 1=C_Finalize, 2=C_GetInfo, 3=C_GetFunctionList,
+        ///   4=C_GetSlotList, 5=C_GetSlotInfo, 6=C_GetTokenInfo, 7=C_GetMechanismList,
+        ///   8=C_GetMechanismInfo, 9=C_InitToken, 10=C_InitPIN, 11=C_SetPIN,
+        ///   12=C_OpenSession, 13=C_CloseSession, 14=C_CloseAllSessions, 15=C_GetSessionInfo,
+        ///   16=C_GetOperationState, 17=C_SetOperationState,
+        ///   18=C_Login, 19=C_Logout
+        /// </para>
         /// </remarks>
-        [StructLayout(LayoutKind.Sequential)]
+        [StructLayout(LayoutKind.Explicit)]
         internal struct CK_FUNCTION_LIST
         {
-            public CK_VERSION version;
-            public IntPtr C_Initialize;
-            public IntPtr C_Finalize;
-            public IntPtr C_GetInfo;
-            // ... many other function pointers omitted for brevity
-            // Full implementation would include all 70+ PKCS#11 functions
-            public IntPtr C_OpenSession;
-            public IntPtr C_CloseSession;
-            public IntPtr C_Login;
-            public IntPtr C_Logout;
-            // ... more function pointers would go here
+            // CK_VERSION (2 bytes: major + minor), padded to pointer-size alignment
+            [FieldOffset(0)]
+            public byte VersionMajor;
+            [FieldOffset(1)]
+            public byte VersionMinor;
+
+            // Function pointer at index 0: C_Initialize
+            // Offset = IntPtr.Size (version struct padded to pointer alignment)
+            // We store the offsets as constants; at runtime we use GetFunctionPointer helpers.
+            // Using FieldOffset requires compile-time constants, so we fix to 64-bit layout (8-byte pointers).
+            // On 32-bit platforms, use the 32-bit variant (4-byte pointers).
+            // These offsets are for LP64 (Linux/macOS/Windows 64-bit): version at offset 0 (padded to 8), then pointers.
+            [FieldOffset(8)]
+            public IntPtr C_Initialize;       // index 0
+
+            [FieldOffset(16)]
+            public IntPtr C_Finalize;         // index 1
+
+            [FieldOffset(24)]
+            public IntPtr C_GetInfo;          // index 2
+
+            [FieldOffset(32)]
+            public IntPtr C_GetFunctionList;  // index 3
+
+            [FieldOffset(40)]
+            public IntPtr C_GetSlotList;      // index 4
+
+            [FieldOffset(48)]
+            public IntPtr C_GetSlotInfo;      // index 5
+
+            [FieldOffset(56)]
+            public IntPtr C_GetTokenInfo;     // index 6
+
+            [FieldOffset(64)]
+            public IntPtr C_GetMechanismList; // index 7
+
+            [FieldOffset(72)]
+            public IntPtr C_GetMechanismInfo; // index 8
+
+            [FieldOffset(80)]
+            public IntPtr C_InitToken;        // index 9
+
+            [FieldOffset(88)]
+            public IntPtr C_InitPIN;          // index 10
+
+            [FieldOffset(96)]
+            public IntPtr C_SetPIN;           // index 11
+
+            [FieldOffset(104)]
+            public IntPtr C_OpenSession;      // index 12
+
+            [FieldOffset(112)]
+            public IntPtr C_CloseSession;     // index 13
+
+            [FieldOffset(120)]
+            public IntPtr C_CloseAllSessions; // index 14
+
+            [FieldOffset(128)]
+            public IntPtr C_GetSessionInfo;   // index 15
+
+            [FieldOffset(136)]
+            public IntPtr C_GetOperationState; // index 16
+
+            [FieldOffset(144)]
+            public IntPtr C_SetOperationState; // index 17
+
+            [FieldOffset(152)]
+            public IntPtr C_Login;            // index 18
+
+            [FieldOffset(160)]
+            public IntPtr C_Logout;           // index 19
         }
 
         // ==================== Library Loading ====================

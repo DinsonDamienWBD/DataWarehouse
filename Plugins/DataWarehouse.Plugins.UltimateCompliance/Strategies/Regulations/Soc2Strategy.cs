@@ -32,7 +32,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("soc2.check");
+            IncrementCounter("soc2.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -51,9 +51,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
             // P: Privacy
             CheckPrivacyCriteria(context, violations, recommendations);
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -270,8 +271,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
             }
 
             // CC6.3: Remove access when no longer required
-            if (context.OperationType.Equals("termination", StringComparison.OrdinalIgnoreCase) ||
-                context.OperationType.Equals("offboarding", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("termination", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(context.OperationType, "offboarding", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("AccessRevokedTimely", out var artObj) || artObj is not true)
                 {
@@ -532,8 +533,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
             }
 
             // C1.3: Disposal of confidential information
-            if (context.OperationType.Equals("delete", StringComparison.OrdinalIgnoreCase) ||
-                context.OperationType.Equals("dispose", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("delete", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(context.OperationType, "dispose", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("SecureDisposal", out var sdObj) || sdObj is not true)
                 {
@@ -621,7 +622,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
             }
 
             // P6.1: Access rights
-            if (context.OperationType.Equals("access-request", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("access-request", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("IdentityVerified", out var ivObj) || ivObj is not true)
                 {
@@ -637,7 +638,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
             }
 
             // P6.7: Correction rights
-            if (context.OperationType.Equals("correction-request", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("correction-request", StringComparison.OrdinalIgnoreCase))
             {
                 recommendations.Add("P6.7: Process correction requests and update inaccurate data");
             }
@@ -670,14 +671,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("soc2.initialized");
+            IncrementCounter("soc2.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("soc2.shutdown");
+            IncrementCounter("soc2.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

@@ -288,7 +288,7 @@ internal sealed class ZeroConfigApiStrategy : SdkInterface.InterfaceStrategyBase
             "status" => new
             {
                 status = "healthy",
-                uptime = "72 hours",
+                uptimeSeconds = (long)(DateTimeOffset.UtcNow - System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime()).TotalSeconds,
                 version = "1.0.0"
             },
             _ => new { message = "Endpoint not found" }

@@ -61,15 +61,13 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.DataProtection
         }
 public string Pseudonymize(string identifier)
         {
-            if (_pseudonymMap.TryGetValue(identifier, out var existingPseudonym))
-                return existingPseudonym;
-
-            using var hmac = new HMACSHA256(_key);
-            var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(identifier));
-            var pseudonym = "PSE-" + Convert.ToBase64String(hash).Substring(0, 16).Replace("+", "").Replace("/", "");
-
-            _pseudonymMap[identifier] = pseudonym;
-            return pseudonym;
+            // Use GetOrAdd for atomic check-and-add to prevent TOCTOU race
+            return _pseudonymMap.GetOrAdd(identifier, id =>
+            {
+                using var hmac = new HMACSHA256(_key);
+                var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(id));
+                return "PSE-" + Convert.ToBase64String(hash).Substring(0, 16).Replace("+", "").Replace("/", "");
+            });
         }
 
         protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)

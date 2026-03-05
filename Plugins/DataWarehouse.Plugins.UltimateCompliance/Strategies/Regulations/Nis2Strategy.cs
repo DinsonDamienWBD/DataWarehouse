@@ -43,7 +43,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("nis2.check");
+            IncrementCounter("nis2.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -62,9 +62,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
             // Check risk management procedures
             CheckRiskManagement(context, violations, recommendations);
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -77,19 +78,57 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
             });
         }
 
+        // NIS2 Annex I sectors are "essential entities" (higher tier, stricter supervision)
+        // NIS2 Annex II sectors are "important entities" (lower tier, lighter requirements)
+        private static readonly HashSet<string> _essentialSectors = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "energy", "transport", "banking", "financial-market", "health", "drinking-water",
+            "wastewater", "digital-infrastructure", "ict-service-management", "public-administration", "space"
+        };
+
         private void CheckSectorApplicability(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
-            if (context.Attributes.TryGetValue("Sector", out var sectorObj) && sectorObj is string sector)
+            if (!context.Attributes.TryGetValue("Sector", out var sectorObj) || sectorObj is not string sector)
+                return;
+
+            if (!_coveredSectors.Contains(sector))
+                return;
+
+            // NIS2: essential entities (Annex I) face stricter requirements and proactive supervision
+            // Important entities (Annex II) have lighter obligations — opposite of what was previously coded
+            var isEssential = _essentialSectors.Contains(sector);
+            var entityType = isEssential ? "Essential Entity (Annex I)" : "Important Entity (Annex II)";
+            recommendations.Add($"NIS2 applies to {sector} sector as {entityType} - ensure full compliance with all Article 21 measures");
+
+            if (isEssential)
             {
-                if (_coveredSectors.Contains(sector))
+                // Essential entities require proactive ex-ante supervision
+                if (!context.Attributes.TryGetValue("ProactiveSupervisionCompliance", out var psObj) || psObj is not true)
                 {
-                    recommendations.Add($"NIS2 applies to {sector} sector - ensure full compliance with all measures");
+                    violations.Add(new ComplianceViolation
+                    {
+                        Code = "NIS2-ESS-001",
+                        Description = $"Essential entity in {sector} sector must comply with proactive ex-ante supervision (NIS2 Article 32)",
+                        Severity = ViolationSeverity.High,
+                        Remediation = "Register with national competent authority and submit to proactive supervision",
+                        RegulatoryReference = "NIS2 Article 32-33"
+                    });
                 }
             }
         }
 
         private void CheckIncidentReporting(ComplianceContext context, List<ComplianceViolation> violations, List<string> recommendations)
         {
+            // P2-1513: Reporting deadline is configurable via context attribute "IncidentReportingDeadlineHours".
+            // NIS2 defaults: Essential entities = 24h early warning, Important entities = 72h notification.
+            // Operators can set per-entity-type deadlines via context.
+            int earlyWarningHours = 24;
+            int notificationHours = 72;
+            if (context.Attributes.TryGetValue("IncidentReportingDeadlineHours", out var deadlineObj) && deadlineObj is int configuredHours && configuredHours > 0)
+                earlyWarningHours = configuredHours;
+            if (context.Attributes.TryGetValue("IncidentNotificationDeadlineHours", out var notifObj) && notifObj is int configuredNotif && configuredNotif > 0)
+                notificationHours = configuredNotif;
+
             if (!context.Attributes.TryGetValue("IncidentReportingCapability", out var reportingObj) || reportingObj is not true)
             {
                 violations.Add(new ComplianceViolation
@@ -97,12 +136,12 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
                     Code = "NIS2-001",
                     Description = "No incident reporting capability implemented",
                     Severity = ViolationSeverity.Critical,
-                    Remediation = "Implement 24-hour incident reporting to national CSIRT",
+                    Remediation = $"Implement {earlyWarningHours}-hour early warning and {notificationHours}-hour incident notification to national CSIRT",
                     RegulatoryReference = "NIS2 Article 23"
                 });
             }
 
-            // Check for early warning (significant incidents within 24 hours)
+            // Check for early warning (significant incidents within configured hours)
             if (!context.Attributes.TryGetValue("EarlyWarningSystem", out var earlyWarningObj) || earlyWarningObj is not true)
             {
                 violations.Add(new ComplianceViolation
@@ -202,14 +241,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("nis2.initialized");
+            IncrementCounter("nis2.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("nis2.shutdown");
+            IncrementCounter("nis2.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

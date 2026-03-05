@@ -334,7 +334,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("attestation.check");
+            IncrementCounter("attestation.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -391,9 +391,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
                 recommendations.Add($"{lowConfidence.Count} attestations have confidence below 95%");
             }
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -782,14 +783,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("attestation.initialized");
+            IncrementCounter("attestation.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("attestation.shutdown");
+            IncrementCounter("attestation.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

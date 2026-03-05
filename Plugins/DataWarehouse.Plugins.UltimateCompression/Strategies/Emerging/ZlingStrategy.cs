@@ -139,13 +139,17 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
         {
             using var output = new MemoryStream(input.Length + 256);
 
-            // Context table: for each byte context, maintain list of positions
+            // Context table: for each byte context, maintain the last 32 positions (only 32 are scanned).
+            // Capping at 32 prevents unbounded growth on highly-repetitive input.
+            const int ContextBucketDepth = 32;
             var contextTable = new Dictionary<byte, List<int>>();
             for (int i = 0; i < ContextSize; i++)
-                contextTable[(byte)i] = new List<int>();
+                contextTable[(byte)i] = new List<int>(ContextBucketDepth);
 
-            // MTF list for match offsets
-            var mtfList = new List<int>();
+            // MTF array for match offsets — fixed-size array avoids O(n) List<T> Insert/RemoveAt shifts.
+            const int MtfCapacity = 256;
+            var mtfArray = new int[MtfCapacity];
+            int mtfCount = 0;
 
             byte context = 0;
             int pos = 0;
@@ -179,37 +183,43 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
                     // Encode match
                     output.WriteByte(1); // Match flag
 
-                    // Compute MTF position
+                    // Compute MTF position using fixed array to avoid O(n) List<T> shifts.
                     int distance = pos - bestMatchPos;
-                    int mtfPos = mtfList.IndexOf(distance);
+                    int mtfPos = -1;
+                    for (int mi = 0; mi < mtfCount; mi++)
+                    {
+                        if (mtfArray[mi] == distance) { mtfPos = mi; break; }
+                    }
 
                     if (mtfPos == -1)
                     {
-                        mtfList.Insert(0, distance);
-                        if (mtfList.Count > 256)
-                            mtfList.RemoveAt(256);
+                        // New distance — shift array right by one (capped at MtfCapacity) and prepend.
+                        int insertCount = Math.Min(mtfCount, MtfCapacity - 1);
+                        Array.Copy(mtfArray, 0, mtfArray, 1, insertCount);
+                        mtfArray[0] = distance;
+                        if (mtfCount < MtfCapacity) mtfCount++;
 
-                        // New distance - encode as raw
+                        // Encode as raw
                         output.WriteByte(255); // MTF escape
                         WriteVarint(output, (uint)distance);
                     }
                     else
                     {
-                        // Encode MTF position
+                        // Encode MTF position, then move to front.
                         output.WriteByte((byte)mtfPos);
-
-                        // Move to front
-                        mtfList.RemoveAt(mtfPos);
-                        mtfList.Insert(0, distance);
+                        Array.Copy(mtfArray, 0, mtfArray, 1, mtfPos);
+                        mtfArray[0] = distance;
                     }
 
                     // Encode match length
                     output.WriteByte((byte)Math.Min(bestMatchLen, 255));
 
-                    // Update context table for matched region
+                    // Update context table for matched region (bounded to ContextBucketDepth)
                     for (int i = 0; i < bestMatchLen; i++)
                     {
-                        contextTable[context].Add(pos + i);
+                        var ctxBucket = contextTable[context];
+                        if (ctxBucket.Count >= ContextBucketDepth) ctxBucket.RemoveAt(0);
+                        ctxBucket.Add(pos + i);
                         if (pos + i + 1 < input.Length)
                             context = input[pos + i];
                     }
@@ -222,7 +232,9 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
                     output.WriteByte(0); // Literal flag
                     output.WriteByte(currentByte);
 
-                    contextTable[context].Add(pos);
+                    var litCtxBucket = contextTable[context];
+                    if (litCtxBucket.Count >= ContextBucketDepth) litCtxBucket.RemoveAt(0);
+                    litCtxBucket.Add(pos);
                     context = currentByte;
                     pos++;
                 }
@@ -296,6 +308,13 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
 
             int originalLength = reader.ReadInt32();
             int compressedLength = reader.ReadInt32();
+
+            // P2-1617: Validate header fields to prevent OOM from crafted streams.
+            if (originalLength < 0 || originalLength > 256 * 1024 * 1024)
+                throw new InvalidDataException($"Zling header originalLength {originalLength} is out of valid range [0, 268435456].");
+            if (compressedLength < 0 || compressedLength > 256 * 1024 * 1024)
+                throw new InvalidDataException($"Zling header compressedLength {compressedLength} is out of valid range [0, 268435456].");
+
             byte[] compressed = reader.ReadBytes(compressedLength);
 
             if (originalLength == 0)
@@ -305,7 +324,10 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
             using var compressedStream = new MemoryStream(compressed);
             using var output = new MemoryStream(originalLength);
 
-            var mtfList = new List<int>();
+            // Fixed-size MTF array mirrors the compressor to avoid O(n) List<T> shifts.
+            const int DecompMtfCapacity = 256;
+            var decompMtfArray = new int[DecompMtfCapacity];
+            int decompMtfCount = 0;
 
             while (output.Length < originalLength && compressedStream.Position < compressedStream.Length)
             {
@@ -325,22 +347,23 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
                     int distance;
                     if (mtfPos == 255)
                     {
-                        // Raw distance
+                        // Raw distance — shift array right and prepend.
                         distance = (int)ReadVarint(compressedStream);
-                        mtfList.Insert(0, distance);
-                        if (mtfList.Count > 256)
-                            mtfList.RemoveAt(256);
+                        int insertCount = Math.Min(decompMtfCount, DecompMtfCapacity - 1);
+                        Array.Copy(decompMtfArray, 0, decompMtfArray, 1, insertCount);
+                        decompMtfArray[0] = distance;
+                        if (decompMtfCount < DecompMtfCapacity) decompMtfCount++;
                     }
                     else
                     {
-                        if (mtfPos >= mtfList.Count)
+                        if (mtfPos >= decompMtfCount)
                             throw new InvalidDataException("Invalid MTF position.");
 
-                        distance = mtfList[mtfPos];
+                        distance = decompMtfArray[mtfPos];
 
                         // Move to front
-                        mtfList.RemoveAt(mtfPos);
-                        mtfList.Insert(0, distance);
+                        Array.Copy(decompMtfArray, 0, decompMtfArray, 1, mtfPos);
+                        decompMtfArray[0] = distance;
                     }
 
                     byte matchLen = (byte)compressedStream.ReadByte();
@@ -350,13 +373,15 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
                     if (matchPos < 0)
                         throw new InvalidDataException("Invalid match position.");
 
-                    for (int i = 0; i < matchLen && output.Length < originalLength; i++)
+                    long writePos = output.Position;
+                    for (int i = 0; i < matchLen && writePos < originalLength; i++, writePos++)
                     {
                         output.Position = matchPos + i;
-                        byte b = (byte)output.ReadByte();
-
-                        output.Position = output.Length;
-                        output.WriteByte(b);
+                        int b = output.ReadByte();
+                        if (b < 0)
+                            throw new InvalidDataException("Match references position beyond current output.");
+                        output.Position = writePos;
+                        output.WriteByte((byte)b);
                     }
                 }
             }

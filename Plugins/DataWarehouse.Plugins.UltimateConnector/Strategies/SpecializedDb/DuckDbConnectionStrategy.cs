@@ -9,7 +9,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
 {
     public class DuckDbConnectionStrategy : DatabaseConnectionStrategyBase
     {
-        private string? _filePath;
+        private volatile string? _filePath;
 
         public override string StrategyId => "duckdb";
         public override string DisplayName => "DuckDB";
@@ -38,16 +38,16 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             return _filePath != null;
         }
 
-        protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
-        {
-            _filePath = null;
-            await Task.CompletedTask;
-        }
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) {
+            _filePath = null; return Task.CompletedTask; }
 
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
+            // P2-2180: Measure actual latency with Stopwatch instead of hardcoded value.
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             var isHealthy = await TestCoreAsync(handle, ct);
-            return new ConnectionHealth(isHealthy, isHealthy ? "DuckDB healthy" : "DuckDB unhealthy", TimeSpan.FromMilliseconds(1), DateTimeOffset.UtcNow);
+            sw.Stop();
+            return new ConnectionHealth(isHealthy, isHealthy ? "DuckDB healthy" : "DuckDB unhealthy", sw.Elapsed, DateTimeOffset.UtcNow);
         }
 
         public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)

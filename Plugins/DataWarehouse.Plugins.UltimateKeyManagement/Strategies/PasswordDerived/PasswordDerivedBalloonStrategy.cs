@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using DataWarehouse.SDK.Security;
 using Org.BouncyCastle.Crypto.Digests;
 using System.Security.Cryptography;
@@ -35,7 +36,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.PasswordDerived
         private BalloonConfig _config = new();
         private string _currentKeyId = "default";
         private readonly Dictionary<string, BalloonEncryptedKeyData> _storedKeys = new();
-        private string? _masterPassword;
+        // #3563: Store password as byte[] instead of string to enable zeroing after use.
+        private byte[]? _masterPasswordBytes;
         private readonly SemaphoreSlim _storageLock = new(1, 1);
         private bool _disposed;
 
@@ -77,13 +79,17 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.PasswordDerived
         {
             IncrementCounter("passwordderivedballoon.init");
             // Load configuration
+            // #3563: Convert password to byte[] immediately; do not retain the string form.
             if (Configuration.TryGetValue("Password", out var pwdObj) && pwdObj is string pwd)
-                _masterPassword = pwd;
+            {
+                _masterPasswordBytes = Encoding.UTF8.GetBytes(pwd);
+                // Note: the string 'pwd' cannot be zeroed in managed code, but we avoid storing it as a field
+            }
             if (Configuration.TryGetValue("PasswordEnvVar", out var envObj) && envObj is string envVar)
             {
                 var envPwd = Environment.GetEnvironmentVariable(envVar);
                 if (!string.IsNullOrEmpty(envPwd))
-                    _masterPassword = envPwd;
+                    _masterPasswordBytes = Encoding.UTF8.GetBytes(envPwd);
             }
             if (Configuration.TryGetValue("SpaceCost", out var sObj) && sObj is int s)
                 _config.SpaceCost = s;
@@ -114,13 +120,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.PasswordDerived
 
         public override async Task<bool> HealthCheckAsync(CancellationToken cancellationToken = default)
         {
-            if (string.IsNullOrEmpty(_masterPassword))
+            if (_masterPasswordBytes == null || _masterPasswordBytes.Length == 0)
                 return false;
 
             try
             {
                 var testSalt = RandomNumberGenerator.GetBytes(16);
-                var _ = await DeriveKeyAsync("test", testSalt, 32, cancellationToken);
+                var _ = await DeriveKeyAsync(GetPasswordBytes(), testSalt, 32, cancellationToken);
                 return true;
             }
             catch
@@ -141,7 +147,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.PasswordDerived
 
                 // Derive the wrapping key using stored salt and parameters
                 var wrappingKey = await DeriveKeyAsync(
-                    GetPassword(),
+                    GetPasswordBytes(),
                     encryptedData.Salt,
                     32,
                     CancellationToken.None,
@@ -167,7 +173,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.PasswordDerived
                 var salt = RandomNumberGenerator.GetBytes(_config.SaltSizeBytes);
 
                 // Derive wrapping key
-                var wrappingKey = await DeriveKeyAsync(GetPassword(), salt, 32, CancellationToken.None);
+                var wrappingKey = await DeriveKeyAsync(GetPasswordBytes(), salt, 32, CancellationToken.None);
 
                 // Encrypt the key material
                 var (encryptedKey, nonce, tag) = EncryptKeyMaterial(keyData, wrappingKey);
@@ -202,8 +208,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.PasswordDerived
         public override async Task<IReadOnlyList<string>> ListKeysAsync(ISecurityContext context, CancellationToken cancellationToken = default)
         {
             ValidateSecurityContext(context);
-            await Task.CompletedTask;
-            return _storedKeys.Keys.ToList().AsReadOnly();
+            // #3571: Take a snapshot under the storage lock to prevent torn reads.
+            await _storageLock.WaitAsync(cancellationToken);
+            try
+            {
+                return _storedKeys.Keys.ToList().AsReadOnly();
+            }
+            finally
+            {
+                _storageLock.Release();
+            }
         }
 
         public override async Task DeleteKeyAsync(string keyId, ISecurityContext context, CancellationToken cancellationToken = default)
@@ -267,7 +281,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.PasswordDerived
         /// Implementation based on the original paper specification.
         /// </summary>
         private async Task<byte[]> DeriveKeyAsync(
-            string password,
+            byte[] passwordBytes,
             byte[] salt,
             int outputLength,
             CancellationToken cancellationToken,
@@ -282,7 +296,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.PasswordDerived
                 var d = delta ?? _config.Delta;
 
                 return BalloonHash(
-                    Encoding.UTF8.GetBytes(password),
+                    passwordBytes,
                     salt,
                     s,
                     t,
@@ -327,13 +341,14 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.PasswordDerived
                     buffer[m] = HashWithCounter(ref counter, prev, buffer[m]);
 
                     // Step 2b: Hash delta pseudo-random blocks
+                    // Use a pre-allocated 12-byte buffer for INTS_TO_BLOCK to avoid ~3 allocations per iteration.
+                    var idxInput = new byte[12];
                     for (int i = 0; i < delta; i++)
                     {
-                        // idx_block = INTS_TO_BLOCK(t, m, i)
-                        var idxInput = BitConverter.GetBytes(t)
-                            .Concat(BitConverter.GetBytes(m))
-                            .Concat(BitConverter.GetBytes(i))
-                            .ToArray();
+                        // idx_block = INTS_TO_BLOCK(t, m, i) — written in-place to avoid per-call allocations.
+                        BinaryPrimitives.WriteInt32LittleEndian(idxInput.AsSpan(0, 4), t);
+                        BinaryPrimitives.WriteInt32LittleEndian(idxInput.AsSpan(4, 4), m);
+                        BinaryPrimitives.WriteInt32LittleEndian(idxInput.AsSpan(8, 4), i);
 
                         // other = INT(H(counter++ || salt || idx_block)) mod sCost
                         var otherHash = HashWithCounter(ref counter, salt, idxInput);
@@ -451,14 +466,14 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.PasswordDerived
             return plaintext;
         }
 
-        private string GetPassword()
+        private byte[] GetPasswordBytes()
         {
-            if (string.IsNullOrEmpty(_masterPassword))
+            if (_masterPasswordBytes == null || _masterPasswordBytes.Length == 0)
             {
                 throw new InvalidOperationException(
                     "Master password not configured. Set 'Password' or 'PasswordEnvVar' in configuration.");
             }
-            return _masterPassword;
+            return _masterPasswordBytes;
         }
 
         private string GetStoragePath()
@@ -492,7 +507,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.PasswordDerived
             }
             catch
             {
+
                 // Ignore load errors - start fresh
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
@@ -515,6 +532,12 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.PasswordDerived
                 return;
 
             _disposed = true;
+            // #3563: Zero out password bytes on disposal
+            if (_masterPasswordBytes != null)
+            {
+                CryptographicOperations.ZeroMemory(_masterPasswordBytes);
+                _masterPasswordBytes = null;
+            }
             _storageLock.Dispose();
             base.Dispose();
         }

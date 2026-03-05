@@ -112,18 +112,24 @@ public sealed class AzureCostManagementProvider : IBillingProvider
             int costIndex = FindColumnIndex(columns, "Cost");
             int serviceIndex = FindColumnIndex(columns, "ServiceName");
 
-            foreach (var row in rows.EnumerateArray())
+            // Only parse rows if required columns exist; avoids reading wrong column on schema mismatch
+            if (costIndex >= 0 && serviceIndex >= 0)
             {
-                var cost = row[costIndex].GetDecimal();
-                var service = row[serviceIndex].GetString() ?? "Unknown";
+                foreach (var row in rows.EnumerateArray())
+                {
+                    var rowArr = row.EnumerateArray().ToArray();
+                    if (costIndex >= rowArr.Length || serviceIndex >= rowArr.Length) continue;
+                    var cost = rowArr[costIndex].GetDecimal();
+                    var service = rowArr[serviceIndex].GetString() ?? "Unknown";
 
-                totalCost += cost;
-                breakdown.Add(new CostBreakdown(
-                    CategorizeAzureService(service),
-                    service,
-                    cost,
-                    "USD",
-                    (double)cost));
+                    totalCost += cost;
+                    breakdown.Add(new CostBreakdown(
+                        CategorizeAzureService(service),
+                        service,
+                        cost,
+                        "USD",
+                        (double)cost));
+                }
             }
         }
 
@@ -152,7 +158,7 @@ public sealed class AzureCostManagementProvider : IBillingProvider
         var responseJson = await ExecuteWithRetryAsync(async () =>
         {
             var request = new HttpRequestMessage(HttpMethod.Get, url);
-            var response = await _httpClient.SendAsync(request, ct).ConfigureAwait(false);
+            using var response = await _httpClient.SendAsync(request, ct).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
             var text = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
             using var doc = JsonDocument.Parse(text);
@@ -216,14 +222,46 @@ public sealed class AzureCostManagementProvider : IBillingProvider
 
                 var termMonths = term.Contains("3Y", StringComparison.OrdinalIgnoreCase) ? 36 : 12;
 
+                // Parse quantity (reserved units) from the reservation properties.
+                // Azure Reservations API: properties.quantity = number of reserved instances/units.
+                var quantity = props.TryGetProperty("quantity", out var qty)
+                    ? qty.GetInt32()
+                    : 0;
+
+                // Parse billing total from billingPlan / billingCurrencyTotal if present.
+                // billingCurrencyTotal is the total cost over the reservation term in billing currency.
+                decimal billingTotal = 0m;
+                if (props.TryGetProperty("billingCurrencyTotal", out var bct))
+                {
+                    if (bct.TryGetProperty("amount", out var amt))
+                        billingTotal = amt.TryGetDecimal(out var d) ? d : 0m;
+                }
+                else if (props.TryGetProperty("purchasePrice", out var pp))
+                {
+                    billingTotal = pp.TryGetDecimal(out var d) ? d : 0m;
+                }
+
+                // Derive per-unit-per-month price from total/term. Azure storage reservations
+                // typically commit in TB; treat quantity as TB, convert to GB-months.
+                decimal committedGb = quantity * 1024m; // quantity units → GB (1 unit = 1 TiB ≈ 1024 GB)
+                decimal reservedPerGbMonth = (committedGb > 0 && termMonths > 0)
+                    ? billingTotal / committedGb / termMonths
+                    : 0m;
+
+                // Azure typically offers 20–40 % savings over on-demand for 1Y, 50–60 % for 3Y.
+                var savingsPct = term.Contains("3Y", StringComparison.OrdinalIgnoreCase) ? 50.0 : 30.0;
+                decimal onDemandPerGbMonth = reservedPerGbMonth > 0
+                    ? reservedPerGbMonth / (decimal)(1.0 - savingsPct / 100.0)
+                    : 0m;
+
                 results.Add(new ReservedCapacity(
                     CloudProvider.Azure,
                     "global",
                     displayName,
-                    CommittedGB: 0,
-                    ReservedPricePerGBMonth: 0m,
-                    OnDemandPricePerGBMonth: 0m,
-                    SavingsPercent: term.Contains("3Y", StringComparison.OrdinalIgnoreCase) ? 50.0 : 30.0,
+                    CommittedGB: (long)committedGb,
+                    ReservedPricePerGBMonth: reservedPerGbMonth,
+                    OnDemandPricePerGBMonth: onDemandPerGbMonth,
+                    SavingsPercent: savingsPct,
                     termMonths,
                     expiryDate));
             }
@@ -311,6 +349,10 @@ public sealed class AzureCostManagementProvider : IBillingProvider
             await AcquireTokenAsync(ct).ConfigureAwait(false);
             return true;
         }
+        catch (OperationCanceledException)
+        {
+            throw; // Cat 5 (finding 621): propagate cancellation, not invalid credentials.
+        }
         catch
         {
             return false;
@@ -336,7 +378,7 @@ public sealed class AzureCostManagementProvider : IBillingProvider
                 ["scope"] = "https://management.azure.com/.default"
             });
 
-            var response = await _httpClient.PostAsync(tokenUrl, content, ct).ConfigureAwait(false);
+            using var response = await _httpClient.PostAsync(tokenUrl, content, ct).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
 
             var responseText = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
@@ -374,7 +416,7 @@ public sealed class AzureCostManagementProvider : IBillingProvider
             };
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            var response = await _httpClient.SendAsync(request, ct).ConfigureAwait(false);
+            using var response = await _httpClient.SendAsync(request, ct).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
 
             var responseText = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
@@ -393,7 +435,7 @@ public sealed class AzureCostManagementProvider : IBillingProvider
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            var response = await _httpClient.SendAsync(request, ct).ConfigureAwait(false);
+            using var response = await _httpClient.SendAsync(request, ct).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
 
             var responseText = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
@@ -442,7 +484,7 @@ public sealed class AzureCostManagementProvider : IBillingProvider
                 return index;
             index++;
         }
-        return 0; // default to first column
+        return -1; // -1 signals "column not found"; callers must check before indexing into row data
     }
 
     private static CostCategory CategorizeAzureService(string serviceName)

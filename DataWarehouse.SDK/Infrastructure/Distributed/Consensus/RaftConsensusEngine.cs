@@ -30,6 +30,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         private readonly RaftVolatileState _volatile = new();
         private readonly SemaphoreSlim _stateLock = new(1, 1);
         private readonly List<Action<Proposal>> _commitHandlers = new();
+        private readonly object _commitHandlersLock = new();
         private readonly CancellationTokenSource _cts = new();
         private readonly BoundedDictionary<string, TaskCompletionSource<bool>> _pendingProposals = new BoundedDictionary<string, TaskCompletionSource<bool>>(1000);
         private readonly IRaftLogStore _logStore;
@@ -135,14 +136,17 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         public bool IsLeader => _role == RaftRole.Leader;
 
         /// <inheritdoc />
-        public async Task<bool> ProposeAsync(Proposal proposal)
+        public string? LeaderId => _leaderId;
+
+        /// <inheritdoc />
+        public async Task<bool> ProposeAsync(Proposal proposal, CancellationToken cancellationToken = default)
         {
             if (_role != RaftRole.Leader)
             {
                 throw new InvalidOperationException("Not the leader. Only the leader can propose state changes.");
             }
 
-            await _stateLock.WaitAsync().ConfigureAwait(false);
+            await _stateLock.WaitAsync(cancellationToken).ConfigureAwait(false);
             RaftLogEntry entry;
             try
             {
@@ -154,6 +158,10 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                     Payload = proposal.Payload,
                     Timestamp = DateTimeOffset.UtcNow
                 };
+
+                // Persist entry via injected log store BEFORE adding to in-memory list
+                // so FileRaftLogStore durability is not bypassed (finding P2-429).
+                await _logStore.AppendAsync(entry).ConfigureAwait(false);
 
                 _persistent.Log.Add(entry);
                 CompactLogIfNeeded();
@@ -193,9 +201,39 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         }
 
         /// <inheritdoc />
-        public void OnCommit(Action<Proposal> handler)
+        public IDisposable OnCommit(Action<Proposal> handler)
         {
-            _commitHandlers.Add(handler);
+            lock (_commitHandlersLock)
+            {
+                _commitHandlers.Add(handler);
+            }
+            return new CommitHandlerRegistration(_commitHandlers, _commitHandlersLock, handler);
+        }
+
+        private sealed class CommitHandlerRegistration : IDisposable
+        {
+            private readonly List<Action<Proposal>> _handlers;
+            private readonly object _lock;
+            private readonly Action<Proposal> _handler;
+            private int _disposed;
+
+            public CommitHandlerRegistration(List<Action<Proposal>> handlers, object handlerLock, Action<Proposal> handler)
+            {
+                _handlers = handlers;
+                _lock = handlerLock;
+                _handler = handler;
+            }
+
+            public void Dispose()
+            {
+                if (Interlocked.Exchange(ref _disposed, 1) == 0)
+                {
+                    lock (_lock)
+                    {
+                        _handlers.Remove(_handler);
+                    }
+                }
+            }
         }
 
         #endregion
@@ -617,8 +655,10 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                             Payload = entry.Payload
                         };
 
-                        // Invoke commit handlers
-                        foreach (var handler in _commitHandlers)
+                        // Invoke commit handlers (snapshot to avoid concurrent modification)
+                        Action<Proposal>[] handlers;
+                        lock (_commitHandlersLock) { handlers = _commitHandlers.ToArray(); }
+                        foreach (var handler in handlers)
                         {
                             try
                             {
@@ -910,7 +950,10 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                             Payload = appliedEntry.Payload
                         };
 
-                        foreach (var handler in _commitHandlers)
+                        // Snapshot handlers under lock to prevent concurrent modification (finding P2-426)
+                        Action<Proposal>[] handlers;
+                        lock (_commitHandlersLock) { handlers = _commitHandlers.ToArray(); }
+                        foreach (var handler in handlers)
                         {
                             try
                             {
@@ -1036,7 +1079,10 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             var expectedHash = hmac.ComputeHash(cleanBytes);
             var expectedHmac = Convert.ToBase64String(expectedHash);
 
-            return string.Equals(receivedHmac, expectedHmac, StringComparison.Ordinal);
+            // Use constant-time comparison to prevent HMAC timing side-channel attacks
+            return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+                System.Text.Encoding.UTF8.GetBytes(receivedHmac),
+                System.Text.Encoding.UTF8.GetBytes(expectedHmac));
         }
 
         /// <summary>

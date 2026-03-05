@@ -614,16 +614,22 @@ public class PipelinePolicyManager
 
     /// <summary>
     /// Validates that a user has admin privileges.
+    /// Throws <see cref="SecurityOperationException"/> if the security context is null
+    /// or the principal is not a system admin (Cat 4, finding 963: fail-closed).
     /// </summary>
     private void ValidateAdminPrivileges(string userId, ISecurityContext? securityContext)
     {
-        // If no security context, allow (development/testing mode)
+        // Cat 4 (finding 963): null context must NOT grant access — fail-closed.
+        // A missing context means the caller did not authenticate, which is a denial.
         if (securityContext == null)
         {
             _kernelContext?.LogWarning(
-                $"No security context provided for admin operation. UserId: {userId}. " +
-                "This is allowed for development/testing only.");
-            return;
+                $"Admin operation attempted without security context. UserId: {userId}. " +
+                "Access denied (fail-closed).");
+            throw SecurityOperationException.AccessDenied(
+                userId,
+                "Instance",
+                "SystemAdmin");
         }
 
         // Check if user is system admin

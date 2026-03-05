@@ -155,7 +155,10 @@ public static class NamespaceAuthority
         prefixUtf8.AsSpan(0, Math.Min(prefixUtf8.Length, NamespaceRegistration.PrefixSize))
             .CopyTo(prefixBytes);
 
-        // Generate a deterministic UUID v4 for this namespace
+        // Cat 15 (finding 839): Generate a random UUID (v4) for this namespace. The previous
+        // comment said "deterministic" which was incorrect — Guid.NewGuid() is non-deterministic.
+        // Namespace UUIDs must be unique per registration and are not derived from the prefix/authority,
+        // so random generation is the correct behaviour here.
         var namespaceUuid = Guid.NewGuid();
 
         // Build padded authority bytes
@@ -248,10 +251,8 @@ public static class NamespaceAuthority
         byte[] privateKey,
         byte[] publicKey)
     {
-        // The HmacSignatureProvider.Sign uses the private key parameter,
-        // but verification uses the public key. For consistency in the HMAC scheme,
-        // we sign with the public key so verification can recompute.
-        // This is the HMAC fallback approach -- real Ed25519 uses private key to sign.
-        return provider.Sign(data, publicKey);
+        // Sign with the private key — only the holder can produce valid signatures.
+        // Verification recomputes using the private key (HMAC is symmetric).
+        return provider.Sign(data, privateKey);
     }
 }

@@ -21,15 +21,34 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var parts = config.ConnectionString.Split(':');
+            if (string.IsNullOrWhiteSpace(config.ConnectionString))
+                throw new ArgumentException("ConnectionString must be in 'host' or 'host:port' format for VSAM.", nameof(config));
+            var parts = (config.ConnectionString ?? throw new ArgumentException("Connection string required")).Split(':');
+            var host = parts[0];
+            if (string.IsNullOrWhiteSpace(host))
+                throw new ArgumentException("Host portion of ConnectionString is empty for VSAM.", nameof(config));
+            var port = parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : 8000;
             var client = new TcpClient();
-            await client.ConnectAsync(parts[0], parts.Length > 1 ? int.Parse(parts[1]) : 8000, ct);
-            return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "VSAM Bridge" });
+            await client.ConnectAsync(host, port, ct);
+            return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "VSAM Bridge", ["host"] = host, ["port"] = port });
         }
 
-        protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(handle.GetConnection<TcpClient>().Connected);
+        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        {
+            var info = handle.ConnectionInfo;
+            var host = info.GetValueOrDefault("host")?.ToString() ?? "";
+            if (!int.TryParse(info.GetValueOrDefault("port")?.ToString(), out var port)) port = 8000;
+            try { using var probe = new TcpClient(); await probe.ConnectAsync(host, port, ct); return true; }
+            catch { return false; }
+        }
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<TcpClient>().Close(); return Task.CompletedTask; }
-        protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(new ConnectionHealth(handle.GetConnection<TcpClient>().Connected, "VSAM bridge", TimeSpan.Zero, DateTimeOffset.UtcNow));
+        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var isHealthy = await TestCoreAsync(handle, ct);
+            sw.Stop();
+            return new ConnectionHealth(isHealthy, isHealthy ? "VSAM bridge reachable" : "VSAM bridge unreachable", sw.Elapsed, DateTimeOffset.UtcNow);
+        }
         public override async Task<string> EmulateProtocolAsync(IConnectionHandle handle, string protocolCommand, CancellationToken ct = default)
         {
             var client = handle.GetConnection<TcpClient>();

@@ -22,9 +22,16 @@ public abstract class DataTransformationStrategyBase : IoTStrategyBase, IDataTra
     public abstract Task<EnrichmentResult> EnrichAsync(EnrichmentRequest request, CancellationToken ct = default);
     public abstract Task<NormalizationResult> NormalizeAsync(NormalizationRequest request, CancellationToken ct = default);
 
+    /// <summary>
+    /// Validates that <paramref name="data"/> conforms to <paramref name="schema"/>.
+    /// LOW-3428: base returns false (not-validated) instead of blindly true; override in subclasses
+    /// that have schema-validation capability.
+    /// </summary>
     public virtual Task<bool> ValidateSchemaAsync(byte[] data, string schema, CancellationToken ct = default)
     {
-        return Task.FromResult(true);
+        // Return false by default — callers should not assume unknown data is valid.
+        // Subclasses override this when they can perform real schema validation.
+        return Task.FromResult(false);
     }
 }
 
@@ -44,19 +51,31 @@ public class FormatConversionStrategy : DataTransformationStrategyBase
     {
         byte[] output;
 
+        // Parse input as UTF-8 text payload (common IoT transport encoding)
+        var inputText = Encoding.UTF8.GetString(request.InputData);
+
         if (request.TargetFormat.Equals("json", StringComparison.OrdinalIgnoreCase))
         {
-            // Convert to JSON
-            var data = new { converted = true, sourceFormat = request.SourceFormat, timestamp = DateTimeOffset.UtcNow };
-            output = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(data));
+            // Wrap the raw payload in a JSON envelope preserving original data
+            var envelope = new
+            {
+                sourceFormat = request.SourceFormat,
+                timestamp = DateTimeOffset.UtcNow,
+                payload = inputText
+            };
+            output = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(envelope));
         }
         else if (request.TargetFormat.Equals("xml", StringComparison.OrdinalIgnoreCase))
         {
-            output = Encoding.UTF8.GetBytes($"<data><converted>true</converted><sourceFormat>{request.SourceFormat}</sourceFormat></data>");
+            var safePayload = System.Security.SecurityElement.Escape(inputText) ?? string.Empty;
+            output = Encoding.UTF8.GetBytes(
+                $"<data><sourceFormat>{request.SourceFormat}</sourceFormat><payload>{safePayload}</payload></data>");
         }
         else if (request.TargetFormat.Equals("csv", StringComparison.OrdinalIgnoreCase))
         {
-            output = Encoding.UTF8.GetBytes("converted,sourceFormat,timestamp\ntrue," + request.SourceFormat + "," + DateTimeOffset.UtcNow);
+            var escapedPayload = inputText.Replace("\"", "\"\"");
+            output = Encoding.UTF8.GetBytes(
+                $"sourceFormat,timestamp,payload\n{request.SourceFormat},{DateTimeOffset.UtcNow:O},\"{escapedPayload}\"");
         }
         else
         {
@@ -150,8 +169,29 @@ public class ProtocolTranslationStrategy : DataTransformationStrategyBase
         }
         else if (request.TargetProtocol.Equals("coap", StringComparison.OrdinalIgnoreCase))
         {
-            // CoAP might need CBOR encoding
-            translatedMessage = request.Message;
+            // LOW-3427: wrap payload in minimal CBOR byte-string encoding (major type 2).
+            // CBOR header: 0x40..0x57 for 0-23 bytes; 0x58 + 1-byte length for 24-255 bytes; 0x59 + 2-byte for 256-65535.
+            var msg = request.Message;
+            byte[] cbor;
+            if (msg.Length <= 23)
+            {
+                cbor = new byte[1 + msg.Length];
+                cbor[0] = (byte)(0x40 | msg.Length);
+                msg.CopyTo(cbor, 1);
+            }
+            else if (msg.Length <= 255)
+            {
+                cbor = new byte[2 + msg.Length];
+                cbor[0] = 0x58; cbor[1] = (byte)msg.Length;
+                msg.CopyTo(cbor, 2);
+            }
+            else
+            {
+                cbor = new byte[3 + msg.Length];
+                cbor[0] = 0x59; cbor[1] = (byte)(msg.Length >> 8); cbor[2] = (byte)(msg.Length & 0xFF);
+                msg.CopyTo(cbor, 3);
+            }
+            translatedMessage = cbor;
         }
         else if (request.TargetProtocol.Equals("http", StringComparison.OrdinalIgnoreCase))
         {
@@ -242,17 +282,28 @@ public class DataEnrichmentStrategy : DataTransformationStrategyBase
         enriched.Data["_enriched_at"] = DateTimeOffset.UtcNow;
         addedFields["_enriched_at"] = DateTimeOffset.UtcNow;
 
-        enriched.Data["_device_type"] = "sensor";
-        addedFields["_device_type"] = "sensor";
+        // Enrich from message metadata when present; caller supplies context via TelemetryMessage.Metadata
+        var deviceType = request.Message.Properties.TryGetValue("deviceType", out var dt) ? dt : "sensor";
+        enriched.Data["_device_type"] = deviceType;
+        addedFields["_device_type"] = deviceType;
 
-        enriched.Data["_region"] = "us-east-1";
-        addedFields["_region"] = "us-east-1";
+        if (request.Message.Properties.TryGetValue("region", out var msgRegion))
+        {
+            enriched.Data["_region"] = msgRegion;
+            addedFields["_region"] = msgRegion;
+        }
 
-        enriched.Data["_building"] = "HQ-Building-A";
-        addedFields["_building"] = "HQ-Building-A";
+        if (request.Message.Properties.TryGetValue("building", out var building))
+        {
+            enriched.Data["_building"] = building;
+            addedFields["_building"] = building;
+        }
 
-        enriched.Data["_floor"] = 3;
-        addedFields["_floor"] = 3;
+        if (request.Message.Properties.TryGetValue("floor", out var floor))
+        {
+            enriched.Data["_floor"] = floor;
+            addedFields["_floor"] = floor;
+        }
 
         // Add source context
         foreach (var source in request.EnrichmentSources)

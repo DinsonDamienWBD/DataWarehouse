@@ -23,7 +23,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.AsiaPacific
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("csl.check");
+            IncrementCounter("csl.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -69,7 +69,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.AsiaPacific
             }
 
             // Check real-name verification (Article 24)
-            if (context.OperationType.Equals("user-registration", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("user-registration", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("RealNameVerified", out var nameObj) || nameObj is not true)
                 {
@@ -99,9 +99,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.AsiaPacific
 
             recommendations.Add("Obtain MLPS certification for critical information infrastructure");
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -117,14 +118,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.AsiaPacific
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("csl.initialized");
+            IncrementCounter("csl.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("csl.shutdown");
+            IncrementCounter("csl.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

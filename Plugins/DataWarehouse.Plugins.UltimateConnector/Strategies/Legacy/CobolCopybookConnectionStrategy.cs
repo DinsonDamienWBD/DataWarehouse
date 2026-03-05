@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Connectors;
 using Microsoft.Extensions.Logging;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
 {
@@ -44,8 +45,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
 
             if (operation == "READ")
             {
-                var offset = parts.Length > 1 ? int.Parse(parts[1]) : 0;
-                var length = parts.Length > 2 ? int.Parse(parts[2]) : 80; // Standard COBOL record length
+                // Finding 1994: Use TryParse to avoid FormatException on non-numeric arguments.
+                var offset = parts.Length > 1 && int.TryParse(parts[1], out var o) ? o : 0;
+                var length = parts.Length > 2 && int.TryParse(parts[2], out var l) ? l : 80; // Standard COBOL record length
+                if (length <= 0) throw new ArgumentException($"Record length must be positive, got: {length}.");
                 stream.Seek(offset, System.IO.SeekOrigin.Begin);
                 var buffer = ArrayPool<byte>.Shared.Rent(length);
                 try
@@ -68,7 +71,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
             var parts = modernCommand.Split(' ');
             var field = parts[0];
             // Example translation - field name to offset/length
-            var translated = $"READ {field.GetHashCode() % 1000} 80";
+            var translated = $"READ {StableHash.Compute(field) % 1000} 80";
             return Task.FromResult($"{{\"original\":\"{modernCommand}\",\"translated\":\"{translated}\",\"protocol\":\"COBOL Copybook\"}}");
         }
     }

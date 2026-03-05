@@ -412,7 +412,9 @@ public class MediaTranscodingPlugin : MediaTranscodingPluginBase
         }
         catch
         {
+
             // Ignore errors
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return MediaFormat.Unknown;
@@ -2509,7 +2511,9 @@ public class MediaTranscodingPlugin : MediaTranscodingPluginBase
         }
         catch
         {
+
             // Ignore errors
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return null;
@@ -2534,7 +2538,9 @@ public class MediaTranscodingPlugin : MediaTranscodingPluginBase
             }
             catch
             {
+
                 // Ignore
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 

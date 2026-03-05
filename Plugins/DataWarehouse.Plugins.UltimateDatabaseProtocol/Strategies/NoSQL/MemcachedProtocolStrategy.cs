@@ -116,7 +116,9 @@ public sealed class MemcachedProtocolStrategy : DatabaseProtocolStrategyBase
         }
         catch
         {
+
             // Fall back to text protocol
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         // Initialize text protocol
@@ -246,6 +248,8 @@ public sealed class MemcachedProtocolStrategy : DatabaseProtocolStrategyBase
                         var lastResponse = await SendBinaryCommandAsync(OpGetK, keys[^1], null, 0, 0, ct);
 
                         // Read all queued responses
+                        // P2-2705: Log partial-result errors instead of silently swallowing them.
+                        string? multiGetError = null;
                         while (true)
                         {
                             try
@@ -266,10 +270,24 @@ public sealed class MemcachedProtocolStrategy : DatabaseProtocolStrategyBase
                                 if (response.Key == keys[^1])
                                     break;
                             }
-                            catch
+                            catch (Exception ex)
                             {
+                                multiGetError = ex.Message;
+                                System.Diagnostics.Trace.TraceWarning(
+                                    "[Memcached] Multi-get read interrupted after {0} keys: {1}",
+                                    rowsAffected, ex.Message);
                                 break;
                             }
+                        }
+                        if (multiGetError != null)
+                        {
+                            return new QueryResult
+                            {
+                                Success = false,
+                                ErrorMessage = $"Multi-get incomplete ({rowsAffected} of {keys.Length} retrieved): {multiGetError}",
+                                Rows = rows.Select(r => (IReadOnlyDictionary<string, object?>)r).ToList(),
+                                RowsAffected = rowsAffected
+                            };
                         }
 
                         if (lastResponse.Status == StatusNoError && lastResponse.Key != null)
@@ -497,7 +515,9 @@ public sealed class MemcachedProtocolStrategy : DatabaseProtocolStrategyBase
                         return new QueryResult { Success = false, ErrorMessage = "TOUCH requires key and expiry" };
 
                     var key = parts[1];
-                    var expiry = uint.Parse(parts[2]);
+                    // P2-2715: use TryParse to avoid FormatException on non-numeric expiry values.
+                    if (!uint.TryParse(parts[2], out var expiry))
+                        return new QueryResult { Success = false, ErrorMessage = $"TOUCH: invalid expiry value '{parts[2]}'" };
 
                     var response = await SendBinaryCommandAsync(OpTouch, key, null, 0, expiry, ct);
 
@@ -599,9 +619,11 @@ public sealed class MemcachedProtocolStrategy : DatabaseProtocolStrategyBase
                         {
                             var valueParts = line.Split(' ');
                             var key = valueParts[1];
-                            var flags = uint.Parse(valueParts[2]);
-                            var length = int.Parse(valueParts[3]);
-                            var cas = valueParts.Length > 4 ? ulong.Parse(valueParts[4]) : 0UL;
+                            if (!uint.TryParse(valueParts[2], out var flags))
+                                throw new InvalidDataException($"Memcached VALUE line has non-numeric flags: '{valueParts[2]}'");
+                            if (!int.TryParse(valueParts[3], out var length))
+                                throw new InvalidDataException($"Memcached VALUE line has non-numeric length: '{valueParts[3]}'");
+                            var cas = valueParts.Length > 4 && ulong.TryParse(valueParts[4], out var casVal) ? casVal : 0UL;
 
                             var valueBuffer = new char[length];
                             await _textReader.ReadBlockAsync(valueBuffer, 0, length);
@@ -998,7 +1020,9 @@ public sealed class MemcachedProtocolStrategy : DatabaseProtocolStrategyBase
             }
             catch
             {
+
                 // Ignore quit errors
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
         else if (_textWriter != null)
@@ -1009,7 +1033,9 @@ public sealed class MemcachedProtocolStrategy : DatabaseProtocolStrategyBase
             }
             catch
             {
+
                 // Ignore
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
     }

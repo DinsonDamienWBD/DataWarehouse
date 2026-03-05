@@ -107,23 +107,29 @@ protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessCont
         {
             const double alpha = 0.2;
 
-            if (profile.SampleCount == 0)
+            lock (profile)
             {
-                profile.AvgTypingSpeed = typingSpeed;
-                profile.AvgMouseDistance = mouseDistance;
-                profile.StdDevTypingSpeed = 10.0;
-                profile.StdDevMouseDistance = 200.0;
-            }
-            else
-            {
-                profile.AvgTypingSpeed = alpha * typingSpeed + (1 - alpha) * profile.AvgTypingSpeed;
-                profile.AvgMouseDistance = alpha * mouseDistance + (1 - alpha) * profile.AvgMouseDistance;
+                if (profile.SampleCount == 0)
+                {
+                    profile.AvgTypingSpeed = typingSpeed;
+                    profile.AvgMouseDistance = mouseDistance;
+                    profile.StdDevTypingSpeed = 10.0;
+                    profile.StdDevMouseDistance = 200.0;
+                }
+                else
+                {
+                    profile.AvgTypingSpeed = alpha * typingSpeed + (1 - alpha) * profile.AvgTypingSpeed;
+                    profile.AvgMouseDistance = alpha * mouseDistance + (1 - alpha) * profile.AvgMouseDistance;
 
-                var typingDiff = Math.Abs(typingSpeed - profile.AvgTypingSpeed);
-                profile.StdDevTypingSpeed = alpha * typingDiff + (1 - alpha) * profile.StdDevTypingSpeed;
-            }
+                    var typingDiff = Math.Abs(typingSpeed - profile.AvgTypingSpeed);
+                    profile.StdDevTypingSpeed = alpha * typingDiff + (1 - alpha) * profile.StdDevTypingSpeed;
 
-            profile.SampleCount++;
+                    var mouseDiff = Math.Abs(mouseDistance - profile.AvgMouseDistance);
+                    profile.StdDevMouseDistance = alpha * mouseDiff + (1 - alpha) * profile.StdDevMouseDistance;
+                }
+
+                profile.SampleCount++;
+            }
         }
 
         private sealed class BehavioralProfile

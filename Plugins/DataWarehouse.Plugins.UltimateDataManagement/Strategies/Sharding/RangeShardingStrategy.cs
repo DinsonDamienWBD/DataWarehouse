@@ -121,10 +121,12 @@ public sealed class RangeShardingStrategy : ShardingStrategyBase
     /// <inheritdoc/>
     protected override Task InitializeCoreAsync(CancellationToken ct)
     {
-        // Create default ranges (A-Z split into 4 shards)
+        // Create default ranges covering the printable ASCII space split into 4 shards.
+        // Starting from '\x00' ensures the first range does not inadvertently match ALL keys
+        // (empty string "" compares less than every real key, routing everything to shard-0001).
         var ranges = new[]
         {
-            ("shard-0001", "", "G"),
+            ("shard-0001", "\x00", "G"),
             ("shard-0002", "G", "N"),
             ("shard-0003", "N", "T"),
             ("shard-0004", "T", null as string)
@@ -132,7 +134,7 @@ public sealed class RangeShardingStrategy : ShardingStrategyBase
 
         foreach (var (shardId, start, end) in ranges)
         {
-            var location = $"node-{shardId.GetHashCode() % 4}/db-range";
+            var location = $"node-{StableHash.Compute(shardId) % 4}/db-range";
 
             ShardRegistry[shardId] = new ShardInfo(shardId, location, ShardStatus.Online, 0, 0)
             {
@@ -287,6 +289,14 @@ public sealed class RangeShardingStrategy : ShardingStrategyBase
         ArgumentNullException.ThrowIfNull(start);
         ArgumentException.ThrowIfNullOrWhiteSpace(shardId);
         ArgumentException.ThrowIfNullOrWhiteSpace(physicalLocation);
+
+        // P2-2487: Validate that start < end to prevent inverted ranges that never match keys.
+        if (end != null && string.Compare(start, end, StringComparison.Ordinal) >= 0)
+        {
+            throw new ArgumentException(
+                $"Range start '{start}' must be less than end '{end}'.",
+                nameof(start));
+        }
 
         _rangeLock.EnterWriteLock();
         try
@@ -538,7 +548,7 @@ public sealed class RangeShardingStrategy : ShardingStrategyBase
             var newShardId = $"shard-{Guid.NewGuid():N}".Substring(0, 15);
             var newShard = new ShardInfo(
                 newShardId,
-                $"node-{newShardId.GetHashCode() % 4}/db-range",
+                $"node-{StableHash.Compute(newShardId) % 4}/db-range",
                 ShardStatus.Online,
                 0, 0)
             {

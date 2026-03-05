@@ -2,6 +2,7 @@
 // Copyright (c) DataWarehouse. All rights reserved.
 // </copyright>
 
+using System.Collections.Concurrent;
 using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateIoTIntegration.Strategies.SensorFusion;
@@ -13,7 +14,7 @@ namespace DataWarehouse.Plugins.UltimateIoTIntegration.Strategies.SensorFusion;
 public sealed class VotingFusion
 {
     private readonly BoundedDictionary<string, int> _faultCounts = new BoundedDictionary<string, int>(1000);
-    private readonly HashSet<string> _faultySensors = new();
+    private readonly ConcurrentDictionary<string, byte> _faultySensors = new();
 
     /// <summary>
     /// Fuses sensor readings using majority voting.
@@ -65,7 +66,7 @@ public sealed class VotingFusion
     /// <returns>Array of faulty sensor IDs.</returns>
     public string[] GetFaultySensors()
     {
-        return _faultySensors.ToArray();
+        return _faultySensors.Keys.ToArray();
     }
 
     /// <summary>
@@ -77,56 +78,58 @@ public sealed class VotingFusion
         _faultySensors.Clear();
     }
 
+    // P2-3420: track a running average per group to avoid O(N) recompute per (reading,group) pair in IsSimilar.
     private List<List<SensorReading>> GroupSimilarReadings(
         SensorReading[] readings,
         int valueDim,
         double tolerancePercent)
     {
         var groups = new List<List<SensorReading>>();
+        var groupAverages = new List<double[]>(); // running average per group
 
         foreach (var reading in readings)
         {
-            // Find a group that this reading belongs to
-            List<SensorReading>? matchingGroup = null;
+            int matchingIndex = -1;
 
-            foreach (var group in groups)
+            for (int g = 0; g < groups.Count; g++)
             {
-                // Check if reading is similar to group average
-                if (IsSimilar(reading, group, valueDim, tolerancePercent))
+                if (IsSimilarToAverage(reading, groupAverages[g], valueDim, tolerancePercent))
                 {
-                    matchingGroup = group;
+                    matchingIndex = g;
                     break;
                 }
             }
 
-            if (matchingGroup != null)
+            if (matchingIndex >= 0)
             {
-                matchingGroup.Add(reading);
+                var group = groups[matchingIndex];
+                group.Add(reading);
+                // Update running average: newAvg = (oldAvg * (n-1) + newValue) / n
+                int n = group.Count;
+                var avg = groupAverages[matchingIndex];
+                for (int dim = 0; dim < valueDim; dim++)
+                    avg[dim] = (avg[dim] * (n - 1) + reading.Value[dim]) / n;
             }
             else
             {
-                // Create new group
                 groups.Add(new List<SensorReading> { reading });
+                var initAvg = new double[valueDim];
+                for (int dim = 0; dim < valueDim; dim++)
+                    initAvg[dim] = reading.Value[dim];
+                groupAverages.Add(initAvg);
             }
         }
 
         return groups;
     }
 
-    private bool IsSimilar(
+    private static bool IsSimilarToAverage(
         SensorReading reading,
-        List<SensorReading> group,
+        double[] groupAverage,
         int valueDim,
         double tolerancePercent)
     {
-        // Compute group average
-        var groupAverage = new double[valueDim];
-        for (int dim = 0; dim < valueDim; dim++)
-        {
-            groupAverage[dim] = group.Average(r => r.Value[dim]);
-        }
-
-        // Check if reading is within tolerance of group average
+        // Check if reading is within tolerance of pre-computed group average
         for (int dim = 0; dim < valueDim; dim++)
         {
             double reference = Math.Abs(groupAverage[dim]);
@@ -159,7 +162,7 @@ public sealed class VotingFusion
                 // Mark as faulty if it has disagreed 3+ times
                 if (newCount >= 3)
                 {
-                    _faultySensors.Add(reading.SensorId);
+                    _faultySensors.TryAdd(reading.SensorId, 0);
                 }
             }
             else
@@ -173,7 +176,7 @@ public sealed class VotingFusion
                 // Remove from faulty set if count drops to 0
                 if (_faultCounts.TryGetValue(reading.SensorId, out int count) && count == 0)
                 {
-                    _faultySensors.Remove(reading.SensorId);
+                    _faultySensors.TryRemove(reading.SensorId, out _);
                 }
             }
         }

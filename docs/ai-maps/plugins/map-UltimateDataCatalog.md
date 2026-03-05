@@ -5,46 +5,6 @@
 
 ## Project: DataWarehouse.Plugins.UltimateDataCatalog
 
-### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/DataCatalogStrategy.cs
-```csharp
-public sealed record DataCatalogCapabilities
-{
-}
-    public required bool SupportsAsync { get; init; }
-    public required bool SupportsBatch { get; init; }
-    public required bool SupportsRealTime { get; init; }
-    public required bool SupportsFederation { get; init; }
-    public required bool SupportsVersioning { get; init; }
-    public required bool SupportsMultiTenancy { get; init; }
-    public long MaxEntries { get; init; }
-}
-```
-```csharp
-public interface IDataCatalogStrategy
-{
-}
-    string StrategyId { get; }
-    string DisplayName { get; }
-    DataCatalogCategory Category { get; }
-    DataCatalogCapabilities Capabilities { get; }
-    string SemanticDescription { get; }
-    string[] Tags { get; }
-}
-```
-```csharp
-public abstract class DataCatalogStrategyBase : StrategyBase, IDataCatalogStrategy
-{
-}
-    public abstract override string StrategyId { get; }
-    public abstract string DisplayName { get; }
-    public override string Name;;
-    public abstract DataCatalogCategory Category { get; }
-    public abstract DataCatalogCapabilities Capabilities { get; }
-    public abstract string SemanticDescription { get; }
-    public abstract string[] Tags { get; }
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/UltimateDataCatalogPlugin.cs
 ```csharp
 public sealed class UltimateDataCatalogPlugin : DataManagementPluginBase, IDisposable
@@ -143,6 +103,46 @@ public sealed record BusinessTerm
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/DataCatalogStrategy.cs
+```csharp
+public sealed record DataCatalogCapabilities
+{
+}
+    public required bool SupportsAsync { get; init; }
+    public required bool SupportsBatch { get; init; }
+    public required bool SupportsRealTime { get; init; }
+    public required bool SupportsFederation { get; init; }
+    public required bool SupportsVersioning { get; init; }
+    public required bool SupportsMultiTenancy { get; init; }
+    public long MaxEntries { get; init; }
+}
+```
+```csharp
+public interface IDataCatalogStrategy
+{
+}
+    string StrategyId { get; }
+    string DisplayName { get; }
+    DataCatalogCategory Category { get; }
+    DataCatalogCapabilities Capabilities { get; }
+    string SemanticDescription { get; }
+    string[] Tags { get; }
+}
+```
+```csharp
+public abstract class DataCatalogStrategyBase : StrategyBase, IDataCatalogStrategy
+{
+}
+    public abstract override string StrategyId { get; }
+    public abstract string DisplayName { get; }
+    public override string Name;;
+    public abstract DataCatalogCategory Category { get; }
+    public abstract DataCatalogCapabilities Capabilities { get; }
+    public abstract string SemanticDescription { get; }
+    public abstract string[] Tags { get; }
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/Scaling/CatalogScalingManager.cs
 ```csharp
 [SdkCompatibility("6.0.0", Notes = "Phase 88-08: Paginated result for catalog and lineage queries")]
@@ -207,359 +207,6 @@ public sealed class CatalogScalingManager : IScalableSubsystem, IDisposable
     }
 }
     public void Dispose();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/Strategies/AccessControl/AccessControlStrategies.cs
-```csharp
-public sealed class RoleBasedAccessControlStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class AttributeBasedAccessControlStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class DataAccessPolicySyncStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class AccessRequestWorkflowStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class DataMaskingIntegrationStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class RowLevelSecurityStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class SsoIntegrationStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class AccessAuditTrailStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class DataPrivacyComplianceStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class TemporaryAccessGrantStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/Strategies/AssetDiscovery/AssetDiscoveryStrategies.cs
-```csharp
-public sealed class AutomatedCrawlerStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class DatabaseSchemaScannerStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class FileSystemScannerStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class CloudStorageScannerStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class ApiEndpointDiscoveryStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class StreamingSourceDiscoveryStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class DataLakeDiscoveryStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class MlModelRegistryDiscoveryStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class FeatureStoreDiscoveryStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class IncrementalChangeDetectionStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/Strategies/AssetDiscovery/DarkDataDiscoveryStrategies.cs
-```csharp
-public sealed record DarkDataScanConfig(int MaxObjectsPerScan = 10000, int StaleDaysThreshold = 180, bool SkipAlreadyScored = true, string[]? IncludeStorageTiers = null, string[]? ExcludePatterns = null)
-{
-}
-    public string[] EffectiveExcludePatterns;;
-}
-```
-```csharp
-public sealed class UntaggedObjectScanStrategy : ConsciousnessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ConsciousnessCategory Category;;
-    public override ConsciousnessCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<List<DarkDataCandidate>> ScanAsync(IReadOnlyList<(string objectId, Dictionary<string, object> metadata)> objects, DarkDataScanConfig config, string scanScope = "default", CancellationToken ct = default);
-    public DateTime GetWatermark(string scanScope = "default");
-}
-```
-```csharp
-public sealed class OrphanedDataScanStrategy : ConsciousnessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ConsciousnessCategory Category;;
-    public override ConsciousnessCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<List<DarkDataCandidate>> ScanAsync(IReadOnlyList<(string objectId, Dictionary<string, object> metadata)> objects, IReadOnlySet<string> activePrincipalIds, IReadOnlySet<string> existingObjectIds, DarkDataScanConfig config, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class ShadowDataScanStrategy : ConsciousnessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ConsciousnessCategory Category;;
-    public override ConsciousnessCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public Task<List<DarkDataCandidate>> ScanAsync(IReadOnlyList<(string objectId, Dictionary<string, object> metadata)> objects, IReadOnlySet<string> registeredLocations, DarkDataScanConfig config, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class DarkDataDiscoveryOrchestrator : ConsciousnessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ConsciousnessCategory Category;;
-    public override ConsciousnessCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public UntaggedObjectScanStrategy UntaggedScanner;;
-    public OrphanedDataScanStrategy OrphanedScanner;;
-    public ShadowDataScanStrategy ShadowScanner;;
-    public IReadOnlyDictionary<DateTime, DarkDataScanResult> ScanHistory;;
-    public async Task<DarkDataScanResult> RunDiscoveryAsync(IReadOnlyList<(string objectId, Dictionary<string, object> metadata)> objects, IReadOnlySet<string> activePrincipalIds, IReadOnlySet<string> existingObjectIds, IReadOnlySet<string> registeredLocations, IConsciousnessScorer scorer, DarkDataScanConfig config, CancellationToken ct = default);
-    public async Task<DarkDataScanResult> RunIncrementalAsync(IReadOnlyList<(string objectId, Dictionary<string, object> metadata)> objects, IReadOnlySet<string> activePrincipalIds, IReadOnlySet<string> existingObjectIds, IReadOnlySet<string> registeredLocations, IConsciousnessScorer scorer, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/Strategies/AssetDiscovery/RetroactiveScoringStrategies.cs
-```csharp
-public sealed class RetroactiveBatchScoringStrategy : ConsciousnessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ConsciousnessCategory Category;;
-    public override ConsciousnessCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public async Task<RescoringResult> ScoreBatchAsync(IReadOnlyList<(string objectId, byte[] data, Dictionary<string, object> metadata)> objects, IConsciousnessScorer scorer, CancellationToken ct = default, Action<int, int>? progressCallback = null);
-}
-```
-```csharp
-public sealed class IncrementalRescoringStrategy : ConsciousnessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ConsciousnessCategory Category;;
-    public override ConsciousnessCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public async Task<RescoringResult> RescoreChangedAsync(IReadOnlyList<(string objectId, Dictionary<string, object> currentMetadata, Dictionary<string, object> previousMetadata)> objects, IConsciousnessScorer scorer, RescoringConfig? config = null, CancellationToken ct = default);
-}
-```
-```csharp
-public sealed class ScoreDecayRecalculationStrategy : ConsciousnessStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override ConsciousnessCategory Category;;
-    public override ConsciousnessCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-    public IReadOnlyCollection<(string ObjectId, ConsciousnessGrade OldGrade, ConsciousnessGrade NewGrade, DateTime DecayedAt)> GradeBoundaryEvents;;
-    public async Task<RescoringResult> RecalculateDecayAsync(IReadOnlyList<ConsciousnessScore> existingScores, IConsciousnessScorer scorer, RescoringConfig? config = null, CancellationToken ct = default);
 }
 ```
 
@@ -796,6 +443,128 @@ public sealed class CatalogMobileAppStrategy : DataCatalogStrategyBase
 ```
 ```csharp
 public sealed class EmbeddedWidgetStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/Strategies/SearchDiscovery/SearchDiscoveryStrategies.cs
+```csharp
+public sealed class FullTextSearchStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class SemanticSearchStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class FacetedSearchStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class ColumnSearchStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class TagBasedDiscoveryStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class SimilarityBasedDiscoveryStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class RecommendationEngineStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class LineageBasedDiscoveryStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class NaturalLanguageQueryStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class SavedSearchStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1147,6 +916,237 @@ public sealed class UsageProfile
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/Strategies/AssetDiscovery/AssetDiscoveryStrategies.cs
+```csharp
+public sealed class AutomatedCrawlerStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class DatabaseSchemaScannerStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class FileSystemScannerStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class CloudStorageScannerStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class ApiEndpointDiscoveryStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class StreamingSourceDiscoveryStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class DataLakeDiscoveryStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class MlModelRegistryDiscoveryStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class FeatureStoreDiscoveryStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class IncrementalChangeDetectionStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/Strategies/AssetDiscovery/RetroactiveScoringStrategies.cs
+```csharp
+public sealed class RetroactiveBatchScoringStrategy : ConsciousnessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ConsciousnessCategory Category;;
+    public override ConsciousnessCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public async Task<RescoringResult> ScoreBatchAsync(IReadOnlyList<(string objectId, byte[] data, Dictionary<string, object> metadata)> objects, IConsciousnessScorer scorer, CancellationToken ct = default, Action<int, int>? progressCallback = null);
+}
+```
+```csharp
+public sealed class IncrementalRescoringStrategy : ConsciousnessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ConsciousnessCategory Category;;
+    public override ConsciousnessCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public async Task<RescoringResult> RescoreChangedAsync(IReadOnlyList<(string objectId, Dictionary<string, object> currentMetadata, Dictionary<string, object> previousMetadata)> objects, IConsciousnessScorer scorer, RescoringConfig? config = null, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class ScoreDecayRecalculationStrategy : ConsciousnessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ConsciousnessCategory Category;;
+    public override ConsciousnessCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public IReadOnlyCollection<(string ObjectId, ConsciousnessGrade OldGrade, ConsciousnessGrade NewGrade, DateTime DecayedAt)> GradeBoundaryEvents;;
+    public async Task<RescoringResult> RecalculateDecayAsync(IReadOnlyList<ConsciousnessScore> existingScores, IConsciousnessScorer scorer, RescoringConfig? config = null, CancellationToken ct = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/Strategies/AssetDiscovery/DarkDataDiscoveryStrategies.cs
+```csharp
+public sealed record DarkDataScanConfig(int MaxObjectsPerScan = 10000, int StaleDaysThreshold = 180, bool SkipAlreadyScored = true, string[]? IncludeStorageTiers = null, string[]? ExcludePatterns = null)
+{
+}
+    public string[] EffectiveExcludePatterns;;
+}
+```
+```csharp
+public sealed class UntaggedObjectScanStrategy : ConsciousnessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ConsciousnessCategory Category;;
+    public override ConsciousnessCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<List<DarkDataCandidate>> ScanAsync(IReadOnlyList<(string objectId, Dictionary<string, object> metadata)> objects, DarkDataScanConfig config, string scanScope = "default", CancellationToken ct = default);
+    public DateTime GetWatermark(string scanScope = "default");
+}
+```
+```csharp
+public sealed class OrphanedDataScanStrategy : ConsciousnessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ConsciousnessCategory Category;;
+    public override ConsciousnessCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<List<DarkDataCandidate>> ScanAsync(IReadOnlyList<(string objectId, Dictionary<string, object> metadata)> objects, IReadOnlySet<string> activePrincipalIds, IReadOnlySet<string> existingObjectIds, DarkDataScanConfig config, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class ShadowDataScanStrategy : ConsciousnessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ConsciousnessCategory Category;;
+    public override ConsciousnessCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public Task<List<DarkDataCandidate>> ScanAsync(IReadOnlyList<(string objectId, Dictionary<string, object> metadata)> objects, IReadOnlySet<string> registeredLocations, DarkDataScanConfig config, CancellationToken ct = default);
+}
+```
+```csharp
+public sealed class DarkDataDiscoveryOrchestrator : ConsciousnessStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override ConsciousnessCategory Category;;
+    public override ConsciousnessCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+    public UntaggedObjectScanStrategy UntaggedScanner;;
+    public OrphanedDataScanStrategy OrphanedScanner;;
+    public ShadowDataScanStrategy ShadowScanner;;
+    public IReadOnlyDictionary<DateTime, DarkDataScanResult> ScanHistory;;
+    public async Task<DarkDataScanResult> RunDiscoveryAsync(IReadOnlyList<(string objectId, Dictionary<string, object> metadata)> objects, IReadOnlySet<string> activePrincipalIds, IReadOnlySet<string> existingObjectIds, IReadOnlySet<string> registeredLocations, IConsciousnessScorer scorer, DarkDataScanConfig config, CancellationToken ct = default);
+    public async Task<DarkDataScanResult> RunIncrementalAsync(IReadOnlyList<(string objectId, Dictionary<string, object> metadata)> objects, IReadOnlySet<string> activePrincipalIds, IReadOnlySet<string> existingObjectIds, IReadOnlySet<string> registeredLocations, IConsciousnessScorer scorer, CancellationToken ct = default);
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/Strategies/Marketplace/MarketplaceStrategies.cs
 ```csharp
 public sealed class DataMarketplaceStrategy : DataCatalogStrategyBase
@@ -1162,6 +1162,128 @@ public sealed class DataMarketplaceStrategy : DataCatalogStrategyBase
 ```
 ```csharp
 public sealed class DataListingStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/Strategies/AccessControl/AccessControlStrategies.cs
+```csharp
+public sealed class RoleBasedAccessControlStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class AttributeBasedAccessControlStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class DataAccessPolicySyncStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class AccessRequestWorkflowStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class DataMaskingIntegrationStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class RowLevelSecurityStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class SsoIntegrationStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class AccessAuditTrailStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class DataPrivacyComplianceStrategy : DataCatalogStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string DisplayName;;
+    public override DataCatalogCategory Category;;
+    public override DataCatalogCapabilities Capabilities;;
+    public override string SemanticDescription;;
+    public override string[] Tags;;
+}
+```
+```csharp
+public sealed class TemporaryAccessGrantStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1284,128 +1406,6 @@ public sealed class CrossPlatformSchemaTranslatorStrategy : DataCatalogStrategyB
 ```
 ```csharp
 public sealed class SchemaGovernancePolicyStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/Strategies/SearchDiscovery/SearchDiscoveryStrategies.cs
-```csharp
-public sealed class FullTextSearchStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class SemanticSearchStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class FacetedSearchStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class ColumnSearchStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class TagBasedDiscoveryStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class SimilarityBasedDiscoveryStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class RecommendationEngineStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class LineageBasedDiscoveryStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class NaturalLanguageQueryStrategy : DataCatalogStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string DisplayName;;
-    public override DataCatalogCategory Category;;
-    public override DataCatalogCapabilities Capabilities;;
-    public override string SemanticDescription;;
-    public override string[] Tags;;
-}
-```
-```csharp
-public sealed class SavedSearchStrategy : DataCatalogStrategyBase
 {
 }
     public override string StrategyId;;

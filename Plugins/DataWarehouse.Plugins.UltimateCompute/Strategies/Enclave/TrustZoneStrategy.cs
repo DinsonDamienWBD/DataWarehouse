@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using DataWarehouse.SDK.Contracts.Compute;
 
 namespace DataWarehouse.Plugins.UltimateCompute.Strategies.Enclave;
@@ -9,6 +10,13 @@ namespace DataWarehouse.Plugins.UltimateCompute.Strategies.Enclave;
 /// </summary>
 internal sealed class TrustZoneStrategy : ComputeRuntimeStrategyBase
 {
+    // Validate TA UUID to RFC 4122 format — prevents path traversal and command injection.
+    private static readonly Regex UuidRegex = new(
+        @"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+        RegexOptions.Compiled);
+    // Validate entrypoint — only simple alphanumeric function names.
+    private static readonly Regex SafeEntryPointRegex = new(@"^[a-zA-Z_][a-zA-Z0-9_]*$", RegexOptions.Compiled);
+
     /// <inheritdoc/>
     public override string StrategyId => "compute.enclave.trustzone";
     /// <inheritdoc/>
@@ -42,10 +50,12 @@ internal sealed class TrustZoneStrategy : ComputeRuntimeStrategyBase
             {
                 await File.WriteAllBytesAsync(taPath, task.Code.ToArray(), cancellationToken);
 
-                // Extract UUID from metadata or generate
+                // Extract UUID from metadata or generate — validate RFC 4122 format.
                 var taUuid = task.Metadata?.TryGetValue("ta_uuid", out var u) == true && u is string us
                     ? us
                     : Guid.NewGuid().ToString();
+                if (!UuidRegex.IsMatch(taUuid))
+                    throw new ArgumentException($"TA UUID '{taUuid}' is not a valid RFC 4122 UUID.");
 
                 // Copy TA to the standard OP-TEE directory
                 var taDir = "/lib/optee_armtz";
@@ -56,7 +66,12 @@ internal sealed class TrustZoneStrategy : ComputeRuntimeStrategyBase
                 args.Append($"invoke {taUuid} ");
 
                 if (task.EntryPoint != null)
+                {
+                    // Validate entrypoint to prevent command injection.
+                    if (!SafeEntryPointRegex.IsMatch(task.EntryPoint))
+                        throw new ArgumentException($"EntryPoint '{task.EntryPoint}' contains invalid characters.");
                     args.Append($"--cmd {task.EntryPoint} ");
+                }
 
                 // Pass input data as hex for secure world communication
                 if (task.InputData.Length > 0)

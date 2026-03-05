@@ -49,11 +49,13 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
                 throw new ArgumentException("SSE endpoint URL is required in ConnectionString");
 
             var client = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+            client.DefaultRequestHeaders.Remove("Accept");
             client.DefaultRequestHeaders.Add("Accept", "text/event-stream");
+            client.DefaultRequestHeaders.Remove("Cache-Control");
             client.DefaultRequestHeaders.Add("Cache-Control", "no-cache");
 
             var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
-            var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+            using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
             response.EnsureSuccessStatusCode();
 
             var contentType = response.Content.Headers.ContentType?.MediaType;

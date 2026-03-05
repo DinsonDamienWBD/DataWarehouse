@@ -52,7 +52,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         private ushort _targetSessionId = 0;
         private uint _commandSequenceNumber = 0;
         private uint _expectedStatusSequenceNumber = 0;
-        private bool _isLoggedIn = false;
+        private volatile bool _isLoggedIn = false;
         private ushort _connectionId = 0;
 
         // Block storage configuration
@@ -795,11 +795,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                             _blockMappings[kvp.Key] = kvp.Value;
                         }
 
-                        // Update next block address
-                        if (_blockMappings.Any())
-                        {
-                            _nextBlockAddress = _blockMappings.Values.Max(m => m.StartLBA + m.BlockCount);
-                        }
+                        // Update next block address — use DefaultIfEmpty to guard against
+                        // empty deserialization result (InvalidOperationException from Max on empty).
+                        _nextBlockAddress = _blockMappings.Values.Count > 0
+                            ? _blockMappings.Values.Max(m => m.StartLBA + m.BlockCount)
+                            : 0;
                     }
                 }
             }

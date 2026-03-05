@@ -52,6 +52,19 @@ public interface IFederationOrchestrator : IDisposable
     Task RegisterNodeAsync(NodeRegistration registration, CancellationToken ct = default);
 
     /// <summary>
+    /// Registers a new node in the cluster, optionally bypassing the topology rate-limit guard.
+    /// Use with caution: skipping the rate limit should only be done for initial cluster bootstrap
+    /// or operator-initiated batch registration.
+    /// </summary>
+    /// <param name="registration">The node registration metadata.</param>
+    /// <param name="skipTopologyRateLimit">
+    /// When <c>true</c>, the per-node topology rate-limit cool-down is skipped.
+    /// Intended for bootstrap or administrative use only.
+    /// </param>
+    /// <param name="ct">Cancellation token.</param>
+    Task RegisterNodeAsync(NodeRegistration registration, bool skipTopologyRateLimit, CancellationToken ct = default);
+
+    /// <summary>
     /// Unregisters a node from the cluster.
     /// </summary>
     /// <param name="nodeId">The unique identifier of the node to unregister.</param>

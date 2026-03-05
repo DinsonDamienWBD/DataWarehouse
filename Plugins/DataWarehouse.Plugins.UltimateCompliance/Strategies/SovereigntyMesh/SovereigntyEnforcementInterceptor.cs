@@ -85,9 +85,12 @@ public sealed class SovereigntyEnforcementInterceptor : ComplianceStrategyBase
         IReadOnlyDictionary<string, object> context,
         CancellationToken ct = default)
     {
+        // P2-1533: Validate required parameters to prevent NRE inside EvaluateAndTranslateAsync.
+        ArgumentException.ThrowIfNullOrEmpty(objectId);
+        ArgumentException.ThrowIfNullOrEmpty(destinationLocation);
         ct.ThrowIfCancellationRequested();
         Interlocked.Increment(ref _interceptionsTotal);
-        IncrementCounter("enforcement_interceptor.write");
+            IncrementCounter("enforcement_interceptor.write");
 
         var sourceLocation = ResolveString(context, "SourceLocation") ?? DefaultHomeJurisdiction;
 
@@ -120,9 +123,12 @@ public sealed class SovereigntyEnforcementInterceptor : ComplianceStrategyBase
         IReadOnlyDictionary<string, object> context,
         CancellationToken ct = default)
     {
+        // P2-1534: Validate required parameters to prevent NRE inside EvaluateAndTranslateAsync.
+        ArgumentException.ThrowIfNullOrEmpty(objectId);
+        ArgumentException.ThrowIfNullOrEmpty(requestorLocation);
         ct.ThrowIfCancellationRequested();
         Interlocked.Increment(ref _interceptionsTotal);
-        IncrementCounter("enforcement_interceptor.read");
+            IncrementCounter("enforcement_interceptor.read");
 
         var dataLocation = ResolveString(context, "DataLocation");
 
@@ -165,7 +171,7 @@ public sealed class SovereigntyEnforcementInterceptor : ComplianceStrategyBase
     protected override async Task<ComplianceResult> CheckComplianceCoreAsync(
         ComplianceContext context, CancellationToken cancellationToken)
     {
-        IncrementCounter("enforcement_interceptor.check");
+            IncrementCounter("enforcement_interceptor.check");
 
         var violations = new List<ComplianceViolation>();
         var recommendations = new List<string>();
@@ -237,14 +243,17 @@ public sealed class SovereigntyEnforcementInterceptor : ComplianceStrategyBase
             });
         }
 
-        var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+        var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+
+
+        var isCompliant = !hasHighViolations;
 
         return new ComplianceResult
         {
             IsCompliant = isCompliant,
             Framework = Framework,
             Status = violations.Count == 0 ? ComplianceStatus.Compliant
-                : violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant
+                : hasHighViolations ? ComplianceStatus.NonCompliant
                 : ComplianceStatus.PartiallyCompliant,
             Violations = violations,
             Recommendations = recommendations,
@@ -259,14 +268,14 @@ public sealed class SovereigntyEnforcementInterceptor : ComplianceStrategyBase
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("enforcement_interceptor.initialized");
+            IncrementCounter("enforcement_interceptor.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("enforcement_interceptor.shutdown");
+            IncrementCounter("enforcement_interceptor.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 

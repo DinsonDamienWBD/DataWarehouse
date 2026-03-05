@@ -82,7 +82,8 @@ internal sealed class ProcessingJobScheduler : IDisposable
             Query = query,
             Priority = priority,
             ScheduledAt = DateTimeOffset.UtcNow,
-            Completion = tcs
+            Completion = tcs,
+            Cts = cts
         };
 
         _cancellations.TryAdd(jobId, cts);
@@ -157,8 +158,10 @@ internal sealed class ProcessingJobScheduler : IDisposable
                 {
                     _activeJobs.TryAdd(job.JobId, job);
 
-                    var cts = _cancellations.GetValueOrDefault(job.JobId);
-                    var token = cts?.Token ?? CancellationToken.None;
+                    // Use CTS stored on the job — avoids the TryAdd/GetValueOrDefault race where
+                    // Cancel() may have already removed the entry from _cancellations by the time
+                    // we look it up here.
+                    var token = job.Cts.Token;
 
                     var result = await job.Strategy.ProcessAsync(job.Query, token);
                     job.Completion.TrySetResult(result);
@@ -186,11 +189,16 @@ internal sealed class ProcessingJobScheduler : IDisposable
 
     /// <summary>
     /// Disposes scheduler resources including the concurrency semaphore.
+    /// Cancels all active and queued jobs and completes their TaskCompletionSources
+    /// so that any awaiter of <see cref="ScheduleAsync"/> is unblocked with
+    /// <see cref="OperationCanceledException"/> rather than hanging indefinitely.
     /// </summary>
     public void Dispose()
     {
         if (_disposed) return;
+        _disposed = true;
 
+        // Cancel all active jobs' CTSes first.
         foreach (var cts in _cancellations.Values)
         {
             try { cts.Cancel(); cts.Dispose(); }
@@ -198,8 +206,25 @@ internal sealed class ProcessingJobScheduler : IDisposable
         }
         _cancellations.Clear();
 
+        // Drain any queued (not yet started) jobs and cancel their TCSes.
+        // Without this, callers awaiting tcs.Task hang indefinitely after Dispose.
+        lock (_queueLock)
+        {
+            while (_queue.TryDequeue(out var pendingJob, out _))
+            {
+                pendingJob.Completion.TrySetCanceled();
+                try { pendingJob.Cts.Cancel(); pendingJob.Cts.Dispose(); } catch { }
+            }
+        }
+
+        // Cancel TCSes of active jobs (their tasks will be set by DrainQueueAsync catch(OperationCanceledException)).
+        // Belt-and-suspenders: also set TCSes directly so they unblock even if DrainQueue already finished.
+        foreach (var activeJob in _activeJobs.Values)
+        {
+            activeJob.Completion.TrySetCanceled();
+        }
+
         _concurrencyGate.Dispose();
-        _disposed = true;
     }
 
     /// <summary>
@@ -224,5 +249,8 @@ internal sealed class ProcessingJobScheduler : IDisposable
 
         /// <summary>Gets or sets the task completion source for the result.</summary>
         public required TaskCompletionSource<ProcessingResult> Completion { get; init; }
+
+        /// <summary>Gets or sets the CancellationTokenSource owned by this job. Stored here so DrainQueueAsync can read it atomically without re-querying the shared dictionary after Cancel() may have already removed it.</summary>
+        public required CancellationTokenSource Cts { get; init; }
     }
 }

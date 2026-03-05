@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace DataWarehouse.SDK.Hardware.Hypervisor;
 
@@ -57,7 +58,7 @@ namespace DataWarehouse.SDK.Hardware.Hypervisor;
 [SdkCompatibility("3.0.0", Notes = "Phase 35: Hypervisor detection (HW-05)")]
 public sealed class HypervisorDetector : IHypervisorDetector
 {
-    private HypervisorInfo? _cachedResult;
+    private volatile HypervisorInfo? _cachedResult;
     private readonly object _lock = new();
 
     /// <summary>
@@ -189,13 +190,30 @@ public sealed class HypervisorDetector : IHypervisorDetector
     /// </remarks>
     private static string GetCpuidHypervisorSignature()
     {
-        // Actual CPUID implementation requires System.Runtime.Intrinsics.X86
-        // For Phase 35: SIMPLIFIED — use placeholder
-        // Production: use System.Runtime.Intrinsics.X86.X86Base.CpuId(0x40000000, 0)
-        // to read hypervisor signature from EBX, ECX, EDX
+        try
+        {
+            if (!System.Runtime.Intrinsics.X86.X86Base.IsSupported)
+                return string.Empty;
 
-        // Placeholder: return empty string (falls back to platform-specific detection)
-        return string.Empty;
+            // Check hypervisor presence bit: CPUID leaf 1, ECX bit 31
+            var leaf1 = System.Runtime.Intrinsics.X86.X86Base.CpuId(1, 0);
+            bool hypervisorPresent = (leaf1.Ecx & (1u << 31)) != 0;
+            if (!hypervisorPresent)
+                return string.Empty;
+
+            // Query CPUID leaf 0x40000000 for hypervisor vendor signature (EBX, ECX, EDX = 12 ASCII chars)
+            var leaf40 = System.Runtime.Intrinsics.X86.X86Base.CpuId(unchecked((int)0x40000000), 0);
+            byte[] sig = new byte[12];
+            BitConverter.GetBytes(leaf40.Ebx).CopyTo(sig, 0);
+            BitConverter.GetBytes(leaf40.Ecx).CopyTo(sig, 4);
+            BitConverter.GetBytes(leaf40.Edx).CopyTo(sig, 8);
+            return Encoding.ASCII.GetString(sig).TrimEnd('\0');
+        }
+        catch
+        {
+            // CPUID not available or failed — fall back to platform-specific detection
+            return string.Empty;
+        }
     }
 
     /// <summary>

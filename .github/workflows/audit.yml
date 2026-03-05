@@ -1,0 +1,319 @@
+name: DW Military-Grade Audit
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+# Cancel in-progress runs for the same branch/PR to save runner minutes
+concurrency:
+  group: audit-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  CONFIGURATION: Release
+
+jobs:
+  # ──────────────────────────────────────────────────────────────
+  # Stage 1: Build + Unit Tests (fast gate — blocks everything)
+  # ──────────────────────────────────────────────────────────────
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore Dependencies
+      run: dotnet restore
+
+    - name: Build Solution (Release)
+      run: dotnet build -c ${{ env.CONFIGURATION }} --no-restore /p:TreatWarningsAsErrors=true
+
+    - name: Run All Tests
+      run: dotnet test -c ${{ env.CONFIGURATION }} --no-build --logger "trx;LogFileName=test-results.trx" --results-directory ./test-results
+
+    - name: Upload Test Results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results
+        path: ./test-results/*.trx
+        retention-days: 30
+
+    - name: Upload Build Output
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-output
+        path: |
+          **/bin/Release/
+          !**/obj/
+        retention-days: 1
+
+  # ──────────────────────────────────────────────────────────────
+  # Stage 2a: Coyote Concurrency Testing (1000 iterations)
+  # ──────────────────────────────────────────────────────────────
+  coyote-concurrency:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Install Coyote CLI
+      run: dotnet tool install -g Microsoft.Coyote.CLI
+
+    - name: Restore and Build
+      run: dotnet build -c ${{ env.CONFIGURATION }} DataWarehouse.Hardening.Tests/
+
+    - name: Run Coyote (1000 iterations)
+      run: |
+        coyote test ./DataWarehouse.Hardening.Tests/bin/Release/net10.0/DataWarehouse.Hardening.Tests.dll \
+          --iterations 1000 \
+          --max-steps 10000 \
+          --timeout 3600 \
+          --output ./coyote-results/ \
+          2>&1 | tee coyote-output.log
+
+        # Check for any bugs found
+        if grep -q "found [1-9]" coyote-output.log; then
+          echo "::error::Coyote found concurrency bugs! See output above."
+          exit 1
+        fi
+
+    - name: Upload Coyote Results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: coyote-results
+        path: |
+          ./coyote-results/
+          ./coyote-output.log
+        retention-days: 30
+
+  # ──────────────────────────────────────────────────────────────
+  # Stage 2b: Static Analysis (JetBrains InspectCode + dupFinder)
+  # ──────────────────────────────────────────────────────────────
+  static-analysis:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Install JetBrains CLI Tools
+      run: |
+        dotnet tool install -g JetBrains.ReSharper.GlobalTools
+
+    - name: Run InspectCode
+      run: |
+        jb inspectcode DataWarehouse.slnx \
+          --output=inspectcode-results.xml \
+          --format=Xml \
+          --severity=WARNING \
+          --no-build \
+          2>&1 | tee inspectcode-output.log || true
+
+    - name: Run dupFinder
+      run: |
+        jb dupfinder DataWarehouse.slnx \
+          --output=dupfinder-results.xml \
+          --show-text \
+          --discard-cost=100 \
+          2>&1 | tee dupfinder-output.log || true
+
+    - name: Upload Static Analysis Results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: static-analysis-results
+        path: |
+          inspectcode-results.xml
+          dupfinder-results.xml
+          inspectcode-output.log
+          dupfinder-output.log
+        retention-days: 30
+
+  # ──────────────────────────────────────────────────────────────
+  # Stage 2c: Code Coverage (dotCover via dotnet-coverage)
+  # ──────────────────────────────────────────────────────────────
+  code-coverage:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Install dotCover CLI
+      run: dotnet tool install -g JetBrains.dotCover.CommandLineTools
+
+    - name: Run dotCover Coverage
+      run: |
+        dotnet dotcover test \
+          --dcOutput=coverage-report.html \
+          --dcReportType=HTML \
+          --dcFilters="+:DataWarehouse.*;-:*.Tests;-:*.Benchmarks" \
+          -- -c ${{ env.CONFIGURATION }} \
+          2>&1 | tee dotcover-output.log
+
+    - name: Upload Coverage Report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: |
+          coverage-report.html
+          dotcover-output.log
+        retention-days: 30
+
+  # ──────────────────────────────────────────────────────────────
+  # Stage 3: Stryker Mutation Testing (expensive — runs after all others pass)
+  # ──────────────────────────────────────────────────────────────
+  mutation-testing:
+    needs: [coyote-concurrency, static-analysis, code-coverage]
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Install Stryker
+      run: dotnet tool install -g dotnet-stryker
+
+    - name: Restore and Build
+      run: dotnet build -c ${{ env.CONFIGURATION }}
+
+    - name: Run Stryker Mutation Testing
+      working-directory: ./DataWarehouse.Hardening.Tests
+      run: |
+        dotnet-stryker \
+          --break-at 95 \
+          --reporters "['html', 'json', 'progress']" \
+          --output ../stryker-results/ \
+          2>&1 | tee ../stryker-output.log
+
+    - name: Upload Stryker Results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: stryker-results
+        path: |
+          stryker-results/
+          stryker-output.log
+        retention-days: 30
+
+  # ──────────────────────────────────────────────────────────────
+  # Stage 4: Performance Baseline Check (BenchmarkDotNet)
+  # ──────────────────────────────────────────────────────────────
+  performance-check:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Run BenchmarkDotNet
+      run: |
+        dotnet run -c ${{ env.CONFIGURATION }} --project Benchmarks/ -- \
+          --filter '*' \
+          --exporters json \
+          --artifacts ./benchmark-results/ \
+          2>&1 | tee benchmark-output.log || true
+
+    - name: Check for Gen2 Regressions
+      run: |
+        # Parse benchmark JSON for Gen2 allocations on zero-allocation paths
+        if [ -f benchmark-results/results/*.json ]; then
+          python3 -c "
+        import json, glob, sys
+        for f in glob.glob('benchmark-results/results/*.json'):
+            data = json.load(open(f))
+            for b in data.get('Benchmarks', []):
+                gen2 = b.get('Statistics', {}).get('Gen2Collections', 0)
+                name = b.get('Method', 'unknown')
+                if gen2 > 0 and 'ZeroAlloc' in b.get('Categories', []):
+                    print(f'FAIL: {name} has {gen2} Gen2 collections on zero-alloc path')
+                    sys.exit(1)
+        print('All zero-allocation paths clean.')
+          " || exit 1
+        else
+          echo "::warning::No benchmark results found — skipping Gen2 check"
+        fi
+
+    - name: Upload Benchmark Results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: benchmark-results
+        path: |
+          benchmark-results/
+          benchmark-output.log
+        retention-days: 30
+
+  # ──────────────────────────────────────────────────────────────
+  # Final: Summary Status Check
+  # ──────────────────────────────────────────────────────────────
+  audit-summary:
+    if: always()
+    needs: [build-and-test, coyote-concurrency, static-analysis, code-coverage, mutation-testing, performance-check]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+    - name: Check All Jobs
+      run: |
+        echo "=== DW Military-Grade Audit Summary ==="
+        echo "Build & Test:     ${{ needs.build-and-test.result }}"
+        echo "Coyote:           ${{ needs.coyote-concurrency.result }}"
+        echo "Static Analysis:  ${{ needs.static-analysis.result }}"
+        echo "Code Coverage:    ${{ needs.code-coverage.result }}"
+        echo "Mutation Testing: ${{ needs.mutation-testing.result }}"
+        echo "Performance:      ${{ needs.performance-check.result }}"
+
+        # Fail if any required job failed
+        if [[ "${{ needs.build-and-test.result }}" == "failure" ]] || \
+           [[ "${{ needs.coyote-concurrency.result }}" == "failure" ]] || \
+           [[ "${{ needs.mutation-testing.result }}" == "failure" ]]; then
+          echo "::error::Required audit jobs failed — merge blocked"
+          exit 1
+        fi
+
+        echo "All required gates passed."

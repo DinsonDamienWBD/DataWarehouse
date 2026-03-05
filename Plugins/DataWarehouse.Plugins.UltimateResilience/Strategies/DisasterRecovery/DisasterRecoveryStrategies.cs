@@ -191,20 +191,10 @@ public sealed class GeoReplicationFailoverStrategy : ResilienceStrategyBase
                 _mode = DisasterRecoveryMode.FailedOver;
             }
 
-            await Task.Delay(10, cancellationToken); // Simulate failover work
-
-            return new DisasterRecoveryResult
-            {
-                Success = true,
-                Mode = _mode,
-                Description = $"Failed over to region: {_activeRegionId}",
-                Duration = DateTimeOffset.UtcNow - startTime,
-                Metadata =
-                {
-                    ["previousRegion"] = _regions.FirstOrDefault(r => !r.isHealthy).regionId ?? "unknown",
-                    ["newRegion"] = _activeRegionId ?? "unknown"
-                }
-            };
+            // Actual failover requires configured DR endpoints
+            throw new NotSupportedException(
+                "Configure DR endpoints and credentials. " +
+                $"Failover to region '{_activeRegionId}' requires replication endpoint connectivity and failover orchestration.");
         }
         catch (Exception ex)
         {
@@ -251,15 +241,10 @@ public sealed class GeoReplicationFailoverStrategy : ResilienceStrategyBase
                 _mode = DisasterRecoveryMode.Normal;
             }
 
-            await Task.Delay(10, cancellationToken); // Simulate failback work
-
-            return new DisasterRecoveryResult
-            {
-                Success = true,
-                Mode = _mode,
-                Description = $"Failed back to primary region: {_activeRegionId}",
-                Duration = DateTimeOffset.UtcNow - startTime
-            };
+            // Actual failback requires configured DR endpoints
+            throw new NotSupportedException(
+                "Configure DR endpoints and credentials. " +
+                $"Failback to primary region '{_activeRegionId}' requires replication endpoint connectivity and data resynchronization.");
         }
         catch (Exception ex)
         {
@@ -310,6 +295,8 @@ public sealed class GeoReplicationFailoverStrategy : ResilienceStrategyBase
         }
         catch (Exception ex)
         {
+            IncrementCounter("dr.primary.failure");
+
             bool shouldFailover;
             lock (_lock)
             {
@@ -322,7 +309,7 @@ public sealed class GeoReplicationFailoverStrategy : ResilienceStrategyBase
                 var failoverResult = await FailoverAsync(cancellationToken);
                 if (failoverResult.Success)
                 {
-                    // Retry on new region
+                    // Retry on new region after successful failover
                     try
                     {
                         var retryResult = await operation(cancellationToken);
@@ -339,9 +326,11 @@ public sealed class GeoReplicationFailoverStrategy : ResilienceStrategyBase
                             }
                         };
                     }
-                    catch
+                    catch (Exception retryEx)
                     {
-                        // Failover retry also failed
+                        // Failover retry also failed — log and fall through to failure result below
+                        IncrementCounter("dr.failover.retry.failure");
+                        System.Diagnostics.Debug.WriteLine($"[DR] Failover retry also failed for region '{_activeRegionId}': {retryEx.Message}");
                     }
                 }
             }
@@ -509,21 +498,10 @@ public sealed class PointInTimeRecoveryStrategy : ResilienceStrategyBase
             };
         }
 
-        await Task.Delay(10, cancellationToken); // Simulate restore work
-
-        return new DisasterRecoveryResult
-        {
-            Success = true,
-            Mode = DisasterRecoveryMode.Normal,
-            Description = $"Restored to recovery point: {recoveryPoint.Description}",
-            Duration = DateTimeOffset.UtcNow - startTime,
-            RecoveryPoint = recoveryPoint,
-            Metadata =
-            {
-                ["recoveryPointTimestamp"] = recoveryPoint.Timestamp,
-                ["recoveryPointType"] = recoveryPoint.Type
-            }
-        };
+        // Actual restore requires configured DR endpoints and storage access
+        throw new NotSupportedException(
+            "Configure DR endpoints and credentials. " +
+            $"Restore to recovery point '{recoveryPointId}' requires storage endpoint connectivity and data restoration orchestration.");
     }
 
     /// <summary>
@@ -882,7 +860,9 @@ public sealed class MultiRegionDisasterRecoveryStrategy : ResilienceStrategyBase
                         }
                         catch
                         {
+
                             // Retry also failed
+                            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                         }
                     }
                 }
@@ -1302,7 +1282,9 @@ public sealed class DataCenterFailoverStrategy : ResilienceStrategyBase
                 }
                 catch
                 {
+
                     // Failover retry failed
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
 

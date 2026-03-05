@@ -579,6 +579,8 @@ public sealed class SemanticDataLinkingStrategy : FeatureStrategyBase
     private readonly BoundedDictionary<string, HashSet<string>> _outgoingLinks = new BoundedDictionary<string, HashSet<string>>(1000);
     private readonly BoundedDictionary<string, HashSet<string>> _incomingLinks = new BoundedDictionary<string, HashSet<string>>(1000);
     private readonly BoundedDictionary<string, DataNode> _nodes = new BoundedDictionary<string, DataNode>(1000);
+    // Finding 3235: Inner HashSet<string> values are not thread-safe; guard all mutations.
+    private readonly object _linkSetLock = new();
 
     /// <inheritdoc/>
     public override string StrategyId => "feature-semantic-linking";
@@ -675,11 +677,15 @@ public sealed class SemanticDataLinkingStrategy : FeatureStrategyBase
             };
 
             _links[linkId] = link;
-            _outgoingLinks[sourceId].Add(linkId);
-            _incomingLinks[targetId].Add(linkId);
+            // Finding 3235: Guard inner HashSet mutations with a dedicated lock.
+            lock (_linkSetLock)
+            {
+                if (_outgoingLinks.TryGetValue(sourceId, out var outSet)) outSet.Add(linkId);
+                if (_incomingLinks.TryGetValue(targetId, out var inSet)) inSet.Add(linkId);
+            }
 
             // Create reverse link if bidirectional
-            if (bool.Parse(GetConfig("EnableBidirectional") ?? "true") && IsSymmetricLinkType(linkType))
+            if (GetConfigBool("EnableBidirectional", true) && IsSymmetricLinkType(linkType))
             {
                 var reverseLinkId = $"{targetId}:{linkType}:{sourceId}";
                 if (!_links.ContainsKey(reverseLinkId))
@@ -696,8 +702,11 @@ public sealed class SemanticDataLinkingStrategy : FeatureStrategyBase
                         CreatedAt = link.CreatedAt
                     };
                     _links[reverseLinkId] = reverseLink;
-                    _outgoingLinks[targetId].Add(reverseLinkId);
-                    _incomingLinks[sourceId].Add(reverseLinkId);
+                    lock (_linkSetLock)
+                    {
+                        if (_outgoingLinks.TryGetValue(targetId, out var revOutSet)) revOutSet.Add(reverseLinkId);
+                        if (_incomingLinks.TryGetValue(sourceId, out var revInSet)) revInSet.Add(reverseLinkId);
+                    }
                 }
             }
 
@@ -720,7 +729,7 @@ public sealed class SemanticDataLinkingStrategy : FeatureStrategyBase
                 throw new InvalidOperationException($"Node '{nodeId}' not found");
 
             var suggestions = new List<SemanticLinkSuggestion>();
-            var threshold = float.Parse(GetConfig("MinSimilarityThreshold") ?? "0.7");
+            var threshold = GetConfigFloat("MinSimilarityThreshold", 0.7f);
 
             // Find similar nodes by embedding
             if (sourceNode.Embedding != null && VectorStore != null)
@@ -1077,7 +1086,7 @@ public sealed class DataMeaningPreservationStrategy : FeatureStrategyBase
 
             // Compare fingerprints
             var similarityScore = CompareFingerprintsDetailed(originalFingerprint, transformedFingerprint);
-            var threshold = float.Parse(GetConfig("MeaningThreshold") ?? "0.85");
+            var threshold = GetConfigFloat("MeaningThreshold", 0.85f);
 
             var lostConcepts = originalFingerprint.KeyConcepts
                 .Except(transformedFingerprint.KeyConcepts)
@@ -1159,7 +1168,7 @@ public sealed class DataMeaningPreservationStrategy : FeatureStrategyBase
             var fp2 = await CreateFingerprintAsync("temp2", data2, null, ct);
 
             var similarity = CompareFingerprintsDetailed(fp1, fp2);
-            var threshold = float.Parse(GetConfig("MeaningThreshold") ?? "0.85");
+            var threshold = GetConfigFloat("MeaningThreshold", 0.85f);
 
             return new SemanticEquivalenceResult
             {
@@ -1469,7 +1478,7 @@ public sealed class ContextAwareStorageStrategy : FeatureStrategyBase
             if (_accessHistory.TryGetValue(dataId, out var history))
             {
                 history.Add(accessContext);
-                var maxHistory = int.Parse(GetConfig("MaxContextHistory") ?? "100");
+                var maxHistory = GetConfigInt("MaxContextHistory", 100);
                 while (history.Count > maxHistory)
                     history.RemoveAt(0);
             }
@@ -1663,7 +1672,7 @@ public sealed class ContextAwareStorageStrategy : FeatureStrategyBase
 
         // Temporal relevance (decay)
         var daysSince = (DateTimeOffset.UtcNow - stored.StoredAt).Days;
-        var decayDays = int.Parse(GetConfig("ContextDecayDays") ?? "30");
+        var decayDays = GetConfigInt("ContextDecayDays", 30);
         var temporalScore = Math.Max(0, 1 - (float)daysSince / (decayDays * 3));
         score += 0.2f * temporalScore;
 
@@ -1836,7 +1845,7 @@ public sealed class SemanticDataValidationStrategy : FeatureStrategyBase
             }
 
             // AI-enhanced validation
-            if (bool.Parse(GetConfig("EnableAIValidation") ?? "true") && AIProvider != null)
+            if (GetConfigBool("EnableAIValidation", true) && AIProvider != null)
             {
                 var aiIssues = await ValidateWithAIAsync(content, schema, ct);
                 issues.AddRange(aiIssues);
@@ -1989,8 +1998,8 @@ public sealed class SemanticDataValidationStrategy : FeatureStrategyBase
         return constraint.Type switch
         {
             "regex" => Regex.IsMatch(content, constraint.Expression),
-            "min-length" => content.Length >= int.Parse(constraint.Expression),
-            "max-length" => content.Length <= int.Parse(constraint.Expression),
+            "min-length" => int.TryParse(constraint.Expression, out var minLen) && content.Length >= minLen,
+            "max-length" => int.TryParse(constraint.Expression, out var maxLen) && content.Length <= maxLen,
             "contains" => content.Contains(constraint.Expression, StringComparison.OrdinalIgnoreCase),
             "not-contains" => !content.Contains(constraint.Expression, StringComparison.OrdinalIgnoreCase),
             _ => true
@@ -2004,7 +2013,7 @@ public sealed class SemanticDataValidationStrategy : FeatureStrategyBase
             "regex" => Regex.IsMatch(content, rule.Condition),
             "contains" => content.Contains(rule.Condition, StringComparison.OrdinalIgnoreCase),
             "not-empty" => !string.IsNullOrWhiteSpace(content),
-            "min-words" => content.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length >= int.Parse(rule.Condition),
+            "min-words" => int.TryParse(rule.Condition, out var minWords) && content.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length >= minWords,
             _ => true
         };
     }
@@ -2310,7 +2319,7 @@ public sealed class SemanticInteroperabilityStrategy : FeatureStrategyBase
             // Try to parse as JSON first
             try
             {
-                var jsonDoc = JsonDocument.Parse(content);
+                using var jsonDoc = JsonDocument.Parse(content);
                 var jsonLd = $"{{\n  {context},\n  \"@type\": \"Thing\",\n  {content.Trim().TrimStart('{').TrimEnd('}')}}}";
                 return Task.FromResult(jsonLd);
             }
@@ -2387,7 +2396,7 @@ public sealed class SemanticInteroperabilityStrategy : FeatureStrategyBase
         // Try JSON extraction
         try
         {
-            var jsonDoc = JsonDocument.Parse(content);
+            using var jsonDoc = JsonDocument.Parse(content);
             foreach (var property in jsonDoc.RootElement.EnumerateObject())
             {
                 fields[property.Name] = property.Value.ToString();

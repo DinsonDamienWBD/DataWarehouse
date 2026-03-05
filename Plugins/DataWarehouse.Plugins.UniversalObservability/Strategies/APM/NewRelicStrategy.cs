@@ -34,9 +34,12 @@ public sealed class NewRelicStrategy : ObservabilityStrategyBase
         _accountId = accountId;
         _region = region;
         _serviceName = serviceName;
-        _httpClient.DefaultRequestHeaders.Clear();
-        _httpClient.DefaultRequestHeaders.Add("Api-Key", _licenseKey);
+        // Do NOT set DefaultRequestHeaders — inject per-request to avoid thread-safety issues.
     }
+
+    /// <summary>Adds the New Relic API key to the request headers (per-request, thread-safe).</summary>
+    private void AddApiKey(HttpRequestMessage request) =>
+        request.Headers.Add("Api-Key", _licenseKey);
 
     private string GetEndpoint(string type) => _region.ToUpperInvariant() == "EU"
         ? $"https://{type}-api.eu.newrelic.com"
@@ -62,7 +65,9 @@ public sealed class NewRelicStrategy : ObservabilityStrategyBase
 
         var json = JsonSerializer.Serialize(metricPayload);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{GetEndpoint("metric")}/metric/v1", content, cancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{GetEndpoint("metric")}/metric/v1") { Content = content };
+        AddApiKey(request);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -92,7 +97,9 @@ public sealed class NewRelicStrategy : ObservabilityStrategyBase
 
         var json = JsonSerializer.Serialize(tracePayload);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{GetEndpoint("trace")}/trace/v1", content, cancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{GetEndpoint("trace")}/trace/v1") { Content = content };
+        AddApiKey(request);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -120,7 +127,9 @@ public sealed class NewRelicStrategy : ObservabilityStrategyBase
 
         var json = JsonSerializer.Serialize(logPayload);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{GetEndpoint("log")}/log/v1", content, cancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{GetEndpoint("log")}/log/v1") { Content = content };
+        AddApiKey(request);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -140,24 +149,22 @@ public sealed class NewRelicStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        // Configuration validated via Configure method
+        if (string.IsNullOrWhiteSpace(_licenseKey))
+            throw new InvalidOperationException("NewRelicStrategy: License key is required. Call Configure() before initialization.");
+        if (string.IsNullOrWhiteSpace(_accountId))
+            throw new InvalidOperationException("NewRelicStrategy: Account ID is required. Call Configure() before initialization.");
         IncrementCounter("new_relic.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
+        // HttpClient in-flight requests are abandoned on Dispose; the 100ms added no real grace.
         IncrementCounter("new_relic.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     protected override void Dispose(bool disposing) { if (disposing) _httpClient.Dispose(); base.Dispose(disposing); }

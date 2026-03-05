@@ -73,7 +73,7 @@ public sealed class IstioStrategy : ObservabilityStrategyBase
 
         try
         {
-            var response = await _httpClient.GetAsync($"http://localhost:{_envoyAdminPort}/stats?format=json", ct);
+            using var response = await _httpClient.GetAsync($"http://localhost:{_envoyAdminPort}/stats?format=json", ct);
 
             if (response.IsSuccessStatusCode)
             {
@@ -135,7 +135,9 @@ public sealed class IstioStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // Envoy admin not accessible
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return metrics;
@@ -151,7 +153,7 @@ public sealed class IstioStrategy : ObservabilityStrategyBase
 
         try
         {
-            var response = await _httpClient.GetAsync($"http://localhost:{_envoyAdminPort}/certs", ct);
+            using var response = await _httpClient.GetAsync($"http://localhost:{_envoyAdminPort}/certs", ct);
 
             if (response.IsSuccessStatusCode)
             {
@@ -193,7 +195,9 @@ public sealed class IstioStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // Unable to determine mTLS status
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return status;
@@ -209,7 +213,7 @@ public sealed class IstioStrategy : ObservabilityStrategyBase
 
         try
         {
-            var response = await _httpClient.GetAsync(
+            using var response = await _httpClient.GetAsync(
                 $"{_kialiUrl}/api/namespaces/{_namespace}/services/{_serviceName}/graph?duration=60s", ct);
 
             if (response.IsSuccessStatusCode)
@@ -250,7 +254,9 @@ public sealed class IstioStrategy : ObservabilityStrategyBase
         }
         catch
         {
+
             // Kiali not accessible
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return info;
@@ -285,17 +291,19 @@ public sealed class IstioStrategy : ObservabilityStrategyBase
 
     private static bool IsImportantEnvoyMetric(string name)
     {
-        return name.StartsWith("cluster.") && (
-            name.Contains("upstream_rq") ||
-            name.Contains("upstream_cx") ||
-            name.Contains("health_check") ||
-            name.Contains("outlier_detection") ||
-            name.Contains("circuit_breaker")) ||
-            name.StartsWith("http.") && (
-            name.Contains("downstream_rq") ||
-            name.Contains("downstream_cx")) ||
-            name.StartsWith("server.") ||
-            name.StartsWith("listener.");
+        // P2-4681: Wrap each disjunct in explicit parentheses so operator precedence is unambiguous
+        // and the logic remains correct if conditions are ever reordered.
+        return (name.StartsWith("cluster.") && (
+                    name.Contains("upstream_rq") ||
+                    name.Contains("upstream_cx") ||
+                    name.Contains("health_check") ||
+                    name.Contains("outlier_detection") ||
+                    name.Contains("circuit_breaker")))
+            || (name.StartsWith("http.") && (
+                    name.Contains("downstream_rq") ||
+                    name.Contains("downstream_cx")))
+            || name.StartsWith("server.")
+            || name.StartsWith("listener.");
     }
 
     private static string SanitizeMetricName(string name)
@@ -306,10 +314,14 @@ public sealed class IstioStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
-        IncrementCounter("istio.metrics_sent");
+        // Collect live Envoy sidecar metrics from Istio and merge with caller-supplied metrics
         var envoyMetrics = await CollectEnvoyMetricsAsync(cancellationToken);
-        // Both sets would be forwarded to configured backend
-        await Task.CompletedTask;
+        var combined = metrics.Concat(envoyMetrics).ToList();
+        IncrementCounter("istio.metrics_sent");
+        foreach (var m in combined)
+        {
+            IncrementCounter($"istio.metric.{m.Name.Replace('.', '_')}");
+        }
     }
 
     /// <inheritdoc/>
@@ -365,17 +377,11 @@ public sealed class IstioStrategy : ObservabilityStrategyBase
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("istio.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     protected override void Dispose(bool disposing)

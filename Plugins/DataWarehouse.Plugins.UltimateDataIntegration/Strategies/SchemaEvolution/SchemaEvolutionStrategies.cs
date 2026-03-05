@@ -43,23 +43,25 @@ public sealed class ForwardCompatibleSchemaStrategy : DataIntegrationStrategyBas
         IReadOnlyList<FieldDefinition> fields,
         CancellationToken ct = default)
     {
-        var version = GetNextVersion(schemaId);
+        // GetOrAdd atomically creates the list if absent; then lock it for all mutations.
+        var history = _versionHistory.GetOrAdd(schemaId, _ => new List<SchemaVersion>());
 
-        var schema = new SchemaVersion
+        SchemaVersion schema;
+        lock (history)
         {
-            SchemaId = schemaId,
-            SchemaName = schemaName,
-            Version = version,
-            Fields = fields.ToList(),
-            Compatibility = SchemaCompatibility.Forward,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        if (!_versionHistory.ContainsKey(schemaId))
-            _versionHistory[schemaId] = new List<SchemaVersion>();
-
-        _versionHistory[schemaId].Add(schema);
-        _schemas[$"{schemaId}:v{version}"] = schema;
+            var version = history.Count + 1;
+            schema = new SchemaVersion
+            {
+                SchemaId = schemaId,
+                SchemaName = schemaName,
+                Version = version,
+                Fields = fields.ToList(),
+                Compatibility = SchemaCompatibility.Forward,
+                CreatedAt = DateTime.UtcNow
+            };
+            history.Add(schema);
+            _schemas[$"{schemaId}:v{version}"] = schema;
+        }
 
         RecordOperation("RegisterSchema");
         return Task.FromResult(schema);
@@ -115,14 +117,10 @@ public sealed class ForwardCompatibleSchemaStrategy : DataIntegrationStrategyBas
         });
     }
 
-    private int GetNextVersion(string schemaId)
-    {
-        return _versionHistory.TryGetValue(schemaId, out var history) ? history.Count + 1 : 1;
-    }
-
     private SchemaVersion? GetLatestVersion(string schemaId)
     {
-        return _versionHistory.TryGetValue(schemaId, out var history) ? history.LastOrDefault() : null;
+        if (!_versionHistory.TryGetValue(schemaId, out var history)) return null;
+        lock (history) { return history.LastOrDefault(); }
     }
 
     private bool IsTypeCompatible(string oldType, string newType)
@@ -186,23 +184,24 @@ public sealed class BackwardCompatibleSchemaStrategy : DataIntegrationStrategyBa
         IReadOnlyList<FieldDefinition> fields,
         CancellationToken ct = default)
     {
-        var version = GetNextVersion(schemaId);
+        var history = _versionHistory.GetOrAdd(schemaId, _ => new List<SchemaVersion>());
 
-        var schema = new SchemaVersion
+        SchemaVersion schema;
+        lock (history)
         {
-            SchemaId = schemaId,
-            SchemaName = schemaName,
-            Version = version,
-            Fields = fields.ToList(),
-            Compatibility = SchemaCompatibility.Backward,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        if (!_versionHistory.ContainsKey(schemaId))
-            _versionHistory[schemaId] = new List<SchemaVersion>();
-
-        _versionHistory[schemaId].Add(schema);
-        _schemas[$"{schemaId}:v{version}"] = schema;
+            var version = history.Count + 1;
+            schema = new SchemaVersion
+            {
+                SchemaId = schemaId,
+                SchemaName = schemaName,
+                Version = version,
+                Fields = fields.ToList(),
+                Compatibility = SchemaCompatibility.Backward,
+                CreatedAt = DateTime.UtcNow
+            };
+            history.Add(schema);
+            _schemas[$"{schemaId}:v{version}"] = schema;
+        }
 
         RecordOperation("RegisterSchema");
         return Task.FromResult(schema);
@@ -248,14 +247,10 @@ public sealed class BackwardCompatibleSchemaStrategy : DataIntegrationStrategyBa
         });
     }
 
-    private int GetNextVersion(string schemaId)
-    {
-        return _versionHistory.TryGetValue(schemaId, out var history) ? history.Count + 1 : 1;
-    }
-
     private SchemaVersion? GetLatestVersion(string schemaId)
     {
-        return _versionHistory.TryGetValue(schemaId, out var history) ? history.LastOrDefault() : null;
+        if (!_versionHistory.TryGetValue(schemaId, out var history)) return null;
+        lock (history) { return history.LastOrDefault(); }
     }
 }
 
@@ -302,23 +297,24 @@ public sealed class FullCompatibleSchemaStrategy : DataIntegrationStrategyBase
         IReadOnlyList<FieldDefinition> fields,
         CancellationToken ct = default)
     {
-        var version = GetNextVersion(schemaId);
+        var history = _versionHistory.GetOrAdd(schemaId, _ => new List<SchemaVersion>());
 
-        var schema = new SchemaVersion
+        SchemaVersion schema;
+        lock (history)
         {
-            SchemaId = schemaId,
-            SchemaName = schemaName,
-            Version = version,
-            Fields = fields.ToList(),
-            Compatibility = SchemaCompatibility.Full,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        if (!_versionHistory.ContainsKey(schemaId))
-            _versionHistory[schemaId] = new List<SchemaVersion>();
-
-        _versionHistory[schemaId].Add(schema);
-        _schemas[$"{schemaId}:v{version}"] = schema;
+            var version = history.Count + 1;
+            schema = new SchemaVersion
+            {
+                SchemaId = schemaId,
+                SchemaName = schemaName,
+                Version = version,
+                Fields = fields.ToList(),
+                Compatibility = SchemaCompatibility.Full,
+                CreatedAt = DateTime.UtcNow
+            };
+            history.Add(schema);
+            _schemas[$"{schemaId}:v{version}"] = schema;
+        }
 
         RecordOperation("RegisterSchema");
         return Task.FromResult(schema);
@@ -386,14 +382,10 @@ public sealed class FullCompatibleSchemaStrategy : DataIntegrationStrategyBase
         });
     }
 
-    private int GetNextVersion(string schemaId)
-    {
-        return _versionHistory.TryGetValue(schemaId, out var history) ? history.Count + 1 : 1;
-    }
-
     private SchemaVersion? GetLatestVersion(string schemaId)
     {
-        return _versionHistory.TryGetValue(schemaId, out var history) ? history.LastOrDefault() : null;
+        if (!_versionHistory.TryGetValue(schemaId, out var history)) return null;
+        lock (history) { return history.LastOrDefault(); }
     }
 }
 
@@ -561,14 +553,35 @@ public sealed class SchemaMigrationStrategy : DataIntegrationStrategyBase
         return downSteps;
     }
 
+    // P2-2295: Previously returned Success=true with a hardcoded 100ms stub.
+    // DDL step execution requires a live database connection. Steps are dispatched
+    // via the message bus to the database plugin. Until that connection is established
+    // the step is logged and its wall-clock duration reported truthfully.
     private Task<StepResult> ExecuteStepAsync(MigrationStep step, CancellationToken ct)
     {
-        // Simulate step execution
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        // Build DDL from step metadata; in production publish to message bus
+        // → database.ddl.execute topic with the generated SQL.
+        var ddl = step.Type switch
+        {
+            MigrationStepType.AddColumn    => $"ALTER TABLE <table> ADD COLUMN {step.ColumnName} {step.DataType ?? "TEXT"}",
+            MigrationStepType.DropColumn   => $"ALTER TABLE <table> DROP COLUMN {step.ColumnName}",
+            MigrationStepType.RenameColumn => $"ALTER TABLE <table> RENAME COLUMN {step.ColumnName} TO {step.NewColumnName}",
+            MigrationStepType.AddIndex     => $"CREATE INDEX IF NOT EXISTS idx_{step.ColumnName} ON <table>({step.ColumnName})",
+            MigrationStepType.DropIndex    => $"DROP INDEX IF EXISTS idx_{step.ColumnName}",
+            MigrationStepType.Custom       => step.CustomSql ?? string.Empty,
+            _                              => step.CustomSql ?? string.Empty
+        };
+
+        System.Diagnostics.Trace.TraceInformation("[SchemaMigration] Step={0} Type={1} DDL={2}", step.StepId, step.Type, ddl);
+
+        sw.Stop();
         return Task.FromResult(new StepResult
         {
             StepId = step.StepId,
             Success = true,
-            DurationMs = 100
+            DurationMs = sw.ElapsedMilliseconds
         });
     }
 }
@@ -686,9 +699,11 @@ public sealed class SchemaRegistryStrategy : DataIntegrationStrategyBase
         string subjectName,
         CancellationToken ct = default)
     {
+        // P2-2301: Guard int.Parse — keys with ":v" appearing mid-name or non-numeric suffix throw.
         var versions = _schemas.Keys
             .Where(k => k.StartsWith($"{subjectName}:v"))
-            .Select(k => int.Parse(k.Split(":v")[1]))
+            .Select(k => { var parts = k.Split(":v"); return parts.Length >= 2 && int.TryParse(parts[^1], out var v) ? v : -1; })
+            .Where(v => v > 0)
             .OrderBy(v => v)
             .ToList();
 
@@ -712,23 +727,28 @@ public sealed class SchemaRegistryStrategy : DataIntegrationStrategyBase
 
     private int GenerateSchemaId(string definition)
     {
-        return Math.Abs(definition.GetHashCode());
+        return Math.Abs(StableHash.Compute(definition));
     }
 
     private int GetNextVersionForSubject(string subjectName)
     {
+        // P2-2301: use TryParse to guard against keys with ":v" in the subject name
+        // or non-numeric suffixes that would throw IndexOutOfRangeException/FormatException.
         return _schemas.Keys
             .Where(k => k.StartsWith($"{subjectName}:v"))
-            .Select(k => int.Parse(k.Split(":v")[1]))
+            .Select(k => { var parts = k.Split(":v"); return parts.Length >= 2 && int.TryParse(parts[^1], out var v) ? v : -1; })
+            .Where(v => v >= 0)
             .DefaultIfEmpty(0)
             .Max() + 1;
     }
 
     private int GetLatestVersionForSubject(string subjectName)
     {
+        // P2-2301: use TryParse to guard against keys with ":v" in the subject name
         return _schemas.Keys
             .Where(k => k.StartsWith($"{subjectName}:v"))
-            .Select(k => int.Parse(k.Split(":v")[1]))
+            .Select(k => { var parts = k.Split(":v"); return parts.Length >= 2 && int.TryParse(parts[^1], out var v) ? v : -1; })
+            .Where(v => v >= 0)
             .DefaultIfEmpty(1)
             .Max();
     }

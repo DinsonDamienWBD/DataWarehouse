@@ -38,6 +38,7 @@ internal sealed class ZeroTrustApiStrategy : SdkInterface.InterfaceStrategyBase,
     public string[] Tags => new[] { "zero-trust", "security", "authentication", "authorization", "mtls" };
 
     // SDK contract properties
+    public override bool IsProductionReady => false;
     public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.REST;
     public override SdkInterface.InterfaceCapabilities Capabilities => new SdkInterface.InterfaceCapabilities(
         SupportsStreaming: false,
@@ -234,7 +235,9 @@ internal sealed class ZeroTrustApiStrategy : SdkInterface.InterfaceStrategyBase,
                 }
                 catch
                 {
+
                     // JWT parsing failed
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
         }

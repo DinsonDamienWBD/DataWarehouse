@@ -239,6 +239,8 @@ internal sealed class PubSubStreamStrategy : StreamingDataStrategyBase
     private readonly BoundedDictionary<string, PubSubSubscription> _subscriptions = new BoundedDictionary<string, PubSubSubscription>(1000);
     private readonly BoundedDictionary<string, ConcurrentQueue<PubSubMessage>> _subscriptionQueues = new BoundedDictionary<string, ConcurrentQueue<PubSubMessage>>(1000);
     private readonly BoundedDictionary<string, PubSubMessage> _pendingAcks = new BoundedDictionary<string, PubSubMessage>(1000);
+    // Finding 4379: per-message ack deadline tracking (ackId -> absolute expiry DateTimeOffset).
+    private readonly BoundedDictionary<string, DateTimeOffset> _ackDeadlines = new BoundedDictionary<string, DateTimeOffset>(1000);
     private readonly BoundedDictionary<string, PubSubSnapshot> _snapshots = new BoundedDictionary<string, PubSubSnapshot>(1000);
     private readonly BoundedDictionary<string, int> _deliveryAttempts = new BoundedDictionary<string, int>(1000);
     private long _messageIdCounter;
@@ -532,6 +534,8 @@ internal sealed class PubSubStreamStrategy : StreamingDataStrategyBase
             };
 
             _pendingAcks[ackId] = deliveredMsg;
+            // Finding 4379: record per-message initial ack deadline using the subscription's configured deadline.
+            _ackDeadlines[ackId] = DateTimeOffset.UtcNow.AddSeconds(subscription.AckDeadlineSeconds);
             results.Add(deliveredMsg);
             Interlocked.Increment(ref _totalDelivered);
         }
@@ -558,6 +562,7 @@ internal sealed class PubSubStreamStrategy : StreamingDataStrategyBase
         {
             if (_pendingAcks.TryRemove(ackId, out _))
             {
+                _ackDeadlines.TryRemove(ackId, out _);
                 Interlocked.Increment(ref _totalAcknowledged);
             }
         }
@@ -593,7 +598,7 @@ internal sealed class PubSubStreamStrategy : StreamingDataStrategyBase
                 if (attempts >= subscription.MaxDeliveryAttempts && !string.IsNullOrEmpty(subscription.DeadLetterTopic))
                 {
                     // Dead-letter the message
-                    DeadLetterMessage(subscription.DeadLetterTopic, msg);
+                    DeadLetterMessage(subscription.DeadLetterTopic, subscriptionName, msg);
                     Interlocked.Increment(ref _totalDeadLettered);
                 }
                 else if (_subscriptionQueues.TryGetValue(subscriptionName, out var queue))
@@ -628,17 +633,26 @@ internal sealed class PubSubStreamStrategy : StreamingDataStrategyBase
             throw new ArgumentOutOfRangeException(nameof(ackDeadlineSeconds),
                 "Ack deadline must be between 0 and 600 seconds.");
 
-        // In production, this would update the ack deadline timer for each message.
-        // Here we validate the operation and record it.
+        // Finding 4379: update per-message ack deadline in _ackDeadlines so callers extending
+        // processing time before expiry actually get more time. ackDeadlineSeconds == 0 is immediate nack.
         foreach (var ackId in ackIds)
         {
-            if (ackDeadlineSeconds == 0 && _pendingAcks.TryRemove(ackId, out var msg))
+            if (ackDeadlineSeconds == 0)
             {
-                // Immediate nack
-                if (_subscriptionQueues.TryGetValue(subscriptionName, out var queue))
+                _ackDeadlines.TryRemove(ackId, out _);
+                if (_pendingAcks.TryRemove(ackId, out var msg))
                 {
-                    queue.Enqueue(msg with { AckStatus = PubSubAckStatus.NegativelyAcknowledged });
+                    // Immediate nack — re-enqueue for redelivery
+                    if (_subscriptionQueues.TryGetValue(subscriptionName, out var queue))
+                    {
+                        queue.Enqueue(msg with { AckStatus = PubSubAckStatus.NegativelyAcknowledged });
+                    }
                 }
+            }
+            else
+            {
+                // Extend the deadline from now
+                _ackDeadlines[ackId] = DateTimeOffset.UtcNow.AddSeconds(ackDeadlineSeconds);
             }
         }
 
@@ -710,6 +724,7 @@ internal sealed class PubSubStreamStrategy : StreamingDataStrategyBase
         foreach (var key in keysToRemove)
         {
             _pendingAcks.TryRemove(key, out _);
+            _ackDeadlines.TryRemove(key, out _);
         }
 
         RecordOperation("seek");
@@ -797,7 +812,8 @@ internal sealed class PubSubStreamStrategy : StreamingDataStrategyBase
         return true; // Unknown filter fields pass through
     }
 
-    private void DeadLetterMessage(string deadLetterTopic, PubSubMessage message)
+    // Finding 4392: accept sourceSubscriptionName so the attribute reflects the actual subscription, not a literal.
+    private void DeadLetterMessage(string deadLetterTopic, string sourceSubscriptionName, PubSubMessage message)
     {
         // Route message to dead-letter topic's subscriptions
         var dlSubs = _subscriptions.Values
@@ -809,7 +825,7 @@ internal sealed class PubSubStreamStrategy : StreamingDataStrategyBase
             MessageId = Interlocked.Increment(ref _messageIdCounter).ToString(),
             Attributes = new Dictionary<string, string>(message.Attributes)
             {
-                ["CloudPubSubDeadLetterSourceSubscription"] = "original-subscription",
+                ["CloudPubSubDeadLetterSourceSubscription"] = sourceSubscriptionName,
                 ["CloudPubSubDeadLetterSourceDeliveryCount"] = message.DeliveryAttempt.ToString()
             }
         };

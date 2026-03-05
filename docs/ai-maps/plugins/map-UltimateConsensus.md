@@ -5,30 +5,6 @@
 
 ## Project: DataWarehouse.Plugins.UltimateConsensus
 
-### File: Plugins/DataWarehouse.Plugins.UltimateConsensus/ConsistentHash.cs
-```csharp
-public sealed class ConsistentHash
-{
-}
-    public ConsistentHash(int initialBuckets);
-    public static int GetBucket(string key, int numBuckets);
-    public int Route(string key);
-    public int Route(byte[] data);
-    public void AddNode(int nodeId);
-    public void RemoveNode(int nodeId);
-    public int BucketCount
-{
-    get
-    {
-        lock (_lock)
-        {
-            return _bucketCount;
-        }
-    }
-}
-}
-```
-
 ### File: Plugins/DataWarehouse.Plugins.UltimateConsensus/IRaftStrategy.cs
 ```csharp
 public interface IRaftStrategy
@@ -171,7 +147,7 @@ private sealed class PbftGroupState
     public BoundedDictionary<int, PbftCommittedEntry> CommittedEntries { get; };
     public List<PbftCheckpoint> Checkpoints { get; };
     public List<PbftViewChange> ViewChangeHistory { get; };
-    public PbftGroupState(int totalNodes);
+    public PbftGroupState(int totalNodes, int checkpointInterval = 100);
 }
 ```
 ```csharp
@@ -244,8 +220,8 @@ public sealed class UltimateConsensusPlugin : ConsensusPluginBase, IDisposable
     public int GroupCount;;
     public UltimateConsensusPlugin(int groupCount = 3, int votersPerGroup = 3);
     public override async Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request);
-    public override async Task<bool> ProposeAsync(Proposal proposal);
-    public override void OnCommit(Action<Proposal> handler);
+    public override async Task<bool> ProposeAsync(Proposal proposal, CancellationToken cancellationToken = default);
+    public override IDisposable OnCommit(Action<Proposal> handler);
     public override Task<ClusterState> GetClusterStateAsync();
     public override async Task<ConsensusResult> ProposeAsync(byte[] data, CancellationToken ct);
     public async Task<ConsensusResult> ProposeToGroupAsync(byte[] data, int groupId, CancellationToken ct);
@@ -260,6 +236,113 @@ public sealed class UltimateConsensusPlugin : ConsensusPluginBase, IDisposable
     protected override List<PluginCapabilityDescriptor> GetCapabilities();
     protected override Dictionary<string, object> GetMetadata();
     protected override void Dispose(bool disposing);
+}
+```
+```csharp
+private sealed class CommitHandlerRegistration : IDisposable
+{
+}
+    public CommitHandlerRegistration(List<Action<Proposal>> handlers, object handlerLock, Action<Proposal> handler);
+    public void Dispose();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateConsensus/ConsistentHash.cs
+```csharp
+public sealed class ConsistentHash : IDisposable
+{
+}
+    public ConsistentHash(int initialBuckets);
+    public static int GetBucket(string key, int numBuckets);
+    public int Route(string key);
+    public int Route(byte[] data);
+    public void AddNode(int nodeId);
+    public void RemoveNode(int nodeId);
+    public int BucketCount
+{
+    get
+    {
+        _lock.EnterReadLock();
+        try
+        {
+            return _bucketCount;
+        }
+        finally
+        {
+            _lock.ExitReadLock();
+        }
+    }
+}
+    public void Dispose();;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateConsensus/Scaling/SegmentedRaftLog.cs
+```csharp
+[SdkCompatibility("6.0.0", Notes = "Phase 88-05: Segmented Raft log store with mmap'd hot segments")]
+public sealed class SegmentedRaftLog : IRaftLogStore, IDisposable
+{
+#endregion
+}
+    public int EntriesPerSegment { get; }
+    public int HotSegmentCount { get; }
+    public SegmentedRaftLog(string dataDir, string groupId, int entriesPerSegment = 10_000, int hotSegmentCount = 3);
+    public async Task InitializeAsync();
+    public long Count
+{
+    get
+    {
+        EnsureInitialized();
+        _entriesLock.EnterReadLock();
+        try
+        {
+            return _entries.Count;
+        }
+        finally
+        {
+            _entriesLock.ExitReadLock();
+        }
+    }
+}
+    public Task<long> GetLastIndexAsync();
+    public Task<long> GetLastTermAsync();
+    public Task<RaftLogEntry?> GetAsync(long index);
+    public Task<IReadOnlyList<RaftLogEntry>> GetRangeAsync(long fromIndex, long toIndex);
+    public Task<IReadOnlyList<RaftLogEntry>> GetFromAsync(long fromIndex);
+    public async Task AppendAsync(RaftLogEntry entry);
+    public async Task TruncateFromAsync(long fromIndex);
+    public Task<(long term, string? votedFor)> GetPersistentStateAsync();
+    public async Task SavePersistentStateAsync(long term, string? votedFor);
+    public async Task CompactAsync(long upToIndex);
+    public int SegmentCount
+{
+    get
+    {
+        EnsureInitialized();
+        return _segments.Count;
+    }
+}
+    public int ActiveHotSegments;;
+    public void Dispose();
+}
+```
+```csharp
+private sealed class MappedSegment : IDisposable
+{
+}
+    public MemoryMappedFile File { get; }
+    public MemoryMappedViewAccessor Accessor { get; }
+    public long Length { get; }
+    public MappedSegment(MemoryMappedFile file, MemoryMappedViewAccessor accessor, long length);
+    public void Dispose();
+}
+```
+```csharp
+private sealed class PersistentStateDto
+{
+}
+    public long Term { get; set; }
+    public string VotedFor { get; set; };
 }
 ```
 
@@ -352,66 +435,5 @@ public sealed class ConnectionPool
     public bool TryAcquire();
     public void Release();
     public double Utilization;;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateConsensus/Scaling/SegmentedRaftLog.cs
-```csharp
-[SdkCompatibility("6.0.0", Notes = "Phase 88-05: Segmented Raft log store with mmap'd hot segments")]
-public sealed class SegmentedRaftLog : IRaftLogStore, IDisposable
-{
-#endregion
-}
-    public int EntriesPerSegment { get; }
-    public int HotSegmentCount { get; }
-    public SegmentedRaftLog(string dataDir, string groupId, int entriesPerSegment = 10_000, int hotSegmentCount = 3);
-    public async Task InitializeAsync();
-    public long Count
-{
-    get
-    {
-        EnsureInitialized();
-        return _entries.Count;
-    }
-}
-    public Task<long> GetLastIndexAsync();
-    public Task<long> GetLastTermAsync();
-    public Task<RaftLogEntry?> GetAsync(long index);
-    public Task<IReadOnlyList<RaftLogEntry>> GetRangeAsync(long fromIndex, long toIndex);
-    public Task<IReadOnlyList<RaftLogEntry>> GetFromAsync(long fromIndex);
-    public async Task AppendAsync(RaftLogEntry entry);
-    public async Task TruncateFromAsync(long fromIndex);
-    public Task<(long term, string? votedFor)> GetPersistentStateAsync();
-    public async Task SavePersistentStateAsync(long term, string? votedFor);
-    public async Task CompactAsync(long upToIndex);
-    public int SegmentCount
-{
-    get
-    {
-        EnsureInitialized();
-        return _segments.Count;
-    }
-}
-    public int ActiveHotSegments;;
-    public void Dispose();
-}
-```
-```csharp
-private sealed class MappedSegment : IDisposable
-{
-}
-    public MemoryMappedFile File { get; }
-    public MemoryMappedViewAccessor Accessor { get; }
-    public long Length { get; }
-    public MappedSegment(MemoryMappedFile file, MemoryMappedViewAccessor accessor, long length);
-    public void Dispose();
-}
-```
-```csharp
-private sealed class PersistentStateDto
-{
-}
-    public long Term { get; set; }
-    public string VotedFor { get; set; };
 }
 ```

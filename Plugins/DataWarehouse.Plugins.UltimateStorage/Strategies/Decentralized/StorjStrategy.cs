@@ -682,15 +682,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
         {
             EnsureInitialized();
 
-            // Note: This would require Storj-specific API calls
-            // For now, return estimated values based on Storj's architecture
+            // Storj does not expose a live node-count API in its S3-compatible layer.
+            // TotalNodeCount reflects the configured erasure coding total pieces (not network-wide nodes).
+            // ActiveNodeCount reflects the configured success threshold.
             return new StorjNetworkStats
             {
                 RedundancyScheme = _redundancyScheme,
                 RepairThreshold = _repairThreshold,
                 SuccessThreshold = _successThreshold,
-                TotalNodeCount = 110, // Total pieces
-                ActiveNodeCount = _redundancyScheme, // Successful pieces
+                TotalNodeCount = _redundancyScheme, // Pieces required per segment (from config)
+                ActiveNodeCount = _successThreshold, // Upload-success threshold (from config)
                 EncryptionEnabled = _enableClientSideEncryption,
                 ErasureCodingEnabled = _enableErasureCoding,
                 Satellite = _satellite

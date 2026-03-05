@@ -287,13 +287,24 @@ public sealed class VdeMigrationEngine
                         totalRead += read;
                     }
 
-                    // Write to destination
+                    // Write to destination (only write the bytes actually read)
                     destStream.Position = blockIndex * blockSize;
                     await destStream.WriteAsync(buffer.AsMemory(0, totalRead), ct)
                         .ConfigureAwait(false);
 
-                    blocksCopied += blocksInBatch;
-                    blockIndex += blocksInBatch;
+                    // Track actual blocks copied to avoid corruption on short reads
+                    int actualBlocksCopied = totalRead > 0 ? (totalRead + blockSize - 1) / blockSize : 0;
+                    if (totalRead < bytesInBatch && totalRead > 0)
+                    {
+                        // Short read: partial last block; still advance by full batch to avoid infinite loop
+                        blocksCopied += actualBlocksCopied;
+                        blockIndex += blocksInBatch;
+                    }
+                    else
+                    {
+                        blocksCopied += blocksInBatch;
+                        blockIndex += blocksInBatch;
+                    }
                     batchCount++;
 
                     // Report progress periodically

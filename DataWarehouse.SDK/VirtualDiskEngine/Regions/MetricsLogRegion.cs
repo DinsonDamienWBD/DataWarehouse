@@ -133,7 +133,10 @@ public sealed class MetricsLogRegion
     /// <param name="sample">The sample to record.</param>
     public void RecordSample(MetricsSample sample)
     {
-        if (_samples.Count >= (long)(MaxCapacitySamples * CompactionThreshold))
+        // Cat 12 (finding 896): _samples.Count is int (List<T>.Count cannot exceed int.MaxValue),
+        // so cast the threshold to int before comparison to avoid compaction never triggering
+        // when MaxCapacitySamples > int.MaxValue (the list would never reach that count anyway).
+        if (_samples.Count >= (int)Math.Min(MaxCapacitySamples * CompactionThreshold, int.MaxValue))
             AutoCompact();
 
         _samples.Add(sample);
@@ -358,6 +361,13 @@ public sealed class MetricsLogRegion
         long sampleCount = BinaryPrimitives.ReadInt64LittleEndian(block0);
         long maxCapacity = BinaryPrimitives.ReadInt64LittleEndian(block0.Slice(8));
         double compactionThreshold = BinaryPrimitives.ReadDoubleLittleEndian(block0.Slice(16));
+
+        if (sampleCount < 0 || sampleCount > 10_000_000)
+            throw new InvalidDataException($"MetricsLog sampleCount {sampleCount} is out of valid range [0, 10M].");
+        if (maxCapacity <= 0 || maxCapacity > 100_000_000)
+            throw new InvalidDataException($"MetricsLog maxCapacity {maxCapacity} is out of valid range.");
+        if (compactionThreshold <= 0 || compactionThreshold > 1.0)
+            throw new InvalidDataException($"MetricsLog compactionThreshold {compactionThreshold} is out of valid range (0, 1.0].");
 
         var region = new MetricsLogRegion(maxCapacity, compactionThreshold)
         {

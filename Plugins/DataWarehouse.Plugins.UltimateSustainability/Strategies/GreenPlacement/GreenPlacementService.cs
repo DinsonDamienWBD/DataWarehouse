@@ -226,7 +226,9 @@ public sealed class GreenPlacementService : SustainabilityStrategyBase, IGreenPl
             }
             catch
             {
+
                 // Fall through to ElectricityMaps
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
@@ -244,7 +246,9 @@ public sealed class GreenPlacementService : SustainabilityStrategyBase, IGreenPl
             }
             catch
             {
+
                 // Fall through to estimation
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
 
@@ -290,8 +294,23 @@ public sealed class GreenPlacementService : SustainabilityStrategyBase, IGreenPl
 
         await Task.WhenAll(tasks);
 
-        // Persist updated scores
-        await _registry.PersistAsync(ct);
+        // Persist updated scores. Finding 4430: wrap in try/catch so a persistence failure
+        // is logged rather than propagating as an unhandled exception from a background refresh.
+        try
+        {
+            await _registry.PersistAsync(ct);
+        }
+        catch (OperationCanceledException)
+        {
+            throw; // Cancellation must always propagate.
+        }
+        catch (Exception ex)
+        {
+            // Log to Debug so persistence failures don't surface as unhandled exceptions from
+            // a background refresh cycle.  (Finding 4430)
+            System.Diagnostics.Debug.WriteLine(
+                $"[GreenPlacementService] PersistAsync failed: {ex.GetType().Name}: {ex.Message}");
+        }
     }
 
     /// <inheritdoc/>
@@ -336,7 +355,9 @@ public sealed class GreenPlacementService : SustainabilityStrategyBase, IGreenPl
         }
         catch
         {
+
             // Registration from message bus is best-effort
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
 
         return Task.CompletedTask;
@@ -378,7 +399,9 @@ public sealed class GreenPlacementService : SustainabilityStrategyBase, IGreenPl
         }
         catch
         {
+
             // Audit publish failure is non-fatal
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

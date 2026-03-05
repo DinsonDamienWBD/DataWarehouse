@@ -30,6 +30,9 @@
         /// When available, this provides the complete hierarchy context
         /// (System → Tenant → Instance → UserGroup → User) for access decisions.
         /// </summary>
-        CommandIdentity? CommandIdentity => null; // Default interface method for backward compatibility
+        // Cat 11 (finding 587): default is null for backward compatibility with implementations that pre-date
+        // the CommandIdentity hierarchy feature. Callers MUST null-check before using for hierarchy evaluation;
+        // null means "context does not carry hierarchy information — fall back to flat identity checks".
+        CommandIdentity? CommandIdentity => null;
     }
 }

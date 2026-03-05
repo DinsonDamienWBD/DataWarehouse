@@ -28,10 +28,11 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
     private readonly SemaphoreSlim _flushLock = new(1, 1);
     private int _batchSize = 500; // Elasticsearch can handle larger batches
     private int _flushIntervalMs = 5000; // Default 5 seconds
-    private int _circuitBreakerFailures = 0;
+    private int _circuitBreakerFailures = 0; // Interlocked
     private const int CircuitBreakerThreshold = 5;
-    private bool _circuitOpen = false;
-    private DateTimeOffset _circuitOpenedAt = DateTimeOffset.MinValue;
+    private volatile bool _circuitOpen = false;
+    private long _circuitOpenedAtTicks = DateTimeOffset.MinValue.UtcTicks; // Interlocked
+    private readonly object _circuitLock = new();
     private int _flushIntervalSeconds = 5;
 
     /// <inheritdoc/>
@@ -131,7 +132,7 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
         // Test cluster health endpoint
         try
         {
-            var response = await _httpClient.GetAsync($"{_url}/_cluster/health", cancellationToken);
+            using var response = await _httpClient.GetAsync($"{_url}/_cluster/health", cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 throw new InvalidOperationException($"Elasticsearch cluster health check failed with status {response.StatusCode}");
@@ -161,9 +162,11 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
             if (_logsBatch.Count > 0)
                 await FlushLogsAsync(cts.Token);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
+
             // Shutdown timeout exceeded, abandon remaining logs
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
         finally
         {
@@ -178,7 +181,7 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
 
     private async Task FlushLogsAsync(CancellationToken ct)
     {
-        if (_circuitOpen && DateTimeOffset.UtcNow - _circuitOpenedAt < TimeSpan.FromMinutes(1))
+        if (_circuitOpen && (DateTimeOffset.UtcNow.UtcTicks - Interlocked.Read(ref _circuitOpenedAtTicks)) < TimeSpan.FromMinutes(1).Ticks)
             return; // Circuit open, skip flush
 
         if (_logsBatch.IsEmpty) return;
@@ -206,7 +209,7 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
                     }
 
                     var content = new StringContent(bulkBody.ToString(), Encoding.UTF8, "application/x-ndjson");
-                    var response = await _httpClient.PostAsync($"{_url}/_bulk", content, ct);
+                    using var response = await _httpClient.PostAsync($"{_url}/_bulk", content, ct);
                     response.EnsureSuccessStatusCode();
 
                     // Check for partial failures in bulk response
@@ -223,7 +226,8 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
             }
             catch (Exception)
             {
-                IncrementCounter("elasticsearch.bulk_requests");
+                // bulk_requests already incremented on success path; increment only errors here.
+                IncrementCounter("elasticsearch.bulk_errors");
                 throw;
             }
         }
@@ -243,7 +247,7 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
             try
             {
                 await action();
-                _circuitBreakerFailures = 0; // Reset on success
+                Interlocked.Exchange(ref _circuitBreakerFailures, 0); // Reset on success
                 _circuitOpen = false;
                 return;
             }
@@ -282,11 +286,10 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
             }
             catch (Exception)
             {
-                _circuitBreakerFailures++;
-                if (_circuitBreakerFailures >= CircuitBreakerThreshold)
+                if (Interlocked.Increment(ref _circuitBreakerFailures) >= CircuitBreakerThreshold)
                 {
                     _circuitOpen = true;
-                    _circuitOpenedAt = DateTimeOffset.UtcNow;
+                    Interlocked.Exchange(ref _circuitOpenedAtTicks, DateTimeOffset.UtcNow.UtcTicks);
                 }
                 throw;
             }
@@ -296,7 +299,7 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override async Task LoggingAsyncCore(IEnumerable<LogEntry> logEntries, CancellationToken cancellationToken)
     {
-        if (_circuitOpen && DateTimeOffset.UtcNow - _circuitOpenedAt < TimeSpan.FromMinutes(1))
+        if (_circuitOpen && (DateTimeOffset.UtcNow.UtcTicks - Interlocked.Read(ref _circuitOpenedAtTicks)) < TimeSpan.FromMinutes(1).Ticks)
             return; // Circuit open, drop logs
 
         foreach (var entry in logEntries)
@@ -353,7 +356,7 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
         });
 
         var content = new StringContent(searchBody, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{_url}/{_indexPrefix}-*/_search", content, ct);
+        using var response = await _httpClient.PostAsync($"{_url}/{_indexPrefix}-*/_search", content, ct);
         response.EnsureSuccessStatusCode();
 
         return await response.Content.ReadAsStringAsync(ct);
@@ -424,7 +427,7 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
         });
 
         var content = new StringContent(aggBody, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{_url}/{_indexPrefix}-*/_search", content, ct);
+        using var response = await _httpClient.PostAsync($"{_url}/{_indexPrefix}-*/_search", content, ct);
         response.EnsureSuccessStatusCode();
 
         return await response.Content.ReadAsStringAsync(ct);
@@ -470,7 +473,7 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
         };
 
         var content = new StringContent(JsonSerializer.Serialize(template), Encoding.UTF8, "application/json");
-        var response = await _httpClient.PutAsync($"{_url}/_index_template/{_indexPrefix}-template", content, ct);
+        using var response = await _httpClient.PutAsync($"{_url}/_index_template/{_indexPrefix}-template", content, ct);
         response.EnsureSuccessStatusCode();
     }
 
@@ -493,7 +496,8 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
         {
             try
             {
-                var response = await _httpClient.GetAsync($"{_url}/_cluster/health", ct);
+                using var response = await _httpClient.GetAsync($"{_url}/_cluster/health", ct);
+                response.EnsureSuccessStatusCode();
                 var content = await response.Content.ReadAsStringAsync(ct);
                 var health = JsonSerializer.Deserialize<JsonElement>(content);
 
@@ -536,18 +540,24 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {
+        _apiKey = string.Empty;
+        _password = string.Empty;
         if (disposing)
         {
             _flushTimer?.Stop();
             _flushTimer?.Dispose();
-            _flushLock.Wait();
-            try
+            // Flush pending logs with a bounded wait; use GetAwaiter to avoid deadlock.
+            if (_flushLock.Wait(TimeSpan.FromSeconds(1)))
             {
-                Task.Run(() => FlushLogsAsync(CancellationToken.None)).Wait(TimeSpan.FromSeconds(5));
-            }
-            finally
-            {
-                _flushLock.Release();
+                try
+                {
+                    FlushLogsAsync(CancellationToken.None).GetAwaiter().GetResult();
+                }
+                catch { /* Best-effort flush on dispose */ }
+                finally
+                {
+                    _flushLock.Release();
+                }
             }
             _flushLock.Dispose();
             _httpClient.Dispose();

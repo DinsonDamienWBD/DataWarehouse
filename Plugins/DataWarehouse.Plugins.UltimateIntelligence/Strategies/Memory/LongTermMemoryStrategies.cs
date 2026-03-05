@@ -877,7 +877,7 @@ public sealed class ChromaMemoryStrategy : LongTermMemoryStrategyBase, ITierAwar
         {
             // Apply temporal decay
             var now = DateTime.UtcNow;
-            var decayRate = float.Parse(GetConfig("DecayRate") ?? "0.01");
+            var decayRate = GetConfigFloat("DecayRate", 0.01f);
 
             var results = _episodes.Values
                 .Select(m =>
@@ -907,7 +907,7 @@ public sealed class ChromaMemoryStrategy : LongTermMemoryStrategyBase, ITierAwar
     {
         await ExecuteWithTrackingAsync(async () =>
         {
-            var decayRate = float.Parse(GetConfig("DecayRate") ?? "0.01");
+            var decayRate = GetConfigFloat("DecayRate", 0.01f);
             var cutoff = DateTime.UtcNow.AddDays(-90);
 
             // Remove very old, low-importance memories
@@ -963,7 +963,7 @@ public sealed class ChromaMemoryStrategy : LongTermMemoryStrategyBase, ITierAwar
 
     private string GetOrCreateEpisode()
     {
-        var timeout = int.Parse(GetConfig("EpisodeTimeoutMinutes") ?? "60");
+        var timeout = GetConfigInt("EpisodeTimeoutMinutes", 60);
         var latestEpisode = _episodeBoundaries.Keys.LastOrDefault();
 
         if (latestEpisode == null)
@@ -1105,7 +1105,7 @@ public sealed class RedisMemoryStrategy : LongTermMemoryStrategyBase, ITierAware
                 Metadata = new Dictionary<string, object>(metadata ?? new Dictionary<string, object>())
                 {
                     ["session_id"] = sessionId,
-                    ["ttl_expires"] = DateTime.UtcNow.AddSeconds(int.Parse(GetConfig("DefaultTTLSeconds") ?? "3600"))
+                    ["ttl_expires"] = DateTime.UtcNow.AddSeconds(GetConfigInt("DefaultTTLSeconds", 3600))
                 }
             };
 
@@ -1126,7 +1126,7 @@ public sealed class RedisMemoryStrategy : LongTermMemoryStrategyBase, ITierAware
         {
             var sessionId = GetConfig("SessionId") ?? "default";
             var now = DateTime.UtcNow;
-            var promotionThreshold = int.Parse(GetConfig("PromotionThreshold") ?? "3");
+            var promotionThreshold = GetConfigInt("PromotionThreshold", 3);
 
             // Clean up expired entries
             var expired = _cache.Values

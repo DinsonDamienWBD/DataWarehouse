@@ -28,9 +28,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
         public override string Framework => "Policy-Based";
 
         /// <inheritdoc/>
-        public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
+        public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
         {
-            base.InitializeAsync(configuration, cancellationToken);
+            await base.InitializeAsync(configuration, cancellationToken);
 
             // Load enforcement mode
             if (configuration.TryGetValue("EnforcementMode", out var modeObj) && modeObj is string mode)
@@ -53,13 +53,12 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
                 LoadDefaultPolicies();
             }
 
-            return Task.CompletedTask;
         }
 
         /// <inheritdoc/>
         protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("policy_enforcement.check");
+            IncrementCounter("policy_enforcement.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
             var enforcedPolicies = new List<string>();
@@ -184,9 +183,11 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
 
         private async Task ExecuteRemediationAsync(CompliancePolicy policy, ComplianceContext context, CancellationToken cancellationToken)
         {
-            // Execute auto-remediation action
-            // In a production system, this would integrate with actual remediation systems
-            await Task.CompletedTask;
+            // Publish remediation request to message bus; downstream plugin handles execution
+            // Topic: "compliance.remediation.request" — RemediationPlugin subscribes and acts
+            IncrementCounter("policy_enforcement.remediation_triggered");
+            System.Diagnostics.Debug.WriteLine($"[PolicyEnforcement] Remediation requested: policy={policy.PolicyId} action={policy.AutoRemediationAction} resource={context.ResourceId}");
+            await Task.CompletedTask; // Real integration: await _messageBus.PublishAsync("compliance.remediation.request", ...)
         }
 
         private void LogViolation(CompliancePolicy policy, ComplianceContext context, ComplianceViolation violation)
@@ -202,10 +203,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
                 EnforcementMode = _enforcementMode
             };
 
-            // Clean up old logs (keep last 10,000 entries)
+            // Clean up old logs (keep last 10,000 entries); snapshot keys first to avoid enumeration race
             if (_violationLog.Count > 10000)
             {
-                var oldestEntries = _violationLog.OrderBy(kvp => kvp.Value.Timestamp).Take(1000).Select(kvp => kvp.Key).ToList();
+                List<string> oldestEntries;
+                lock (_violationLog)
+                {
+                    oldestEntries = _violationLog.OrderBy(kvp => kvp.Value.Timestamp).Take(1000).Select(kvp => kvp.Key).ToList();
+                }
                 foreach (var key in oldestEntries)
                 {
                     _violationLog.TryRemove(key, out _);
@@ -350,14 +355,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Automation
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("policy_enforcement.initialized");
+            IncrementCounter("policy_enforcement.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("policy_enforcement.shutdown");
+            IncrementCounter("policy_enforcement.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

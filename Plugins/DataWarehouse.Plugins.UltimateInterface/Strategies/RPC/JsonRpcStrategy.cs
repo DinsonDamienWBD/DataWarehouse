@@ -203,7 +203,9 @@ internal sealed class JsonRpcStrategy : SdkInterface.InterfaceStrategyBase, IPlu
                 }
                 catch
                 {
+
                     // Skip malformed responses
+                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
             }
         }

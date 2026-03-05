@@ -29,6 +29,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         private readonly IMessageBus _messageBus;
         private readonly BoundedDictionary<string, RaidArray> _raidArrays = new BoundedDictionary<string, RaidArray>(1000);
         private readonly BoundedDictionary<string, string> _objectToArrayMapping = new BoundedDictionary<string, string>(1000); // object key -> array ID
+        private readonly object _failedBackendsLock = new();
         private bool _disposed;
         private IDisposable? _messageBusSubscription;
 
@@ -79,12 +80,18 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         /// <param name="raidLevel">RAID level (0, 1, 5, 6, 10).</param>
         /// <param name="backendIds">Backend strategy IDs to include in the array.</param>
         /// <param name="stripeSize">Stripe size in bytes (for RAID 0, 5, 6).</param>
+        /// <param name="perBackendCapacityBytes">
+        /// Capacity of each backend in bytes. Used to compute total array capacity.
+        /// Finding 3862: was hardcoded to 1 TB; now caller-supplied so actual backend sizes are reflected.
+        /// Defaults to 1 TB when the backend does not expose a capacity API.
+        /// </param>
         /// <returns>The created RAID array.</returns>
         public async Task<RaidArray> CreateRaidArrayAsync(
             string arrayId,
             RaidLevel raidLevel,
             IEnumerable<string> backendIds,
-            int stripeSize = 65536)
+            int stripeSize = 65536,
+            long perBackendCapacityBytes = 1_000_000_000_000L)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(arrayId);
             ArgumentNullException.ThrowIfNull(backendIds);
@@ -117,7 +124,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 StripeSize = stripeSize,
                 CreatedTime = DateTime.UtcNow,
                 State = RaidArrayState.Online,
-                TotalCapacityBytes = CalculateTotalCapacity(raidLevel, backends.Count, 1_000_000_000_000) // Assume 1TB per backend
+                TotalCapacityBytes = CalculateTotalCapacity(raidLevel, backends.Count, perBackendCapacityBytes)
             };
 
             if (!_raidArrays.TryAdd(arrayId, array))
@@ -255,21 +262,31 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
             Interlocked.Increment(ref _totalBackendFailures);
 
-            array.FailedBackends.Add(backendId);
-            array.State = RaidArrayState.Degraded;
+            bool canTolerate;
+            int failedCount;
+            lock (_failedBackendsLock)
+            {
+                array.FailedBackends.Add(backendId);
+                array.State = RaidArrayState.Degraded;
+                canTolerate = CanTolerateFailures(array);
+                failedCount = array.FailedBackends.Count;
+                if (!canTolerate)
+                {
+                    array.State = RaidArrayState.Failed;
+                }
+            }
 
             // Notify RAID plugin about backend failure
             await NotifyRaidPluginAsync("backend.failed", new Dictionary<string, object>
             {
                 ["arrayId"] = arrayId,
                 ["backendId"] = backendId,
-                ["failedCount"] = array.FailedBackends.Count
+                ["failedCount"] = failedCount
             });
 
             // Check if array can tolerate more failures
-            if (!CanTolerateFailures(array))
+            if (!canTolerate)
             {
-                array.State = RaidArrayState.Failed;
                 await NotifyRaidPluginAsync("array.failed", new Dictionary<string, object>
                 {
                     ["arrayId"] = arrayId,
@@ -310,17 +327,28 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 ["spareBackendId"] = spareBackendId
             });
 
-            // Simulate rebuild operation
-            // Real implementation would reconstruct data from parity and copy to spare
-            await Task.Delay(100, ct); // Simulate rebuild time
-
-            // Replace failed backend with spare
-            if (array.FailedBackends.Any())
+            // RAID 5/6 rebuild requires reading surviving stripe data and recomputing XOR parity
+            // to reconstruct the failed drive's contents. This requires full XOR parity engine
+            // which is not implemented. For RAID 6 dual-parity reconstruction, Reed-Solomon
+            // galois-field arithmetic is required.
+            if (array.RaidLevel == RaidLevel.RAID5 || array.RaidLevel == RaidLevel.RAID6)
             {
-                var failedBackend = array.FailedBackends.First();
-                array.BackendIds.Remove(failedBackend);
-                array.BackendIds.Add(spareBackendId);
-                array.FailedBackends.Remove(failedBackend);
+                throw new NotSupportedException(
+                    $"RAID {(array.RaidLevel == RaidLevel.RAID5 ? 5 : 6)} rebuild requires XOR parity reconstruction (RAID 5) or " +
+                    "Reed-Solomon dual-parity reconstruction (RAID 6), neither of which is implemented. " +
+                    "Use RAID 1 or RAID 10 for supported rebuild operations.");
+            }
+
+            // Replace failed backend with spare (lock to prevent race with MarkBackendFailedAsync)
+            lock (_failedBackendsLock)
+            {
+                if (array.FailedBackends.Any())
+                {
+                    var failedBackend = array.FailedBackends.First();
+                    array.BackendIds.Remove(failedBackend);
+                    array.BackendIds.Add(spareBackendId);
+                    array.FailedBackends.Remove(failedBackend);
+                }
             }
 
             array.State = array.FailedBackends.Any() ? RaidArrayState.Degraded : RaidArrayState.Online;
@@ -395,45 +423,25 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             await Task.WhenAll(tasks);
         }
 
-        private async Task WriteRaid5Async(RaidArray array, string objectKey, byte[] data, CancellationToken ct)
+        private Task WriteRaid5Async(RaidArray array, string objectKey, byte[] data, CancellationToken ct)
         {
-            // RAID 5: Stripe with distributed parity
-            // Simplified implementation - real RAID 5 would calculate XOR parity
-            var backendCount = array.BackendIds.Count;
-            var stripeCount = (data.Length + array.StripeSize - 1) / array.StripeSize;
-
-            for (int i = 0; i < stripeCount; i++)
-            {
-                var offset = i * array.StripeSize;
-                var length = Math.Min(array.StripeSize, data.Length - offset);
-                var stripe = new byte[length];
-                Array.Copy(data, offset, stripe, 0, length);
-
-                var dataBackendIndex = i % (backendCount - 1);
-                var parityBackendIndex = (i / (backendCount - 1)) % backendCount;
-
-                // Write data stripe
-                var dataBackendId = array.BackendIds[dataBackendIndex];
-                var backend = _registry.Get(dataBackendId);
-                if (backend != null)
-                {
-                    await backend.StoreAsync($"{objectKey}.stripe{i}", new System.IO.MemoryStream(stripe), null, ct);
-                }
-
-                // Write parity stripe (simplified - would be XOR of all data stripes)
-                var parityBackendId = array.BackendIds[parityBackendIndex];
-                var parityBackend = _registry.Get(parityBackendId);
-                if (parityBackend != null)
-                {
-                    await parityBackend.StoreAsync($"{objectKey}.parity{i}", new System.IO.MemoryStream(stripe), null, ct);
-                }
-            }
+            // RAID 5 requires XOR parity computation across all data stripes in each stripe row.
+            // The parity block P = D0 XOR D1 XOR ... XOR D(n-2) must be stored on rotating parity
+            // drives. Copying the data stripe as parity (which the old implementation did) provides
+            // zero fault tolerance and is functionally incorrect.
+            throw new NotSupportedException(
+                "RAID 5 XOR parity is not implemented. Writing data bytes as the parity block provides " +
+                "no fault tolerance and is unsafe. Implement a full XOR parity engine or use RAID 1/RAID 10.");
         }
 
         private Task WriteRaid6Async(RaidArray array, string objectKey, byte[] data, CancellationToken ct)
         {
-            // RAID 6: Stripe with dual parity (similar to RAID 5 but with 2 parity blocks)
-            return WriteRaid5Async(array, objectKey, data, ct); // Simplified
+            // RAID 6 requires two independent parity computations: P (XOR) and Q (Reed-Solomon over GF(2^8)).
+            // Delegating to RAID 5 provides only one parity block and gives incorrect fault tolerance.
+            throw new NotSupportedException(
+                "RAID 6 dual-parity (P+Q) is not implemented. RAID 6 requires Reed-Solomon encoding over " +
+                "GF(2^8) for the Q parity block in addition to the XOR P parity block. " +
+                "Implement a full RS erasure-coding engine or use RAID 1/RAID 10.");
         }
 
         private async Task WriteRaid10Async(RaidArray array, string objectKey, byte[] data, CancellationToken ct)
@@ -496,8 +504,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
         private async Task<byte[]> ReadRaid1Async(RaidArray array, string objectKey, CancellationToken ct)
         {
+            // Snapshot failed-backends set under lock before iterating to avoid race with MarkBackendFailedAsync
+            HashSet<string> failedSnapshot;
+            lock (_failedBackendsLock)
+            {
+                failedSnapshot = new HashSet<string>(array.FailedBackends, StringComparer.Ordinal);
+            }
+
             // Try each backend until successful read
-            foreach (var backendId in array.BackendIds.Where(id => !array.FailedBackends.Contains(id)))
+            foreach (var backendId in array.BackendIds.Where(id => !failedSnapshot.Contains(id)))
             {
                 try
                 {
@@ -606,10 +621,46 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             }
         }
 
-        private async Task HandleRaidStatusMessageAsync(PluginMessage message)
+        private Task HandleRaidStatusMessageAsync(PluginMessage message)
         {
-            // Handle status updates from RAID plugin
-            await Task.CompletedTask;
+            // Process RAID status updates received from the RAID plugin via the message bus.
+            // Update the local array state to reflect the authoritative status from T91 RAID plugin.
+            if (message?.Type == null || message.Payload == null)
+                return Task.CompletedTask;
+
+            try
+            {
+                if (message.Type.EndsWith("backend.failed", StringComparison.OrdinalIgnoreCase) &&
+                    message.Payload.TryGetValue("arrayId", out var arrayIdObj) &&
+                    message.Payload.TryGetValue("backendId", out var backendIdObj) &&
+                    arrayIdObj is string arrayId &&
+                    backendIdObj is string backendId &&
+                    _raidArrays.TryGetValue(arrayId, out var array))
+                {
+                    lock (_failedBackendsLock)
+                    {
+                        array.FailedBackends.Add(backendId);
+                        array.State = CanTolerateFailures(array) ? RaidArrayState.Degraded : RaidArrayState.Failed;
+                    }
+                }
+                else if (message.Type.EndsWith("array.online", StringComparison.OrdinalIgnoreCase) &&
+                         message.Payload.TryGetValue("arrayId", out var onlineArrayIdObj) &&
+                         onlineArrayIdObj is string onlineArrayId &&
+                         _raidArrays.TryGetValue(onlineArrayId, out var onlineArray))
+                {
+                    lock (_failedBackendsLock)
+                    {
+                        onlineArray.FailedBackends.Clear();
+                        onlineArray.State = RaidArrayState.Online;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[RaidIntegrationFeature] HandleRaidStatusMessageAsync failed: {ex.GetType().Name}: {ex.Message}");
+            }
+
+            return Task.CompletedTask;
         }
 
         #endregion

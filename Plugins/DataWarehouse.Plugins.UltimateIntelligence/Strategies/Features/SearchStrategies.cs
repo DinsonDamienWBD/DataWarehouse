@@ -54,7 +54,7 @@ public sealed class FullTextSearchStrategy : FeatureStrategyBase
         return ExecuteWithTrackingAsync(() =>
         {
             var tokens = Tokenize(content);
-            var stemmedTokens = bool.Parse(GetConfig("EnableStemming") ?? "true")
+            var stemmedTokens = GetConfigBool("EnableStemming", true)
                 ? tokens.Select(Stem).ToList()
                 : tokens;
 
@@ -109,12 +109,12 @@ public sealed class FullTextSearchStrategy : FeatureStrategyBase
     {
         return ExecuteWithTrackingAsync(() =>
         {
-            var k = topK ?? int.Parse(GetConfig("TopK") ?? "10");
-            var enableFuzzy = bool.Parse(GetConfig("EnableFuzzyMatch") ?? "true");
-            var fuzzyThreshold = float.Parse(GetConfig("FuzzyThreshold") ?? "0.8");
+            var k = topK ?? GetConfigInt("TopK", 10);
+            var enableFuzzy = GetConfigBool("EnableFuzzyMatch", true);
+            var fuzzyThreshold = GetConfigFloat("FuzzyThreshold", 0.8f);
 
             var queryTokens = Tokenize(query);
-            var stemmedQuery = bool.Parse(GetConfig("EnableStemming") ?? "true")
+            var stemmedQuery = GetConfigBool("EnableStemming", true)
                 ? queryTokens.Select(Stem).ToList()
                 : queryTokens;
 
@@ -400,10 +400,10 @@ public sealed class HybridSearchStrategy : FeatureStrategyBase
     {
         return await ExecuteWithTrackingAsync(async () =>
         {
-            var k = topK ?? int.Parse(GetConfig("TopK") ?? "10");
-            var semanticWeight = float.Parse(GetConfig("SemanticWeight") ?? "0.5");
-            var keywordWeight = float.Parse(GetConfig("KeywordWeight") ?? "0.5");
-            var rrfK = int.Parse(GetConfig("RrfK") ?? "60");
+            var k = topK ?? GetConfigInt("TopK", 10);
+            var semanticWeight = GetConfigFloat("SemanticWeight", 0.5f);
+            var keywordWeight = GetConfigFloat("KeywordWeight", 0.5f);
+            var rrfK = GetConfigInt("RrfK", 60);
 
             // Get results from both search methods (fetch more to allow for RRF)
             var fetchK = k * 3;

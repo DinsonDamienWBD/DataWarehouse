@@ -106,8 +106,19 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 LastAccess = DateTime.UtcNow
             });
 
-            metrics.LastAccess = DateTime.UtcNow;
+            var now = DateTime.UtcNow;
+            metrics.LastAccess = now;
             Interlocked.Increment(ref metrics.TotalAccesses);
+
+            // Track recent accesses for time-windowed frequency evaluation (24-hour window)
+            metrics.RecentAccessTicks.Enqueue(now.Ticks);
+            // Prune entries older than 24 hours; limit queue size to avoid unbounded growth
+            var cutoff = now.AddHours(-24).Ticks;
+            while (metrics.RecentAccessTicks.TryPeek(out var oldest) && oldest < cutoff)
+                metrics.RecentAccessTicks.TryDequeue(out _);
+            // Safety cap: drop oldest if queue exceeds 10000 entries
+            while (metrics.RecentAccessTicks.Count > 10000)
+                metrics.RecentAccessTicks.TryDequeue(out _);
 
             if (accessType == AccessType.Read)
             {
@@ -389,14 +400,17 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                         break;
 
                     case ConditionType.AccessesInPeriod:
-                        // For simplicity, check total accesses (real implementation would track time windows)
-                        if (metrics.TotalAccesses < condition.Threshold)
+                        // Use time-windowed access count (24-hour rolling window)
+                        var recentCount = metrics.RecentAccessTicks.Count;
+                        if (recentCount < condition.Threshold)
                             return false;
                         break;
 
                     case ConditionType.SizeGreaterThan:
-                        // Would need object size - skip for now
-                        break;
+                        // Size information is not tracked in access metrics; skip condition
+                        // (object size would need to be supplied at RecordAccess time)
+                        // Return false to avoid false positives when size is unknown
+                        return false;
 
                     case ConditionType.AgeDays:
                         var ageDays = (DateTime.UtcNow - metrics.FirstAccess).TotalDays;
@@ -514,14 +528,22 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
     /// </summary>
     public sealed class ObjectAccessMetrics
     {
+        // Backing fields for lock-free atomic operations on timestamps
+        private long _lastAccessTicks = DateTime.UtcNow.Ticks;
+        private int _temperature = (int)ObjectTemperature.Unknown;
+
         /// <summary>Object key.</summary>
         public string Key { get; init; } = string.Empty;
 
         /// <summary>First access timestamp.</summary>
         public DateTime FirstAccess { get; set; }
 
-        /// <summary>Last access timestamp.</summary>
-        public DateTime LastAccess { get; set; }
+        /// <summary>Last access timestamp (thread-safe via Interlocked on backing ticks).</summary>
+        public DateTime LastAccess
+        {
+            get => new DateTime(Interlocked.Read(ref _lastAccessTicks), DateTimeKind.Utc);
+            set => Interlocked.Exchange(ref _lastAccessTicks, value.Ticks);
+        }
 
         /// <summary>Total number of accesses.</summary>
         public long TotalAccesses;
@@ -532,8 +554,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         /// <summary>Number of write accesses.</summary>
         public long WriteCount;
 
-        /// <summary>Current temperature classification.</summary>
-        public ObjectTemperature Temperature { get; set; } = ObjectTemperature.Unknown;
+        /// <summary>Current temperature classification (thread-safe via Interlocked).</summary>
+        public ObjectTemperature Temperature
+        {
+            get => (ObjectTemperature)Interlocked.CompareExchange(ref _temperature, 0, 0);
+            set => Interlocked.Exchange(ref _temperature, (int)value);
+        }
+
+        /// <summary>Recent access window entries (ticks) for time-windowed frequency checks.</summary>
+        public System.Collections.Concurrent.ConcurrentQueue<long> RecentAccessTicks { get; } = new();
     }
 
     /// <summary>

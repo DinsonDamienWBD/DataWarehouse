@@ -325,6 +325,13 @@ internal sealed class DdsTextureStrategy : MediaStrategyBase
         // Height at offset 12, Width at offset 16 (after magic + dwSize)
         int height = BitConverter.ToInt32(data, 12);
         int width = BitConverter.ToInt32(data, 16);
+
+        // LOW-1066: Guard against negative or extreme values that cause integer overflow in mipmap
+        // calculations (e.g., width * height * bytesPerPixel). DDS spec limits dimensions to 16384.
+        const int MaxDdsDimension = 65536;
+        if (width <= 0 || height <= 0 || width > MaxDdsDimension || height > MaxDdsDimension)
+            return (0, 0);
+
         return (width, height);
     }
 

@@ -305,12 +305,25 @@ public sealed class DuckDbStorageStrategy : DatabaseStorageStrategyBase
     /// <summary>
     /// Exports data to Parquet format.
     /// </summary>
+    /// <summary>
+    /// Exports data to Parquet format.
+    /// </summary>
     public async Task ExportToParquetAsync(string filePath, CancellationToken ct = default)
     {
+        // P2-2775: Validate filePath to prevent path traversal and single-quote injection.
+        if (string.IsNullOrWhiteSpace(filePath))
+            throw new ArgumentException("File path must not be empty.", nameof(filePath));
+        if (filePath.Contains('\'') || filePath.Contains('\0'))
+            throw new ArgumentException("File path contains invalid characters.", nameof(filePath));
+
+        // Normalize and validate the path is an absolute path (prevents traversal via relative paths).
+        var fullPath = Path.GetFullPath(filePath);
+
         lock (_lock)
         {
             using var command = _connection!.CreateCommand();
-            command.CommandText = $"COPY {_tableName} TO '{filePath}' (FORMAT PARQUET)";
+            // Use the validated, normalized absolute path.
+            command.CommandText = $"COPY {_tableName} TO '{fullPath.Replace("'", "''")}' (FORMAT PARQUET)";
             command.ExecuteNonQuery();
         }
 

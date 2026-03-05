@@ -306,9 +306,11 @@ internal sealed class RabbitMqStreamStrategy : StreamingDataStrategyBase, IStrea
     /// <inheritdoc/>
     public Task CommitOffsetAsync(string streamName, ConsumerGroup consumerGroup, StreamOffset offset, CancellationToken ct = default)
     {
-        // RabbitMQ uses acknowledgment, not offset commits
-        // Model as consumer tag tracking
-        var key = $"{streamName}:{consumerGroup.GroupId}";
+        ArgumentNullException.ThrowIfNull(consumerGroup);
+        // Finding 4367: GroupId can be null on a valid ConsumerGroup instance.
+        var groupId = consumerGroup.GroupId ?? consumerGroup.ConsumerId ?? string.Empty;
+        // RabbitMQ uses acknowledgment, not offset commits; model as consumer tag tracking.
+        var key = $"{streamName}:{groupId}";
         _consumerOffsets[key] = offset.Offset;
         return Task.CompletedTask;
     }

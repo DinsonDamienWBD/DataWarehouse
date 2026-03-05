@@ -1,6 +1,7 @@
 using DataWarehouse.SDK.Security;
 using Org.BouncyCastle.Math;
 using Org.BouncyCastle.Security;
+using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -91,6 +92,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
                 _config.MaxRecoveryAttempts = max;
             if (Configuration.TryGetValue("RequireIdentityVerification", out var v) && v is bool verify)
                 _config.RequireIdentityVerification = verify;
+            if (Configuration.TryGetValue("VerificationSecret", out var vs) && vs is string verifySecret)
+                _config.VerificationSecret = verifySecret;
 
             ValidateConfiguration();
             await LoadFromStorage();
@@ -413,9 +416,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
                     throw new InvalidOperationException("Guardian not found for this key.");
 
                 // Verify share hash
+                // P2-3603: Reject shares whose hash was never recorded (ShareHash == null).
+                // FixedTimeEquals on two empty arrays returns true, which would allow any
+                // share value to pass the check for legacy/uninitialised shares.
+                if (share.ShareHash == null || share.ShareHash.Length == 0)
+                    throw new CryptographicException("Share has no recorded hash; cannot verify integrity.");
                 var providedHash = SHA256.HashData(shareValue);
-                var expectedHash = share.ShareHash ?? Array.Empty<byte>();
-                if (!(providedHash.Length == expectedHash.Length && CryptographicOperations.FixedTimeEquals(providedHash, expectedHash)))
+                if (!CryptographicOperations.FixedTimeEquals(providedHash, share.ShareHash))
                     throw new CryptographicException("Invalid share provided.");
 
                 // Verify identity if required
@@ -747,8 +754,19 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
                     using var encryptor = aes.CreateEncryptor();
                     var encrypted = encryptor.TransformFinalBlock(share.ShareValue, 0, share.ShareValue.Length);
 
-                    // In real implementation, wrap AES key with guardian's public key
-                    encryptedShare = ConcatBytes(aes.IV, aes.Key, encrypted);
+                    // P2-3606: Use a length-prefixed format so the parser does not rely on hardcoded field sizes.
+                    // Layout: [ivLen:2LE][iv][keyLen:2LE][key][ciphertextLen:4LE][ciphertext]
+                    var iv = aes.IV;
+                    var key = aes.Key;
+                    var buf = new byte[2 + iv.Length + 2 + key.Length + 4 + encrypted.Length];
+                    int pos = 0;
+                    BinaryPrimitives.WriteUInt16LittleEndian(buf.AsSpan(pos, 2), (ushort)iv.Length); pos += 2;
+                    iv.CopyTo(buf.AsSpan(pos)); pos += iv.Length;
+                    BinaryPrimitives.WriteUInt16LittleEndian(buf.AsSpan(pos, 2), (ushort)key.Length); pos += 2;
+                    key.CopyTo(buf.AsSpan(pos)); pos += key.Length;
+                    BinaryPrimitives.WriteInt32LittleEndian(buf.AsSpan(pos, 4), encrypted.Length); pos += 4;
+                    encrypted.CopyTo(buf.AsSpan(pos));
+                    encryptedShare = buf;
                 }
 
                 return new GuardianShareExport
@@ -850,20 +868,43 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
 
         private bool VerifyGuardianIdentity(Guardian guardian, string? verificationCode)
         {
-            // In real implementation, this would:
-            // - Send OTP via email/SMS
-            // - Verify biometric
-            // - Check hardware token
-            // For now, simple code check
             if (string.IsNullOrEmpty(verificationCode))
                 return false;
 
-            // Simple hash-based verification (placeholder)
-            var expected = Convert.ToHexString(
-                SHA256.HashData(Encoding.UTF8.GetBytes(guardian.GuardianId + DateTime.UtcNow.Date.ToString("yyyyMMdd")))
-            )[..6].ToUpper();
+            // #3585: Use HMAC-SHA256(guardianId + date, server_secret) for verification codes.
+            // The server_secret must come from configuration — it must NOT be derivable from
+            // public information (guardian ID + date is public, so SHA256 of that is insecure).
+            var secret = _config.VerificationSecret;
+            if (string.IsNullOrEmpty(secret))
+                throw new InvalidOperationException(
+                    "Guardian verification requires SsssConfig.VerificationSecret to be configured. " +
+                    "Generate a random 32+ byte secret and set it in configuration.");
 
-            return verificationCode.ToUpper() == expected;
+            byte[] secretBytes;
+            try { secretBytes = Convert.FromBase64String(secret); }
+            catch { secretBytes = Encoding.UTF8.GetBytes(secret); }
+
+            if (secretBytes.Length < 16)
+                throw new InvalidOperationException(
+                    "SsssConfig.VerificationSecret must be at least 16 bytes (128 bits).");
+
+            // Compute: HMAC-SHA256(key=server_secret, data=guardianId + "|" + date)
+            var date = DateTime.UtcNow.Date.ToString("yyyyMMdd");
+            var data = Encoding.UTF8.GetBytes(guardian.GuardianId + "|" + date);
+            using var hmac = new HMACSHA256(secretBytes);
+            var mac = hmac.ComputeHash(data);
+
+            // Truncate to 6 hex chars (24 bits) for human-usable codes
+            var expected = Convert.ToHexString(mac)[..6].ToUpper();
+
+            // Use constant-time comparison to prevent timing oracle
+            var expectedBytes = Encoding.UTF8.GetBytes(expected);
+            var submittedBytes = Encoding.UTF8.GetBytes(verificationCode.Trim().ToUpper()[..Math.Min(6, verificationCode.Length)]);
+
+            if (expectedBytes.Length != submittedBytes.Length)
+                return false;
+
+            return CryptographicOperations.FixedTimeEquals(expectedBytes, submittedBytes);
         }
 
         private static byte[] ConcatBytes(params byte[][] arrays)
@@ -1006,6 +1047,12 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
         public int MaxRecoveryAttempts { get; set; } = 3;
         public bool RequireIdentityVerification { get; set; } = true;
         public string? StoragePath { get; set; }
+        /// <summary>
+        /// Server-side secret (32+ bytes, base64) used for HMAC-based guardian verification codes.
+        /// Must be configured; must NOT be derivable from public information.
+        /// Required when RequireIdentityVerification = true.
+        /// </summary>
+        public string? VerificationSecret { get; set; }
     }
 
     internal class SsssKeyData

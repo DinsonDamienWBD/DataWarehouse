@@ -12,7 +12,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
     /// Connection strategy for FTP servers.
     /// Tests connectivity via TCP connection to port 21.
     /// </summary>
-    public class FtpConnectionStrategy : ConnectionStrategyBase
+    public sealed class FtpConnectionStrategy : ConnectionStrategyBase
     {
         /// <inheritdoc/>
         public override string StrategyId => "ftp";
@@ -42,9 +42,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
         /// <inheritdoc/>
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var parts = config.ConnectionString.Split(':');
-            var host = parts[0];
-            var port = parts.Length > 1 ? int.Parse(parts[1]) : 21;
+            // P2-2132: Use ParseHostPortSafe to correctly handle IPv6 addresses like [::1]:21
+            var (host, port) = ParseHostPortSafe(config.ConnectionString ?? throw new ArgumentException("Connection string required"), 21);
 
             var client = new TcpClient();
             await client.ConnectAsync(host, port, ct);
@@ -80,16 +79,42 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
         }
 
         /// <inheritdoc/>
-        protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
+            // Finding 2109: Measure real round-trip latency via a real probe instead of reporting zero.
+            // Send a TCP no-op (zero-byte) and measure echo time; fall back to Connected if send fails.
             var client = handle.GetConnection<TcpClient>();
-            var isHealthy = client.Connected;
+            if (!client.Connected)
+            {
+                return new ConnectionHealth(
+                    IsHealthy: false,
+                    StatusMessage: "FTP server disconnected",
+                    Latency: TimeSpan.Zero,
+                    CheckedAt: DateTimeOffset.UtcNow);
+            }
 
-            return Task.FromResult(new ConnectionHealth(
-                IsHealthy: isHealthy,
-                StatusMessage: isHealthy ? "FTP server connected" : "FTP server disconnected",
-                Latency: TimeSpan.Zero,
-                CheckedAt: DateTimeOffset.UtcNow));
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            try
+            {
+                // Write a NOOP command and measure the latency of the socket send.
+                var noopBytes = System.Text.Encoding.ASCII.GetBytes("NOOP\r\n");
+                await client.GetStream().WriteAsync(noopBytes, ct);
+                sw.Stop();
+                return new ConnectionHealth(
+                    IsHealthy: true,
+                    StatusMessage: "FTP server connected",
+                    Latency: sw.Elapsed,
+                    CheckedAt: DateTimeOffset.UtcNow);
+            }
+            catch (Exception ex)
+            {
+                sw.Stop();
+                return new ConnectionHealth(
+                    IsHealthy: false,
+                    StatusMessage: $"FTP health check failed: {ex.Message}",
+                    Latency: sw.Elapsed,
+                    CheckedAt: DateTimeOffset.UtcNow);
+            }
         }
     }
 }

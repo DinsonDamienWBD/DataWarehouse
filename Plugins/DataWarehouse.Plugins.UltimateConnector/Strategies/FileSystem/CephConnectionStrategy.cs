@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
 {
-    public class CephConnectionStrategy : ConnectionStrategyBase
+    public sealed class CephConnectionStrategy : ConnectionStrategyBase
     {
         public override string StrategyId => "ceph";
         public override string DisplayName => "Ceph";
@@ -22,11 +22,19 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
             var client = new HttpClient { BaseAddress = new Uri(config.ConnectionString) };
-            await client.GetAsync("/", ct);
-            return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "Ceph S3" });
+            try
+            {
+                await client.GetAsync("/", ct);
+                return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "Ceph S3" });
+            }
+            catch
+            {
+                client.Dispose();
+                throw;
+            }
         }
 
-        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { var response = await handle.GetConnection<HttpClient>().GetAsync("/", ct); return response.StatusCode != System.Net.HttpStatusCode.ServiceUnavailable; }
+        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { var response = await handle.GetConnection<HttpClient>().GetAsync("/", ct); return response.IsSuccessStatusCode; }
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<HttpClient>().Dispose(); return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, "Ceph cluster", sw.Elapsed, DateTimeOffset.UtcNow); }
     }

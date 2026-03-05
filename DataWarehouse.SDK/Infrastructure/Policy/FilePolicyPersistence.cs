@@ -123,23 +123,25 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
         }
 
         /// <inheritdoc />
-        protected override Task DeleteCoreAsync(string key, CancellationToken ct)
+        protected override async Task DeleteCoreAsync(string key, CancellationToken ct)
         {
             try
             {
                 var hash = ComputeKeyHash(key);
                 var filePath = Path.Combine(_policiesDirectory, $"{hash}.json");
 
-                if (File.Exists(filePath))
-                    File.Delete(filePath);
+                // Use Task.Run to avoid blocking the thread pool thread for file I/O
+                await Task.Run(() =>
+                {
+                    if (File.Exists(filePath))
+                        File.Delete(filePath);
+                }, ct).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 throw new InvalidOperationException(
                     $"Failed to delete policy '{key}' from '{_policiesDirectory}': {ex.Message}", ex);
             }
-
-            return Task.CompletedTask;
         }
 
         /// <inheritdoc />

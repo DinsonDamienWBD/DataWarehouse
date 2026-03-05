@@ -72,7 +72,9 @@ internal sealed class BuildCacheSharingStrategy : StorageProcessingStrategyBase
         {
             var prefix = CliProcessHelper.GetOption<string>(query, "prefix") ?? cacheNamespace;
             var removed = 0;
-            foreach (var key in _cache.Keys.Where(k => k.StartsWith(prefix, StringComparison.Ordinal)))
+            // Snapshot Keys before removal to avoid mutate-while-enumerate (finding 4288).
+            var keysToRemove = _cache.Keys.Where(k => k.StartsWith(prefix, StringComparison.Ordinal)).ToList();
+            foreach (var key in keysToRemove)
             {
                 if (_cache.TryRemove(key, out _)) removed++;
             }
@@ -155,8 +157,7 @@ internal sealed class BuildCacheSharingStrategy : StorageProcessingStrategyBase
             };
             idx++;
         }
-
-        await Task.CompletedTask;
+        // No await needed here (finding 4299: `await Task.CompletedTask` is unnecessary anti-pattern).
     }
 
     /// <inheritdoc/>

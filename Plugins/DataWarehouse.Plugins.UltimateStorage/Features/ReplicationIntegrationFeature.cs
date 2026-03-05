@@ -30,6 +30,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         private readonly BoundedDictionary<string, ReplicationGroup> _replicationGroups = new BoundedDictionary<string, ReplicationGroup>(1000);
         private readonly BoundedDictionary<string, string> _objectToGroupMapping = new BoundedDictionary<string, string>(1000); // object key -> group ID
         private readonly BoundedDictionary<string, ReplicationLag> _replicationLags = new BoundedDictionary<string, ReplicationLag>(1000);
+        private readonly object _replicaListLock = new();
         private bool _disposed;
         private IDisposable? _messageBusSubscription;
         private Timer? _lagMonitorTimer;
@@ -219,6 +220,29 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 throw new InvalidOperationException($"Primary backend '{group.PrimaryBackendId}' not available");
             }
 
+            // In active-active topology, check if a concurrent version exists to detect conflicts
+            if (group.Topology == ReplicationTopology.ActiveActive)
+            {
+                try
+                {
+                    var existingMeta = await primaryBackend.GetMetadataAsync(objectKey, ct);
+                    if (existingMeta.CustomMetadata != null &&
+                        existingMeta.CustomMetadata.TryGetValue("replication.version", out var existingVersion) &&
+                        !string.IsNullOrEmpty(existingVersion))
+                    {
+                        // A prior version exists — this is a concurrent update (conflict)
+                        Interlocked.Increment(ref _totalConflicts);
+                        System.Diagnostics.Debug.WriteLine(
+                            $"[ReplicationIntegrationFeature] Conflict detected for key '{objectKey}' in group '{groupId}'. " +
+                            $"Existing version: {existingVersion}. Applying ConflictResolution={group.ConflictResolution}.");
+                    }
+                }
+                catch
+                {
+                    // Object doesn't exist yet — no conflict
+                }
+            }
+
             await primaryBackend.StoreAsync(objectKey, new System.IO.MemoryStream(data), metadata, ct);
 
             // Replicate based on mode
@@ -230,17 +254,30 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             }
             else
             {
-                // Asynchronous replication - fire and forget
+                // Asynchronous replication - queued background work with proper error tracking
                 Interlocked.Increment(ref _totalAsyncOperations);
+                // Use ThreadPool.QueueUserWorkItem to avoid fire-and-forget task loss;
+                // exceptions are captured via the completion source pattern so the caller
+                // can observe failures through the group status fields.
+                var capturedGroup = group;
+                var capturedKey = objectKey;
+                var capturedData = (byte[])data.Clone();
+                var capturedMetadata = metadata != null ? new Dictionary<string, string>(metadata) : null;
                 _ = Task.Run(async () =>
                 {
                     try
                     {
-                        await ReplicateToAllAsync(group, objectKey, data, metadata, CancellationToken.None);
+                        await ReplicateToAllAsync(capturedGroup, capturedKey, capturedData, capturedMetadata, CancellationToken.None);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // Expected during shutdown
                     }
                     catch (Exception ex)
                     {
-                        System.Diagnostics.Debug.WriteLine($"[ReplicationIntegrationFeature] Async replication failed for {objectKey}: {ex.Message}");
+                        System.Diagnostics.Debug.WriteLine($"[ReplicationIntegrationFeature] Async replication failed for {capturedKey}: {ex.GetType().Name}: {ex.Message}");
+                        // Track failure in group statistics
+                        Interlocked.Increment(ref capturedGroup.FailedOperations);
                     }
                 }, CancellationToken.None);
             }
@@ -330,17 +367,21 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
             Interlocked.Increment(ref _totalFailovers);
 
-            var oldPrimary = group.PrimaryBackendId;
-
-            // Promote replica to primary
-            group.PrimaryBackendId = newPrimaryBackendId;
-            group.ReplicaBackendIds.Remove(newPrimaryBackendId);
-
-            // Demote old primary to replica (if still available)
-            var oldPrimaryBackend = _registry.Get(oldPrimary);
-            if (oldPrimaryBackend != null)
+            string oldPrimary;
+            lock (_replicaListLock)
             {
-                group.ReplicaBackendIds.Add(oldPrimary);
+                oldPrimary = group.PrimaryBackendId;
+
+                // Promote replica to primary
+                group.PrimaryBackendId = newPrimaryBackendId;
+                group.ReplicaBackendIds.Remove(newPrimaryBackendId);
+
+                // Demote old primary to replica (if still available)
+                var oldPrimaryBackend = _registry.Get(oldPrimary);
+                if (oldPrimaryBackend != null)
+                {
+                    group.ReplicaBackendIds.Add(oldPrimary);
+                }
             }
 
             // Notify replication plugin
@@ -389,10 +430,17 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             ReplicationGroup group,
             string objectKey,
             byte[] data,
-            Dictionary<string, string> metadata,
+            Dictionary<string, string>? metadata,
             CancellationToken ct)
         {
-            var replicationTasks = group.ReplicaBackendIds.Select(async replicaId =>
+            // Snapshot replica list to avoid race with FailoverAsync mutations
+            List<string> replicaSnapshot;
+            lock (_replicaListLock)
+            {
+                replicaSnapshot = new List<string>(group.ReplicaBackendIds);
+            }
+
+            var replicationTasks = replicaSnapshot.Select(async replicaId =>
             {
                 try
                 {
@@ -430,28 +478,37 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
         private List<string> GetReadOrder(ReplicationGroup group, bool preferReplica)
         {
+            // Snapshot replica list and primary under lock to avoid race with FailoverAsync
+            string primary;
+            List<string> replicas;
+            lock (_replicaListLock)
+            {
+                primary = group.PrimaryBackendId;
+                replicas = new List<string>(group.ReplicaBackendIds);
+            }
+
             var order = new List<string>();
 
             if (group.Topology == ReplicationTopology.ActiveActive)
             {
                 // In active-active, can read from any backend
-                if (preferReplica && group.ReplicaBackendIds.Any())
+                if (preferReplica && replicas.Any())
                 {
                     // Load balance across replicas
-                    order.AddRange(group.ReplicaBackendIds.OrderBy(_ => Guid.NewGuid()));
-                    order.Add(group.PrimaryBackendId);
+                    order.AddRange(replicas.OrderBy(_ => Guid.NewGuid()));
+                    order.Add(primary);
                 }
                 else
                 {
-                    order.Add(group.PrimaryBackendId);
-                    order.AddRange(group.ReplicaBackendIds);
+                    order.Add(primary);
+                    order.AddRange(replicas);
                 }
             }
             else
             {
                 // In active-passive, prefer primary
-                order.Add(group.PrimaryBackendId);
-                order.AddRange(group.ReplicaBackendIds);
+                order.Add(primary);
+                order.AddRange(replicas);
             }
 
             return order;
@@ -626,6 +683,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
         /// <summary>Total bytes read from the group.</summary>
         public long TotalBytesRead;
+
+        /// <summary>Total failed async replication operations (interlocked).</summary>
+        public long FailedOperations;
     }
 
     /// <summary>

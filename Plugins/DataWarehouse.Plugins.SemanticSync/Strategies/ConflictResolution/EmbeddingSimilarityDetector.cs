@@ -55,11 +55,20 @@ internal sealed class EmbeddingSimilarityDetector
         _aiProvider = aiProvider;
     }
 
+    // P2-1015: Use volatile reference to ensure cross-thread visibility when LastSimilarityScore
+    // is written by one DetectAsync call and read by a concurrent caller.
+    private volatile object? _lastSimilarityScore; // boxed double or null
+
     /// <summary>
     /// Gets the last computed similarity score from <see cref="DetectAsync"/>.
     /// Returns null if no detection has been performed or if structural fallback was used.
+    /// Thread-safe: reads always see the latest published value from any writer thread.
     /// </summary>
-    public double? LastSimilarityScore { get; private set; }
+    public double? LastSimilarityScore
+    {
+        get => _lastSimilarityScore is double d ? d : null;
+        private set => _lastSimilarityScore = value.HasValue ? (object)value.Value : null;
+    }
 
     /// <summary>
     /// Detects whether a semantic conflict exists between local and remote data versions.

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -142,7 +143,11 @@ public sealed class InteropConnectionHandle : IDisposable
 public static class NativeInteropExports
 {
     private static readonly BoundedDictionary<long, byte[]> _resultBuffers = new BoundedDictionary<long, byte[]>(1000);
+    private static readonly BoundedDictionary<long, string> _lastErrors = new BoundedDictionary<long, string>(1000);
     private static long _nextBufferId;
+
+    /// <summary>Records an error message for a handle (used internally by operations).</summary>
+    internal static void SetLastError(long handleId, string message) => _lastErrors[handleId] = message;
 
     /// <summary>
     /// Creates a new connection to DataWarehouse.
@@ -191,9 +196,9 @@ public static class NativeInteropExports
         if (!handle.IsConnected) return (InteropErrorCode.NotInitialized, null);
         if (string.IsNullOrEmpty(uri)) return (InteropErrorCode.InvalidArgument, null);
 
-        // Delegate to storage engine through handle's connection
-        // In production, this would route through the kernel's storage pipeline
-        return (InteropErrorCode.Ok, Array.Empty<byte>());
+        // C ABI storage operations require kernel pipeline integration.
+        // Returning empty success would silently lose data; return NotInitialized instead.
+        return (InteropErrorCode.NotInitialized, null);
     }
 
     /// <summary>
@@ -208,7 +213,8 @@ public static class NativeInteropExports
         if (string.IsNullOrEmpty(uri)) return InteropErrorCode.InvalidArgument;
         if (data == null) return InteropErrorCode.InvalidArgument;
 
-        return InteropErrorCode.Ok;
+        // C ABI write operations require kernel pipeline integration.
+        return InteropErrorCode.NotInitialized;
     }
 
     /// <summary>
@@ -222,7 +228,8 @@ public static class NativeInteropExports
         if (!handle.IsConnected) return InteropErrorCode.NotInitialized;
         if (string.IsNullOrEmpty(uri)) return InteropErrorCode.InvalidArgument;
 
-        return InteropErrorCode.Ok;
+        // C ABI delete operations require kernel pipeline integration.
+        return InteropErrorCode.NotInitialized;
     }
 
     /// <summary>
@@ -269,13 +276,19 @@ public static class NativeInteropExports
     /// Gets the last error message for a handle.
     /// C ABI: const char* dw_get_error(int64_t handle)
     /// </summary>
-    public static string GetLastError(long handleId) => "No error";
+    public static string GetLastError(long handleId)
+        => _lastErrors.TryGetValue(handleId, out var msg) ? msg : "No error";
 
     /// <summary>
     /// Gets SDK version.
     /// C ABI: const char* dw_version()
     /// </summary>
-    public static string GetVersion() => "4.5.0";
+    public static string GetVersion()
+    {
+        var asm = System.Reflection.Assembly.GetExecutingAssembly();
+        var ver = asm.GetName().Version;
+        return ver != null ? $"{ver.Major}.{ver.Minor}.{ver.Build}" : "unknown";
+    }
 }
 
 /// <summary>
@@ -520,7 +533,10 @@ public sealed class AppToken
 public sealed class AppPlatformRegistry
 {
     private readonly BoundedDictionary<string, AppRegistration> _apps = new BoundedDictionary<string, AppRegistration>(1000);
-    private readonly BoundedDictionary<string, AppToken> _activeTokens = new BoundedDictionary<string, AppToken>(1000);
+    // clientId → appId index for O(1) FindByClientId lookups (avoids O(n) scan on every token issuance).
+    private readonly BoundedDictionary<string, string> _clientIdIndex = new BoundedDictionary<string, string>(1000);
+    // Maps access-token → (token, owning AppId) to enable O(1) app lookup on ValidateToken.
+    private readonly BoundedDictionary<string, (AppToken Token, string AppId)> _activeTokens = new BoundedDictionary<string, (AppToken Token, string AppId)>(1000);
     private readonly BoundedDictionary<string, (int Count, DateTimeOffset WindowStart)> _rateLimits = new BoundedDictionary<string, (int Count, DateTimeOffset WindowStart)>(1000);
 
     /// <summary>Registers a new application.</summary>
@@ -528,7 +544,8 @@ public sealed class AppPlatformRegistry
     {
         var appId = Guid.NewGuid().ToString("N")[..16];
         var clientId = $"dw-{appId}";
-        var clientSecret = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
+        // Use CSPRNG for client secret (RFC 6749 requires 256-bit entropy minimum)
+        var clientSecret = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         var secretHash = Convert.ToHexString(
             System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(clientSecret)));
 
@@ -547,6 +564,7 @@ public sealed class AppPlatformRegistry
         };
 
         _apps[appId] = registration;
+        _clientIdIndex[clientId] = appId;
         return registration;
     }
 
@@ -561,23 +579,26 @@ public sealed class AppPlatformRegistry
             ? Array.FindAll(requestedScopes, s => Array.Exists(app.Credentials.Scopes, cs => cs == s))
             : app.Credentials.Scopes;
 
+        // Use CSPRNG for token generation (RFC 6749 requires 256-bit entropy minimum)
         var token = new AppToken
         {
-            AccessToken = Convert.ToBase64String(Guid.NewGuid().ToByteArray()),
-            RefreshToken = Convert.ToBase64String(Guid.NewGuid().ToByteArray()),
+            AccessToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
+            RefreshToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
             ExpiresAt = DateTimeOffset.UtcNow.Add(app.Credentials.TokenExpiry),
             Scopes = scopes
         };
 
-        _activeTokens[token.AccessToken] = token;
+        _activeTokens[token.AccessToken] = (token, app.AppId);
         return token;
     }
 
     /// <summary>Validates a token and checks rate limits.</summary>
     public (bool IsValid, AppRegistration? App) ValidateToken(string accessToken)
     {
-        if (!_activeTokens.TryGetValue(accessToken, out var token))
+        if (!_activeTokens.TryGetValue(accessToken, out var entry))
             return (false, null);
+
+        var (token, appId) = entry;
 
         if (token.ExpiresAt < DateTimeOffset.UtcNow)
         {
@@ -585,14 +606,14 @@ public sealed class AppPlatformRegistry
             return (false, null);
         }
 
-        // Find app by matching scopes (simplified lookup)
-        foreach (var app in _apps.Values)
-        {
-            if (app.IsEnabled && CheckRateLimit(app.AppId, app.RateLimitPerMinute))
-                return (true, app);
-        }
+        // Bind token to its owning app — avoids cross-app policy enforcement
+        if (!_apps.TryGetValue(appId, out var app) || !app.IsEnabled)
+            return (false, null);
 
-        return (false, null);
+        if (!CheckRateLimit(app.AppId, app.RateLimitPerMinute))
+            return (false, null);
+
+        return (true, app);
     }
 
     /// <summary>Checks access policy for a request.</summary>
@@ -619,27 +640,37 @@ public sealed class AppPlatformRegistry
 
     private AppRegistration? FindByClientId(string clientId)
     {
-        foreach (var app in _apps.Values)
-            if (app.Credentials.ClientId == clientId)
-                return app;
+        // O(1) lookup via clientId→appId reverse index (populated in RegisterApp).
+        if (_clientIdIndex.TryGetValue(clientId, out var appId) && _apps.TryGetValue(appId, out var app))
+            return app;
         return null;
     }
 
     private bool CheckRateLimit(string appId, int limitPerMinute)
     {
         var now = DateTimeOffset.UtcNow;
-        var entry = _rateLimits.GetOrAdd(appId, _ => (0, now));
 
-        if ((now - entry.WindowStart).TotalMinutes >= 1)
-        {
-            _rateLimits[appId] = (1, now);
-            return true;
-        }
-
-        if (entry.Count >= limitPerMinute) return false;
-
-        _rateLimits[appId] = (entry.Count + 1, entry.WindowStart);
-        return true;
+        // Atomic update via AddOrUpdate to prevent TOCTOU race
+        bool allowed = false;
+        _rateLimits.AddOrUpdate(
+            appId,
+            _ => { allowed = true; return (1, now); },
+            (_, existing) =>
+            {
+                if ((now - existing.WindowStart).TotalMinutes >= 1)
+                {
+                    allowed = true;
+                    return (1, now);
+                }
+                if (existing.Count >= limitPerMinute)
+                {
+                    allowed = false;
+                    return existing;
+                }
+                allowed = true;
+                return (existing.Count + 1, existing.WindowStart);
+            });
+        return allowed;
     }
 
     private static bool MatchesGlob(string value, string pattern)

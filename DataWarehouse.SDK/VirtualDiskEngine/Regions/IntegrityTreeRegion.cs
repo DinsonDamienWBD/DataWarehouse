@@ -449,6 +449,9 @@ public sealed class IntegrityTreeRegion
 
         if (leafCount <= 0)
             throw new InvalidDataException($"Invalid leaf count: {leafCount}.");
+        const int MaxLeafCount = 16_777_216; // 16M leaves is plenty for any practical tree
+        if (leafCount > MaxLeafCount)
+            throw new InvalidDataException($"Leaf count {leafCount} exceeds maximum {MaxLeafCount}.");
         if (treeCapacity != NextPowerOfTwo(leafCount))
             throw new InvalidDataException($"Tree capacity {treeCapacity} is inconsistent with leaf count {leafCount}.");
 

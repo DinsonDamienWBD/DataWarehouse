@@ -358,21 +358,30 @@ internal sealed class FixStreamStrategy : StreamingDataStrategyBase
         session.State = FixSessionState.LogonSent;
         session.LastHeartbeatSent = DateTimeOffset.UtcNow;
 
-        // Simulate logon acceptance
-        session.State = FixSessionState.Active;
-        session.LastHeartbeatReceived = DateTimeOffset.UtcNow;
+        // The logon handshake requires a network round-trip to the counterparty.
+        // The session transitions to Active only when a Logon response (MsgType=A) is
+        // received via the network layer (handled by the transport layer's inbound
+        // message processor calling ProcessInboundMessage with the Logon response).
+        // In a test/offline scenario the caller may manually drive the session to Active
+        // by delivering a synthetic Logon response through the same path.
 
         RecordWrite(logon.RawMessage?.Length ?? 0, 0.5);
         return Task.FromResult(logon);
     }
 
     /// <summary>
-    /// Sends a Logout message to gracefully close the session.
+    /// Builds a Logout FIX message and transitions the session state to Disconnected.
     /// </summary>
+    /// <remarks>
+    /// Finding 4393: this method constructs the Logout message in-process and transitions state
+    /// without sending a network FIN or waiting for the counterparty Logout acknowledgment.
+    /// The actual transmission of the Logout message over the TCP connection is the responsibility
+    /// of the transport layer that consumes the returned <see cref="FixMessage"/>.
+    /// </remarks>
     /// <param name="sessionId">The session identifier.</param>
-    /// <param name="text">Optional logout reason text.</param>
+    /// <param name="text">Optional logout reason text (FIX tag 58).</param>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns>The Logout message sent.</returns>
+    /// <returns>The Logout message ready for transmission by the transport layer.</returns>
     public Task<FixMessage> LogoutAsync(string sessionId, string? text = null, CancellationToken ct = default)
     {
         ThrowIfNotInitialized();
@@ -385,7 +394,7 @@ internal sealed class FixStreamStrategy : StreamingDataStrategyBase
         var logout = BuildMessage(session, FixMsgType.Logout, fields);
         session.State = FixSessionState.LogoutPending;
 
-        // Complete logout
+        // Transition to Disconnected (transport layer must send the message and await counterparty logout)
         session.State = FixSessionState.Disconnected;
 
         RecordWrite(logout.RawMessage?.Length ?? 0, 0.5);

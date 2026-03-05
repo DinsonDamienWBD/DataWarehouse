@@ -346,6 +346,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
 
         private static List<byte[]> ComputeParityShards(List<byte[]> dataShards, int parityCount)
         {
+            if (dataShards.Count == 0) return new List<byte[]>(parityCount); // LOW-3714: empty-list guard
             var parityShards = new List<byte[]>(parityCount);
             var shardSize = dataShards[0].Length;
 
@@ -401,7 +402,15 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
             }
 
             if (compliantRegions.Count == 0)
-                compliantRegions = availableRegions; // Fall back if all fail
+            {
+                // All geofence checks failed (compliance service may be unavailable).
+                // Do NOT fall back to all regions — that would violate data-residency regulations.
+                // Abort the placement and surface a fault to the caller.
+                throw new InvalidOperationException(
+                    "Geo-distributed shard placement failed: no compliant regions found. " +
+                    "All geofence checks failed (possible compliance service outage). " +
+                    "Data placement aborted to preserve data-residency compliance.");
+            }
 
             // Distribute shards across continents using consistent hashing with geo-awareness
             var continentGroups = compliantRegions
@@ -481,7 +490,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
         private async Task<bool> WriteShardToRegionAsync(
             string shardId, byte[] shardData, string regionId, CancellationToken ct)
         {
-            var correlationId = $"shard-write-{shardId}";
+            // Append a unique token so the correlationId is not guessable/injectable
+            // from an attacker-controlled shardId (finding 3707).
+            var correlationId = $"shard-write-{shardId}-{Guid.NewGuid():N}";
             var tcs = new TaskCompletionSource<bool>();
 
             var subscription = _messageBus.Subscribe(StorageWriteResponseTopic, msg =>

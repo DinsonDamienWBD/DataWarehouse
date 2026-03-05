@@ -46,9 +46,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
         private bool _allowInsecureCoap;
 
         /// <summary>
-        /// CSPRNG-generated initial message ID to prevent predictable message ID attacks.
+        /// CSPRNG-generated initial message ID stored as int for Interlocked operations.
+        /// Finding 1968: Use Interlocked.Increment to make GetNextMessageId thread-safe.
         /// </summary>
-        private ushort _currentMessageId;
+        private int _currentMessageId;
 
         /// <inheritdoc/>
         public override string StrategyId => "coap";
@@ -80,8 +81,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
         /// Generates a cryptographically random initial message ID (NET-05).
         /// Prevents predictable sequential message ID attacks.
         /// </summary>
-        /// <returns>A random unsigned 16-bit message ID.</returns>
-        private static ushort GenerateRandomMessageId()
+        /// <returns>A random int seeded from a 16-bit CSPRNG value.</returns>
+        private static int GenerateRandomMessageId()
         {
             Span<byte> buffer = stackalloc byte[2];
             RandomNumberGenerator.Fill(buffer);
@@ -89,20 +90,20 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
         }
 
         /// <summary>
-        /// Gets the next message ID using CSPRNG-seeded counter with wraparound.
+        /// Gets the next message ID using CSPRNG-seeded counter with atomic wraparound.
+        /// Finding 1968: Interlocked.Increment prevents torn reads/writes on concurrent callers.
         /// </summary>
-        /// <returns>The next message ID.</returns>
+        /// <returns>The next message ID (masked to 16-bit CoAP range).</returns>
         public ushort GetNextMessageId()
         {
-            return _currentMessageId++;
+            return (ushort)(Interlocked.Increment(ref _currentMessageId) & 0xFFFF);
         }
 
         /// <inheritdoc/>
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var parts = config.ConnectionString.Split(':');
-            var host = parts[0];
-            var port = parts.Length > 1 ? int.Parse(parts[1]) : 5683;
+            // P2-2132: Use ParseHostPortSafe to correctly handle IPv6 addresses like [::1]:5683
+            var (host, port) = ParseHostPortSafe(config.ConnectionString ?? throw new ArgumentException("Connection string required"), 5683);
 
             // NET-05: Load security configuration
             _useDtls = GetConfiguration(config, "UseDtls", true);
@@ -146,7 +147,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
                 ["connected_at"] = DateTimeOffset.UtcNow,
                 ["dtls_enabled"] = isSecurePort || connectionScheme == "coaps",
                 ["insecure_allowed"] = _allowInsecureCoap,
-                ["initial_message_id"] = _currentMessageId
+                ["initial_message_id"] = (ushort)(_currentMessageId & 0xFFFF)
             };
 
             System.Diagnostics.Trace.TraceInformation(
@@ -157,10 +158,21 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
         }
 
         /// <inheritdoc/>
-        protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
+            // Finding 1969: UDP has no real connection state — probe by sending a CoAP ping
+            // (CON with empty payload, type=0, code=0, token-length=0) and verifying send succeeds.
             var client = handle.GetConnection<UdpClient>();
-            return Task.FromResult(client.Client?.Connected ?? false);
+            if (client.Client == null) return false;
+            try
+            {
+                var msgId = GetNextMessageId();
+                // CoAP CON ping: Ver=1, T=0(CON), TKL=0, Code=0.00, MsgId
+                var ping = new byte[] { 0x40, 0x00, (byte)(msgId >> 8), (byte)(msgId & 0xFF) };
+                await client.SendAsync(ping, ping.Length).WaitAsync(ct);
+                return true;
+            }
+            catch { return false; }
         }
 
         /// <inheritdoc/>
@@ -173,16 +185,16 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
         }
 
         /// <inheritdoc/>
-        protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
+        protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
-            var client = handle.GetConnection<UdpClient>();
-            var isHealthy = client.Client?.Connected ?? false;
-
-            return Task.FromResult(new ConnectionHealth(
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var isHealthy = await TestCoreAsync(handle, ct);
+            sw.Stop();
+            return new ConnectionHealth(
                 IsHealthy: isHealthy,
-                StatusMessage: isHealthy ? "CoAP device connected" : "CoAP device disconnected",
-                Latency: TimeSpan.Zero,
-                CheckedAt: DateTimeOffset.UtcNow));
+                StatusMessage: isHealthy ? "CoAP endpoint reachable" : "CoAP endpoint unreachable",
+                Latency: sw.Elapsed,
+                CheckedAt: DateTimeOffset.UtcNow);
         }
 
         /// <inheritdoc/>

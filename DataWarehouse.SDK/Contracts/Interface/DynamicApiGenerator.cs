@@ -220,6 +220,7 @@ public sealed class DynamicApiGenerator : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
+        DynamicApiModel model;
         lock (_regenerateLock)
         {
             var capabilities = _registry.GetAll();
@@ -236,7 +237,7 @@ public sealed class DynamicApiGenerator : IDisposable
                 endpoints.AddRange(generated);
             }
 
-            var model = new DynamicApiModel
+            model = new DynamicApiModel
             {
                 Endpoints = endpoints.AsReadOnly(),
                 DataTypes = dataTypes.AsReadOnly(),
@@ -246,9 +247,11 @@ public sealed class DynamicApiGenerator : IDisposable
             };
 
             _currentModel = model;
-            ModelRegenerated?.Invoke(this, model);
-            return model;
         }
+
+        // Raise the event outside the lock to prevent deadlock if a subscriber calls back into Regenerate()
+        ModelRegenerated?.Invoke(this, model);
+        return model;
     }
 
     /// <summary>

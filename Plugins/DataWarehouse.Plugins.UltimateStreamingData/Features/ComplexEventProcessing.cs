@@ -258,13 +258,21 @@ internal sealed class ComplexEventProcessing : IDisposable
     {
         ArgumentNullException.ThrowIfNull(events);
 
-        var allMatches = new List<CepMatchResult>();
-        foreach (var evt in events)
+        // Process events concurrently for throughput; order of match detection within a batch
+        // is not guaranteed but each individual ProcessEventAsync call is atomic per pattern state.
+        var eventList = events as IList<StreamEvent> ?? events.ToList();
+        var tasks = new Task<IReadOnlyList<CepMatchResult>>[eventList.Count];
+        for (int i = 0; i < eventList.Count; i++)
         {
             ct.ThrowIfCancellationRequested();
-            var matches = await ProcessEventAsync(evt, ct);
-            allMatches.AddRange(matches);
+            tasks[i] = ProcessEventAsync(eventList[i], ct);
         }
+
+        var results = await Task.WhenAll(tasks).ConfigureAwait(false);
+
+        var allMatches = new List<CepMatchResult>(results.Sum(r => r.Count));
+        foreach (var r in results)
+            allMatches.AddRange(r);
         return allMatches;
     }
 
@@ -508,9 +516,11 @@ internal sealed class ComplexEventProcessing : IDisposable
         {
             await _messageBus.PublishAsync("streaming.cep.match", message, ct);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+
             // Non-critical: match notification failure does not affect CEP processing
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -543,8 +553,12 @@ internal sealed class ComplexEventProcessing : IDisposable
 
         public void AddEvent(string eventType, StreamEvent evt, TimeSpan window)
         {
-            var bag = _eventsByType.GetOrAdd(eventType, _ => new ConcurrentBag<TimestampedEvent>());
-            bag.Add(new TimestampedEvent(evt, DateTimeOffset.UtcNow));
+            // Hold _lock to prevent PurgeExpired swapping the bag under us.
+            lock (_lock)
+            {
+                var bag = _eventsByType.GetOrAdd(eventType, _ => new ConcurrentBag<TimestampedEvent>());
+                bag.Add(new TimestampedEvent(evt, DateTimeOffset.UtcNow));
+            }
         }
 
         public IReadOnlyList<StreamEvent> GetEventsForType(string eventType)
@@ -566,13 +580,16 @@ internal sealed class ComplexEventProcessing : IDisposable
         public void PurgeExpired(TimeSpan window)
         {
             var cutoff = DateTimeOffset.UtcNow - window;
-            foreach (var (eventType, bag) in _eventsByType)
+            // Use the per-state lock to make the bag swap atomic w.r.t. AddEvent.
+            lock (_lock)
             {
-                var remaining = bag.Where(te => te.AddedAt >= cutoff).ToArray();
-                if (remaining.Length < bag.Count)
+                foreach (var (eventType, bag) in _eventsByType)
                 {
-                    var newBag = new ConcurrentBag<TimestampedEvent>(remaining);
-                    _eventsByType[eventType] = newBag;
+                    var remaining = bag.Where(te => te.AddedAt >= cutoff).ToArray();
+                    if (remaining.Length < bag.Count)
+                    {
+                        _eventsByType[eventType] = new ConcurrentBag<TimestampedEvent>(remaining);
+                    }
                 }
             }
         }

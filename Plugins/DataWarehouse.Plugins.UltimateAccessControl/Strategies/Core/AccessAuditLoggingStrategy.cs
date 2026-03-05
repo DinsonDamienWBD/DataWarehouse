@@ -90,7 +90,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
 
             // Start background flush timer
             _flushTimer = new Timer(
-                async _ => await FlushLogsAsync(),
+                async _ => { try { await FlushLogsAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } },
                 null,
                 _flushInterval,
                 _flushInterval);
@@ -654,7 +654,9 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
                     }
                     catch
                     {
+
                         // Log destination failure handling
+                        System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                     }
                 });
 

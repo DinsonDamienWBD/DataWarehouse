@@ -186,15 +186,10 @@ public sealed class RollingUpdateStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
-        var results = new List<HealthCheckResult>();
-
-        for (var i = 0; i < currentState.DeployedInstances; i++)
-        {
-            var result = await HealthCheckInstanceAsync(deploymentId, i, null, ct);
-            results.Add(result);
-        }
-
-        return results.ToArray();
+        // P2-2893: Parallelise health checks with Task.WhenAll instead of serial await per instance
+        var tasks = Enumerable.Range(0, currentState.DeployedInstances)
+            .Select(i => HealthCheckInstanceAsync(deploymentId, i, null, ct));
+        return await Task.WhenAll(tasks).ConfigureAwait(false);
     }
 
     protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct)
@@ -529,8 +524,8 @@ public sealed class ABTestingStrategy : DeploymentStrategyBase
 {
     private readonly BoundedDictionary<string, long> _counters = new BoundedDictionary<string, long>(1000);
     private readonly BoundedDictionary<string, DeploymentState> _experimentStates = new BoundedDictionary<string, DeploymentState>(1000);
-    private DateTimeOffset? _lastHealthCheck;
-    private bool _lastHealthCheckResult = true;
+    // Per-deploymentId health cache to avoid single slot shared across concurrent experiments
+    private readonly BoundedDictionary<string, (long TicksUtc, bool IsHealthy)> _healthCache = new BoundedDictionary<string, (long, bool)>(1000);
 
     public override DeploymentCharacteristics Characteristics { get; } = new()
     {
@@ -634,13 +629,15 @@ public sealed class ABTestingStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
-        // Check if health check is cached (60-second cache)
-        if (_lastHealthCheck.HasValue && DateTimeOffset.UtcNow - _lastHealthCheck.Value < TimeSpan.FromSeconds(60))
+        // Per-deploymentId 60-second health cache
+        var nowTicks = DateTimeOffset.UtcNow.UtcTicks;
+        if (_healthCache.TryGetValue(deploymentId, out var cached)
+            && (nowTicks - cached.TicksUtc) < TimeSpan.FromSeconds(60).Ticks)
         {
             return Task.FromResult(new[]
             {
-                new HealthCheckResult { InstanceId = $"{deploymentId}-A", IsHealthy = _lastHealthCheckResult, StatusCode = 200, ResponseTimeMs = 10 },
-                new HealthCheckResult { InstanceId = $"{deploymentId}-B", IsHealthy = _lastHealthCheckResult, StatusCode = 200, ResponseTimeMs = 12 }
+                new HealthCheckResult { InstanceId = $"{deploymentId}-A", IsHealthy = cached.IsHealthy, StatusCode = 200, ResponseTimeMs = 10 },
+                new HealthCheckResult { InstanceId = $"{deploymentId}-B", IsHealthy = cached.IsHealthy, StatusCode = 200, ResponseTimeMs = 12 }
             });
         }
 
@@ -649,8 +646,7 @@ public sealed class ABTestingStrategy : DeploymentStrategyBase
             && expState.Metadata.TryGetValue("experimentStatus", out var status)
             && status?.ToString() == "running";
 
-        _lastHealthCheck = DateTimeOffset.UtcNow;
-        _lastHealthCheckResult = isRunning;
+        _healthCache[deploymentId] = (nowTicks, isRunning);
 
         return Task.FromResult(new[]
         {
@@ -740,8 +736,8 @@ public sealed class ShadowDeploymentStrategy : DeploymentStrategyBase
     private readonly BoundedDictionary<string, long> _counters = new BoundedDictionary<string, long>(1000);
     private readonly BoundedDictionary<string, DeploymentState> _shadowStates = new BoundedDictionary<string, DeploymentState>(1000);
     private readonly System.Collections.Concurrent.ConcurrentQueue<string> _pendingRequests = new();
-    private DateTimeOffset? _lastHealthCheck;
-    private bool _lastHealthCheckResult = true;
+    // Per-deploymentId health cache (thread-safe, no shared single-slot race)
+    private readonly BoundedDictionary<string, (long TicksUtc, bool IsHealthy)> _healthCache = new BoundedDictionary<string, (long, bool)>(1000);
 
     public override DeploymentCharacteristics Characteristics { get; } = new()
     {
@@ -841,15 +837,17 @@ public sealed class ShadowDeploymentStrategy : DeploymentStrategyBase
         DeploymentState currentState,
         CancellationToken ct)
     {
-        // Check if health check is cached (60-second cache)
-        if (_lastHealthCheck.HasValue && DateTimeOffset.UtcNow - _lastHealthCheck.Value < TimeSpan.FromSeconds(60))
+        // Per-deploymentId 60-second health cache
+        var nowTicks = DateTimeOffset.UtcNow.UtcTicks;
+        if (_healthCache.TryGetValue(deploymentId, out var cached)
+            && (nowTicks - cached.TicksUtc) < TimeSpan.FromSeconds(60).Ticks)
         {
             return Task.FromResult(new[]
             {
                 new HealthCheckResult
                 {
                     InstanceId = $"{deploymentId}-shadow",
-                    IsHealthy = _lastHealthCheckResult,
+                    IsHealthy = cached.IsHealthy,
                     StatusCode = 200,
                     ResponseTimeMs = 15,
                     Details = new Dictionary<string, object> { ["type"] = "shadow", ["cached"] = true }
@@ -857,13 +855,12 @@ public sealed class ShadowDeploymentStrategy : DeploymentStrategyBase
             });
         }
 
-        // Check shadow endpoint reachability (simulated)
+        // Check shadow endpoint reachability
         var isReachable = _shadowStates.TryGetValue(deploymentId, out var shadowState)
             && shadowState.Metadata.TryGetValue("mirroringEnabled", out var mirroring)
             && mirroring is bool enabled && enabled;
 
-        _lastHealthCheck = DateTimeOffset.UtcNow;
-        _lastHealthCheckResult = isReachable;
+        _healthCache[deploymentId] = (nowTicks, isReachable);
 
         return Task.FromResult(new[]
         {

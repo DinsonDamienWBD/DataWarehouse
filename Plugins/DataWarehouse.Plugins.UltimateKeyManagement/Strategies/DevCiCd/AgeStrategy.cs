@@ -344,7 +344,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
             }
             catch
             {
+
                 // Ignore permission errors on Windows
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
 
             return new AgeIdentity
@@ -370,11 +372,12 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
             }
             else if (!string.IsNullOrEmpty(_identityContent))
             {
-                // Write identity to temp file for decryption
-                var tempIdentityFile = Path.GetTempFileName();
+                // #3458: Write identity to temp file with restricted permissions, then secure-delete.
+                var tempIdentityFile = Path.Combine(Path.GetTempPath(), $"age-id-{Guid.NewGuid():N}.key");
                 try
                 {
                     await File.WriteAllTextAsync(tempIdentityFile, _identityContent, cancellationToken);
+                    SetOwnerOnlyFilePermissions(tempIdentityFile);
                     arguments = $"-d -i \"{tempIdentityFile}\" \"{encryptedFilePath}\"";
 
                     var result = await ExecuteAgeAsync(arguments, cancellationToken);
@@ -495,10 +498,12 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
         {
             if (!string.IsNullOrEmpty(_identityContent))
             {
-                var tempIdentityFile = Path.GetTempFileName();
+                // #3458: Restricted permissions + secure delete for private key temp files
+                var tempIdentityFile = Path.Combine(Path.GetTempPath(), $"age-pub-{Guid.NewGuid():N}.key");
                 try
                 {
                     await File.WriteAllTextAsync(tempIdentityFile, _identityContent, cancellationToken);
+                    SetOwnerOnlyFilePermissions(tempIdentityFile);
                     var result = await ExecuteAgeKeygenAsync($"-y \"{tempIdentityFile}\"", cancellationToken);
                     return result.ExitCode == 0 ? result.Output?.Trim() : null;
                 }
@@ -599,8 +604,23 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
                 if (File.Exists(filePath))
                 {
                     var fileInfo = new FileInfo(filePath);
-                    var randomData = RandomNumberGenerator.GetBytes((int)Math.Min(fileInfo.Length, 1024 * 1024));
-                    File.WriteAllBytes(filePath, randomData);
+                    var fileLen = fileInfo.Length;
+                    // P2-3477: Overwrite the full file, not just the first 1MB.
+                    // Private keys >1MB (uncommon but valid) would partially survive a capped overwrite.
+                    using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Write, FileShare.None))
+                    {
+                        const int chunkSize = 64 * 1024;
+                        var chunk = new byte[chunkSize];
+                        long remaining = fileLen;
+                        while (remaining > 0)
+                        {
+                            int toWrite = (int)Math.Min(remaining, chunkSize);
+                            RandomNumberGenerator.Fill(chunk.AsSpan(0, toWrite));
+                            fs.Write(chunk, 0, toWrite);
+                            remaining -= toWrite;
+                        }
+                        fs.Flush(flushToDisk: true);
+                    }
                     File.Delete(filePath);
                 }
             }
@@ -608,6 +628,36 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
             {
                 // Best effort secure deletion
                 try { File.Delete(filePath); } catch { /* Best-effort cleanup — failure is non-fatal */ }
+            }
+        }
+
+        // #3458: Set owner-only permissions on sensitive temp files (0600 on Unix, restricted ACL on Windows).
+        private static void SetOwnerOnlyFilePermissions(string filePath)
+        {
+            try
+            {
+                if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
+                    System.Runtime.InteropServices.OSPlatform.Windows))
+                {
+                    var fi = new FileInfo(filePath);
+                    var acl = fi.GetAccessControl();
+                    acl.SetAccessRuleProtection(true, false);
+                    var currentUser = System.Security.Principal.WindowsIdentity.GetCurrent().Name;
+                    acl.AddAccessRule(new System.Security.AccessControl.FileSystemAccessRule(
+                        currentUser,
+                        System.Security.AccessControl.FileSystemRights.FullControl,
+                        System.Security.AccessControl.AccessControlType.Allow));
+                    fi.SetAccessControl(acl);
+                }
+                else
+                {
+                    File.SetUnixFileMode(filePath,
+                        UnixFileMode.UserRead | UnixFileMode.UserWrite);
+                }
+            }
+            catch
+            {
+                // Best-effort; file will still be secure-deleted after use
             }
         }
 

@@ -327,7 +327,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("data_tagging.check");
+            IncrementCounter("data_tagging.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -412,9 +412,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
                 }
             }
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -601,38 +602,48 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
 
         private TagTemplate? ParseTemplateFromConfig(Dictionary<string, object> config)
         {
-            try
+            var templateId = config.GetValueOrDefault("TemplateId")?.ToString() ?? "";
+            var templateName = config.GetValueOrDefault("TemplateName")?.ToString() ?? "";
+
+            // Log and skip invalid templates instead of silently returning null (finding 1430)
+            if (string.IsNullOrWhiteSpace(templateId))
             {
-                return new TagTemplate
-                {
-                    TemplateId = config["TemplateId"]?.ToString() ?? "",
-                    TemplateName = config["TemplateName"]?.ToString() ?? "",
-                    DefaultAllowedRegions = (config.TryGetValue("AllowedRegions", out var ar) && ar is IEnumerable<string> allowed)
-                        ? allowed.ToList() : new List<string>(),
-                    DefaultProhibitedRegions = (config.TryGetValue("ProhibitedRegions", out var pr) && pr is IEnumerable<string> prohibited)
-                        ? prohibited.ToList() : new List<string>(),
-                    DefaultClassification = config.GetValueOrDefault("Classification")?.ToString() ?? "general",
-                    RequiresEncryption = config.TryGetValue("RequiresEncryption", out var enc) && enc is true,
-                    AllowsCrossBorder = !config.TryGetValue("AllowsCrossBorder", out var cb) || cb is true
-                };
-            }
-            catch
-            {
+                System.Diagnostics.Debug.WriteLine(
+                    "[DataTaggingStrategy] WARNING: Skipping tag template with missing TemplateId.");
                 return null;
             }
+            if (string.IsNullOrWhiteSpace(templateName))
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"[DataTaggingStrategy] WARNING: Skipping tag template '{templateId}' with missing TemplateName.");
+                return null;
+            }
+
+            return new TagTemplate
+            {
+                TemplateId = templateId,
+                TemplateName = templateName,
+                DefaultAllowedRegions = (config.TryGetValue("AllowedRegions", out var ar) && ar is IEnumerable<string> allowed)
+                    ? allowed.ToList() : new List<string>(),
+                DefaultProhibitedRegions = (config.TryGetValue("ProhibitedRegions", out var pr) && pr is IEnumerable<string> prohibited)
+                    ? prohibited.ToList() : new List<string>(),
+                DefaultClassification = config.GetValueOrDefault("Classification")?.ToString() ?? "general",
+                RequiresEncryption = config.TryGetValue("RequiresEncryption", out var enc) && enc is true,
+                AllowsCrossBorder = !config.TryGetValue("AllowsCrossBorder", out var cb) || cb is true
+            };
         }
     
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("data_tagging.initialized");
+            IncrementCounter("data_tagging.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("data_tagging.shutdown");
+            IncrementCounter("data_tagging.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

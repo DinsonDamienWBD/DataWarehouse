@@ -215,7 +215,12 @@ public sealed class ChildWorkflowExecutor
         var children = _children.Values
             .Where(c => c.ParentWorkflowId == parentWorkflowId && c.Status == ChildWorkflowStatus.Running)
             .ToList();
-        foreach (var child in children) child.Status = ChildWorkflowStatus.Cancelled;
+        foreach (var child in children)
+        {
+            // Finding 4524: signal the actual running task via the CTS, not just flip the status field.
+            child.Cts.Cancel();
+            child.Status = ChildWorkflowStatus.Cancelled;
+        }
         return children.Count;
     }
 }
@@ -245,6 +250,12 @@ public sealed class ChildWorkflowRecord
     public DateTime? CompletedAt { get; set; }
     public WorkflowResult? Result { get; set; }
     public ParentClosePolicy CancellationOnParentClose { get; init; }
+    /// <summary>
+    /// Finding 4524: CancellationTokenSource for this child workflow, so CancelChildren
+    /// actually signals the running task rather than only flipping a status field.
+    /// </summary>
+    public CancellationTokenSource Cts { get; } = new CancellationTokenSource();
+    public CancellationToken CancellationToken => Cts.Token;
 }
 
 /// <summary>Handle to a running child workflow.</summary>
@@ -277,20 +288,23 @@ public sealed class ActivityHeartbeatManager
     /// <summary>Records a heartbeat for an activity.</summary>
     public void RecordHeartbeat(string activityId, object? details = null)
     {
+        // The AddOrUpdate update factory may be invoked multiple times by ConcurrentDictionary
+        // on contention. Mutating the existing object in-place inside the factory is not safe.
+        // Return a fresh instance each time instead.
         _heartbeats.AddOrUpdate(activityId,
-            new ActivityHeartbeat
+            _ => new ActivityHeartbeat
             {
                 ActivityId = activityId,
                 Details = details,
                 LastHeartbeat = DateTime.UtcNow,
                 HeartbeatCount = 1
             },
-            (_, existing) =>
+            (_, existing) => new ActivityHeartbeat
             {
-                existing.LastHeartbeat = DateTime.UtcNow;
-                existing.Details = details;
-                existing.HeartbeatCount++;
-                return existing;
+                ActivityId = activityId,
+                Details = details,
+                LastHeartbeat = DateTime.UtcNow,
+                HeartbeatCount = existing.HeartbeatCount + 1
             });
     }
 

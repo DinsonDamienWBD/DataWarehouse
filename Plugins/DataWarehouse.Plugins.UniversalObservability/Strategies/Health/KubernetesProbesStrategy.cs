@@ -19,6 +19,7 @@ public sealed class KubernetesProbesStrategy : ObservabilityStrategyBase
     private volatile bool _isLive = true;
     private volatile bool _isReady = false;
     private volatile bool _isStarted = false;
+    private readonly object _startLock = new();
     private readonly BoundedDictionary<string, HealthCheck> _healthChecks = new BoundedDictionary<string, HealthCheck>(1000);
     private readonly BoundedDictionary<string, string> _metadata = new BoundedDictionary<string, string>(1000);
 
@@ -27,7 +28,10 @@ public sealed class KubernetesProbesStrategy : ObservabilityStrategyBase
 
     public KubernetesProbesStrategy() : base(new ObservabilityCapabilities(
         SupportsMetrics: false, SupportsTracing: false, SupportsLogging: false,
-        SupportsDistributedTracing: false, SupportsAlerting: false,
+        SupportsDistributedTracing: false,
+        // Finding 4614: liveness/readiness probe failures cause Kubernetes to redirect traffic
+        // away from the pod and trigger pod restarts — this is alerting/remediation behaviour.
+        SupportsAlerting: true,
         SupportedExporters: new[] { "Kubernetes", "K8sProbes", "HTTP" }))
     {
     }
@@ -38,31 +42,47 @@ public sealed class KubernetesProbesStrategy : ObservabilityStrategyBase
     }
 
     /// <summary>
-    /// Starts the HTTP listener for probes.
+    /// Starts the HTTP listener for probes. Idempotent — calling when already started is a no-op.
     /// </summary>
     public void StartProbeServer()
     {
-        _cts = new CancellationTokenSource();
-        _listener = new HttpListener();
-        _listener.Prefixes.Add(_prefix);
-        _listener.Start();
-
-        _serverTask = Task.Run(async () =>
+        // Double-checked locking to guarantee at most one listener is created even under concurrent calls.
+        if (_isStarted) return;
+        lock (_startLock)
         {
-            while (!_cts.Token.IsCancellationRequested)
-            {
-                try
-                {
-                    var context = await _listener.GetContextAsync();
-                    await HandleRequestAsync(context);
-                }
-                catch (Exception) when (_cts.Token.IsCancellationRequested) { break; }
-                catch { /* Continue */ }
-            }
-        });
+            if (_isStarted) return;
 
-        _isStarted = true;
-        _isReady = true;
+            _cts = new CancellationTokenSource();
+            _listener = new HttpListener();
+            _listener.Prefixes.Add(_prefix);
+            _listener.Start();
+
+            _serverTask = Task.Run(async () =>
+            {
+                while (!_cts.Token.IsCancellationRequested)
+                {
+                    try
+                    {
+                        var context = await _listener.GetContextAsync();
+                        await HandleRequestAsync(context);
+                    }
+                    catch (Exception ex) when (_cts.Token.IsCancellationRequested)
+                    {
+                        _ = ex; // Expected on shutdown
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        // Log unexpected errors from GetContextAsync but keep the probe server alive
+                        System.Diagnostics.Trace.TraceWarning(
+                            "[KubernetesProbes] GetContextAsync error: {0}", ex.Message);
+                    }
+                }
+            });
+
+            _isReady = true;
+            _isStarted = true;
+        }
     }
 
     /// <summary>

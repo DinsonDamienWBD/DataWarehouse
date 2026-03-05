@@ -75,7 +75,7 @@ namespace DataWarehouse.SDK.Infrastructure.Scaling
         private long _totalDropped;
         private volatile ScalingLimits _currentLimits;
         private volatile BackpressureState _backpressureState = BackpressureState.Normal;
-        private bool _disposed;
+        private volatile bool _disposed; // P2-523: volatile prevents stale reads from concurrent threads
 
         /// <summary>
         /// Initializes a new <see cref="ScalableMessageBus"/> decorating the given inner bus.
@@ -115,6 +115,14 @@ namespace DataWarehouse.SDK.Infrastructure.Scaling
             var partitionIndex = GetPartitionIndex(message, partitionSet.PartitionCount);
             var partition = partitionSet.Partitions[partitionIndex];
 
+            // Check backpressure BEFORE enqueue so the message never enters the queue when shedding
+            if (_backpressureState == BackpressureState.Shedding)
+            {
+                Interlocked.Increment(ref _totalDropped);
+                Interlocked.Increment(ref _totalPublished);
+                return;
+            }
+
             if (partition.RingBuffer != null)
             {
                 // Hot path: use Disruptor ring buffer
@@ -132,13 +140,6 @@ namespace DataWarehouse.SDK.Infrastructure.Scaling
 
             Interlocked.Increment(ref partition.EnqueuedCount);
             Interlocked.Increment(ref _totalPublished);
-
-            // Check backpressure: if shedding, drop non-critical messages
-            if (_backpressureState == BackpressureState.Shedding)
-            {
-                Interlocked.Increment(ref _totalDropped);
-                return;
-            }
 
             // Delegate to inner bus for actual delivery
             await _inner.PublishAsync(topic, message, ct).ConfigureAwait(false);
@@ -403,7 +404,7 @@ namespace DataWarehouse.SDK.Infrastructure.Scaling
         private sealed class TopicPartition
         {
             public readonly ConcurrentQueue<PluginMessage> Queue = new();
-            public MessageRingBuffer? RingBuffer;
+            public volatile MessageRingBuffer? RingBuffer;
             public long EnqueuedCount;
             public int SubscriberCount;
             public long FallbackCount;

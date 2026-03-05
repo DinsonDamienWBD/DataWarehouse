@@ -1,4 +1,4 @@
-﻿using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Primitives;
 
 namespace DataWarehouse.SDK.Contracts
 {
@@ -27,16 +27,18 @@ namespace DataWarehouse.SDK.Contracts
         /// "Hello, I am Node A. Here are my public capabilities."
         /// </summary>
         /// <param name="nodeId"></param>
+        /// <param name="ct">Cancellation token.</param>
         /// <returns></returns>
-        Task<NodeHandshake> HandshakeAsync(string nodeId);
+        Task<NodeHandshake> HandshakeAsync(string nodeId, CancellationToken ct = default);
 
         /// <summary>
         /// Get manifest from a node.
         /// "Do you have file X?"
         /// </summary>
         /// <param name="uri"></param>
+        /// <param name="ct">Cancellation token.</param>
         /// <returns></returns>
-        Task<Manifest?> GetManifestAsync(string uri);
+        Task<Manifest?> GetManifestAsync(string uri, CancellationToken ct = default);
 
         /// <summary>
         /// Read data from a node.
@@ -45,8 +47,9 @@ namespace DataWarehouse.SDK.Contracts
         /// <param name="uri"></param>
         /// <param name="offset"></param>
         /// <param name="length"></param>
+        /// <param name="ct">Cancellation token.</param>
         /// <returns></returns>
-        Task<Stream> OpenReadStreamAsync(string uri, long offset, long length);
+        Task<Stream> OpenReadStreamAsync(string uri, long offset, long length, CancellationToken ct = default);
 
         /// <summary>
         /// Write data to a node.
@@ -54,7 +57,8 @@ namespace DataWarehouse.SDK.Contracts
         /// </summary>
         /// <param name="uri"></param>
         /// <param name="data"></param>
+        /// <param name="ct">Cancellation token.</param>
         /// <returns></returns>
-        Task WriteStreamAsync(string uri, Stream data);
+        Task WriteStreamAsync(string uri, Stream data, CancellationToken ct = default);
     }
 }

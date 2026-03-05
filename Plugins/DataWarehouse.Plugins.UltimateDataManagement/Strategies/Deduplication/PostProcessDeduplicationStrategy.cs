@@ -155,8 +155,16 @@ public sealed class PostProcessDeduplicationStrategy : DeduplicationStrategyBase
         try
         {
             _isProcessing = true;
-            // Sync bridge: Timer callback cannot be async. Task.Run avoids deadlocks.
-            Task.Run(() => ProcessBatchInternalAsync(CancellationToken.None)).ConfigureAwait(false).GetAwaiter().GetResult();
+            // P2-2415: ProcessBatchInternalAsync is synchronous (returns Task.FromResult).
+            // Use .GetAwaiter().GetResult() only because there is no SynchronizationContext
+            // on a timer callback thread. This is safe and avoids spawning another Task.
+            var t = ProcessBatchInternalAsync(CancellationToken.None);
+            // The task is already completed; GetResult() does NOT block.
+            _ = t.GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[PostProcessDedup] Batch processing error: {ex}");
         }
         finally
         {

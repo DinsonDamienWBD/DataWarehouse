@@ -258,11 +258,7 @@ internal sealed class AmqpStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
             return SdkInterface.InterfaceResponse.NotFound($"Queue not found: {queueName}");
 
         var count = request.QueryParameters.TryGetValue("count", out var countStr) && int.TryParse(countStr, out var c) ? c : 1;
-        var messages = queue.Messages.Take(count).ToList();
-
-        // Remove consumed messages (basic.get - auto-ack for simplicity)
-        foreach (var msg in messages)
-            queue.Messages.Remove(msg);
+        var messages = queue.DequeueMessages(count);
 
         var responsePayload = JsonSerializer.SerializeToUtf8Bytes(new
         {
@@ -377,7 +373,7 @@ internal sealed class AmqpStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
         {
             if (_queues.TryGetValue(binding.Queue, out var queue))
             {
-                queue.Messages.Add(message);
+                queue.EnqueueMessage(message);
                 deliveredQueues.Add(binding.Queue);
             }
         }
@@ -408,7 +404,11 @@ internal sealed class AmqpStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
         while (pIndex < patternParts.Length && kIndex < keyParts.Length)
         {
             if (patternParts[pIndex] == "#")
-                return true; // Multi-word wildcard matches rest
+            {
+                // P2-3322: # must be the last segment per AMQP spec (matches zero or more words).
+                // Returning true here is only valid when # is the final pattern token.
+                return pIndex == patternParts.Length - 1;
+            }
 
             if (patternParts[pIndex] != "*" && patternParts[pIndex] != keyParts[kIndex])
                 return false;
@@ -416,6 +416,10 @@ internal sealed class AmqpStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
             pIndex++;
             kIndex++;
         }
+
+        // Handle trailing # with remaining key parts when loop exits normally
+        if (pIndex < patternParts.Length && patternParts[pIndex] == "#")
+            return pIndex == patternParts.Length - 1;
 
         return pIndex == patternParts.Length && kIndex == keyParts.Length;
     }
@@ -438,7 +442,31 @@ internal sealed class AmqpQueue
     public bool Durable { get; init; }
     public bool Exclusive { get; init; }
     public bool AutoDelete { get; init; }
-    public List<AmqpMessage> Messages { get; } = new();
+    private readonly object _messagesLock = new();
+    private readonly List<AmqpMessage> _messages = new();
+
+    public void EnqueueMessage(AmqpMessage message)
+    {
+        lock (_messagesLock)
+        {
+            _messages.Add(message);
+        }
+    }
+
+    public List<AmqpMessage> DequeueMessages(int count)
+    {
+        lock (_messagesLock)
+        {
+            var taken = _messages.Take(count).ToList();
+            _messages.RemoveRange(0, taken.Count);
+            return taken;
+        }
+    }
+
+    public int MessageCount
+    {
+        get { lock (_messagesLock) { return _messages.Count; } }
+    }
 }
 
 internal sealed class AmqpBinding

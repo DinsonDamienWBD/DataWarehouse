@@ -38,7 +38,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
     [SdkCompatibility("5.0.0", Notes = "Phase 59: Crypto key rotation")]
     public sealed class MlKem512Strategy : EncryptionStrategyBase
     {
-        private readonly SecureRandom _secureRandom;
 
         /// <inheritdoc/>
         public override CipherInfo CipherInfo => new()
@@ -55,12 +54,14 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
             SecurityLevel = SecurityLevel.QuantumSafe,
             Parameters = new Dictionary<string, object>
             {
+                // NOTE (finding #2992): NTRU is NOT ML-KEM/FIPS 203. NTRU and ML-KEM use
+                // different lattice constructions with incompatible key formats. FipsReference
+                // removed to avoid false compliance claims.
                 ["KemAlgorithm"] = "NTRU-HPS-2048-509",
-                ["FipsReference"] = "FIPS 203",
                 ["NistLevel"] = 1,
-                ["KemImplementation"] = "BouncyCastle-NTRU (ML-KEM compatible)",
+                ["KemImplementation"] = "BouncyCastle-NTRU",
                 ["MigrationTarget"] = "crystals-kyber-512",
-                ["Note"] = "ML-KEM-512 via NTRU lattice-based KEM (FIPS 203)"
+                ["Note"] = "NTRU-HPS-2048-509 KEM (NOT ML-KEM/FIPS 203 — incompatible lattice construction and key format)"
             }
         };
 
@@ -86,14 +87,13 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         }
 
         /// <inheritdoc/>
-        public override string StrategyName => "NTRU-HPS-2048-509 + AES-256-GCM (ML-KEM-512, FIPS 203)";
+        public override string StrategyName => "NTRU-HPS-2048-509 + AES-256-GCM (NIST Level 1, via ml-kem-512)";
 
         /// <summary>
         /// Initializes a new instance of the NTRU-based encryption strategy.
         /// </summary>
         public MlKem512Strategy()
         {
-            _secureRandom = new SecureRandom();
         }
 
         /// <inheritdoc/>
@@ -109,7 +109,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 var recipientPublicKey = NtruPublicKeyParameters.FromEncoding(NtruParameters.NtruHps2048509, key);
 
                 // Encapsulate to derive shared secret
-                var kemGenerator = new NtruKemGenerator(_secureRandom);
+                var kemGenerator = new NtruKemGenerator(new SecureRandom());
                 var encapsulated = kemGenerator.GenerateEncapsulated(recipientPublicKey);
 
                 var kemCiphertext = encapsulated.GetEncapsulation();
@@ -205,7 +205,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public override byte[] GenerateKey()
         {
-            var keyGenParams = new NtruKeyGenerationParameters(_secureRandom, NtruParameters.NtruHps2048509);
+            var keyGenParams = new NtruKeyGenerationParameters(new SecureRandom(), NtruParameters.NtruHps2048509);
             var keyPairGenerator = new NtruKeyPairGenerator();
             keyPairGenerator.Init(keyGenParams);
             var keyPair = keyPairGenerator.GenerateKeyPair();
@@ -218,7 +218,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair()
         {
-            var keyGenParams = new NtruKeyGenerationParameters(_secureRandom, NtruParameters.NtruHps2048509);
+            var keyGenParams = new NtruKeyGenerationParameters(new SecureRandom(), NtruParameters.NtruHps2048509);
             var keyPairGenerator = new NtruKeyPairGenerator();
             keyPairGenerator.Init(keyGenParams);
             var keyPair = keyPairGenerator.GenerateKeyPair();
@@ -248,7 +248,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
     [SdkCompatibility("5.0.0", Notes = "Phase 59: Crypto key rotation")]
     public sealed class MlKem768Strategy : EncryptionStrategyBase
     {
-        private readonly SecureRandom _secureRandom;
 
         /// <inheritdoc/>
         public override CipherInfo CipherInfo => new()
@@ -265,12 +264,12 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
             SecurityLevel = SecurityLevel.QuantumSafe,
             Parameters = new Dictionary<string, object>
             {
+                // NOTE (finding #2992): NTRU is NOT ML-KEM/FIPS 203. FipsReference removed.
                 ["KemAlgorithm"] = "NTRU-HPS-2048-677",
-                ["FipsReference"] = "FIPS 203",
                 ["NistLevel"] = 3,
-                ["KemImplementation"] = "BouncyCastle-NTRU (ML-KEM compatible)",
+                ["KemImplementation"] = "BouncyCastle-NTRU",
                 ["MigrationTarget"] = "crystals-kyber-768",
-                ["Note"] = "ML-KEM-768 via NTRU lattice-based KEM (FIPS 203)"
+                ["Note"] = "NTRU-HPS-2048-677 KEM (NOT ML-KEM/FIPS 203 — incompatible lattice construction and key format)"
             }
         };
 
@@ -278,11 +277,10 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         public override string StrategyId => "ml-kem-768";
 
         /// <inheritdoc/>
-        public override string StrategyName => "NTRU-HPS-2048-677 + AES-256-GCM (ML-KEM-768, FIPS 203)";
+        public override string StrategyName => "NTRU-HPS-2048-677 + AES-256-GCM (NIST Level 3, via ml-kem-768)";
 
         public MlKem768Strategy()
         {
-            _secureRandom = new SecureRandom();
         }
 
         /// <inheritdoc/>
@@ -295,7 +293,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
             return await Task.Run(() =>
             {
                 var recipientPublicKey = NtruPublicKeyParameters.FromEncoding(NtruParameters.NtruHps2048677, key);
-                var kemGenerator = new NtruKemGenerator(_secureRandom);
+                var kemGenerator = new NtruKemGenerator(new SecureRandom());
                 var encapsulated = kemGenerator.GenerateEncapsulated(recipientPublicKey);
 
                 var kemCiphertext = encapsulated.GetEncapsulation();
@@ -382,7 +380,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public override byte[] GenerateKey()
         {
-            var keyGenParams = new NtruKeyGenerationParameters(_secureRandom, NtruParameters.NtruHps2048677);
+            var keyGenParams = new NtruKeyGenerationParameters(new SecureRandom(), NtruParameters.NtruHps2048677);
             var keyPairGenerator = new NtruKeyPairGenerator();
             keyPairGenerator.Init(keyGenParams);
             var keyPair = keyPairGenerator.GenerateKeyPair();
@@ -395,7 +393,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair()
         {
-            var keyGenParams = new NtruKeyGenerationParameters(_secureRandom, NtruParameters.NtruHps2048677);
+            var keyGenParams = new NtruKeyGenerationParameters(new SecureRandom(), NtruParameters.NtruHps2048677);
             var keyPairGenerator = new NtruKeyPairGenerator();
             keyPairGenerator.Init(keyGenParams);
             var keyPair = keyPairGenerator.GenerateKeyPair();
@@ -425,7 +423,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
     [SdkCompatibility("5.0.0", Notes = "Phase 59: Crypto key rotation")]
     public sealed class MlKem1024Strategy : EncryptionStrategyBase
     {
-        private readonly SecureRandom _secureRandom;
 
         /// <inheritdoc/>
         public override CipherInfo CipherInfo => new()
@@ -442,12 +439,12 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
             SecurityLevel = SecurityLevel.QuantumSafe,
             Parameters = new Dictionary<string, object>
             {
+                // NOTE (finding #2992): NTRU is NOT ML-KEM/FIPS 203. FipsReference removed.
                 ["KemAlgorithm"] = "NTRU-HPS-4096-821",
-                ["FipsReference"] = "FIPS 203",
                 ["NistLevel"] = 5,
-                ["KemImplementation"] = "BouncyCastle-NTRU (ML-KEM compatible)",
+                ["KemImplementation"] = "BouncyCastle-NTRU",
                 ["MigrationTarget"] = "crystals-kyber-1024",
-                ["Note"] = "ML-KEM-1024 via NTRU lattice-based KEM (FIPS 203)"
+                ["Note"] = "NTRU-HPS-4096-821 KEM (NOT ML-KEM/FIPS 203 — incompatible lattice construction and key format)"
             }
         };
 
@@ -455,11 +452,10 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         public override string StrategyId => "ml-kem-1024";
 
         /// <inheritdoc/>
-        public override string StrategyName => "NTRU-HPS-4096-821 + AES-256-GCM (ML-KEM-1024, FIPS 203)";
+        public override string StrategyName => "NTRU-HPS-4096-821 + AES-256-GCM (NIST Level 5, via ml-kem-1024)";
 
         public MlKem1024Strategy()
         {
-            _secureRandom = new SecureRandom();
         }
 
         /// <inheritdoc/>
@@ -472,7 +468,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
             return await Task.Run(() =>
             {
                 var recipientPublicKey = NtruPublicKeyParameters.FromEncoding(NtruParameters.NtruHps4096821, key);
-                var kemGenerator = new NtruKemGenerator(_secureRandom);
+                var kemGenerator = new NtruKemGenerator(new SecureRandom());
                 var encapsulated = kemGenerator.GenerateEncapsulated(recipientPublicKey);
 
                 var kemCiphertext = encapsulated.GetEncapsulation();
@@ -559,7 +555,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public override byte[] GenerateKey()
         {
-            var keyGenParams = new NtruKeyGenerationParameters(_secureRandom, NtruParameters.NtruHps4096821);
+            var keyGenParams = new NtruKeyGenerationParameters(new SecureRandom(), NtruParameters.NtruHps4096821);
             var keyPairGenerator = new NtruKeyPairGenerator();
             keyPairGenerator.Init(keyGenParams);
             var keyPair = keyPairGenerator.GenerateKeyPair();
@@ -572,7 +568,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// </summary>
         public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair()
         {
-            var keyGenParams = new NtruKeyGenerationParameters(_secureRandom, NtruParameters.NtruHps4096821);
+            var keyGenParams = new NtruKeyGenerationParameters(new SecureRandom(), NtruParameters.NtruHps4096821);
             var keyPairGenerator = new NtruKeyPairGenerator();
             keyPairGenerator.Init(keyGenParams);
             var keyPair = keyPairGenerator.GenerateKeyPair();

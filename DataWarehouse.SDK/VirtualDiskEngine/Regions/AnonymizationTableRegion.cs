@@ -326,9 +326,9 @@ public sealed class AnonymizationTableRegion
 
         while (mappingIndex < _mappings.Count)
         {
-            int blockPayloadEnd = payloadSize;
-
-            if (offset + AnonymizationMapping.SerializedSize > blockPayloadEnd)
+            // offset is relative to current block start
+            // payloadSize accounts for trailer but not for the block-0 header
+            if (offset + AnonymizationMapping.SerializedSize > payloadSize)
             {
                 UniversalBlockTrailer.Write(
                     buffer.Slice(currentBlock * blockSize, blockSize),
@@ -389,12 +389,22 @@ public sealed class AnonymizationTableRegion
 
         int mappingCount = BinaryPrimitives.ReadInt32LittleEndian(block0);
 
+        // Cat 14 (finding 895): upper-bound mappingCount before entering the deserialization loop.
+        // An arbitrarily large value from a corrupt block device would otherwise trigger
+        // ArgumentOutOfRangeException deep in the loop rather than a clean InvalidDataException here.
+        int payloadSize = UniversalBlockTrailer.PayloadSize(blockSize);
+        int maxPossibleMappingsPerBlock = payloadSize / AnonymizationMapping.SerializedSize;
+        int maxBlocks = buffer.Length / blockSize;
+        int absoluteMax = maxPossibleMappingsPerBlock * maxBlocks;
+        if (mappingCount < 0 || mappingCount > absoluteMax)
+            throw new InvalidDataException(
+                $"AnonymizationTableRegion: mappingCount {mappingCount} is out of range [0, {absoluteMax}].");
+
         var region = new AnonymizationTableRegion
         {
             Generation = trailer.GenerationNumber
         };
 
-        int payloadSize = UniversalBlockTrailer.PayloadSize(blockSize);
         int offset = HeaderFieldsSize;
         int currentBlock = 0;
         int mappingsRead = 0;

@@ -5,6 +5,7 @@ using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
+using DataWarehouse.Plugins.UltimateDataCatalog.Delegation;
 
 namespace DataWarehouse.Plugins.UltimateDataCatalog;
 
@@ -34,8 +35,8 @@ public sealed class UltimateDataCatalogPlugin : DataManagementPluginBase, IDispo
     private readonly StrategyRegistry<IDataCatalogStrategy> _registry;
     private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private readonly BoundedDictionary<string, CatalogAsset> _assets = new BoundedDictionary<string, CatalogAsset>(1000);
-    private readonly BoundedDictionary<string, CatalogRelationship> _relationships = new BoundedDictionary<string, CatalogRelationship>(1000);
     private readonly BoundedDictionary<string, BusinessTerm> _glossary = new BoundedDictionary<string, BusinessTerm>(1000);
+    private readonly MessageBusDelegationHelper _lineageDelegation;
     private bool _disposed;
 
     private volatile bool _auditEnabled = true;
@@ -80,6 +81,7 @@ public sealed class UltimateDataCatalogPlugin : DataManagementPluginBase, IDispo
     public UltimateDataCatalogPlugin()
     {
         _registry = new StrategyRegistry<IDataCatalogStrategy>(s => s.StrategyId);
+        _lineageDelegation = new MessageBusDelegationHelper(Name, () => MessageBus, "lineage");
         DiscoverAndRegisterStrategies();
     }
 
@@ -211,7 +213,6 @@ public sealed class UltimateDataCatalogPlugin : DataManagementPluginBase, IDispo
         var metadata = base.GetMetadata();
         metadata["TotalStrategies"] = _registry.Count;
         metadata["CatalogAssets"] = _assets.Count;
-        metadata["CatalogRelationships"] = _relationships.Count;
         metadata["GlossaryTerms"] = _glossary.Count;
         metadata["TotalOperations"] = Interlocked.Read(ref _totalOperations);
         metadata["SearchQueries"] = Interlocked.Read(ref _searchQueries);
@@ -314,40 +315,123 @@ public sealed class UltimateDataCatalogPlugin : DataManagementPluginBase, IDispo
         return Task.CompletedTask;
     }
 
-    private Task HandleLineageAsync(PluginMessage message)
+    private async Task HandleLineageAsync(PluginMessage message)
     {
         var action = message.Payload.TryGetValue("action", out var actObj) && actObj is string act ? act : "list";
+        Interlocked.Increment(ref _totalOperations);
 
         switch (action.ToLowerInvariant())
         {
             case "add":
-                var rel = new CatalogRelationship
-                {
-                    Id = Guid.NewGuid().ToString("N"),
-                    SourceId = GetRequiredString(message.Payload, "sourceId"),
-                    TargetId = GetRequiredString(message.Payload, "targetId"),
-                    Type = message.Payload.TryGetValue("type", out var tObj) && tObj is string t ? t : "derives_from",
-                    CreatedAt = DateTimeOffset.UtcNow
-                };
-                _relationships[rel.Id] = rel;
-                message.Payload["relationship"] = rel;
-                break;
-            case "upstream":
-                var targetId = GetRequiredString(message.Payload, "targetId");
-                message.Payload["relationships"] = _relationships.Values.Where(r => r.TargetId == targetId).ToList();
-                break;
-            case "downstream":
                 var sourceId = GetRequiredString(message.Payload, "sourceId");
-                message.Payload["relationships"] = _relationships.Values.Where(r => r.SourceId == sourceId).ToList();
-                break;
+                var targetId = GetRequiredString(message.Payload, "targetId");
+                var edgeType = message.Payload.TryGetValue("type", out var tObj) && tObj is string t ? t : "derives_from";
+
+                var addMsg = new PluginMessage
+                {
+                    Type = "lineage.add-edge",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["sourceNodeId"] = sourceId,
+                        ["targetNodeId"] = targetId,
+                        ["edgeType"] = edgeType
+                    }
+                };
+                var addResponse = await _lineageDelegation.DelegateAsync("lineage.add-edge", addMsg);
+                if (addResponse.Success)
+                {
+                    message.Payload["relationship"] = addResponse.Payload ?? new Dictionary<string, object>
+                    {
+                        ["sourceId"] = sourceId,
+                        ["targetId"] = targetId,
+                        ["type"] = edgeType
+                    };
+                    message.Payload["success"] = true;
+                    if (addResponse.ErrorCode == "DELEGATION_FALLBACK")
+                        message.Payload["_delegationFallback"] = true;
+                }
+                else
+                {
+                    message.Payload["success"] = false;
+                    message.Payload["error"] = addResponse.ErrorMessage ?? "Failed to add lineage edge";
+                    if (addResponse.ErrorCode == "DELEGATION_UNAVAILABLE")
+                        message.Payload["_delegationUnavailable"] = true;
+                }
+                return;
+
+            case "upstream":
+                var upTargetId = GetRequiredString(message.Payload, "targetId");
+                var upMsg = new PluginMessage
+                {
+                    Type = "lineage.upstream",
+                    Payload = new Dictionary<string, object> { ["nodeId"] = upTargetId }
+                };
+                var upResponse = await _lineageDelegation.DelegateAsync("lineage.upstream", upMsg);
+                if (upResponse.Success)
+                {
+                    message.Payload["relationships"] = upResponse.Payload ?? Array.Empty<object>();
+                    message.Payload["success"] = true;
+                    if (upResponse.ErrorCode == "DELEGATION_FALLBACK")
+                        message.Payload["_delegationFallback"] = true;
+                }
+                else
+                {
+                    message.Payload["success"] = false;
+                    message.Payload["error"] = upResponse.ErrorMessage ?? "Failed to query upstream lineage";
+                    if (upResponse.ErrorCode == "DELEGATION_UNAVAILABLE")
+                        message.Payload["_delegationUnavailable"] = true;
+                }
+                return;
+
+            case "downstream":
+                var downSourceId = GetRequiredString(message.Payload, "sourceId");
+                var downMsg = new PluginMessage
+                {
+                    Type = "lineage.downstream",
+                    Payload = new Dictionary<string, object> { ["nodeId"] = downSourceId }
+                };
+                var downResponse = await _lineageDelegation.DelegateAsync("lineage.downstream", downMsg);
+                if (downResponse.Success)
+                {
+                    message.Payload["relationships"] = downResponse.Payload ?? Array.Empty<object>();
+                    message.Payload["success"] = true;
+                    if (downResponse.ErrorCode == "DELEGATION_FALLBACK")
+                        message.Payload["_delegationFallback"] = true;
+                }
+                else
+                {
+                    message.Payload["success"] = false;
+                    message.Payload["error"] = downResponse.ErrorMessage ?? "Failed to query downstream lineage";
+                    if (downResponse.ErrorCode == "DELEGATION_UNAVAILABLE")
+                        message.Payload["_delegationUnavailable"] = true;
+                }
+                return;
+
             case "list":
-                message.Payload["relationships"] = _relationships.Values.ToList();
-                break;
+                var listMsg = new PluginMessage
+                {
+                    Type = "lineage.search",
+                    Payload = new Dictionary<string, object> { ["query"] = "*" }
+                };
+                var listResponse = await _lineageDelegation.DelegateAsync("lineage.search", listMsg);
+                if (listResponse.Success)
+                {
+                    message.Payload["relationships"] = listResponse.Payload ?? Array.Empty<object>();
+                    message.Payload["success"] = true;
+                    if (listResponse.ErrorCode == "DELEGATION_FALLBACK")
+                        message.Payload["_delegationFallback"] = true;
+                }
+                else
+                {
+                    message.Payload["success"] = false;
+                    message.Payload["error"] = listResponse.ErrorMessage ?? "Failed to list lineage relationships";
+                    if (listResponse.ErrorCode == "DELEGATION_UNAVAILABLE")
+                        message.Payload["_delegationUnavailable"] = true;
+                }
+                return;
         }
 
-        Interlocked.Increment(ref _totalOperations);
         message.Payload["success"] = true;
-        return Task.CompletedTask;
     }
 
     private async Task HandleDocumentAsync(PluginMessage message)
@@ -466,9 +550,23 @@ public sealed class UltimateDataCatalogPlugin : DataManagementPluginBase, IDispo
         message.Payload["apiCalls"] = Interlocked.Read(ref _apiCalls);
         message.Payload["registeredStrategies"] = _registry.Count;
         message.Payload["catalogAssets"] = _assets.Count;
-        message.Payload["catalogRelationships"] = _relationships.Count;
         message.Payload["glossaryTerms"] = _glossary.Count;
         message.Payload["usageByStrategy"] = new Dictionary<string, long>(_usageStats);
+
+        // Circuit breaker delegation health stats
+        var lineageStats = _lineageDelegation.GetStatistics();
+        message.Payload["delegationHealth"] = new Dictionary<string, object>
+        {
+            ["lineage"] = new Dictionary<string, object>
+            {
+                ["circuitState"] = lineageStats.CurrentState.ToString(),
+                ["totalRequests"] = lineageStats.TotalRequests,
+                ["successfulRequests"] = lineageStats.SuccessfulRequests,
+                ["failedRequests"] = lineageStats.FailedRequests,
+                ["rejectedRequests"] = lineageStats.RejectedRequests
+            }
+        };
+
         return Task.CompletedTask;
     }
 
@@ -525,19 +623,6 @@ public sealed class UltimateDataCatalogPlugin : DataManagementPluginBase, IDispo
             catch { /* corrupted state — start fresh */ }
         }
 
-        var relData = await LoadStateAsync("relationships", ct);
-        if (relData != null)
-        {
-            try
-            {
-                var entries = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, CatalogRelationship>>(relData);
-                if (entries != null)
-                    foreach (var kvp in entries)
-                        _relationships[kvp.Key] = kvp.Value;
-            }
-            catch { /* corrupted state — start fresh */ }
-        }
-
         var glossData = await LoadStateAsync("glossary", ct);
         if (glossData != null)
         {
@@ -559,10 +644,6 @@ public sealed class UltimateDataCatalogPlugin : DataManagementPluginBase, IDispo
             new Dictionary<string, CatalogAsset>(_assets));
         await SaveStateAsync("assets", assetBytes, ct);
 
-        var relBytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
-            new Dictionary<string, CatalogRelationship>(_relationships));
-        await SaveStateAsync("relationships", relBytes, ct);
-
         var glossBytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
             new Dictionary<string, BusinessTerm>(_glossary));
         await SaveStateAsync("glossary", glossBytes, ct);
@@ -575,9 +656,9 @@ public sealed class UltimateDataCatalogPlugin : DataManagementPluginBase, IDispo
         {
             if (_disposed) return;
             _disposed = true;
+            _lineageDelegation.Dispose();
             _usageStats.Clear();
             _assets.Clear();
-            _relationships.Clear();
             _glossary.Clear();
         }
         base.Dispose(disposing);

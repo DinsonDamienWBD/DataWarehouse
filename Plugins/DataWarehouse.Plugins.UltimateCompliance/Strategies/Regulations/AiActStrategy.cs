@@ -36,7 +36,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("ai_act.check");
+            IncrementCounter("ai_act.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -46,9 +46,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
             CheckHumanOversight(context, violations, recommendations);
             CheckDataGovernance(context, violations, recommendations);
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -191,7 +192,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
                 });
             }
 
-            if (context.DataClassification.Equals("sensitive", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("sensitive", StringComparison.OrdinalIgnoreCase))
             {
                 recommendations.Add("Ensure AI system respects fundamental rights when processing sensitive data");
             }
@@ -200,14 +201,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("ai_act.initialized");
+            IncrementCounter("ai_act.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("ai_act.shutdown");
+            IncrementCounter("ai_act.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

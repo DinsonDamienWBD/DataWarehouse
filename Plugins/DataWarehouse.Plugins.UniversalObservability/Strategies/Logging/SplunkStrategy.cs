@@ -60,6 +60,7 @@ public sealed class SplunkStrategy : ObservabilityStrategyBase
         _sourcetype = sourcetype;
 
         _httpClient.DefaultRequestHeaders.Clear();
+        _httpClient.DefaultRequestHeaders.Remove("Authorization");
         _httpClient.DefaultRequestHeaders.Add("Authorization", $"Splunk {_hecToken}");
     }
 
@@ -96,7 +97,7 @@ public sealed class SplunkStrategy : ObservabilityStrategyBase
         }
 
         var content = new StringContent(events.ToString(), Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{_hecUrl}/services/collector/event", content, cancellationToken);
+        using var response = await _httpClient.PostAsync($"{_hecUrl}/services/collector/event", content, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -130,7 +131,7 @@ public sealed class SplunkStrategy : ObservabilityStrategyBase
         }
 
         var content = new StringContent(metricEvents.ToString(), Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync($"{_hecUrl}/services/collector/event", content, cancellationToken);
+        using var response = await _httpClient.PostAsync($"{_hecUrl}/services/collector/event", content, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -142,7 +143,7 @@ public sealed class SplunkStrategy : ObservabilityStrategyBase
     public async Task SendRawAsync(string rawData, CancellationToken ct = default)
     {
         var content = new StringContent(rawData, Encoding.UTF8, "text/plain");
-        var response = await _httpClient.PostAsync(
+        using var response = await _httpClient.PostAsync(
             $"{_hecUrl}/services/collector/raw?index={_index}&source={_source}&sourcetype={_sourcetype}",
             content, ct);
         response.EnsureSuccessStatusCode();
@@ -155,7 +156,8 @@ public sealed class SplunkStrategy : ObservabilityStrategyBase
     /// <returns>Health status as JSON.</returns>
     public async Task<string> GetHecHealthAsync(CancellationToken ct = default)
     {
-        var response = await _httpClient.GetAsync($"{_hecUrl}/services/collector/health", ct);
+        using var response = await _httpClient.GetAsync($"{_hecUrl}/services/collector/health", ct);
+ response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(ct);
     }
 
@@ -170,7 +172,8 @@ public sealed class SplunkStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{_hecUrl}/services/collector/health", cancellationToken);
+            using var response = await _httpClient.GetAsync($"{_hecUrl}/services/collector/health", cancellationToken);
+            response.EnsureSuccessStatusCode();
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
 
             return new HealthCheckResult(
@@ -205,21 +208,16 @@ public sealed class SplunkStrategy : ObservabilityStrategyBase
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("splunk.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     protected override void Dispose(bool disposing)
     {
+                _hecToken = string.Empty;
         if (disposing)
         {
             _httpClient.Dispose();

@@ -47,9 +47,11 @@ public sealed class CacheOptimizationStrategy : SustainabilityStrategyBase
     /// <summary>Records cache statistics.</summary>
     public void RecordCacheStats(string cacheId, long hits, long misses, long currentSizeBytes, long evictions)
     {
+        bool found;
         lock (_lock)
         {
-            if (_caches.TryGetValue(cacheId, out var cache))
+            found = _caches.TryGetValue(cacheId, out var cache);
+            if (found && cache != null)
             {
                 cache.TotalHits += hits;
                 cache.TotalMisses += misses;
@@ -60,6 +62,9 @@ public sealed class CacheOptimizationStrategy : SustainabilityStrategyBase
                     : 0;
             }
         }
+
+        // Only record metrics for registered caches to avoid misleading data for unknown cacheIds.
+        if (!found) return;
         RecordSample(currentSizeBytes / 1_073_741_824.0 * WattsPerGb, 0);
         EvaluateOptimizations();
     }

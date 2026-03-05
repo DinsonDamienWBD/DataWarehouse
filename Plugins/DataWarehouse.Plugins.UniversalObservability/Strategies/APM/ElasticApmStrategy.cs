@@ -56,6 +56,7 @@ public sealed class ElasticApmStrategy : ObservabilityStrategyBase
 
         if (!string.IsNullOrEmpty(secretToken))
         {
+            _httpClient.DefaultRequestHeaders.Remove("Authorization");
             _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {secretToken}");
         }
     }
@@ -102,6 +103,12 @@ public sealed class ElasticApmStrategy : ObservabilityStrategyBase
 
         foreach (var traceGroup in spansByTrace)
         {
+            // Find the root transaction span (no parent) to get its ID for child span transaction_id.
+            var rootSpanId = traceGroup
+                .Where(s => string.IsNullOrEmpty(s.ParentSpanId))
+                .Select(s => s.SpanId)
+                .FirstOrDefault();
+
             foreach (var span in traceGroup)
             {
                 var isTransaction = string.IsNullOrEmpty(span.ParentSpanId);
@@ -131,12 +138,15 @@ public sealed class ElasticApmStrategy : ObservabilityStrategyBase
                 }
                 else
                 {
+                    // transaction_id must reference the root transaction span of this trace,
+                    // not the direct parent span (which may itself be a child span).
+                    var transactionId = rootSpanId ?? span.ParentSpanId;
                     var apmSpan = new
                     {
                         span = new
                         {
                             id = span.SpanId,
-                            transaction_id = span.ParentSpanId,
+                            transaction_id = transactionId,
                             trace_id = span.TraceId,
                             parent_id = span.ParentSpanId,
                             name = span.OperationName,
@@ -178,7 +188,7 @@ public sealed class ElasticApmStrategy : ObservabilityStrategyBase
             var content = new StringContent(sb.ToString(), Encoding.UTF8, "application/x-ndjson");
             var url = $"{_serverUrl}/intake/v2/events";
 
-            var response = await _httpClient.PostAsync(url, content, ct);
+            using var response = await _httpClient.PostAsync(url, content, ct);
             response.EnsureSuccessStatusCode();
         }
         catch (HttpRequestException)
@@ -196,7 +206,7 @@ public sealed class ElasticApmStrategy : ObservabilityStrategyBase
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{_serverUrl}/", cancellationToken);
+            using var response = await _httpClient.GetAsync($"{_serverUrl}/", cancellationToken);
 
             return new HealthCheckResult(
                 IsHealthy: response.IsSuccessStatusCode,
@@ -219,8 +229,6 @@ public sealed class ElasticApmStrategy : ObservabilityStrategyBase
     }
 
     /// <inheritdoc/>
-
-    /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(_serverUrl) || (!_serverUrl.StartsWith("http://") && !_serverUrl.StartsWith("https://")))
@@ -231,21 +239,17 @@ public sealed class ElasticApmStrategy : ObservabilityStrategyBase
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
+        // HttpClient in-flight requests are abandoned on Dispose; the 100ms added no real grace.
         IncrementCounter("elastic_apm.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     protected override void Dispose(bool disposing)
     {
+                _secretToken = string.Empty;
         if (disposing)
         {
             _httpClient.Dispose();

@@ -370,9 +370,9 @@ namespace DataWarehouse.SDK.Security.SupplyChain
             // Try to verify the signature using the key store
             if (_keyStore == null || _securityContext == null)
             {
-                findings.Add("L2: No key store available for signature verification — signature present but unverified");
-                // Signature exists but we can't verify it — pass Level 2 with a note
-                return true;
+                findings.Add("L2: No key store configured — signature verification failed (fail-closed)");
+                // Fail-closed: a signature that cannot be verified is not trusted.
+                return false;
             }
 
             try
@@ -431,35 +431,30 @@ namespace DataWarehouse.SDK.Security.SupplyChain
 
         private static bool VerifySignature(byte[] payload, byte[] signature, byte[] keyBytes)
         {
-            // Try RSA-PSS verification
+            // Try RSA-PSS verification with public key only
+            // Security: Never import private keys for verification — only public keys are needed.
+            // HMAC fallback removed: symmetric key verification makes signatures forgeable
+            // by anyone with the "verification" key.
             try
             {
                 using var rsa = RSA.Create();
                 rsa.ImportRSAPublicKey(keyBytes, out _);
                 return rsa.VerifyData(payload, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
             }
-            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[SlsaVerifier.VerifySignature] {ex.GetType().Name}: {ex.Message}"); }
-
-            // Try RSA private key (extract public)
-            try
+            catch (CryptographicException)
             {
-                using var rsa = RSA.Create();
-                rsa.ImportRSAPrivateKey(keyBytes, out _);
-                return rsa.VerifyData(payload, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
-            }
-            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[SlsaVerifier.VerifySignature] RSA private key: {ex.GetType().Name}: {ex.Message}"); }
-
-            // Fallback: HMAC-SHA256 verification
-            try
-            {
-                using var hmac = new HMACSHA256(keyBytes);
-                var expected = hmac.ComputeHash(payload);
-                return CryptographicOperations.FixedTimeEquals(expected, signature);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[SlsaVerifier.VerifySignature] HMAC fallback: {ex.GetType().Name}: {ex.Message}");
-                return false;
+                // Try SubjectPublicKeyInfo format (X.509 DER)
+                try
+                {
+                    using var rsa = RSA.Create();
+                    rsa.ImportSubjectPublicKeyInfo(keyBytes, out _);
+                    return rsa.VerifyData(payload, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[SlsaVerifier.VerifySignature] All public key formats failed: {ex.Message}");
+                    return false;
+                }
             }
         }
 

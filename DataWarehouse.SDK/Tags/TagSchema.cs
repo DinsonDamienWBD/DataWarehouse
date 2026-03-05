@@ -117,7 +117,10 @@ namespace DataWarehouse.SDK.Tags
         public required IReadOnlyList<TagSchemaVersion> Versions { get; init; }
 
         /// <summary>Gets the current (latest) schema version.</summary>
-        public TagSchemaVersion CurrentVersion => Versions[^1];
+        /// <exception cref="InvalidOperationException">Thrown when Versions list is empty.</exception>
+        public TagSchemaVersion CurrentVersion => Versions.Count > 0
+            ? Versions[^1]
+            : throw new InvalidOperationException("TagSchema has no versions. At least one version is required.");
 
         /// <summary>
         /// Flags indicating which <see cref="TagSource"/> values are permitted

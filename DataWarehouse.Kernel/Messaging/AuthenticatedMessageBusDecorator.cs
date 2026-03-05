@@ -218,12 +218,25 @@ namespace DataWarehouse.Kernel.Messaging
 
         public IDisposable SubscribePattern(string pattern, Func<PluginMessage, Task> handler)
         {
-            // Pattern subscriptions: we cannot pre-check auth options because the actual topic varies.
-            // Wrap with dynamic auth check.
+            // Pattern subscriptions: topic is only known at delivery time, so auth check
+            // is performed dynamically inside the wrapper using the message's Topic field.
             return _inner.SubscribePattern(pattern, async msg =>
             {
-                // For pattern subscriptions, we check auth based on the message type as topic proxy
-                // In practice, the inner bus resolves the actual topic
+                // Use MessageType as the topic proxy — it is the closest equivalent for pattern subscriptions
+                // where the actual routing topic is not carried in the message envelope itself.
+                var deliveredTopic = msg.MessageType ?? string.Empty;
+                var authOptions = GetAuthenticationOptions(deliveredTopic);
+                if (authOptions?.RequireSignature == true)
+                {
+                    var result = VerifyMessageInternal(msg, deliveredTopic, authOptions);
+                    if (!result.IsValid)
+                    {
+                        _logger?.LogWarning(
+                            "Pattern subscription '{Pattern}': message verification failed on topic {Topic}: {Reason}",
+                            pattern, deliveredTopic, result.FailureReason);
+                        return; // Drop unauthenticated message — never forward to handler
+                    }
+                }
                 await handler(msg);
             });
         }

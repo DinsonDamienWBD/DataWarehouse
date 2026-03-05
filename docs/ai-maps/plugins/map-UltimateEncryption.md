@@ -86,6 +86,23 @@ private new sealed class DefaultSecurityContext : ISecurityContext
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/CryptoAgility/MigrationWorker.cs
+```csharp
+[SdkCompatibility("5.0.0", Notes = "Phase 59: Crypto agility engine")]
+public sealed class MigrationWorker : IDisposable
+{
+}
+    public string? LastFailureMessage;;
+    public MigrationWorker(MigrationPlan plan, DoubleEncryptionService doubleEncryptionService, IMessageBus messageBus, MigrationOptions options);
+    public Task StartAsync(CancellationToken ct = default);
+    public async Task EnqueueBatchAsync(MigrationBatch batch, CancellationToken ct = default);
+    public Task PauseAsync();
+    public Task ResumeAsync();
+    public Task<MigrationStatus> GetProgressAsync(CancellationToken ct = default);
+    public void Dispose();
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/CryptoAgility/CryptoAgilityEngine.cs
 ```csharp
 [SdkCompatibility("5.0.0", Notes = "Phase 59: Crypto agility engine")]
@@ -120,22 +137,6 @@ public sealed class DoubleEncryptionService
     public async Task<DoubleEncryptionEnvelope> EncryptAsync(Guid objectId, byte[] plaintext, string primaryAlgorithmId, string secondaryAlgorithmId, CancellationToken ct = default);
     public async Task<byte[]> DecryptAsync(DoubleEncryptionEnvelope envelope, string preferredAlgorithmId, CancellationToken ct = default);
     public async Task<byte[]> RemoveSecondaryEncryptionAsync(DoubleEncryptionEnvelope envelope, string algorithmToKeep, CancellationToken ct = default);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/CryptoAgility/MigrationWorker.cs
-```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 59: Crypto agility engine")]
-public sealed class MigrationWorker : IDisposable
-{
-}
-    public MigrationWorker(MigrationPlan plan, DoubleEncryptionService doubleEncryptionService, IMessageBus messageBus, MigrationOptions options);
-    public Task StartAsync(CancellationToken ct = default);
-    public async Task EnqueueBatchAsync(MigrationBatch batch, CancellationToken ct = default);
-    public Task PauseAsync();
-    public Task ResumeAsync();
-    public Task<MigrationStatus> GetProgressAsync(CancellationToken ct = default);
-    public void Dispose();
 }
 ```
 
@@ -318,7 +319,7 @@ public sealed class EncryptionScalingManager : IScalableSubsystem, IDisposable
     public EncryptionScalingManager(ILogger logger, ScalingLimits? limits = null, TimeSpan? probeInterval = null);
     public HardwareCryptoCapabilities CurrentCapabilities;;
     public BoundedCache<string, int> AlgorithmConcurrencyLimits;;
-    public BoundedCache<string, byte[]> KeyDerivationCache;;
+    internal BoundedCache<string, byte[]> KeyDerivationCache;;
     public HardwareCryptoCapabilities ReprobeHardware();
     public int GetAlgorithmParallelism(string algorithmName);
     public void SetAlgorithmParallelism(string algorithmName, int maxConcurrent);
@@ -348,9 +349,9 @@ public sealed class EncryptionScalingManager : IScalableSubsystem, IDisposable
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Aead/AeadStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Hybrid/HybridStrategies.cs
 ```csharp
-public sealed class AsconStrategy : EncryptionStrategyBase
+public sealed class HybridAesKyberStrategy : EncryptionStrategyBase
 {
 }
     public override CipherInfo CipherInfo;;
@@ -358,292 +359,480 @@ public sealed class AsconStrategy : EncryptionStrategyBase
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     public override string StrategyName;;
-    public AsconStrategy();
+    public HybridAesKyberStrategy();
     protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
     protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public (byte[] PublicKey, byte[] CompositePrivateKey) GenerateCompositeKeyPair();
 }
 ```
 ```csharp
-public sealed class Aegis128LStrategy : EncryptionStrategyBase
+public sealed class HybridChaChaKyberStrategy : EncryptionStrategyBase
 {
 }
     public override CipherInfo CipherInfo;;
     public override string StrategyId;;
     public override string StrategyName;;
-    public Aegis128LStrategy();
+    public HybridChaChaKyberStrategy();
     protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
     protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public (byte[] PublicKey, byte[] CompositePrivateKey) GenerateCompositeKeyPair();
 }
 ```
 ```csharp
-public sealed class Aegis256Strategy : EncryptionStrategyBase
+public sealed class HybridX25519KyberStrategy : EncryptionStrategyBase
 {
 }
     public override CipherInfo CipherInfo;;
     public override string StrategyId;;
     public override string StrategyName;;
-    public Aegis256Strategy();
+    public HybridX25519KyberStrategy();
     protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
     protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public (byte[] PublicKey, byte[] CompositePrivateKey) GenerateCompositeKeyPair();
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Aes/AesCbcStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Hybrid/X25519Kyber768Strategy.cs
 ```csharp
-public sealed class Aes256CbcStrategy : EncryptionStrategyBase
+[SdkCompatibility("5.0.0", Notes = "Phase 59: Double encryption envelope")]
+public sealed class X25519Kyber768Strategy : EncryptionStrategyBase
 {
 }
+    public override CipherInfo CipherInfo;;
     public override string StrategyId;;
+    public override string StrategyName;;
+    public X25519Kyber768Strategy();
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public override string StrategyName;;
-    public override CipherInfo CipherInfo;;
-    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-}
-```
-```csharp
-public sealed class Aes128CbcStrategy : EncryptionStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override CipherInfo CipherInfo;;
-    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken ct);
-    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken ct);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Aes/AesCtrXtsStrategies.cs
-```csharp
-public sealed class AesCtrStrategy : EncryptionStrategyBase
-{
-}
-    public override string StrategyId;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public override string StrategyName;;
-    public override CipherInfo CipherInfo;;
-    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-}
-```
-```csharp
-public sealed class AesXtsStrategy : EncryptionStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override CipherInfo CipherInfo;;
-    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-}
-```
-```csharp
-public sealed class AesCcmStrategy : EncryptionStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override CipherInfo CipherInfo;;
-    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-}
-```
-```csharp
-public sealed class AesEcbStrategy : EncryptionStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override CipherInfo CipherInfo;;
-    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    public override byte[] GenerateIv();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Aes/AesGcmStrategy.cs
-```csharp
-public sealed class AesGcmStrategy : EncryptionStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override CipherInfo CipherInfo;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async ValueTask DisposeAsyncCore();
-    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-}
-```
-```csharp
-public sealed class Aes128GcmStrategy : EncryptionStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override CipherInfo CipherInfo;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async ValueTask DisposeAsyncCore();
-    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken ct);
-    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken ct);
-}
-```
-```csharp
-public sealed class Aes192GcmStrategy : EncryptionStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override CipherInfo CipherInfo;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async ValueTask DisposeAsyncCore();
-    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken ct);
-    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken ct);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Asymmetric/RsaStrategies.cs
-```csharp
-public sealed class RsaOaepStrategy : EncryptionStrategyBase
-{
-}
-    public override CipherInfo CipherInfo;;
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public RsaOaepStrategy(int keySize = 2048);
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
     protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
     protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override byte[] GenerateKey();
+    public (byte[] PublicKey, byte[] CompositePrivateKey) GenerateCompositeKeyPair();
+    public override bool ValidateKey(byte[] key);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/PostQuantum/CrystalsDilithiumStrategies.cs
+```csharp
+[SdkCompatibility("5.0.0", Notes = "Phase 59: PQC migration")]
+internal static class DilithiumSignatureHelper
+{
+}
+    public static byte[] Sign(byte[] data, byte[] privateKey, MLDsaParameters parameters);
+    public static bool Verify(byte[] data, byte[] signature, byte[] publicKey, MLDsaParameters parameters);
+    public static (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair(MLDsaParameters parameters, SecureRandom random);
 }
 ```
 ```csharp
-public sealed class RsaPkcs1Strategy : EncryptionStrategyBase
+[SdkCompatibility("5.0.0", Notes = "Phase 59: PQC migration")]
+public sealed class DilithiumSignature44Strategy : EncryptionStrategyBase
 {
 }
     public override CipherInfo CipherInfo;;
     public override string StrategyId;;
     public override string StrategyName;;
-    public RsaPkcs1Strategy(int keySize = 2048);
+    public DilithiumSignature44Strategy();
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
     protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
     protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override byte[] GenerateKey();
+    public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair();
+}
+```
+```csharp
+[SdkCompatibility("5.0.0", Notes = "Phase 59: PQC migration")]
+public sealed class DilithiumSignature65Strategy : EncryptionStrategyBase
+{
+}
+    public override CipherInfo CipherInfo;;
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public DilithiumSignature65Strategy();
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override byte[] GenerateKey();
+    public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair();
+}
+```
+```csharp
+[SdkCompatibility("5.0.0", Notes = "Phase 59: PQC migration")]
+public sealed class DilithiumSignature87Strategy : EncryptionStrategyBase
+{
+}
+    public override CipherInfo CipherInfo;;
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public DilithiumSignature87Strategy();
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override byte[] GenerateKey();
+    public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair();
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/BlockCiphers/BlockCipherStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/PostQuantum/AdditionalPqcKemStrategies.cs
 ```csharp
-public sealed class SerpentStrategy : EncryptionStrategyBase
+public sealed class NtruHrss701Strategy : EncryptionStrategyBase
 {
 }
+    public override CipherInfo CipherInfo;;
+    public override string StrategyId;;
+    public override string StrategyName;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public NtruHrss701Strategy();
+    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override byte[] GenerateKey();
+    public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair();
+}
+```
+```csharp
+public sealed class ClassicMcElieceStrategy : EncryptionStrategyBase
+{
+}
+    public override CipherInfo CipherInfo;;
+    public override string StrategyId;;
+    public override string StrategyName;;
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);;
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);;
+    public override byte[] GenerateKey();;
+}
+```
+```csharp
+public sealed class BikeStrategy : EncryptionStrategyBase
+{
+}
+    public override CipherInfo CipherInfo;;
+    public override string StrategyId;;
+    public override string StrategyName;;
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);;
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);;
+    public override byte[] GenerateKey();;
+}
+```
+```csharp
+public sealed class HqcStrategy : EncryptionStrategyBase
+{
+}
+    public override CipherInfo CipherInfo;;
+    public override string StrategyId;;
+    public override string StrategyName;;
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);;
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);;
+    public override byte[] GenerateKey();;
+}
+```
+```csharp
+public sealed class FrodoKemStrategy : EncryptionStrategyBase
+{
+}
+    public override CipherInfo CipherInfo;;
+    public override string StrategyId;;
+    public override string StrategyName;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public FrodoKemStrategy();
+    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override byte[] GenerateKey();
+    public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair();
+}
+```
+```csharp
+public sealed class SaberStrategy : EncryptionStrategyBase
+{
+}
+    public override CipherInfo CipherInfo;;
+    public override string StrategyId;;
+    public override string StrategyName;;
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);;
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);;
+    public override byte[] GenerateKey();;
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/PostQuantum/PqSignatureStrategies.cs
+```csharp
+public sealed class MlDsaStrategy : EncryptionStrategyBase
+{
+}
+    public override CipherInfo CipherInfo;;
     public override string StrategyId;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     public override string StrategyName;;
-    public override CipherInfo CipherInfo;;
-    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public MlDsaStrategy();
+    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override byte[] GenerateKey();
 }
 ```
 ```csharp
-public sealed class TwofishStrategy : EncryptionStrategyBase
+public sealed class SlhDsaStrategy : EncryptionStrategyBase
 {
 }
+    public override CipherInfo CipherInfo;;
     public override string StrategyId;;
     public override string StrategyName;;
-    public override CipherInfo CipherInfo;;
-    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public SlhDsaStrategy();
+    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override byte[] GenerateKey();
 }
 ```
 ```csharp
-private sealed class TwofishContext
+public sealed class FalconStrategy : EncryptionStrategyBase
 {
 }
-    public uint[] SubKeys = new uint[40];
-    public uint[] SBoxKeys = new uint[4];
-    public int KeyLength;
+    public override CipherInfo CipherInfo;;
+    public override string StrategyId;;
+    public override string StrategyName;;
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override byte[] GenerateKey();
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/BlockCiphers/CamelliaAriaStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/PostQuantum/CrystalsKyberStrategies.cs
 ```csharp
-public sealed class CamelliaStrategy : EncryptionStrategyBase
+[SdkCompatibility("5.0.0", Notes = "Phase 59: Crypto key rotation")]
+internal static class KyberKemHelper
 {
 }
+    internal static byte[] Encrypt(NtruParameters ntruParameters, byte[] plaintext, byte[] recipientPublicKeyBytes, byte[]? associatedData, SecureRandom secureRandom, Func<byte[]> generateIv);
+    internal static byte[] Decrypt(NtruParameters ntruParameters, byte[] ciphertext, byte[] privateKeyBytes, byte[]? associatedData);
+    internal static (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair(NtruParameters ntruParameters, SecureRandom secureRandom);
+}
+```
+```csharp
+[SdkCompatibility("5.0.0", Notes = "Phase 59: Crypto key rotation")]
+public sealed class KyberKem512Strategy : EncryptionStrategyBase
+{
+}
+    public override CipherInfo CipherInfo;;
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public KyberKem512Strategy();
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override byte[] GenerateKey();
+    public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair();
+}
+```
+```csharp
+[SdkCompatibility("5.0.0", Notes = "Phase 59: Crypto key rotation")]
+public sealed class KyberKem768Strategy : EncryptionStrategyBase
+{
+}
+    public override CipherInfo CipherInfo;;
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public KyberKem768Strategy();
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override byte[] GenerateKey();
+    public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair();
+}
+```
+```csharp
+[SdkCompatibility("5.0.0", Notes = "Phase 59: Crypto key rotation")]
+public sealed class KyberKem1024Strategy : EncryptionStrategyBase
+{
+}
+    public override CipherInfo CipherInfo;;
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public KyberKem1024Strategy();
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override byte[] GenerateKey();
+    public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/PostQuantum/MlKemStrategies.cs
+```csharp
+[SdkCompatibility("5.0.0", Notes = "Phase 59: Crypto key rotation")]
+public sealed class MlKem512Strategy : EncryptionStrategyBase
+{
+}
+    public override CipherInfo CipherInfo;;
     public override string StrategyId;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     public override string StrategyName;;
-    public override CipherInfo CipherInfo;;
-    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public MlKem512Strategy();
+    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override byte[] GenerateKey();
+    public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair();
 }
 ```
 ```csharp
-public sealed class AriaStrategy : EncryptionStrategyBase
+[SdkCompatibility("5.0.0", Notes = "Phase 59: Crypto key rotation")]
+public sealed class MlKem768Strategy : EncryptionStrategyBase
 {
 }
+    public override CipherInfo CipherInfo;;
     public override string StrategyId;;
     public override string StrategyName;;
-    public override CipherInfo CipherInfo;;
-    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public MlKem768Strategy();
+    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override byte[] GenerateKey();
+    public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair();
 }
 ```
 ```csharp
-public sealed class Sm4Strategy : EncryptionStrategyBase
+[SdkCompatibility("5.0.0", Notes = "Phase 59: Crypto key rotation")]
+public sealed class MlKem1024Strategy : EncryptionStrategyBase
 {
 }
+    public override CipherInfo CipherInfo;;
     public override string StrategyId;;
     public override string StrategyName;;
+    public MlKem1024Strategy();
+    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override byte[] GenerateKey();
+    public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/PostQuantum/AdditionalPqcSignatureStrategies.cs
+```csharp
+public sealed class MlDsa44Strategy : EncryptionStrategyBase
+{
+}
     public override CipherInfo CipherInfo;;
-    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override string StrategyId;;
+    public override string StrategyName;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public MlDsa44Strategy();
+    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override byte[] GenerateKey();
 }
 ```
 ```csharp
-public sealed class SeedStrategy : EncryptionStrategyBase
+public sealed class MlDsa87Strategy : EncryptionStrategyBase
 {
 }
+    public override CipherInfo CipherInfo;;
     public override string StrategyId;;
     public override string StrategyName;;
-    public override CipherInfo CipherInfo;;
-    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public MlDsa87Strategy();
+    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override byte[] GenerateKey();
 }
 ```
 ```csharp
-public sealed class KuznyechikStrategy : EncryptionStrategyBase
+public sealed class SlhDsaSha2Strategy : EncryptionStrategyBase
 {
 }
+    public override CipherInfo CipherInfo;;
     public override string StrategyId;;
     public override string StrategyName;;
-    public override CipherInfo CipherInfo;;
-    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public SlhDsaSha2Strategy();
+    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override byte[] GenerateKey();
 }
 ```
 ```csharp
-public sealed class MagmaStrategy : EncryptionStrategyBase
+public sealed class SlhDsaShake256fStrategy : EncryptionStrategyBase
 {
 }
+    public override CipherInfo CipherInfo;;
     public override string StrategyId;;
     public override string StrategyName;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public SlhDsaShake256fStrategy();
+    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override byte[] GenerateKey();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/PostQuantum/SphincsPlusStrategies.cs
+```csharp
+[SdkCompatibility("5.0.0", Notes = "Phase 59: PQC migration")]
+internal static class SphincsPlusSignatureHelper
+{
+}
+    public static byte[] Sign(byte[] data, byte[] privateKey, SlhDsaParameters parameters);
+    public static bool Verify(byte[] data, byte[] signature, byte[] publicKey, SlhDsaParameters parameters);
+    public static (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair(SlhDsaParameters parameters, SecureRandom random);
+}
+```
+```csharp
+[SdkCompatibility("5.0.0", Notes = "Phase 59: PQC migration")]
+public sealed class SphincsPlus128fStrategy : EncryptionStrategyBase
+{
+}
     public override CipherInfo CipherInfo;;
-    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public SphincsPlus128fStrategy();
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override byte[] GenerateKey();
+    public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair();
+}
+```
+```csharp
+[SdkCompatibility("5.0.0", Notes = "Phase 59: PQC migration")]
+public sealed class SphincsPlus192fStrategy : EncryptionStrategyBase
+{
+}
+    public override CipherInfo CipherInfo;;
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public SphincsPlus192fStrategy();
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override byte[] GenerateKey();
+    public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair();
+}
+```
+```csharp
+[SdkCompatibility("5.0.0", Notes = "Phase 59: PQC migration")]
+public sealed class SphincsPlus256fStrategy : EncryptionStrategyBase
+{
+}
+    public override CipherInfo CipherInfo;;
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public SphincsPlus256fStrategy();
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override byte[] GenerateKey();
+    public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair();
 }
 ```
 
@@ -684,139 +873,9 @@ public sealed class ChaCha20Strategy : EncryptionStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Disk/DiskEncryptionStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Legacy/LegacyCipherStrategies.cs
 ```csharp
-public sealed class XtsAes256Strategy : EncryptionStrategyBase
-{
-}
-    public override string StrategyId;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public override string StrategyName;;
-    public override CipherInfo CipherInfo;;
-    public override byte[] GenerateKey();
-    public override bool ValidateKey(byte[] key);
-    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-}
-```
-```csharp
-public sealed class AdiantumStrategy : EncryptionStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override CipherInfo CipherInfo;;
-    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-}
-```
-```csharp
-public sealed class EssivStrategy : EncryptionStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override CipherInfo CipherInfo;;
-    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Educational/EducationalCipherStrategies.cs
-```csharp
-public sealed class CaesarCipherStrategy : EncryptionStrategyBase
-{
-}
-    public override string StrategyId;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public override string StrategyName;;
-    public override CipherInfo CipherInfo;;
-    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    public override byte[] GenerateKey();
-    public override byte[] GenerateIv();
-}
-```
-```csharp
-public sealed class XorCipherStrategy : EncryptionStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override CipherInfo CipherInfo;;
-    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    public override byte[] GenerateIv();
-}
-```
-```csharp
-public sealed class VigenereCipherStrategy : EncryptionStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override CipherInfo CipherInfo;;
-    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    public override byte[] GenerateIv();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Fpe/FpeStrategies.cs
-```csharp
-public sealed class Ff1Strategy : EncryptionStrategyBase
-{
-}
-    public override string StrategyId;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public override string StrategyName;;
-    public override CipherInfo CipherInfo;;
-    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-}
-```
-```csharp
-public sealed class Ff3Strategy : EncryptionStrategyBase
-{
-}
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override CipherInfo CipherInfo;;
-    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-}
-```
-```csharp
-public sealed class FpeCreditCardStrategy : EncryptionStrategyBase
-{
-}
-    public FpeCreditCardStrategy();
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override CipherInfo CipherInfo;;
-    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-}
-```
-```csharp
-public sealed class FpeSsnStrategy : EncryptionStrategyBase
-{
-}
-    public FpeSsnStrategy();
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public override CipherInfo CipherInfo;;
-    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Homomorphic/HomomorphicStrategies.cs
-```csharp
-public sealed class PaillierStrategy : EncryptionStrategyBase
+public sealed class BlowfishStrategy : EncryptionStrategyBase
 {
 }
     public override CipherInfo CipherInfo;;
@@ -824,136 +883,90 @@ public sealed class PaillierStrategy : EncryptionStrategyBase
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     public override string StrategyName;;
-    public PaillierStrategy(int keyBits = 2048);
     protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
     protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
     public override byte[] GenerateKey();
-    public byte[] Add(byte[] ciphertext1, byte[] ciphertext2, byte[] publicKey);
-    public byte[] ScalarMultiply(byte[] ciphertext, BigInteger scalar, byte[] publicKey);
 }
 ```
 ```csharp
-public sealed class ElGamalStrategy : EncryptionStrategyBase
+public sealed class IdeaStrategy : EncryptionStrategyBase
 {
 }
     public override CipherInfo CipherInfo;;
     public override string StrategyId;;
     public override string StrategyName;;
-    public ElGamalStrategy(int keyBits = 2048);
     protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
     protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    public override byte[] GenerateKey();
-    public byte[] Multiply(byte[] ciphertext1, byte[] ciphertext2, byte[] publicKey);
-}
-```
-```csharp
-public sealed class GoldwasserMicaliStrategy : EncryptionStrategyBase
-{
-}
-    public override CipherInfo CipherInfo;;
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public GoldwasserMicaliStrategy(int keyBits = 2048);
-    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    public override byte[] GenerateKey();
-    public byte[] Xor(byte[] ciphertext1, byte[] ciphertext2, byte[] publicKey);
-}
-```
-```csharp
-public sealed class BfvFheStrategy : EncryptionStrategyBase
-{
-}
-    public override CipherInfo CipherInfo;;
-    public override string StrategyId;;
-    public override string StrategyName;;
-    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);;
-    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);;
     public override byte[] GenerateKey();;
 }
 ```
 ```csharp
-public sealed class CkksFheStrategy : EncryptionStrategyBase
+public sealed class Cast5Strategy : EncryptionStrategyBase
 {
 }
     public override CipherInfo CipherInfo;;
     public override string StrategyId;;
     public override string StrategyName;;
-    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);;
-    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);;
+    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
     public override byte[] GenerateKey();;
 }
 ```
 ```csharp
-public sealed class TfheStrategy : EncryptionStrategyBase
+public sealed class Cast6Strategy : EncryptionStrategyBase
 {
 }
     public override CipherInfo CipherInfo;;
     public override string StrategyId;;
     public override string StrategyName;;
-    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);;
-    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);;
+    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
     public override byte[] GenerateKey();;
 }
 ```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Hybrid/HybridStrategies.cs
 ```csharp
-public sealed class HybridAesKyberStrategy : EncryptionStrategyBase
+public sealed class Rc5Strategy : EncryptionStrategyBase
 {
 }
     public override CipherInfo CipherInfo;;
     public override string StrategyId;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     public override string StrategyName;;
-    public HybridAesKyberStrategy();
+    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override byte[] GenerateKey();;
+}
+```
+```csharp
+public sealed class Rc6Strategy : EncryptionStrategyBase
+{
+}
+    public override CipherInfo CipherInfo;;
+    public override string StrategyId;;
+    public override string StrategyName;;
     protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
     protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
 }
 ```
 ```csharp
-public sealed class HybridChaChaKyberStrategy : EncryptionStrategyBase
+public sealed class DesStrategy : EncryptionStrategyBase
 {
 }
     public override CipherInfo CipherInfo;;
     public override string StrategyId;;
     public override string StrategyName;;
-    public HybridChaChaKyberStrategy();
     protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
     protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
 }
 ```
 ```csharp
-public sealed class HybridX25519KyberStrategy : EncryptionStrategyBase
+public sealed class TripleDesStrategy : EncryptionStrategyBase
 {
 }
     public override CipherInfo CipherInfo;;
     public override string StrategyId;;
     public override string StrategyName;;
-    public HybridX25519KyberStrategy();
     protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
     protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Hybrid/X25519Kyber768Strategy.cs
-```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 59: Double encryption envelope")]
-public sealed class X25519Kyber768Strategy : EncryptionStrategyBase
-{
-}
-    public override CipherInfo CipherInfo;;
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public X25519Kyber768Strategy();
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    public override byte[] GenerateKey();
-    public (byte[] PublicKey, byte[] CompositePrivateKey) GenerateCompositeKeyPair();
-    public override bool ValidateKey(byte[] key);
 }
 ```
 
@@ -1076,9 +1089,9 @@ public sealed class Pbkdf2Sha512Strategy : EncryptionStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Legacy/LegacyCipherStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Homomorphic/HomomorphicStrategies.cs
 ```csharp
-public sealed class BlowfishStrategy : EncryptionStrategyBase
+public sealed class PaillierStrategy : EncryptionStrategyBase
 {
 }
     public override CipherInfo CipherInfo;;
@@ -1086,86 +1099,76 @@ public sealed class BlowfishStrategy : EncryptionStrategyBase
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     public override string StrategyName;;
+    public PaillierStrategy(int keyBits = 2048);
     protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
     protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
     public override byte[] GenerateKey();
+    public byte[] Add(byte[] ciphertext1, byte[] ciphertext2, byte[] publicKey);
+    public byte[] ScalarMultiply(byte[] ciphertext, BigInteger scalar, byte[] publicKey);
 }
 ```
 ```csharp
-public sealed class IdeaStrategy : EncryptionStrategyBase
+public sealed class ElGamalStrategy : EncryptionStrategyBase
 {
 }
     public override CipherInfo CipherInfo;;
     public override string StrategyId;;
     public override string StrategyName;;
+    public ElGamalStrategy(int keyBits = 2048);
     protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
     protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override byte[] GenerateKey();
+    public byte[] Multiply(byte[] ciphertext1, byte[] ciphertext2, byte[] publicKey);
 }
 ```
 ```csharp
-public sealed class Cast5Strategy : EncryptionStrategyBase
+public sealed class GoldwasserMicaliStrategy : EncryptionStrategyBase
 {
 }
     public override CipherInfo CipherInfo;;
     public override string StrategyId;;
     public override string StrategyName;;
+    public GoldwasserMicaliStrategy(int keyBits = 2048);
     protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
     protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override byte[] GenerateKey();
+    public byte[] Xor(byte[] ciphertext1, byte[] ciphertext2, byte[] publicKey);
 }
 ```
 ```csharp
-public sealed class Cast6Strategy : EncryptionStrategyBase
+public sealed class BfvFheStrategy : EncryptionStrategyBase
 {
 }
     public override CipherInfo CipherInfo;;
     public override string StrategyId;;
     public override string StrategyName;;
-    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);;
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);;
+    public override byte[] GenerateKey();;
 }
 ```
 ```csharp
-public sealed class Rc5Strategy : EncryptionStrategyBase
+public sealed class CkksFheStrategy : EncryptionStrategyBase
 {
 }
     public override CipherInfo CipherInfo;;
     public override string StrategyId;;
     public override string StrategyName;;
-    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);;
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);;
+    public override byte[] GenerateKey();;
 }
 ```
 ```csharp
-public sealed class Rc6Strategy : EncryptionStrategyBase
+public sealed class TfheStrategy : EncryptionStrategyBase
 {
 }
     public override CipherInfo CipherInfo;;
     public override string StrategyId;;
     public override string StrategyName;;
-    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-}
-```
-```csharp
-public sealed class DesStrategy : EncryptionStrategyBase
-{
-}
-    public override CipherInfo CipherInfo;;
-    public override string StrategyId;;
-    public override string StrategyName;;
-    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-}
-```
-```csharp
-public sealed class TripleDesStrategy : EncryptionStrategyBase
-{
-}
-    public override CipherInfo CipherInfo;;
-    public override string StrategyId;;
-    public override string StrategyName;;
-    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);;
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);;
+    public override byte[] GenerateKey();;
 }
 ```
 
@@ -1187,433 +1190,121 @@ public sealed class ChaffPaddingStrategy : EncryptionStrategyBase
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/PostQuantum/AdditionalPqcKemStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Educational/EducationalCipherStrategies.cs
 ```csharp
-public sealed class NtruHrss701Strategy : EncryptionStrategyBase
+public sealed class CaesarCipherStrategy : EncryptionStrategyBase
 {
 }
-    public override CipherInfo CipherInfo;;
-    public override string StrategyId;;
-    public override string StrategyName;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public NtruHrss701Strategy();
-    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    public override byte[] GenerateKey();
-    public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair();
-}
-```
-```csharp
-public sealed class ClassicMcElieceStrategy : EncryptionStrategyBase
-{
-}
-    public override CipherInfo CipherInfo;;
-    public override string StrategyId;;
-    public override string StrategyName;;
-    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);;
-    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);;
-    public override byte[] GenerateKey();;
-}
-```
-```csharp
-public sealed class BikeStrategy : EncryptionStrategyBase
-{
-}
-    public override CipherInfo CipherInfo;;
-    public override string StrategyId;;
-    public override string StrategyName;;
-    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);;
-    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);;
-    public override byte[] GenerateKey();;
-}
-```
-```csharp
-public sealed class HqcStrategy : EncryptionStrategyBase
-{
-}
-    public override CipherInfo CipherInfo;;
-    public override string StrategyId;;
-    public override string StrategyName;;
-    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);;
-    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);;
-    public override byte[] GenerateKey();;
-}
-```
-```csharp
-public sealed class FrodoKemStrategy : EncryptionStrategyBase
-{
-}
-    public override CipherInfo CipherInfo;;
-    public override string StrategyId;;
-    public override string StrategyName;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public FrodoKemStrategy();
-    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    public override byte[] GenerateKey();
-    public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair();
-}
-```
-```csharp
-public sealed class SaberStrategy : EncryptionStrategyBase
-{
-}
-    public override CipherInfo CipherInfo;;
-    public override string StrategyId;;
-    public override string StrategyName;;
-    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);;
-    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);;
-    public override byte[] GenerateKey();;
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/PostQuantum/AdditionalPqcSignatureStrategies.cs
-```csharp
-public sealed class MlDsa44Strategy : EncryptionStrategyBase
-{
-}
-    public override CipherInfo CipherInfo;;
-    public override string StrategyId;;
-    public override string StrategyName;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public MlDsa44Strategy();
-    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    public override byte[] GenerateKey();
-}
-```
-```csharp
-public sealed class MlDsa87Strategy : EncryptionStrategyBase
-{
-}
-    public override CipherInfo CipherInfo;;
-    public override string StrategyId;;
-    public override string StrategyName;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public MlDsa87Strategy();
-    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    public override byte[] GenerateKey();
-}
-```
-```csharp
-public sealed class SlhDsaSha2Strategy : EncryptionStrategyBase
-{
-}
-    public override CipherInfo CipherInfo;;
-    public override string StrategyId;;
-    public override string StrategyName;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public SlhDsaSha2Strategy();
-    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    public override byte[] GenerateKey();
-}
-```
-```csharp
-public sealed class SlhDsaShake256fStrategy : EncryptionStrategyBase
-{
-}
-    public override CipherInfo CipherInfo;;
-    public override string StrategyId;;
-    public override string StrategyName;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public SlhDsaShake256fStrategy();
-    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    public override byte[] GenerateKey();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/PostQuantum/CrystalsDilithiumStrategies.cs
-```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 59: PQC migration")]
-internal static class DilithiumSignatureHelper
-{
-}
-    public static byte[] Sign(byte[] data, byte[] privateKey, MLDsaParameters parameters);
-    public static bool Verify(byte[] data, byte[] signature, byte[] publicKey, MLDsaParameters parameters);
-    public static (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair(MLDsaParameters parameters, SecureRandom random);
-}
-```
-```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 59: PQC migration")]
-public sealed class DilithiumSignature44Strategy : EncryptionStrategyBase
-{
-}
-    public override CipherInfo CipherInfo;;
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public DilithiumSignature44Strategy();
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    public override byte[] GenerateKey();
-    public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair();
-}
-```
-```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 59: PQC migration")]
-public sealed class DilithiumSignature65Strategy : EncryptionStrategyBase
-{
-}
-    public override CipherInfo CipherInfo;;
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public DilithiumSignature65Strategy();
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    public override byte[] GenerateKey();
-    public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair();
-}
-```
-```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 59: PQC migration")]
-public sealed class DilithiumSignature87Strategy : EncryptionStrategyBase
-{
-}
-    public override CipherInfo CipherInfo;;
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public DilithiumSignature87Strategy();
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    public override byte[] GenerateKey();
-    public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/PostQuantum/CrystalsKyberStrategies.cs
-```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 59: Crypto key rotation")]
-internal static class KyberKemHelper
-{
-}
-    internal static byte[] Encrypt(NtruParameters ntruParameters, byte[] plaintext, byte[] recipientPublicKeyBytes, byte[]? associatedData, SecureRandom secureRandom, Func<byte[]> generateIv);
-    internal static byte[] Decrypt(NtruParameters ntruParameters, byte[] ciphertext, byte[] privateKeyBytes, byte[]? associatedData);
-    internal static (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair(NtruParameters ntruParameters, SecureRandom secureRandom);
-}
-```
-```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 59: Crypto key rotation")]
-public sealed class KyberKem512Strategy : EncryptionStrategyBase
-{
-}
-    public override CipherInfo CipherInfo;;
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public KyberKem512Strategy();
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    public override byte[] GenerateKey();
-    public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair();
-}
-```
-```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 59: Crypto key rotation")]
-public sealed class KyberKem768Strategy : EncryptionStrategyBase
-{
-}
-    public override CipherInfo CipherInfo;;
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public KyberKem768Strategy();
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    public override byte[] GenerateKey();
-    public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair();
-}
-```
-```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 59: Crypto key rotation")]
-public sealed class KyberKem1024Strategy : EncryptionStrategyBase
-{
-}
-    public override CipherInfo CipherInfo;;
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public KyberKem1024Strategy();
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    public override byte[] GenerateKey();
-    public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/PostQuantum/MlKemStrategies.cs
-```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 59: Crypto key rotation")]
-public sealed class MlKem512Strategy : EncryptionStrategyBase
-{
-}
-    public override CipherInfo CipherInfo;;
     public override string StrategyId;;
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
     public override string StrategyName;;
-    public MlKem512Strategy();
-    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    public override byte[] GenerateKey();
-    public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair();
-}
-```
-```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 59: Crypto key rotation")]
-public sealed class MlKem768Strategy : EncryptionStrategyBase
-{
-}
     public override CipherInfo CipherInfo;;
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public MlKem768Strategy();
-    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    public override byte[] GenerateKey();
-    public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair();
-}
-```
-```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 59: Crypto key rotation")]
-public sealed class MlKem1024Strategy : EncryptionStrategyBase
-{
-}
-    public override CipherInfo CipherInfo;;
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public MlKem1024Strategy();
-    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    public override byte[] GenerateKey();
-    public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair();
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/PostQuantum/PqSignatureStrategies.cs
-```csharp
-public sealed class MlDsaStrategy : EncryptionStrategyBase
-{
-}
-    public override CipherInfo CipherInfo;;
-    public override string StrategyId;;
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public override string StrategyName;;
-    public MlDsaStrategy();
-    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    public override byte[] GenerateKey();
-}
-```
-```csharp
-public sealed class SlhDsaStrategy : EncryptionStrategyBase
-{
-}
-    public override CipherInfo CipherInfo;;
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public SlhDsaStrategy();
-    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    public override byte[] GenerateKey();
-}
-```
-```csharp
-public sealed class FalconStrategy : EncryptionStrategyBase
-{
-}
-    public override CipherInfo CipherInfo;;
-    public override string StrategyId;;
-    public override string StrategyName;;
     protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
     protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
     public override byte[] GenerateKey();
+    public override byte[] GenerateIv();
+}
+```
+```csharp
+public sealed class XorCipherStrategy : EncryptionStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override CipherInfo CipherInfo;;
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override byte[] GenerateIv();
+}
+```
+```csharp
+public sealed class VigenereCipherStrategy : EncryptionStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override CipherInfo CipherInfo;;
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override byte[] GenerateIv();
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/PostQuantum/SphincsPlusStrategies.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Disk/DiskEncryptionStrategies.cs
 ```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 59: PQC migration")]
-internal static class SphincsPlusSignatureHelper
+public sealed class XtsAes256Strategy : EncryptionStrategyBase
 {
 }
-    public static byte[] Sign(byte[] data, byte[] privateKey, SlhDsaParameters parameters);
-    public static bool Verify(byte[] data, byte[] signature, byte[] publicKey, SlhDsaParameters parameters);
-    public static (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair(SlhDsaParameters parameters, SecureRandom random);
+    public override string StrategyId;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public override string StrategyName;;
+    public override CipherInfo CipherInfo;;
+    public override byte[] GenerateKey();
+    public override bool ValidateKey(byte[] key);
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
 }
 ```
 ```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 59: PQC migration")]
-public sealed class SphincsPlus128fStrategy : EncryptionStrategyBase
+public sealed class AdiantumStrategy : EncryptionStrategyBase
 {
 }
-    public override CipherInfo CipherInfo;;
     public override string StrategyId;;
     public override string StrategyName;;
-    public SphincsPlus128fStrategy();
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    public override byte[] GenerateKey();
-    public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair();
+    public override CipherInfo CipherInfo;;
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
 }
 ```
 ```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 59: PQC migration")]
-public sealed class SphincsPlus192fStrategy : EncryptionStrategyBase
+public sealed class EssivStrategy : EncryptionStrategyBase
 {
 }
-    public override CipherInfo CipherInfo;;
     public override string StrategyId;;
     public override string StrategyName;;
-    public SphincsPlus192fStrategy();
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    public override byte[] GenerateKey();
-    public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair();
-}
-```
-```csharp
-[SdkCompatibility("5.0.0", Notes = "Phase 59: PQC migration")]
-public sealed class SphincsPlus256fStrategy : EncryptionStrategyBase
-{
-}
     public override CipherInfo CipherInfo;;
-    public override string StrategyId;;
-    public override string StrategyName;;
-    public SphincsPlus256fStrategy();
-    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
-    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
-    public override byte[] GenerateKey();
-    public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair();
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/StreamCiphers/OtpStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Asymmetric/RsaStrategies.cs
 ```csharp
-public sealed class OtpStrategy : EncryptionStrategyBase
+public sealed class RsaOaepStrategy : EncryptionStrategyBase
+{
+}
+    public override CipherInfo CipherInfo;;
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public RsaOaepStrategy(int keySize = 2048);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
+    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+}
+```
+```csharp
+public sealed class RsaPkcs1Strategy : EncryptionStrategyBase
+{
+}
+    public override CipherInfo CipherInfo;;
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public RsaPkcs1Strategy(int keySize = 2048);
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
+    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/BlockCiphers/CamelliaAriaStrategies.cs
+```csharp
+public sealed class CamelliaStrategy : EncryptionStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1625,59 +1316,94 @@ public sealed class OtpStrategy : EncryptionStrategyBase
     protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
 }
 ```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Transit/Aes128GcmTransitStrategy.cs
 ```csharp
-public sealed class Aes128GcmTransitStrategy : TransitEncryptionPluginBase
+public sealed class AriaStrategy : EncryptionStrategyBase
 {
 }
-    public override string Id;;
-    public override string Name;;
-    public override string Version;;
-    protected override async Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
-    public override async Task<TransitEncryptionResult> EncryptStreamForTransitAsync(System.IO.Stream plaintextStream, System.IO.Stream ciphertextStream, TransitEncryptionOptions options, ISecurityContext context, CancellationToken cancellationToken = default);
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override CipherInfo CipherInfo;;
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+}
+```
+```csharp
+public sealed class Sm4Strategy : EncryptionStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override CipherInfo CipherInfo;;
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+}
+```
+```csharp
+public sealed class SeedStrategy : EncryptionStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override CipherInfo CipherInfo;;
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+}
+```
+```csharp
+public sealed class KuznyechikStrategy : EncryptionStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override CipherInfo CipherInfo;;
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+}
+```
+```csharp
+public sealed class MagmaStrategy : EncryptionStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override CipherInfo CipherInfo;;
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Transit/AesCbcTransitStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/BlockCiphers/BlockCipherStrategies.cs
 ```csharp
-public sealed class AesCbcTransitStrategy : TransitEncryptionPluginBase
+public sealed class SerpentStrategy : EncryptionStrategyBase
 {
 }
-    public override string Id;;
-    public override string Name;;
-    public override string Version;;
-    protected override async Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
+    public override string StrategyId;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public override string StrategyName;;
+    public override CipherInfo CipherInfo;;
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
 }
 ```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Transit/AesGcmTransitStrategy.cs
 ```csharp
-public sealed class AesGcmTransitStrategy : TransitEncryptionPluginBase
+public sealed class TwofishStrategy : EncryptionStrategyBase
 {
 }
-    public override string Id;;
-    public override string Name;;
-    public override string Version;;
-    protected override async Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
-    public override async Task<TransitEncryptionResult> EncryptStreamForTransitAsync(System.IO.Stream plaintextStream, System.IO.Stream ciphertextStream, TransitEncryptionOptions options, ISecurityContext context, CancellationToken cancellationToken = default);
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override CipherInfo CipherInfo;;
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
 }
 ```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Transit/ChaCha20TransitStrategy.cs
 ```csharp
-public sealed class ChaCha20TransitStrategy : TransitEncryptionPluginBase
+private sealed class TwofishContext
 {
 }
-    public override string Id;;
-    public override string Name;;
-    public override string Version;;
-    protected override async Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
-    public override async Task<TransitEncryptionResult> EncryptStreamForTransitAsync(System.IO.Stream plaintextStream, System.IO.Stream ciphertextStream, TransitEncryptionOptions options, ISecurityContext context, CancellationToken cancellationToken = default);
+    public uint[] SubKeys = new uint[40];
+    public uint[] SBoxKeys = new uint[4];
+    public int KeyLength;
 }
 ```
 
@@ -1691,11 +1417,26 @@ public sealed class CompoundTransitStrategy : TransitEncryptionPluginBase
     public override string Version;;
     public string PrimaryCipher { get; set; };
     public string SecondaryCipher { get; set; };
-    protected override async Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
-    public override async Task<EndpointCapabilities> GetCapabilitiesAsync(CancellationToken cancellationToken = default);
+    protected override Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
+    public override Task<EndpointCapabilities> GetCapabilitiesAsync(CancellationToken cancellationToken = default);
     public void ConfigureCiphers(string primaryCipher, string secondaryCipher);
     public Dictionary<string, object> GetCascadeInfo();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Transit/ChaCha20TransitStrategy.cs
+```csharp
+public sealed class ChaCha20TransitStrategy : TransitEncryptionPluginBase
+{
+}
+    public override string Id;;
+    public override string Name;;
+    public override string Version;;
+    protected override Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
+    public override async Task<TransitEncryptionResult> EncryptStreamForTransitAsync(System.IO.Stream plaintextStream, System.IO.Stream ciphertextStream, TransitEncryptionOptions options, ISecurityContext context, CancellationToken cancellationToken = default);
+    public override async Task<TransitDecryptionResult> DecryptStreamFromTransitAsync(System.IO.Stream ciphertextStream, System.IO.Stream plaintextStream, ISecurityContext context, CancellationToken cancellationToken = default);
 }
 ```
 
@@ -1707,9 +1448,66 @@ public sealed class SerpentGcmTransitStrategy : TransitEncryptionPluginBase
     public override string Id;;
     public override string Name;;
     public override string Version;;
-    protected override async Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
-    public override async Task<EndpointCapabilities> GetCapabilitiesAsync(CancellationToken cancellationToken = default);
+    protected override Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
+    public override Task<EndpointCapabilities> GetCapabilitiesAsync(CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Transit/XChaCha20TransitStrategy.cs
+```csharp
+public sealed class XChaCha20TransitStrategy : TransitEncryptionPluginBase
+{
+}
+    public override string Id;;
+    public override string Name;;
+    public override string Version;;
+    protected override Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
+    public override Task<EndpointCapabilities> GetCapabilitiesAsync(CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Transit/AesCbcTransitStrategy.cs
+```csharp
+public sealed class AesCbcTransitStrategy : TransitEncryptionPluginBase
+{
+}
+    public override string Id;;
+    public override string Name;;
+    public override string Version;;
+    protected override Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Transit/Aes128GcmTransitStrategy.cs
+```csharp
+public sealed class Aes128GcmTransitStrategy : TransitEncryptionPluginBase
+{
+}
+    public override string Id;;
+    public override string Name;;
+    public override string Version;;
+    protected override Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
+    public override async Task<TransitEncryptionResult> EncryptStreamForTransitAsync(System.IO.Stream plaintextStream, System.IO.Stream ciphertextStream, TransitEncryptionOptions options, ISecurityContext context, CancellationToken cancellationToken = default);
+    public override async Task<TransitDecryptionResult> DecryptStreamFromTransitAsync(System.IO.Stream ciphertextStream, System.IO.Stream plaintextStream, ISecurityContext context, CancellationToken cancellationToken = default);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Transit/AesGcmTransitStrategy.cs
+```csharp
+public sealed class AesGcmTransitStrategy : TransitEncryptionPluginBase
+{
+}
+    public override string Id;;
+    public override string Name;;
+    public override string Version;;
+    protected override Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
+    public override async Task<TransitEncryptionResult> EncryptStreamForTransitAsync(System.IO.Stream plaintextStream, System.IO.Stream ciphertextStream, TransitEncryptionOptions options, ISecurityContext context, CancellationToken cancellationToken = default);
+    public override async Task<TransitDecryptionResult> DecryptStreamFromTransitAsync(System.IO.Stream ciphertextStream, System.IO.Stream plaintextStream, ISecurityContext context, CancellationToken cancellationToken = default);
 }
 ```
 
@@ -1722,24 +1520,239 @@ public sealed class TlsBridgeTransitStrategy : TransitEncryptionPluginBase
     public override string Name;;
     public override string Version;;
     public SslStream? TlsStream { get; set; }
-    protected override async Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
+    protected override Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
     public override async Task<TransitEncryptionResult> EncryptStreamForTransitAsync(System.IO.Stream plaintextStream, System.IO.Stream ciphertextStream, TransitEncryptionOptions options, ISecurityContext context, CancellationToken cancellationToken = default);
     public override Task<EndpointCapabilities> GetCapabilitiesAsync(CancellationToken cancellationToken = default);
     public Dictionary<string, object> GetTlsConnectionInfo();
 }
 ```
 
-### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Transit/XChaCha20TransitStrategy.cs
+### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/StreamCiphers/OtpStrategy.cs
 ```csharp
-public sealed class XChaCha20TransitStrategy : TransitEncryptionPluginBase
+public sealed class OtpStrategy : EncryptionStrategyBase
 {
 }
-    public override string Id;;
-    public override string Name;;
-    public override string Version;;
-    protected override async Task<(byte[] Ciphertext, Dictionary<string, object> Metadata)> EncryptDataAsync(byte[] plaintext, CipherPreset preset, byte[] key, byte[]? aad, CancellationToken cancellationToken);
-    protected override async Task<byte[]> DecryptDataAsync(byte[] ciphertext, CipherPreset preset, byte[] key, Dictionary<string, object> metadata, CancellationToken cancellationToken);
-    public override async Task<EndpointCapabilities> GetCapabilitiesAsync(CancellationToken cancellationToken = default);
+    public override string StrategyId;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public override string StrategyName;;
+    public override CipherInfo CipherInfo;;
+    public byte[] GenerateKey(int plaintextLengthBytes);
+    public override byte[] GenerateKey();;
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Aead/AeadStrategies.cs
+```csharp
+public sealed class AsconStrategy : EncryptionStrategyBase
+{
+}
+    public override CipherInfo CipherInfo;;
+    public override string StrategyId;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public override string StrategyName;;
+    public AsconStrategy();
+    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+}
+```
+```csharp
+public sealed class Aegis128LStrategy : EncryptionStrategyBase
+{
+}
+    public override CipherInfo CipherInfo;;
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public Aegis128LStrategy();
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+}
+```
+```csharp
+public sealed class Aegis256Strategy : EncryptionStrategyBase
+{
+}
+    public override CipherInfo CipherInfo;;
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public Aegis256Strategy();
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Aes/AesCbcStrategy.cs
+```csharp
+public sealed class Aes256CbcStrategy : EncryptionStrategyBase
+{
+}
+    public override string StrategyId;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public override string StrategyName;;
+    public override CipherInfo CipherInfo;;
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+}
+```
+```csharp
+public sealed class Aes128CbcStrategy : EncryptionStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override CipherInfo CipherInfo;;
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken ct);
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken ct);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Aes/AesGcmStrategy.cs
+```csharp
+public sealed class AesGcmStrategy : EncryptionStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override CipherInfo CipherInfo;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override async ValueTask DisposeAsyncCore();
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+}
+```
+```csharp
+public sealed class Aes128GcmStrategy : EncryptionStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override CipherInfo CipherInfo;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override async ValueTask DisposeAsyncCore();
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken ct);
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken ct);
+}
+```
+```csharp
+public sealed class Aes192GcmStrategy : EncryptionStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override CipherInfo CipherInfo;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    protected override async ValueTask DisposeAsyncCore();
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken ct);
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken ct);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Aes/AesCtrXtsStrategies.cs
+```csharp
+public sealed class AesCtrStrategy : EncryptionStrategyBase
+{
+}
+    public override string StrategyId;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public override string StrategyName;;
+    public override CipherInfo CipherInfo;;
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+}
+```
+```csharp
+public sealed class AesXtsStrategy : EncryptionStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override CipherInfo CipherInfo;;
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+}
+```
+```csharp
+public sealed class AesCcmStrategy : EncryptionStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override CipherInfo CipherInfo;;
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+}
+```
+```csharp
+public sealed class AesEcbStrategy : EncryptionStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override CipherInfo CipherInfo;;
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    public override byte[] GenerateIv();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateEncryption/Strategies/Fpe/FpeStrategies.cs
+```csharp
+public sealed class Ff1Strategy : EncryptionStrategyBase
+{
+}
+    public override string StrategyId;;
+    protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
+    public override string StrategyName;;
+    public override CipherInfo CipherInfo;;
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+}
+```
+```csharp
+public sealed class Ff3Strategy : EncryptionStrategyBase
+{
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override CipherInfo CipherInfo;;
+    protected override Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+}
+```
+```csharp
+public sealed class FpeCreditCardStrategy : EncryptionStrategyBase
+{
+}
+    public FpeCreditCardStrategy();
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override CipherInfo CipherInfo;;
+    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+}
+```
+```csharp
+public sealed class FpeSsnStrategy : EncryptionStrategyBase
+{
+}
+    public FpeSsnStrategy();
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override CipherInfo CipherInfo;;
+    protected override async Task<byte[]> EncryptCoreAsync(byte[] plaintext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
+    protected override async Task<byte[]> DecryptCoreAsync(byte[] ciphertext, byte[] key, byte[]? associatedData, CancellationToken cancellationToken);
 }
 ```

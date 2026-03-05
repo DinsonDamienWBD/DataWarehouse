@@ -29,6 +29,12 @@ public sealed record AutoScalingPolicy
 
     /// <summary>Gets the auto-scaling evaluation interval.</summary>
     public TimeSpan EvaluationInterval { get; init; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>Gets the instance type for new nodes. Configurable to match cloud provider SKUs.</summary>
+    public string InstanceType { get; init; } = "general-purpose";
+
+    /// <summary>Gets the storage allocation in GB for each new node.</summary>
+    public int StorageGb { get; init; } = 100;
 }
 
 /// <summary>
@@ -60,7 +66,7 @@ public sealed class HyperscaleProvisioner : IDisposable
     private readonly ICloudProvider _cloudProvider;
     private readonly AutoScalingPolicy _policy;
     private readonly ILogger<HyperscaleProvisioner> _logger;
-    private bool _isActive;
+    private volatile bool _isActive;
     private bool _disposed;
 
     /// <summary>
@@ -79,7 +85,7 @@ public sealed class HyperscaleProvisioner : IDisposable
     /// <summary>
     /// Starts auto-scaling with periodic evaluation.
     /// </summary>
-    public async Task StartAutoScalingAsync(CancellationToken ct = default)
+    public Task StartAutoScalingAsync(CancellationToken ct = default)
     {
         _isActive = true;
         _logger.LogInformation(
@@ -99,16 +105,27 @@ public sealed class HyperscaleProvisioner : IDisposable
                 {
                     await EvaluateScalingAsync(ct);
                 }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Auto-scaling evaluation failed. Continuing monitoring.");
                 }
 
-                await Task.Delay(_policy.EvaluationInterval, ct);
+                try
+                {
+                    await Task.Delay(_policy.EvaluationInterval, ct);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
             }
         }, ct);
 
-        await Task.CompletedTask;
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -213,8 +230,8 @@ public sealed class HyperscaleProvisioner : IDisposable
     {
         var vmSpec = new VmSpec
         {
-            InstanceType = "general-purpose",
-            StorageGb = 100,
+            InstanceType = _policy.InstanceType,
+            StorageGb = _policy.StorageGb,
             Tags = new Dictionary<string, string>
             {
                 ["ManagedBy"] = "DataWarehouse",
@@ -224,9 +241,10 @@ public sealed class HyperscaleProvisioner : IDisposable
 
         var instanceId = await _cloudProvider.ProvisionVmAsync(vmSpec, ct);
 
-        _logger.LogInformation("New node provisioned: {InstanceId}. Waiting for cluster join...", instanceId);
-
-        // In production: Wait for new node to join cluster (poll cluster API, max 10 minutes)
+        _logger.LogWarning(
+            "New node provisioned: {InstanceId}. Cluster join verification not yet implemented. " +
+            "Node may not be accepting traffic yet. Monitor cluster membership before routing requests.",
+            instanceId);
     }
 
     private async Task DeprovisionLeastLoadedNodeAsync(IReadOnlyList<string> managedResources, CancellationToken ct)
@@ -256,9 +274,12 @@ public sealed class HyperscaleProvisioner : IDisposable
             leastLoadedNode,
             lowestUtilization);
 
-        // In production: Drain node (move data to other nodes using Phase 34 federated rebalancing)
+        _logger.LogWarning(
+            "Node drain not yet implemented for {NodeId}. Data migration to other nodes " +
+            "requires federation rebalancing integration. Deprovisioning without drain may cause data loss.",
+            leastLoadedNode);
 
-        _logger.LogInformation("Node drained. Deprovisioning {NodeId}...", leastLoadedNode);
+        _logger.LogInformation("Deprovisioning {NodeId}...", leastLoadedNode);
 
         await _cloudProvider.DeprovisionAsync(leastLoadedNode, ct);
 

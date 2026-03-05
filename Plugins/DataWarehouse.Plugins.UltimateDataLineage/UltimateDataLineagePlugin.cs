@@ -494,12 +494,14 @@ public sealed class UltimateDataLineagePlugin : DataManagementPluginBase, IDispo
             return Task.CompletedTask;
         }
 
-        // Get provenance from default strategy
+        // Retrieve provenance from the default strategy
         var strategy = _registry.Get(_defaultStrategy) as LineageStrategyBase;
-        // Provenance would be retrieved here
+        var records = strategy?.GetProvenance(dataObjectId)
+                      ?? Array.Empty<ProvenanceRecord>();
 
         message.Payload["success"] = true;
         message.Payload["dataObjectId"] = dataObjectId;
+        message.Payload["records"] = records;
         return Task.CompletedTask;
     }
 

@@ -76,7 +76,10 @@ public sealed class DualHeadRouter : IStorageRouter
         _classifier = classifier;
         _objectPipeline = objectPipeline;
         _filePathPipeline = filePathPipeline;
-        _routingCounters = new BoundedDictionary<RequestLanguage, long>(1000);
+        // RequestLanguage has 2 members (Object, FilePath) — capacity 2 is exact.
+        // BoundedDictionary is used here as a simple concurrent counter map; any excess
+        // capacity only wastes memory with no functional benefit.
+        _routingCounters = new BoundedDictionary<RequestLanguage, long>(Enum.GetValues<RequestLanguage>().Length);
     }
 
     /// <inheritdoc />

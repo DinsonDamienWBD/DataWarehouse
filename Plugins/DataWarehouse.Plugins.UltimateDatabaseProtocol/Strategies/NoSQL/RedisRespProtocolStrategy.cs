@@ -37,8 +37,11 @@ public sealed class RedisRespProtocolStrategy : DatabaseProtocolStrategyBase
 
     // Connection state
     private string _serverVersion = "";
-    private bool _inTransaction;
+    // P2-2701: volatile ensures visibility across async continuations without a full lock for the bool.
+    private volatile bool _inTransaction;
     private readonly List<string> _transactionQueue = new();
+    // _transactionQueueLock guards both _inTransaction mutation and _transactionQueue access.
+    private readonly object _transactionQueueLock = new();
     private StreamReader? _reader;
     private StreamWriter? _writer;
 
@@ -118,7 +121,9 @@ public sealed class RedisRespProtocolStrategy : DatabaseProtocolStrategyBase
             }
             catch
             {
+
                 // Ignore info errors
+                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
             }
         }
     }
@@ -491,7 +496,7 @@ public sealed class RedisRespProtocolStrategy : DatabaseProtocolStrategyBase
         var result = await SendCommandInternalAsync(["MULTI"], ct);
         if (result?.ToString() == "OK")
         {
-            _inTransaction = true;
+            lock (_transactionQueueLock) { _inTransaction = true; }
             return Guid.NewGuid().ToString("N");
         }
         throw new InvalidOperationException($"Failed to start transaction: {result}");
@@ -506,8 +511,7 @@ public sealed class RedisRespProtocolStrategy : DatabaseProtocolStrategyBase
         }
 
         await SendCommandInternalAsync(["EXEC"], ct);
-        _inTransaction = false;
-        _transactionQueue.Clear();
+        lock (_transactionQueueLock) { _inTransaction = false; _transactionQueue.Clear(); }
     }
 
     /// <inheritdoc/>
@@ -519,8 +523,7 @@ public sealed class RedisRespProtocolStrategy : DatabaseProtocolStrategyBase
         }
 
         await SendCommandInternalAsync(["DISCARD"], ct);
-        _inTransaction = false;
-        _transactionQueue.Clear();
+        lock (_transactionQueueLock) { _inTransaction = false; _transactionQueue.Clear(); }
     }
 
     /// <inheritdoc/>
@@ -532,7 +535,9 @@ public sealed class RedisRespProtocolStrategy : DatabaseProtocolStrategyBase
         }
         catch
         {
+
             // Ignore errors during disconnect
+            System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
         }
     }
 

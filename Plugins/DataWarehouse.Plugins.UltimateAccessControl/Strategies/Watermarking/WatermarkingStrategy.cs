@@ -155,7 +155,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Watermarking
                         if (Configuration.TryGetValue("WatermarkSource", out var sourceObj) &&
                             sourceObj is string source)
                         {
-                            var isAccessible = File.Exists(source) || true; // Production: actual file check
+                            var isAccessible = File.Exists(source);
 
                             if (!isAccessible)
                             {

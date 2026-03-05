@@ -23,7 +23,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.NIST
         /// <inheritdoc/>
         protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
-        IncrementCounter("nist80053.check");
+            IncrementCounter("nist80053.check");
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
@@ -54,7 +54,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.NIST
             }
 
             // Check Configuration Management (CM family)
-            if (context.OperationType.Equals("modify", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.OperationType) && context.OperationType.Equals("modify", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("ChangeControlled", out var cmObj) || cmObj is not true)
                 {
@@ -70,16 +70,18 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.NIST
             }
 
             // Check Identification and Authentication (IA family)
+            // Applies to confidential, secret, top-secret, and restricted classifications
             if (!context.Attributes.TryGetValue("AuthenticationStrength", out var authObj) ||
                 authObj is not string authStrength ||
                 authStrength.Equals("single-factor", StringComparison.OrdinalIgnoreCase))
             {
-                if (context.DataClassification.Equals("confidential", StringComparison.OrdinalIgnoreCase))
+                var sensitiveClassifications = new[] { "confidential", "secret", "top-secret", "restricted" };
+                if (!string.IsNullOrEmpty(context.DataClassification) && sensitiveClassifications.Any(c => context.DataClassification.Equals(c, StringComparison.OrdinalIgnoreCase)))
                 {
                     violations.Add(new ComplianceViolation
                     {
                         Code = "NIST80053-IA-001",
-                        Description = "Multi-factor authentication not used for confidential data access",
+                        Description = $"Multi-factor authentication not used for {context.DataClassification} data access",
                         Severity = ViolationSeverity.High,
                         Remediation = "Implement multi-factor authentication for privileged access (IA-2(1))",
                         RegulatoryReference = "NIST SP 800-53 Rev. 5 IA-2(1)"
@@ -88,8 +90,8 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.NIST
             }
 
             // Check System and Communications Protection (SC family)
-            if (context.DataClassification.Equals("confidential", StringComparison.OrdinalIgnoreCase) ||
-                context.DataClassification.Equals("secret", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(context.DataClassification) && context.DataClassification.Equals("confidential", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(context.DataClassification, "secret", StringComparison.OrdinalIgnoreCase))
             {
                 if (!context.Attributes.TryGetValue("EncryptionInTransit", out var transitObj) || transitObj is not true)
                 {
@@ -118,9 +120,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.NIST
 
             recommendations.Add("Conduct regular control assessments as per NIST SP 800-53A");
 
-            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var hasHighViolations = violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var isCompliant = !hasHighViolations;
             var status = violations.Count == 0 ? ComplianceStatus.Compliant :
-                        violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
+                        hasHighViolations ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
             return Task.FromResult(new ComplianceResult
@@ -136,14 +139,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.NIST
     /// <inheritdoc/>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("nist80053.initialized");
+            IncrementCounter("nist80053.initialized");
         return base.InitializeAsyncCore(cancellationToken);
     }
 
     /// <inheritdoc/>
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        IncrementCounter("nist80053.shutdown");
+            IncrementCounter("nist80053.shutdown");
         return base.ShutdownAsyncCore(cancellationToken);
     }
 }

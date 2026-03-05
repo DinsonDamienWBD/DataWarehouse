@@ -30,8 +30,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
     public sealed class OAuth2Strategy : AccessControlStrategyBase
     {
         private readonly HttpClient _httpClient;
-        private readonly Dictionary<string, CachedTokenInfo> _tokenCache = new();
-        private readonly Dictionary<string, CachedJwks> _jwksCache = new();
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, CachedTokenInfo> _tokenCache = new();
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, CachedJwks> _jwksCache = new();
 
         private string? _introspectionEndpoint;
         private string? _clientId;
@@ -109,6 +109,18 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
             return base.ShutdownAsyncCore(cancellationToken);
         }
 
+        /// <inheritdoc/>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _httpClient.Dispose();
+                _tokenCache.Clear();
+                _jwksCache.Clear();
+            }
+            base.Dispose(disposing);
+        }
+
 
         /// <summary>
         /// Checks if OAuth 2.0 introspection endpoint is available.
@@ -120,7 +132,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
 
             try
             {
-                var response = await _httpClient.GetAsync(_introspectionEndpoint, cancellationToken);
+                using var response = await _httpClient.GetAsync(_introspectionEndpoint, cancellationToken);
                 return response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.MethodNotAllowed;
             }
             catch
@@ -183,7 +195,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
                     request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", authValue);
                 }
 
-                var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
                 response.EnsureSuccessStatusCode();
 
                 var json = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -496,7 +508,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
             if (_jwksCache.TryGetValue(cacheKey, out var cached) && cached.ExpiresAt > DateTime.UtcNow)
                 return cached.Jwks;
 
-            var response = await _httpClient.GetAsync(_jwksUri, cancellationToken);
+            using var response = await _httpClient.GetAsync(_jwksUri, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);

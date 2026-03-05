@@ -123,25 +123,28 @@ public sealed class RocksDbStorageStrategy : DatabaseStorageStrategyBase
             ModifiedAt = now
         };
 
-        // Check if document exists to preserve created timestamp
-        var existingMetadataBytes = _db!.Get(Encoding.UTF8.GetBytes(key), _metadataHandle);
-        if (existingMetadataBytes != null)
+        // Hold the lock for the entire read-modify-write to prevent TOCTOU with concurrent stores.
+        lock (_lock)
         {
-            var existingMetadata = JsonSerializer.Deserialize<MetadataDocument>(existingMetadataBytes, JsonOptions);
-            if (existingMetadata != null)
+            var existingMetadataBytes = _db!.Get(Encoding.UTF8.GetBytes(key), _metadataHandle);
+            if (existingMetadataBytes != null)
             {
-                metadataDoc.CreatedAt = existingMetadata.CreatedAt;
+                var existingMetadata = JsonSerializer.Deserialize<MetadataDocument>(existingMetadataBytes, JsonOptions);
+                if (existingMetadata != null)
+                {
+                    metadataDoc.CreatedAt = existingMetadata.CreatedAt;
+                }
             }
+
+            var metadataJson = JsonSerializer.SerializeToUtf8Bytes(metadataDoc, JsonOptions);
+            var keyBytes = Encoding.UTF8.GetBytes(key);
+
+            using var batch = new WriteBatch();
+            batch.Put(keyBytes, data, _dataHandle);
+            batch.Put(keyBytes, metadataJson, _metadataHandle);
+
+            _db.Write(batch);
         }
-
-        var metadataJson = JsonSerializer.SerializeToUtf8Bytes(metadataDoc, JsonOptions);
-        var keyBytes = Encoding.UTF8.GetBytes(key);
-
-        using var batch = new WriteBatch();
-        batch.Put(keyBytes, data, _dataHandle);
-        batch.Put(keyBytes, metadataJson, _metadataHandle);
-
-        _db.Write(batch);
 
         return Task.FromResult(new StorageObjectMetadata
         {

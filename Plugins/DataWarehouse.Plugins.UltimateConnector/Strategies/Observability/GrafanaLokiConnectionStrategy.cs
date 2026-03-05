@@ -42,6 +42,7 @@ public sealed class GrafanaLokiConnectionStrategy : ObservabilityConnectionStrat
 
         if (config.Properties.TryGetValue("TenantId", out var tenantId))
         {
+            httpClient.DefaultRequestHeaders.Remove("X-Scope-OrgID");
             httpClient.DefaultRequestHeaders.Add("X-Scope-OrgID", tenantId.ToString()!);
         }
 
@@ -98,7 +99,7 @@ public sealed class GrafanaLokiConnectionStrategy : ObservabilityConnectionStrat
         var httpClient = handle.GetConnection<HttpClient>();
         var json = JsonSerializer.Serialize(new { streams = logs });
         var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var response = await httpClient.PostAsync("/loki/api/v1/push", content, ct);
+        using var response = await httpClient.PostAsync("/loki/api/v1/push", content, ct);
         response.EnsureSuccessStatusCode();
     }
 

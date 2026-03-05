@@ -179,16 +179,18 @@ public static class TlaPlusModelGenerator
                 "echo \"=== Verifying {0} ===\"", moduleName));
             sb.AppendLine("TOTAL=$((TOTAL + 1))");
 
+            // P2-799: Inline spec and config content directly into the heredoc rather than
+            // referencing bash variables that were never populated, which produced empty files.
             // Write spec file
             sb.AppendLine(string.Format(CultureInfo.InvariantCulture,
                 "cat > \"{0}.tla\" << 'SPEC_EOF'", moduleName));
-            sb.AppendLine("${" + moduleName + "_SPEC}");
+            sb.AppendLine(spec.SpecText);
             sb.AppendLine("SPEC_EOF");
 
             // Write config file
             sb.AppendLine(string.Format(CultureInfo.InvariantCulture,
                 "cat > \"{0}.cfg\" << 'CFG_EOF'", moduleName));
-            sb.AppendLine("${" + moduleName + "_CFG}");
+            sb.AppendLine(GenerateTlcConfig(spec));
             sb.AppendLine("CFG_EOF");
 
             // Run TLC
@@ -225,6 +227,10 @@ public static class TlaPlusModelGenerator
     {
         ArgumentNullException.ThrowIfNull(tlcStdout);
 
+        // Cat 13 (finding 802): string.Split allocates proportional to TLC output size.
+        // TLC output is bounded (≤ few MB) and ParseTlcOutput is called once per model-check
+        // run — not in a hot path. For large outputs, prefer MemoryExtensions.Split or
+        // StreamReader line-by-line enumeration to avoid the intermediate array allocation.
         var lines = tlcStdout.Split('\n');
         var passed = true;
         long statesExplored = 0;

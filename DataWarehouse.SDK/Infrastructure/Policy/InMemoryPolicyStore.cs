@@ -23,6 +23,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
     {
         private readonly ConcurrentDictionary<string, FeaturePolicy> _policies = new();
         private readonly ConcurrentDictionary<string, int> _locationCounts = new();
+        private readonly object _capacityLock = new();
         private readonly int _maxCapacity;
 
         /// <summary>
@@ -67,15 +68,18 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
             var key = BuildKey(featureId, level, path);
             var locationKey = BuildLocationKey(level, path);
 
-            var isNew = !_policies.ContainsKey(key);
-            if (isNew && _policies.Count >= _maxCapacity)
-                throw new InvalidOperationException($"InMemoryPolicyStore capacity exceeded ({_maxCapacity}).");
-
-            _policies.AddOrUpdate(key, _ => policy, (_, _) => policy);
-
-            if (isNew)
+            lock (_capacityLock)
             {
-                _locationCounts.AddOrUpdate(locationKey, _ => 1, (_, count) => count + 1);
+                var isNew = !_policies.ContainsKey(key);
+                if (isNew && _policies.Count >= _maxCapacity)
+                    throw new InvalidOperationException($"InMemoryPolicyStore capacity exceeded ({_maxCapacity}).");
+
+                _policies.AddOrUpdate(key, _ => policy, (_, _) => policy);
+
+                if (isNew)
+                {
+                    _locationCounts.AddOrUpdate(locationKey, _ => 1, (_, count) => count + 1);
+                }
             }
 
             return Task.CompletedTask;
@@ -153,12 +157,21 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
             // Key format: "featureId:level:path"
             // Find the first colon (end of featureId), then parse level and path
             var firstColon = compositeKey.IndexOf(':');
+            // P2-500: Guard against malformed keys to avoid ArgumentOutOfRangeException.
+            if (firstColon < 0 || firstColon >= compositeKey.Length - 1)
+                throw new ArgumentException($"Malformed policy composite key: '{compositeKey}'.", nameof(compositeKey));
+
             var remaining = compositeKey.Substring(firstColon + 1);
             var secondColon = remaining.IndexOf(':');
+            if (secondColon < 0)
+                throw new ArgumentException($"Malformed policy composite key (missing second colon): '{compositeKey}'.", nameof(compositeKey));
+
             var levelStr = remaining.Substring(0, secondColon);
             var path = remaining.Substring(secondColon + 1);
 
-            var level = (PolicyLevel)Enum.Parse(typeof(PolicyLevel), levelStr);
+            if (!Enum.TryParse<PolicyLevel>(levelStr, out var level))
+                throw new ArgumentException($"Malformed policy composite key (invalid level '{levelStr}'): '{compositeKey}'.", nameof(compositeKey));
+
             return (level, path);
         }
     }

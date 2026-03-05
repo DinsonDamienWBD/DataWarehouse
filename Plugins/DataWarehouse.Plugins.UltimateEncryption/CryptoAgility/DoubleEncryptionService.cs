@@ -173,9 +173,11 @@ public sealed class DoubleEncryptionService
             return await DecryptViaMessageBusAsync(preferredAlgorithm, preferredCiphertext, ct)
                 .ConfigureAwait(false);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+
             // Fall back to the other algorithm
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
 
         // Try fallback algorithm

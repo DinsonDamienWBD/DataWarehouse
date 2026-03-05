@@ -319,10 +319,14 @@ public static class TierFeatureMap
     /// </summary>
     public static IReadOnlyList<FeatureTierAssignment> GetFeatureMap()
     {
-        var result = new FeatureTierAssignment[FormatConstants.DefinedModules];
+        var result = new List<FeatureTierAssignment>(FormatConstants.DefinedModules);
         for (int i = 0; i < FormatConstants.DefinedModules; i++)
         {
-            result[i] = Assignments[(ModuleId)i];
+            var moduleId = (ModuleId)i;
+            if (Assignments.ContainsKey(moduleId))
+            {
+                result.Add(Assignments[moduleId]);
+            }
         }
         return result;
     }

@@ -14,6 +14,11 @@ public sealed class OnnxStrategy : DataFormatStrategyBase
 
     public override string DisplayName => "ONNX";
 
+    // Finding 2228: ParseAsync/SerializeAsync always fail because Microsoft.ML.OnnxRuntime
+    // is not referenced. Mark not production-ready so the plugin host does not route live
+    // data through this strategy.
+    public override bool IsProductionReady => false;
+
     /// <summary>Production hardening: initialization with counter tracking.</summary>
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken) { IncrementCounter("onnx.init"); return base.InitializeAsyncCore(cancellationToken); }
     /// <summary>Production hardening: graceful shutdown.</summary>
@@ -114,6 +119,10 @@ public sealed class OnnxStrategy : DataFormatStrategyBase
         // We can parse basic protobuf structure without full ONNX library
         try
         {
+            // Guard: refuse unbounded allocation from untrusted stream length (finding 2233).
+            const long MaxOnnxSchemaBytes = 256L * 1024 * 1024; // 256 MB
+            if (stream.Length > MaxOnnxSchemaBytes)
+                return null;
             var buffer = new byte[stream.Length];
             await stream.ReadExactlyAsync(buffer, 0, buffer.Length, ct);
 

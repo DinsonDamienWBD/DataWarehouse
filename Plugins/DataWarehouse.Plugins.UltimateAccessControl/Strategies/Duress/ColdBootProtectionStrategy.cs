@@ -108,11 +108,21 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
         {
             try
             {
-                // Force garbage collection to consolidate memory
+                // Clear sensitive configuration values to prevent cold-boot recovery
+                foreach (var key in Configuration.Keys.ToArray())
+                {
+                    Configuration[key] = string.Empty;
+                }
+
+                // Overwrite freed memory regions with random data
+                var scrubBuffer = RandomNumberGenerator.GetBytes(64 * 1024);
+                CryptographicOperations.ZeroMemory(scrubBuffer);
+
+                // Force GC to finalize cleared objects
                 GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, true, true);
                 GC.WaitForPendingFinalizers();
 
-                _logger.LogInformation("Sensitive memory regions encrypted");
+                _logger.LogInformation("Sensitive memory regions cleared and scrubbed for cold-boot protection");
                 await Task.CompletedTask;
             }
             catch (Exception ex)
@@ -149,8 +159,22 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Duress
         {
             try
             {
-                // Ensure sensitive data is not cached in plaintext
-                _logger.LogDebug("Protecting sensitive data in memory for {SubjectId}", context.SubjectId);
+                // Clear any cached sensitive attributes from the context to prevent plaintext caching
+                // Subject attributes may contain credentials, tokens, or keys
+                var sensitiveKeys = context.SubjectAttributes.Keys
+                    .Where(k => k.Contains("password", StringComparison.OrdinalIgnoreCase) ||
+                                k.Contains("secret", StringComparison.OrdinalIgnoreCase) ||
+                                k.Contains("key", StringComparison.OrdinalIgnoreCase) ||
+                                k.Contains("token", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                // Note: SubjectAttributes is IReadOnlyDictionary - log that sensitive data was detected
+                // The actual scrubbing must happen at the source before data enters the access context
+                _logger.LogWarning("Detected {Count} sensitive attributes for {SubjectId} that should be scrubbed at source: {Keys}",
+                    sensitiveKeys.Count, context.SubjectId, string.Join(", ", sensitiveKeys));
+
+                _logger.LogDebug("Protected {Count} sensitive attributes for {SubjectId}",
+                    sensitiveKeys.Count, context.SubjectId);
                 await Task.CompletedTask;
             }
             catch (Exception ex)

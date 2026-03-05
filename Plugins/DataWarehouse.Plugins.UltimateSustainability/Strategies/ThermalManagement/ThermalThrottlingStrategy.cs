@@ -49,7 +49,7 @@ public sealed class ThermalThrottlingStrategy : SustainabilityStrategyBase
     /// <inheritdoc/>
     protected override Task InitializeCoreAsync(CancellationToken ct)
     {
-        _checkTimer = new Timer(async _ => await CheckAndThrottleAsync(), null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2));
+        _checkTimer = new Timer(async _ => { try { await CheckAndThrottleAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } }, null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2));
         return Task.CompletedTask;
     }
 
@@ -62,19 +62,39 @@ public sealed class ThermalThrottlingStrategy : SustainabilityStrategyBase
 
     private async Task CheckAndThrottleAsync()
     {
-        var temp = _temperatureProvider != null ? await _temperatureProvider() : 50 + Random.Shared.NextDouble() * 30;
-        lock (_lock) _currentTemp = temp;
-
-        var newLevel = temp switch
+        // If no provider is configured, read temperature from hwmon sysfs (Linux)
+        // or return the last known temperature (stable, no simulation).
+        double temp;
+        if (_temperatureProvider != null)
         {
-            >= 100 => ThrottleLevel.Emergency,
-            >= 92 => ThrottleLevel.Heavy,
-            >= 85 => ThrottleLevel.Moderate,
-            >= 75 => ThrottleLevel.Light,
-            _ => ThrottleLevel.None
-        };
+            temp = await _temperatureProvider();
+        }
+        else
+        {
+            temp = ReadTemperatureFromSysFs() ?? _currentTemp;
+        }
 
-        if (newLevel != _currentLevel)
+        ThrottleLevel prevLevel;
+        lock (_lock)
+        {
+            _currentTemp = temp;
+            prevLevel = _currentLevel;
+        }
+
+        // Use the user-configurable threshold properties instead of literal constants.
+        ThrottleLevel newLevel;
+        if (temp >= EmergencyShutdownC)
+            newLevel = ThrottleLevel.Emergency;
+        else if (temp >= HeavyThrottleC)
+            newLevel = ThrottleLevel.Heavy;
+        else if (temp >= ModerateThrottleC)
+            newLevel = ThrottleLevel.Moderate;
+        else if (temp >= LightThrottleC)
+            newLevel = ThrottleLevel.Light;
+        else
+            newLevel = ThrottleLevel.None;
+
+        if (newLevel != prevLevel)
         {
             await ApplyThrottleLevelAsync(newLevel);
             lock (_lock) _currentLevel = newLevel;
@@ -83,6 +103,39 @@ public sealed class ThermalThrottlingStrategy : SustainabilityStrategyBase
         }
 
         UpdateRecommendations();
+    }
+
+    private static double? ReadTemperatureFromSysFs()
+    {
+        if (!System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Linux))
+            return null;
+
+        try
+        {
+            // Read first available CPU thermal zone
+            var thermalBase = "/sys/class/thermal";
+            if (!Directory.Exists(thermalBase)) return null;
+
+            foreach (var zoneDir in Directory.GetDirectories(thermalBase, "thermal_zone*"))
+            {
+                var typePath = Path.Combine(zoneDir, "type");
+                var tempPath = Path.Combine(zoneDir, "temp");
+                if (!File.Exists(tempPath)) continue;
+
+                // Prefer x86_pkg_temp or cpu-thermal zones
+                var type = File.Exists(typePath) ? File.ReadAllText(typePath).Trim() : string.Empty;
+                if (!type.Contains("cpu", StringComparison.OrdinalIgnoreCase) &&
+                    !type.Contains("pkg", StringComparison.OrdinalIgnoreCase) &&
+                    !type.Contains("thermal", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                if (int.TryParse(File.ReadAllText(tempPath).Trim(), out var tempMilliC))
+                    return tempMilliC / 1000.0;
+            }
+        }
+        catch { /* Sysfs not accessible */ }
+
+        return null;
     }
 
     private async Task ApplyThrottleLevelAsync(ThrottleLevel level)
@@ -104,15 +157,24 @@ public sealed class ThermalThrottlingStrategy : SustainabilityStrategyBase
 
     private void UpdateRecommendations()
     {
+        // Capture shared fields under lock before using them outside the lock.
+        ThrottleLevel level;
+        double temp;
+        lock (_lock)
+        {
+            level = _currentLevel;
+            temp = _currentTemp;
+        }
+
         ClearRecommendations();
-        if (_currentLevel >= ThrottleLevel.Heavy)
+        if (level >= ThrottleLevel.Heavy)
         {
             AddRecommendation(new SustainabilityRecommendation
             {
                 RecommendationId = $"{StrategyId}-improve-cooling",
                 Type = "ImproveCooling",
                 Priority = 9,
-                Description = $"Heavy thermal throttling active ({_currentTemp:F0}C). Improve cooling or reduce workload.",
+                Description = $"Heavy thermal throttling active ({temp:F0}C). Improve cooling or reduce workload.",
                 CanAutoApply = false
             });
         }

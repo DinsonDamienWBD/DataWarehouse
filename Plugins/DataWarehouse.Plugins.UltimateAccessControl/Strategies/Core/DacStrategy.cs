@@ -138,6 +138,18 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
                 currentOwner == currentOwnerId)
             {
                 _resourceOwners[resourceId] = newOwnerId;
+
+                // Transfer previous owner's permissions to new owner and revoke previous owner's access
+                if (_resourcePermissions.TryGetValue(resourceId, out var matrix))
+                {
+                    var previousPerms = matrix.GetPermissions(currentOwnerId);
+                    if (previousPerms != DacPermission.None)
+                    {
+                        matrix.Grant(newOwnerId, previousPerms);
+                    }
+                    // Revoke all permissions from previous owner
+                    matrix.Revoke(currentOwnerId, DacPermission.All);
+                }
                 return true;
             }
 

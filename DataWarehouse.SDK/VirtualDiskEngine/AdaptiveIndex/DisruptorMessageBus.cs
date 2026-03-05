@@ -199,10 +199,10 @@ public sealed class DisruptorMessageBus : IDisposable
         }
         else
         {
-            // Channel-based fallback - use TryWrite for non-blocking, fall back to sync wait
-            if (!_channel!.Writer.TryWrite(msg))
+            // Fan-out: write to every subscriber's dedicated channel (finding P2-726).
+            foreach (var kvp in _subscriptions)
             {
-                _channel.Writer.WriteAsync(msg).AsTask().GetAwaiter().GetResult();
+                kvp.Value.SubscriberChannel?.Writer.TryWrite(msg); // non-blocking; DropOldest handles backpressure
             }
         }
     }
@@ -229,7 +229,15 @@ public sealed class DisruptorMessageBus : IDisposable
         }
         else
         {
-            await _channel!.Writer.WriteAsync(msg, cancellationToken).ConfigureAwait(false);
+            // Fan-out: write to every subscriber's dedicated channel (finding P2-726).
+            var tasks = new List<ValueTask>();
+            foreach (var kvp in _subscriptions)
+            {
+                if (kvp.Value.SubscriberChannel != null)
+                    tasks.Add(kvp.Value.SubscriberChannel.Writer.WriteAsync(msg, cancellationToken));
+            }
+            foreach (var task in tasks)
+                await task.ConfigureAwait(false);
         }
     }
 
@@ -302,7 +310,15 @@ public sealed class DisruptorMessageBus : IDisposable
         }
         else
         {
-            // Channel-based: start a reader task
+            // Per-subscriber channel for fan-out — each subscriber gets its own channel
+            // so all subscribers receive every message (finding P2-726).
+            int ringSize = _channel!.Reader.Count > 0 ? 65536 : 65536;
+            entry.SubscriberChannel = Channel.CreateBounded<IndexMessage>(new BoundedChannelOptions(ringSize)
+            {
+                FullMode = BoundedChannelFullMode.DropOldest, // backpressure: drop oldest rather than blocking
+                SingleWriter = true,
+                SingleReader = true
+            });
             entry.ReaderCts = new CancellationTokenSource();
             entry.ReaderTask = Task.Factory.StartNew(
                 () => ChannelReaderLoop(entry, handler, typeFilter, entry.ReaderCts.Token),
@@ -320,7 +336,8 @@ public sealed class DisruptorMessageBus : IDisposable
         IndexMessageType? typeFilter,
         CancellationToken ct)
     {
-        var reader = _channel!.Reader;
+        // Read from this subscriber's dedicated channel (finding P2-726: per-subscriber for fan-out).
+        var reader = (entry.SubscriberChannel ?? _channel!).Reader;
 
         try
         {
@@ -387,6 +404,7 @@ public sealed class DisruptorMessageBus : IDisposable
             entry.Processor?.Dispose();
             entry.ReaderCts?.Cancel();
             entry.ReaderCts?.Dispose();
+            entry.SubscriberChannel?.Writer.TryComplete(); // signal subscriber reader to stop
         }
     }
 
@@ -413,6 +431,8 @@ public sealed class DisruptorMessageBus : IDisposable
         public BatchEventProcessor<IndexMessage>? Processor { get; set; }
         public CancellationTokenSource? ReaderCts { get; set; }
         public Task? ReaderTask { get; set; }
+        // Per-subscriber channel for fan-out in Channel mode (finding P2-726)
+        public Channel<IndexMessage>? SubscriberChannel { get; set; }
 
         public SubscriptionEntry(DisruptorSubscription subscription)
         {

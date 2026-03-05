@@ -60,21 +60,30 @@ public sealed class AirbrakeStrategy : ObservabilityStrategyBase
     protected override async Task MetricsAsyncCore(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken)
     {
         IncrementCounter("airbrake.metrics_sent");
-        // Airbrake supports performance metrics
+        // Finding 4613: Use metric metadata for HTTP method and status where present;
+        // fall back to sensible defaults rather than hardcoding GET/200 for every metric.
         foreach (var metric in metrics)
         {
+            // Airbrake routes-stats API expects HTTP method/status for route-level performance data.
+            // Labels "http.method" and "http.status_code" let callers supply real values.
+            var labelMap = metric.Labels?.ToDictionary(l => l.Name, l => l.Value, StringComparer.OrdinalIgnoreCase)
+                           ?? new Dictionary<string, string>();
+            var httpMethod = labelMap.TryGetValue("http.method", out var m) ? m : "POST";
+            var statusCode = labelMap.TryGetValue("http.status_code", out var sc)
+                && int.TryParse(sc, out var scInt) ? scInt : 0;
+
             var route = new
             {
-                method = "GET",
+                method = httpMethod,
                 route = $"/metrics/{metric.Name}",
-                statusCode = 200,
+                statusCode,
                 time = DateTimeOffset.UtcNow.ToString("o")
             };
 
             var timing = new
             {
                 value = metric.Value,
-                unit = "ms"
+                unit = labelMap.TryGetValue("unit", out var u) ? u : "ms"
             };
 
             var payload = new
@@ -205,12 +214,14 @@ public sealed class AirbrakeStrategy : ObservabilityStrategyBase
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             var url = $"{_host}/api/v3/projects/{_projectId}/notices?key={_projectKey}";
-            var response = await _httpClient.PostAsync(url, content, ct);
+            using var response = await _httpClient.PostAsync(url, content, ct);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Airbrake unavailable
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -222,12 +233,14 @@ public sealed class AirbrakeStrategy : ObservabilityStrategyBase
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             var url = $"{_host}/api/v5/projects/{_projectId}/routes-stats?key={_projectKey}";
-            var response = await _httpClient.PostAsync(url, content, ct);
+            using var response = await _httpClient.PostAsync(url, content, ct);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+
             // Airbrake unavailable
+            System.Diagnostics.Debug.WriteLine($"[Warning] caught {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -243,14 +256,46 @@ public sealed class AirbrakeStrategy : ObservabilityStrategyBase
         };
     }
 
+    /// <summary>
+    /// Parses a .NET stack trace string into Airbrake backtrace frames.
+    /// Extracts file path, line number, and method name from each "at ... in file:line N" frame.
+    /// </summary>
     private static object[] ParseBacktrace(string stackTrace)
     {
+        if (string.IsNullOrEmpty(stackTrace))
+            return Array.Empty<object>();
+
         var lines = stackTrace.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-        return lines.Select((line, index) => new
+        return lines.Select(line =>
         {
-            file = "unknown",
-            line = index + 1,
-            function = line.Trim()
+            line = line.Trim();
+            string file = "unknown";
+            int lineNumber = 0;
+            string function = line;
+
+            // .NET stack frame format: "   at Namespace.Class.Method(...) in /path/file.cs:line 42"
+            var inIdx = line.LastIndexOf(" in ", StringComparison.Ordinal);
+            if (inIdx >= 0)
+            {
+                function = line[..inIdx].TrimStart().TrimStart("at ".ToCharArray()).Trim();
+                var fileAndLine = line[(inIdx + 4)..]; // after " in "
+                var lineColonIdx = fileAndLine.LastIndexOf(":line ", StringComparison.Ordinal);
+                if (lineColonIdx >= 0)
+                {
+                    file = fileAndLine[..lineColonIdx];
+                    int.TryParse(fileAndLine[(lineColonIdx + 6)..], out lineNumber);
+                }
+                else
+                {
+                    file = fileAndLine;
+                }
+            }
+            else if (line.StartsWith("at ", StringComparison.Ordinal))
+            {
+                function = line[3..].Trim();
+            }
+
+            return (object)new { file, line = lineNumber, function };
         }).ToArray();
     }
 
@@ -283,17 +328,11 @@ public sealed class AirbrakeStrategy : ObservabilityStrategyBase
 
 
     /// <inheritdoc/>
-    protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+    protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { /* Shutdown grace period elapsed */ }
+        // Finding 4584: removed decorative Task.Delay(100ms) — no real in-flight queue to drain.
         IncrementCounter("airbrake.shutdown");
-        await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        return base.ShutdownAsyncCore(cancellationToken);
     }
 
     protected override void Dispose(bool disposing)
