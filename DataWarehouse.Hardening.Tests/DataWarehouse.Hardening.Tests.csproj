@@ -24,6 +24,7 @@
   <ItemGroup>
     <ProjectReference Include="..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.AedsCore\DataWarehouse.Plugins.AedsCore.csproj" />
+    <ProjectReference Include="..\DataWarehouse.Kernel\DataWarehouse.Kernel.csproj" />
   </ItemGroup>
 
 </Project>

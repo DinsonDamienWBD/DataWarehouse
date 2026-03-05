@@ -644,20 +644,27 @@ public class PipelinePolicyManager
 
     /// <summary>
     /// Validates that a user is an admin of a specific group.
+    /// Finding 130-131 fix: null securityContext now denied (fail-closed),
+    /// consistent with ValidateAdminPrivileges behavior.
     /// </summary>
     private void ValidateGroupAdminPrivileges(
         string userId,
         string groupId,
         ISecurityContext? securityContext)
     {
-        // If no security context, allow (development/testing mode)
+        // Finding 130-131: null context must NOT grant access — fail-closed.
+        // Previously allowed null context for "development/testing mode", which
+        // created a critical security inconsistency with ValidateAdminPrivileges.
         if (securityContext == null)
         {
             _kernelContext?.LogWarning(
-                $"No security context provided for group admin operation. " +
+                $"Group admin operation attempted without security context. " +
                 $"UserId: {userId}, GroupId: {groupId}. " +
-                "This is allowed for development/testing only.");
-            return;
+                "Access denied (fail-closed).");
+            throw SecurityOperationException.AccessDenied(
+                userId,
+                $"Group:{groupId}",
+                "GroupAdmin");
         }
 
         // Check if user is system admin (can manage all groups)
