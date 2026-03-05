@@ -2763,7 +2763,14 @@ Plans:
   2. All tests pass after fixes
   3. Solution builds with 0 errors
   4. `dotnet test` passes after each commit
-**Plans**: TBD
+**Plans**: 6 plans
+Plans:
+- [ ] 098-01-PLAN.md — AedsCore (139 findings, lines 113-256)
+- [ ] 098-02-PLAN.md — Kernel (148 findings, lines 479-631)
+- [ ] 098-03-PLAN.md — Plugin (195 findings, lines 650-849)
+- [ ] 098-04-PLAN.md — Shared (61 findings, lines 3470-3535)
+- [ ] 098-05-PLAN.md — TamperProof (81 findings, lines 3547-3632)
+- [ ] 098-06-PLAN.md — Tests (126 findings, lines 3633-3763)
 
 ### Phase 99: Stage 1, Steps 1-3 — Hardening: Large Plugins A
 **Goal**: All findings in the three largest plugins have failing tests followed by production fixes
