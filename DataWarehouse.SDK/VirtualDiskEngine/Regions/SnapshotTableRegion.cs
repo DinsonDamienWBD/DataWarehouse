@@ -149,7 +149,7 @@ public readonly record struct SnapshotEntry
 /// <summary>
 /// Snapshot Table Region: stores <see cref="SnapshotEntry"/> records implementing
 /// a copy-on-write snapshot registry with parent-child relationships and O(1)
-/// lookup by snapshot ID. Serialized using <see cref="BlockTypeTags.SNAP"/> type tag.
+/// lookup by snapshot ID. Serialized using <see cref="BlockTypeTags.Snap"/> type tag.
 /// </summary>
 /// <remarks>
 /// Serialization layout:
@@ -366,7 +366,7 @@ public sealed class SnapshotTableRegion
                 snapshotIndex++;
             }
 
-            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.SNAP, Generation);
+            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.Snap, Generation);
 
             if (snapshotIndex < _snapshots.Count)
             {
@@ -377,13 +377,13 @@ public sealed class SnapshotTableRegion
 
         // Write trailer for block 0 if no snapshots
         if (_snapshots.Count == 0)
-            UniversalBlockTrailer.Write(block0, blockSize, BlockTypeTags.SNAP, Generation);
+            UniversalBlockTrailer.Write(block0, blockSize, BlockTypeTags.Snap, Generation);
 
         // Write trailers for any remaining blocks
         for (int blk = currentBlock + 1; blk < requiredBlocks; blk++)
         {
             var block = buffer.Slice(blk * blockSize, blockSize);
-            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.SNAP, Generation);
+            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.Snap, Generation);
         }
     }
 

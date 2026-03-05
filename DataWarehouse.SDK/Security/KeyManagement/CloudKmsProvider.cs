@@ -76,8 +76,6 @@ namespace DataWarehouse.SDK.Security.KeyManagement
         private string? _clientEmail;
         private string? _privateKeyPem;
         private string? _currentKeyId;
-        private readonly ConcurrentDictionary<string, byte[]> _wrappedDekCache = new();
-
         private const string KmsBaseUrl = "https://cloudkms.googleapis.com";
         private const string TokenUrl = "https://oauth2.googleapis.com/token";
         private const string MetadataUrl = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
@@ -176,7 +174,6 @@ namespace DataWarehouse.SDK.Security.KeyManagement
 
             // Store the wrapped DEK for recovery — the plaintext DEK is returned for use
             // and the wrapped version can be decrypted via KMS on restart
-            _wrappedDekCache[keyId] = wrappedDek;
 
             return dek;
         }
@@ -207,10 +204,8 @@ namespace DataWarehouse.SDK.Security.KeyManagement
 
             return await ExecuteWithRetryAsync(async () =>
             {
-                using var request = new HttpRequestMessage(HttpMethod.Post, $"/v1/{keyName}:encrypt")
-                {
-                    Content = new StringContent(requestBody, Encoding.UTF8, "application/json")
-                };
+                using var request = new HttpRequestMessage(HttpMethod.Post, $"/v1/{keyName}:encrypt");
+                request.Content = new StringContent(requestBody, Encoding.UTF8, "application/json");
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
                 var response = await _httpClient!.SendAsync(request, ct).ConfigureAwait(false);
@@ -240,10 +235,8 @@ namespace DataWarehouse.SDK.Security.KeyManagement
 
             return await ExecuteWithRetryAsync(async () =>
             {
-                using var request = new HttpRequestMessage(HttpMethod.Post, $"/v1/{keyName}:decrypt")
-                {
-                    Content = new StringContent(requestBody, Encoding.UTF8, "application/json")
-                };
+                using var request = new HttpRequestMessage(HttpMethod.Post, $"/v1/{keyName}:decrypt");
+                request.Content = new StringContent(requestBody, Encoding.UTF8, "application/json");
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
                 var response = await _httpClient!.SendAsync(request, ct).ConfigureAwait(false);
@@ -950,10 +943,8 @@ namespace DataWarehouse.SDK.Security.KeyManagement
             var authorization = $"AWS4-HMAC-SHA256 Credential={_accessKeyId}/{credentialScope}, " +
                                $"SignedHeaders={signedHeaders}, Signature={signature}";
 
-            using var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
-            {
-                Content = new StringContent(payload, Encoding.UTF8, "application/x-amz-json-1.1")
-            };
+            using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
+            request.Content = new StringContent(payload, Encoding.UTF8, "application/x-amz-json-1.1");
 
             request.Headers.Add("X-Amz-Date", amzDate);
             request.Headers.Add("X-Amz-Target", target);

@@ -164,7 +164,7 @@ public sealed class ExtentAwareVdeCopy
 
         // Step 4: Read source allocation bitmap to identify allocated blocks
         var sourceRegionDir = await ReadRegionDirectoryAsync(_sourceStream, ct);
-        int bitmapSlot = sourceRegionDir.FindRegion(BlockTypeTags.BMAP);
+        int bitmapSlot = sourceRegionDir.FindRegion(BlockTypeTags.Bmap);
         if (bitmapSlot < 0)
             return CopyResult.Failed("Could not locate allocation bitmap in source VDE.");
 
@@ -272,7 +272,7 @@ public sealed class ExtentAwareVdeCopy
         long totalBlocks = superblock.TotalBlocks;
 
         var regionDir = await ReadRegionDirectoryAsync(_sourceStream, ct);
-        int bitmapSlot = regionDir.FindRegion(BlockTypeTags.BMAP);
+        int bitmapSlot = regionDir.FindRegion(BlockTypeTags.Bmap);
         if (bitmapSlot < 0) return totalBlocks; // Can't read bitmap, assume full copy
 
         var bitmapPointer = regionDir.GetSlot(bitmapSlot);
@@ -338,7 +338,7 @@ public sealed class ExtentAwareVdeCopy
         foreach (var (_, pointer) in activeRegions)
         {
             // Skip data region
-            if (pointer.RegionTypeId == BlockTypeTags.DATA)
+            if (pointer.RegionTypeId == BlockTypeTags.Data)
                 continue;
 
             ranges.Add((pointer.StartBlock, pointer.BlockCount));
@@ -371,8 +371,8 @@ public sealed class ExtentAwareVdeCopy
         InodeLayoutDescriptor oldLayout, InodeLayoutDescriptor newLayout,
         Stream destStream, CancellationToken ct)
     {
-        int sourceInodeSlot = sourceRegionDir.FindRegion(BlockTypeTags.INOD);
-        int destInodeSlot = destRegionDir.FindRegion(BlockTypeTags.INOD);
+        int sourceInodeSlot = sourceRegionDir.FindRegion(BlockTypeTags.Inod);
+        int destInodeSlot = destRegionDir.FindRegion(BlockTypeTags.Inod);
         if (sourceInodeSlot < 0 || destInodeSlot < 0) return;
 
         var sourceInodePointer = sourceRegionDir.GetSlot(sourceInodeSlot);
@@ -471,7 +471,7 @@ public sealed class ExtentAwareVdeCopy
             // Write to both primary and mirror superblock blocks
             Array.Clear(buffer, 0, _blockSize);
             SuperblockV2.Serialize(updatedSb, buffer.AsSpan(0, _blockSize), _blockSize);
-            UniversalBlockTrailer.Write(buffer.AsSpan(0, _blockSize), _blockSize, BlockTypeTags.SUPB, 1);
+            UniversalBlockTrailer.Write(buffer.AsSpan(0, _blockSize), _blockSize, BlockTypeTags.Supb, 1);
 
             destStream.Seek(0, SeekOrigin.Begin);
             await destStream.WriteAsync(buffer.AsMemory(0, _blockSize), ct);

@@ -249,7 +249,7 @@ public sealed class BTree : IBTreeIndex, IAsyncDisposable
             // Find the starting leaf node
             var leaf = await FindLeafForKeyAsync(startKey ?? Array.Empty<byte>(), ct).ConfigureAwait(false);
 
-            while (leaf != null)
+            while (true)
             {
                 for (int i = 0; i < leaf.Header.KeyCount; i++)
                 {
@@ -294,7 +294,7 @@ public sealed class BTree : IBTreeIndex, IAsyncDisposable
             long count = 0;
             var leaf = await FindLeftmostLeafAsync(ct).ConfigureAwait(false);
 
-            while (leaf != null)
+            while (true)
             {
                 count += leaf.Header.KeyCount;
                 if (leaf.Header.NextLeafBlock != -1)

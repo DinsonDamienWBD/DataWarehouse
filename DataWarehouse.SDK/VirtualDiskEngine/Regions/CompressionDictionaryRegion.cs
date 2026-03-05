@@ -107,7 +107,7 @@ public readonly record struct CompressionDictEntry
 /// <summary>
 /// Compression Dictionary Region: manages up to 256 trained compression dictionaries
 /// (Zstd-style) addressable by 2-byte DictId with O(1) lookup via flat array indexing.
-/// Serialized using <see cref="BlockTypeTags.DICT"/> type tag.
+/// Serialized using <see cref="BlockTypeTags.Dict"/> type tag.
 /// </summary>
 /// <remarks>
 /// Serialization layout:
@@ -316,7 +316,7 @@ public sealed class CompressionDictionaryRegion
             {
                 UniversalBlockTrailer.Write(
                     buffer.Slice(currentBlock * blockSize, blockSize),
-                    blockSize, BlockTypeTags.DICT, Generation);
+                    blockSize, BlockTypeTags.Dict, Generation);
                 currentBlock++;
                 offset = 0;
             }
@@ -328,14 +328,14 @@ public sealed class CompressionDictionaryRegion
         // Write trailer for the last block containing data
         UniversalBlockTrailer.Write(
             buffer.Slice(currentBlock * blockSize, blockSize),
-            blockSize, BlockTypeTags.DICT, Generation);
+            blockSize, BlockTypeTags.Dict, Generation);
 
         // Write trailers for any remaining empty blocks
         for (int blk = currentBlock + 1; blk < requiredBlocks; blk++)
         {
             UniversalBlockTrailer.Write(
                 buffer.Slice(blk * blockSize, blockSize),
-                blockSize, BlockTypeTags.DICT, Generation);
+                blockSize, BlockTypeTags.Dict, Generation);
         }
     }
 

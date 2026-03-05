@@ -531,7 +531,7 @@ public sealed class VdeMigrationEngine
             // Serialize updated superblock
             Array.Clear(buffer, 0, blockSize);
             SuperblockV2.Serialize(updatedSb, buffer.AsSpan(0, blockSize), blockSize);
-            UniversalBlockTrailer.Write(buffer.AsSpan(0, blockSize), blockSize, BlockTypeTags.SUPB, 1);
+            UniversalBlockTrailer.Write(buffer.AsSpan(0, blockSize), blockSize, BlockTypeTags.Supb, 1);
 
             // Write to primary superblock (block 0)
             destStream.Position = 0;

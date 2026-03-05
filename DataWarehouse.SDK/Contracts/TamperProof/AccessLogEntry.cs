@@ -688,12 +688,12 @@ public sealed class SuspiciousAccessAnalysis
         if (string.IsNullOrWhiteSpace(ActualHash)) return false;
         if (ExpectedHash == ActualHash) return false; // Not tampering if hashes match
         if (DetectionTime == default) return false;
-        if (Evidence == null || Evidence.Count == 0) return false;
-        if (AnalyzedEntries == null) return false;
+        if (Evidence.Count == 0) return false;
+        if (AnalyzedEntries.Count == 0) return false;
 
         // If confidence is not Unknown, should have suspects
         if (Confidence != AttributionConfidence.Unknown &&
-            (SuspectedPrincipals == null || SuspectedPrincipals.Count == 0))
+            SuspectedPrincipals.Count == 0)
         {
             return false;
         }

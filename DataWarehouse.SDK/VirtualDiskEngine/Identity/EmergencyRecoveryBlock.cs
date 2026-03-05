@@ -203,7 +203,7 @@ public readonly struct EmergencyRecoveryBlock : IEquatable<EmergencyRecoveryBloc
         BinaryPrimitives.WriteInt64LittleEndian(buffer.Slice(offset), erb.MountCount);
 
         // Universal block trailer with ERCV tag
-        UniversalBlockTrailer.Write(buffer, blockSize, BlockTypeTags.ERCV, generation: 1);
+        UniversalBlockTrailer.Write(buffer, blockSize, BlockTypeTags.Ercv, generation: 1);
     }
 
     /// <summary>

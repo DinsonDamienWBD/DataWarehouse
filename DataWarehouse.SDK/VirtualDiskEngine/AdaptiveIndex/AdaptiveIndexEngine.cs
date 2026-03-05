@@ -28,15 +28,27 @@ namespace DataWarehouse.SDK.VirtualDiskEngine.AdaptiveIndex;
 [SdkCompatibility("6.0.0", Notes = "Phase 86: AIE-01 Adaptive Index Engine orchestrator")]
 public sealed class AdaptiveIndexEngine : IAdaptiveIndex, IAsyncDisposable
 {
-    private readonly IBlockDevice _device;
-    private readonly IBlockAllocator _allocator;
     private readonly IWriteAheadLog _wal;
     private readonly long _rootBlockNumber;
-    private readonly int _blockSize;
     private readonly ReaderWriterLockSlim _lock = new(LockRecursionPolicy.NoRecursion);
 
     private IAdaptiveIndex _current;
     private MorphLevel _currentLevel;
+
+    /// <summary>
+    /// The block device used for index storage I/O.
+    /// </summary>
+    public IBlockDevice Device { get; }
+
+    /// <summary>
+    /// The block allocator used for index block allocation.
+    /// </summary>
+    public IBlockAllocator Allocator { get; }
+
+    /// <summary>
+    /// The block size in bytes for index operations.
+    /// </summary>
+    public int BlockSize { get; }
 
     /// <summary>
     /// Maximum object count for Level 0 (DirectPointer). Default: 1.
@@ -102,11 +114,11 @@ public sealed class AdaptiveIndexEngine : IAdaptiveIndex, IAsyncDisposable
         long level1Max = 10_000,
         long level2Max = 1_000_000)
     {
-        _device = device ?? throw new ArgumentNullException(nameof(device));
-        _allocator = allocator ?? throw new ArgumentNullException(nameof(allocator));
+        Device = device ?? throw new ArgumentNullException(nameof(device));
+        Allocator = allocator ?? throw new ArgumentNullException(nameof(allocator));
         _wal = wal ?? throw new ArgumentNullException(nameof(wal));
         _rootBlockNumber = rootBlockNumber;
-        _blockSize = blockSize;
+        BlockSize = blockSize;
         Level0Max = level0Max;
         Level1Max = level1Max;
         Level2Max = level2Max;

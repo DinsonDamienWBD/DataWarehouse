@@ -37,9 +37,9 @@ public sealed class OperationJournalRegion
 
     /// <summary>
     /// Block type tag for OPJR blocks ("OPJR" = 0x4F504A52).
-    /// Matches <see cref="BlockTypeTags.OPJR"/>.
+    /// Matches <see cref="BlockTypeTags.Opjr"/>.
     /// </summary>
-    public const uint BlockTypeTag = BlockTypeTags.OPJR;
+    public const uint BlockTypeTag = BlockTypeTags.Opjr;
 
     // ── Header field offsets ────────────────────────────────────────────────
     // +0x00  Magic               ulong  8

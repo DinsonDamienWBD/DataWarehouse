@@ -22,8 +22,10 @@ public sealed class ChecksumTable : IAsyncDisposable
 
     private readonly IBlockDevice _device;
     private readonly long _checksumTableStartBlock;
-    private readonly long _checksumTableBlockCount;
     private readonly long _totalDataBlocks;
+
+    /// <summary>Gets the number of blocks in the checksum table.</summary>
+    public long ChecksumTableBlockCount { get; }
     private readonly int _checksumsPerBlock;
     private readonly SemaphoreSlim _lock = new(1, 1);
 
@@ -49,7 +51,7 @@ public sealed class ChecksumTable : IAsyncDisposable
 
         _device = device;
         _checksumTableStartBlock = checksumTableStartBlock;
-        _checksumTableBlockCount = checksumTableBlockCount;
+        ChecksumTableBlockCount = checksumTableBlockCount;
         _totalDataBlocks = totalDataBlocks;
         _checksumsPerBlock = device.BlockSize / ChecksumSize;
 

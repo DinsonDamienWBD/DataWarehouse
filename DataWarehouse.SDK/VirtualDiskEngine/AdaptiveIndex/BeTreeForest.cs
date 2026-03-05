@@ -179,7 +179,7 @@ public sealed class BeTreeForest : IAdaptiveIndex, IAsyncDisposable
         if (checkShardId >= 0 && checkShardId < _shards.Count)
         {
             var checkShard = _shards[checkShardId];
-            if (Interlocked.Read(ref checkShard._objectCount) > _splitThreshold)
+            if (Interlocked.Read(ref checkShard.ObjectCount) > _splitThreshold)
             {
                 await TryAutoSplitAsync(checkShardId, ct).ConfigureAwait(false);
             }
@@ -252,7 +252,7 @@ public sealed class BeTreeForest : IAdaptiveIndex, IAsyncDisposable
         if (deleted && shardId >= 0 && shardId < _shards.Count && _shards.Count > 1)
         {
             var checkShard = _shards[shardId];
-            if (Interlocked.Read(ref checkShard._objectCount) < _mergeThreshold)
+            if (Interlocked.Read(ref checkShard.ObjectCount) < _mergeThreshold)
             {
                 await TryAutoMergeAsync(shardId, ct).ConfigureAwait(false);
             }
@@ -367,7 +367,7 @@ public sealed class BeTreeForest : IAdaptiveIndex, IAsyncDisposable
         {
             if (shardIndex < 0 || shardIndex >= _shards.Count)
                 throw new ArgumentOutOfRangeException(nameof(shardIndex));
-            return Interlocked.Read(ref _shards[shardIndex]._objectCount);
+            return Interlocked.Read(ref _shards[shardIndex].ObjectCount);
         }
         finally
         {
@@ -438,7 +438,7 @@ public sealed class BeTreeForest : IAdaptiveIndex, IAsyncDisposable
                 return;
 
             var shard = _shards[shardId];
-            long shardCount = Interlocked.Read(ref shard._objectCount);
+            long shardCount = Interlocked.Read(ref shard.ObjectCount);
             if (shardCount <= _splitThreshold)
                 return; // Already below threshold (concurrent operation resolved it)
 
@@ -505,8 +505,8 @@ public sealed class BeTreeForest : IAdaptiveIndex, IAsyncDisposable
 
             // Update shard metadata
             shard.KeyRangeMax = medianKey;
-            Interlocked.Add(ref shard._objectCount, -transferred);
-            Interlocked.Exchange(ref newShard._objectCount, transferred);
+            Interlocked.Add(ref shard.ObjectCount, -transferred);
+            Interlocked.Exchange(ref newShard.ObjectCount, transferred);
 
             // Insert new shard after current
             _shards.Insert(shardId + 1, newShard);
@@ -547,7 +547,7 @@ public sealed class BeTreeForest : IAdaptiveIndex, IAsyncDisposable
                 return;
 
             var shard = _shards[shardId];
-            long shardCount = Interlocked.Read(ref shard._objectCount);
+            long shardCount = Interlocked.Read(ref shard.ObjectCount);
             if (shardCount >= _mergeThreshold)
                 return;
 
@@ -559,8 +559,8 @@ public sealed class BeTreeForest : IAdaptiveIndex, IAsyncDisposable
                 mergeTarget = shardId - 1;
             else
             {
-                long leftCount = Interlocked.Read(ref _shards[shardId - 1]._objectCount);
-                long rightCount = Interlocked.Read(ref _shards[shardId + 1]._objectCount);
+                long leftCount = Interlocked.Read(ref _shards[shardId - 1].ObjectCount);
+                long rightCount = Interlocked.Read(ref _shards[shardId + 1].ObjectCount);
                 mergeTarget = leftCount <= rightCount ? shardId - 1 : shardId + 1;
             }
 
@@ -587,7 +587,7 @@ public sealed class BeTreeForest : IAdaptiveIndex, IAsyncDisposable
             }
 
             // Update target shard metadata
-            Interlocked.Add(ref targetShard._objectCount, transferred);
+            Interlocked.Add(ref targetShard.ObjectCount, transferred);
 
             // Expand target key range to cover merged shard
             if (BeTreeMessage.CompareKeys(shard.KeyRangeMin, targetShard.KeyRangeMin) < 0)
@@ -705,7 +705,7 @@ public sealed class BeTreeForest : IAdaptiveIndex, IAsyncDisposable
         /// <summary>
         /// Object count for this shard. Use Interlocked for thread-safe access.
         /// </summary>
-        internal long _objectCount;
+        internal long ObjectCount;
 
         /// <summary>
         /// Per-shard mutation lock.
@@ -723,7 +723,7 @@ public sealed class BeTreeForest : IAdaptiveIndex, IAsyncDisposable
             Index = index ?? throw new ArgumentNullException(nameof(index));
             KeyRangeMin = keyRangeMin ?? throw new ArgumentNullException(nameof(keyRangeMin));
             KeyRangeMax = keyRangeMax ?? throw new ArgumentNullException(nameof(keyRangeMax));
-            _objectCount = objectCount;
+            ObjectCount = objectCount;
             ShardLock = shardLock ?? throw new ArgumentNullException(nameof(shardLock));
         }
 
@@ -731,12 +731,12 @@ public sealed class BeTreeForest : IAdaptiveIndex, IAsyncDisposable
         /// Thread-safe increment of the object count.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void IncrementCount() => Interlocked.Increment(ref _objectCount);
+        public void IncrementCount() => Interlocked.Increment(ref ObjectCount);
 
         /// <summary>
         /// Thread-safe decrement of the object count.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void DecrementCount() => Interlocked.Decrement(ref _objectCount);
+        public void DecrementCount() => Interlocked.Decrement(ref ObjectCount);
     }
 }

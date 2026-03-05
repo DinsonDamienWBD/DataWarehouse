@@ -714,7 +714,7 @@ public sealed class ModuleAdditionOrchestrator
                 // Write updated superblock atomically
                 Array.Clear(buffer, 0, _blockSize);
                 SuperblockV2.Serialize(updated, buffer.AsSpan(0, _blockSize), _blockSize);
-                UniversalBlockTrailer.Write(buffer.AsSpan(0, _blockSize), _blockSize, BlockTypeTags.SUPB, 1);
+                UniversalBlockTrailer.Write(buffer.AsSpan(0, _blockSize), _blockSize, BlockTypeTags.Supb, 1);
 
                 _vdeStream.Seek(0, SeekOrigin.Begin);
                 await _vdeStream.WriteAsync(buffer.AsMemory(0, _blockSize), ct);

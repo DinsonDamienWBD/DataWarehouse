@@ -21,14 +21,16 @@ namespace DataWarehouse.SDK.Deployment.CloudProviders;
 [SdkCompatibility("3.0.0", Notes = "Phase 37: AWS provisioning provider (ENV-04)")]
 public sealed class AwsProvider : ICloudProvider
 {
-    private readonly ILogger<AwsProvider> _logger;
     private int _disposed;
+
+    /// <summary>Gets the logger instance for this provider.</summary>
+    internal ILogger<AwsProvider> Logger { get; }
 
     public string Name => "AWS";
 
     public AwsProvider(ILogger<AwsProvider>? logger = null)
     {
-        _logger = logger ?? NullLogger<AwsProvider>.Instance;
+        Logger = logger ?? NullLogger<AwsProvider>.Instance;
     }
 
     public Task<string> ProvisionVmAsync(VmSpec spec, CancellationToken ct = default)

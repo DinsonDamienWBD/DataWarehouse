@@ -212,7 +212,7 @@ public static class VdeCreator
             {
                 var mwalHeader = WalHeader.CreateMetadataWal(mwalRegion.BlockCount);
                 await WriteWalHeaderBlockAsync(stream, mwalRegion.StartBlock,
-                    BlockTypeTags.MWAL, mwalHeader, blockSize, cancellationToken);
+                    BlockTypeTags.Mwal, mwalHeader, blockSize, cancellationToken);
             }
 
             // Write Data WAL header (if Streaming module is active)
@@ -220,7 +220,7 @@ public static class VdeCreator
             {
                 var dwalHeader = WalHeader.CreateDataWal(dwalRegion.BlockCount);
                 await WriteWalHeaderBlockAsync(stream, dwalRegion.StartBlock,
-                    BlockTypeTags.DWAL, dwalHeader, blockSize, cancellationToken);
+                    BlockTypeTags.Dwal, dwalHeader, blockSize, cancellationToken);
             }
 
             // Write module-specific region headers
@@ -461,7 +461,7 @@ public static class VdeCreator
         }
 
         // Write trailer
-        UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.BMAP, 1);
+        UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.Bmap, 1);
 
         stream.Position = startBlock * blockSize;
         await stream.WriteAsync(block, ct);
@@ -470,7 +470,7 @@ public static class VdeCreator
         if (blockCount > 1)
         {
             var emptyBlock = new byte[blockSize];
-            UniversalBlockTrailer.Write(emptyBlock, blockSize, BlockTypeTags.BMAP, 1);
+            UniversalBlockTrailer.Write(emptyBlock, blockSize, BlockTypeTags.Bmap, 1);
 
             for (long b = 1; b < blockCount; b++)
             {
@@ -491,7 +491,7 @@ public static class VdeCreator
         InodeLayoutDescriptor.Serialize(inodeLayout, block);
 
         // Write trailer
-        UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.INOD, 1);
+        UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.Inod, 1);
 
         stream.Position = startBlock * blockSize;
         await stream.WriteAsync(block, ct);
@@ -529,32 +529,32 @@ public static class VdeCreator
 
     private static uint ResolveBlockTypeTag(string regionName) => regionName switch
     {
-        "PrimarySuperblock" or "MirrorSuperblock" => BlockTypeTags.SUPB,
-        "RegionDirectory" => BlockTypeTags.RMAP,
-        "PolicyVault" => BlockTypeTags.POLV,
-        "EncryptionHeader" => BlockTypeTags.ENCR,
-        "AllocationBitmap" => BlockTypeTags.BMAP,
-        "InodeTable" => BlockTypeTags.INOD,
-        "MetadataWAL" => BlockTypeTags.MWAL,
-        "DataWAL" => BlockTypeTags.DWAL,
-        "DataRegion" => BlockTypeTags.DATA,
-        "TagIndexRegion" => BlockTypeTags.TAGI,
-        "IntegrityTree" => BlockTypeTags.MTRK,
-        "SnapshotTable" => BlockTypeTags.SNAP,
-        "BTreeIndexForest" => BlockTypeTags.BTRE,
-        "ReplicationState" => BlockTypeTags.REPL,
-        "RAIDMetadata" => BlockTypeTags.RAID,
-        "DictionaryRegion" => BlockTypeTags.DICT,
-        "IntelligenceCache" => BlockTypeTags.INTE,
-        "StreamingAppend" => BlockTypeTags.STRE,
-        "CrossVDEReferenceTable" => BlockTypeTags.XREF,
-        "ComputeCodeCache" => BlockTypeTags.CODE,
-        "ConsensusLogRegion" => BlockTypeTags.CLOG,
-        "ComplianceVault" => BlockTypeTags.CMVT,
-        "AuditLog" or "AuditLogRegion" => BlockTypeTags.ALOG,
-        "AnonymizationTable" => BlockTypeTags.ANON,
-        "MetricsLogRegion" => BlockTypeTags.MLOG,
-        _ => BlockTypeTags.DATA,
+        "PrimarySuperblock" or "MirrorSuperblock" => BlockTypeTags.Supb,
+        "RegionDirectory" => BlockTypeTags.Rmap,
+        "PolicyVault" => BlockTypeTags.Polv,
+        "EncryptionHeader" => BlockTypeTags.Encr,
+        "AllocationBitmap" => BlockTypeTags.Bmap,
+        "InodeTable" => BlockTypeTags.Inod,
+        "MetadataWAL" => BlockTypeTags.Mwal,
+        "DataWAL" => BlockTypeTags.Dwal,
+        "DataRegion" => BlockTypeTags.Data,
+        "TagIndexRegion" => BlockTypeTags.Tagi,
+        "IntegrityTree" => BlockTypeTags.Mtrk,
+        "SnapshotTable" => BlockTypeTags.Snap,
+        "BTreeIndexForest" => BlockTypeTags.Btre,
+        "ReplicationState" => BlockTypeTags.Repl,
+        "RAIDMetadata" => BlockTypeTags.Raid,
+        "DictionaryRegion" => BlockTypeTags.Dict,
+        "IntelligenceCache" => BlockTypeTags.Inte,
+        "StreamingAppend" => BlockTypeTags.Stre,
+        "CrossVDEReferenceTable" => BlockTypeTags.Xref,
+        "ComputeCodeCache" => BlockTypeTags.Code,
+        "ConsensusLogRegion" => BlockTypeTags.Clog,
+        "ComplianceVault" => BlockTypeTags.Cmvt,
+        "AuditLog" or "AuditLogRegion" => BlockTypeTags.Alog,
+        "AnonymizationTable" => BlockTypeTags.Anon,
+        "MetricsLogRegion" => BlockTypeTags.Mlog,
+        _ => BlockTypeTags.Data,
     };
 
     private static bool IsModuleRegion(string regionName) => regionName switch

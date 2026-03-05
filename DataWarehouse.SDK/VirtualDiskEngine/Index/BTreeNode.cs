@@ -184,10 +184,6 @@ public sealed class BTreeNode
     /// <returns>Negative if a &lt; b, zero if equal, positive if a &gt; b.</returns>
     public static int CompareKeys(byte[] a, byte[] b)
     {
-        if (a == null && b == null) return 0;
-        if (a == null) return -1;
-        if (b == null) return 1;
-
         int minLen = Math.Min(a.Length, b.Length);
         for (int i = 0; i < minLen; i++)
         {
@@ -233,7 +229,7 @@ public sealed class BTreeNode
         // Write keys
         for (int i = 0; i < Header.KeyCount; i++)
         {
-            if (Keys[i] != null && Keys[i].Length > 0)
+            if (Keys[i].Length > 0)
             {
                 Keys[i].CopyTo(buffer.Slice(offset, Keys[i].Length));
                 offset += Keys[i].Length;
@@ -262,18 +258,16 @@ public sealed class BTreeNode
         if (buffer.Length < blockSize)
             throw new ArgumentException($"Buffer too small: {buffer.Length} < {blockSize}", nameof(buffer));
 
-        int offset = 0;
-
-        // Read header
+        // Read header (28 bytes at start of buffer)
         var header = new BTreeNodeHeader
         {
-            KeyCount = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(offset, 2)),
-            Flags = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(offset + 2, 2)),
-            ParentBlock = BinaryPrimitives.ReadInt64LittleEndian(buffer.Slice(offset + 4, 8)),
-            NextLeafBlock = BinaryPrimitives.ReadInt64LittleEndian(buffer.Slice(offset + 12, 8)),
-            PrevLeafBlock = BinaryPrimitives.ReadInt64LittleEndian(buffer.Slice(offset + 20, 8))
+            KeyCount = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(0, 2)),
+            Flags = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(2, 2)),
+            ParentBlock = BinaryPrimitives.ReadInt64LittleEndian(buffer.Slice(4, 8)),
+            NextLeafBlock = BinaryPrimitives.ReadInt64LittleEndian(buffer.Slice(12, 8)),
+            PrevLeafBlock = BinaryPrimitives.ReadInt64LittleEndian(buffer.Slice(20, 8))
         };
-        offset += BTreeNodeHeader.Size;
+        int offset = BTreeNodeHeader.Size;
 
         var node = new BTreeNode(blockSize, avgKeySize: 64)
         {

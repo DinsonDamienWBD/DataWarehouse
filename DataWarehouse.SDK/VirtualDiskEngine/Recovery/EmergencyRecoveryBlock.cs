@@ -52,7 +52,7 @@ public sealed class EmergencyRecoveryBlock
     public const ulong RecoveryMagic = 0x4457564452435652UL;
 
     /// <summary>Block type tag for RCVR blocks ("RCVR" as big-endian uint32).</summary>
-    public const uint BlockTypeTag = BlockTypeTags.RCVR; // 0x52435652
+    public const uint BlockTypeTag = BlockTypeTags.Rcvr; // 0x52435652
 
     private const int AdminContactOffset = 0x3C;
     private const int AdminContactSize = 128;

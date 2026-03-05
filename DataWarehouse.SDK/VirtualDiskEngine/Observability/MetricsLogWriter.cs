@@ -29,7 +29,7 @@ namespace DataWarehouse.SDK.VirtualDiskEngine.Observability;
 /// </code>
 ///
 /// Each MLOG block is closed with a 16-byte <see cref="UniversalBlockTrailer"/> using
-/// <see cref="BlockTypeTags.MLOG"/> as the block type tag.
+/// <see cref="BlockTypeTags.Mlog"/> as the block type tag.
 /// </remarks>
 [SdkCompatibility("6.0.0", Notes = "Phase 91.5: MLOG region writer (VOPT-68-70)")]
 public sealed class MetricsLogWriter
@@ -254,7 +254,7 @@ public sealed class MetricsLogWriter
 
     /// <summary>
     /// Serializes the MLOG region (header + all entries) into one or more MLOG blocks.
-    /// Each block ends with a <see cref="UniversalBlockTrailer"/> using <see cref="BlockTypeTags.MLOG"/>.
+    /// Each block ends with a <see cref="UniversalBlockTrailer"/> using <see cref="BlockTypeTags.Mlog"/>.
     /// </summary>
     /// <param name="buffer">
     /// Target buffer. Must be at least <see cref="RequiredBlocks"/> * <paramref name="blockSize"/> bytes.
@@ -298,7 +298,7 @@ public sealed class MetricsLogWriter
             {
                 UniversalBlockTrailer.Write(
                     buffer.Slice(currentBlock * blockSize, blockSize),
-                    blockSize, BlockTypeTags.MLOG, generation: 0);
+                    blockSize, BlockTypeTags.Mlog, generation: 0);
                 currentBlock++;
                 offset = 0;
             }
@@ -316,7 +316,7 @@ public sealed class MetricsLogWriter
         {
             UniversalBlockTrailer.Write(
                 buffer.Slice(blk * blockSize, blockSize),
-                blockSize, BlockTypeTags.MLOG, generation: 0);
+                blockSize, BlockTypeTags.Mlog, generation: 0);
         }
 
         return buffer.Slice(0, totalSize);

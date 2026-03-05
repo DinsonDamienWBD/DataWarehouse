@@ -41,12 +41,12 @@ namespace DataWarehouse.SDK.Edge.Memory;
 [SdkCompatibility("3.0.0", Notes = "Phase 36: Bounded memory runtime (EDGE-06)")]
 public sealed class BoundedMemoryRuntime : IDisposable
 {
-    private static readonly Lazy<BoundedMemoryRuntime> _instance = new(() => new BoundedMemoryRuntime());
+    private static readonly Lazy<BoundedMemoryRuntime> SingletonInstance = new(() => new BoundedMemoryRuntime());
 
     /// <summary>
     /// Gets the singleton instance.
     /// </summary>
-    public static BoundedMemoryRuntime Instance => _instance.Value;
+    public static BoundedMemoryRuntime Instance => SingletonInstance.Value;
 
     private volatile MemoryBudgetTracker? _tracker;
     private MemorySettings _settings = new();

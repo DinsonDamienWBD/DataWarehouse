@@ -174,7 +174,7 @@ public readonly record struct CompliancePassport
 /// Compliance Vault Region: stores <see cref="CompliancePassport"/> records with
 /// ECDSA P-256 digital signatures for tamper detection and non-repudiation.
 /// Supports querying passports by object ID, framework, or passport ID.
-/// Serialized using <see cref="BlockTypeTags.CMVT"/> type tag.
+/// Serialized using <see cref="BlockTypeTags.Cmvt"/> type tag.
 /// </summary>
 /// <remarks>
 /// Serialization layout:
@@ -441,7 +441,7 @@ public sealed class ComplianceVaultRegion
                 passportIndex++;
             }
 
-            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.CMVT, Generation);
+            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.Cmvt, Generation);
 
             if (passportIndex < _passports.Count)
             {
@@ -452,13 +452,13 @@ public sealed class ComplianceVaultRegion
 
         // Write trailer for block 0 if no passports
         if (_passports.Count == 0)
-            UniversalBlockTrailer.Write(block0, blockSize, BlockTypeTags.CMVT, Generation);
+            UniversalBlockTrailer.Write(block0, blockSize, BlockTypeTags.Cmvt, Generation);
 
         // Write trailers for any remaining blocks
         for (int blk = currentBlock + 1; blk < requiredBlocks; blk++)
         {
             var block = buffer.Slice(blk * blockSize, blockSize);
-            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.CMVT, Generation);
+            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.Cmvt, Generation);
         }
     }
 

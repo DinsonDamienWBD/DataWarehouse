@@ -93,7 +93,7 @@ public readonly record struct BeTreeMessage : IComparable<BeTreeMessage>
     /// <returns>The resolved value, or null if the key is effectively deleted.</returns>
     public static long? Resolve(IReadOnlyList<BeTreeMessage> messages)
     {
-        if (messages == null || messages.Count == 0)
+        if (messages.Count == 0)
             return null;
 
         // The most recent message (first in timestamp-descending order) wins
@@ -143,10 +143,10 @@ public readonly record struct BeTreeMessage : IComparable<BeTreeMessage>
         int keyLen = BinaryPrimitives.ReadInt32BigEndian(source.Slice(offset));
         offset += 4;
         // Guard against OOM from corrupt/malicious keyLen before allocating
-        const int MaxKeyLen = 65536; // 64 KB — reasonable upper bound for B-epsilon tree keys
-        if (keyLen < 0 || keyLen > MaxKeyLen || offset + keyLen > source.Length)
+        const int maxKeyLen = 65536; // 64 KB — reasonable upper bound for B-epsilon tree keys
+        if (keyLen < 0 || keyLen > maxKeyLen || offset + keyLen > source.Length)
             throw new InvalidDataException(
-                $"BeTreeMessage deserialization failed: keyLen {keyLen} is invalid (max {MaxKeyLen}, available {source.Length - offset}).");
+                $"BeTreeMessage deserialization failed: keyLen {keyLen} is invalid (max {maxKeyLen}, available {source.Length - offset}).");
         var key = source.Slice(offset, keyLen).ToArray();
         offset += keyLen;
         long value = BinaryPrimitives.ReadInt64BigEndian(source.Slice(offset));
@@ -162,10 +162,6 @@ public readonly record struct BeTreeMessage : IComparable<BeTreeMessage>
     /// </summary>
     internal static int CompareKeys(byte[] a, byte[] b)
     {
-        if (a is null && b is null) return 0;
-        if (a is null) return -1;
-        if (b is null) return 1;
-
         int minLen = Math.Min(a.Length, b.Length);
         for (int i = 0; i < minLen; i++)
         {

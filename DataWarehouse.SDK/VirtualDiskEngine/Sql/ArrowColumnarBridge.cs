@@ -320,7 +320,7 @@ public static class ArrowColumnarBridge
         // Arrow Utf8: [offsets: int32 * (n+1)][data: UTF-8 bytes]
         int totalBytes = 0;
         for (int i = 0; i < values.Length; i++)
-            totalBytes += values[i] != null ? Encoding.UTF8.GetByteCount(values[i]) : 0;
+            totalBytes += Encoding.UTF8.GetByteCount(values[i]);
 
         int offsetsSize = (values.Length + 1) * 4;
         var buffer = new byte[offsetsSize + totalBytes];
@@ -329,11 +329,8 @@ public static class ArrowColumnarBridge
         for (int i = 0; i < values.Length; i++)
         {
             BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(i * 4, 4), dataOffset);
-            if (values[i] != null)
-            {
-                int written = Encoding.UTF8.GetBytes(values[i], buffer.AsSpan(offsetsSize + dataOffset));
-                dataOffset += written;
-            }
+            int written = Encoding.UTF8.GetBytes(values[i], buffer.AsSpan(offsetsSize + dataOffset));
+            dataOffset += written;
         }
         BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(values.Length * 4, 4), dataOffset);
 
@@ -344,7 +341,7 @@ public static class ArrowColumnarBridge
     {
         int totalBytes = 0;
         for (int i = 0; i < values.Length; i++)
-            totalBytes += values[i]?.Length ?? 0;
+            totalBytes += values[i].Length;
 
         int offsetsSize = (values.Length + 1) * 4;
         var buffer = new byte[offsetsSize + totalBytes];
@@ -353,11 +350,8 @@ public static class ArrowColumnarBridge
         for (int i = 0; i < values.Length; i++)
         {
             BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(i * 4, 4), dataOffset);
-            if (values[i] != null)
-            {
-                values[i].CopyTo(buffer, offsetsSize + dataOffset);
-                dataOffset += values[i].Length;
-            }
+            values[i].CopyTo(buffer, offsetsSize + dataOffset);
+            dataOffset += values[i].Length;
         }
         BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(values.Length * 4, 4), dataOffset);
 

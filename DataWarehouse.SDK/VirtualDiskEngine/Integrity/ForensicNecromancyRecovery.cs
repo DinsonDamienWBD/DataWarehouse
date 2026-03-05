@@ -287,7 +287,7 @@ public sealed class ForensicNecromancyRecovery
 
             // Validate: last 16B of this block must have BlockTypeTag == TRLR
             var selfTrailer = UniversalBlockTrailer.Read(blockBuf, _config.BlockSize);
-            if (selfTrailer.BlockTypeTag != BlockTypeTags.TRLR)
+            if (selfTrailer.BlockTypeTag != BlockTypeTags.Trlr)
                 continue;
 
             // Parse the record area (bytes 0 .. blockSize-16)
@@ -430,9 +430,9 @@ public sealed class ForensicNecromancyRecovery
             var trailer = UniversalBlockTrailer.Read(blockBuf, _config.BlockSize);
 
             // Skip DATA blocks and TRLR blocks — those are handled by Phase 2 / Phase 1
-            if (trailer.BlockTypeTag == BlockTypeTags.DATA ||
-                trailer.BlockTypeTag == BlockTypeTags.TRLR ||
-                trailer.BlockTypeTag == BlockTypeTags.FREE)
+            if (trailer.BlockTypeTag == BlockTypeTags.Data ||
+                trailer.BlockTypeTag == BlockTypeTags.Trlr ||
+                trailer.BlockTypeTag == BlockTypeTags.Free)
                 continue;
 
             if (!BlockTypeTags.IsKnownTag(trailer.BlockTypeTag))

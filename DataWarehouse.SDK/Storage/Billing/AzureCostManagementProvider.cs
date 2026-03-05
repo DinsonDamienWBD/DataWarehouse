@@ -190,7 +190,7 @@ public sealed class AzureCostManagementProvider : IBillingProvider
                     retailPrice,
                     spotEstimate,
                     savings,
-                    AvailableCapacityGB: 0,
+                    AvailableCapacityGb: 0,
                     InterruptionProbability: 0.03));
             }
         }
@@ -258,9 +258,9 @@ public sealed class AzureCostManagementProvider : IBillingProvider
                     CloudProvider.Azure,
                     "global",
                     displayName,
-                    CommittedGB: (long)committedGb,
-                    ReservedPricePerGBMonth: reservedPerGbMonth,
-                    OnDemandPricePerGBMonth: onDemandPerGbMonth,
+                    CommittedGb: (long)committedGb,
+                    ReservedPricePerGbMonth: reservedPerGbMonth,
+                    OnDemandPricePerGbMonth: onDemandPerGbMonth,
                     SavingsPercent: savingsPct,
                     termMonths,
                     expiryDate));

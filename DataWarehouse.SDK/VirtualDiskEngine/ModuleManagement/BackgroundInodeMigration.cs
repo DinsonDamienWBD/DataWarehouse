@@ -351,7 +351,7 @@ public sealed class BackgroundInodeMigration
             var rpt = await ReadRegionPointerTableAsync(ct);
 
             // Restore old inode table pointers
-            UpdateRegionDirectory(regionDir, BlockTypeTags.INOD, cp.OldInodeTableStartBlock, cp.OldInodeTableBlockCount);
+            UpdateRegionDirectory(regionDir, BlockTypeTags.Inod, cp.OldInodeTableStartBlock, cp.OldInodeTableBlockCount);
             UpdateRptInodeRegion(rpt, cp.OldInodeTableStartBlock, cp.OldInodeTableBlockCount);
 
             var restoredSuperblock = CreateUpdatedSuperblock(superblock, cp.OriginalManifest,
@@ -405,7 +405,7 @@ public sealed class BackgroundInodeMigration
         var rpt = await ReadRegionPointerTableAsync(ct);
 
         // Update inode table region pointers to new location
-        UpdateRegionDirectory(regionDir, BlockTypeTags.INOD, newTableStartBlock, newTableBlockCount);
+        UpdateRegionDirectory(regionDir, BlockTypeTags.Inod, newTableStartBlock, newTableBlockCount);
         UpdateRptInodeRegion(rpt, newTableStartBlock, newTableBlockCount);
 
         // Update superblock with new manifest and inode size
@@ -522,7 +522,7 @@ public sealed class BackgroundInodeMigration
     private async Task<(long StartBlock, long BlockCount)> FindInodeTableRegionAsync(CancellationToken ct)
     {
         var regionDir = await ReadRegionDirectoryAsync(ct);
-        int slot = regionDir.FindRegion(BlockTypeTags.INOD);
+        int slot = regionDir.FindRegion(BlockTypeTags.Inod);
         if (slot < 0) return (0, 0);
         var pointer = regionDir.GetSlot(slot);
         return (pointer.StartBlock, pointer.BlockCount);
@@ -531,7 +531,7 @@ public sealed class BackgroundInodeMigration
     private async Task<(long StartBlock, long BlockCount)> FindBitmapRegionAsync(CancellationToken ct)
     {
         var regionDir = await ReadRegionDirectoryAsync(ct);
-        int slot = regionDir.FindRegion(BlockTypeTags.BMAP);
+        int slot = regionDir.FindRegion(BlockTypeTags.Bmap);
         if (slot < 0) return (0, 0);
         var pointer = regionDir.GetSlot(slot);
         return (pointer.StartBlock, pointer.BlockCount);
@@ -540,7 +540,7 @@ public sealed class BackgroundInodeMigration
     private async Task<(long StartBlock, long BlockCount)> FindMetadataWalRegionAsync(CancellationToken ct)
     {
         var regionDir = await ReadRegionDirectoryAsync(ct);
-        int slot = regionDir.FindRegion(BlockTypeTags.MWAL);
+        int slot = regionDir.FindRegion(BlockTypeTags.Mwal);
         if (slot < 0) return (0, 0);
         var pointer = regionDir.GetSlot(slot);
         return (pointer.StartBlock, pointer.BlockCount);
@@ -576,7 +576,7 @@ public sealed class BackgroundInodeMigration
             newData[byteInPayload] |= (byte)(1 << bitInByte);
 
             // Re-write trailer
-            UniversalBlockTrailer.Write(newData, _blockSize, BlockTypeTags.BMAP, 1);
+            UniversalBlockTrailer.Write(newData, _blockSize, BlockTypeTags.Bmap, 1);
 
             walWriter.AddBitmapUpdate(txn, bitmapBlockNumber, oldData, newData);
         }
@@ -612,7 +612,7 @@ public sealed class BackgroundInodeMigration
             // Clear the allocation bit
             newData[byteInPayload] &= (byte)~(1 << bitInByte);
 
-            UniversalBlockTrailer.Write(newData, _blockSize, BlockTypeTags.BMAP, 1);
+            UniversalBlockTrailer.Write(newData, _blockSize, BlockTypeTags.Bmap, 1);
 
             walWriter.AddBitmapUpdate(txn, bitmapBlockNumber, oldData, newData);
         }
@@ -632,10 +632,10 @@ public sealed class BackgroundInodeMigration
         for (int i = 0; i < RegionPointerTable.MaxSlots; i++)
         {
             var pointer = rpt.GetSlot(i);
-            if (pointer.RegionTypeId == BlockTypeTags.INOD)
+            if (pointer.RegionTypeId == BlockTypeTags.Inod)
             {
                 rpt.SetSlot(i, new RegionPointer(
-                    BlockTypeTags.INOD, pointer.Flags, startBlock, blockCount, pointer.UsedBlocks));
+                    BlockTypeTags.Inod, pointer.Flags, startBlock, blockCount, pointer.UsedBlocks));
                 return;
             }
         }

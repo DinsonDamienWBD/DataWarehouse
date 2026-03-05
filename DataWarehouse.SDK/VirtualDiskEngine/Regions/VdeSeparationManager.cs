@@ -104,7 +104,7 @@ public readonly record struct VdeRoleAssignment
 ///   Block 0 (header): [AssignmentCount:4 LE][Reserved:12][VdeRoleAssignment entries...]
 ///   Entries overflow to subsequent blocks as needed.
 ///   Each block ends with <see cref="UniversalBlockTrailer"/>.
-///   Uses <see cref="BlockTypeTags.XREF"/> (differentiated from CrossVdeReferenceRegion
+///   Uses <see cref="BlockTypeTags.Xref"/> (differentiated from CrossVdeReferenceRegion
 ///   by RegionDirectory slot assignment).
 /// </remarks>
 [SdkCompatibility("6.0.0", Notes = "Phase 73: VDE regions -- VDE Separation (VADV-01)")]
@@ -402,7 +402,7 @@ public sealed class VdeSeparationManager
                 entryIndex++;
             }
 
-            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.XREF, Generation);
+            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.Xref, Generation);
 
             if (entryIndex < _assignments.Count)
             {
@@ -413,13 +413,13 @@ public sealed class VdeSeparationManager
 
         // Write trailer for block 0 if no assignments
         if (_assignments.Count == 0)
-            UniversalBlockTrailer.Write(block0, blockSize, BlockTypeTags.XREF, Generation);
+            UniversalBlockTrailer.Write(block0, blockSize, BlockTypeTags.Xref, Generation);
 
         // Write trailers for any remaining blocks
         for (int blk = currentBlock + 1; blk < requiredBlocks; blk++)
         {
             var block = buffer.Slice(blk * blockSize, blockSize);
-            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.XREF, Generation);
+            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.Xref, Generation);
         }
     }
 

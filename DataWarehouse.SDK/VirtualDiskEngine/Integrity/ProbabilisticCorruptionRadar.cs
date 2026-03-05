@@ -295,7 +295,7 @@ public sealed class ProbabilisticCorruptionRadar
                     trailerRecordsVerified++;
 
                     // Step 3c: verify block type tag
-                    if (dataBlockTypeTag != BlockTypeTags.DATA)
+                    if (dataBlockTypeTag != BlockTypeTags.Data)
                     {
                         // Not a DATA block tag — treat as suspect
                         suspectRecords++;

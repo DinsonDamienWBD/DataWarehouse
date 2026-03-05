@@ -469,7 +469,7 @@ public sealed class WalJournaledRegionWriter
 
             // Write trailer for the header block
             UniversalBlockTrailer.Write(buffer.AsSpan(0, _blockSize), _blockSize,
-                BlockTypeTags.MWAL, (uint)(newSequenceEnd & 0xFFFFFFFF));
+                BlockTypeTags.Mwal, (uint)(newSequenceEnd & 0xFFFFFFFF));
 
             _vdeStream.Seek(headerOffset, SeekOrigin.Begin);
             await _vdeStream.WriteAsync(buffer.AsMemory(0, _blockSize), ct);

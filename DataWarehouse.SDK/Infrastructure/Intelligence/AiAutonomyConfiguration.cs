@@ -134,7 +134,7 @@ public sealed class AiAutonomyConfiguration
     }
 
     // LOW-469: Cache the timing values array to avoid Enum.GetValues<CheckTiming>() allocation per call.
-    private static readonly CheckTiming[] _allCheckTimings = Enum.GetValues<CheckTiming>();
+    private static readonly CheckTiming[] AllCheckTimings = Enum.GetValues<CheckTiming>();
 
     /// <summary>
     /// Checks whether a feature ID is recognized in the <see cref="CheckClassificationTable"/>.
@@ -147,7 +147,7 @@ public sealed class AiAutonomyConfiguration
         if (featureId is null) throw new ArgumentNullException(nameof(featureId));
 
         // LOW-469: Use pre-cached timing array; iterate O(T) timings × O(F/T) features per timing.
-        foreach (CheckTiming timing in _allCheckTimings)
+        foreach (CheckTiming timing in AllCheckTimings)
         {
             var features = CheckClassificationTable.GetFeaturesByTiming(timing);
             for (int i = 0; i < features.Count; i++)

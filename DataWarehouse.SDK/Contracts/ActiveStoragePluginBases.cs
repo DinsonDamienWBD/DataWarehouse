@@ -2234,11 +2234,11 @@ public enum MediaFormat
     /// <summary>H.265/HEVC video format.</summary>
     H265,
     /// <summary>VP8 video format.</summary>
-    VP8,
+    Vp8,
     /// <summary>VP9 video format.</summary>
-    VP9,
+    Vp9,
     /// <summary>AV1 video format.</summary>
-    AV1,
+    Av1,
     /// <summary>MPEG-4 video format.</summary>
     Mpeg4,
     /// <summary>WebM container format.</summary>
@@ -2934,7 +2934,7 @@ public abstract class MediaTranscodingPluginBase : MediaPluginBase, ITranscoding
     /// </summary>
     public virtual IReadOnlyList<MediaFormat> SupportedInputFormats => new[]
     {
-        MediaFormat.H264, MediaFormat.H265, MediaFormat.VP8, MediaFormat.VP9,
+        MediaFormat.H264, MediaFormat.H265, MediaFormat.Vp8, MediaFormat.Vp9,
         MediaFormat.Mp4, MediaFormat.Mkv, MediaFormat.WebM, MediaFormat.Avi, MediaFormat.Mov,
         MediaFormat.Aac, MediaFormat.Mp3, MediaFormat.Opus, MediaFormat.Flac, MediaFormat.Wav,
         MediaFormat.Jpeg, MediaFormat.Png, MediaFormat.WebP, MediaFormat.Gif, MediaFormat.Bmp
@@ -2946,7 +2946,7 @@ public abstract class MediaTranscodingPluginBase : MediaPluginBase, ITranscoding
     /// </summary>
     public virtual IReadOnlyList<MediaFormat> SupportedOutputFormats => new[]
     {
-        MediaFormat.H264, MediaFormat.H265, MediaFormat.VP9, MediaFormat.AV1,
+        MediaFormat.H264, MediaFormat.H265, MediaFormat.Vp9, MediaFormat.Av1,
         MediaFormat.Mp4, MediaFormat.WebM, MediaFormat.Mkv,
         MediaFormat.Aac, MediaFormat.Mp3, MediaFormat.Opus,
         MediaFormat.Jpeg, MediaFormat.Png, MediaFormat.WebP, MediaFormat.Avif

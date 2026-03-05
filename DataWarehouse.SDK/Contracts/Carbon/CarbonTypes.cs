@@ -145,18 +145,18 @@ namespace DataWarehouse.SDK.Contracts.Carbon
         /// <summary>
         /// Total allocated carbon budget in grams of CO2 equivalent.
         /// </summary>
-        public required double BudgetGramsCO2e { get; init; }
+        public required double BudgetGramsCo2E { get; init; }
 
         /// <summary>
         /// Carbon already consumed in the current period in grams of CO2 equivalent.
         /// </summary>
-        public required double UsedGramsCO2e { get; init; }
+        public required double UsedGramsCo2E { get; init; }
 
         /// <summary>
-        /// Remaining carbon budget: <c>BudgetGramsCO2e - UsedGramsCO2e</c>.
+        /// Remaining carbon budget: <c>BudgetGramsCo2E - UsedGramsCo2E</c>.
         /// Returns zero if usage exceeds budget.
         /// </summary>
-        public double RemainingGramsCO2e => Math.Max(0, BudgetGramsCO2e - UsedGramsCO2e);
+        public double RemainingGramsCo2E => Math.Max(0, BudgetGramsCo2E - UsedGramsCo2E);
 
         /// <summary>
         /// Percentage of budget usage at which soft throttling begins. Default 80%.
@@ -181,12 +181,12 @@ namespace DataWarehouse.SDK.Contracts.Carbon
         /// <summary>
         /// Whether soft throttling is active (usage exceeds <see cref="ThrottleThresholdPercent"/>).
         /// </summary>
-        public bool IsThrottled => BudgetGramsCO2e > 0 && (UsedGramsCO2e / BudgetGramsCO2e * 100.0) >= ThrottleThresholdPercent;
+        public bool IsThrottled => BudgetGramsCo2E > 0 && (UsedGramsCo2E / BudgetGramsCo2E * 100.0) >= ThrottleThresholdPercent;
 
         /// <summary>
         /// Whether the budget is fully exhausted (usage exceeds <see cref="HardLimitPercent"/>).
         /// </summary>
-        public bool IsExhausted => BudgetGramsCO2e > 0 && (UsedGramsCO2e / BudgetGramsCO2e * 100.0) >= HardLimitPercent;
+        public bool IsExhausted => BudgetGramsCo2E > 0 && (UsedGramsCo2E / BudgetGramsCo2E * 100.0) >= HardLimitPercent;
     }
 
     #endregion
@@ -229,7 +229,7 @@ namespace DataWarehouse.SDK.Contracts.Carbon
         /// <summary>
         /// Carbon intensity in grams of CO2 equivalent per kilowatt-hour.
         /// </summary>
-        public required double CarbonIntensityGCO2ePerKwh { get; init; }
+        public required double CarbonIntensityGco2EPerKwh { get; init; }
 
         /// <summary>
         /// Percentage of grid generation from renewable sources (0-100).
@@ -291,7 +291,7 @@ namespace DataWarehouse.SDK.Contracts.Carbon
         /// <summary>
         /// Grid carbon intensity in grams of CO2 equivalent per kilowatt-hour.
         /// </summary>
-        public required double CarbonIntensityGCO2ePerKwh { get; init; }
+        public required double CarbonIntensityGco2EPerKwh { get; init; }
 
         /// <summary>
         /// Power Usage Effectiveness ratio (1.0 = ideal, typical data center ~1.2-1.6).
@@ -325,11 +325,11 @@ namespace DataWarehouse.SDK.Contracts.Carbon
     public enum GhgScopeCategory
     {
         /// <summary>Scope 1: Direct emissions from owned or controlled sources.</summary>
-        Scope1_DirectEmissions,
+        Scope1DirectEmissions,
         /// <summary>Scope 2: Indirect emissions from purchased electricity, steam, heating, and cooling.</summary>
-        Scope2_PurchasedElectricity,
+        Scope2PurchasedElectricity,
         /// <summary>Scope 3: All other indirect emissions in the value chain.</summary>
-        Scope3_ValueChain
+        Scope3ValueChain
     }
 
     /// <summary>
@@ -366,7 +366,7 @@ namespace DataWarehouse.SDK.Contracts.Carbon
         /// <summary>
         /// Total emissions for this entry in grams of CO2 equivalent.
         /// </summary>
-        public required double EmissionsGramsCO2e { get; init; }
+        public required double EmissionsGramsCo2E { get; init; }
 
         /// <summary>
         /// Total energy consumed for this entry in watt-hours.
@@ -432,7 +432,7 @@ namespace DataWarehouse.SDK.Contracts.Carbon
         /// <summary>
         /// Estimated carbon emissions in grams of CO2 equivalent for the operation on this backend.
         /// </summary>
-        public required double EstimatedCarbonGramsCO2e { get; init; }
+        public required double EstimatedCarbonGramsCo2E { get; init; }
 
         /// <summary>
         /// Estimated energy consumption in watt-hours for the operation on this backend.

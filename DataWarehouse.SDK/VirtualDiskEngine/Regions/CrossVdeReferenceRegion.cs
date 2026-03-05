@@ -107,7 +107,7 @@ public readonly record struct VdeReference
 /// Cross-VDE Reference Table Region: persists dw:// fabric links between VDE
 /// volumes, enabling broken-link detection and cross-VDE navigation.
 /// Provides O(1) lookup by reference ID via dictionary index.
-/// Serialized using <see cref="BlockTypeTags.XREF"/> type tag.
+/// Serialized using <see cref="BlockTypeTags.Xref"/> type tag.
 /// </summary>
 /// <remarks>
 /// Serialization layout:
@@ -317,7 +317,7 @@ public sealed class CrossVdeReferenceRegion
                 refIndex++;
             }
 
-            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.XREF, Generation);
+            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.Xref, Generation);
 
             if (refIndex < _references.Count)
             {
@@ -328,13 +328,13 @@ public sealed class CrossVdeReferenceRegion
 
         // Write trailer for block 0 if no references
         if (_references.Count == 0)
-            UniversalBlockTrailer.Write(block0, blockSize, BlockTypeTags.XREF, Generation);
+            UniversalBlockTrailer.Write(block0, blockSize, BlockTypeTags.Xref, Generation);
 
         // Write trailers for any remaining blocks
         for (int blk = currentBlock + 1; blk < requiredBlocks; blk++)
         {
             var block = buffer.Slice(blk * blockSize, blockSize);
-            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.XREF, Generation);
+            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.Xref, Generation);
         }
     }
 

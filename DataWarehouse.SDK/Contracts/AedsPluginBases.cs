@@ -330,22 +330,22 @@ public abstract class ServerDispatcherPluginBase : OrchestrationPluginBase, ISer
     /// <summary>
     /// In-memory job storage (use persistent storage in production).
     /// </summary>
-    protected readonly Dictionary<string, DistributionJob> _jobs = new();
+    protected readonly Dictionary<string, DistributionJob> Jobs = new();
 
     /// <summary>
     /// In-memory client registry (use persistent storage in production).
     /// </summary>
-    protected readonly Dictionary<string, AedsClient> _clients = new();
+    protected readonly Dictionary<string, AedsClient> Clients = new();
 
     /// <summary>
     /// In-memory channel registry (use persistent storage in production).
     /// </summary>
-    protected readonly Dictionary<string, DistributionChannel> _channels = new();
+    protected readonly Dictionary<string, DistributionChannel> Channels = new();
 
     /// <summary>
     /// Lock for thread-safe access to collections.
     /// </summary>
-    protected readonly SemaphoreSlim _lock = new(1, 1);
+    protected readonly SemaphoreSlim Lock = new(1, 1);
 
     /// <summary>
     /// Enqueues a new distribution job.
@@ -394,17 +394,17 @@ public abstract class ServerDispatcherPluginBase : OrchestrationPluginBase, ISer
         if (string.IsNullOrEmpty(jobId))
             throw new ArgumentException("Job ID cannot be null or empty.", nameof(jobId));
 
-        await _lock.WaitAsync(ct);
+        await Lock.WaitAsync(ct);
         try
         {
-            if (!_jobs.TryGetValue(jobId, out var job))
+            if (!Jobs.TryGetValue(jobId, out var job))
                 throw new KeyNotFoundException($"Job '{jobId}' not found.");
 
             return job.Status;
         }
         finally
         {
-            _lock.Release();
+            Lock.Release();
         }
     }
 
@@ -414,16 +414,16 @@ public abstract class ServerDispatcherPluginBase : OrchestrationPluginBase, ISer
         if (string.IsNullOrEmpty(jobId))
             throw new ArgumentException("Job ID cannot be null or empty.", nameof(jobId));
 
-        await _lock.WaitAsync(ct);
+        await Lock.WaitAsync(ct);
         try
         {
-            if (!_jobs.TryGetValue(jobId, out var job))
+            if (!Jobs.TryGetValue(jobId, out var job))
                 throw new KeyNotFoundException($"Job '{jobId}' not found.");
 
             if (job.Status is JobStatus.Completed or JobStatus.Failed or JobStatus.Cancelled)
                 throw new InvalidOperationException($"Cannot cancel job in status {job.Status}.");
 
-            _jobs[jobId] = job with
+            Jobs[jobId] = job with
             {
                 Status = JobStatus.Cancelled,
                 CompletedAt = DateTimeOffset.UtcNow
@@ -431,17 +431,17 @@ public abstract class ServerDispatcherPluginBase : OrchestrationPluginBase, ISer
         }
         finally
         {
-            _lock.Release();
+            Lock.Release();
         }
     }
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<DistributionJob>> ListJobsAsync(JobFilter? filter = null, CancellationToken ct = default)
     {
-        await _lock.WaitAsync(ct);
+        await Lock.WaitAsync(ct);
         try
         {
-            IEnumerable<DistributionJob> query = _jobs.Values;
+            IEnumerable<DistributionJob> query = Jobs.Values;
 
             if (filter != null)
             {
@@ -461,7 +461,7 @@ public abstract class ServerDispatcherPluginBase : OrchestrationPluginBase, ISer
         }
         finally
         {
-            _lock.Release();
+            Lock.Release();
         }
     }
 
@@ -482,17 +482,17 @@ public abstract class ServerDispatcherPluginBase : OrchestrationPluginBase, ISer
         if (string.IsNullOrEmpty(adminId))
             throw new ArgumentException("Admin ID cannot be null or empty.", nameof(adminId));
 
-        await _lock.WaitAsync(ct);
+        await Lock.WaitAsync(ct);
         try
         {
-            if (!_clients.TryGetValue(clientId, out var client))
+            if (!Clients.TryGetValue(clientId, out var client))
                 throw new KeyNotFoundException($"Client '{clientId}' not found.");
 
-            _clients[clientId] = client with { TrustLevel = newLevel };
+            Clients[clientId] = client with { TrustLevel = newLevel };
         }
         finally
         {
-            _lock.Release();
+            Lock.Release();
         }
     }
 
@@ -508,14 +508,14 @@ public abstract class ServerDispatcherPluginBase : OrchestrationPluginBase, ISer
     /// <inheritdoc />
     public async Task<IReadOnlyList<DistributionChannel>> ListChannelsAsync(CancellationToken ct = default)
     {
-        await _lock.WaitAsync(ct);
+        await Lock.WaitAsync(ct);
         try
         {
-            return _channels.Values.ToList();
+            return Channels.Values.ToList();
         }
         finally
         {
-            _lock.Release();
+            Lock.Release();
         }
     }
 
@@ -532,7 +532,7 @@ public abstract class ServerDispatcherPluginBase : OrchestrationPluginBase, ISer
     /// </summary>
     public override Task StopAsync()
     {
-        _lock?.Dispose();
+        Lock?.Dispose();
         return Task.CompletedTask;
     }
 }

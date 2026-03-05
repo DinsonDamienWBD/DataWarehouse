@@ -71,7 +71,7 @@ public readonly record struct MetricsSample
 /// automatic compaction when capacity threshold is reached. Compaction groups
 /// consecutive raw samples with the same MetricId into 1-minute windows, replacing
 /// them with aggregated averages.
-/// Serialized using <see cref="BlockTypeTags.MTRK"/> type tag.
+/// Serialized using <see cref="BlockTypeTags.Mtrk"/> type tag.
 /// </summary>
 /// <remarks>
 /// Serialization layout:
@@ -79,7 +79,7 @@ public readonly record struct MetricsSample
 ///   [CompactionThreshold:8 LE (as double)][Reserved:8][samples...]
 ///   Samples overflow to block 1+ if needed. Each block ends with [UniversalBlockTrailer].
 ///
-/// Note: BlockTypeTags.MTRK ("Metrics tracker") is shared with IntegrityTreeRegion.
+/// Note: BlockTypeTags.Mtrk ("Metrics tracker") is shared with IntegrityTreeRegion.
 /// The RegionDirectory distinguishes them by region type ID.
 /// </remarks>
 [SdkCompatibility("6.0.0", Notes = "Phase 73: VDE regions -- Metrics Log (VREG-17)")]
@@ -304,7 +304,7 @@ public sealed class MetricsLogRegion
             {
                 UniversalBlockTrailer.Write(
                     buffer.Slice(currentBlock * blockSize, blockSize),
-                    blockSize, BlockTypeTags.MTRK, Generation);
+                    blockSize, BlockTypeTags.Mtrk, Generation);
                 currentBlock++;
                 offset = 0;
             }
@@ -317,14 +317,14 @@ public sealed class MetricsLogRegion
         // Write trailer for the last block containing data
         UniversalBlockTrailer.Write(
             buffer.Slice(currentBlock * blockSize, blockSize),
-            blockSize, BlockTypeTags.MTRK, Generation);
+            blockSize, BlockTypeTags.Mtrk, Generation);
 
         // Write trailers for any remaining empty blocks
         for (int blk = currentBlock + 1; blk < requiredBlocks; blk++)
         {
             UniversalBlockTrailer.Write(
                 buffer.Slice(blk * blockSize, blockSize),
-                blockSize, BlockTypeTags.MTRK, Generation);
+                blockSize, BlockTypeTags.Mtrk, Generation);
         }
     }
 

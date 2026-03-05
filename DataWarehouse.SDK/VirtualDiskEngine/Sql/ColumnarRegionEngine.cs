@@ -124,7 +124,7 @@ public sealed class ColumnarRegionEngine
         long startBlock = FindFreeRegionStart(initialRegionBlocks);
 
         // Register in region directory
-        _regionDir.AddRegion(BlockTypeTags.COLR, RegionFlags.None, startBlock, initialRegionBlocks);
+        _regionDir.AddRegion(BlockTypeTags.Colr, RegionFlags.None, startBlock, initialRegionBlocks);
 
         // Serialize table metadata to the first block of the region
         var metadataBlock = new byte[_blockSize];
@@ -185,7 +185,6 @@ public sealed class ColumnarRegionEngine
         long nextBlock = meta.NextFreeBlock;
 
         // Encode and write each column chunk, tracking actual block offsets
-        var zoneMapEntries = new List<ZoneMapEntry>();
         long writeOffset = nextBlock;
 
         for (int colIdx = 0; colIdx < meta.Columns.Length; colIdx++)
@@ -239,10 +238,6 @@ public sealed class ColumnarRegionEngine
                     ct).ConfigureAwait(false);
             }
 
-            // Create zone map entry for this column chunk
-            var zoneEntry = BuildZoneMapEntry(rawData, valueWidth, rowCount, writeOffset, blocksNeeded);
-            zoneMapEntries.Add(zoneEntry);
-
             writeOffset += blocksNeeded;
         }
 
@@ -292,14 +287,14 @@ public sealed class ColumnarRegionEngine
         int headerSize = 9;
 
         // Validate rowCount before use to prevent OOM from corrupt/malicious on-disk values (finding 910).
-        const int MaxRowCount = 100_000_000; // 100M rows per column block is a safe upper bound
-        if (rowCount < 0 || rowCount > MaxRowCount)
+        const int maxRowCount = 100_000_000; // 100M rows per column block is a safe upper bound
+        if (rowCount < 0 || rowCount > maxRowCount)
             throw new InvalidDataException(
                 $"Columnar region block at offset {blockOffset} has invalid rowCount={rowCount}. Data may be corrupt.");
 
         // Validate dataLen before allocation to prevent OOM from corrupt/malicious on-disk values
-        const int MaxColumnarDataLen = 256 * 1024 * 1024; // 256 MB upper bound
-        if (dataLen < 0 || dataLen > MaxColumnarDataLen)
+        const int maxColumnarDataLen = 256 * 1024 * 1024; // 256 MB upper bound
+        if (dataLen < 0 || dataLen > maxColumnarDataLen)
             throw new InvalidDataException(
                 $"Columnar region block at offset {blockOffset} has invalid dataLen={dataLen}. Data may be corrupt.");
 

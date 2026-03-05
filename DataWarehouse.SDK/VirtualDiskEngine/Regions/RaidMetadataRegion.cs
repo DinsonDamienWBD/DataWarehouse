@@ -374,7 +374,7 @@ public readonly struct RebuildProgress : IEquatable<RebuildProgress>
 
 /// <summary>
 /// RAID Metadata Region: stores shard maps, parity layout descriptors, and rebuild progress
-/// for all supported RAID strategies. Serialized across 2 blocks using <see cref="BlockTypeTags.RAID"/>
+/// for all supported RAID strategies. Serialized across 2 blocks using <see cref="BlockTypeTags.Raid"/>
 /// type tag.
 /// </summary>
 /// <remarks>
@@ -592,7 +592,7 @@ public sealed class RaidMetadataRegion
             offset += ShardDescriptor.SerializedSize;
         }
 
-        UniversalBlockTrailer.Write(block0, blockSize, BlockTypeTags.RAID, Generation);
+        UniversalBlockTrailer.Write(block0, blockSize, BlockTypeTags.Raid, Generation);
 
         // ── Block 1: [ParityDescriptor entries][RebuildProgress entries][zero-fill][Trailer] ──
         var block1 = buffer.Slice(blockSize, blockSize);
@@ -611,7 +611,7 @@ public sealed class RaidMetadataRegion
             offset += RebuildProgress.SerializedSize;
         }
 
-        UniversalBlockTrailer.Write(block1, blockSize, BlockTypeTags.RAID, Generation);
+        UniversalBlockTrailer.Write(block1, blockSize, BlockTypeTags.Raid, Generation);
     }
 
     /// <summary>

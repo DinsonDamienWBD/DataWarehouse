@@ -185,7 +185,7 @@ public sealed class RegionDirectory
         }
         // Remaining bytes up to blockSize-16 are already zero (reserved).
         // Write trailer for block 0
-        UniversalBlockTrailer.Write(block0, blockSize, BlockTypeTags.RMAP, Generation);
+        UniversalBlockTrailer.Write(block0, blockSize, BlockTypeTags.Rmap, Generation);
 
         // ── Block 1: Write directory header ─────────────────────────────
         var block1 = buffer.Slice(blockSize, blockSize);
@@ -203,7 +203,7 @@ public sealed class RegionDirectory
         BinaryPrimitives.WriteUInt64LittleEndian(block1.Slice(8), block0Hash);
 
         // Write trailer for block 1
-        UniversalBlockTrailer.Write(block1, blockSize, BlockTypeTags.RMAP, Generation);
+        UniversalBlockTrailer.Write(block1, blockSize, BlockTypeTags.Rmap, Generation);
     }
 
     /// <summary>

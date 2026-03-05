@@ -10,9 +10,9 @@ namespace DataWarehouse.SDK.Storage.Billing;
 [SdkCompatibility("5.0.0", Notes = "Phase 58: Zero-Gravity Storage")]
 public enum CloudProvider
 {
-    AWS,
+    Aws,
     Azure,
-    GCP,
+    Gcp,
     Oracle,
     Alibaba,
     OnPremise,
@@ -81,10 +81,10 @@ public sealed record SpotPricing(
     CloudProvider Provider,
     string Region,
     string StorageClass,
-    decimal CurrentPricePerGBMonth,
-    decimal SpotPricePerGBMonth,
+    decimal CurrentPricePerGbMonth,
+    decimal SpotPricePerGbMonth,
     double SavingsPercent,
-    long AvailableCapacityGB,
+    long AvailableCapacityGb,
     double InterruptionProbability);
 
 /// <summary>
@@ -95,9 +95,9 @@ public sealed record ReservedCapacity(
     CloudProvider Provider,
     string Region,
     string StorageClass,
-    long CommittedGB,
-    decimal ReservedPricePerGBMonth,
-    decimal OnDemandPricePerGBMonth,
+    long CommittedGb,
+    decimal ReservedPricePerGbMonth,
+    decimal OnDemandPricePerGbMonth,
     double SavingsPercent,
     int TermMonths,
     DateTimeOffset ExpiresUtc);

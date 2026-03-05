@@ -8,7 +8,7 @@ namespace DataWarehouse.SDK.VirtualDiskEngine.Allocation;
 /// <summary>
 /// Manages all allocation groups for a VDE, providing a unified interface for
 /// block allocation across the entire data region. The descriptor table is
-/// stored in a dedicated VDE region identified by <see cref="BlockTypeTags.BMAP"/>.
+/// stored in a dedicated VDE region identified by <see cref="BlockTypeTags.Bmap"/>.
 /// </summary>
 [SdkCompatibility("6.0.0", Notes = "Phase 87: Allocation group descriptor table (VOPT-02)")]
 public sealed class AllocationGroupDescriptorTable : IDisposable
@@ -22,11 +22,15 @@ public sealed class AllocationGroupDescriptorTable : IDisposable
     /// <summary>
     /// Block type tag for the allocation group descriptor region.
     /// </summary>
-    public const uint RegionTag = BlockTypeTags.BMAP;
+    public const uint RegionTag = BlockTypeTags.Bmap;
 
     private readonly AllocationGroup[] _groups;
-    private readonly int _blockSize;
     private bool _disposed;
+
+    /// <summary>
+    /// Gets the block size in bytes used for descriptor table operations.
+    /// </summary>
+    public int BlockSize { get; }
 
     /// <summary>
     /// Gets the number of allocation groups.
@@ -59,7 +63,7 @@ public sealed class AllocationGroupDescriptorTable : IDisposable
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(blockSize);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(groupSizeBytes);
 
-        _blockSize = blockSize;
+        BlockSize = blockSize;
 
         long totalDataBytes = totalDataBlocks * blockSize;
         int groupCount = Math.Max(1, (int)Math.Ceiling((double)totalDataBytes / groupSizeBytes));
@@ -85,7 +89,7 @@ public sealed class AllocationGroupDescriptorTable : IDisposable
     private AllocationGroupDescriptorTable(AllocationGroup[] groups, int blockSize)
     {
         _groups = groups;
-        _blockSize = blockSize;
+        BlockSize = blockSize;
     }
 
     /// <summary>

@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using DataWarehouse.SDK.VirtualDiskEngine;
 using DataWarehouse.SDK.VirtualDiskEngine.AdaptiveIndex;
 using DataWarehouse.SDK.VirtualDiskEngine.BlockAllocation;
+using MorphLevel = DataWarehouse.SDK.VirtualDiskEngine.AdaptiveIndex.MorphLevel;
 using DataWarehouse.SDK.VirtualDiskEngine.Journal;
 using Xunit;
 

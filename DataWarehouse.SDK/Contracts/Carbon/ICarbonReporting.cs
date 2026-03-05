@@ -16,7 +16,7 @@ namespace DataWarehouse.SDK.Contracts.Carbon
         /// <summary>
         /// Total carbon emissions in grams of CO2 equivalent for the period.
         /// </summary>
-        public required double TotalEmissionsGramsCO2e { get; init; }
+        public required double TotalEmissionsGramsCo2E { get; init; }
 
         /// <summary>
         /// Total energy consumed in watt-hours for the period.

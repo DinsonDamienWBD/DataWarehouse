@@ -84,9 +84,9 @@ namespace DataWarehouse.SDK.Infrastructure.Policy.Performance
     {
         // LOW-501: Build both tables from a single BuildEntries() call to avoid double allocation.
         private static readonly (FrozenDictionary<string, CheckTiming> Classifications,
-                                  FrozenDictionary<CheckTiming, string[]> FeaturesByTiming) _tables = BuildAllTables();
-        private static readonly FrozenDictionary<string, CheckTiming> _classifications = _tables.Classifications;
-        private static readonly FrozenDictionary<CheckTiming, string[]> _featuresByTiming = _tables.FeaturesByTiming;
+                                  FrozenDictionary<CheckTiming, string[]> FeaturesByTiming) Tables = BuildAllTables();
+        private static readonly FrozenDictionary<string, CheckTiming> Classifications = Tables.Classifications;
+        private static readonly FrozenDictionary<CheckTiming, string[]> FeaturesByTiming = Tables.FeaturesByTiming;
 
         private static Dictionary<string, CheckTiming> BuildEntries() => new(StringComparer.Ordinal)
         {
@@ -221,7 +221,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy.Performance
         public static CheckTiming GetTiming(string featureId)
         {
             if (featureId is null) throw new ArgumentNullException(nameof(featureId));
-            return _classifications.TryGetValue(featureId, out var timing) ? timing : CheckTiming.PerOperation;
+            return Classifications.TryGetValue(featureId, out var timing) ? timing : CheckTiming.PerOperation;
         }
 
         /// <summary>
@@ -231,13 +231,13 @@ namespace DataWarehouse.SDK.Infrastructure.Policy.Performance
         /// <returns>A read-only list of feature IDs with the specified timing classification.</returns>
         public static IReadOnlyList<string> GetFeaturesByTiming(CheckTiming timing)
         {
-            return _featuresByTiming.TryGetValue(timing, out var features) ? features : Array.Empty<string>();
+            return FeaturesByTiming.TryGetValue(timing, out var features) ? features : Array.Empty<string>();
         }
 
         /// <summary>
         /// Gets the total number of classified features in the routing table.
         /// </summary>
-        public static int TotalFeatures => _classifications.Count;
+        public static int TotalFeatures => Classifications.Count;
     }
 
     /// <summary>

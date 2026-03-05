@@ -16,14 +16,16 @@ namespace DataWarehouse.SDK.Deployment.CloudProviders;
 [SdkCompatibility("3.0.0", Notes = "Phase 37: Azure provisioning provider (ENV-04)")]
 public sealed class AzureProvider : ICloudProvider
 {
-    private readonly ILogger<AzureProvider> _logger;
     private int _disposed;
+
+    /// <summary>Gets the logger instance for this provider.</summary>
+    internal ILogger<AzureProvider> Logger { get; }
 
     public string Name => "Azure";
 
     public AzureProvider(ILogger<AzureProvider>? logger = null)
     {
-        _logger = logger ?? NullLogger<AzureProvider>.Instance;
+        Logger = logger ?? NullLogger<AzureProvider>.Instance;
     }
 
     public Task<string> ProvisionVmAsync(VmSpec spec, CancellationToken ct = default)

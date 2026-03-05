@@ -186,7 +186,7 @@ public readonly struct ReplicationWatermark : IEquatable<ReplicationWatermark>
 /// <summary>
 /// Replication State Region: tracks causal ordering (DVV), per-replica sync watermarks,
 /// and a dirty bitmap identifying blocks modified since last successful replication.
-/// Serialized across 2+ blocks using <see cref="BlockTypeTags.REPL"/> type tag.
+/// Serialized across 2+ blocks using <see cref="BlockTypeTags.Repl"/> type tag.
 /// </summary>
 /// <remarks>
 /// Block 0 layout: [ActiveReplicaCount:2 LE][TrackedBlockCount:4 LE][Reserved:2]
@@ -445,7 +445,7 @@ public sealed class ReplicationStateRegion
             offset += ReplicationWatermark.SerializedSize;
         }
 
-        UniversalBlockTrailer.Write(block0, blockSize, BlockTypeTags.REPL, Generation);
+        UniversalBlockTrailer.Write(block0, blockSize, BlockTypeTags.Repl, Generation);
 
         // ── Block 1..N: [DirtyBitmap bytes][zero-fill][Trailer] ──
         int payloadSize = UniversalBlockTrailer.PayloadSize(blockSize);
@@ -459,7 +459,7 @@ public sealed class ReplicationStateRegion
                 _dirtyBitmap.AsSpan(bitmapOffset, bytesToWrite).CopyTo(block);
                 bitmapOffset += bytesToWrite;
             }
-            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.REPL, Generation);
+            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.Repl, Generation);
         }
     }
 

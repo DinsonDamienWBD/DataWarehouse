@@ -125,7 +125,7 @@ public sealed class ExtentTreeNode
         }
 
         // Write Universal Block Trailer
-        UniversalBlockTrailer.Write(buffer, blockSize, BlockTypeTags.EXTN, generation: 1);
+        UniversalBlockTrailer.Write(buffer, blockSize, BlockTypeTags.Extn, generation: 1);
     }
 
     /// <summary>

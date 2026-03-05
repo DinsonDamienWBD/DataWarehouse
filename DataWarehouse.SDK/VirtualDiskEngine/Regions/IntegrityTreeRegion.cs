@@ -371,7 +371,7 @@ public sealed class IntegrityTreeRegion
 
     /// <summary>
     /// Serializes the tree into a multi-block buffer. Each block carries a
-    /// <see cref="UniversalBlockTrailer"/> with <see cref="BlockTypeTags.MTRK"/>.
+    /// <see cref="UniversalBlockTrailer"/> with <see cref="BlockTypeTags.Mtrk"/>.
     /// </summary>
     /// <param name="buffer">Target buffer, must be at least RequiredBlocks * blockSize bytes.</param>
     /// <param name="blockSize">Block size in bytes.</param>
@@ -393,7 +393,7 @@ public sealed class IntegrityTreeRegion
         BinaryPrimitives.WriteInt32LittleEndian(block0, LeafCount);
         BinaryPrimitives.WriteInt32LittleEndian(block0.Slice(4), TreeCapacity);
         _nodes[1].AsSpan().CopyTo(block0.Slice(8, HashSize)); // root hash copy
-        UniversalBlockTrailer.Write(block0, blockSize, BlockTypeTags.MTRK, Generation);
+        UniversalBlockTrailer.Write(block0, blockSize, BlockTypeTags.Mtrk, Generation);
 
         // ── Data blocks (block 1+): packed node hashes, indices 1..TotalNodes-1 ──
         int payloadSize = UniversalBlockTrailer.PayloadSize(blockSize);
@@ -414,7 +414,7 @@ public sealed class IntegrityTreeRegion
                 nodeWritten++;
             }
 
-            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.MTRK, Generation);
+            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.Mtrk, Generation);
         }
     }
 

@@ -131,7 +131,7 @@ namespace DataWarehouse.SDK.Contracts.Scaling
                 options = new BoundedCacheOptions<TKey, TValue>
                 {
                     MaxEntries = GetDefaultMaxEntries(PluginCategory.General),
-                    EvictionPolicy = CacheEvictionMode.LRU,
+                    EvictionPolicy = CacheEvictionMode.Lru,
                     BackingStorePath = $"dw://cache/{pluginId}/{storeName}",
                     KeyToString = static k => k?.ToString() ?? "null",
                     Serializer = static v => JsonSerializer.SerializeToUtf8Bytes(v, _jsonOptions),
@@ -160,7 +160,7 @@ namespace DataWarehouse.SDK.Contracts.Scaling
         /// <param name="pluginId">The unique identifier of the plugin owning this store.</param>
         /// <param name="storeName">A human-readable name for the store.</param>
         /// <param name="maxEntries">Maximum number of entries before eviction.</param>
-        /// <param name="mode">Eviction policy. Default: <see cref="CacheEvictionMode.LRU"/>.</param>
+        /// <param name="mode">Eviction policy. Default: <see cref="CacheEvictionMode.Lru"/>.</param>
         /// <returns>A fully configured <see cref="BoundedCache{TKey,TValue}"/>.</returns>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="pluginId"/> or <paramref name="storeName"/> is null.</exception>
         /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="maxEntries"/> is less than 1.</exception>
@@ -168,7 +168,7 @@ namespace DataWarehouse.SDK.Contracts.Scaling
             string pluginId,
             string storeName,
             int maxEntries,
-            CacheEvictionMode mode = CacheEvictionMode.LRU) where TKey : notnull
+            CacheEvictionMode mode = CacheEvictionMode.Lru) where TKey : notnull
         {
             ArgumentNullException.ThrowIfNull(pluginId);
             ArgumentNullException.ThrowIfNull(storeName);
@@ -212,7 +212,7 @@ namespace DataWarehouse.SDK.Contracts.Scaling
             var options = new BoundedCacheOptions<TKey, TValue>
             {
                 MaxEntries = GetDefaultMaxEntries(category),
-                EvictionPolicy = CacheEvictionMode.LRU,
+                EvictionPolicy = CacheEvictionMode.Lru,
                 BackingStore = backingStore,
                 BackingStorePath = $"dw://cache/{pluginId}/{storeName}",
                 KeyToString = static k => k?.ToString() ?? "null",

@@ -81,7 +81,7 @@ public sealed class GcpBillingProvider : IBillingProvider
     }
 
     /// <inheritdoc />
-    public CloudProvider Provider => CloudProvider.GCP;
+    public CloudProvider Provider => CloudProvider.Gcp;
 
     /// <inheritdoc />
     public async Task<BillingReport> GetBillingReportAsync(
@@ -208,7 +208,7 @@ public sealed class GcpBillingProvider : IBillingProvider
 
         return new BillingReport(
             $"gcp-{_projectId}",
-            CloudProvider.GCP,
+            CloudProvider.Gcp,
             from,
             to,
             totalCost,
@@ -283,13 +283,13 @@ public sealed class GcpBillingProvider : IBillingProvider
                     foreach (var r in skuRegions.Take(3))
                     {
                         results.Add(new SpotPricing(
-                            CloudProvider.GCP,
+                            CloudProvider.Gcp,
                             r,
                             description,
                             price,
                             spotPrice,
                             savings,
-                            AvailableCapacityGB: 0,
+                            AvailableCapacityGb: 0,
                             InterruptionProbability: 0.05));
                     }
                 }
@@ -382,12 +382,12 @@ public sealed class GcpBillingProvider : IBillingProvider
                             : 0m;
 
                         results.Add(new ReservedCapacity(
-                            CloudProvider.GCP,
+                            CloudProvider.Gcp,
                             zoneName,
                             name,
-                            CommittedGB: committedGb,
-                            ReservedPricePerGBMonth: reservedPerGbMonth,
-                            OnDemandPricePerGBMonth: onDemandPerGbMonth,
+                            CommittedGb: committedGb,
+                            ReservedPricePerGbMonth: reservedPerGbMonth,
+                            OnDemandPricePerGbMonth: onDemandPerGbMonth,
                             savingsPercent,
                             termMonths,
                             endTimestamp));
@@ -453,7 +453,7 @@ public sealed class GcpBillingProvider : IBillingProvider
         }
 
         return new CostForecast(
-            CloudProvider.GCP,
+            CloudProvider.Gcp,
             days,
             projectedCost,
             confidence,

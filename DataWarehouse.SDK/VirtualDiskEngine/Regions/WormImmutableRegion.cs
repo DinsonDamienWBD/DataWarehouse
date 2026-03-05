@@ -93,7 +93,7 @@ public readonly struct WormWriteRecord : IEquatable<WormWriteRecord>
 /// with a high-water mark (HWM). All blocks below the HWM are immutable and
 /// cannot be overwritten. Writes are only permitted at the HWM position (sequential append).
 /// Each write is recorded with a SHA-256 content hash for tamper detection.
-/// Serialized using <see cref="BlockTypeTags.WORM"/> type tag.
+/// Serialized using <see cref="BlockTypeTags.Worm"/> type tag.
 /// </summary>
 /// <remarks>
 /// Header block layout:
@@ -281,7 +281,7 @@ public sealed class WormImmutableRegion
                 recordIndex++;
             }
 
-            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.WORM, Generation);
+            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.Worm, Generation);
 
             if (recordIndex < _writeLog.Count)
             {
@@ -292,13 +292,13 @@ public sealed class WormImmutableRegion
 
         // Write trailer for block 0 if no records were written
         if (_writeLog.Count == 0)
-            UniversalBlockTrailer.Write(block0, blockSize, BlockTypeTags.WORM, Generation);
+            UniversalBlockTrailer.Write(block0, blockSize, BlockTypeTags.Worm, Generation);
 
         // Write trailers for any remaining blocks that may not have had records
         for (int blk = currentBlock + 1; blk < requiredBlocks; blk++)
         {
             var block = buffer.Slice(blk * blockSize, blockSize);
-            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.WORM, Generation);
+            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.Worm, Generation);
         }
     }
 

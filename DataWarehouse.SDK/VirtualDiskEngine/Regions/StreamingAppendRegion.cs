@@ -9,7 +9,7 @@ namespace DataWarehouse.SDK.VirtualDiskEngine.Regions;
 /// and grows on demand up to a configurable maximum capacity. WriteHead and ReadTail
 /// are absolute counters; actual block index = counter % AllocatedBlocks.
 /// When the buffer wraps and overwrites old data, ReadTail advances automatically.
-/// Serialized as 1 header block using <see cref="BlockTypeTags.STRE"/> type tag.
+/// Serialized as 1 header block using <see cref="BlockTypeTags.Stre"/> type tag.
 /// </summary>
 /// <remarks>
 /// Header block layout:
@@ -209,7 +209,7 @@ public sealed class StreamingAppendRegion
         BinaryPrimitives.WriteInt64LittleEndian(buffer.Slice(32), EntryCount);
         BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(40), GrowthIncrement);
 
-        UniversalBlockTrailer.Write(buffer, blockSize, BlockTypeTags.STRE, Generation);
+        UniversalBlockTrailer.Write(buffer, blockSize, BlockTypeTags.Stre, Generation);
     }
 
     /// <summary>

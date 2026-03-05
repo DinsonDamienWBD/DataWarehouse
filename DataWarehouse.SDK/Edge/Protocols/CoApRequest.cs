@@ -58,16 +58,16 @@ namespace DataWarehouse.SDK.Edge.Protocols
     public enum CoApMethod
     {
         /// <summary>GET method (retrieve resource).</summary>
-        GET = 1,
+        Get = 1,
 
         /// <summary>POST method (create resource or trigger action).</summary>
-        POST = 2,
+        Post = 2,
 
         /// <summary>PUT method (update or create resource).</summary>
-        PUT = 3,
+        Put = 3,
 
         /// <summary>DELETE method (delete resource).</summary>
-        DELETE = 4
+        Delete = 4
     }
 
     /// <summary>

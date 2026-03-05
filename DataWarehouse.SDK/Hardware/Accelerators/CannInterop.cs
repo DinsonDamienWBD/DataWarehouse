@@ -40,45 +40,45 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// <summary>
         /// Success return code for CANN operations.
         /// </summary>
-        internal const int ACL_SUCCESS = 0;
+        internal const int AclSuccess = 0;
 
         /// <summary>
         /// CANN error codes (minimal subset).
         /// </summary>
         internal enum AclError
         {
-            ACL_SUCCESS = 0,
-            ACL_ERROR_INVALID_PARAM = 100000,
-            ACL_ERROR_UNINITIALIZE = 100001,
-            ACL_ERROR_REPEAT_INITIALIZE = 100002,
-            ACL_ERROR_INVALID_FILE = 100003,
-            ACL_ERROR_WRITE_FILE = 100004,
-            ACL_ERROR_INVALID_FILE_SIZE = 100005,
-            ACL_ERROR_PARSE_FILE = 100006,
-            ACL_ERROR_FILE_MISSING_ATTR = 100007,
-            ACL_ERROR_FILE_ATTR_INVALID = 100008,
-            ACL_ERROR_INVALID_DUMP_CONFIG = 100009,
-            ACL_ERROR_INVALID_PROFILING_CONFIG = 100010,
-            ACL_ERROR_INVALID_MODEL_ID = 100011,
-            ACL_ERROR_DESERIALIZE_MODEL = 100012,
-            ACL_ERROR_MEMORY_ADDRESS_UNALIGNED = 200000,
-            ACL_ERROR_RESOURCE_NOT_MATCH = 200001,
-            ACL_ERROR_INVALID_RESOURCE_HANDLE = 200002,
-            ACL_ERROR_FEATURE_UNSUPPORTED = 200003,
-            ACL_ERROR_STORAGE_OVER_LIMIT = 300000,
-            ACL_ERROR_INTERNAL_ERROR = 500000,
-            ACL_ERROR_FAILURE = 500001,
-            ACL_ERROR_NOT_FOUND = 500002,
-            ACL_ERROR_STREAM_NOT_CREATED = 500003,
+            AclSuccess = 0,
+            AclErrorInvalidParam = 100000,
+            AclErrorUninitialize = 100001,
+            AclErrorRepeatInitialize = 100002,
+            AclErrorInvalidFile = 100003,
+            AclErrorWriteFile = 100004,
+            AclErrorInvalidFileSize = 100005,
+            AclErrorParseFile = 100006,
+            AclErrorFileMissingAttr = 100007,
+            AclErrorFileAttrInvalid = 100008,
+            AclErrorInvalidDumpConfig = 100009,
+            AclErrorInvalidProfilingConfig = 100010,
+            AclErrorInvalidModelId = 100011,
+            AclErrorDeserializeModel = 100012,
+            AclErrorMemoryAddressUnaligned = 200000,
+            AclErrorResourceNotMatch = 200001,
+            AclErrorInvalidResourceHandle = 200002,
+            AclErrorFeatureUnsupported = 200003,
+            AclErrorStorageOverLimit = 300000,
+            AclErrorInternalError = 500000,
+            AclErrorFailure = 500001,
+            AclErrorNotFound = 500002,
+            AclErrorStreamNotCreated = 500003,
         }
 
         /// <summary>
         /// CANN memory copy types.
         /// </summary>
-        internal const int ACL_MEMCPY_HOST_TO_HOST = 0;
-        internal const int ACL_MEMCPY_HOST_TO_DEVICE = 1;
-        internal const int ACL_MEMCPY_DEVICE_TO_HOST = 2;
-        internal const int ACL_MEMCPY_DEVICE_TO_DEVICE = 3;
+        internal const int AclMemcpyHostToHost = 0;
+        internal const int AclMemcpyHostToDevice = 1;
+        internal const int AclMemcpyDeviceToHost = 2;
+        internal const int AclMemcpyDeviceToDevice = 3;
 
         // --- Initialization API ---
 
@@ -273,7 +273,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
     [SdkCompatibility("5.0.0", Notes = "Phase 65: CANN accelerator (HW-05)")]
     public sealed class CannAccelerator : IGpuAccelerator, IDisposable
     {
-        private readonly IPlatformCapabilityRegistry _registry;
+        
         private int _deviceCount;
         private volatile bool _isAvailable;
         private volatile bool _initialized;
@@ -293,7 +293,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// <exception cref="ArgumentNullException">Thrown when registry is null.</exception>
         public CannAccelerator(IPlatformCapabilityRegistry registry)
         {
-            _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+            ArgumentNullException.ThrowIfNull(registry);
         }
 
         /// <inheritdoc/>
@@ -333,8 +333,8 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
 
                         // Initialize ACL runtime
                         int result = CannInterop.AclInit(null);
-                        if (result != CannInterop.ACL_SUCCESS &&
-                            result != (int)CannInterop.AclError.ACL_ERROR_REPEAT_INITIALIZE)
+                        if (result != CannInterop.AclSuccess &&
+                            result != (int)CannInterop.AclError.AclErrorRepeatInitialize)
                         {
                             _isAvailable = false;
                             _initialized = true;
@@ -345,7 +345,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
 
                         // Query device count
                         result = CannInterop.GetDeviceCount(out uint deviceCount);
-                        if (result != CannInterop.ACL_SUCCESS || deviceCount == 0)
+                        if (result != CannInterop.AclSuccess || deviceCount == 0)
                         {
                             _isAvailable = false;
                             _initialized = true;
@@ -356,7 +356,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
 
                         // Set device 0 and create stream
                         result = CannInterop.SetDevice(0);
-                        if (result != CannInterop.ACL_SUCCESS)
+                        if (result != CannInterop.AclSuccess)
                         {
                             _isAvailable = false;
                             _initialized = true;
@@ -364,7 +364,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                         }
 
                         result = CannInterop.CreateStream(out IntPtr stream);
-                        if (result != CannInterop.ACL_SUCCESS)
+                        if (result != CannInterop.AclSuccess)
                         {
                             _isAvailable = false;
                             _initialized = true;
@@ -411,20 +411,20 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                 ct.ThrowIfCancellationRequested();
 
                 int result = CannInterop.ModelLoadFromFile(modelPath, out uint modelId);
-                if (result != CannInterop.ACL_SUCCESS)
+                if (result != CannInterop.AclSuccess)
                     return false;
 
                 try
                 {
                     result = CannInterop.ModelExecute(modelId, inputData, outputData);
-                    if (result != CannInterop.ACL_SUCCESS)
+                    if (result != CannInterop.AclSuccess)
                         return false;
 
                     // Synchronize stream to ensure execution completes
                     if (_stream != IntPtr.Zero)
                     {
                         result = CannInterop.SynchronizeStream(_stream);
-                        if (result != CannInterop.ACL_SUCCESS)
+                        if (result != CannInterop.AclSuccess)
                             return false;
                     }
 
@@ -478,25 +478,25 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             ArgumentNullException.ThrowIfNull(a);
             ArgumentNullException.ThrowIfNull(b);
 
-            int M = a.GetLength(0), K = a.GetLength(1);
-            int K2 = b.GetLength(0), N = b.GetLength(1);
+            int m = a.GetLength(0), k = a.GetLength(1);
+            int k2 = b.GetLength(0), n = b.GetLength(1);
 
-            if (K != K2)
+            if (k != k2)
                 throw new ArgumentException("Matrix dimensions incompatible for multiplication");
-            if (M > 4096 || N > 4096 || K > 4096)
-                throw new ArgumentException($"Matrix dimensions too large for CPU fallback: {M}x{K} * {K}x{N}. Max 4096 per dimension (finding P2-372).");
+            if (m > 4096 || n > 4096 || k > 4096)
+                throw new ArgumentException($"Matrix dimensions too large for CPU fallback: {m}x{k} * {k}x{n}. Max 4096 per dimension (finding P2-372).");
 
-            float[] result = new float[M * N];
+            float[] result = new float[m * n];
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             await Task.Run(() =>
             {
-                for (int i = 0; i < M; i++)
-                    for (int j = 0; j < N; j++)
+                for (int i = 0; i < m; i++)
+                    for (int j = 0; j < n; j++)
                     {
                         float sum = 0;
-                        for (int k = 0; k < K; k++)
-                            sum += a[i, k] * b[k, j];
-                        result[i * N + j] = sum;
+                        for (int ki = 0; ki < k; ki++)
+                            sum += a[i, ki] * b[ki, j];
+                        result[i * n + j] = sum;
                     }
             });
             Interlocked.Add(ref _totalProcessingTicks, System.Diagnostics.Stopwatch.GetTimestamp() - t0);
@@ -513,19 +513,19 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             ArgumentNullException.ThrowIfNull(input);
             ArgumentNullException.ThrowIfNull(weights);
 
-            int D = input.Length;
-            int D2 = weights.GetLength(0), E = weights.GetLength(1);
+            int d = input.Length;
+            int d2 = weights.GetLength(0), e = weights.GetLength(1);
 
-            if (D != D2)
+            if (d != d2)
                 throw new ArgumentException("Input dimension must match weight rows");
 
-            float[] result = new float[E];
+            float[] result = new float[e];
             await Task.Run(() =>
             {
-                for (int j = 0; j < E; j++)
+                for (int j = 0; j < e; j++)
                 {
                     float sum = 0;
-                    for (int i = 0; i < D; i++)
+                    for (int i = 0; i < d; i++)
                         sum += input[i] * weights[i, j];
                     result[j] = sum;
                 }

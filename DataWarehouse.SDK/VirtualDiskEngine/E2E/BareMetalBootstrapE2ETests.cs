@@ -404,7 +404,7 @@ public static class BareMetalBootstrapE2ETests
             if (fedVde != null) await fedVde.DisposeAsync().ConfigureAwait(false);
             // Note: fedVde.Dispose does NOT dispose the inner VDE per single-VDE semantics,
             // so we dispose VDE-A separately if it wasn't already disposed
-            if (vdeA != null) try { await vdeA.DisposeAsync().ConfigureAwait(false); } catch { }
+            if (vdeA != null) try { await vdeA.DisposeAsync().ConfigureAwait(false); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[E2E] VDE-A dispose failed: {ex.Message}"); }
             if (vdeB != null) await vdeB.DisposeAsync().ConfigureAwait(false);
             SafeDeleteFile(tempPathA);
             SafeDeleteFile(tempPathB);

@@ -121,7 +121,7 @@ public readonly record struct AuditLogEntry
 /// This region is deliberately designed with no truncation, deletion, or modification API.
 /// The append-only constraint is enforced at the API level to ensure audit integrity
 /// even against privileged processes.
-/// Serialized using <see cref="BlockTypeTags.ALOG"/> type tag.
+/// Serialized using <see cref="BlockTypeTags.Alog"/> type tag.
 /// </summary>
 /// <remarks>
 /// Header block layout:
@@ -247,7 +247,7 @@ public sealed class AuditLogRegion
 
         // First entry must have all-zero PreviousEntryHash
         var first = _entries[0];
-        if (first.PreviousEntryHash is null || first.PreviousEntryHash.Length != AuditLogEntry.HashSize)
+        if (first.PreviousEntryHash.Length != AuditLogEntry.HashSize)
             return false;
         for (int i = 0; i < AuditLogEntry.HashSize; i++)
         {
@@ -262,8 +262,7 @@ public sealed class AuditLogRegion
             var previous = _entries[i - 1];
             byte[] expectedHash = ComputeEntryHash(previous);
 
-            if (current.PreviousEntryHash is null
-                || current.PreviousEntryHash.Length != AuditLogEntry.HashSize
+            if (current.PreviousEntryHash.Length != AuditLogEntry.HashSize
                 || !current.PreviousEntryHash.AsSpan().SequenceEqual(expectedHash))
             {
                 return false;
@@ -291,7 +290,7 @@ public sealed class AuditLogRegion
         if (sequenceNumber == 0)
         {
             // First entry must have all-zero hash
-            if (entry.PreviousEntryHash is null || entry.PreviousEntryHash.Length != AuditLogEntry.HashSize)
+            if (entry.PreviousEntryHash.Length != AuditLogEntry.HashSize)
                 return false;
             for (int i = 0; i < AuditLogEntry.HashSize; i++)
             {
@@ -303,8 +302,7 @@ public sealed class AuditLogRegion
 
         var previous = _entries[(int)(sequenceNumber - 1)];
         byte[] expectedHash = ComputeEntryHash(previous);
-        return entry.PreviousEntryHash is not null
-            && entry.PreviousEntryHash.Length == AuditLogEntry.HashSize
+        return entry.PreviousEntryHash.Length == AuditLogEntry.HashSize
             && entry.PreviousEntryHash.AsSpan().SequenceEqual(expectedHash);
     }
 
@@ -378,7 +376,7 @@ public sealed class AuditLogRegion
                 entryIndex++;
             }
 
-            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.ALOG, Generation);
+            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.Alog, Generation);
 
             if (entryIndex < _entries.Count)
             {
@@ -389,13 +387,13 @@ public sealed class AuditLogRegion
 
         // Write trailer for block 0 if no entries
         if (_entries.Count == 0)
-            UniversalBlockTrailer.Write(block0, blockSize, BlockTypeTags.ALOG, Generation);
+            UniversalBlockTrailer.Write(block0, blockSize, BlockTypeTags.Alog, Generation);
 
         // Write trailers for any remaining blocks
         for (int blk = currentBlock + 1; blk < requiredBlocks; blk++)
         {
             var block = buffer.Slice(blk * blockSize, blockSize);
-            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.ALOG, Generation);
+            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.Alog, Generation);
         }
     }
 

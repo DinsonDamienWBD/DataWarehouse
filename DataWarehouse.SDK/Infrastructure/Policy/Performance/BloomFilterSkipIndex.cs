@@ -193,8 +193,8 @@ namespace DataWarehouse.SDK.Infrastructure.Policy.Performance
             int totalBytes = 2 + pathByteCount; // level digit + ':' + path bytes
 
             // Use stackalloc for small keys (≤256 bytes); rent from pool for larger paths.
-            const int StackThreshold = 256;
-            if (totalBytes <= StackThreshold)
+            const int stackThreshold = 256;
+            if (totalBytes <= stackThreshold)
             {
                 Span<byte> buf = stackalloc byte[totalBytes];
                 buf[0] = (byte)('0' + (int)level); // level is a small int (0-5)

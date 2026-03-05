@@ -33,8 +33,10 @@ namespace DataWarehouse.SDK.Hardware.Hypervisor;
 [SdkCompatibility("3.0.0", Notes = "Phase 35: Balloon driver implementation (HW-06)")]
 public sealed class BalloonDriver : IBalloonDriver, IDisposable
 {
-    private readonly IHypervisorDetector _hypervisorDetector;
     private readonly HypervisorInfo _hypervisorInfo;
+
+    /// <summary>Gets the hypervisor detector used for environment detection.</summary>
+    public IHypervisorDetector HypervisorDetector { get; }
     private bool _isAvailable = false;
     private Action<long>? _pressureHandler;
     private readonly object _lock = new();
@@ -56,7 +58,7 @@ public sealed class BalloonDriver : IBalloonDriver, IDisposable
     {
         ArgumentNullException.ThrowIfNull(hypervisorDetector);
 
-        _hypervisorDetector = hypervisorDetector;
+        HypervisorDetector = hypervisorDetector;
         _hypervisorInfo = hypervisorDetector.Detect();
 
         // Balloon driver available only in VM environments that support it
@@ -119,7 +121,7 @@ public sealed class BalloonDriver : IBalloonDriver, IDisposable
                 }
                 finally
                 {
-                    try { GC.CancelFullGCNotification(); } catch { }
+                    try { GC.CancelFullGCNotification(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[BalloonDriver] CancelFullGCNotification failed: {ex.Message}"); }
                 }
             }, ct);
         }

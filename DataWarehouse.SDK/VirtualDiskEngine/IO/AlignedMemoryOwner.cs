@@ -27,11 +27,19 @@ namespace DataWarehouse.SDK.VirtualDiskEngine.IO;
 [SdkCompatibility("6.0.0", Notes = "VOPT-79: Aligned native memory for direct I/O buffers")]
 public sealed class AlignedMemoryOwner : IMemoryOwner<byte>
 {
-    private readonly int _byteCount;
-    private readonly int _alignment;
     private unsafe byte* _pointer;
     private UnmanagedMemoryManager? _manager;
     private int _disposed;
+
+    /// <summary>
+    /// Gets the number of bytes allocated.
+    /// </summary>
+    public int ByteCount { get; }
+
+    /// <summary>
+    /// Gets the alignment in bytes.
+    /// </summary>
+    public int Alignment { get; }
 
     /// <summary>
     /// Creates a new aligned memory owner with the specified size and alignment.
@@ -56,8 +64,8 @@ public sealed class AlignedMemoryOwner : IMemoryOwner<byte>
                 "Alignment must be a power of 2.");
         }
 
-        _byteCount = byteCount;
-        _alignment = alignment;
+        ByteCount = byteCount;
+        Alignment = alignment;
         _pointer = (byte*)NativeMemory.AlignedAlloc((nuint)byteCount, (nuint)alignment);
         _manager = new UnmanagedMemoryManager(_pointer, byteCount);
 

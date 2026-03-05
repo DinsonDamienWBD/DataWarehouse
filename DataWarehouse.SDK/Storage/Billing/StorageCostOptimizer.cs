@@ -117,8 +117,8 @@ public sealed class StorageCostOptimizer
             if (spot.InterruptionProbability > _options.MaxSpotInterruptionRisk)
                 continue;
 
-            decimal monthlySavings = (spot.CurrentPricePerGBMonth - spot.SpotPricePerGBMonth)
-                * spot.AvailableCapacityGB;
+            decimal monthlySavings = (spot.CurrentPricePerGbMonth - spot.SpotPricePerGbMonth)
+                * spot.AvailableCapacityGb;
 
             if (monthlySavings < _options.MinMonthlySavings)
                 continue;
@@ -128,9 +128,9 @@ public sealed class StorageCostOptimizer
                 Provider = spot.Provider,
                 Region = spot.Region,
                 StorageClass = spot.StorageClass,
-                DataSizeGB = spot.AvailableCapacityGB,
-                CurrentCostPerGBMonth = spot.CurrentPricePerGBMonth,
-                SpotCostPerGBMonth = spot.SpotPricePerGBMonth,
+                DataSizeGB = spot.AvailableCapacityGb,
+                CurrentCostPerGBMonth = spot.CurrentPricePerGbMonth,
+                SpotCostPerGBMonth = spot.SpotPricePerGbMonth,
                 MonthlySavings = monthlySavings,
                 InterruptionRisk = spot.InterruptionProbability,
                 ConfidenceScore = 1.0 - spot.InterruptionProbability

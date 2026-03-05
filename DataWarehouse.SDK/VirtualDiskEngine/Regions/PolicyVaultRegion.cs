@@ -208,7 +208,7 @@ public sealed class PolicyVaultRegion
             offset += _policies[i].WriteTo(block0, offset);
 
         // Write trailer on block 0
-        UniversalBlockTrailer.Write(block0, blockSize, BlockTypeTags.POLV, Generation);
+        UniversalBlockTrailer.Write(block0, blockSize, BlockTypeTags.Polv, Generation);
 
         // ── Block 1: [HmacHash:32][Reserved:zero-fill][Trailer] ──
         var block1 = buffer.Slice(blockSize, blockSize);
@@ -219,7 +219,7 @@ public sealed class PolicyVaultRegion
         hash.AsSpan().CopyTo(block1);
 
         // Write trailer on block 1
-        UniversalBlockTrailer.Write(block1, blockSize, BlockTypeTags.POLV, Generation);
+        UniversalBlockTrailer.Write(block1, blockSize, BlockTypeTags.Polv, Generation);
     }
 
     /// <summary>

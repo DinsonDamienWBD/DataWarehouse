@@ -13,7 +13,7 @@ namespace DataWarehouse.SDK.VirtualDiskEngine.Journal;
 /// that cursor via <see cref="AdvanceAsync"/> once entries have been durably processed.
 ///
 /// Cursor state is persisted in the <see cref="WalSubscriberCursorTable"/> WALS region
-/// (Module bit 21, <c>BlockTypeTags.WALS</c> = 0x57414C53).  Per-subscriber ACL
+/// (Module bit 21, <c>BlockTypeTags.Wals</c> = 0x57414C53).  Per-subscriber ACL
 /// enforcement is applied via the <see cref="WalSubscriberFlags.AclRestricted"/> flag
 /// and the policy vault before any entries are returned.
 ///

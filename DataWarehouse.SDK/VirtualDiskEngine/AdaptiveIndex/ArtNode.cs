@@ -131,20 +131,20 @@ public abstract class ArtNode
     [SdkCompatibility("6.0.0", Notes = "Phase 86: AIE-01 ART Node4")]
     public sealed class Node4 : ArtNode
     {
-        private readonly byte[] _keys = new byte[4];
-        private readonly ArtNode?[] _children = new ArtNode?[4];
-        private int _count;
+        private readonly byte[] Keys = new byte[4];
+        private readonly ArtNode?[] Children = new ArtNode?[4];
+        private int Count;
 
         /// <inheritdoc />
-        public override int ChildCount => _count;
+        public override int ChildCount => Count;
 
         /// <inheritdoc />
         public override ArtNode? FindChild(byte keyByte)
         {
-            for (int i = 0; i < _count; i++)
+            for (int i = 0; i < Count; i++)
             {
-                if (_keys[i] == keyByte)
-                    return _children[i];
+                if (Keys[i] == keyByte)
+                    return Children[i];
             }
             return null;
         }
@@ -152,27 +152,27 @@ public abstract class ArtNode
         /// <inheritdoc />
         public override ArtNode AddChild(byte keyByte, ArtNode child)
         {
-            if (_count < 4)
+            if (Count < 4)
             {
                 // Insert in sorted order
-                int pos = _count;
-                for (int i = 0; i < _count; i++)
+                int pos = Count;
+                for (int i = 0; i < Count; i++)
                 {
-                    if (_keys[i] > keyByte)
+                    if (Keys[i] > keyByte)
                     {
                         pos = i;
                         break;
                     }
                 }
                 // Shift right
-                for (int i = _count; i > pos; i--)
+                for (int i = Count; i > pos; i--)
                 {
-                    _keys[i] = _keys[i - 1];
-                    _children[i] = _children[i - 1];
+                    Keys[i] = Keys[i - 1];
+                    Children[i] = Children[i - 1];
                 }
-                _keys[pos] = keyByte;
-                _children[pos] = child;
-                _count++;
+                Keys[pos] = keyByte;
+                Children[pos] = child;
+                Count++;
                 return this;
             }
 
@@ -182,9 +182,9 @@ public abstract class ArtNode
                 Prefix = Prefix,
                 PrefixLength = PrefixLength
             };
-            for (int i = 0; i < _count; i++)
+            for (int i = 0; i < Count; i++)
             {
-                node16.AddChild(_keys[i], _children[i]!);
+                node16.AddChild(Keys[i], Children[i]!);
             }
             return node16.AddChild(keyByte, child);
         }
@@ -192,18 +192,18 @@ public abstract class ArtNode
         /// <inheritdoc />
         public override ArtNode RemoveChild(byte keyByte)
         {
-            for (int i = 0; i < _count; i++)
+            for (int i = 0; i < Count; i++)
             {
-                if (_keys[i] == keyByte)
+                if (Keys[i] == keyByte)
                 {
                     // Shift left
-                    for (int j = i; j < _count - 1; j++)
+                    for (int j = i; j < Count - 1; j++)
                     {
-                        _keys[j] = _keys[j + 1];
-                        _children[j] = _children[j + 1];
+                        Keys[j] = Keys[j + 1];
+                        Children[j] = Children[j + 1];
                     }
-                    _children[_count - 1] = null;
-                    _count--;
+                    Children[Count - 1] = null;
+                    Count--;
                     return this;
                 }
             }
@@ -213,9 +213,9 @@ public abstract class ArtNode
         /// <inheritdoc />
         public override void ForEachChild(Action<byte, ArtNode> action)
         {
-            for (int i = 0; i < _count; i++)
+            for (int i = 0; i < Count; i++)
             {
-                action(_keys[i], _children[i]!);
+                action(Keys[i], Children[i]!);
             }
         }
     }
@@ -226,18 +226,18 @@ public abstract class ArtNode
     [SdkCompatibility("6.0.0", Notes = "Phase 86: AIE-01 ART Node16 with SIMD")]
     public sealed class Node16 : ArtNode
     {
-        internal readonly byte[] _keys = new byte[16];
-        internal readonly ArtNode?[] _children = new ArtNode?[16];
-        internal int _count;
+        internal readonly byte[] Keys = new byte[16];
+        internal readonly ArtNode?[] Children = new ArtNode?[16];
+        internal int Count;
 
         /// <inheritdoc />
-        public override int ChildCount => _count;
+        public override int ChildCount => Count;
 
         /// <inheritdoc />
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override ArtNode? FindChild(byte keyByte)
         {
-            if (Sse2.IsSupported && _count >= 4)
+            if (Sse2.IsSupported && Count >= 4)
             {
                 return FindChildSimd(keyByte);
             }
@@ -249,18 +249,18 @@ public abstract class ArtNode
         {
             unsafe
             {
-                fixed (byte* keysPtr = _keys)
+                fixed (byte* keysPtr = Keys)
                 {
                     var keyVec = Vector128.Create(keyByte);
                     var keysVec = Sse2.LoadVector128(keysPtr);
                     var cmp = Sse2.CompareEqual(keysVec, keyVec);
                     int mask = Sse2.MoveMask(cmp);
                     // Only check bits within valid range
-                    mask &= (1 << _count) - 1;
+                    mask &= (1 << Count) - 1;
                     if (mask != 0)
                     {
                         int idx = System.Numerics.BitOperations.TrailingZeroCount(mask);
-                        return _children[idx];
+                        return Children[idx];
                     }
                 }
             }
@@ -269,10 +269,10 @@ public abstract class ArtNode
 
         private ArtNode? FindChildScalar(byte keyByte)
         {
-            for (int i = 0; i < _count; i++)
+            for (int i = 0; i < Count; i++)
             {
-                if (_keys[i] == keyByte)
-                    return _children[i];
+                if (Keys[i] == keyByte)
+                    return Children[i];
             }
             return null;
         }
@@ -280,26 +280,26 @@ public abstract class ArtNode
         /// <inheritdoc />
         public override ArtNode AddChild(byte keyByte, ArtNode child)
         {
-            if (_count < 16)
+            if (Count < 16)
             {
                 // Insert in sorted order
-                int pos = _count;
-                for (int i = 0; i < _count; i++)
+                int pos = Count;
+                for (int i = 0; i < Count; i++)
                 {
-                    if (_keys[i] > keyByte)
+                    if (Keys[i] > keyByte)
                     {
                         pos = i;
                         break;
                     }
                 }
-                for (int i = _count; i > pos; i--)
+                for (int i = Count; i > pos; i--)
                 {
-                    _keys[i] = _keys[i - 1];
-                    _children[i] = _children[i - 1];
+                    Keys[i] = Keys[i - 1];
+                    Children[i] = Children[i - 1];
                 }
-                _keys[pos] = keyByte;
-                _children[pos] = child;
-                _count++;
+                Keys[pos] = keyByte;
+                Children[pos] = child;
+                Count++;
                 return this;
             }
 
@@ -309,9 +309,9 @@ public abstract class ArtNode
                 Prefix = Prefix,
                 PrefixLength = PrefixLength
             };
-            for (int i = 0; i < _count; i++)
+            for (int i = 0; i < Count; i++)
             {
-                node48.AddChild(_keys[i], _children[i]!);
+                node48.AddChild(Keys[i], Children[i]!);
             }
             return node48.AddChild(keyByte, child);
         }
@@ -319,29 +319,29 @@ public abstract class ArtNode
         /// <inheritdoc />
         public override ArtNode RemoveChild(byte keyByte)
         {
-            for (int i = 0; i < _count; i++)
+            for (int i = 0; i < Count; i++)
             {
-                if (_keys[i] == keyByte)
+                if (Keys[i] == keyByte)
                 {
-                    for (int j = i; j < _count - 1; j++)
+                    for (int j = i; j < Count - 1; j++)
                     {
-                        _keys[j] = _keys[j + 1];
-                        _children[j] = _children[j + 1];
+                        Keys[j] = Keys[j + 1];
+                        Children[j] = Children[j + 1];
                     }
-                    _children[_count - 1] = null;
-                    _count--;
+                    Children[Count - 1] = null;
+                    Count--;
 
                     // Shrink to Node4 if below threshold
-                    if (_count <= 3)
+                    if (Count <= 3)
                     {
                         var node4 = new Node4
                         {
                             Prefix = Prefix,
                             PrefixLength = PrefixLength
                         };
-                        for (int j = 0; j < _count; j++)
+                        for (int j = 0; j < Count; j++)
                         {
-                            node4.AddChild(_keys[j], _children[j]!);
+                            node4.AddChild(Keys[j], Children[j]!);
                         }
                         return node4;
                     }
@@ -354,9 +354,9 @@ public abstract class ArtNode
         /// <inheritdoc />
         public override void ForEachChild(Action<byte, ArtNode> action)
         {
-            for (int i = 0; i < _count; i++)
+            for (int i = 0; i < Count; i++)
             {
-                action(_keys[i], _children[i]!);
+                action(Keys[i], Children[i]!);
             }
         }
     }
@@ -370,39 +370,39 @@ public abstract class ArtNode
         /// <summary>
         /// Index array: childIndex[keyByte] -> index into _children (0xFF = empty).
         /// </summary>
-        internal readonly byte[] _childIndex = new byte[256];
-        internal readonly ArtNode?[] _children = new ArtNode?[48];
-        internal int _count;
+        internal readonly byte[] ChildIndex = new byte[256];
+        internal readonly ArtNode?[] Children = new ArtNode?[48];
+        internal int Count;
 
         /// <summary>
         /// Initializes a new Node48 with empty child index.
         /// </summary>
         public Node48()
         {
-            Array.Fill(_childIndex, (byte)0xFF);
+            Array.Fill(ChildIndex, (byte)0xFF);
         }
 
         /// <inheritdoc />
-        public override int ChildCount => _count;
+        public override int ChildCount => Count;
 
         /// <inheritdoc />
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override ArtNode? FindChild(byte keyByte)
         {
-            byte idx = _childIndex[keyByte];
-            return idx != 0xFF ? _children[idx] : null;
+            byte idx = ChildIndex[keyByte];
+            return idx != 0xFF ? Children[idx] : null;
         }
 
         /// <inheritdoc />
         public override ArtNode AddChild(byte keyByte, ArtNode child)
         {
-            if (_count < 48)
+            if (Count < 48)
             {
                 // Find first free slot
                 int slot = -1;
                 for (int i = 0; i < 48; i++)
                 {
-                    if (_children[i] == null)
+                    if (Children[i] == null)
                     {
                         slot = i;
                         break;
@@ -410,9 +410,9 @@ public abstract class ArtNode
                 }
                 if (slot >= 0)
                 {
-                    _childIndex[keyByte] = (byte)slot;
-                    _children[slot] = child;
-                    _count++;
+                    ChildIndex[keyByte] = (byte)slot;
+                    Children[slot] = child;
+                    Count++;
                     return this;
                 }
             }
@@ -425,9 +425,9 @@ public abstract class ArtNode
             };
             for (int i = 0; i < 256; i++)
             {
-                if (_childIndex[i] != 0xFF)
+                if (ChildIndex[i] != 0xFF)
                 {
-                    node256.AddChild((byte)i, _children[_childIndex[i]]!);
+                    node256.AddChild((byte)i, Children[ChildIndex[i]]!);
                 }
             }
             return node256.AddChild(keyByte, child);
@@ -436,15 +436,15 @@ public abstract class ArtNode
         /// <inheritdoc />
         public override ArtNode RemoveChild(byte keyByte)
         {
-            byte idx = _childIndex[keyByte];
+            byte idx = ChildIndex[keyByte];
             if (idx != 0xFF)
             {
-                _children[idx] = null;
-                _childIndex[keyByte] = 0xFF;
-                _count--;
+                Children[idx] = null;
+                ChildIndex[keyByte] = 0xFF;
+                Count--;
 
                 // Shrink to Node16 if below threshold
-                if (_count <= 12)
+                if (Count <= 12)
                 {
                     var node16 = new Node16
                     {
@@ -453,9 +453,9 @@ public abstract class ArtNode
                     };
                     for (int i = 0; i < 256; i++)
                     {
-                        if (_childIndex[i] != 0xFF)
+                        if (ChildIndex[i] != 0xFF)
                         {
-                            node16.AddChild((byte)i, _children[_childIndex[i]]!);
+                            node16.AddChild((byte)i, Children[ChildIndex[i]]!);
                         }
                     }
                     return node16;
@@ -469,9 +469,9 @@ public abstract class ArtNode
         {
             for (int i = 0; i < 256; i++)
             {
-                if (_childIndex[i] != 0xFF)
+                if (ChildIndex[i] != 0xFF)
                 {
-                    action((byte)i, _children[_childIndex[i]]!);
+                    action((byte)i, Children[ChildIndex[i]]!);
                 }
             }
         }
@@ -483,38 +483,38 @@ public abstract class ArtNode
     [SdkCompatibility("6.0.0", Notes = "Phase 86: AIE-01 ART Node256")]
     public sealed class Node256 : ArtNode
     {
-        internal readonly ArtNode?[] _children = new ArtNode?[256];
-        internal int _count;
+        internal readonly ArtNode?[] Children = new ArtNode?[256];
+        internal int Count;
 
         /// <inheritdoc />
-        public override int ChildCount => _count;
+        public override int ChildCount => Count;
 
         /// <inheritdoc />
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override ArtNode? FindChild(byte keyByte)
         {
-            return _children[keyByte];
+            return Children[keyByte];
         }
 
         /// <inheritdoc />
         public override ArtNode AddChild(byte keyByte, ArtNode child)
         {
-            if (_children[keyByte] == null)
-                _count++;
-            _children[keyByte] = child;
+            if (Children[keyByte] == null)
+                Count++;
+            Children[keyByte] = child;
             return this;
         }
 
         /// <inheritdoc />
         public override ArtNode RemoveChild(byte keyByte)
         {
-            if (_children[keyByte] != null)
+            if (Children[keyByte] != null)
             {
-                _children[keyByte] = null;
-                _count--;
+                Children[keyByte] = null;
+                Count--;
 
                 // Shrink to Node48 if below threshold
-                if (_count <= 36)
+                if (Count <= 36)
                 {
                     var node48 = new Node48
                     {
@@ -523,9 +523,9 @@ public abstract class ArtNode
                     };
                     for (int i = 0; i < 256; i++)
                     {
-                        if (_children[i] != null)
+                        if (Children[i] != null)
                         {
-                            node48.AddChild((byte)i, _children[i]!);
+                            node48.AddChild((byte)i, Children[i]!);
                         }
                     }
                     return node48;
@@ -539,9 +539,9 @@ public abstract class ArtNode
         {
             for (int i = 0; i < 256; i++)
             {
-                if (_children[i] != null)
+                if (Children[i] != null)
                 {
-                    action((byte)i, _children[i]!);
+                    action((byte)i, Children[i]!);
                 }
             }
         }

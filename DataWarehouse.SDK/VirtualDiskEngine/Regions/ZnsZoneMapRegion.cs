@@ -158,7 +158,7 @@ public sealed class ZnsZoneMapRegion
 
     /// <summary>
     /// Block type tag for ZNS Zone Map blocks: <c>ZNSM</c> = 0x5A4E534D,
-    /// matching <see cref="BlockTypeTags.ZNSM"/>.
+    /// matching <see cref="BlockTypeTags.Znsm"/>.
     /// </summary>
     public const uint BlockTypeTag = 0x5A4E534D;
 

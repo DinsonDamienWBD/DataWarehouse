@@ -84,7 +84,7 @@ public readonly record struct ConsensusGroupState
 /// Consensus Log Region: tracks per-Raft-group term, committed/applied indices,
 /// voted-for, and leader identity for distributed coordination.
 /// Supports multiple concurrent Raft groups, each with independent state.
-/// Serialized using <see cref="BlockTypeTags.CLOG"/> type tag.
+/// Serialized using <see cref="BlockTypeTags.Clog"/> type tag.
 /// </summary>
 /// <remarks>
 /// Header block layout:
@@ -244,7 +244,7 @@ public sealed class ConsensusLogRegion
                 groupIndex++;
             }
 
-            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.CLOG, Generation);
+            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.Clog, Generation);
 
             if (groupIndex < groupList.Count)
             {
@@ -255,13 +255,13 @@ public sealed class ConsensusLogRegion
 
         // Write trailer for block 0 if no groups
         if (groupList.Count == 0)
-            UniversalBlockTrailer.Write(block0, blockSize, BlockTypeTags.CLOG, Generation);
+            UniversalBlockTrailer.Write(block0, blockSize, BlockTypeTags.Clog, Generation);
 
         // Write trailers for any remaining blocks
         for (int blk = currentBlock + 1; blk < requiredBlocks; blk++)
         {
             var block = buffer.Slice(blk * blockSize, blockSize);
-            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.CLOG, Generation);
+            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.Clog, Generation);
         }
     }
 

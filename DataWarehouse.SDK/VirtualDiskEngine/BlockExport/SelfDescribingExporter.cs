@@ -259,11 +259,11 @@ public sealed class SelfDescribingExporter
 
             // Check block trailer — if this is a DATA or INOD block, scan for inodes
             var trailer = UniversalBlockTrailer.Read(blockBuf, _srcBlockSize);
-            if (trailer.BlockTypeTag != BlockTypeTags.INOD &&
-                trailer.BlockTypeTag != BlockTypeTags.DATA)
+            if (trailer.BlockTypeTag != BlockTypeTags.Inod &&
+                trailer.BlockTypeTag != BlockTypeTags.Data)
                 continue;
 
-            if (trailer.BlockTypeTag != BlockTypeTags.INOD)
+            if (trailer.BlockTypeTag != BlockTypeTags.Inod)
                 continue;
 
             // Parse inode slots
@@ -442,22 +442,22 @@ public sealed class SelfDescribingExporter
         // Register regions in the Region Pointer Table
         // Slot 0: Bitmap
         rpt.SetSlot(0, new RegionPointer(
-            BlockTypeTags.BMAP, RegionFlags.Active,
+            BlockTypeTags.Bmap, RegionFlags.Active,
             layout.BitmapStartBlock, layout.BitmapBlockCount, layout.BitmapBlockCount));
 
         // Slot 1: Inode Table
         rpt.SetSlot(1, new RegionPointer(
-            BlockTypeTags.INOD, RegionFlags.Active,
+            BlockTypeTags.Inod, RegionFlags.Active,
             layout.InodeTableStartBlock, layout.InodeTableBlockCount, layout.InodeTableBlockCount));
 
         // Slot 2: Integrity Tree
         rpt.SetSlot(2, new RegionPointer(
-            BlockTypeTags.IANT, RegionFlags.Active,
+            BlockTypeTags.Iant, RegionFlags.Active,
             layout.IntegrityTreeStartBlock, layout.IntegrityTreeBlockCount, layout.IntegrityTreeBlockCount));
 
         // Slot 3: Data Region
         rpt.SetSlot(3, new RegionPointer(
-            BlockTypeTags.DATA, RegionFlags.Active,
+            BlockTypeTags.Data, RegionFlags.Active,
             layout.DataRegionStartBlock, layout.DataRegionBlockCount, layout.DataRegionBlockCount));
 
         var ext = ExtendedMetadata.CreateDefault();
@@ -471,10 +471,10 @@ public sealed class SelfDescribingExporter
     private static RegionDirectory BuildRegionDirectory(ExportLayout layout, int blockSize)
     {
         var dir = new RegionDirectory();
-        dir.AddRegion(BlockTypeTags.BMAP, RegionFlags.None, layout.BitmapStartBlock,   layout.BitmapBlockCount);
-        dir.AddRegion(BlockTypeTags.INOD, RegionFlags.None, layout.InodeTableStartBlock, layout.InodeTableBlockCount);
-        dir.AddRegion(BlockTypeTags.IANT, RegionFlags.None, layout.IntegrityTreeStartBlock, layout.IntegrityTreeBlockCount);
-        dir.AddRegion(BlockTypeTags.DATA, RegionFlags.None, layout.DataRegionStartBlock, layout.DataRegionBlockCount);
+        dir.AddRegion(BlockTypeTags.Bmap, RegionFlags.None, layout.BitmapStartBlock,   layout.BitmapBlockCount);
+        dir.AddRegion(BlockTypeTags.Inod, RegionFlags.None, layout.InodeTableStartBlock, layout.InodeTableBlockCount);
+        dir.AddRegion(BlockTypeTags.Iant, RegionFlags.None, layout.IntegrityTreeStartBlock, layout.IntegrityTreeBlockCount);
+        dir.AddRegion(BlockTypeTags.Data, RegionFlags.None, layout.DataRegionStartBlock, layout.DataRegionBlockCount);
         return dir;
     }
 
@@ -510,7 +510,7 @@ public sealed class SelfDescribingExporter
         {
             int blockOff = b * blockSize;
             var blockSpan = buf.AsSpan(blockOff, blockSize);
-            UniversalBlockTrailer.Write(blockSpan, blockSize, BlockTypeTags.BMAP, 1);
+            UniversalBlockTrailer.Write(blockSpan, blockSize, BlockTypeTags.Bmap, 1);
         }
 
         await output.WriteAsync(buf, ct).ConfigureAwait(false);
@@ -546,7 +546,7 @@ public sealed class SelfDescribingExporter
         for (int b = 0; b < (int)layout.InodeTableBlockCount; b++)
         {
             var blockSpan = buf.AsSpan(b * blockSize, blockSize);
-            UniversalBlockTrailer.Write(blockSpan, blockSize, BlockTypeTags.INOD, 1);
+            UniversalBlockTrailer.Write(blockSpan, blockSize, BlockTypeTags.Inod, 1);
         }
 
         await output.WriteAsync(buf, ct).ConfigureAwait(false);
@@ -635,7 +635,7 @@ public sealed class SelfDescribingExporter
 
         // Write a recognizable anchor with a zero Merkle root
         IntegrityAnchor.Serialize(IntegrityAnchor.CreateDefault(), buf, blockSize);
-        UniversalBlockTrailer.Write(buf, blockSize, BlockTypeTags.IANT, 1);
+        UniversalBlockTrailer.Write(buf, blockSize, BlockTypeTags.Iant, 1);
 
         await output.WriteAsync(buf, ct).ConfigureAwait(false);
     }
@@ -692,7 +692,7 @@ public sealed class SelfDescribingExporter
                     }
 
                     // Overwrite trailer with correct tag and checksum
-                    UniversalBlockTrailer.Write(dstBuf, dstBlockSize, BlockTypeTags.DATA, 1);
+                    UniversalBlockTrailer.Write(dstBuf, dstBlockSize, BlockTypeTags.Data, 1);
 
                     await output.WriteAsync(dstBuf, ct).ConfigureAwait(false);
                     blocksWritten++;
@@ -701,7 +701,7 @@ public sealed class SelfDescribingExporter
                     if (blocksWritten % TrailerInterval == 0)
                     {
                         var trlrBuf = new byte[dstBlockSize];
-                        UniversalBlockTrailer.Write(trlrBuf, dstBlockSize, BlockTypeTags.TRLR, 1);
+                        UniversalBlockTrailer.Write(trlrBuf, dstBlockSize, BlockTypeTags.Trlr, 1);
                         await output.WriteAsync(trlrBuf, ct).ConfigureAwait(false);
                     }
                 }

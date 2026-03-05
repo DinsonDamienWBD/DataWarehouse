@@ -407,7 +407,7 @@ public sealed class EncryptionHeaderRegion
         for (int i = 0; i < slotsInB0 && i < MaxKeySlots; i++)
             offset += _slots[i].WriteTo(block0, offset);
 
-        UniversalBlockTrailer.Write(block0, blockSize, BlockTypeTags.ENCR, Generation);
+        UniversalBlockTrailer.Write(block0, blockSize, BlockTypeTags.Encr, Generation);
 
         // ── Block 1: [KeySlot x overflow][RotationEvents][zero-fill][Trailer] ──
         var block1 = buffer.Slice(blockSize, blockSize);
@@ -418,7 +418,7 @@ public sealed class EncryptionHeaderRegion
         for (int i = 0; i < eventCount; i++)
             offset += _rotationLog[eventSkip + i].WriteTo(block1, offset);
 
-        UniversalBlockTrailer.Write(block1, blockSize, BlockTypeTags.ENCR, Generation);
+        UniversalBlockTrailer.Write(block1, blockSize, BlockTypeTags.Encr, Generation);
     }
 
     /// <summary>

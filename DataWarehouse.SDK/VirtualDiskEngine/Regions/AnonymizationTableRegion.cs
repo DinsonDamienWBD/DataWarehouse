@@ -117,7 +117,7 @@ public readonly record struct AnonymizationMapping
 /// Anonymization Table Region: maps PII identifiers to anonymized tokens for GDPR
 /// compliance. Supports O(1) lookup by MappingId, indexed retrieval by SubjectId,
 /// and bulk erasure for GDPR Article 17 right-to-be-forgotten.
-/// Serialized using <see cref="BlockTypeTags.ANON"/> type tag.
+/// Serialized using <see cref="BlockTypeTags.Anon"/> type tag.
 /// </summary>
 /// <remarks>
 /// Serialization layout:
@@ -332,7 +332,7 @@ public sealed class AnonymizationTableRegion
             {
                 UniversalBlockTrailer.Write(
                     buffer.Slice(currentBlock * blockSize, blockSize),
-                    blockSize, BlockTypeTags.ANON, Generation);
+                    blockSize, BlockTypeTags.Anon, Generation);
                 currentBlock++;
                 offset = 0;
             }
@@ -345,14 +345,14 @@ public sealed class AnonymizationTableRegion
         // Write trailer for the last block containing data
         UniversalBlockTrailer.Write(
             buffer.Slice(currentBlock * blockSize, blockSize),
-            blockSize, BlockTypeTags.ANON, Generation);
+            blockSize, BlockTypeTags.Anon, Generation);
 
         // Write trailers for any remaining empty blocks
         for (int blk = currentBlock + 1; blk < requiredBlocks; blk++)
         {
             UniversalBlockTrailer.Write(
                 buffer.Slice(blk * blockSize, blockSize),
-                blockSize, BlockTypeTags.ANON, Generation);
+                blockSize, BlockTypeTags.Anon, Generation);
         }
     }
 

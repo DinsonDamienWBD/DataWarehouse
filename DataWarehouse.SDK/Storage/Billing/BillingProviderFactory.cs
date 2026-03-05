@@ -37,7 +37,7 @@ public static class BillingProviderFactory
 
         return provider switch
         {
-            CloudProvider.AWS => new AwsCostExplorerProvider(
+            CloudProvider.Aws => new AwsCostExplorerProvider(
                 client,
                 GetConfig(config, "AccessKeyId", "AWS_ACCESS_KEY_ID"),
                 GetConfig(config, "SecretAccessKey", "AWS_SECRET_ACCESS_KEY"),
@@ -50,7 +50,7 @@ public static class BillingProviderFactory
                 GetConfig(config, "ClientSecret", "AZURE_CLIENT_SECRET"),
                 GetConfig(config, "SubscriptionId", "AZURE_SUBSCRIPTION_ID")),
 
-            CloudProvider.GCP => new GcpBillingProvider(
+            CloudProvider.Gcp => new GcpBillingProvider(
                 client,
                 GetConfig(config, "ServiceAccountJson", "GOOGLE_APPLICATION_CREDENTIALS"),
                 GetConfig(config, "ProjectId", "GCP_PROJECT_ID")),
@@ -71,7 +71,7 @@ public static class BillingProviderFactory
         CancellationToken ct = default)
     {
         var providers = new List<IBillingProvider>();
-        foreach (var cloudProvider in new[] { CloudProvider.AWS, CloudProvider.Azure, CloudProvider.GCP })
+        foreach (var cloudProvider in new[] { CloudProvider.Aws, CloudProvider.Azure, CloudProvider.Gcp })
         {
             try
             {

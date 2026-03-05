@@ -400,7 +400,6 @@ public sealed class BwTree<TKey, TValue> : IDisposable where TKey : IComparable<
                     return new ChainSearchResult(false, false, default, split.NewSiblingPageId, true);
 
                 case ConsolidationRecord<TKey, TValue> consolidation:
-                    isLeaf = consolidation.IsLeaf;
                     if (consolidation.IsLeaf)
                     {
                         // Binary search in sorted entries
@@ -543,8 +542,7 @@ public sealed class BwTree<TKey, TValue> : IDisposable where TKey : IComparable<
         if (_mappingTable.CompareExchange(pageId, currentChain, newBase))
         {
             // Register old chain for epoch-based GC
-            if (currentChain is not null)
-                _epochManager.AddGarbage(currentChain!);
+            _epochManager.AddGarbage(currentChain);
 
             // Check if page needs splitting after consolidation
             if (entries.Count > _pageCapacity)

@@ -72,7 +72,7 @@ public sealed class RecoveryFooter
         mirror.AsSpan(0, copyLen).CopyTo(buffer);
 
         // Write SUPB trailer (same tag as primary superblock) so recovery tools identify it
-        UniversalBlockTrailer.Write(buffer, blockSize, BlockTypeTags.SUPB, Generation);
+        UniversalBlockTrailer.Write(buffer, blockSize, BlockTypeTags.Supb, Generation);
     }
 
     /// <summary>
@@ -88,9 +88,9 @@ public sealed class RecoveryFooter
         if (!UniversalBlockTrailer.Verify(buffer, blockSize, out var trailer))
             throw new InvalidDataException("Recovery Footer trailer checksum verification failed.");
 
-        if (trailer.BlockTypeTag != BlockTypeTags.SUPB)
+        if (trailer.BlockTypeTag != BlockTypeTags.Supb)
             throw new InvalidDataException(
-                $"Recovery Footer tag mismatch: expected SUPB (0x{BlockTypeTags.SUPB:X8}), " +
+                $"Recovery Footer tag mismatch: expected SUPB (0x{BlockTypeTags.Supb:X8}), " +
                 $"got 0x{trailer.BlockTypeTag:X8}.");
 
         // Copy payload (bytes before trailer) as the superblock mirror

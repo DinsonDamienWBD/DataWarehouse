@@ -101,25 +101,25 @@ public static class BusControllerFactory
     /// </list>
     /// </para>
     /// </remarks>
-    public static II2cBusController CreateI2cController(IPlatformCapabilityRegistry? registry = null)
+    public static II2cBusController CreateI2CController(IPlatformCapabilityRegistry? registry = null)
     {
-        bool hasI2c = false;
+        bool hasI2C = false;
 
         // Check registry first if provided
         if (registry != null)
         {
-            hasI2c = registry.HasCapability("i2c");
+            hasI2C = registry.HasCapability("i2c");
         }
         else
         {
             // Fallback: Check if running on Linux with I2C support
             if (OperatingSystem.IsLinux() && Directory.Exists("/sys/class/i2c-adapter"))
             {
-                hasI2c = true;
+                hasI2C = true;
             }
         }
 
-        return hasI2c
+        return hasI2C
             ? new I2cBusController()
             : new NullI2cBusController();
     }

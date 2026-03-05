@@ -229,12 +229,13 @@ namespace DataWarehouse.SDK.Utilities
             _debounceTimer?.Change(BoundedCollectionConstants.PersistDebounceInterval, Timeout.InfiniteTimeSpan);
         }
 
-        private void OnDebounceElapsed(object? _)
+        private void OnDebounceElapsed(object? state)
         {
             if (!_pendingPersist || _disposed) return;
-            _ = PersistAsync().ContinueWith(t =>
+            PersistAsync().ContinueWith(t =>
             {
-                // Best-effort persistence — swallow exceptions to avoid crashing plugin threads
+                if (t.IsFaulted)
+                    System.Diagnostics.Debug.WriteLine($"[BoundedQueue] Persist failed: {t.Exception?.Message}");
             }, TaskScheduler.Default);
         }
 

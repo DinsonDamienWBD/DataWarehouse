@@ -143,7 +143,7 @@ public sealed class MerkleIntegrityVerifier
         BinaryPrimitives.WriteInt32LittleEndian(headerBlock.AsSpan(8, 4), leafHashes.Length);
         BinaryPrimitives.WriteInt32LittleEndian(headerBlock.AsSpan(12, 4), capacity);
         nodes[1].Hash.AsSpan().CopyTo(headerBlock.AsSpan(16, HashSize));
-        UniversalBlockTrailer.Write(headerBlock, _blockSize, BlockTypeTags.MTRK, 1);
+        UniversalBlockTrailer.Write(headerBlock, _blockSize, BlockTypeTags.Mtrk, 1);
 
         long baseBlock = GetObjectTreeBaseBlock(objectInodeNumber);
         await _device.WriteBlockAsync(baseBlock, headerBlock, ct);
@@ -164,7 +164,7 @@ public sealed class MerkleIntegrityVerifier
                 nodeWritten++;
             }
 
-            UniversalBlockTrailer.Write(dataBlock, _blockSize, BlockTypeTags.MTRK, 1);
+            UniversalBlockTrailer.Write(dataBlock, _blockSize, BlockTypeTags.Mtrk, 1);
             await _device.WriteBlockAsync(baseBlock + 1 + b, dataBlock, ct);
         }
     }
@@ -517,7 +517,7 @@ public sealed class MerkleIntegrityVerifier
         BinaryPrimitives.WriteInt32LittleEndian(headerBlock.AsSpan(8, 4), leafCount);
         BinaryPrimitives.WriteInt32LittleEndian(headerBlock.AsSpan(12, 4), treeCapacity);
         nodes[1].AsSpan().CopyTo(headerBlock.AsSpan(16, HashSize));
-        UniversalBlockTrailer.Write(headerBlock, _blockSize, BlockTypeTags.MTRK, 1);
+        UniversalBlockTrailer.Write(headerBlock, _blockSize, BlockTypeTags.Mtrk, 1);
         await _device.WriteBlockAsync(baseBlock, headerBlock, ct);
 
         // Write data blocks
@@ -545,7 +545,7 @@ public sealed class MerkleIntegrityVerifier
                 nodeWritten++;
             }
 
-            UniversalBlockTrailer.Write(dataBlock, _blockSize, BlockTypeTags.MTRK, 1);
+            UniversalBlockTrailer.Write(dataBlock, _blockSize, BlockTypeTags.Mtrk, 1);
             await _device.WriteBlockAsync(baseBlock + 1 + b, dataBlock, ct);
         }
     }

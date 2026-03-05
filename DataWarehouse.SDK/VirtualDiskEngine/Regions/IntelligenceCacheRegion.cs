@@ -96,7 +96,7 @@ public readonly record struct IntelligenceCacheEntry
 /// Intelligence Cache Region: stores per-object AI classification results with
 /// confidence scores, access heat scores, and storage tier assignments.
 /// Provides O(1) lookup by object ID via dictionary index.
-/// Serialized using <see cref="BlockTypeTags.INTE"/> type tag.
+/// Serialized using <see cref="BlockTypeTags.Inte"/> type tag.
 /// </summary>
 /// <remarks>
 /// Serialization layout:
@@ -277,7 +277,7 @@ public sealed class IntelligenceCacheRegion
                 entryIndex++;
             }
 
-            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.INTE, Generation);
+            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.Inte, Generation);
 
             if (entryIndex < _entries.Count)
             {
@@ -288,13 +288,13 @@ public sealed class IntelligenceCacheRegion
 
         // Write trailer for block 0 if no entries
         if (_entries.Count == 0)
-            UniversalBlockTrailer.Write(block0, blockSize, BlockTypeTags.INTE, Generation);
+            UniversalBlockTrailer.Write(block0, blockSize, BlockTypeTags.Inte, Generation);
 
         // Write trailers for any remaining blocks
         for (int blk = currentBlock + 1; blk < requiredBlocks; blk++)
         {
             var block = buffer.Slice(blk * blockSize, blockSize);
-            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.INTE, Generation);
+            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.Inte, Generation);
         }
     }
 

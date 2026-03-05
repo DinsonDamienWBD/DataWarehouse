@@ -477,7 +477,7 @@ public sealed class TagIndexRegion
     /// <summary>
     /// Serializes the tag index into blocks. BFS serialization of tree into blocks,
     /// rebuilds bloom filter from all entries, writes header + bloom + tree blocks,
-    /// each block with UniversalBlockTrailer using BlockTypeTags.TAGI.
+    /// each block with UniversalBlockTrailer using BlockTypeTags.Tagi.
     /// </summary>
     /// <param name="buffer">Output buffer (must be at least RequiredBlocks * blockSize).</param>
     /// <param name="blockSize">Block size in bytes.</param>
@@ -504,7 +504,7 @@ public sealed class TagIndexRegion
 
         _bloomFilter.Serialize(headerBlock.Slice(HeaderFieldsSize));
 
-        UniversalBlockTrailer.Write(headerBlock, blockSize, BlockTypeTags.TAGI, Generation);
+        UniversalBlockTrailer.Write(headerBlock, blockSize, BlockTypeTags.Tagi, Generation);
 
         // ── Block 1+: BFS tree node serialization ───────────────────────
         // First, assign block indices via BFS
@@ -577,7 +577,7 @@ public sealed class TagIndexRegion
                 }
             }
 
-            UniversalBlockTrailer.Write(nodeBlock, blockSize, BlockTypeTags.TAGI, Generation);
+            UniversalBlockTrailer.Write(nodeBlock, blockSize, BlockTypeTags.Tagi, Generation);
         }
     }
 

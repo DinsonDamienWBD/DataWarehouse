@@ -127,7 +127,7 @@ namespace DataWarehouse.SDK.Edge.Protocols
 
             var request = new CoApRequest
             {
-                Method = CoApMethod.GET,
+                Method = CoApMethod.Get,
                 Uri = $"{serverUri}/.well-known/core"
             };
 
@@ -157,25 +157,25 @@ namespace DataWarehouse.SDK.Edge.Protocols
         /// Convenience method for GET requests.
         /// </summary>
         public Task<CoApResponse> GetAsync(string uri, CancellationToken ct = default) =>
-            SendAsync(new CoApRequest { Method = CoApMethod.GET, Uri = uri }, ct);
+            SendAsync(new CoApRequest { Method = CoApMethod.Get, Uri = uri }, ct);
 
         /// <summary>
         /// Convenience method for POST requests.
         /// </summary>
         public Task<CoApResponse> PostAsync(string uri, byte[] payload, CancellationToken ct = default) =>
-            SendAsync(new CoApRequest { Method = CoApMethod.POST, Uri = uri, Payload = payload }, ct);
+            SendAsync(new CoApRequest { Method = CoApMethod.Post, Uri = uri, Payload = payload }, ct);
 
         /// <summary>
         /// Convenience method for PUT requests.
         /// </summary>
         public Task<CoApResponse> PutAsync(string uri, byte[] payload, CancellationToken ct = default) =>
-            SendAsync(new CoApRequest { Method = CoApMethod.PUT, Uri = uri, Payload = payload }, ct);
+            SendAsync(new CoApRequest { Method = CoApMethod.Put, Uri = uri, Payload = payload }, ct);
 
         /// <summary>
         /// Convenience method for DELETE requests.
         /// </summary>
         public Task<CoApResponse> DeleteAsync(string uri, CancellationToken ct = default) =>
-            SendAsync(new CoApRequest { Method = CoApMethod.DELETE, Uri = uri }, ct);
+            SendAsync(new CoApRequest { Method = CoApMethod.Delete, Uri = uri }, ct);
 
         /// <summary>
         /// Disposes UDP client and stops receive loop.

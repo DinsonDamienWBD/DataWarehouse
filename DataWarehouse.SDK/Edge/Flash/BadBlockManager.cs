@@ -78,5 +78,5 @@ internal sealed class BadBlockManager
     /// <summary>
     /// Gets the total count of bad blocks.
     /// </summary>
-    public int BadBlockCount => _badBlocks.Count;
+    public int BadBlockCount { get { lock (_badBlockLock) { return _badBlocks.Count; } } }
 }

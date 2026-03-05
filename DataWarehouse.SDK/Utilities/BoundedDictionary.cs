@@ -629,15 +629,15 @@ namespace DataWarehouse.SDK.Utilities
             _debounceTimer?.Change(BoundedCollectionConstants.PersistDebounceInterval, Timeout.InfiniteTimeSpan);
         }
 
-        private void OnDebounceElapsed(object? _)
+        private void OnDebounceElapsed(object? state)
         {
             if (!_pendingPersist || _disposed) return;
             // Fire-and-forget with structured exception handling
-            _ = PersistAsync().ContinueWith(t =>
+            PersistAsync().ContinueWith(t =>
             {
                 if (t.IsFaulted)
                 {
-                    // Swallow — persistence is best-effort; do not crash the plugin thread
+                    System.Diagnostics.Debug.WriteLine($"[BoundedDictionary] Persist failed: {t.Exception?.Message}");
                 }
             }, TaskScheduler.Default);
         }

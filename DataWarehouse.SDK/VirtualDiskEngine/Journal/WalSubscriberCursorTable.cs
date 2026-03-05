@@ -145,9 +145,9 @@ public sealed class WalSubscriberCursorTable
 
     /// <summary>
     /// Block type tag for the WALS region: ASCII "WALS" = 0x57414C53.
-    /// Matches <see cref="BlockTypeTags.WALS"/>.
+    /// Matches <see cref="BlockTypeTags.Wals"/>.
     /// </summary>
-    public const uint BlockTypeTag = BlockTypeTags.WALS;
+    public const uint BlockTypeTag = BlockTypeTags.Wals;
 
     /// <summary>Module registry bit position for WALS (bit 21).</summary>
     public const byte ModuleBitPosition = 21;

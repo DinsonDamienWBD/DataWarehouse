@@ -88,7 +88,7 @@ public sealed class AlexCdfModel
         }
 
         // xi = normalized key value, yi = normalized position (i / (n-1))
-        double sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+        double sumX = 0, sumY = 0, sumXy = 0, sumX2 = 0;
 
         for (int i = 0; i < n; i++)
         {
@@ -97,7 +97,7 @@ public sealed class AlexCdfModel
 
             sumX += xi;
             sumY += yi;
-            sumXY += xi * yi;
+            sumXy += xi * yi;
             sumX2 += xi * xi;
         }
 
@@ -111,7 +111,7 @@ public sealed class AlexCdfModel
         }
         else
         {
-            Slope = ((double)n * sumXY - sumX * sumY) / denominator;
+            Slope = ((double)n * sumXy - sumX * sumY) / denominator;
             Intercept = (sumY - Slope * sumX) / n;
         }
 
@@ -135,7 +135,7 @@ public sealed class AlexCdfModel
     /// </summary>
     internal static double NormalizeKey(byte[] key)
     {
-        if (key == null || key.Length == 0)
+        if (key.Length == 0)
             return 0.0;
 
         // Extract first 8 bytes as big-endian ulong

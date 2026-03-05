@@ -139,7 +139,7 @@ public readonly record struct ComputeModuleEntry
 /// <summary>
 /// Compute Code Cache Region: stores <see cref="ComputeModuleEntry"/> records
 /// for WASM modules with O(1) hash-based retrieval by SHA-256 content hash.
-/// Serialized using <see cref="BlockTypeTags.CODE"/> type tag.
+/// Serialized using <see cref="BlockTypeTags.Code"/> type tag.
 /// </summary>
 /// <remarks>
 /// Serialization layout:
@@ -336,7 +336,7 @@ public sealed class ComputeCodeCacheRegion
                 moduleIndex++;
             }
 
-            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.CODE, Generation);
+            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.Code, Generation);
 
             if (moduleIndex < _modules.Count)
             {
@@ -347,13 +347,13 @@ public sealed class ComputeCodeCacheRegion
 
         // Write trailer for block 0 if no modules
         if (_modules.Count == 0)
-            UniversalBlockTrailer.Write(block0, blockSize, BlockTypeTags.CODE, Generation);
+            UniversalBlockTrailer.Write(block0, blockSize, BlockTypeTags.Code, Generation);
 
         // Write trailers for any remaining blocks
         for (int blk = currentBlock + 1; blk < requiredBlocks; blk++)
         {
             var block = buffer.Slice(blk * blockSize, blockSize);
-            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.CODE, Generation);
+            UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.Code, Generation);
         }
     }
 

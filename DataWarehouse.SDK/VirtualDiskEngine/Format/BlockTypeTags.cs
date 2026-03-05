@@ -14,149 +14,149 @@ public static class BlockTypeTags
     // ── Core Layout ────────────────────────────────────────────────────
 
     /// <summary>Superblock ("SUPB").</summary>
-    public const uint SUPB = 0x53555042;
+    public const uint Supb = 0x53555042;
 
     /// <summary>Region map / directory ("RMAP").</summary>
-    public const uint RMAP = 0x524D4150;
+    public const uint Rmap = 0x524D4150;
 
     /// <summary>Policy vault ("POLV").</summary>
-    public const uint POLV = 0x504F4C56;
+    public const uint Polv = 0x504F4C56;
 
     /// <summary>Encryption header ("ENCR").</summary>
-    public const uint ENCR = 0x454E4352;
+    public const uint Encr = 0x454E4352;
 
     /// <summary>Block allocation bitmap ("BMAP").</summary>
-    public const uint BMAP = 0x424D4150;
+    public const uint Bmap = 0x424D4150;
 
     // ── Data Structures ────────────────────────────────────────────────
 
     /// <summary>Inode ("INOD").</summary>
-    public const uint INOD = 0x494E4F44;
+    public const uint Inod = 0x494E4F44;
 
     /// <summary>Tag index ("TAGI").</summary>
-    public const uint TAGI = 0x54414749;
+    public const uint Tagi = 0x54414749;
 
     /// <summary>Metadata write-ahead log ("MWAL").</summary>
-    public const uint MWAL = 0x4D57414C;
+    public const uint Mwal = 0x4D57414C;
 
     /// <summary>Metrics tracker ("MTRK").</summary>
-    public const uint MTRK = 0x4D54524B;
+    public const uint Mtrk = 0x4D54524B;
 
     /// <summary>B-tree node ("BTRE").</summary>
-    public const uint BTRE = 0x42545245;
+    public const uint Btre = 0x42545245;
 
     // ── Features ───────────────────────────────────────────────────────
 
     /// <summary>Snapshot ("SNAP").</summary>
-    public const uint SNAP = 0x534E4150;
+    public const uint Snap = 0x534E4150;
 
     /// <summary>Replication metadata ("REPL").</summary>
-    public const uint REPL = 0x5245504C;
+    public const uint Repl = 0x5245504C;
 
     /// <summary>RAID metadata ("RAID").</summary>
-    public const uint RAID = 0x52414944;
+    public const uint Raid = 0x52414944;
 
     /// <summary>Compression metadata ("COMP").</summary>
-    public const uint COMP = 0x434F4D50;
+    public const uint Comp = 0x434F4D50;
 
     /// <summary>Intelligence cache ("INTE").</summary>
-    public const uint INTE = 0x494E5445;
+    public const uint Inte = 0x494E5445;
 
     /// <summary>Streaming region ("STRE").</summary>
-    public const uint STRE = 0x53545245;
+    public const uint Stre = 0x53545245;
 
     /// <summary>Cross-reference table ("XREF").</summary>
-    public const uint XREF = 0x58524546;
+    public const uint Xref = 0x58524546;
 
     /// <summary>WORM (write-once-read-many) region ("WORM").</summary>
-    public const uint WORM = 0x574F524D;
+    public const uint Worm = 0x574F524D;
 
     /// <summary>Compute cache / code region ("CODE").</summary>
-    public const uint CODE = 0x434F4445;
+    public const uint Code = 0x434F4445;
 
     /// <summary>Data write-ahead log ("DWAL").</summary>
-    public const uint DWAL = 0x4457414C;
+    public const uint Dwal = 0x4457414C;
 
     /// <summary>Data block ("DATA").</summary>
-    public const uint DATA = 0x44415441;
+    public const uint Data = 0x44415441;
 
     /// <summary>Free / unallocated block ("FREE").</summary>
-    public const uint FREE = 0x46524545;
+    public const uint Free = 0x46524545;
 
     // ── Module Registry Extensions ─────────────────────────────────────
 
     /// <summary>Compliance vault ("CMVT").</summary>
-    public const uint CMVT = 0x434D5654;
+    public const uint Cmvt = 0x434D5654;
 
     /// <summary>Audit log ("ALOG") — owned by the AuditLog module.</summary>
-    public const uint ALOG = 0x414C4F47;
+    public const uint Alog = 0x414C4F47;
 
     /// <summary>
     /// Compliance audit log ("CMAL") — compliance-module-specific audit trail,
     /// distinct from the standalone AuditLog module's ALOG blocks.
     /// Cat 9 (finding 827): separate tag prevents ambiguity during crash recovery.
     /// </summary>
-    public const uint CMAL = 0x434D414C;
+    public const uint Cmal = 0x434D414C;
 
     /// <summary>Consensus log ("CLOG").</summary>
-    public const uint CLOG = 0x434C4F47;
+    public const uint Clog = 0x434C4F47;
 
     /// <summary>Dictionary / metadata store ("DICT").</summary>
-    public const uint DICT = 0x44494354;
+    public const uint Dict = 0x44494354;
 
     /// <summary>Anonymous / anonymization region ("ANON").</summary>
-    public const uint ANON = 0x414E4F4E;
+    public const uint Anon = 0x414E4F4E;
 
     /// <summary>Module log ("MLOG").</summary>
-    public const uint MLOG = 0x4D4C4F47;
+    public const uint Mlog = 0x4D4C4F47;
 
     // ── Identity & Recovery ─────────────────────────────────────────────
 
     /// <summary>Emergency Recovery ("ERCV").</summary>
-    public const uint ERCV = 0x45524356;
+    public const uint Ercv = 0x45524356;
 
     /// <summary>Recovery Control ("RCVR") — always at block 14, never encrypted (AD-67).</summary>
-    public const uint RCVR = 0x52435652;
+    public const uint Rcvr = 0x52435652;
 
     /// <summary>Extent tree node ("EXTN").</summary>
-    public const uint EXTN = 0x4558544E;
+    public const uint Extn = 0x4558544E;
 
     /// <summary>Extended metadata ("EXMD").</summary>
-    public const uint EXMD = 0x45584D44;
+    public const uint Exmd = 0x45584D44;
 
     /// <summary>Integrity anchor ("IANT").</summary>
-    public const uint IANT = 0x49414E54;
+    public const uint Iant = 0x49414E54;
 
     // ── SQL / Analytics ─────────────────────────────────────────────────
 
     /// <summary>Columnar region ("COLR").</summary>
-    public const uint COLR = 0x434F4C52;
+    public const uint Colr = 0x434F4C52;
 
     /// <summary>Zone map index ("ZMAP").</summary>
-    public const uint ZMAP = 0x5A4D4150;
+    public const uint Zmap = 0x5A4D4150;
 
     // ── v2.1 Module Extensions (VOPT-87) ────────────────────────────────
 
     /// <summary>WAL Subscriber Cursors ("WALS") — WalSubscribers module (bit 21).</summary>
-    public const uint WALS = 0x57414C53;
+    public const uint Wals = 0x57414C53;
 
     /// <summary>ZNS Zone Map ("ZNSM") — ZnsZoneMap module (bit 23).</summary>
-    public const uint ZNSM = 0x5A4E534D;
+    public const uint Znsm = 0x5A4E534D;
 
     /// <summary>Online Operations Journal ("OPJR") — OnlineOps module (bit 28).</summary>
-    public const uint OPJR = 0x4F504A52;
+    public const uint Opjr = 0x4F504A52;
 
     /// <summary>Trailer block ("TRLR") — format trailer sentinel.</summary>
-    public const uint TRLR = 0x54524C52;
+    public const uint Trlr = 0x54524C52;
 
     // ── Lookup Set ─────────────────────────────────────────────────────
 
     private static readonly FrozenSet<uint> KnownTags = new HashSet<uint>
     {
-        SUPB, RMAP, POLV, ENCR, BMAP, INOD, TAGI, MWAL, MTRK, BTRE,
-        SNAP, REPL, RAID, COMP, INTE, STRE, XREF, WORM, CODE, DWAL,
-        DATA, FREE, CMVT, ALOG, CMAL, CLOG, DICT, ANON, MLOG, ERCV, EXTN,
-        COLR, ZMAP, EXMD, IANT, WALS, ZNSM, OPJR, TRLR, RCVR
+        Supb, Rmap, Polv, Encr, Bmap, Inod, Tagi, Mwal, Mtrk, Btre,
+        Snap, Repl, Raid, Comp, Inte, Stre, Xref, Worm, Code, Dwal,
+        Data, Free, Cmvt, Alog, Cmal, Clog, Dict, Anon, Mlog, Ercv, Extn,
+        Colr, Zmap, Exmd, Iant, Wals, Znsm, Opjr, Trlr, Rcvr
     }.ToFrozenSet();
 
     /// <summary>

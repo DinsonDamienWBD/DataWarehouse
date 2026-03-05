@@ -33,7 +33,6 @@ namespace DataWarehouse.SDK.Storage.Placement;
 [SdkCompatibility("5.0.0", Notes = "Phase 58: Autonomous rebalancer")]
 public sealed class AutonomousRebalancer : IRebalancer, IAsyncDisposable
 {
-    private readonly IPlacementAlgorithm _crushAlgorithm;
     private readonly IPlacementOptimizer _optimizer;
     private readonly IMigrationEngine _migrationEngine;
     private readonly RebalancerOptions _options;
@@ -41,6 +40,11 @@ public sealed class AutonomousRebalancer : IRebalancer, IAsyncDisposable
     private readonly Timer _monitorTimer;
     private bool _disposed;
     private int _isRunning; // 0 = idle, 1 = running (interlocked)
+
+    /// <summary>
+    /// The CRUSH placement algorithm for computing ideal object placement.
+    /// </summary>
+    public IPlacementAlgorithm CrushAlgorithm { get; }
 
     /// <summary>
     /// Delegate to provide the current cluster map for imbalance calculation.
@@ -67,13 +71,14 @@ public sealed class AutonomousRebalancer : IRebalancer, IAsyncDisposable
         IMigrationEngine migrationEngine,
         RebalancerOptions? options = null)
     {
-        _crushAlgorithm = crushAlgorithm ?? throw new ArgumentNullException(nameof(crushAlgorithm));
+        ArgumentNullException.ThrowIfNull(crushAlgorithm);
+        CrushAlgorithm = crushAlgorithm;
         _optimizer = optimizer ?? throw new ArgumentNullException(nameof(optimizer));
         _migrationEngine = migrationEngine ?? throw new ArgumentNullException(nameof(migrationEngine));
         _options = options ?? RebalancerOptions.Default;
 
         _monitorTimer = new Timer(
-            async _ => { try { await CheckAndRebalanceAsync(CancellationToken.None).ConfigureAwait(false); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } },
+            _ => { try { CheckAndRebalanceAsync(CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } },
             null,
             _options.CheckInterval,
             _options.CheckInterval);

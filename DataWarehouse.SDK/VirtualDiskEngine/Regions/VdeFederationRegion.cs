@@ -241,7 +241,7 @@ public readonly record struct FederationEntry
 ///   Section 1: [GeoRegion entries...] (variable size)
 ///   Section 2: [FederationEntry entries...] (variable size)
 ///   Each block ends with <see cref="UniversalBlockTrailer"/>.
-///   Uses <see cref="BlockTypeTags.XREF"/> (differentiated from CrossVdeReferenceRegion
+///   Uses <see cref="BlockTypeTags.Xref"/> (differentiated from CrossVdeReferenceRegion
 ///   by RegionDirectory slot assignment).
 /// </remarks>
 [SdkCompatibility("6.0.0", Notes = "Phase 73: VDE regions -- VDE Federation (VADV-03)")]
@@ -597,7 +597,7 @@ public sealed class VdeFederationRegion
                 // Finalize current block and move to next
                 UniversalBlockTrailer.Write(
                     buffer.Slice(currentBlock * blockSize, blockSize),
-                    blockSize, BlockTypeTags.XREF, Generation);
+                    blockSize, BlockTypeTags.Xref, Generation);
                 currentBlock++;
                 offset = 0;
             }
@@ -614,7 +614,7 @@ public sealed class VdeFederationRegion
             {
                 UniversalBlockTrailer.Write(
                     buffer.Slice(currentBlock * blockSize, blockSize),
-                    blockSize, BlockTypeTags.XREF, Generation);
+                    blockSize, BlockTypeTags.Xref, Generation);
                 currentBlock++;
                 offset = 0;
             }
@@ -628,7 +628,7 @@ public sealed class VdeFederationRegion
         {
             UniversalBlockTrailer.Write(
                 buffer.Slice(blk * blockSize, blockSize),
-                blockSize, BlockTypeTags.XREF, Generation);
+                blockSize, BlockTypeTags.Xref, Generation);
         }
     }
 

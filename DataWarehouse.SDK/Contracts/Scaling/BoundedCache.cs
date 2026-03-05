@@ -15,17 +15,17 @@ namespace DataWarehouse.SDK.Contracts.Scaling
     public enum CacheEvictionMode
     {
         /// <summary>Least Recently Used -- O(1) get/put via linked list + dictionary.</summary>
-        LRU,
+        Lru,
 
         /// <summary>
         /// Adaptive Replacement Cache -- maintains T1/T2 frequency/recency lists
         /// with B1/B2 ghost lists that auto-tune the split point per the ARC paper.
         /// O(1) get/put.
         /// </summary>
-        ARC,
+        Arc,
 
         /// <summary>Time-To-Live -- entries expire after a configurable duration with lazy cleanup and background timer.</summary>
-        TTL
+        Ttl
     }
 
     /// <summary>
@@ -39,10 +39,10 @@ namespace DataWarehouse.SDK.Contracts.Scaling
         /// <summary>Maximum number of entries. When <see cref="AutoSizeFromRam"/> is true, this is computed at construction.</summary>
         public int MaxEntries { get; set; } = 10_000;
 
-        /// <summary>Eviction policy to use. Default: <see cref="CacheEvictionMode.LRU"/>.</summary>
-        public CacheEvictionMode EvictionPolicy { get; set; } = CacheEvictionMode.LRU;
+        /// <summary>Eviction policy to use. Default: <see cref="CacheEvictionMode.Lru"/>.</summary>
+        public CacheEvictionMode EvictionPolicy { get; set; } = CacheEvictionMode.Lru;
 
-        /// <summary>Default TTL for entries when using <see cref="CacheEvictionMode.TTL"/> mode. Null means no expiry.</summary>
+        /// <summary>Default TTL for entries when using <see cref="CacheEvictionMode.Ttl"/> mode. Null means no expiry.</summary>
         public TimeSpan? DefaultTtl { get; set; }
 
         /// <summary>When true, <see cref="MaxEntries"/> is computed from available RAM at construction time.</summary>
@@ -71,8 +71,8 @@ namespace DataWarehouse.SDK.Contracts.Scaling
     }
 
     /// <summary>
-    /// A thread-safe, bounded cache with <see cref="CacheEvictionMode.LRU"/>,
-    /// <see cref="CacheEvictionMode.ARC"/>, and <see cref="CacheEvictionMode.TTL"/> eviction modes,
+    /// A thread-safe, bounded cache with <see cref="CacheEvictionMode.Lru"/>,
+    /// <see cref="CacheEvictionMode.Arc"/>, and <see cref="CacheEvictionMode.Ttl"/> eviction modes,
     /// optional <see cref="IPersistentBackingStore"/> integration for lazy-load on cache miss
     /// and write-through on eviction, and auto-sizing from available RAM.
     /// </summary>
@@ -196,7 +196,7 @@ namespace DataWarehouse.SDK.Contracts.Scaling
             _arcB2 = new LinkedList<TKey>();
 
             // Start TTL cleanup timer for TTL mode
-            if (_evictionPolicy == CacheEvictionMode.TTL && _defaultTtl.HasValue)
+            if (_evictionPolicy == CacheEvictionMode.Ttl && _defaultTtl.HasValue)
             {
                 var interval = TimeSpan.FromMilliseconds(Math.Max(_defaultTtl.Value.TotalMilliseconds / 4, 1000));
                 _ttlCleanupTimer = new Timer(TtlCleanupCallback, null, interval, interval);
@@ -215,7 +215,7 @@ namespace DataWarehouse.SDK.Contracts.Scaling
                 _lock.EnterReadLock();
                 try
                 {
-                    return _evictionPolicy == CacheEvictionMode.ARC
+                    return _evictionPolicy == CacheEvictionMode.Arc
                         ? _arcT1Map.Count + _arcT2Map.Count
                         : _map.Count;
                 }
@@ -246,7 +246,7 @@ namespace DataWarehouse.SDK.Contracts.Scaling
             {
                 return _evictionPolicy switch
                 {
-                    CacheEvictionMode.ARC => ArcGet(key, out var v) ? v : default,
+                    CacheEvictionMode.Arc => ArcGet(key, out var v) ? v : default,
                     _ => LruGet(key, out var v) ? v : default,
                 };
             }
@@ -265,7 +265,7 @@ namespace DataWarehouse.SDK.Contracts.Scaling
             {
                 switch (_evictionPolicy)
                 {
-                    case CacheEvictionMode.ARC:
+                    case CacheEvictionMode.Arc:
                         ArcPut(key, value);
                         break;
                     default:
@@ -287,7 +287,7 @@ namespace DataWarehouse.SDK.Contracts.Scaling
             _lock.EnterWriteLock();
             try
             {
-                if (_evictionPolicy == CacheEvictionMode.ARC)
+                if (_evictionPolicy == CacheEvictionMode.Arc)
                     return ArcTryRemove(key, out value);
                 return LruTryRemove(key, out value);
             }
@@ -308,7 +308,7 @@ namespace DataWarehouse.SDK.Contracts.Scaling
             {
                 bool found = _evictionPolicy switch
                 {
-                    CacheEvictionMode.ARC => ArcGet(key, out value!),
+                    CacheEvictionMode.Arc => ArcGet(key, out value!),
                     _ => LruGet(key, out value!),
                 };
                 if (!found) value = default!;
@@ -327,7 +327,7 @@ namespace DataWarehouse.SDK.Contracts.Scaling
             _lock.EnterReadLock();
             try
             {
-                return _evictionPolicy == CacheEvictionMode.ARC
+                return _evictionPolicy == CacheEvictionMode.Arc
                     ? _arcT1Map.ContainsKey(key) || _arcT2Map.ContainsKey(key)
                     : _map.ContainsKey(key);
             }
@@ -351,7 +351,7 @@ namespace DataWarehouse.SDK.Contracts.Scaling
             _lock.EnterWriteLock();
             try
             {
-                bool found = _evictionPolicy == CacheEvictionMode.ARC
+                bool found = _evictionPolicy == CacheEvictionMode.Arc
                     ? ArcGet(key, out var av)
                     : LruGet(key, out av);
 
@@ -382,7 +382,7 @@ namespace DataWarehouse.SDK.Contracts.Scaling
             {
                 switch (_evictionPolicy)
                 {
-                    case CacheEvictionMode.ARC:
+                    case CacheEvictionMode.Arc:
                         ArcPut(key, value);
                         break;
                     default:
@@ -438,7 +438,7 @@ namespace DataWarehouse.SDK.Contracts.Scaling
             if (_map.TryGetValue(key, out var node))
             {
                 // TTL lazy check
-                if (_evictionPolicy == CacheEvictionMode.TTL && node.Value.ExpiresAt.HasValue
+                if (_evictionPolicy == CacheEvictionMode.Ttl && node.Value.ExpiresAt.HasValue
                     && node.Value.ExpiresAt.Value <= DateTime.UtcNow)
                 {
                     EvictLruNode(node);
@@ -772,7 +772,7 @@ namespace DataWarehouse.SDK.Contracts.Scaling
 
         private DateTime? ComputeExpiry()
         {
-            return _evictionPolicy == CacheEvictionMode.TTL && _defaultTtl.HasValue
+            return _evictionPolicy == CacheEvictionMode.Ttl && _defaultTtl.HasValue
                 ? DateTime.UtcNow + _defaultTtl.Value
                 : null;
         }
@@ -796,7 +796,7 @@ namespace DataWarehouse.SDK.Contracts.Scaling
             List<KeyValuePair<TKey, TValue>> snapshot;
             try
             {
-                if (_evictionPolicy == CacheEvictionMode.ARC)
+                if (_evictionPolicy == CacheEvictionMode.Arc)
                 {
                     snapshot = new List<KeyValuePair<TKey, TValue>>(_arcT1Map.Count + _arcT2Map.Count);
                     foreach (var kvp in _arcT1Map)

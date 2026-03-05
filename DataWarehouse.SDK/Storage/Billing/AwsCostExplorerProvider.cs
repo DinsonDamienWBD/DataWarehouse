@@ -55,7 +55,7 @@ public sealed class AwsCostExplorerProvider : IBillingProvider
     }
 
     /// <inheritdoc />
-    public CloudProvider Provider => CloudProvider.AWS;
+    public CloudProvider Provider => CloudProvider.Aws;
 
     /// <inheritdoc />
     public async Task<BillingReport> GetBillingReportAsync(
@@ -113,7 +113,7 @@ public sealed class AwsCostExplorerProvider : IBillingProvider
 
         return new BillingReport(
             $"aws-{_region}",
-            CloudProvider.AWS,
+            CloudProvider.Aws,
             from,
             to,
             totalCost,
@@ -160,13 +160,13 @@ public sealed class AwsCostExplorerProvider : IBillingProvider
                 var savings = 0.0;
 
                 results.Add(new SpotPricing(
-                    CloudProvider.AWS,
+                    CloudProvider.Aws,
                     az,
                     instanceType,
                     onDemandEstimate,
                     spotPrice,
                     savings,
-                    AvailableCapacityGB: 0,
+                    AvailableCapacityGb: 0,
                     InterruptionProbability: 0.05));
             }
         }
@@ -210,10 +210,10 @@ public sealed class AwsCostExplorerProvider : IBillingProvider
                 var savings = 0.0;
 
                 results.Add(new ReservedCapacity(
-                    CloudProvider.AWS,
+                    CloudProvider.Aws,
                     _region,
                     instanceType,
-                    CommittedGB: 0,
+                    CommittedGb: 0,
                     usagePrice,
                     onDemandEstimate,
                     savings,
@@ -275,7 +275,7 @@ public sealed class AwsCostExplorerProvider : IBillingProvider
         }
 
         return new CostForecast(
-            CloudProvider.AWS,
+            CloudProvider.Aws,
             days,
             projectedCost,
             confidence,

@@ -107,7 +107,7 @@ public sealed class OnlineRegionAddition
                 $"Module {module} does not require any dedicated regions.");
 
         // Step 4: Find allocation bitmap and scan for free space
-        int bmapSlot = rpt.FindRegion(BlockTypeTags.BMAP);
+        int bmapSlot = rpt.FindRegion(BlockTypeTags.Bmap);
         if (bmapSlot < 0)
             return RegionAdditionResult.Failed("Allocation bitmap region (BMAP) not found in the VDE.");
 
@@ -136,7 +136,7 @@ public sealed class OnlineRegionAddition
         }
 
         // Step 5: Find the metadata WAL for journaling
-        int mwalSlot = rpt.FindRegion(BlockTypeTags.MWAL);
+        int mwalSlot = rpt.FindRegion(BlockTypeTags.Mwal);
         if (mwalSlot < 0)
             return RegionAdditionResult.Failed("Metadata WAL region (MWAL) not found in the VDE.");
 
@@ -255,7 +255,7 @@ public sealed class OnlineRegionAddition
             return false; // No regions needed; nothing to add online
 
         // Check for BMAP region
-        int bmapSlot = rpt.FindRegion(BlockTypeTags.BMAP);
+        int bmapSlot = rpt.FindRegion(BlockTypeTags.Bmap);
         if (bmapSlot < 0)
             return false;
 
@@ -440,25 +440,25 @@ public sealed class OnlineRegionAddition
     /// </summary>
     private static uint ResolveBlockTypeTag(string regionName) => regionName switch
     {
-        "PolicyVault" => BlockTypeTags.POLV,
-        "EncryptionHeader" => BlockTypeTags.ENCR,
-        "ComplianceVault" => BlockTypeTags.CMVT,
-        "AuditLog" or "AuditLogRegion" => BlockTypeTags.ALOG,
-        "IntelligenceCache" => BlockTypeTags.INTE,
-        "TagIndexRegion" => BlockTypeTags.TAGI,
-        "ReplicationState" => BlockTypeTags.REPL,
-        "RAIDMetadata" => BlockTypeTags.RAID,
-        "StreamingAppend" => BlockTypeTags.STRE,
-        "DataWAL" => BlockTypeTags.DWAL,
-        "ComputeCodeCache" => BlockTypeTags.CODE,
-        "CrossVDEReferenceTable" => BlockTypeTags.XREF,
-        "ConsensusLogRegion" => BlockTypeTags.CLOG,
-        "DictionaryRegion" => BlockTypeTags.DICT,
-        "IntegrityTree" => BlockTypeTags.MTRK,
-        "SnapshotTable" => BlockTypeTags.SNAP,
-        "BTreeIndexForest" => BlockTypeTags.BTRE,
-        "AnonymizationTable" => BlockTypeTags.ANON,
-        "MetricsLogRegion" => BlockTypeTags.MLOG,
-        _ => BlockTypeTags.DATA,
+        "PolicyVault" => BlockTypeTags.Polv,
+        "EncryptionHeader" => BlockTypeTags.Encr,
+        "ComplianceVault" => BlockTypeTags.Cmvt,
+        "AuditLog" or "AuditLogRegion" => BlockTypeTags.Alog,
+        "IntelligenceCache" => BlockTypeTags.Inte,
+        "TagIndexRegion" => BlockTypeTags.Tagi,
+        "ReplicationState" => BlockTypeTags.Repl,
+        "RAIDMetadata" => BlockTypeTags.Raid,
+        "StreamingAppend" => BlockTypeTags.Stre,
+        "DataWAL" => BlockTypeTags.Dwal,
+        "ComputeCodeCache" => BlockTypeTags.Code,
+        "CrossVDEReferenceTable" => BlockTypeTags.Xref,
+        "ConsensusLogRegion" => BlockTypeTags.Clog,
+        "DictionaryRegion" => BlockTypeTags.Dict,
+        "IntegrityTree" => BlockTypeTags.Mtrk,
+        "SnapshotTable" => BlockTypeTags.Snap,
+        "BTreeIndexForest" => BlockTypeTags.Btre,
+        "AnonymizationTable" => BlockTypeTags.Anon,
+        "MetricsLogRegion" => BlockTypeTags.Mlog,
+        _ => BlockTypeTags.Data,
     };
 }

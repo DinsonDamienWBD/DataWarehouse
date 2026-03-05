@@ -24,13 +24,13 @@ namespace DataWarehouse.SDK.Infrastructure.Authority
     [SdkCompatibility("6.0.0", Notes = "Phase 75: Authority Chain (AUTH-09)")]
     public static class AuthorityContextPropagator
     {
-        private static readonly AsyncLocal<AuthorityDecision?> _current = new();
+        private static readonly AsyncLocal<AuthorityDecision?> CurrentLocal = new();
 
         /// <summary>
         /// Gets the authority decision currently in effect for the ambient async context.
         /// Returns null if no authority context has been set.
         /// </summary>
-        public static AuthorityDecision? Current => _current.Value;
+        public static AuthorityDecision? Current => CurrentLocal.Value;
 
         /// <summary>
         /// Sets the ambient authority context to the specified decision.
@@ -48,8 +48,8 @@ namespace DataWarehouse.SDK.Infrastructure.Authority
             if (decision is null)
                 throw new ArgumentNullException(nameof(decision));
 
-            var previous = _current.Value;
-            _current.Value = decision;
+            var previous = CurrentLocal.Value;
+            CurrentLocal.Value = decision;
             return new AuthorityScope(previous);
         }
 
@@ -60,7 +60,7 @@ namespace DataWarehouse.SDK.Infrastructure.Authority
         /// </summary>
         public static void Clear()
         {
-            _current.Value = null;
+            CurrentLocal.Value = null;
         }
 
         /// <summary>
@@ -80,7 +80,7 @@ namespace DataWarehouse.SDK.Infrastructure.Authority
             {
                 if (Interlocked.Exchange(ref _disposed, 1) == 0)
                 {
-                    _current.Value = _previous;
+                    CurrentLocal.Value = _previous;
                 }
             }
         }

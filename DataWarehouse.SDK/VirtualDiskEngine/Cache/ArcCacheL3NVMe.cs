@@ -28,12 +28,14 @@ public sealed class ArcCacheL3NVMe : IArcCache, IDisposable
 
     private readonly string? _l3DevicePath;
     private readonly int _blockSize;
-    private readonly long _maxCacheBytes;
+    /// <summary>Gets the maximum cache size in bytes.</summary>
+    public long MaxCacheBytes { get; }
     private readonly long _slotCount;
     private readonly int _slotSize;
 
     private FileStream? _fileStream;
     private readonly SemaphoreSlim _ioLock = new(1, 1);
+    private readonly object _initLock = new();
     private volatile bool _initialized;
     private volatile bool _disposed;
 
@@ -56,7 +58,7 @@ public sealed class ArcCacheL3NVMe : IArcCache, IDisposable
 
         _l3DevicePath = l3DevicePath;
         _blockSize = blockSize;
-        _maxCacheBytes = maxCacheBytes;
+        MaxCacheBytes = maxCacheBytes;
         _slotSize = BlockNumberSize + blockSize + ChecksumSize;
         _slotCount = maxCacheBytes / _slotSize;
 
@@ -320,7 +322,7 @@ public sealed class ArcCacheL3NVMe : IArcCache, IDisposable
     {
         if (_initialized) return;
 
-        lock (_ioLock)
+        lock (_initLock)
         {
             if (_initialized) return;
 
