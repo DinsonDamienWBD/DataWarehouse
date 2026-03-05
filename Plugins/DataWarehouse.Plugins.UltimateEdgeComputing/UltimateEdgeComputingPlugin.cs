@@ -56,7 +56,7 @@ public sealed class UltimateEdgeComputingPlugin : OrchestrationPluginBase, EC.IE
         SupportsOfflineMode = true,
         SupportsDeltaSync = true,
         SupportsEdgeAnalytics = true,
-        SupportsEdgeML = true,
+        SupportsEdgeMl = true,
         SupportsSecureTunnels = true,
         SupportsMultiEdge = true,
         SupportsFederatedLearning = true,

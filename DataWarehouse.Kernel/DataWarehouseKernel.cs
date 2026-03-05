@@ -834,7 +834,7 @@ namespace DataWarehouse.Kernel
             // INFRA-06: Audit breadcrumbs for remaining unaudited operation classes
 
             // 3. Security policy changes -- ACL/AccessVerificationMatrix modifications
-            _messageBus.Subscribe(SecurityACL, async msg =>
+            _messageBus.Subscribe(SecurityAcl, async msg =>
             {
                 var identity = msg.Payload.TryGetValue("Identity", out var id) ? id?.ToString() : "System";
                 var action = msg.Payload.TryGetValue("Action", out var a) ? a?.ToString() : "unknown";

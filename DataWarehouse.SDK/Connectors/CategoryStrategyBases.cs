@@ -553,7 +553,7 @@ namespace DataWarehouse.SDK.Connectors
     public abstract class AiConnectionStrategyBase : ConnectionStrategyBase
     {
         /// <inheritdoc/>
-        public override ConnectorCategory Category => ConnectorCategory.AI;
+        public override ConnectorCategory Category => ConnectorCategory.Ai;
 
         /// <summary>
         /// Initializes a new instance of <see cref="AiConnectionStrategyBase"/>.

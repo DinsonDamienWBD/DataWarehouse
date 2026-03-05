@@ -139,8 +139,8 @@ namespace DataWarehouse.SDK.Contracts
         public const string PipelineError = "pipeline.error";
 
         // AI operations
-        public const string AIQuery = "ai.query";
-        public const string AIEmbed = "ai.embed";
+        public const string AiQuery = "ai.query";
+        public const string AiEmbed = "ai.embed";
         public const string AiResponse = "ai.response";
 
         // Metadata operations
@@ -150,7 +150,7 @@ namespace DataWarehouse.SDK.Contracts
 
         // Security operations
         public const string SecurityAuth = "security.auth";
-        public const string SecurityACL = "security.acl";
+        public const string SecurityAcl = "security.acl";
         public const string SecurityAudit = "security.audit";
 
         // Configuration

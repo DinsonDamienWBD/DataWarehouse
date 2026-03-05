@@ -1342,10 +1342,7 @@ namespace DataWarehouse.SDK.Security
             // Wipe key material from cache before clearing
             foreach (var entry in _keyCache.Values)
             {
-                if (entry.KeyData != null)
-                {
-                    CryptographicOperations.ZeroMemory(entry.KeyData);
-                }
+                CryptographicOperations.ZeroMemory(entry.KeyData);
             }
             _keyCache.Clear();
             _initializationLock.Dispose();

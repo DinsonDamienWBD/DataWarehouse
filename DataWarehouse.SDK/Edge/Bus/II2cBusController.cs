@@ -35,14 +35,14 @@ public interface II2CBusController : IDisposable
     /// </summary>
     /// <param name="busId">I2C bus ID (e.g., 1 for /dev/i2c-1 on Linux).</param>
     /// <param name="deviceAddress">7-bit I2C device address (0-127).</param>
-    /// <returns>An <see cref="II2cDevice"/> instance for communicating with the device.</returns>
+    /// <returns>An <see cref="II2CDevice"/> instance for communicating with the device.</returns>
     /// <remarks>
     /// Multiple devices can be opened on the same bus (different addresses). The returned
     /// device should be disposed when no longer needed to release the bus connection.
     /// </remarks>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if busId or deviceAddress is out of range.</exception>
     /// <exception cref="InvalidOperationException">Thrown if the bus or device cannot be opened (e.g., hardware not present, permission denied).</exception>
-    II2cDevice OpenDevice(int busId, int deviceAddress);
+    II2CDevice OpenDevice(int busId, int deviceAddress);
 }
 
 /// <summary>
@@ -59,7 +59,7 @@ public interface II2CBusController : IDisposable
 /// </para>
 /// </remarks>
 [SdkCompatibility("3.0.0", Notes = "Phase 36: I2C device interface (EDGE-01)")]
-public interface II2cDevice : IDisposable
+public interface II2CDevice : IDisposable
 {
     /// <summary>
     /// Reads bytes from the I2C device.

@@ -74,13 +74,15 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
                         var policy = PolicySerializationHelper.DeserializePolicy(entry.PolicyData);
                         result.Add((entry.FeatureId, entry.Level, entry.Path, policy));
                     }
-                    catch (JsonException)
+                    catch (JsonException ex)
                     {
-                        // Skip malformed files rather than failing the entire load
+                        // Log malformed files rather than silently dropping them
+                        System.Diagnostics.Debug.WriteLine($"[FilePolicyPersistence] Skipping malformed policy file '{filePath}': {ex.Message}");
                     }
-                    catch (IOException)
+                    catch (IOException ex)
                     {
-                        // Skip files that cannot be read (locked, permissions)
+                        // Log files that cannot be read (locked, permissions)
+                        System.Diagnostics.Debug.WriteLine($"[FilePolicyPersistence] Cannot read policy file '{filePath}': {ex.Message}");
                     }
                 }
             }

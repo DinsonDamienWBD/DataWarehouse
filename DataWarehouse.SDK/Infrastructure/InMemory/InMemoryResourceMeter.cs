@@ -30,7 +30,7 @@ namespace DataWarehouse.SDK.Infrastructure.InMemory
         // CPU% tracking (finding P2-463): measure process CPU delta between snapshots
         private TimeSpan _lastCpuTime = TimeSpan.Zero;
         private long _lastCpuTimestampTicks = Stopwatch.GetTimestamp();
-        private static readonly double s_processorCount = Environment.ProcessorCount;
+        private static readonly double SProcessorCount = Environment.ProcessorCount;
 
         // Circular snapshot history for GetHistoryAsync (finding P2-462)
         private readonly ResourceSnapshot[] _history = new ResourceSnapshot[HistoryCapacity];
@@ -128,7 +128,7 @@ namespace DataWarehouse.SDK.Infrastructure.InMemory
                 if (elapsedSec > 0)
                 {
                     var cpuUsedSec = (nowCpu - _lastCpuTime).TotalSeconds;
-                    cpuPercent = Math.Min(100.0, cpuUsedSec / (elapsedSec * s_processorCount) * 100.0);
+                    cpuPercent = Math.Min(100.0, cpuUsedSec / (elapsedSec * SProcessorCount) * 100.0);
                 }
                 _lastCpuTime = nowCpu;
                 _lastCpuTimestampTicks = nowTick;

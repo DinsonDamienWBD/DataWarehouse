@@ -274,9 +274,9 @@ namespace DataWarehouse.SDK.Contracts
     public abstract class QatAcceleratorPluginBase : HardwareAcceleratorPluginBase, IQatAccelerator
     {
         /// <summary>
-        /// Gets the accelerator type. Always returns IntelQAT.
+        /// Gets the accelerator type. Always returns IntelQat.
         /// </summary>
-        public override AcceleratorType Type => AcceleratorType.IntelQAT;
+        public override AcceleratorType Type => AcceleratorType.IntelQat;
 
         /// <summary>
         /// Extended capabilities for QAT acceleration.

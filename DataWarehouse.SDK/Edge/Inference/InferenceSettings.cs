@@ -16,7 +16,7 @@ namespace DataWarehouse.SDK.Edge.Inference
         public required string ModelPath { get; init; }
 
         /// <summary>Gets or sets the execution provider (CPU, CUDA, DirectML, TensorRT).</summary>
-        public ExecutionProvider Provider { get; init; } = ExecutionProvider.CPU;
+        public ExecutionProvider Provider { get; init; } = ExecutionProvider.Cpu;
 
         /// <summary>Gets or sets the batch size for inference.</summary>
         public int BatchSize { get; init; } = 1;
@@ -31,15 +31,15 @@ namespace DataWarehouse.SDK.Edge.Inference
     public enum ExecutionProvider
     {
         /// <summary>CPU execution (portable, no special hardware required).</summary>
-        CPU,
+        Cpu,
 
         /// <summary>NVIDIA CUDA GPU acceleration.</summary>
-        CUDA,
+        Cuda,
 
         /// <summary>DirectML GPU acceleration (Windows, supports NVIDIA/AMD/Intel).</summary>
-        DirectML,
+        DirectMl,
 
         /// <summary>NVIDIA TensorRT optimized execution.</summary>
-        TensorRT
+        TensorRt
     }
 }

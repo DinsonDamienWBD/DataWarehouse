@@ -21,7 +21,7 @@ public enum CompressionAlgorithm
     Brotli,
 
     /// <summary>LZ4 compression (high speed).</summary>
-    LZ4,
+    Lz4,
 
     /// <summary>Zstandard compression (high ratio).</summary>
     Zstd,
@@ -210,7 +210,7 @@ public sealed class ProtocolCompressionManager : IDisposable
             [CompressionAlgorithm.GZip] = new GZipCompressionProvider(),
             [CompressionAlgorithm.Deflate] = new DeflateCompressionProvider(),
             [CompressionAlgorithm.Brotli] = new BrotliCompressionProvider(),
-            [CompressionAlgorithm.LZ4] = new LZ4CompressionProvider(),
+            [CompressionAlgorithm.Lz4] = new LZ4CompressionProvider(),
             [CompressionAlgorithm.Zstd] = new ZstdCompressionProvider(),
             [CompressionAlgorithm.Snappy] = new SnappyCompressionProvider(),
             [CompressionAlgorithm.LZO] = new LZOCompressionProvider()
@@ -472,7 +472,7 @@ public sealed class ProtocolCompressionManager : IDisposable
 
         // LZ4: 04 22 4D 18
         if (data.Length >= 4 && data[0] == 0x04 && data[1] == 0x22 && data[2] == 0x4D && data[3] == 0x18)
-            return CompressionAlgorithm.LZ4;
+            return CompressionAlgorithm.Lz4;
 
         // Brotli detection is complex - no fixed magic bytes
         // Snappy detection requires frame format check
@@ -491,7 +491,7 @@ public sealed class ProtocolCompressionManager : IDisposable
             "application/xml" => CompressionAlgorithm.Brotli,
             "text/plain" => CompressionAlgorithm.Brotli,
             "text/csv" => CompressionAlgorithm.GZip,
-            "application/octet-stream" => CompressionAlgorithm.LZ4,
+            "application/octet-stream" => CompressionAlgorithm.Lz4,
             "application/x-binary" => CompressionAlgorithm.Zstd,
             _ => CompressionAlgorithm.GZip
         };

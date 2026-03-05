@@ -18,7 +18,7 @@ namespace DataWarehouse.SDK.Hardware
         None = 0,
 
         /// <summary>Intel QuickAssist Technology (QAT) - Compression and Encryption acceleration.</summary>
-        IntelQAT = 1,
+        IntelQat = 1,
 
         /// <summary>NVIDIA GPU (CUDA) - Vector and matrix operations.</summary>
         NvidiaGpu = 2,
@@ -47,8 +47,8 @@ namespace DataWarehouse.SDK.Hardware
         /// <summary>HSM PCIe - Hardware Security Module over PCIe for cryptographic operations.</summary>
         HsmPcie = 512,
 
-        /// <summary>OpenCL - Cross-vendor GPU/CPU/FPGA compute acceleration.</summary>
-        OpenCL = 1024,
+        /// <summary>OpenCl - Cross-vendor GPU/CPU/FPGA compute acceleration.</summary>
+        OpenCl = 1024,
 
         /// <summary>SYCL - Intel oneAPI heterogeneous compute (CPU+GPU+FPGA).</summary>
         Sycl = 2048,
@@ -222,8 +222,8 @@ namespace DataWarehouse.SDK.Hardware
         /// <summary>AMD ROCm runtime.</summary>
         RoCm,
 
-        /// <summary>OpenCL runtime (cross-vendor).</summary>
-        OpenCL,
+        /// <summary>OpenCl runtime (cross-vendor).</summary>
+        OpenCl,
 
         /// <summary>SYCL runtime (Intel oneAPI DPC++).</summary>
         Sycl,

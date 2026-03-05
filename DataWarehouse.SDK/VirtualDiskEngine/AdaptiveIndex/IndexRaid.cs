@@ -73,7 +73,7 @@ public sealed class IndexRaidConfig
     /// </summary>
     public long L2MaxEntries { get; set; } = 1_000_000;
 
-    private static readonly JsonSerializerOptions s_jsonOptions = new()
+    private static readonly JsonSerializerOptions SJsonOptions = new()
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -84,7 +84,7 @@ public sealed class IndexRaidConfig
     /// Serializes this configuration to JSON.
     /// </summary>
     /// <returns>A JSON string representing this configuration.</returns>
-    public string ToJson() => JsonSerializer.Serialize(this, s_jsonOptions);
+    public string ToJson() => JsonSerializer.Serialize(this, SJsonOptions);
 
     /// <summary>
     /// Deserializes a configuration from JSON.
@@ -93,7 +93,7 @@ public sealed class IndexRaidConfig
     /// <returns>A new <see cref="IndexRaidConfig"/> instance.</returns>
     /// <exception cref="JsonException">Thrown if the JSON is invalid.</exception>
     public static IndexRaidConfig FromJson(string json)
-        => JsonSerializer.Deserialize<IndexRaidConfig>(json, s_jsonOptions)
+        => JsonSerializer.Deserialize<IndexRaidConfig>(json, SJsonOptions)
            ?? throw new JsonException("Failed to deserialize IndexRaidConfig.");
 }
 

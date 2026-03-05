@@ -14,7 +14,7 @@ public enum CompressionAlgorithm
     /// <summary>Brotli compression (RFC 7932).</summary>
     Brotli = 3,
     /// <summary>LZ4 high-speed compression.</summary>
-    LZ4 = 4,
+    Lz4 = 4,
     /// <summary>Zstandard (Zstd) compression.</summary>
     Zstd = 5
 }
@@ -62,10 +62,10 @@ public sealed class CompressionOptions
     public int BufferSize { get; set; } = 81920;
 
     /// <summary>For LZ4: use high compression mode.</summary>
-    public bool LZ4HighCompression { get; set; } = false;
+    public bool Lz4HighCompression { get; set; } = false;
 
     /// <summary>For LZ4: block size.</summary>
-    public int LZ4BlockSize { get; set; } = 64 * 1024;
+    public int Lz4BlockSize { get; set; } = 64 * 1024;
 
     /// <summary>For Zstd: compression level (1-22).</summary>
     public int ZstdLevel { get; set; } = 3;

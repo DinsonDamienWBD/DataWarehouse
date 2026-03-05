@@ -7,29 +7,29 @@ using DataWarehouse.SDK.Contracts;
 namespace DataWarehouse.SDK.Hardware.Accelerators
 {
     /// <summary>
-    /// OpenCL API interop layer for cross-vendor GPU/CPU/FPGA compute acceleration.
+    /// OpenCl API interop layer for cross-vendor GPU/CPU/FPGA compute acceleration.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// OpenCL (Open Computing Language) provides a standard API for parallel programming
+    /// OpenCl (Open Computing Language) provides a standard API for parallel programming
     /// across heterogeneous platforms including CPUs, GPUs, and FPGAs from multiple vendors
     /// (NVIDIA, AMD, Intel, ARM, Xilinx).
     /// </para>
     /// <para>
-    /// OpenCL Runtime libraries:
-    /// - Windows: OpenCL.dll
+    /// OpenCl Runtime libraries:
+    /// - Windows: OpenCl.dll
     /// - Linux: libOpenCL.so
     /// </para>
     /// <para>
-    /// This implementation targets OpenCL 1.2+ which is the most widely supported version.
-    /// For advanced features (SVM, pipes), OpenCL 2.0+ is required.
+    /// This implementation targets OpenCl 1.2+ which is the most widely supported version.
+    /// For advanced features (SVM, pipes), OpenCl 2.0+ is required.
     /// </para>
     /// </remarks>
-    [SdkCompatibility("5.0.0", Notes = "Phase 65: OpenCL interop (HW-05)")]
+    [SdkCompatibility("5.0.0", Notes = "Phase 65: OpenCl interop (HW-05)")]
     internal static partial class OpenClInterop
     {
         // Platform-specific library names
-        private const string OpenClLibraryWindows = "OpenCL";
+        private const string OpenClLibraryWindows = "OpenCl";
         private const string OpenClLibraryLinux = "libOpenCL.so";
 
         // Determine library name based on platform
@@ -38,12 +38,12 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             : OpenClLibraryLinux;
 
         /// <summary>
-        /// Success return code for OpenCL operations.
+        /// Success return code for OpenCl operations.
         /// </summary>
         internal const int CL_SUCCESS = 0;
 
         /// <summary>
-        /// OpenCL error codes (minimal subset).
+        /// OpenCl error codes (minimal subset).
         /// </summary>
         internal enum ClError
         {
@@ -69,7 +69,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         }
 
         /// <summary>
-        /// OpenCL device type flags.
+        /// OpenCl device type flags.
         /// </summary>
         internal const ulong CL_DEVICE_TYPE_DEFAULT = 1;
         internal const ulong CL_DEVICE_TYPE_CPU = 2;
@@ -78,7 +78,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         internal const ulong CL_DEVICE_TYPE_ALL = 0xFFFFFFFF;
 
         /// <summary>
-        /// OpenCL memory flags.
+        /// OpenCl memory flags.
         /// </summary>
         internal const ulong CL_MEM_READ_WRITE = 1;
         internal const ulong CL_MEM_WRITE_ONLY = 2;
@@ -86,14 +86,14 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         internal const ulong CL_MEM_COPY_HOST_PTR = 32;
 
         /// <summary>
-        /// OpenCL platform info query parameters.
+        /// OpenCl platform info query parameters.
         /// </summary>
         internal const uint CL_PLATFORM_NAME = 0x0902;
         internal const uint CL_PLATFORM_VENDOR = 0x0903;
         internal const uint CL_PLATFORM_VERSION = 0x0901;
 
         /// <summary>
-        /// OpenCL device info query parameters.
+        /// OpenCl device info query parameters.
         /// </summary>
         internal const uint CL_DEVICE_NAME = 0x102B;
         internal const uint CL_DEVICE_VENDOR = 0x102C;
@@ -104,7 +104,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         // --- Platform API ---
 
         /// <summary>
-        /// Gets the list of available OpenCL platforms.
+        /// Gets the list of available OpenCl platforms.
         /// </summary>
         [LibraryImport(OpenClLibraryWindows, EntryPoint = "clGetPlatformIDs")]
         [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
@@ -112,7 +112,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             uint numEntries, IntPtr[] platforms, out uint numPlatforms);
 
         /// <summary>
-        /// Gets information about an OpenCL platform.
+        /// Gets information about an OpenCl platform.
         /// </summary>
         [LibraryImport(OpenClLibraryWindows, EntryPoint = "clGetPlatformInfo")]
         [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
@@ -132,7 +132,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             IntPtr[] devices, out uint numDevices);
 
         /// <summary>
-        /// Gets information about an OpenCL device.
+        /// Gets information about an OpenCl device.
         /// </summary>
         [LibraryImport(OpenClLibraryWindows, EntryPoint = "clGetDeviceInfo")]
         [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
@@ -143,7 +143,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         // --- Context API ---
 
         /// <summary>
-        /// Creates an OpenCL context for the specified devices.
+        /// Creates an OpenCl context for the specified devices.
         /// </summary>
         [LibraryImport(OpenClLibraryWindows, EntryPoint = "clCreateContext")]
         [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
@@ -162,7 +162,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         // --- Memory API ---
 
         /// <summary>
-        /// Creates an OpenCL buffer object.
+        /// Creates an OpenCl buffer object.
         /// </summary>
         [LibraryImport(OpenClLibraryWindows, EntryPoint = "clCreateBuffer")]
         [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
@@ -246,35 +246,35 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         internal static partial int WaitForEvents(uint numEvents, IntPtr[] eventList);
 
         /// <summary>
-        /// Releases an OpenCL kernel.
+        /// Releases an OpenCl kernel.
         /// </summary>
         [LibraryImport(OpenClLibraryWindows, EntryPoint = "clReleaseKernel")]
         [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
         internal static partial int ReleaseKernel(IntPtr kernel);
 
         /// <summary>
-        /// Releases an OpenCL program.
+        /// Releases an OpenCl program.
         /// </summary>
         [LibraryImport(OpenClLibraryWindows, EntryPoint = "clReleaseProgram")]
         [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
         internal static partial int ReleaseProgram(IntPtr program);
 
         /// <summary>
-        /// Releases an OpenCL memory object.
+        /// Releases an OpenCl memory object.
         /// </summary>
         [LibraryImport(OpenClLibraryWindows, EntryPoint = "clReleaseMemObject")]
         [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
         internal static partial int ReleaseMemObject(IntPtr memObj);
 
         /// <summary>
-        /// Releases an OpenCL command queue.
+        /// Releases an OpenCl command queue.
         /// </summary>
         [LibraryImport(OpenClLibraryWindows, EntryPoint = "clReleaseCommandQueue")]
         [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
         internal static partial int ReleaseCommandQueue(IntPtr commandQueue);
 
         /// <summary>
-        /// Releases an OpenCL context.
+        /// Releases an OpenCl context.
         /// </summary>
         [LibraryImport(OpenClLibraryWindows, EntryPoint = "clReleaseContext")]
         [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
@@ -289,21 +289,21 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
     }
 
     /// <summary>
-    /// OpenCL accelerator providing cross-vendor GPU/CPU/FPGA compute acceleration.
+    /// OpenCl accelerator providing cross-vendor GPU/CPU/FPGA compute acceleration.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Wraps the OpenCL P/Invoke bindings with a managed API that implements
+    /// Wraps the OpenCl P/Invoke bindings with a managed API that implements
     /// <see cref="IGpuAccelerator"/>. Supports device enumeration across all
-    /// OpenCL platforms (NVIDIA, AMD, Intel, ARM, etc.).
+    /// OpenCl platforms (NVIDIA, AMD, Intel, ARM, etc.).
     /// </para>
     /// <para>
-    /// <strong>Graceful Unavailability:</strong> If the OpenCL runtime library is not
+    /// <strong>Graceful Unavailability:</strong> If the OpenCl runtime library is not
     /// found on the system, <see cref="IsAvailable"/> returns false and all operations
     /// throw <see cref="InvalidOperationException"/>.
     /// </para>
     /// </remarks>
-    [SdkCompatibility("5.0.0", Notes = "Phase 65: OpenCL accelerator (HW-05)")]
+    [SdkCompatibility("5.0.0", Notes = "Phase 65: OpenCl accelerator (HW-05)")]
     public sealed class OpenClAccelerator : IGpuAccelerator, IDisposable
     {
         private readonly IPlatformCapabilityRegistry _registry;
@@ -315,7 +315,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         private readonly object _lock = new();
         private bool _disposed;
 
-        // OpenCL handles
+        // OpenCl handles
         private IntPtr _context;
         private IntPtr _commandQueue;
         private IntPtr _selectedDevice;
@@ -323,7 +323,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// <summary>
         /// Initializes a new instance of the <see cref="OpenClAccelerator"/> class.
         /// </summary>
-        /// <param name="registry">Platform capability registry for registering OpenCL capabilities.</param>
+        /// <param name="registry">Platform capability registry for registering OpenCl capabilities.</param>
         /// <exception cref="ArgumentNullException">Thrown when registry is null.</exception>
         public OpenClAccelerator(IPlatformCapabilityRegistry registry)
         {
@@ -331,17 +331,17 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         }
 
         /// <inheritdoc/>
-        public AcceleratorType Type => AcceleratorType.OpenCL;
+        public AcceleratorType Type => AcceleratorType.OpenCl;
 
         /// <inheritdoc/>
         public bool IsAvailable => _isAvailable;
 
         /// <inheritdoc/>
-        /// <remarks>True when OpenCL GPU is unavailable and CPU is used as fallback (finding P1-365).</remarks>
+        /// <remarks>True when OpenCl GPU is unavailable and CPU is used as fallback (finding P1-365).</remarks>
         public bool IsCpuFallback => !_isAvailable;
 
         /// <inheritdoc/>
-        public GpuRuntime Runtime => GpuRuntime.OpenCL;
+        public GpuRuntime Runtime => GpuRuntime.OpenCl;
 
         /// <inheritdoc/>
         public int DeviceCount => _deviceCount;
@@ -357,7 +357,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
 
                     try
                     {
-                        string openClLib = OperatingSystem.IsWindows() ? "OpenCL.dll" : "libOpenCL.so";
+                        string openClLib = OperatingSystem.IsWindows() ? "OpenCl.dll" : "libOpenCL.so";
 
                         if (!NativeLibrary.TryLoad(openClLib, out IntPtr _))
                         {
@@ -456,7 +456,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         public async Task<float[]> VectorMultiplyAsync(float[] a, float[] b)
         {
             if (!_isAvailable)
-                throw new InvalidOperationException("OpenCL is not available. Check IsAvailable before calling.");
+                throw new InvalidOperationException("OpenCl is not available. Check IsAvailable before calling.");
 
             ArgumentNullException.ThrowIfNull(a);
             ArgumentNullException.ThrowIfNull(b);
@@ -464,7 +464,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             if (a.Length != b.Length)
                 throw new ArgumentException("Vectors must have the same length");
 
-            // OpenCL kernel execution:
+            // OpenCl kernel execution:
             // 1. Create buffers (clCreateBuffer) for a, b, result
             // 2. Write a, b to device (clEnqueueWriteBuffer)
             // 3. Build kernel: __kernel void vecMul(__global float* a, __global float* b, __global float* c, int n) { ... }
@@ -473,7 +473,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             // 6. Read result (clEnqueueReadBuffer)
             // 7. Release buffers
             //
-            // CPU fallback to establish API contract (GPU kernel launch requires OpenCL runtime)
+            // CPU fallback to establish API contract (GPU kernel launch requires OpenCl runtime)
             float[] result = new float[a.Length];
             await Task.Run(() =>
             {
@@ -489,7 +489,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         public async Task<float[]> MatrixMultiplyAsync(float[,] a, float[,] b)
         {
             if (!_isAvailable)
-                throw new InvalidOperationException("OpenCL is not available.");
+                throw new InvalidOperationException("OpenCl is not available.");
 
             ArgumentNullException.ThrowIfNull(a);
             ArgumentNullException.ThrowIfNull(b);
@@ -524,7 +524,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         public async Task<float[]> ComputeEmbeddingsAsync(float[] input, float[,] weights)
         {
             if (!_isAvailable)
-                throw new InvalidOperationException("OpenCL is not available.");
+                throw new InvalidOperationException("OpenCl is not available.");
 
             ArgumentNullException.ThrowIfNull(input);
             ArgumentNullException.ThrowIfNull(weights);
@@ -555,7 +555,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         public Task<byte[]> ProcessAsync(byte[] data, AcceleratorOperation operation)
         {
             throw new NotSupportedException(
-                "OpenCL accelerator requires float[] operations. Use VectorMultiplyAsync, MatrixMultiplyAsync, or ComputeEmbeddingsAsync.");
+                "OpenCl accelerator requires float[] operations. Use VectorMultiplyAsync, MatrixMultiplyAsync, or ComputeEmbeddingsAsync.");
         }
 
         /// <inheritdoc/>
@@ -564,7 +564,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             return Task.FromResult(new AcceleratorStatistics(
                 Type: Type,
                 OperationsCompleted: Interlocked.Read(ref _operationsCompleted),
-                AverageThroughputMBps: 0.0, // Requires OpenCL perf counters (finding P2-371)
+                AverageThroughputMBps: 0.0, // Requires OpenCl perf counters (finding P2-371)
                 CurrentUtilization: 0.0,
                 TotalProcessingTime: Interlocked.Read(ref _totalProcessingTicks) > 0
                     ? TimeSpan.FromSeconds((double)Interlocked.Read(ref _totalProcessingTicks) / System.Diagnostics.Stopwatch.Frequency)

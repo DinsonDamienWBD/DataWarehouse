@@ -46,7 +46,7 @@ public enum ComplianceFramework
     Iso27001,
 
     /// <summary>Service Organization Control 2 Type II - Service organization controls</summary>
-    Soc2TypeII
+    Soc2TypeIi
 }
 
 /// <summary>

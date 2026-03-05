@@ -35,7 +35,7 @@ public record CarbonIntensityData(
     string RegionId,
 
     /// <summary>Carbon intensity in grams of CO2 per kilowatt-hour.</summary>
-    double GramsCO2PerKwh,
+    double GramsCo2PerKwh,
 
     /// <summary>Classified carbon intensity level.</summary>
     CarbonIntensityLevel Level,
@@ -186,7 +186,7 @@ public enum OperationStatus
 /// </summary>
 public record CarbonThreshold(
     /// <summary>Maximum acceptable grams CO2 per kWh.</summary>
-    double MaxGramsCO2PerKwh,
+    double MaxGramsCo2PerKwh,
 
     /// <summary>Maximum acceptable intensity level.</summary>
     CarbonIntensityLevel MaxLevel
@@ -396,16 +396,16 @@ public record OffsetOptions(
 public enum OffsetStandard
 {
     /// <summary>Verified Carbon Standard.</summary>
-    VCS,
+    Vcs,
 
     /// <summary>Gold Standard.</summary>
     GoldStandard,
 
     /// <summary>American Carbon Registry.</summary>
-    ACR,
+    Acr,
 
     /// <summary>Climate Action Reserve.</summary>
-    CAR
+    Car
 }
 
 /// <summary>
@@ -425,7 +425,7 @@ public record OffsetProject(
     OffsetStandard Standard,
 
     /// <summary>Price per metric ton of CO2.</summary>
-    double PricePerTonCO2,
+    double PricePerTonCo2,
 
     /// <summary>Country where project is located.</summary>
     string Country

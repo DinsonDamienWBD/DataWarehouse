@@ -67,29 +67,29 @@ namespace DataWarehouse.SDK.Contracts.Carbon
         /// Sets or updates the carbon budget for a tenant.
         /// </summary>
         /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="budgetGramsCO2e">Total budget in grams of CO2 equivalent for the period.</param>
+        /// <param name="budgetGramsCo2E">Total budget in grams of CO2 equivalent for the period.</param>
         /// <param name="period">Budget period granularity.</param>
         /// <param name="ct">Cancellation token.</param>
-        Task SetBudgetAsync(string tenantId, double budgetGramsCO2e, CarbonBudgetPeriod period, CancellationToken ct = default);
+        Task SetBudgetAsync(string tenantId, double budgetGramsCo2E, CarbonBudgetPeriod period, CancellationToken ct = default);
 
         /// <summary>
         /// Checks whether a tenant has sufficient carbon budget to proceed with an operation
         /// of the estimated carbon cost. Returns false if the budget is exhausted.
         /// </summary>
         /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="estimatedCarbonGramsCO2e">Estimated carbon cost of the pending operation.</param>
+        /// <param name="estimatedCarbonGramsCo2E">Estimated carbon cost of the pending operation.</param>
         /// <param name="ct">Cancellation token.</param>
         /// <returns>True if the operation can proceed within budget; false if budget is exhausted.</returns>
-        Task<bool> CanProceedAsync(string tenantId, double estimatedCarbonGramsCO2e, CancellationToken ct = default);
+        Task<bool> CanProceedAsync(string tenantId, double estimatedCarbonGramsCo2E, CancellationToken ct = default);
 
         /// <summary>
         /// Records actual carbon usage for a completed operation against the tenant's budget.
         /// </summary>
         /// <param name="tenantId">Tenant identifier.</param>
-        /// <param name="carbonGramsCO2e">Actual carbon emissions in grams of CO2 equivalent.</param>
+        /// <param name="carbonGramsCo2E">Actual carbon emissions in grams of CO2 equivalent.</param>
         /// <param name="operationType">Type of operation: "read", "write", "delete", or "list".</param>
         /// <param name="ct">Cancellation token.</param>
-        Task RecordUsageAsync(string tenantId, double carbonGramsCO2e, string operationType, CancellationToken ct = default);
+        Task RecordUsageAsync(string tenantId, double carbonGramsCo2E, string operationType, CancellationToken ct = default);
 
         /// <summary>
         /// Evaluates the current throttle state for a tenant based on budget usage vs thresholds.

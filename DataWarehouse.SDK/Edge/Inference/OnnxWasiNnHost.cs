@@ -82,13 +82,13 @@ namespace DataWarehouse.SDK.Edge.Inference
                 // Configure execution provider
                 switch (settings.Provider)
                 {
-                    case ExecutionProvider.CUDA:
+                    case ExecutionProvider.Cuda:
                         sessionOptions.AppendExecutionProvider_CUDA();
                         break;
-                    case ExecutionProvider.DirectML:
+                    case ExecutionProvider.DirectMl:
                         sessionOptions.AppendExecutionProvider_DML();
                         break;
-                    case ExecutionProvider.TensorRT:
+                    case ExecutionProvider.TensorRt:
                         sessionOptions.AppendExecutionProvider_Tensorrt();
                         break;
                     default:

@@ -483,7 +483,7 @@ public sealed class EdgeComputingCapabilities
     public bool SupportsOfflineMode { get; init; }
     public bool SupportsDeltaSync { get; init; }
     public bool SupportsEdgeAnalytics { get; init; }
-    public bool SupportsEdgeML { get; init; }
+    public bool SupportsEdgeMl { get; init; }
     public bool SupportsSecureTunnels { get; init; }
     public bool SupportsMultiEdge { get; init; }
     public bool SupportsFederatedLearning { get; init; }
@@ -1024,7 +1024,7 @@ public enum ModelType
     Clustering,
     TimeSeries,
     ObjectDetection,
-    NLP
+    Nlp
 }
 
 /// <summary>

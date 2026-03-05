@@ -152,7 +152,7 @@ public sealed class IndexMorphPolicy
         MorphCooldown = TimeSpan.FromMinutes(1)
     };
 
-    private static readonly JsonSerializerOptions _jsonOptions = new()
+    private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
         Converters = { new JsonStringEnumConverter() }
@@ -161,7 +161,7 @@ public sealed class IndexMorphPolicy
     /// <summary>
     /// Serializes this policy to a JSON string.
     /// </summary>
-    public string ToJson() => JsonSerializer.Serialize(this, _jsonOptions);
+    public string ToJson() => JsonSerializer.Serialize(this, JsonOptions);
 
     /// <summary>
     /// Deserializes a policy from a JSON string.
@@ -169,5 +169,5 @@ public sealed class IndexMorphPolicy
     /// <param name="json">The JSON string.</param>
     /// <returns>The deserialized <see cref="IndexMorphPolicy"/>.</returns>
     public static IndexMorphPolicy FromJson(string json) =>
-        JsonSerializer.Deserialize<IndexMorphPolicy>(json, _jsonOptions) ?? new IndexMorphPolicy();
+        JsonSerializer.Deserialize<IndexMorphPolicy>(json, JsonOptions) ?? new IndexMorphPolicy();
 }

@@ -456,7 +456,7 @@ public abstract record PersistenceBackendConfig
     public bool EnableCompression { get; init; } = true;
 
     /// <summary>Compression algorithm to use.</summary>
-    public CompressionAlgorithm CompressionAlgorithm { get; init; } = CompressionAlgorithm.LZ4;
+    public CompressionAlgorithm CompressionAlgorithm { get; init; } = CompressionAlgorithm.Lz4;
 
     /// <summary>Whether to enable encryption at rest.</summary>
     public bool EnableEncryption { get; init; }
@@ -493,7 +493,7 @@ public enum CompressionAlgorithm
     None,
 
     /// <summary>LZ4 fast compression.</summary>
-    LZ4,
+    Lz4,
 
     /// <summary>Zstandard compression.</summary>
     Zstd,

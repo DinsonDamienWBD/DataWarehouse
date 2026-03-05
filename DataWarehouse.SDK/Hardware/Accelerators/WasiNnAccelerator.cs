@@ -25,8 +25,8 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// <summary>AMD ROCm GPU acceleration.</summary>
         ROCm = 2,
 
-        /// <summary>OpenCL cross-vendor GPU/accelerator.</summary>
-        OpenCL = 3,
+        /// <summary>OpenCl cross-vendor GPU/accelerator.</summary>
+        OpenCl = 3,
 
         /// <summary>NVIDIA TensorRT optimized inference.</summary>
         TensorRT = 4,
@@ -188,7 +188,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
     /// </para>
     /// <para>
     /// <strong>Backend Priority:</strong>
-    /// CUDA > ROCm > CoreML (macOS) > NNAPI (Android) > CANN > OpenCL > CPU
+    /// CUDA > ROCm > CoreML (macOS) > NNAPI (Android) > CANN > OpenCl > CPU
     /// </para>
     /// <para>
     /// <strong>Hardware Detection:</strong>
@@ -256,7 +256,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         {
             _availableBackends.Clear();
 
-            // Priority order: CUDA > ROCm > CoreML > NNAPI > CANN > OpenCL > CPU
+            // Priority order: CUDA > ROCm > CoreML > NNAPI > CANN > OpenCl > CPU
 
             // Check CUDA availability
             if (TryDetectCuda())
@@ -278,9 +278,9 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             if (TryDetectCann())
                 _availableBackends.Add(InferenceBackend.CANN);
 
-            // Check OpenCL
+            // Check OpenCl
             if (TryDetectOpenCL())
-                _availableBackends.Add(InferenceBackend.OpenCL);
+                _availableBackends.Add(InferenceBackend.OpenCl);
 
             // CPU is always available
             _availableBackends.Add(InferenceBackend.CPU);
@@ -323,7 +323,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         {
             try
             {
-                string clLib = OperatingSystem.IsWindows() ? "OpenCL.dll" : "libOpenCL.so";
+                string clLib = OperatingSystem.IsWindows() ? "OpenCl.dll" : "libOpenCL.so";
                 return NativeLibrary.TryLoad(clLib, out _);
             }
             catch { return false; }
@@ -447,14 +447,14 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         {
             return backend switch
             {
-                InferenceBackend.CUDA => ExecutionProvider.CUDA,
-                InferenceBackend.TensorRT => ExecutionProvider.TensorRT,
-                InferenceBackend.ROCm => ExecutionProvider.CPU, // ROCm uses MIGraphX provider; fall back to CPU for ONNX Runtime
-                InferenceBackend.CoreML => ExecutionProvider.CPU, // CoreML provider requires ORT CoreML EP; fall back to CPU
-                InferenceBackend.NNAPI => ExecutionProvider.CPU, // NNAPI provider requires ORT NNAPI EP; fall back to CPU
-                InferenceBackend.OpenCL => ExecutionProvider.CPU, // No direct OpenCL EP in ONNX Runtime; fall back to CPU
-                InferenceBackend.CANN => ExecutionProvider.CPU, // CANN EP requires Huawei SDK; fall back to CPU
-                _ => ExecutionProvider.CPU,
+                InferenceBackend.CUDA => ExecutionProvider.Cuda,
+                InferenceBackend.TensorRT => ExecutionProvider.TensorRt,
+                InferenceBackend.ROCm => ExecutionProvider.Cpu, // ROCm uses MIGraphX provider; fall back to CPU for ONNX Runtime
+                InferenceBackend.CoreML => ExecutionProvider.Cpu, // CoreML provider requires ORT CoreML EP; fall back to CPU
+                InferenceBackend.NNAPI => ExecutionProvider.Cpu, // NNAPI provider requires ORT NNAPI EP; fall back to CPU
+                InferenceBackend.OpenCl => ExecutionProvider.Cpu, // No direct OpenCl EP in ONNX Runtime; fall back to CPU
+                InferenceBackend.CANN => ExecutionProvider.Cpu, // CANN EP requires Huawei SDK; fall back to CPU
+                _ => ExecutionProvider.Cpu,
             };
         }
 

@@ -21,7 +21,7 @@ namespace DataWarehouse.SDK.Edge.Bus;
 /// </para>
 /// <para>
 /// <strong>Thread Safety:</strong> This class is thread-safe. Multiple devices can be opened
-/// on the same bus concurrently. However, individual <see cref="II2cDevice"/> instances are
+/// on the same bus concurrently. However, individual <see cref="II2CDevice"/> instances are
 /// NOT thread-safe (serialize operations or use external locking).
 /// </para>
 /// </remarks>
@@ -31,7 +31,7 @@ public sealed class I2CBusController : II2CBusController
     private bool _disposed;
 
     /// <inheritdoc/>
-    public II2cDevice OpenDevice(int busId, int deviceAddress)
+    public II2CDevice OpenDevice(int busId, int deviceAddress)
     {
         ThrowIfDisposed();
 
@@ -76,9 +76,9 @@ public sealed class I2CBusController : II2CBusController
     }
 
     /// <summary>
-    /// Wrapper around System.Device.I2c.I2cDevice implementing II2cDevice.
+    /// Wrapper around System.Device.I2c.I2cDevice implementing II2CDevice.
     /// </summary>
-    private sealed class I2CDeviceWrapper : II2cDevice
+    private sealed class I2CDeviceWrapper : II2CDevice
     {
         private readonly I2cDevice _device;
         private bool _disposed;

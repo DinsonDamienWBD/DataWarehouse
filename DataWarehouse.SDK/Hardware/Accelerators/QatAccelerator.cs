@@ -75,7 +75,7 @@ public sealed class QatAccelerator : IQatAccelerator, IDisposable
     }
 
     /// <inheritdoc />
-    public AcceleratorType Type => AcceleratorType.IntelQAT;
+    public AcceleratorType Type => AcceleratorType.IntelQat;
 
     /// <inheritdoc />
     public bool IsAvailable => _isAvailable;
@@ -444,7 +444,7 @@ public sealed class QatAccelerator : IQatAccelerator, IDisposable
     public Task<AcceleratorStatistics> GetStatisticsAsync()
     {
         var stats = new AcceleratorStatistics(
-            Type: AcceleratorType.IntelQAT,
+            Type: AcceleratorType.IntelQat,
             OperationsCompleted: Interlocked.Read(ref _operationsCompleted),
             AverageThroughputMBps: 0.0, // Requires hardware-specific query API for real metrics (finding P2-371)
             CurrentUtilization: 0.0,     // QAT doesn't expose utilization via public API

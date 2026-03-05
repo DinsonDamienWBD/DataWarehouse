@@ -13,7 +13,7 @@ public enum HypervisorType
     Unknown,
 
     /// <summary>VMware ESXi hypervisor.</summary>
-    VMwareESXi,
+    VMwareEsXi,
 
     /// <summary>Microsoft Hyper-V hypervisor.</summary>
     HyperV,
@@ -28,10 +28,10 @@ public enum HypervisorType
     Proxmox,
 
     /// <summary>oVirt/RHV hypervisor.</summary>
-    OVirtRHV,
+    OVirtRhv,
 
     /// <summary>Nutanix AHV hypervisor.</summary>
-    NutanixAHV,
+    NutanixAhv,
 
     /// <summary>Bare metal (no virtualization).</summary>
     Bare
@@ -271,10 +271,10 @@ public enum BackupApiType
     None,
 
     /// <summary>VMware VADP (vStorage APIs for Data Protection).</summary>
-    VMwareVADP,
+    VMwareVadp,
 
     /// <summary>Hyper-V VSS (Volume Shadow Copy Service).</summary>
-    HyperVVSS,
+    HyperVvss,
 
     /// <summary>Proxmox Backup Server integration.</summary>
     ProxmoxBackup,

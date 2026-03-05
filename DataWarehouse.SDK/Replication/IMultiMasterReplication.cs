@@ -72,7 +72,7 @@ namespace DataWarehouse.SDK.Replication
         /// Uses mathematical properties to merge concurrent updates deterministically.
         /// Use for collaborative editing, counters, sets where merges are well-defined.
         /// </summary>
-        CRDT,
+        Crdt,
 
         /// <summary>
         /// Custom Resolver - application-provided callback.

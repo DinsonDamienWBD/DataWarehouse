@@ -25,7 +25,7 @@ public class UltimateEdgeComputingTests
         Assert.True(plugin.Capabilities.SupportsOfflineMode);
         Assert.True(plugin.Capabilities.SupportsDeltaSync);
         Assert.True(plugin.Capabilities.SupportsEdgeAnalytics);
-        Assert.True(plugin.Capabilities.SupportsEdgeML);
+        Assert.True(plugin.Capabilities.SupportsEdgeMl);
         Assert.True(plugin.Capabilities.SupportsMultiEdge);
         Assert.True(plugin.Capabilities.SupportsFederatedLearning);
         Assert.Equal(10000, plugin.Capabilities.MaxEdgeNodes);

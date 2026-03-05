@@ -182,7 +182,7 @@ namespace DataWarehouse.Kernel.Infrastructure
                 UsedMemoryBytes = usedMemory,
                 AvailableMemoryBytes = availableMemory,
                 UsagePercent = totalMemory > 0 ? (double)usedMemory / totalMemory * 100 : 0,
-                GCTotalMemory = gcMemory,
+                GcTotalMemory = gcMemory,
                 Gen0Collections = GC.CollectionCount(0),
                 Gen1Collections = GC.CollectionCount(1),
                 Gen2Collections = GC.CollectionCount(2),

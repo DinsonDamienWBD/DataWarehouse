@@ -95,7 +95,7 @@ namespace DataWarehouse.SDK.Connectors
         /// <summary>
         /// AI and ML platform connectors (OpenAI, Anthropic, Ollama, Bedrock).
         /// </summary>
-        AI
+        Ai
     }
 
     /// <summary>

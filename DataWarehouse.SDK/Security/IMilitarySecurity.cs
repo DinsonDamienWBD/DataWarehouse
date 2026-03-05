@@ -425,14 +425,14 @@ namespace DataWarehouse.SDK.Security
         /// Pass 1: Write binary 0, Pass 2: Write binary 1, Pass 3: Write random.
         /// Suitable for Confidential and Secret data on magnetic media.
         /// </summary>
-        DoD5220_22M,
+        DoD522022M,
 
         /// <summary>
         /// DoD 5220.22-M Enhanced (7-pass overwrite).
         /// More thorough variant with additional passes for higher assurance.
         /// Suitable for Top Secret data on magnetic media.
         /// </summary>
-        DoD5220_22M_ECE,
+        DoD522022MEce,
 
         /// <summary>
         /// Gutmann method (35-pass overwrite).
@@ -446,14 +446,14 @@ namespace DataWarehouse.SDK.Security
         /// Suitable for data reuse within same security domain.
         /// Not sufficient for releasing media to lower classification.
         /// </summary>
-        NIST800_88_Clear,
+        Nist80088Clear,
 
         /// <summary>
         /// NIST SP 800-88 Purge - cryptographic erase or degaussing.
         /// Renders target data recovery infeasible using state-of-the-art laboratory techniques.
         /// Suitable for releasing media to unclassified use or different security domain.
         /// </summary>
-        NIST800_88_Purge,
+        Nist80088Purge,
 
         /// <summary>
         /// Physical destruction (shredding, incineration, pulverizing, disintegration).

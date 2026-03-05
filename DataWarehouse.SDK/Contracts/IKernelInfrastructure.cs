@@ -182,7 +182,7 @@ namespace DataWarehouse.SDK.Contracts
         public long UsedMemoryBytes { get; init; }
         public long AvailableMemoryBytes { get; init; }
         public double UsagePercent { get; init; }
-        public long GCTotalMemory { get; init; }
+        public long GcTotalMemory { get; init; }
         public int Gen0Collections { get; init; }
         public int Gen1Collections { get; init; }
         public int Gen2Collections { get; init; }

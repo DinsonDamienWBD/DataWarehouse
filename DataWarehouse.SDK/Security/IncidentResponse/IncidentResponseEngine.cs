@@ -423,9 +423,9 @@ namespace DataWarehouse.SDK.Security.IncidentResponse
             // Group events by source IP or user ID for targeted responses
             if (message.Payload is Dictionary<string, object> payload)
             {
-                if (payload.TryGetValue("ipAddress", out var ip) && ip != null)
+                if (payload.TryGetValue("ipAddress", out var ip))
                     return $"ip:{ip}";
-                if (payload.TryGetValue("userId", out var userId) && userId != null)
+                if (payload.TryGetValue("userId", out var userId))
                     return $"user:{userId}";
             }
             return "global";

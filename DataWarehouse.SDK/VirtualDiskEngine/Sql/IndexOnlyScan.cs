@@ -130,10 +130,10 @@ public sealed class IndexOnlyScan
     /// <returns>True if all requested columns are available in the index.</returns>
     public bool CanSatisfyFromIndexOnly(string[] requestedColumns, string[] indexColumns)
     {
-        if (requestedColumns is null || requestedColumns.Length == 0)
+        if (requestedColumns.Length == 0)
             return true;
 
-        if (indexColumns is null || indexColumns.Length == 0)
+        if (indexColumns.Length == 0)
             return false;
 
         var indexSet = new HashSet<string>(indexColumns, StringComparer.OrdinalIgnoreCase);

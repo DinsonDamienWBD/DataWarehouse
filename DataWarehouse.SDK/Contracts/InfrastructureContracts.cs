@@ -31,59 +31,59 @@ namespace DataWarehouse.SDK.Contracts
     public enum RaidLevel
     {
         // Standard RAID Levels
-        RAID_0,     // Striping (performance)
-        RAID_1,     // Mirroring (redundancy)
-        RAID_2,     // Bit-level striping with Hamming code
-        RAID_3,     // Byte-level striping with dedicated parity
-        RAID_4,     // Block-level striping with dedicated parity
-        RAID_5,     // Block-level striping with distributed parity
-        RAID_6,     // Block-level striping with dual distributed parity
+        Raid0,     // Striping (performance)
+        Raid1,     // Mirroring (redundancy)
+        Raid2,     // Bit-level striping with Hamming code
+        Raid3,     // Byte-level striping with dedicated parity
+        Raid4,     // Block-level striping with dedicated parity
+        Raid5,     // Block-level striping with distributed parity
+        Raid6,     // Block-level striping with dual distributed parity
 
         // Nested RAID Levels
-        RAID_10,    // RAID 1+0 (mirrored stripes)
-        RAID_01,    // RAID 0+1 (striped mirrors)
-        RAID_03,    // RAID 0+3 (striped dedicated parity)
-        RAID_50,    // RAID 5+0 (striped RAID 5 sets)
-        RAID_60,    // RAID 6+0 (striped RAID 6 sets)
-        RAID_100,   // RAID 10+0 (striped mirrors of mirrors)
+        Raid10,    // RAID 1+0 (mirrored stripes)
+        Raid01,    // RAID 0+1 (striped mirrors)
+        Raid03,    // RAID 0+3 (striped dedicated parity)
+        Raid50,    // RAID 5+0 (striped RAID 5 sets)
+        Raid60,    // RAID 6+0 (striped RAID 6 sets)
+        Raid100,   // RAID 10+0 (striped mirrors of mirrors)
 
         // Enhanced RAID Levels
-        RAID_1E,    // RAID 1 Enhanced (mirrored striping)
-        RAID_5E,    // RAID 5 with hot spare
-        RAID_5EE,   // RAID 5 Enhanced with distributed spare
-        RAID_6E,    // RAID 6 Enhanced with extra parity
+        Raid1E,    // RAID 1 Enhanced (mirrored striping)
+        Raid5E,    // RAID 5 with hot spare
+        Raid5Ee,   // RAID 5 Enhanced with distributed spare
+        Raid6E,    // RAID 6 Enhanced with extra parity
 
         // Vendor-Specific RAID
-        RAID_DP,    // NetApp Double Parity (RAID 6 variant)
-        RAID_S,     // Dell/EMC Parity RAID (RAID 5 variant)
-        RAID_7,     // Cached striping with parity
-        RAID_FR,    // Fast Rebuild (optimized RAID 6)
+        RaidDp,    // NetApp Double Parity (RAID 6 variant)
+        RaidS,     // Dell/EMC Parity RAID (RAID 5 variant)
+        Raid7,     // Cached striping with parity
+        RaidFr,    // Fast Rebuild (optimized RAID 6)
 
         // ZFS RAID Levels
-        RAID_Z1,    // ZFS single parity (RAID 5 equivalent)
-        RAID_Z2,    // ZFS double parity (RAID 6 equivalent)
-        RAID_Z3,    // ZFS triple parity
+        RaidZ1,    // ZFS single parity (RAID 5 equivalent)
+        RaidZ2,    // ZFS double parity (RAID 6 equivalent)
+        RaidZ3,    // ZFS triple parity
 
         // Advanced/Proprietary RAID
-        RAID_MD10,      // Linux MD RAID 10 (near/far/offset layouts)
-        RAID_Adaptive,  // IBM Adaptive RAID (auto-tuning)
-        RAID_Beyond,    // Drobo BeyondRAID (single/dual parity)
-        RAID_Unraid,    // Unraid parity system (1-2 parity disks)
-        RAID_Declustered, // Declustered/Distributed RAID
+        RaidMd10,      // Linux MD RAID 10 (near/far/offset layouts)
+        RaidAdaptive,  // IBM Adaptive RAID (auto-tuning)
+        RaidBeyond,    // Drobo BeyondRAID (single/dual parity)
+        RaidUnraid,    // Unraid parity system (1-2 parity disks)
+        RaidDeclustered, // Declustered/Distributed RAID
 
         // Extended RAID Levels
-        RAID_71,        // RAID 7.1 - Enhanced RAID 7 with read cache
-        RAID_72,        // RAID 7.2 - Enhanced RAID 7 with write-back cache
-        RAID_NM,        // RAID N+M - Flexible N data + M parity
-        RAID_Matrix,    // Intel Matrix RAID - Multiple RAID types on same disks
-        RAID_JBOD,      // Just a Bunch of Disks - Simple concatenation
-        RAID_Crypto,    // Crypto SoftRAID - Encrypted software RAID
-        RAID_DUP,       // Btrfs DUP Profile - Duplicate on same device
-        RAID_DDP,       // NetApp Dynamic Disk Pool
-        RAID_SPAN,      // Simple disk spanning/concatenation
-        RAID_BIG,       // Concatenated volumes (Linux md BIG)
-        RAID_MAID,      // Massive Array of Idle Disks - Power managed RAID
-        RAID_Linear     // Linear mode - Sequential concatenation
+        Raid71,        // RAID 7.1 - Enhanced RAID 7 with read cache
+        Raid72,        // RAID 7.2 - Enhanced RAID 7 with write-back cache
+        RaidNm,        // RAID N+M - Flexible N data + M parity
+        RaidMatrix,    // Intel Matrix RAID - Multiple RAID types on same disks
+        RaidJbod,      // Just a Bunch of Disks - Simple concatenation
+        RaidCrypto,    // Crypto SoftRAID - Encrypted software RAID
+        RaidDup,       // Btrfs DUP Profile - Duplicate on same device
+        RaidDdp,       // NetApp Dynamic Disk Pool
+        RaidSpan,      // Simple disk spanning/concatenation
+        RaidBig,       // Concatenated volumes (Linux md BIG)
+        RaidMaid,      // Massive Array of Idle Disks - Power managed RAID
+        RaidLinear     // Linear mode - Sequential concatenation
     }
 
     /// <summary>

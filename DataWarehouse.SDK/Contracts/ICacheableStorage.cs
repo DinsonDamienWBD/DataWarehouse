@@ -268,7 +268,7 @@ public enum CacheEvictionPolicy
     Random,
 
     /// <summary>Time-based - evict items closest to expiration.</summary>
-    TTL,
+    Ttl,
 
     /// <summary>Size-based - evict largest items first.</summary>
     LargestFirst,
