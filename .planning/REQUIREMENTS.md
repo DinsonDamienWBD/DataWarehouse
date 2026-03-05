@@ -814,11 +814,11 @@ Single source of truth: `Metadata/production-audit-2026-03-05/CONSOLIDATED-FINDI
 
 ### Component-Level Hardening (HARD) — Phases 96-101
 
-- [ ] **HARD-01**: Every finding in CONSOLIDATED-FINDINGS.md (11,128 total) has a corresponding failing test in `DataWarehouse.Hardening.Tests/` proving the vulnerability exists (Coyote for concurrency, xUnit for logic/memory)
-- [ ] **HARD-02**: Every finding has a production code fix that makes its test pass — no finding skipped regardless of severity, type, or style
-- [ ] **HARD-03**: Processing is strictly sequential: project by project, file by file, line by line through CONSOLIDATED-FINDINGS.md — no reordering
-- [ ] **HARD-04**: Solution builds with 0 errors after each commit; `dotnet test` passes after each commit (post-commit sanity)
-- [ ] **HARD-05**: Commits batched per project (≤150 findings = 1 commit) or per file group (larger projects)
+- [x] **HARD-01**: Every finding in CONSOLIDATED-FINDINGS.md (11,128 total) has a corresponding failing test in `DataWarehouse.Hardening.Tests/` proving the vulnerability exists (Coyote for concurrency, xUnit for logic/memory)
+- [x] **HARD-02**: Every finding has a production code fix that makes its test pass — no finding skipped regardless of severity, type, or style
+- [x] **HARD-03**: Processing is strictly sequential: project by project, file by file, line by line through CONSOLIDATED-FINDINGS.md — no reordering
+- [x] **HARD-04**: Solution builds with 0 errors after each commit; `dotnet test` passes after each commit (post-commit sanity)
+- [x] **HARD-05**: Commits batched per project (≤150 findings = 1 commit) or per file group (larger projects)
 
 ### Full Audit (AUDT) — Phase 102
 
