@@ -2675,7 +2675,7 @@ STAGE 4: CI/CD Fortress
 
 ### Phases
 
-- [ ] **Phase 96: Stage 1 — Hardening: SDK Part 1** — TDD loop for SDK findings 1-1249 (CONSOLIDATED-FINDINGS.md lines 876-2148)
+- [x] **Phase 96: Stage 1 — Hardening: SDK Part 1** — TDD loop for SDK findings 1-1249 (CONSOLIDATED-FINDINGS.md lines 876-2148)
 - [ ] **Phase 97: Stage 1 — Hardening: SDK Part 2** — TDD loop for SDK findings 1250-2499 (CONSOLIDATED-FINDINGS.md lines 2149-3440)
 - [ ] **Phase 98: Stage 1 — Hardening: Core Infrastructure** — TDD loop for AedsCore (139), Kernel (148), Plugin (195), Shared (61), TamperProof (81), Tests (126) — 750 findings
 - [ ] **Phase 99: Stage 1 — Hardening: Large Plugins A** — TDD loop for UltimateStorage (1243), UltimateIntelligence (562), UltimateConnector (542) — 2,347 findings
@@ -2715,8 +2715,8 @@ Plans:
 - [x] 096-01-PLAN.md — Findings 1-218 (Accelerators through ColumnarRegionEngine)
 - [x] 096-02-PLAN.md — Findings 219-467 (Post-ColumnarRegionEngine through Contracts/Spatial)
 - [x] 096-03-PLAN.md — Findings 468-710 (Post-Contracts/Spatial through ExtentTree)
-- [ ] 096-04-PLAN.md — Findings 711-954 (FaultToleranceConfig through ICacheableStorage)
-- [ ] 096-05-PLAN.md — Findings 955-1249 (ICarbonAwareStorage through IoUringBindings)
+- [x] 096-04-PLAN.md — Findings 711-954 (FaultToleranceConfig through ICacheableStorage)
+- [x] 096-05-PLAN.md — Findings 955-1249 (ICarbonAwareStorage through IoUringBindings)
 
 ### Phase 97: Stage 1, Steps 1-3 — Hardening: SDK Part 2
 **Goal**: Every SDK finding from #1250 through #2499 has a failing test followed by a production fix
