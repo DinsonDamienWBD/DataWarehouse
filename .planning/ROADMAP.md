@@ -2737,8 +2737,8 @@ Plans:
 **Plans**: 5 plans
 Plans:
 - [x] 097-01-PLAN.md — Findings 1253-1499 (IoUringBindings through OpenClInterop)
-- [ ] 097-02-PLAN.md — Findings 1500-1742 (OpenClInterop through RaftConsensusEngine)
-- [ ] 097-03-PLAN.md — Findings 1743-1974 (RaftLogEntry through StorageProcessingStrategy)
+- [x] 097-02-PLAN.md — Findings 1500-1742 (OpenClInterop through RaftConsensusEngine)
+- [x] 097-03-PLAN.md — Findings 1743-1974 (RaftLogEntry through StorageProcessingStrategy)
 - [ ] 097-04-PLAN.md — Findings 1975-2256 (StrategyBase through VDE/Identity)
 - [ ] 097-05-PLAN.md — Findings 2257-2499 (VDE/Identity/VdeNesting through ZoneMapIndex)
 
@@ -3139,7 +3139,7 @@ Plans:
 | Phase | Stage | Description | Plans | Status | Completed |
 |-------|-------|-------------|-------|--------|-----------|
 | 96 | 1 | Hardening: SDK Part 1 (1,249 findings) | 0/TBD | Not started | - |
-| 97 | 1 | Hardening: SDK Part 2 (1,250 findings) | 0/TBD | Not started | - |
+| 97 | 1 | Hardening: SDK Part 2 (1,250 findings) | 3/5 | In progress | - |
 | 98 | 1 | Hardening: Core Infrastructure (750 findings) | 0/TBD | Not started | - |
 | 99 | 1 | Hardening: Large Plugins A (2,347 findings) | 0/TBD | Not started | - |
 | 100 | 1 | Hardening: Large Plugins B (1,725 findings) | 0/TBD | Not started | - |
