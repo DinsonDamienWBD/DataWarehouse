@@ -549,9 +549,11 @@ public sealed class AedsScalingManager : IScalableSubsystem, IDisposable
 
     private int GetPartitionIndex(string jobId)
     {
-        // Use hash code for consistent partition routing
+        // Use hash code for consistent partition routing.
+        // Finding 45 fix: Math.Abs(int.MinValue) throws OverflowException.
+        // Mask off sign bit instead to guarantee non-negative result.
         int hash = jobId.GetHashCode(StringComparison.Ordinal);
-        return Math.Abs(hash % _partitionCount);
+        return (hash & 0x7FFFFFFF) % _partitionCount;
     }
 
     private async Task ProcessPartitionAsync(int partition, CancellationToken ct)
@@ -569,9 +571,12 @@ public sealed class AedsScalingManager : IScalableSubsystem, IDisposable
                 {
                     break;
                 }
-                catch
+                catch (Exception ex)
                 {
                     Interlocked.Increment(ref _jobsFailed);
+                    // Finding 33 fix: log the exception so job failures can be diagnosed.
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[AedsScalingManager] Job '{job.JobId}' failed in partition {partition}: {ex.GetType().Name}: {ex.Message}");
                 }
             }
             else
@@ -591,8 +596,10 @@ public sealed class AedsScalingManager : IScalableSubsystem, IDisposable
 
     private static double ComputeHitRate(long hits, long misses)
     {
-        long total = Interlocked.Read(ref hits) + Interlocked.Read(ref misses);
-        return total == 0 ? 0.0 : (double)Interlocked.Read(ref hits) / total;
+        // Finding 47 fix: parameters are stack copies — Interlocked.Read on them reads
+        // random stack values. Use the values directly (they are already copies of the fields).
+        long total = hits + misses;
+        return total == 0 ? 0.0 : (double)hits / total;
     }
 
     private double ComputeContentionRate()
