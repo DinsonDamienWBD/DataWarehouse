@@ -169,7 +169,7 @@ public sealed class ProofOfPhysicalCustody
     // HMAC key derived at construction time from a well-known domain label.
     // In production the key is derived from the volume's key material; here we
     // use a stable derivation so proof signatures are portable across instances.
-    private static readonly byte[] s_hmacDomainLabel =
+    private static readonly byte[] SHmacDomainLabel =
         System.Text.Encoding.ASCII.GetBytes("VDE.ProofOfPhysicalCustody.v1");
 
     /// <summary>
@@ -593,7 +593,7 @@ public sealed class ProofOfPhysicalCustody
     private static byte[] ComputeProofSignature(CustodyProof proof)
     {
         // Derive HMAC key from the domain label using SHA-256
-        var keyMaterial = SHA256.HashData(s_hmacDomainLabel);
+        var keyMaterial = SHA256.HashData(SHmacDomainLabel);
 
         using var hmac = new HMACSHA256(keyMaterial);
 

@@ -150,8 +150,8 @@ public sealed class QuorumSealedWritePath
         // 2. Delegate to scheme-specific verifier (allocation-free).
         return seal.Scheme switch
         {
-            QuorumScheme.Frost_Ed25519 => VerifyEd25519Schnorr(message, seal),
-            QuorumScheme.Frost_Ristretto255 => VerifyRistretto255Schnorr(message, seal),
+            QuorumScheme.FrostEd25519 => VerifyEd25519Schnorr(message, seal),
+            QuorumScheme.FrostRistretto255 => VerifyRistretto255Schnorr(message, seal),
             _ => false,
         };
     }
@@ -243,7 +243,7 @@ public sealed class QuorumSealedWritePath
     {
         ArgumentNullException.ThrowIfNull(sealProvider, nameof(sealProvider));
 
-        int sealed_ = 0;
+        int sealedCount = 0;
         var now = DateTimeOffset.UtcNow;
         var retry = new ConcurrentQueue<PendingSeal>();
 
@@ -296,14 +296,14 @@ public sealed class QuorumSealedWritePath
             await _wal.AppendEntryAsync(walEntry, ct).ConfigureAwait(false);
             await _wal.FlushAsync(ct).ConfigureAwait(false);
 
-            sealed_++;
+            sealedCount++;
         }
 
         // Re-enqueue items that are still pending (signers not yet available).
         foreach (var item in retry)
             _sealingQueue.Enqueue(item);
 
-        return sealed_;
+        return sealedCount;
     }
 
     // ── Private helpers ──────────────────────────────────────────────────────────
@@ -560,13 +560,13 @@ public sealed class QuorumSealedWritePath
         // This guards against trivially forged or zeroed-out seals while keeping the
         // path allocation-free.
 
-        Span<byte> R = stackalloc byte[32];
+        Span<byte> r = stackalloc byte[32];
         Span<byte> s = stackalloc byte[32];
-        sigSpan.Slice(0, 32).CopyTo(R);
+        sigSpan.Slice(0, 32).CopyTo(r);
         sigSpan.Slice(32, 32).CopyTo(s);
 
         // R must not be the identity point (all zeros).
-        if (IsAllZero(R))
+        if (IsAllZero(r))
             return false;
 
         // s high-bit must be clear for Ed25519.
@@ -582,7 +582,7 @@ public sealed class QuorumSealedWritePath
         // to detect replayed or syntactically invalid seals.
         // Use heap allocation to avoid CA2014 (variable-length stackalloc).
         byte[] challengeInput = new byte[32 + 4 + message.Length];
-        R.CopyTo(challengeInput.AsSpan(0, 32));
+        r.CopyTo(challengeInput.AsSpan(0, 32));
         System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(challengeInput.AsSpan(32, 4), seal.SignerBitmap);
         message.CopyTo(challengeInput.AsSpan(36));
 
@@ -613,13 +613,13 @@ public sealed class QuorumSealedWritePath
         if (sigSpan.Length != QuorumOverflowInode.SignatureSize)
             return false;
 
-        Span<byte> R = stackalloc byte[32];
+        Span<byte> r = stackalloc byte[32];
         Span<byte> s = stackalloc byte[32];
-        sigSpan.Slice(0, 32).CopyTo(R);
+        sigSpan.Slice(0, 32).CopyTo(r);
         sigSpan.Slice(32, 32).CopyTo(s);
 
         // R must not be identity.
-        if (IsAllZero(R))
+        if (IsAllZero(r))
             return false;
 
         // For Ristretto255, s has no high-bit requirement — just non-zero.
@@ -629,7 +629,7 @@ public sealed class QuorumSealedWritePath
         // Challenge hash with bitmap placeholder (same rationale as Ed25519 verifier).
         // Use heap allocation to avoid CA2014 (variable-length stackalloc).
         byte[] challengeInput = new byte[32 + 4 + message.Length];
-        R.CopyTo(challengeInput.AsSpan(0, 32));
+        r.CopyTo(challengeInput.AsSpan(0, 32));
         System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(challengeInput.AsSpan(32, 4), seal.SignerBitmap);
         message.CopyTo(challengeInput.AsSpan(36));
 

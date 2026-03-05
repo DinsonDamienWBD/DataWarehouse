@@ -25,7 +25,7 @@ public sealed class GravityOptimizerTests
             Rack: rack,
             Host: host,
             Tags: new Dictionary<string, string>(),
-            StorageClasses: new[] { StorageClass.SSD },
+            StorageClasses: new[] { StorageClass.Ssd },
             CapacityBytes: 1_000_000_000_000L,
             UsedBytes: 0L,
             Weight: weight);

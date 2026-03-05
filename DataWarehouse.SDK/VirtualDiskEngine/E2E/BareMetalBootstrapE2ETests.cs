@@ -118,7 +118,7 @@ public static class BareMetalBootstrapE2ETests
             members.Add(new PoolMemberDescriptor(
                 DeviceId: devices[i].DeviceInfo.DeviceId,
                 DevicePath: devices[i].DeviceInfo.DevicePath,
-                MediaType: MediaType.RAMDisk,
+                MediaType: MediaType.RamDisk,
                 CapacityBytes: (long)DefaultBlockSize * DefaultBlockCount,
                 ReservedBytes: DefaultBlockSize * 16, // 16 blocks reserved for metadata
                 IsActive: true));
@@ -443,7 +443,7 @@ public static class BareMetalBootstrapE2ETests
             new FeaturePolicy
             {
                 FeatureId = "compression",
-                Level = PolicyLevel.VDE,
+                Level = PolicyLevel.Vde,
                 IntensityLevel = 80,
                 AiAutonomy = AiAutonomyLevel.Suggest,
                 Cascade = CascadeStrategy.Inherit,
@@ -483,13 +483,13 @@ public static class BareMetalBootstrapE2ETests
 
         // Test CascadeOverrideStore: set and retrieve overrides
         var overrideStore = new CascadeOverrideStore();
-        overrideStore.SetOverride("compression", PolicyLevel.VDE, CascadeStrategy.Inherit);
+        overrideStore.SetOverride("compression", PolicyLevel.Vde, CascadeStrategy.Inherit);
         overrideStore.SetOverride("compression", PolicyLevel.Object, CascadeStrategy.Override);
 
         AssertEqual(overrideStore.Count == 2,
             $"Override store should have 2 entries, got {overrideStore.Count}");
 
-        bool vdeFound = overrideStore.TryGetOverride("compression", PolicyLevel.VDE, out var vdeStrategy);
+        bool vdeFound = overrideStore.TryGetOverride("compression", PolicyLevel.Vde, out var vdeStrategy);
         AssertEqual(vdeFound && vdeStrategy == CascadeStrategy.Inherit,
             "VDE-level override should be Inherit");
 
@@ -622,7 +622,7 @@ public static class BareMetalBootstrapE2ETests
             members.Add(new PoolMemberDescriptor(
                 DeviceId: dev.DeviceInfo.DeviceId,
                 DevicePath: dev.DeviceInfo.DevicePath,
-                MediaType: MediaType.NVMe,
+                MediaType: MediaType.NvMe,
                 CapacityBytes: (long)DefaultBlockSize * DefaultBlockCount,
                 ReservedBytes: DefaultBlockSize * 8,
                 IsActive: true));
@@ -632,7 +632,7 @@ public static class BareMetalBootstrapE2ETests
             members.Add(new PoolMemberDescriptor(
                 DeviceId: dev.DeviceInfo.DeviceId,
                 DevicePath: dev.DeviceInfo.DevicePath,
-                MediaType: MediaType.SSD,
+                MediaType: MediaType.Ssd,
                 CapacityBytes: (long)DefaultBlockSize * DefaultBlockCount,
                 ReservedBytes: DefaultBlockSize * 8,
                 IsActive: true));

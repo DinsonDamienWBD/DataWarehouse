@@ -640,7 +640,7 @@ public sealed class DualRaidIntegrationTests
         Assert.True(device.IsOnline);
         Assert.Equal(4096, device.PhysicalSectorSize);
         Assert.Equal(4096, device.LogicalSectorSize);
-        Assert.Equal(MediaType.RAMDisk, device.DeviceInfo.MediaType);
+        Assert.Equal(MediaType.RamDisk, device.DeviceInfo.MediaType);
 
         // Health check
         var health = await device.GetHealthAsync();

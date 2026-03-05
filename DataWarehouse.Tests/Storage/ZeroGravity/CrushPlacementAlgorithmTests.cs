@@ -29,7 +29,7 @@ public sealed class CrushPlacementAlgorithmTests
             Rack: rack,
             Host: host,
             Tags: tags ?? new Dictionary<string, string>(),
-            StorageClasses: storageClasses ?? new[] { StorageClass.SSD },
+            StorageClasses: storageClasses ?? new[] { StorageClass.Ssd },
             CapacityBytes: 1_000_000_000_000L,
             UsedBytes: 0L,
             Weight: weight);
@@ -146,20 +146,20 @@ public sealed class CrushPlacementAlgorithmTests
         var nodes = new List<NodeDescriptor>
         {
             CreateNode("nvme-1", "zone-a", "rack-1", "host-1",
-                storageClasses: new[] { StorageClass.NVMe }),
+                storageClasses: new[] { StorageClass.NvMe }),
             CreateNode("nvme-2", "zone-b", "rack-2", "host-2",
-                storageClasses: new[] { StorageClass.NVMe }),
+                storageClasses: new[] { StorageClass.NvMe }),
             CreateNode("hdd-1", "zone-c", "rack-3", "host-3",
-                storageClasses: new[] { StorageClass.HDD }),
+                storageClasses: new[] { StorageClass.Hdd }),
             CreateNode("hdd-2", "zone-c", "rack-4", "host-4",
-                storageClasses: new[] { StorageClass.HDD }),
+                storageClasses: new[] { StorageClass.Hdd }),
         };
-        var target = CreateTarget("nvme-only", replicaCount: 2, requiredStorageClass: StorageClass.NVMe);
+        var target = CreateTarget("nvme-only", replicaCount: 2, requiredStorageClass: StorageClass.NvMe);
 
         var result = _algorithm.ComputePlacement(target, nodes);
 
         Assert.All(result.TargetNodes, n =>
-            Assert.Contains(StorageClass.NVMe, n.StorageClasses));
+            Assert.Contains(StorageClass.NvMe, n.StorageClasses));
     }
 
     [Fact]

@@ -39,8 +39,8 @@ public class CascadeSafetyTests
         var persistence = new InMemoryPolicyPersistence();
 
         // Store initial policy
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/vde1",
-            MakePolicy("encryption", PolicyLevel.VDE, 50));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/vde1",
+            MakePolicy("encryption", PolicyLevel.Vde, 50));
 
         // Update cache from store
         await cache.UpdateFromStoreAsync(store, new[] { "encryption" });
@@ -49,17 +49,17 @@ public class CascadeSafetyTests
         var snapshot = cache.GetSnapshot();
         snapshot.Should().NotBeNull();
 
-        var policyBefore = snapshot.TryGetPolicy("encryption", PolicyLevel.VDE, "/vde1");
+        var policyBefore = snapshot.TryGetPolicy("encryption", PolicyLevel.Vde, "/vde1");
         policyBefore.Should().NotBeNull();
         policyBefore!.IntensityLevel.Should().Be(50);
 
         // Modify the store and update the cache (simulating a concurrent write)
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/vde1",
-            MakePolicy("encryption", PolicyLevel.VDE, 99));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/vde1",
+            MakePolicy("encryption", PolicyLevel.Vde, 99));
         await cache.UpdateFromStoreAsync(store, new[] { "encryption" });
 
         // The old snapshot should still see intensity=50
-        var policyAfter = snapshot.TryGetPolicy("encryption", PolicyLevel.VDE, "/vde1");
+        var policyAfter = snapshot.TryGetPolicy("encryption", PolicyLevel.Vde, "/vde1");
         policyAfter.Should().NotBeNull();
         policyAfter!.IntensityLevel.Should().Be(50);
     }
@@ -70,18 +70,18 @@ public class CascadeSafetyTests
         var store = new InMemoryPolicyStore();
         var cache = new VersionedPolicyCache();
 
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/vde1",
-            MakePolicy("encryption", PolicyLevel.VDE, 50));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/vde1",
+            MakePolicy("encryption", PolicyLevel.Vde, 50));
         await cache.UpdateFromStoreAsync(store, new[] { "encryption" });
 
         // Modify store and update cache
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/vde1",
-            MakePolicy("encryption", PolicyLevel.VDE, 99));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/vde1",
+            MakePolicy("encryption", PolicyLevel.Vde, 99));
         await cache.UpdateFromStoreAsync(store, new[] { "encryption" });
 
         // New snapshot should see intensity=99
         var snapshot = cache.GetSnapshot();
-        var policy = snapshot.TryGetPolicy("encryption", PolicyLevel.VDE, "/vde1");
+        var policy = snapshot.TryGetPolicy("encryption", PolicyLevel.Vde, "/vde1");
         policy.Should().NotBeNull();
         policy!.IntensityLevel.Should().Be(99);
     }
@@ -106,23 +106,23 @@ public class CascadeSafetyTests
         var store = new InMemoryPolicyStore();
         var cache = new VersionedPolicyCache();
 
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/vde1",
-            MakePolicy("encryption", PolicyLevel.VDE, 50));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/vde1",
+            MakePolicy("encryption", PolicyLevel.Vde, 50));
         await cache.UpdateFromStoreAsync(store, new[] { "encryption" });
 
         var firstSnapshot = cache.GetSnapshot();
         firstSnapshot.Version.Should().Be(1);
 
         // Update cache again
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/vde1",
-            MakePolicy("encryption", PolicyLevel.VDE, 99));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/vde1",
+            MakePolicy("encryption", PolicyLevel.Vde, 99));
         await cache.UpdateFromStoreAsync(store, new[] { "encryption" });
 
         var previousSnapshot = cache.GetPreviousSnapshot();
         previousSnapshot.Version.Should().Be(1);
 
         // Previous snapshot still has the old data
-        var policy = previousSnapshot.TryGetPolicy("encryption", PolicyLevel.VDE, "/vde1");
+        var policy = previousSnapshot.TryGetPolicy("encryption", PolicyLevel.Vde, "/vde1");
         policy.Should().NotBeNull();
         policy!.IntensityLevel.Should().Be(50);
     }
@@ -135,16 +135,16 @@ public class CascadeSafetyTests
         var store = new InMemoryPolicyStore();
 
         // Policy B redirects to A
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/pathB",
-            MakePolicy("encryption", PolicyLevel.VDE, 50,
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/pathB",
+            MakePolicy("encryption", PolicyLevel.Vde, 50,
                 customParams: new Dictionary<string, string> { ["redirect"] = "/pathA" }));
 
         // Policy A redirects to B -> direct cycle
-        var policyA = MakePolicy("encryption", PolicyLevel.VDE, 50,
+        var policyA = MakePolicy("encryption", PolicyLevel.Vde, 50,
             customParams: new Dictionary<string, string> { ["redirect"] = "/pathB" });
 
         var act = () => CircularReferenceDetector.ValidateAsync(
-            "encryption", PolicyLevel.VDE, "/pathA", policyA, store);
+            "encryption", PolicyLevel.Vde, "/pathA", policyA, store);
 
         await act.Should().ThrowAsync<PolicyCircularReferenceException>()
             .Where(ex => ex.PathChain.Contains("/pathA") && ex.PathChain.Contains("/pathB"));
@@ -156,21 +156,21 @@ public class CascadeSafetyTests
         var store = new InMemoryPolicyStore();
 
         // B -> C
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/pathB",
-            MakePolicy("encryption", PolicyLevel.VDE, 50,
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/pathB",
+            MakePolicy("encryption", PolicyLevel.Vde, 50,
                 customParams: new Dictionary<string, string> { ["redirect"] = "/pathC" }));
 
         // C -> A
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/pathC",
-            MakePolicy("encryption", PolicyLevel.VDE, 50,
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/pathC",
+            MakePolicy("encryption", PolicyLevel.Vde, 50,
                 customParams: new Dictionary<string, string> { ["redirect"] = "/pathA" }));
 
         // A -> B (creates A->B->C->A cycle)
-        var policyA = MakePolicy("encryption", PolicyLevel.VDE, 50,
+        var policyA = MakePolicy("encryption", PolicyLevel.Vde, 50,
             customParams: new Dictionary<string, string> { ["redirect"] = "/pathB" });
 
         var act = () => CircularReferenceDetector.ValidateAsync(
-            "encryption", PolicyLevel.VDE, "/pathA", policyA, store);
+            "encryption", PolicyLevel.Vde, "/pathA", policyA, store);
 
         await act.Should().ThrowAsync<PolicyCircularReferenceException>()
             .Where(ex => ex.PathChain.Count >= 3);
@@ -182,15 +182,15 @@ public class CascadeSafetyTests
         var store = new InMemoryPolicyStore();
 
         // B has no redirect
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/pathB",
-            MakePolicy("encryption", PolicyLevel.VDE, 50));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/pathB",
+            MakePolicy("encryption", PolicyLevel.Vde, 50));
 
         // A redirects to B (no cycle)
-        var policyA = MakePolicy("encryption", PolicyLevel.VDE, 50,
+        var policyA = MakePolicy("encryption", PolicyLevel.Vde, 50,
             customParams: new Dictionary<string, string> { ["redirect"] = "/pathB" });
 
         var result = await CircularReferenceDetector.ValidateAsync(
-            "encryption", PolicyLevel.VDE, "/pathA", policyA, store);
+            "encryption", PolicyLevel.Vde, "/pathA", policyA, store);
 
         result.IsValid.Should().BeTrue();
     }
@@ -204,21 +204,21 @@ public class CascadeSafetyTests
         // Set maxDepth to 3 but chain is 5 hops
         for (var i = 1; i <= 5; i++)
         {
-            await store.SetAsync("encryption", PolicyLevel.VDE, $"/path{i}",
-                MakePolicy("encryption", PolicyLevel.VDE, 50,
+            await store.SetAsync("encryption", PolicyLevel.Vde, $"/path{i}",
+                MakePolicy("encryption", PolicyLevel.Vde, 50,
                     customParams: new Dictionary<string, string> { ["redirect"] = $"/path{i + 1}" }));
         }
 
         // Last node has no redirect (no actual cycle)
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/path6",
-            MakePolicy("encryption", PolicyLevel.VDE, 50));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/path6",
+            MakePolicy("encryption", PolicyLevel.Vde, 50));
 
         // A redirects to path1, max depth 3 should trigger depth exceeded
-        var policyA = MakePolicy("encryption", PolicyLevel.VDE, 50,
+        var policyA = MakePolicy("encryption", PolicyLevel.Vde, 50,
             customParams: new Dictionary<string, string> { ["redirect"] = "/path1" });
 
         var result = await CircularReferenceDetector.ValidateAsync(
-            "encryption", PolicyLevel.VDE, "/pathA", policyA, store, maxDepth: 3);
+            "encryption", PolicyLevel.Vde, "/pathA", policyA, store, maxDepth: 3);
 
         // Chain is longer than maxDepth, should produce an error
         result.IsValid.Should().BeFalse();
@@ -230,17 +230,17 @@ public class CascadeSafetyTests
     {
         var store = new InMemoryPolicyStore();
 
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/pathB",
-            MakePolicy("encryption", PolicyLevel.VDE, 50,
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/pathB",
+            MakePolicy("encryption", PolicyLevel.Vde, 50,
                 customParams: new Dictionary<string, string> { ["redirect"] = "/pathA" }));
 
-        var policyA = MakePolicy("encryption", PolicyLevel.VDE, 50,
+        var policyA = MakePolicy("encryption", PolicyLevel.Vde, 50,
             customParams: new Dictionary<string, string> { ["redirect"] = "/pathB" });
 
         try
         {
             await CircularReferenceDetector.ValidateAsync(
-                "encryption", PolicyLevel.VDE, "/pathA", policyA, store);
+                "encryption", PolicyLevel.Vde, "/pathA", policyA, store);
 
             // Should not reach here
             true.Should().BeFalse("Expected PolicyCircularReferenceException");
@@ -328,9 +328,9 @@ public class CascadeSafetyTests
     {
         var store = new CascadeOverrideStore();
 
-        store.SetOverride("encryption", PolicyLevel.VDE, CascadeStrategy.Enforce);
+        store.SetOverride("encryption", PolicyLevel.Vde, CascadeStrategy.Enforce);
 
-        store.TryGetOverride("encryption", PolicyLevel.VDE, out var strategy).Should().BeTrue();
+        store.TryGetOverride("encryption", PolicyLevel.Vde, out var strategy).Should().BeTrue();
         strategy.Should().Be(CascadeStrategy.Enforce);
     }
 
@@ -343,8 +343,8 @@ public class CascadeSafetyTests
         // Store a policy at Container level with no explicit cascade (uses Inherit as zero value)
         await policyStore.SetAsync("encryption", PolicyLevel.Container, "/v1/c1",
             MakePolicy("encryption", PolicyLevel.Container, 60, cascade: CascadeStrategy.Inherit));
-        await policyStore.SetAsync("encryption", PolicyLevel.VDE, "/v1",
-            MakePolicy("encryption", PolicyLevel.VDE, 40, cascade: CascadeStrategy.Inherit));
+        await policyStore.SetAsync("encryption", PolicyLevel.Vde, "/v1",
+            MakePolicy("encryption", PolicyLevel.Vde, 40, cascade: CascadeStrategy.Inherit));
 
         // Set user override: Container level should use Override
         overrideStore.SetOverride("encryption", PolicyLevel.Container, CascadeStrategy.Override);
@@ -365,10 +365,10 @@ public class CascadeSafetyTests
     public void CascadeOverride_Remove_FallsBackToDefault()
     {
         var store = new CascadeOverrideStore();
-        store.SetOverride("encryption", PolicyLevel.VDE, CascadeStrategy.Enforce);
+        store.SetOverride("encryption", PolicyLevel.Vde, CascadeStrategy.Enforce);
 
-        store.RemoveOverride("encryption", PolicyLevel.VDE).Should().BeTrue();
-        store.TryGetOverride("encryption", PolicyLevel.VDE, out _).Should().BeFalse();
+        store.RemoveOverride("encryption", PolicyLevel.Vde).Should().BeTrue();
+        store.TryGetOverride("encryption", PolicyLevel.Vde, out _).Should().BeFalse();
     }
 
     [Fact]
@@ -377,7 +377,7 @@ public class CascadeSafetyTests
         var persistence = new InMemoryPolicyPersistence();
         var store1 = new CascadeOverrideStore();
 
-        store1.SetOverride("encryption", PolicyLevel.VDE, CascadeStrategy.Enforce);
+        store1.SetOverride("encryption", PolicyLevel.Vde, CascadeStrategy.Enforce);
         store1.SetOverride("compression", PolicyLevel.Container, CascadeStrategy.MostRestrictive);
 
         await store1.SaveToPersistenceAsync(persistence);
@@ -387,7 +387,7 @@ public class CascadeSafetyTests
         var loaded = await store2.LoadFromPersistenceAsync(persistence);
 
         loaded.Should().Be(2);
-        store2.TryGetOverride("encryption", PolicyLevel.VDE, out var strategy1).Should().BeTrue();
+        store2.TryGetOverride("encryption", PolicyLevel.Vde, out var strategy1).Should().BeTrue();
         strategy1.Should().Be(CascadeStrategy.Enforce);
         store2.TryGetOverride("compression", PolicyLevel.Container, out var strategy2).Should().BeTrue();
         strategy2.Should().Be(CascadeStrategy.MostRestrictive);
@@ -402,8 +402,8 @@ public class CascadeSafetyTests
         var cache = new VersionedPolicyCache();
         var persistence = new InMemoryPolicyPersistence();
 
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/vde1",
-            MakePolicy("encryption", PolicyLevel.VDE, 75));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/vde1",
+            MakePolicy("encryption", PolicyLevel.Vde, 75));
 
         await cache.UpdateFromStoreAsync(store, new[] { "encryption" });
 
@@ -424,16 +424,16 @@ public class CascadeSafetyTests
         var store = new InMemoryPolicyStore();
         var persistence = new InMemoryPolicyPersistence();
 
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/pathB",
-            MakePolicy("encryption", PolicyLevel.VDE, 50,
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/pathB",
+            MakePolicy("encryption", PolicyLevel.Vde, 50,
                 customParams: new Dictionary<string, string> { ["redirect"] = "/pathA" }));
 
         var engine = new PolicyResolutionEngine(store, persistence);
 
-        var circularPolicy = MakePolicy("encryption", PolicyLevel.VDE, 50,
+        var circularPolicy = MakePolicy("encryption", PolicyLevel.Vde, 50,
             customParams: new Dictionary<string, string> { ["redirect"] = "/pathB" });
 
-        var act = () => engine.ValidatePolicyAsync("encryption", PolicyLevel.VDE, "/pathA", circularPolicy);
+        var act = () => engine.ValidatePolicyAsync("encryption", PolicyLevel.Vde, "/pathA", circularPolicy);
 
         await act.Should().ThrowAsync<PolicyCircularReferenceException>();
     }
@@ -447,8 +447,8 @@ public class CascadeSafetyTests
         var persistence = new InMemoryPolicyPersistence();
 
         // VDE with Merge cascade
-        await store.SetAsync("governance", PolicyLevel.VDE, "/v1",
-            MakePolicy("governance", PolicyLevel.VDE, 50, cascade: CascadeStrategy.Merge,
+        await store.SetAsync("governance", PolicyLevel.Vde, "/v1",
+            MakePolicy("governance", PolicyLevel.Vde, 50, cascade: CascadeStrategy.Merge,
                 customParams: new Dictionary<string, string> { ["limit"] = "100", ["region"] = "us" }));
 
         // Container with Merge cascade

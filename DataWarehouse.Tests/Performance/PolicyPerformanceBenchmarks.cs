@@ -61,7 +61,7 @@ public class PolicyPerformanceBenchmarks
         var policies = new Dictionary<string, FeaturePolicy>();
         foreach (var fid in featureIds)
         {
-            policies[fid] = MakePolicy(fid, PolicyLevel.VDE, 50);
+            policies[fid] = MakePolicy(fid, PolicyLevel.Vde, 50);
         }
         return new OperationalProfile
         {
@@ -79,8 +79,8 @@ public class PolicyPerformanceBenchmarks
     public async Task ResolutionEngine_SingleResolve_CompletesWithin10ms()
     {
         var store = CreateStore();
-        var policy = MakePolicy("encryption", PolicyLevel.VDE, 80);
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/vde1", policy);
+        var policy = MakePolicy("encryption", PolicyLevel.Vde, 80);
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/vde1", policy);
         var engine = CreateEngine(store);
         var ctx = new PolicyResolutionContext { Path = "/vde1" };
 
@@ -103,7 +103,7 @@ public class PolicyPerformanceBenchmarks
         var featureIds = Enumerable.Range(0, 10).Select(i => $"feature_{i}").ToArray();
         foreach (var fid in featureIds)
         {
-            await store.SetAsync(fid, PolicyLevel.VDE, "/vde1", MakePolicy(fid, PolicyLevel.VDE, 50 + featureIds.ToList().IndexOf(fid)));
+            await store.SetAsync(fid, PolicyLevel.Vde, "/vde1", MakePolicy(fid, PolicyLevel.Vde, 50 + featureIds.ToList().IndexOf(fid)));
         }
         var profile = CreateProfileWithFeatures(featureIds);
         var engine = CreateEngine(store, profile: profile);
@@ -125,7 +125,7 @@ public class PolicyPerformanceBenchmarks
     public async Task ResolutionEngine_100SequentialResolves_CompletesWithin500ms()
     {
         var store = CreateStore();
-        await store.SetAsync("compression", PolicyLevel.VDE, "/vde1", MakePolicy("compression", PolicyLevel.VDE, 70));
+        await store.SetAsync("compression", PolicyLevel.Vde, "/vde1", MakePolicy("compression", PolicyLevel.Vde, 70));
         var engine = CreateEngine(store);
         var ctx = new PolicyResolutionContext { Path = "/vde1" };
 
@@ -148,7 +148,7 @@ public class PolicyPerformanceBenchmarks
     {
         var store = CreateStore();
         var path = "/vde1/cont1/obj1/chunk1/block1";
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/vde1", MakePolicy("encryption", PolicyLevel.VDE, 50));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/vde1", MakePolicy("encryption", PolicyLevel.Vde, 50));
         await store.SetAsync("encryption", PolicyLevel.Container, "/vde1/cont1", MakePolicy("encryption", PolicyLevel.Container, 60));
         await store.SetAsync("encryption", PolicyLevel.Object, "/vde1/cont1/obj1", MakePolicy("encryption", PolicyLevel.Object, 70));
         await store.SetAsync("encryption", PolicyLevel.Chunk, "/vde1/cont1/obj1/chunk1", MakePolicy("encryption", PolicyLevel.Chunk, 80));
@@ -172,7 +172,7 @@ public class PolicyPerformanceBenchmarks
     public async Task ResolutionEngine_OverrideCascade_CompletesWithin10ms()
     {
         var store = CreateStore();
-        await store.SetAsync("compression", PolicyLevel.VDE, "/vde1", MakePolicy("compression", PolicyLevel.VDE, 50, CascadeStrategy.Override));
+        await store.SetAsync("compression", PolicyLevel.Vde, "/vde1", MakePolicy("compression", PolicyLevel.Vde, 50, CascadeStrategy.Override));
         await store.SetAsync("compression", PolicyLevel.Container, "/vde1/cont1", MakePolicy("compression", PolicyLevel.Container, 80, CascadeStrategy.Override));
         var engine = CreateEngine(store);
         var ctx = new PolicyResolutionContext { Path = "/vde1/cont1" };
@@ -193,8 +193,8 @@ public class PolicyPerformanceBenchmarks
     public async Task ResolutionEngine_MostRestrictive_CompletesWithin15ms()
     {
         var store = CreateStore();
-        await store.SetAsync("access_control", PolicyLevel.VDE, "/vde1",
-            MakePolicy("access_control", PolicyLevel.VDE, 90, CascadeStrategy.MostRestrictive));
+        await store.SetAsync("access_control", PolicyLevel.Vde, "/vde1",
+            MakePolicy("access_control", PolicyLevel.Vde, 90, CascadeStrategy.MostRestrictive));
         await store.SetAsync("access_control", PolicyLevel.Container, "/vde1/cont1",
             MakePolicy("access_control", PolicyLevel.Container, 60, CascadeStrategy.MostRestrictive));
         var engine = CreateEngine(store);
@@ -215,10 +215,10 @@ public class PolicyPerformanceBenchmarks
     public async Task ResolutionEngine_SimulateAsync_CompletesWithin10ms()
     {
         var store = CreateStore();
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/vde1", MakePolicy("encryption", PolicyLevel.VDE, 50));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/vde1", MakePolicy("encryption", PolicyLevel.Vde, 50));
         var engine = CreateEngine(store);
         var ctx = new PolicyResolutionContext { Path = "/vde1" };
-        var hypothetical = MakePolicy("encryption", PolicyLevel.VDE, 100);
+        var hypothetical = MakePolicy("encryption", PolicyLevel.Vde, 100);
 
         // Warmup
         await engine.SimulateAsync("encryption", ctx, hypothetical);
@@ -277,7 +277,7 @@ public class PolicyPerformanceBenchmarks
     public async Task FastPath_CriticalFeatureResolution_CompletesWithin5ms()
     {
         var store = CreateStore();
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/vde1", MakePolicy("encryption", PolicyLevel.VDE, 90));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/vde1", MakePolicy("encryption", PolicyLevel.Vde, 90));
         var profile = CreateProfileWithFeatures("encryption");
         var engine = CreateFastPathEngine(store, profile);
         var ctx = new PolicyResolutionContext { Path = "/vde1" };
@@ -329,7 +329,7 @@ public class PolicyPerformanceBenchmarks
                 effectiveIntensity: 50,
                 effectiveAiAutonomy: AiAutonomyLevel.SuggestExplain,
                 appliedCascade: CascadeStrategy.Inherit,
-                decidedAtLevel: PolicyLevel.VDE,
+                decidedAtLevel: PolicyLevel.Vde,
                 resolutionChain: Array.Empty<FeaturePolicy>(),
                 mergedParameters: new Dictionary<string, string>(),
                 snapshotTimestamp: DateTimeOffset.UtcNow)
@@ -358,7 +358,7 @@ public class PolicyPerformanceBenchmarks
     public async Task FastPath_1000Resolutions_CompletesWithin2000ms()
     {
         var store = CreateStore();
-        await store.SetAsync("compression", PolicyLevel.VDE, "/vde1", MakePolicy("compression", PolicyLevel.VDE, 70));
+        await store.SetAsync("compression", PolicyLevel.Vde, "/vde1", MakePolicy("compression", PolicyLevel.Vde, 70));
         var profile = CreateProfileWithFeatures("compression");
         var engine = CreateFastPathEngine(store, profile);
         var ctx = new PolicyResolutionContext { Path = "/vde1" };
@@ -381,7 +381,7 @@ public class PolicyPerformanceBenchmarks
     public async Task FastPath_FasterThanFullPath_AtLeast2x()
     {
         var store = CreateStore();
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/vde1", MakePolicy("encryption", PolicyLevel.VDE, 80));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/vde1", MakePolicy("encryption", PolicyLevel.Vde, 80));
         var profile = CreateProfileWithFeatures("encryption");
         var ctx = new PolicyResolutionContext { Path = "/vde1" };
 
@@ -397,7 +397,7 @@ public class PolicyPerformanceBenchmarks
                 effectiveIntensity: 80,
                 effectiveAiAutonomy: AiAutonomyLevel.SuggestExplain,
                 appliedCascade: CascadeStrategy.Override,
-                decidedAtLevel: PolicyLevel.VDE,
+                decidedAtLevel: PolicyLevel.Vde,
                 resolutionChain: Array.Empty<FeaturePolicy>(),
                 mergedParameters: new Dictionary<string, string>(),
                 snapshotTimestamp: DateTimeOffset.UtcNow)
@@ -444,13 +444,13 @@ public class PolicyPerformanceBenchmarks
     public void BloomFilter_SingleQuery_CompletesWithin100Microseconds()
     {
         var filter = new BloomFilterSkipIndex(expectedItems: 1000);
-        filter.Add(PolicyLevel.VDE, "/vde1");
+        filter.Add(PolicyLevel.Vde, "/vde1");
 
         // Warmup
-        filter.MayContain(PolicyLevel.VDE, "/vde1");
+        filter.MayContain(PolicyLevel.Vde, "/vde1");
 
         var sw = Stopwatch.StartNew();
-        var result = filter.MayContain(PolicyLevel.VDE, "/vde1");
+        var result = filter.MayContain(PolicyLevel.Vde, "/vde1");
         sw.Stop();
 
         result.Should().BeTrue();
@@ -465,19 +465,19 @@ public class PolicyPerformanceBenchmarks
         var filter = new BloomFilterSkipIndex(expectedItems: 1000);
         for (int i = 0; i < 100; i++)
         {
-            filter.Add(PolicyLevel.VDE, $"/vde{i}");
+            filter.Add(PolicyLevel.Vde, $"/vde{i}");
         }
 
         // Warmup
         for (int i = 0; i < 100; i++)
         {
-            filter.MayContain(PolicyLevel.VDE, $"/vde{i}");
+            filter.MayContain(PolicyLevel.Vde, $"/vde{i}");
         }
 
         var sw = Stopwatch.StartNew();
         for (int i = 0; i < 10_000; i++)
         {
-            filter.MayContain(PolicyLevel.VDE, $"/vde{i % 100}");
+            filter.MayContain(PolicyLevel.Vde, $"/vde{i % 100}");
         }
         sw.Stop();
 
@@ -518,14 +518,14 @@ public class PolicyPerformanceBenchmarks
         // Add 1000 known entries
         for (int i = 0; i < 1000; i++)
         {
-            filter.Add(PolicyLevel.VDE, $"/known-vde-{i}");
+            filter.Add(PolicyLevel.Vde, $"/known-vde-{i}");
         }
 
         // Test 10000 unknown entries for false positives
         int falsePositives = 0;
         for (int i = 0; i < 10_000; i++)
         {
-            if (filter.MayContain(PolicyLevel.VDE, $"/unknown-vde-{i + 100_000}"))
+            if (filter.MayContain(PolicyLevel.Vde, $"/unknown-vde-{i + 100_000}"))
             {
                 falsePositives++;
             }
@@ -574,7 +574,7 @@ public class PolicyPerformanceBenchmarks
                 effectiveIntensity: 80,
                 effectiveAiAutonomy: AiAutonomyLevel.SuggestExplain,
                 appliedCascade: CascadeStrategy.Override,
-                decidedAtLevel: PolicyLevel.VDE,
+                decidedAtLevel: PolicyLevel.Vde,
                 resolutionChain: Array.Empty<FeaturePolicy>(),
                 mergedParameters: new Dictionary<string, string>(),
                 snapshotTimestamp: DateTimeOffset.UtcNow)
@@ -615,7 +615,7 @@ public class PolicyPerformanceBenchmarks
                 effectiveIntensity: 50,
                 effectiveAiAutonomy: AiAutonomyLevel.SuggestExplain,
                 appliedCascade: CascadeStrategy.Inherit,
-                decidedAtLevel: PolicyLevel.VDE,
+                decidedAtLevel: PolicyLevel.Vde,
                 resolutionChain: Array.Empty<FeaturePolicy>(),
                 mergedParameters: new Dictionary<string, string>(),
                 snapshotTimestamp: DateTimeOffset.UtcNow);
@@ -644,7 +644,7 @@ public class PolicyPerformanceBenchmarks
                 effectiveIntensity: i,
                 effectiveAiAutonomy: AiAutonomyLevel.SuggestExplain,
                 appliedCascade: CascadeStrategy.Inherit,
-                decidedAtLevel: PolicyLevel.VDE,
+                decidedAtLevel: PolicyLevel.Vde,
                 resolutionChain: Array.Empty<FeaturePolicy>(),
                 mergedParameters: new Dictionary<string, string>(),
                 snapshotTimestamp: DateTimeOffset.UtcNow);
@@ -679,7 +679,7 @@ public class PolicyPerformanceBenchmarks
                 effectiveIntensity: 50,
                 effectiveAiAutonomy: AiAutonomyLevel.SuggestExplain,
                 appliedCascade: CascadeStrategy.Inherit,
-                decidedAtLevel: PolicyLevel.VDE,
+                decidedAtLevel: PolicyLevel.Vde,
                 resolutionChain: Array.Empty<FeaturePolicy>(),
                 mergedParameters: new Dictionary<string, string>(),
                 snapshotTimestamp: DateTimeOffset.UtcNow)
@@ -725,7 +725,7 @@ public class PolicyPerformanceBenchmarks
                         effectiveIntensity: 50 + (i % 50),
                         effectiveAiAutonomy: AiAutonomyLevel.SuggestExplain,
                         appliedCascade: CascadeStrategy.Inherit,
-                        decidedAtLevel: PolicyLevel.VDE,
+                        decidedAtLevel: PolicyLevel.Vde,
                         resolutionChain: Array.Empty<FeaturePolicy>(),
                         mergedParameters: new Dictionary<string, string>(),
                         snapshotTimestamp: DateTimeOffset.UtcNow)
@@ -753,7 +753,7 @@ public class PolicyPerformanceBenchmarks
     public async Task Concurrency_100ParallelResolves_CompletesWithin2000ms_NoDeadlock()
     {
         var store = CreateStore();
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/vde1", MakePolicy("encryption", PolicyLevel.VDE, 80));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/vde1", MakePolicy("encryption", PolicyLevel.Vde, 80));
         var engine = CreateEngine(store);
         var ctx = new PolicyResolutionContext { Path = "/vde1" };
 
@@ -777,7 +777,7 @@ public class PolicyPerformanceBenchmarks
     public async Task Concurrency_50Writes50Reads_NoCorruption_CompletesWithin3000ms()
     {
         var store = CreateStore();
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/vde1", MakePolicy("encryption", PolicyLevel.VDE, 50));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/vde1", MakePolicy("encryption", PolicyLevel.Vde, 50));
         var engine = CreateEngine(store);
         var ctx = new PolicyResolutionContext { Path = "/vde1" };
 
@@ -786,8 +786,8 @@ public class PolicyPerformanceBenchmarks
         // 50 parallel writes
         var writeTasks = Enumerable.Range(0, 50).Select(i => Task.Run(async () =>
         {
-            await store.SetAsync("encryption", PolicyLevel.VDE, "/vde1",
-                MakePolicy("encryption", PolicyLevel.VDE, 50 + (i % 50)));
+            await store.SetAsync("encryption", PolicyLevel.Vde, "/vde1",
+                MakePolicy("encryption", PolicyLevel.Vde, 50 + (i % 50)));
         })).ToArray();
 
         // 50 parallel reads
@@ -842,7 +842,7 @@ public class PolicyPerformanceBenchmarks
         {
             var policies = new Dictionary<string, FeaturePolicy>
             {
-                [$"encryption:VDE:/vde{i}"] = MakePolicy("encryption", PolicyLevel.VDE, 50 + (i % 50))
+                [$"encryption:VDE:/vde{i}"] = MakePolicy("encryption", PolicyLevel.Vde, 50 + (i % 50))
             };
             cache.Update(policies);
         }
@@ -869,11 +869,11 @@ public class PolicyPerformanceBenchmarks
             var path = $"/vde{i % 5}";
 
             // Write
-            await store.SetAsync(featureId, PolicyLevel.VDE, path,
-                MakePolicy(featureId, PolicyLevel.VDE, 50 + i));
+            await store.SetAsync(featureId, PolicyLevel.Vde, path,
+                MakePolicy(featureId, PolicyLevel.Vde, 50 + i));
 
             // Read
-            var result = await store.GetAsync(featureId, PolicyLevel.VDE, path);
+            var result = await store.GetAsync(featureId, PolicyLevel.Vde, path);
             return result;
         })).ToArray();
 
@@ -900,15 +900,15 @@ public class PolicyPerformanceBenchmarks
                 var featureId = $"feature_{i % 5}";
                 var path = $"/vde{i % 3}";
 
-                await store.SetAsync(featureId, PolicyLevel.VDE, path,
-                    MakePolicy(featureId, PolicyLevel.VDE, i));
+                await store.SetAsync(featureId, PolicyLevel.Vde, path,
+                    MakePolicy(featureId, PolicyLevel.Vde, i));
 
-                await store.GetAsync(featureId, PolicyLevel.VDE, path);
-                await store.HasOverrideAsync(PolicyLevel.VDE, path);
+                await store.GetAsync(featureId, PolicyLevel.Vde, path);
+                await store.HasOverrideAsync(PolicyLevel.Vde, path);
 
                 if (i % 3 == 0)
                 {
-                    await store.RemoveAsync(featureId, PolicyLevel.VDE, path);
+                    await store.RemoveAsync(featureId, PolicyLevel.Vde, path);
                 }
             }
             catch (Exception ex)
@@ -1025,7 +1025,7 @@ public class PolicyPerformanceBenchmarks
                 effectiveIntensity: 90,
                 effectiveAiAutonomy: AiAutonomyLevel.SuggestExplain,
                 appliedCascade: CascadeStrategy.Override,
-                decidedAtLevel: PolicyLevel.VDE,
+                decidedAtLevel: PolicyLevel.Vde,
                 resolutionChain: Array.Empty<FeaturePolicy>(),
                 mergedParameters: new Dictionary<string, string>(),
                 snapshotTimestamp: DateTimeOffset.UtcNow)
@@ -1094,7 +1094,7 @@ public class PolicyPerformanceBenchmarks
                 effectiveIntensity: 50,
                 effectiveAiAutonomy: AiAutonomyLevel.SuggestExplain,
                 appliedCascade: CascadeStrategy.Inherit,
-                decidedAtLevel: PolicyLevel.VDE,
+                decidedAtLevel: PolicyLevel.Vde,
                 resolutionChain: Array.Empty<FeaturePolicy>(),
                 mergedParameters: new Dictionary<string, string>(),
                 snapshotTimestamp: DateTimeOffset.UtcNow)
@@ -1118,7 +1118,7 @@ public class PolicyPerformanceBenchmarks
                             effectiveIntensity: 50 + i,
                             effectiveAiAutonomy: AiAutonomyLevel.SuggestExplain,
                             appliedCascade: CascadeStrategy.Inherit,
-                            decidedAtLevel: PolicyLevel.VDE,
+                            decidedAtLevel: PolicyLevel.Vde,
                             resolutionChain: Array.Empty<FeaturePolicy>(),
                             mergedParameters: new Dictionary<string, string>(),
                             snapshotTimestamp: DateTimeOffset.UtcNow)

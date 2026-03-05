@@ -272,7 +272,7 @@ public sealed class KernelBuildScriptGenerator
     /// </summary>
     private static string GetImageTarget(TargetArchitecture arch) => arch switch
     {
-        TargetArchitecture.X86_64 => "bzImage",
+        TargetArchitecture.X8664 => "bzImage",
         TargetArchitecture.Aarch64 => "Image.gz",
         TargetArchitecture.RiscV64 => "Image.gz",
         _ => "bzImage",
@@ -283,7 +283,7 @@ public sealed class KernelBuildScriptGenerator
     /// </summary>
     private static string GetImagePath(TargetArchitecture arch, string kernelVersion) => arch switch
     {
-        TargetArchitecture.X86_64 => $"arch/x86/boot/bzImage",
+        TargetArchitecture.X8664 => $"arch/x86/boot/bzImage",
         TargetArchitecture.Aarch64 => $"arch/arm64/boot/Image.gz",
         TargetArchitecture.RiscV64 => $"arch/riscv/boot/Image.gz",
         _ => $"arch/x86/boot/bzImage",
@@ -294,7 +294,7 @@ public sealed class KernelBuildScriptGenerator
     /// </summary>
     private static string GetOutputFileName(TargetArchitecture arch) => arch switch
     {
-        TargetArchitecture.X86_64 => "dwvd-kernel-x86_64.bzImage",
+        TargetArchitecture.X8664 => "dwvd-kernel-x86_64.bzImage",
         TargetArchitecture.Aarch64 => "dwvd-kernel-aarch64.Image.gz",
         TargetArchitecture.RiscV64 => "dwvd-kernel-riscv64.Image.gz",
         _ => "dwvd-kernel.bzImage",

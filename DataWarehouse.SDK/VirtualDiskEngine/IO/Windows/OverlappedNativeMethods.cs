@@ -28,31 +28,31 @@ internal static partial class OverlappedNativeMethods
     /// <summary>
     /// FILE_FLAG_OVERLAPPED: Opens the file for asynchronous (overlapped) I/O.
     /// </summary>
-    internal const uint FILE_FLAG_OVERLAPPED = 0x40000000;
+    internal const uint FileFlagOverlapped = 0x40000000;
 
     /// <summary>
     /// FILE_FLAG_NO_BUFFERING: Opens the file with no intermediate buffering or caching.
     /// All reads and writes must be aligned to the volume sector size.
     /// </summary>
-    internal const uint FILE_FLAG_NO_BUFFERING = 0x20000000;
+    internal const uint FileFlagNoBuffering = 0x20000000;
 
     /// <summary>
     /// FILE_FLAG_WRITE_THROUGH: Instructs the system to write through any intermediate cache
     /// and go directly to disk. Must be combined with FILE_FLAG_NO_BUFFERING for full bypass.
     /// </summary>
-    internal const uint FILE_FLAG_WRITE_THROUGH = 0x80000000;
+    internal const uint FileFlagWriteThrough = 0x80000000;
 
     /// <summary>Generic read access right.</summary>
-    internal const uint GENERIC_READ = 0x80000000;
+    internal const uint GenericRead = 0x80000000;
 
     /// <summary>Generic write access right.</summary>
-    internal const uint GENERIC_WRITE = 0x40000000;
+    internal const uint GenericWrite = 0x40000000;
 
     /// <summary>Opens a file only if it exists.</summary>
-    internal const uint OPEN_EXISTING = 3;
+    internal const uint OpenExisting = 3;
 
     /// <summary>Creates a new file; fails if the file already exists.</summary>
-    internal const uint CREATE_NEW = 1;
+    internal const uint CreateNew = 1;
 
     // ── P/Invoke declarations ───────────────────────────────────────────
 
@@ -132,8 +132,8 @@ internal static partial class OverlappedNativeMethods
     // ── Constants for completion port ───────────────────────────────────
 
     /// <summary>INFINITE timeout value for completion port waits.</summary>
-    internal const uint INFINITE = 0xFFFFFFFF;
+    internal const uint Infinite = 0xFFFFFFFF;
 
     /// <summary>Invalid handle sentinel value.</summary>
-    internal static readonly nint INVALID_HANDLE_VALUE = new(-1);
+    internal static readonly nint InvalidHandleValue = new(-1);
 }

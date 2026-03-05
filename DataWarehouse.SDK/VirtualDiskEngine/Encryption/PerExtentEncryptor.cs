@@ -185,7 +185,7 @@ public sealed class PerExtentEncryptor : IDisposable
     /// <param name="startBlock">The physical start block number of the extent.</param>
     /// <param name="logicalOffset">The logical byte offset within the file.</param>
     /// <returns>A deterministic 12-byte IV derived from extent position and volume key.</returns>
-    public byte[] DeriveIV(long startBlock, long logicalOffset)
+    public byte[] DeriveIv(long startBlock, long logicalOffset)
         => DeriveNonce(startBlock, logicalOffset);
 
     /// <summary>

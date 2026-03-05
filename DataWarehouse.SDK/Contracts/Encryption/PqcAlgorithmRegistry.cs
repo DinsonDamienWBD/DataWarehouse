@@ -51,12 +51,12 @@ namespace DataWarehouse.SDK.Contracts.Encryption
     [SdkCompatibility("5.0.0", Notes = "Phase 59: Cryptographic commitment schemes")]
     public static class PqcAlgorithmRegistry
     {
-        private static readonly Dictionary<string, PqcAlgorithmInfo> _algorithms = BuildAlgorithmDictionary();
+        private static readonly Dictionary<string, PqcAlgorithmInfo> AlgorithmStore = BuildAlgorithmDictionary();
 
         /// <summary>
         /// Gets all registered PQC algorithms indexed by algorithm ID.
         /// </summary>
-        public static IReadOnlyDictionary<string, PqcAlgorithmInfo> Algorithms { get; } = new ReadOnlyDictionary<string, PqcAlgorithmInfo>(_algorithms);
+        public static IReadOnlyDictionary<string, PqcAlgorithmInfo> Algorithms { get; } = new ReadOnlyDictionary<string, PqcAlgorithmInfo>(AlgorithmStore);
 
         private static Dictionary<string, PqcAlgorithmInfo> BuildAlgorithmDictionary() => new(StringComparer.OrdinalIgnoreCase)
         {
@@ -264,9 +264,9 @@ namespace DataWarehouse.SDK.Contracts.Encryption
         {
             return nistLevel switch
             {
-                1 => _algorithms.GetValueOrDefault("ml-kem-512"),
-                3 => _algorithms.GetValueOrDefault("ml-kem-768"),
-                5 => _algorithms.GetValueOrDefault("ml-kem-1024"),
+                1 => Algorithms.GetValueOrDefault("ml-kem-512"),
+                3 => Algorithms.GetValueOrDefault("ml-kem-768"),
+                5 => Algorithms.GetValueOrDefault("ml-kem-1024"),
                 _ => null
             };
         }
@@ -282,9 +282,9 @@ namespace DataWarehouse.SDK.Contracts.Encryption
         {
             return nistLevel switch
             {
-                1 or 2 => _algorithms.GetValueOrDefault("ml-dsa-44"),
-                3 => _algorithms.GetValueOrDefault("ml-dsa-65"),
-                4 or 5 => _algorithms.GetValueOrDefault("ml-dsa-87"),
+                1 or 2 => Algorithms.GetValueOrDefault("ml-dsa-44"),
+                3 => Algorithms.GetValueOrDefault("ml-dsa-65"),
+                4 or 5 => Algorithms.GetValueOrDefault("ml-dsa-87"),
                 _ => null
             };
         }
@@ -304,32 +304,32 @@ namespace DataWarehouse.SDK.Contracts.Encryption
 
             // Key exchange / encryption migrations
             if (normalized.Contains("x25519") || normalized.Contains("ecdh-p256") || normalized.Contains("dh-"))
-                return _algorithms.GetValueOrDefault("ml-kem-768");
+                return Algorithms.GetValueOrDefault("ml-kem-768");
 
             if (normalized.Contains("ecdh-p384"))
-                return _algorithms.GetValueOrDefault("ml-kem-768");
+                return Algorithms.GetValueOrDefault("ml-kem-768");
 
             if (normalized.Contains("ecdh-p521"))
-                return _algorithms.GetValueOrDefault("ml-kem-1024");
+                return Algorithms.GetValueOrDefault("ml-kem-1024");
 
             if (normalized.Contains("rsa-2048") || normalized.Contains("rsa-3072"))
-                return _algorithms.GetValueOrDefault("ml-kem-768");
+                return Algorithms.GetValueOrDefault("ml-kem-768");
 
             if (normalized.Contains("rsa-4096") || normalized.Contains("rsa-8192"))
-                return _algorithms.GetValueOrDefault("ml-kem-1024");
+                return Algorithms.GetValueOrDefault("ml-kem-1024");
 
             // Signature migrations
             if (normalized.Contains("ecdsa-p256") || normalized.Contains("ed25519"))
-                return _algorithms.GetValueOrDefault("ml-dsa-44");
+                return Algorithms.GetValueOrDefault("ml-dsa-44");
 
             if (normalized.Contains("ecdsa-p384"))
-                return _algorithms.GetValueOrDefault("ml-dsa-65");
+                return Algorithms.GetValueOrDefault("ml-dsa-65");
 
             if (normalized.Contains("ecdsa-p521"))
-                return _algorithms.GetValueOrDefault("ml-dsa-87");
+                return Algorithms.GetValueOrDefault("ml-dsa-87");
 
             if (normalized.Contains("rsa") && (normalized.Contains("sign") || normalized.Contains("pss")))
-                return _algorithms.GetValueOrDefault("ml-dsa-65");
+                return Algorithms.GetValueOrDefault("ml-dsa-65");
 
             return null;
         }
@@ -344,7 +344,7 @@ namespace DataWarehouse.SDK.Contracts.Encryption
             if (string.IsNullOrWhiteSpace(algorithmId))
                 return false;
 
-            return _algorithms.TryGetValue(algorithmId, out var info)
+            return Algorithms.TryGetValue(algorithmId, out var info)
                 && info.Profile.IsDeprecated;
         }
     }

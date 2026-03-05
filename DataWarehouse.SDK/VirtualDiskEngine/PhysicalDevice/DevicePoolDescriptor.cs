@@ -92,11 +92,11 @@ public static class StorageTierClassifier
     {
         return mediaType switch
         {
-            MediaType.NVMe => StorageTier.Hot,
-            MediaType.SSD => StorageTier.Warm,
-            MediaType.HDD => StorageTier.Cold,
+            MediaType.NvMe => StorageTier.Hot,
+            MediaType.Ssd => StorageTier.Warm,
+            MediaType.Hdd => StorageTier.Cold,
             MediaType.Tape => StorageTier.Frozen,
-            MediaType.RAMDisk => StorageTier.Hot,
+            MediaType.RamDisk => StorageTier.Hot,
             _ => StorageTier.Cold
         };
     }

@@ -42,17 +42,17 @@ internal static partial class QatNativeInterop
     /// <summary>
     /// QAT operation completed successfully.
     /// </summary>
-    public const int QAT_STATUS_SUCCESS = 0;
+    public const int QatStatusSuccess = 0;
 
     /// <summary>
     /// QAT operation failed.
     /// </summary>
-    public const int QAT_STATUS_FAIL = -1;
+    public const int QatStatusFail = -1;
 
     /// <summary>
     /// QAT operation should be retried (resource temporarily unavailable).
     /// </summary>
-    public const int QAT_STATUS_RETRY = -2;
+    public const int QatStatusRetry = -2;
 
     /// <summary>
     /// CPA (Cryptographic API) buffer list structure.
@@ -88,7 +88,7 @@ internal static partial class QatNativeInterop
     /// Gets the number of available QAT data compression instances.
     /// </summary>
     /// <param name="numInstances">Output: number of available instances.</param>
-    /// <returns>QAT_STATUS_SUCCESS on success, QAT_STATUS_FAIL on failure.</returns>
+    /// <returns>QatStatusSuccess on success, QatStatusFail on failure.</returns>
     [LibraryImport(QatLibrary, EntryPoint = "cpaDcGetNumInstances")]
     internal static partial int GetNumInstances(out ushort numInstances);
 
@@ -97,7 +97,7 @@ internal static partial class QatNativeInterop
     /// </summary>
     /// <param name="numInstances">Number of instances to retrieve.</param>
     /// <param name="instances">Array to receive instance handles.</param>
-    /// <returns>QAT_STATUS_SUCCESS on success, QAT_STATUS_FAIL on failure.</returns>
+    /// <returns>QatStatusSuccess on success, QatStatusFail on failure.</returns>
     [LibraryImport(QatLibrary, EntryPoint = "cpaDcGetInstances")]
     internal static partial int GetInstances(ushort numInstances, IntPtr[] instances);
 
@@ -106,7 +106,7 @@ internal static partial class QatNativeInterop
     /// Must be called before using the instance for operations.
     /// </summary>
     /// <param name="instance">The instance handle to start.</param>
-    /// <returns>QAT_STATUS_SUCCESS on success, QAT_STATUS_FAIL on failure.</returns>
+    /// <returns>QatStatusSuccess on success, QatStatusFail on failure.</returns>
     [LibraryImport(QatLibrary, EntryPoint = "cpaDcStartInstance")]
     internal static partial int StartInstance(IntPtr instance);
 
@@ -115,7 +115,7 @@ internal static partial class QatNativeInterop
     /// Should be called during cleanup to release resources.
     /// </summary>
     /// <param name="instance">The instance handle to stop.</param>
-    /// <returns>QAT_STATUS_SUCCESS on success, QAT_STATUS_FAIL on failure.</returns>
+    /// <returns>QatStatusSuccess on success, QatStatusFail on failure.</returns>
     [LibraryImport(QatLibrary, EntryPoint = "cpaDcStopInstance")]
     internal static partial int StopInstance(IntPtr instance);
 
@@ -128,7 +128,7 @@ internal static partial class QatNativeInterop
     /// <param name="dstBuffer">Destination buffer list to receive compressed data.</param>
     /// <param name="results">Pointer to results structure (can be IntPtr.Zero).</param>
     /// <param name="callbackTag">Callback context pointer for asynchronous operations.</param>
-    /// <returns>QAT_STATUS_SUCCESS on success, QAT_STATUS_FAIL on failure, QAT_STATUS_RETRY if busy.</returns>
+    /// <returns>QatStatusSuccess on success, QatStatusFail on failure, QatStatusRetry if busy.</returns>
     [LibraryImport(QatLibrary, EntryPoint = "cpaDcCompressData")]
     internal static partial int CompressData(
         IntPtr instance,
@@ -147,7 +147,7 @@ internal static partial class QatNativeInterop
     /// <param name="dstBuffer">Destination buffer list to receive decompressed data.</param>
     /// <param name="results">Pointer to results structure (can be IntPtr.Zero).</param>
     /// <param name="callbackTag">Callback context pointer for asynchronous operations.</param>
-    /// <returns>QAT_STATUS_SUCCESS on success, QAT_STATUS_FAIL on failure, QAT_STATUS_RETRY if busy.</returns>
+    /// <returns>QatStatusSuccess on success, QatStatusFail on failure, QatStatusRetry if busy.</returns>
     [LibraryImport(QatLibrary, EntryPoint = "cpaDcDecompressData")]
     internal static partial int DecompressData(
         IntPtr instance,

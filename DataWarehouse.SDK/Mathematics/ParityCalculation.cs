@@ -60,7 +60,7 @@ public static class ParityCalculation
     /// <param name="qParity">Output buffer for Q parity (Reed-Solomon)</param>
     /// <exception cref="ArgumentNullException">Thrown when parameters are null</exception>
     /// <exception cref="ArgumentException">Thrown when block sizes don't match</exception>
-    public static void ComputePQParity(ReadOnlySpan<byte[]> dataBlocks, Span<byte> pParity, Span<byte> qParity)
+    public static void ComputePqParity(ReadOnlySpan<byte[]> dataBlocks, Span<byte> pParity, Span<byte> qParity)
     {
         if (dataBlocks.Length == 0)
         {
@@ -308,8 +308,8 @@ public static class ParityCalculation
 
         // Guard against stack overflow for RAID-sized blocks (typical RAID blocks can be MBs).
         // Limit stackalloc to a safe threshold; use heap allocation for larger blocks.
-        const int MaxStackAllocBytes = 4096;
-        byte[]? heapBuffer = blockSize > MaxStackAllocBytes ? new byte[blockSize] : null;
+        const int maxStackAllocBytes = 4096;
+        byte[]? heapBuffer = blockSize > maxStackAllocBytes ? new byte[blockSize] : null;
         Span<byte> computedParity = heapBuffer != null
             ? heapBuffer.AsSpan(0, blockSize)
             : stackalloc byte[blockSize];

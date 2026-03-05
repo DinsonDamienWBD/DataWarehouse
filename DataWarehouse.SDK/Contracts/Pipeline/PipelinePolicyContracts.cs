@@ -123,7 +123,7 @@ public class CompressionStagePolicy : PipelineStagePolicy
     /// Memory budget for compression in MB. Higher = potentially better compression.
     /// Null = inherit or use default.
     /// </summary>
-    public int? MemoryBudgetMB { get; init; }
+    public int? MemoryBudgetMb { get; init; }
 }
 
 /// <summary>
@@ -557,7 +557,7 @@ public class TieringStagePolicy : PipelineStagePolicy
     /// Whether to use AI-based access prediction for tiering.
     /// Null = inherit from parent.
     /// </summary>
-    public bool? UseAIPrediction { get; init; }
+    public bool? UseAiPrediction { get; init; }
 }
 
 /// <summary>
@@ -1803,7 +1803,7 @@ public class ComputeStagePolicy : PipelineStagePolicy
     /// <summary>
     /// Memory limit per execution in MB. Null = inherit from parent.
     /// </summary>
-    public int? MemoryLimitMB { get; init; }
+    public int? MemoryLimitMb { get; init; }
 
     /// <summary>
     /// CPU limit (cores or millicores). Null = inherit from parent.
@@ -2257,7 +2257,7 @@ public class SelfEmulatingStagePolicy : PipelineStagePolicy
     /// <summary>
     /// Maximum bundle size in MB. Null = inherit from parent.
     /// </summary>
-    public int? MaxBundleSizeMB { get; init; }
+    public int? MaxBundleSizeMb { get; init; }
 
     /// <summary>
     /// Format migration strategy: "preserve", "convert", "both".
@@ -2479,7 +2479,7 @@ public class AirGapStagePolicy : PipelineStagePolicy
     /// <summary>
     /// Maximum transfer size in MB. Null = inherit from parent.
     /// </summary>
-    public long? MaxTransferSizeMB { get; init; }
+    public long? MaxTransferSizeMb { get; init; }
 
     /// <summary>
     /// Whether to enable transfer logging.
@@ -2622,7 +2622,7 @@ public class EhtStagePolicy : PipelineStagePolicy
     /// Maximum local storage quota in GB.
     /// Null = inherit from parent.
     /// </summary>
-    public long? LocalStorageQuotaGB { get; init; }
+    public long? LocalStorageQuotaGb { get; init; }
 
     /// <summary>
     /// Whether to enable offline operation.
@@ -3007,7 +3007,7 @@ public class FanOutStagePolicy : PipelineStagePolicy
     /// Cache TTL for content metadata.
     /// Null = inherit from parent.
     /// </summary>
-    public TimeSpan? CacheTTL { get; init; }
+    public TimeSpan? CacheTtl { get; init; }
 
     /// <summary>
     /// Cache strategy to use: "inmemory", "hybrid", "writethru", "writebehind".

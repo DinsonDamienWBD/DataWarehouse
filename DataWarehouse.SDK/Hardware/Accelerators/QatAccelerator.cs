@@ -110,7 +110,7 @@ public sealed class QatAccelerator : IQatAccelerator, IDisposable
 
                 // Query for QAT instances
                 var status = QatNativeInterop.GetNumInstances(out ushort instanceCount);
-                if (status != QatNativeInterop.QAT_STATUS_SUCCESS || instanceCount == 0)
+                if (status != QatNativeInterop.QatStatusSuccess || instanceCount == 0)
                 {
                     // QAT library loaded but no instances available
                     UnloadLibrary();
@@ -122,7 +122,7 @@ public sealed class QatAccelerator : IQatAccelerator, IDisposable
                 // Get instance handles
                 var instances = new IntPtr[instanceCount];
                 status = QatNativeInterop.GetInstances(instanceCount, instances);
-                if (status != QatNativeInterop.QAT_STATUS_SUCCESS)
+                if (status != QatNativeInterop.QatStatusSuccess)
                 {
                     UnloadLibrary();
                     _isAvailable = false;
@@ -133,7 +133,7 @@ public sealed class QatAccelerator : IQatAccelerator, IDisposable
                 // Start the first instance
                 _qatInstance = instances[0];
                 status = QatNativeInterop.StartInstance(_qatInstance);
-                if (status != QatNativeInterop.QAT_STATUS_SUCCESS)
+                if (status != QatNativeInterop.QatStatusSuccess)
                 {
                     _qatInstance = IntPtr.Zero;
                     UnloadLibrary();
@@ -236,7 +236,7 @@ public sealed class QatAccelerator : IQatAccelerator, IDisposable
                         ref results,
                         IntPtr.Zero); // No callback for sync operation
 
-                    if (status != QatNativeInterop.QAT_STATUS_SUCCESS)
+                    if (status != QatNativeInterop.QatStatusSuccess)
                     {
                         throw new InvalidOperationException($"QAT compression failed with status code {status}");
                     }
@@ -345,7 +345,7 @@ public sealed class QatAccelerator : IQatAccelerator, IDisposable
                         ref results,
                         IntPtr.Zero);
 
-                    if (status != QatNativeInterop.QAT_STATUS_SUCCESS)
+                    if (status != QatNativeInterop.QatStatusSuccess)
                     {
                         throw new InvalidOperationException($"QAT decompression failed with status code {status}");
                     }

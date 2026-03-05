@@ -39,7 +39,7 @@ public record BatchOptions(
 /// <param name="ItemsProcessed">Number of items processed.</param>
 /// <param name="ThroughputMBps">Throughput in megabytes per second (if applicable).</param>
 /// <param name="AllocatedBytes">Number of bytes allocated during the operation.</param>
-/// <param name="GCCollections">Number of garbage collections triggered (by generation).</param>
+/// <param name="GcCollections">Number of garbage collections triggered (by generation).</param>
 public record PerformanceMetrics(
     string OperationName,
     DateTime StartTime,
@@ -49,7 +49,7 @@ public record PerformanceMetrics(
     long ItemsProcessed = 0,
     double ThroughputMBps = 0,
     long AllocatedBytes = 0,
-    Dictionary<int, int>? GCCollections = null);
+    Dictionary<int, int>? GcCollections = null);
 
 /// <summary>
 /// Represents a latency measurement bucket for histogram tracking.

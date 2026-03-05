@@ -44,28 +44,28 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                 : "libCryptoki2_64.so";
 
         // Return codes
-        internal const uint CKR_OK = 0x00000000;
-        internal const uint CKR_ARGUMENTS_BAD = 0x00000007;
-        internal const uint CKR_SESSION_HANDLE_INVALID = 0x000000B3;
+        internal const uint CkrOk = 0x00000000;
+        internal const uint CkrArgumentsBad = 0x00000007;
+        internal const uint CkrSessionHandleInvalid = 0x000000B3;
 
         // Session flags
-        internal const uint CKF_RW_SESSION = 0x00000002;
-        internal const uint CKF_SERIAL_SESSION = 0x00000004;
+        internal const uint CkfRwSession = 0x00000002;
+        internal const uint CkfSerialSession = 0x00000004;
 
         // User types
-        internal const uint CKU_USER = 1;
+        internal const uint CkuUser = 1;
 
         // Attribute types
-        internal const uint CKA_CLASS = 0x00000000;
-        internal const uint CKA_LABEL = 0x00000003;
-        internal const uint CKA_VALUE = 0x00000011;
-        internal const uint CKA_KEY_TYPE = 0x00000100;
+        internal const uint CkaClass = 0x00000000;
+        internal const uint CkaLabel = 0x00000003;
+        internal const uint CkaValue = 0x00000011;
+        internal const uint CkaKeyType = 0x00000100;
 
         // Object classes
-        internal const uint CKO_SECRET_KEY = 0x00000004;
+        internal const uint CkoSecretKey = 0x00000004;
 
         // Key types
-        internal const uint CKK_AES = 0x0000001F;
+        internal const uint CkkAes = 0x0000001F;
 
         // ==================== Structures ====================
 
@@ -73,7 +73,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// PKCS#11 version information.
         /// </summary>
         [StructLayout(LayoutKind.Sequential)]
-        internal struct CK_VERSION
+        internal struct CkVersion
         {
             public byte major;
             public byte minor;
@@ -83,22 +83,22 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// PKCS#11 library information.
         /// </summary>
         [StructLayout(LayoutKind.Sequential)]
-        internal struct CK_INFO
+        internal struct CkInfo
         {
-            public CK_VERSION cryptokiVersion;
+            public CkVersion cryptokiVersion;
             [MarshalAs(UnmanagedType.ByValArray, SizeConst = 32)]
             public byte[] manufacturerID;
             public uint flags;
             [MarshalAs(UnmanagedType.ByValArray, SizeConst = 32)]
             public byte[] libraryDescription;
-            public CK_VERSION libraryVersion;
+            public CkVersion libraryVersion;
         }
 
         /// <summary>
         /// PKCS#11 attribute structure for template-based operations.
         /// </summary>
         [StructLayout(LayoutKind.Sequential)]
-        internal struct CK_ATTRIBUTE
+        internal struct CkAttribute
         {
             public uint type;
             public IntPtr pValue;
@@ -111,26 +111,26 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// Initializes the PKCS#11 library.
         /// </summary>
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        internal delegate uint C_Initialize(IntPtr pInitArgs);
+        internal delegate uint CInitialize(IntPtr pInitArgs);
 
         /// <summary>
         /// Finalizes the PKCS#11 library.
         /// </summary>
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        internal delegate uint C_Finalize(IntPtr pReserved);
+        internal delegate uint CFinalize(IntPtr pReserved);
 
         /// <summary>
         /// Gets PKCS#11 library information.
         /// </summary>
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        internal delegate uint C_GetInfo(ref CK_INFO pInfo);
+        internal delegate uint CGetInfo(ref CkInfo pInfo);
 
         /// <summary>
         /// Opens a session to an HSM slot.
         /// </summary>
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        internal delegate uint C_OpenSession(
-            uint slotID,
+        internal delegate uint COpenSession(
+            uint slotId,
             uint flags,
             IntPtr pApplication,
             IntPtr notify,
@@ -140,28 +140,28 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// Closes an HSM session.
         /// </summary>
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        internal delegate uint C_CloseSession(uint hSession);
+        internal delegate uint CCloseSession(uint hSession);
 
         /// <summary>
         /// Logs into an HSM session.
         /// </summary>
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        internal delegate uint C_Login(uint hSession, uint userType, byte[] pPin, uint ulPinLen);
+        internal delegate uint CLogin(uint hSession, uint userType, byte[] pPin, uint ulPinLen);
 
         /// <summary>
         /// Logs out of an HSM session.
         /// </summary>
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        internal delegate uint C_Logout(uint hSession);
+        internal delegate uint CLogout(uint hSession);
 
         /// <summary>
         /// Generates a secret key in the HSM.
         /// </summary>
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        internal delegate uint C_GenerateKey(
+        internal delegate uint CGenerateKey(
             uint hSession,
             IntPtr pMechanism,
-            CK_ATTRIBUTE[] pTemplate,
+            CkAttribute[] pTemplate,
             uint ulCount,
             out uint phKey);
 
@@ -169,7 +169,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// Signs data using an HSM key.
         /// </summary>
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        internal delegate uint C_Sign(
+        internal delegate uint CSign(
             uint hSession,
             byte[] pData,
             uint ulDataLen,
@@ -183,14 +183,14 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// </summary>
         /// <remarks>
         /// <para>
-        /// Per the PKCS#11 v2.40 specification (section 3.1), CK_FUNCTION_LIST is a structure
-        /// containing a CK_VERSION followed by exactly 70 function pointers in a fixed, defined order.
+        /// Per the PKCS#11 v2.40 specification (section 3.1), CkFunctionList is a structure
+        /// containing a CkVersion followed by exactly 70 function pointers in a fixed, defined order.
         /// Each function pointer is one native pointer width (4 bytes on 32-bit, 8 bytes on 64-bit).
         /// </para>
         /// <para>
         /// We use <see cref="LayoutKind.Explicit"/> with byte offsets computed as:
-        ///   offset = sizeof(CK_VERSION padded to pointer alignment) + (index * IntPtr.Size)
-        /// CK_VERSION is 2 bytes (major + minor), padded to IntPtr.Size alignment = IntPtr.Size bytes.
+        ///   offset = sizeof(CkVersion padded to pointer alignment) + (index * IntPtr.Size)
+        /// CkVersion is 2 bytes (major + minor), padded to IntPtr.Size alignment = IntPtr.Size bytes.
         /// Function pointer index (0-based) per PKCS#11 v2.40 spec:
         ///   0=C_Initialize, 1=C_Finalize, 2=C_GetInfo, 3=C_GetFunctionList,
         ///   4=C_GetSlotList, 5=C_GetSlotInfo, 6=C_GetTokenInfo, 7=C_GetMechanismList,
@@ -201,9 +201,9 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// </para>
         /// </remarks>
         [StructLayout(LayoutKind.Explicit)]
-        internal struct CK_FUNCTION_LIST
+        internal struct CkFunctionList
         {
-            // CK_VERSION (2 bytes: major + minor), padded to pointer-size alignment
+            // CkVersion (2 bytes: major + minor), padded to pointer-size alignment
             [FieldOffset(0)]
             public byte VersionMajor;
             [FieldOffset(1)]
@@ -297,9 +297,9 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// <exception cref="InvalidOperationException">Thrown when C_GetFunctionList is not found or fails.</exception>
         /// <remarks>
         /// This method calls the C_GetFunctionList function to retrieve a pointer to the
-        /// CK_FUNCTION_LIST structure, which contains function pointers to all PKCS#11 functions.
+        /// CkFunctionList structure, which contains function pointers to all PKCS#11 functions.
         /// </remarks>
-        internal static CK_FUNCTION_LIST GetFunctionList(IntPtr libraryHandle)
+        internal static CkFunctionList GetFunctionList(IntPtr libraryHandle)
         {
             // Get C_GetFunctionList export
             IntPtr getFunctionListPtr = NativeLibrary.GetExport(libraryHandle, "C_GetFunctionList");
@@ -307,20 +307,20 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                 throw new InvalidOperationException("C_GetFunctionList not found in PKCS#11 library");
 
             // Invoke C_GetFunctionList
-            var getFunctionList = Marshal.GetDelegateForFunctionPointer<C_GetFunctionListDelegate>(getFunctionListPtr);
+            var getFunctionList = Marshal.GetDelegateForFunctionPointer<CGetFunctionListDelegate>(getFunctionListPtr);
             IntPtr functionListPtr = IntPtr.Zero;
             uint rv = getFunctionList(ref functionListPtr);
-            if (rv != CKR_OK)
+            if (rv != CkrOk)
                 throw new InvalidOperationException($"C_GetFunctionList failed: 0x{rv:X8}");
 
             // Marshal function list structure
-            return Marshal.PtrToStructure<CK_FUNCTION_LIST>(functionListPtr);
+            return Marshal.PtrToStructure<CkFunctionList>(functionListPtr);
         }
 
         /// <summary>
         /// Delegate for C_GetFunctionList.
         /// </summary>
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        private delegate uint C_GetFunctionListDelegate(ref IntPtr ppFunctionList);
+        private delegate uint CGetFunctionListDelegate(ref IntPtr ppFunctionList);
     }
 }

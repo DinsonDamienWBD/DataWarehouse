@@ -35,9 +35,9 @@ public class PolicyPersistenceTests
     public async Task InMemory_SaveAndLoad_RoundTrips()
     {
         var persistence = new InMemoryPolicyPersistence();
-        var policy = MakePolicy("encryption", PolicyLevel.VDE, 80);
+        var policy = MakePolicy("encryption", PolicyLevel.Vde, 80);
 
-        await persistence.SaveAsync("encryption", PolicyLevel.VDE, "/v", policy);
+        await persistence.SaveAsync("encryption", PolicyLevel.Vde, "/v", policy);
         var loaded = await persistence.LoadAllAsync();
 
         loaded.Should().HaveCount(1);
@@ -49,11 +49,11 @@ public class PolicyPersistenceTests
     public async Task InMemory_SaveOverwritesPrevious()
     {
         var persistence = new InMemoryPolicyPersistence();
-        var p1 = MakePolicy("enc", PolicyLevel.VDE, 50);
-        var p2 = MakePolicy("enc", PolicyLevel.VDE, 90);
+        var p1 = MakePolicy("enc", PolicyLevel.Vde, 50);
+        var p2 = MakePolicy("enc", PolicyLevel.Vde, 90);
 
-        await persistence.SaveAsync("enc", PolicyLevel.VDE, "/v", p1);
-        await persistence.SaveAsync("enc", PolicyLevel.VDE, "/v", p2);
+        await persistence.SaveAsync("enc", PolicyLevel.Vde, "/v", p1);
+        await persistence.SaveAsync("enc", PolicyLevel.Vde, "/v", p2);
 
         var loaded = await persistence.LoadAllAsync();
         loaded.Should().HaveCount(1);
@@ -72,7 +72,7 @@ public class PolicyPersistenceTests
     public async Task InMemory_MultiplePolicies_AllRoundTrip()
     {
         var persistence = new InMemoryPolicyPersistence();
-        await persistence.SaveAsync("enc", PolicyLevel.VDE, "/v", MakePolicy("enc", PolicyLevel.VDE, 80));
+        await persistence.SaveAsync("enc", PolicyLevel.Vde, "/v", MakePolicy("enc", PolicyLevel.Vde, 80));
         await persistence.SaveAsync("comp", PolicyLevel.Object, "/v/c/o", MakePolicy("comp", PolicyLevel.Object, 60));
         await persistence.SaveAsync("repl", PolicyLevel.Container, "/v/c", MakePolicy("repl", PolicyLevel.Container, 70));
 
@@ -84,8 +84,8 @@ public class PolicyPersistenceTests
     public async Task InMemory_DeleteRemovesEntry()
     {
         var persistence = new InMemoryPolicyPersistence();
-        await persistence.SaveAsync("enc", PolicyLevel.VDE, "/v", MakePolicy("enc", PolicyLevel.VDE, 80));
-        await persistence.DeleteAsync("enc", PolicyLevel.VDE, "/v");
+        await persistence.SaveAsync("enc", PolicyLevel.Vde, "/v", MakePolicy("enc", PolicyLevel.Vde, 80));
+        await persistence.DeleteAsync("enc", PolicyLevel.Vde, "/v");
 
         var loaded = await persistence.LoadAllAsync();
         loaded.Should().BeEmpty();
@@ -116,7 +116,7 @@ public class PolicyPersistenceTests
     public async Task InMemory_Clear_RemovesAllEntries()
     {
         var persistence = new InMemoryPolicyPersistence();
-        await persistence.SaveAsync("enc", PolicyLevel.VDE, "/v", MakePolicy("enc", PolicyLevel.VDE, 80));
+        await persistence.SaveAsync("enc", PolicyLevel.Vde, "/v", MakePolicy("enc", PolicyLevel.Vde, 80));
         await persistence.SaveProfileAsync(OperationalProfile.Standard());
 
         persistence.Clear();
@@ -130,10 +130,10 @@ public class PolicyPersistenceTests
     public async Task InMemory_CustomParams_RoundTrip()
     {
         var persistence = new InMemoryPolicyPersistence();
-        var policy = MakePolicy("enc", PolicyLevel.VDE, 80,
+        var policy = MakePolicy("enc", PolicyLevel.Vde, 80,
             customParams: new Dictionary<string, string> { ["algo"] = "aes256", ["mode"] = "gcm" });
 
-        await persistence.SaveAsync("enc", PolicyLevel.VDE, "/v", policy);
+        await persistence.SaveAsync("enc", PolicyLevel.Vde, "/v", policy);
         var loaded = await persistence.LoadAllAsync();
 
         loaded[0].Policy.CustomParameters.Should().ContainKey("algo");
@@ -145,10 +145,10 @@ public class PolicyPersistenceTests
     public async Task InMemory_Capacity_ThrowsWhenExceeded()
     {
         var persistence = new InMemoryPolicyPersistence(maxCapacity: 2);
-        await persistence.SaveAsync("a", PolicyLevel.VDE, "/1", MakePolicy("a", PolicyLevel.VDE));
-        await persistence.SaveAsync("b", PolicyLevel.VDE, "/2", MakePolicy("b", PolicyLevel.VDE));
+        await persistence.SaveAsync("a", PolicyLevel.Vde, "/1", MakePolicy("a", PolicyLevel.Vde));
+        await persistence.SaveAsync("b", PolicyLevel.Vde, "/2", MakePolicy("b", PolicyLevel.Vde));
 
-        var act = () => persistence.SaveAsync("c", PolicyLevel.VDE, "/3", MakePolicy("c", PolicyLevel.VDE));
+        var act = () => persistence.SaveAsync("c", PolicyLevel.Vde, "/3", MakePolicy("c", PolicyLevel.Vde));
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
@@ -163,9 +163,9 @@ public class PolicyPersistenceTests
         try
         {
             var persistence = new FilePolicyPersistence(dir);
-            var policy = MakePolicy("enc", PolicyLevel.VDE, 75);
+            var policy = MakePolicy("enc", PolicyLevel.Vde, 75);
 
-            await persistence.SaveAsync("enc", PolicyLevel.VDE, "/v", policy);
+            await persistence.SaveAsync("enc", PolicyLevel.Vde, "/v", policy);
             var loaded = await persistence.LoadAllAsync();
 
             loaded.Should().HaveCount(1);
@@ -184,7 +184,7 @@ public class PolicyPersistenceTests
         try
         {
             var persistence = new FilePolicyPersistence(dir);
-            await persistence.SaveAsync("enc", PolicyLevel.VDE, "/v", MakePolicy("enc", PolicyLevel.VDE, 80));
+            await persistence.SaveAsync("enc", PolicyLevel.Vde, "/v", MakePolicy("enc", PolicyLevel.Vde, 80));
 
             var policiesDir = Path.Combine(dir, "policies");
             Directory.Exists(policiesDir).Should().BeTrue();
@@ -206,7 +206,7 @@ public class PolicyPersistenceTests
         try
         {
             var persistence = new FilePolicyPersistence(dir);
-            await persistence.SaveAsync("enc", PolicyLevel.VDE, "/v", MakePolicy("enc", PolicyLevel.VDE, 80));
+            await persistence.SaveAsync("enc", PolicyLevel.Vde, "/v", MakePolicy("enc", PolicyLevel.Vde, 80));
             await persistence.SaveAsync("comp", PolicyLevel.Object, "/v/c/o", MakePolicy("comp", PolicyLevel.Object, 60));
 
             var loaded = await persistence.LoadAllAsync();
@@ -225,8 +225,8 @@ public class PolicyPersistenceTests
         try
         {
             var persistence = new FilePolicyPersistence(dir);
-            await persistence.SaveAsync("enc", PolicyLevel.VDE, "/v", MakePolicy("enc", PolicyLevel.VDE, 80));
-            await persistence.DeleteAsync("enc", PolicyLevel.VDE, "/v");
+            await persistence.SaveAsync("enc", PolicyLevel.Vde, "/v", MakePolicy("enc", PolicyLevel.Vde, 80));
+            await persistence.DeleteAsync("enc", PolicyLevel.Vde, "/v");
 
             var loaded = await persistence.LoadAllAsync();
             loaded.Should().BeEmpty();
@@ -263,7 +263,7 @@ public class PolicyPersistenceTests
         try
         {
             var persistence = new FilePolicyPersistence(dir);
-            await persistence.SaveAsync("enc", PolicyLevel.VDE, "/v", MakePolicy("enc", PolicyLevel.VDE, 80));
+            await persistence.SaveAsync("enc", PolicyLevel.Vde, "/v", MakePolicy("enc", PolicyLevel.Vde, 80));
 
             // Write a corrupt file alongside the valid one
             var policiesDir = Path.Combine(dir, "policies");
@@ -302,8 +302,8 @@ public class PolicyPersistenceTests
         try
         {
             var persistence = new FilePolicyPersistence(dir);
-            await persistence.SaveAsync("enc", PolicyLevel.VDE, "/v", MakePolicy("enc", PolicyLevel.VDE, 50));
-            await persistence.SaveAsync("enc", PolicyLevel.VDE, "/v", MakePolicy("enc", PolicyLevel.VDE, 99));
+            await persistence.SaveAsync("enc", PolicyLevel.Vde, "/v", MakePolicy("enc", PolicyLevel.Vde, 50));
+            await persistence.SaveAsync("enc", PolicyLevel.Vde, "/v", MakePolicy("enc", PolicyLevel.Vde, 99));
 
             var loaded = await persistence.LoadAllAsync();
             loaded.Should().HaveCount(1);
@@ -322,10 +322,10 @@ public class PolicyPersistenceTests
         try
         {
             var persistence = new FilePolicyPersistence(dir);
-            var policy = MakePolicy("enc", PolicyLevel.VDE, 80,
+            var policy = MakePolicy("enc", PolicyLevel.Vde, 80,
                 customParams: new Dictionary<string, string> { ["key"] = "value" });
 
-            await persistence.SaveAsync("enc", PolicyLevel.VDE, "/v", policy);
+            await persistence.SaveAsync("enc", PolicyLevel.Vde, "/v", policy);
             var loaded = await persistence.LoadAllAsync();
 
             loaded[0].Policy.CustomParameters!["key"].Should().Be("value");
@@ -359,9 +359,9 @@ public class PolicyPersistenceTests
     {
         var config = PolicyPersistenceConfiguration.DatabaseDefault();
         var persistence = new DatabasePolicyPersistence(config);
-        var policy = MakePolicy("enc", PolicyLevel.VDE, 85);
+        var policy = MakePolicy("enc", PolicyLevel.Vde, 85);
 
-        await persistence.SaveAsync("enc", PolicyLevel.VDE, "/v", policy);
+        await persistence.SaveAsync("enc", PolicyLevel.Vde, "/v", policy);
         var loaded = await persistence.LoadAllAsync();
 
         loaded.Should().HaveCount(1);
@@ -374,9 +374,9 @@ public class PolicyPersistenceTests
         var config = PolicyPersistenceConfiguration.DatabaseDefault();
         var persistence = new DatabasePolicyPersistence(config);
 
-        await persistence.SaveAsync("enc", PolicyLevel.VDE, "/v", MakePolicy("enc", PolicyLevel.VDE, 80));
+        await persistence.SaveAsync("enc", PolicyLevel.Vde, "/v", MakePolicy("enc", PolicyLevel.Vde, 80));
         await persistence.SaveAsync("enc", PolicyLevel.Container, "/v/c", MakePolicy("enc", PolicyLevel.Container, 60));
-        await persistence.SaveAsync("comp", PolicyLevel.VDE, "/v", MakePolicy("comp", PolicyLevel.VDE, 50));
+        await persistence.SaveAsync("comp", PolicyLevel.Vde, "/v", MakePolicy("comp", PolicyLevel.Vde, 50));
 
         var loaded = await persistence.LoadAllAsync();
         loaded.Should().HaveCount(3);
@@ -387,8 +387,8 @@ public class PolicyPersistenceTests
     {
         var config = PolicyPersistenceConfiguration.DatabaseDefault();
         var persistence = new DatabasePolicyPersistence(config);
-        await persistence.SaveAsync("enc", PolicyLevel.VDE, "/v", MakePolicy("enc", PolicyLevel.VDE, 80));
-        await persistence.DeleteAsync("enc", PolicyLevel.VDE, "/v");
+        await persistence.SaveAsync("enc", PolicyLevel.Vde, "/v", MakePolicy("enc", PolicyLevel.Vde, 80));
+        await persistence.DeleteAsync("enc", PolicyLevel.Vde, "/v");
 
         var loaded = await persistence.LoadAllAsync();
         loaded.Should().BeEmpty();
@@ -412,15 +412,15 @@ public class PolicyPersistenceTests
     {
         var config = PolicyPersistenceConfiguration.DatabaseDefault();
         var persistence = new DatabasePolicyPersistence(config);
-        var policy1 = MakePolicy("enc", PolicyLevel.VDE, 50);
+        var policy1 = MakePolicy("enc", PolicyLevel.Vde, 50);
         var serialized = PolicySerializationHelper.SerializePolicy(policy1);
 
         await persistence.ApplyReplicatedAsync(
-            "enc:4:/v", "enc", PolicyLevel.VDE, "/v", serialized,
+            "enc:4:/v", "enc", PolicyLevel.Vde, "/v", serialized,
             timestamp: 1000, sourceNodeId: "nodeA");
 
         await persistence.ApplyReplicatedAsync(
-            "enc:4:/v", "enc", PolicyLevel.VDE, "/v", serialized,
+            "enc:4:/v", "enc", PolicyLevel.Vde, "/v", serialized,
             timestamp: 2000, sourceNodeId: "nodeB");
 
         var loaded = await persistence.LoadAllAsync();
@@ -433,15 +433,15 @@ public class PolicyPersistenceTests
         var config = PolicyPersistenceConfiguration.DatabaseDefault();
         var persistence = new DatabasePolicyPersistence(config);
 
-        var p1 = MakePolicy("enc", PolicyLevel.VDE, 80);
+        var p1 = MakePolicy("enc", PolicyLevel.Vde, 80);
         var s1 = PolicySerializationHelper.SerializePolicy(p1);
 
-        await persistence.ApplyReplicatedAsync("enc:4:/v", "enc", PolicyLevel.VDE, "/v", s1, 2000, "nodeA");
+        await persistence.ApplyReplicatedAsync("enc:4:/v", "enc", PolicyLevel.Vde, "/v", s1, 2000, "nodeA");
 
-        var p2 = MakePolicy("enc", PolicyLevel.VDE, 30);
+        var p2 = MakePolicy("enc", PolicyLevel.Vde, 30);
         var s2 = PolicySerializationHelper.SerializePolicy(p2);
 
-        await persistence.ApplyReplicatedAsync("enc:4:/v", "enc", PolicyLevel.VDE, "/v", s2, 1000, "nodeB");
+        await persistence.ApplyReplicatedAsync("enc:4:/v", "enc", PolicyLevel.Vde, "/v", s2, 1000, "nodeB");
 
         var loaded = await persistence.LoadAllAsync();
         loaded.Should().HaveCount(1);
@@ -462,10 +462,10 @@ public class PolicyPersistenceTests
     {
         var config = PolicyPersistenceConfiguration.DatabaseDefault();
         var persistence = new DatabasePolicyPersistence(config);
-        var policy = MakePolicy("enc", PolicyLevel.VDE, 80,
+        var policy = MakePolicy("enc", PolicyLevel.Vde, 80,
             customParams: new Dictionary<string, string> { ["fips"] = "true" });
 
-        await persistence.SaveAsync("enc", PolicyLevel.VDE, "/v", policy);
+        await persistence.SaveAsync("enc", PolicyLevel.Vde, "/v", policy);
         var loaded = await persistence.LoadAllAsync();
 
         loaded[0].Policy.CustomParameters!["fips"].Should().Be("true");
@@ -476,8 +476,8 @@ public class PolicyPersistenceTests
     {
         var config = PolicyPersistenceConfiguration.DatabaseDefault();
         var persistence = new DatabasePolicyPersistence(config);
-        await persistence.SaveAsync("enc", PolicyLevel.VDE, "/v", MakePolicy("enc", PolicyLevel.VDE, 50));
-        await persistence.SaveAsync("enc", PolicyLevel.VDE, "/v", MakePolicy("enc", PolicyLevel.VDE, 99));
+        await persistence.SaveAsync("enc", PolicyLevel.Vde, "/v", MakePolicy("enc", PolicyLevel.Vde, 50));
+        await persistence.SaveAsync("enc", PolicyLevel.Vde, "/v", MakePolicy("enc", PolicyLevel.Vde, 99));
 
         var loaded = await persistence.LoadAllAsync();
         loaded.Should().HaveCount(1);
@@ -494,7 +494,7 @@ public class PolicyPersistenceTests
         var inner = new InMemoryPolicyPersistence();
         var tamper = new TamperProofPolicyPersistence(inner);
 
-        await tamper.SaveAsync("enc", PolicyLevel.VDE, "/v", MakePolicy("enc", PolicyLevel.VDE, 80));
+        await tamper.SaveAsync("enc", PolicyLevel.Vde, "/v", MakePolicy("enc", PolicyLevel.Vde, 80));
         var loaded = await tamper.LoadAllAsync();
 
         loaded.Should().HaveCount(1);
@@ -507,7 +507,7 @@ public class PolicyPersistenceTests
         var inner = new InMemoryPolicyPersistence();
         var tamper = new TamperProofPolicyPersistence(inner);
 
-        await tamper.SaveAsync("enc", PolicyLevel.VDE, "/v", MakePolicy("enc", PolicyLevel.VDE, 80));
+        await tamper.SaveAsync("enc", PolicyLevel.Vde, "/v", MakePolicy("enc", PolicyLevel.Vde, 80));
 
         tamper.AuditBlockCount.Should().Be(1);
         var chain = tamper.GetAuditChain();
@@ -521,8 +521,8 @@ public class PolicyPersistenceTests
         var inner = new InMemoryPolicyPersistence();
         var tamper = new TamperProofPolicyPersistence(inner);
 
-        await tamper.SaveAsync("enc", PolicyLevel.VDE, "/v", MakePolicy("enc", PolicyLevel.VDE, 80));
-        await tamper.DeleteAsync("enc", PolicyLevel.VDE, "/v");
+        await tamper.SaveAsync("enc", PolicyLevel.Vde, "/v", MakePolicy("enc", PolicyLevel.Vde, 80));
+        await tamper.DeleteAsync("enc", PolicyLevel.Vde, "/v");
 
         tamper.AuditBlockCount.Should().Be(2);
         var chain = tamper.GetAuditChain();
@@ -536,7 +536,7 @@ public class PolicyPersistenceTests
         var inner = new InMemoryPolicyPersistence();
         var tamper = new TamperProofPolicyPersistence(inner);
 
-        await tamper.SaveAsync("enc", PolicyLevel.VDE, "/v", MakePolicy("enc", PolicyLevel.VDE, 80));
+        await tamper.SaveAsync("enc", PolicyLevel.Vde, "/v", MakePolicy("enc", PolicyLevel.Vde, 80));
         await tamper.SaveAsync("comp", PolicyLevel.Object, "/v/c/o", MakePolicy("comp", PolicyLevel.Object, 60));
 
         tamper.VerifyChainIntegrity().Should().BeTrue();
@@ -548,7 +548,7 @@ public class PolicyPersistenceTests
         var inner = new InMemoryPolicyPersistence();
         var tamper = new TamperProofPolicyPersistence(inner);
 
-        await tamper.SaveAsync("enc", PolicyLevel.VDE, "/v", MakePolicy("enc", PolicyLevel.VDE, 80));
+        await tamper.SaveAsync("enc", PolicyLevel.Vde, "/v", MakePolicy("enc", PolicyLevel.Vde, 80));
 
         var chain = tamper.GetAuditChain();
         chain[0].PreviousHash.Should().Be("GENESIS");
@@ -582,8 +582,8 @@ public class PolicyPersistenceTests
         var inner = new InMemoryPolicyPersistence();
         var tamper = new TamperProofPolicyPersistence(inner);
 
-        var policy = MakePolicy("enc", PolicyLevel.VDE, 80);
-        await tamper.SaveAsync("enc", PolicyLevel.VDE, "/v", policy);
+        var policy = MakePolicy("enc", PolicyLevel.Vde, 80);
+        await tamper.SaveAsync("enc", PolicyLevel.Vde, "/v", policy);
 
         // Data loaded from inner should be identical to what was saved
         var innerLoaded = await inner.LoadAllAsync();
@@ -619,7 +619,7 @@ public class PolicyPersistenceTests
         var auditStore = new InMemoryPolicyPersistence();
         var hybrid = new HybridPolicyPersistence(policyStore, auditStore);
 
-        await hybrid.SaveAsync("enc", PolicyLevel.VDE, "/v", MakePolicy("enc", PolicyLevel.VDE, 80));
+        await hybrid.SaveAsync("enc", PolicyLevel.Vde, "/v", MakePolicy("enc", PolicyLevel.Vde, 80));
 
         var policyLoaded = await policyStore.LoadAllAsync();
         var auditLoaded = await auditStore.LoadAllAsync();
@@ -635,7 +635,7 @@ public class PolicyPersistenceTests
         var auditStore = new InMemoryPolicyPersistence();
         var hybrid = new HybridPolicyPersistence(policyStore, auditStore);
 
-        await hybrid.SaveAsync("enc", PolicyLevel.VDE, "/v", MakePolicy("enc", PolicyLevel.VDE, 80));
+        await hybrid.SaveAsync("enc", PolicyLevel.Vde, "/v", MakePolicy("enc", PolicyLevel.Vde, 80));
 
         var loaded = await hybrid.LoadAllAsync();
         loaded.Should().HaveCount(1);
@@ -648,8 +648,8 @@ public class PolicyPersistenceTests
         var auditStore = new InMemoryPolicyPersistence();
         var hybrid = new HybridPolicyPersistence(policyStore, auditStore);
 
-        await hybrid.SaveAsync("enc", PolicyLevel.VDE, "/v", MakePolicy("enc", PolicyLevel.VDE, 80));
-        await hybrid.DeleteAsync("enc", PolicyLevel.VDE, "/v");
+        await hybrid.SaveAsync("enc", PolicyLevel.Vde, "/v", MakePolicy("enc", PolicyLevel.Vde, 80));
+        await hybrid.DeleteAsync("enc", PolicyLevel.Vde, "/v");
 
         var policyLoaded = await policyStore.LoadAllAsync();
         policyLoaded.Should().BeEmpty();
@@ -722,9 +722,9 @@ public class PolicyPersistenceTests
         var auditStore = new InMemoryPolicyPersistence();
         var hybrid = new HybridPolicyPersistence(policyStore, auditStore);
 
-        var policy = MakePolicy("enc", PolicyLevel.VDE, 80,
+        var policy = MakePolicy("enc", PolicyLevel.Vde, 80,
             customParams: new Dictionary<string, string> { ["key"] = "val" });
-        await hybrid.SaveAsync("enc", PolicyLevel.VDE, "/v", policy);
+        await hybrid.SaveAsync("enc", PolicyLevel.Vde, "/v", policy);
 
         var loaded = await policyStore.LoadAllAsync();
         loaded[0].Policy.CustomParameters!["key"].Should().Be("val");
@@ -737,8 +737,8 @@ public class PolicyPersistenceTests
         var auditStore = new InMemoryPolicyPersistence();
         var hybrid = new HybridPolicyPersistence(policyStore, auditStore);
 
-        var policy = MakePolicy("enc", PolicyLevel.VDE, 80);
-        await hybrid.SaveAsync("enc", PolicyLevel.VDE, "/v", policy);
+        var policy = MakePolicy("enc", PolicyLevel.Vde, 80);
+        await hybrid.SaveAsync("enc", PolicyLevel.Vde, "/v", policy);
 
         var loaded = await auditStore.LoadAllAsync();
         loaded.Should().HaveCount(1);
@@ -752,7 +752,7 @@ public class PolicyPersistenceTests
     [Fact]
     public void Serialization_PolicyRoundTrip()
     {
-        var policy = MakePolicy("enc", PolicyLevel.VDE, 80, CascadeStrategy.Enforce, AiAutonomyLevel.ManualOnly);
+        var policy = MakePolicy("enc", PolicyLevel.Vde, 80, CascadeStrategy.Enforce, AiAutonomyLevel.ManualOnly);
         var bytes = PolicySerializationHelper.SerializePolicy(policy);
         var deserialized = PolicySerializationHelper.DeserializePolicy(bytes);
 
@@ -770,7 +770,7 @@ public class PolicyPersistenceTests
     [InlineData(CascadeStrategy.Merge)]
     public void Serialization_AllCascadeStrategies_Survive(CascadeStrategy cascade)
     {
-        var policy = MakePolicy("enc", PolicyLevel.VDE, 50, cascade);
+        var policy = MakePolicy("enc", PolicyLevel.Vde, 50, cascade);
         var bytes = PolicySerializationHelper.SerializePolicy(policy);
         var deserialized = PolicySerializationHelper.DeserializePolicy(bytes);
 
@@ -785,7 +785,7 @@ public class PolicyPersistenceTests
     [InlineData(AiAutonomyLevel.AutoSilent)]
     public void Serialization_AllAiAutonomyLevels_Survive(AiAutonomyLevel ai)
     {
-        var policy = MakePolicy("enc", PolicyLevel.VDE, 50, ai: ai);
+        var policy = MakePolicy("enc", PolicyLevel.Vde, 50, ai: ai);
         var bytes = PolicySerializationHelper.SerializePolicy(policy);
         var deserialized = PolicySerializationHelper.DeserializePolicy(bytes);
 
@@ -797,7 +797,7 @@ public class PolicyPersistenceTests
     [InlineData(PolicyLevel.Chunk)]
     [InlineData(PolicyLevel.Object)]
     [InlineData(PolicyLevel.Container)]
-    [InlineData(PolicyLevel.VDE)]
+    [InlineData(PolicyLevel.Vde)]
     public void Serialization_AllPolicyLevels_Survive(PolicyLevel level)
     {
         var policy = MakePolicy("enc", level, 50);
@@ -810,7 +810,7 @@ public class PolicyPersistenceTests
     [Fact]
     public void Serialization_CustomParams_RoundTrip()
     {
-        var policy = MakePolicy("enc", PolicyLevel.VDE, 80,
+        var policy = MakePolicy("enc", PolicyLevel.Vde, 80,
             customParams: new Dictionary<string, string> { ["a"] = "1", ["b"] = "2" });
         var bytes = PolicySerializationHelper.SerializePolicy(policy);
         var deserialized = PolicySerializationHelper.DeserializePolicy(bytes);
@@ -822,7 +822,7 @@ public class PolicyPersistenceTests
     [Fact]
     public void Serialization_NullCustomParams_Handled()
     {
-        var policy = MakePolicy("enc", PolicyLevel.VDE, 80);
+        var policy = MakePolicy("enc", PolicyLevel.Vde, 80);
         var bytes = PolicySerializationHelper.SerializePolicy(policy);
         var deserialized = PolicySerializationHelper.DeserializePolicy(bytes);
 
@@ -832,7 +832,7 @@ public class PolicyPersistenceTests
     [Fact]
     public void Serialization_EmptyCustomParams_Handled()
     {
-        var policy = MakePolicy("enc", PolicyLevel.VDE, 80, customParams: new Dictionary<string, string>());
+        var policy = MakePolicy("enc", PolicyLevel.Vde, 80, customParams: new Dictionary<string, string>());
         var bytes = PolicySerializationHelper.SerializePolicy(policy);
         var deserialized = PolicySerializationHelper.DeserializePolicy(bytes);
 

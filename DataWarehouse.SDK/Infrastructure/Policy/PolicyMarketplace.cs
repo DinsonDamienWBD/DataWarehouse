@@ -42,7 +42,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
     [SdkCompatibility("6.0.0", Notes = "Phase 69: Policy marketplace (PADV-01)")]
     public sealed class PolicyMarketplace
     {
-        private static readonly JsonSerializerOptions s_templateOptions = CreateTemplateOptions();
+        private static readonly JsonSerializerOptions STemplateOptions = CreateTemplateOptions();
 
         private readonly Version _currentEngineVersion;
 
@@ -129,7 +129,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
         public byte[] SerializeTemplate(PolicyTemplate template)
         {
             if (template == null) throw new ArgumentNullException(nameof(template));
-            return JsonSerializer.SerializeToUtf8Bytes(template, s_templateOptions);
+            return JsonSerializer.SerializeToUtf8Bytes(template, STemplateOptions);
         }
 
         /// <summary>
@@ -146,7 +146,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
         {
             if (data == null) throw new ArgumentNullException(nameof(data));
 
-            var template = JsonSerializer.Deserialize<PolicyTemplate>(data, s_templateOptions)
+            var template = JsonSerializer.Deserialize<PolicyTemplate>(data, STemplateOptions)
                 ?? throw new InvalidOperationException("Deserialization of PolicyTemplate produced null result.");
 
             // Validate checksum if present
@@ -334,7 +334,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
                 new()
                 {
                     FeatureId = "encryption",
-                    Level = PolicyLevel.VDE,
+                    Level = PolicyLevel.Vde,
                     IntensityLevel = 90,
                     Cascade = CascadeStrategy.Enforce,
                     AiAutonomy = AiAutonomyLevel.ManualOnly
@@ -388,7 +388,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
                 new()
                 {
                     FeatureId = "encryption",
-                    Level = PolicyLevel.VDE,
+                    Level = PolicyLevel.Vde,
                     IntensityLevel = 80,
                     Cascade = CascadeStrategy.Enforce,
                     AiAutonomy = AiAutonomyLevel.SuggestExplain
@@ -442,7 +442,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
                 new()
                 {
                     FeatureId = "encryption",
-                    Level = PolicyLevel.VDE,
+                    Level = PolicyLevel.Vde,
                     IntensityLevel = 30,
                     Cascade = CascadeStrategy.Inherit,
                     AiAutonomy = AiAutonomyLevel.AutoSilent

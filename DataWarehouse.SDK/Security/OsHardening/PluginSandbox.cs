@@ -19,7 +19,7 @@ namespace DataWarehouse.SDK.Security.OsHardening
         /// <summary>Allow filesystem access beyond the sandbox root.</summary>
         FileSystem = 1 << 1,
         /// <summary>Allow inter-process communication (shared memory, pipes, Unix sockets).</summary>
-        IPC = 1 << 2,
+        Ipc = 1 << 2,
         /// <summary>Allow creating child processes (clone, fork, execve).</summary>
         ProcessCreation = 1 << 3,
         /// <summary>Allow access to hardware devices (/dev/*).</summary>
@@ -135,13 +135,13 @@ namespace DataWarehouse.SDK.Security.OsHardening
 
         /// <summary>
         /// Creates a default sandbox configuration for trusted plugins with relaxed restrictions.
-        /// Grants network, filesystem, and IPC access. 2GB memory, 100% CPU, core seccomp profile.
+        /// Grants network, filesystem, and Ipc access. 2GB memory, 100% CPU, core seccomp profile.
         /// </summary>
         /// <returns>A permissive sandbox configuration for trusted plugin code.</returns>
         public static SandboxConfig CreateDefaultForTrustedPlugin()
         {
             return new SandboxConfig(
-                AllowedCapabilities: SandboxCapabilities.Network | SandboxCapabilities.FileSystem | SandboxCapabilities.IPC,
+                AllowedCapabilities: SandboxCapabilities.Network | SandboxCapabilities.FileSystem | SandboxCapabilities.Ipc,
                 RootfsPath: null,
                 MemoryLimitBytes: 2L * 1024 * 1024 * 1024, // 2 GB
                 CpuPercent: 100,
@@ -172,9 +172,9 @@ namespace DataWarehouse.SDK.Security.OsHardening
                 unshareFlags.Add("--net"); // CLONE_NEWNET - isolate network
             }
 
-            if (!_config.AllowedCapabilities.HasFlag(SandboxCapabilities.IPC))
+            if (!_config.AllowedCapabilities.HasFlag(SandboxCapabilities.Ipc))
             {
-                unshareFlags.Add("--ipc"); // CLONE_NEWIPC - isolate IPC
+                unshareFlags.Add("--ipc"); // CLONE_NEWIpc - isolate Ipc
             }
 
             // Build the process launch command

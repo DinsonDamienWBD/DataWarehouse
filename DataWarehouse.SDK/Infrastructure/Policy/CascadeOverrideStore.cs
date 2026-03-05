@@ -196,14 +196,14 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
             var policy = new FeaturePolicy
             {
                 FeatureId = PersistenceFeatureId,
-                Level = PolicyLevel.VDE,
+                Level = PolicyLevel.Vde,
                 IntensityLevel = 0,
                 Cascade = CascadeStrategy.Inherit,
                 AiAutonomy = AiAutonomyLevel.ManualOnly,
                 CustomParameters = customParams
             };
 
-            await persistence.SaveAsync(PersistenceFeatureId, PolicyLevel.VDE, PersistencePath, policy, ct).ConfigureAwait(false);
+            await persistence.SaveAsync(PersistenceFeatureId, PolicyLevel.Vde, PersistencePath, policy, ct).ConfigureAwait(false);
             await persistence.FlushAsync(ct).ConfigureAwait(false);
         }
 
@@ -219,14 +219,14 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
         {
             var lastColon = key.LastIndexOf(':');
             if (lastColon < 0)
-                return (key, PolicyLevel.VDE);
+                return (key, PolicyLevel.Vde);
 
             var featureId = key.Substring(0, lastColon);
             var levelStr = key.Substring(lastColon + 1);
 
             return Enum.TryParse<PolicyLevel>(levelStr, ignoreCase: false, out var level)
                 ? (featureId, level)
-                : (featureId, PolicyLevel.VDE);
+                : (featureId, PolicyLevel.Vde);
         }
 
         /// <summary>
@@ -237,7 +237,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
             out string featureId, out PolicyLevel level, out CascadeStrategy strategy)
         {
             featureId = string.Empty;
-            level = PolicyLevel.VDE;
+            level = PolicyLevel.Vde;
             strategy = default;
 
             var (parsedFeature, parsedLevel) = ParseKey(key);

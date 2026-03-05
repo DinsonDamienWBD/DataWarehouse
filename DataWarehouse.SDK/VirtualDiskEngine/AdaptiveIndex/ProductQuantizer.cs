@@ -236,18 +236,18 @@ public sealed class ProductQuantizer
         int subDim = reader.ReadInt32();
 
         // Validate bounds before allocating to prevent OOM on crafted/corrupt input.
-        const int MaxDimension = 65536;
-        const int MaxM = 512;
-        const int MaxK = 65536;
-        const int MaxSubDim = 65536;
-        if (dimension < 1 || dimension > MaxDimension)
-            throw new InvalidDataException($"ProductQuantizer.Deserialize: invalid dimension {dimension} (max {MaxDimension}).");
-        if (m < 1 || m > MaxM)
-            throw new InvalidDataException($"ProductQuantizer.Deserialize: invalid m {m} (max {MaxM}).");
-        if (k < 1 || k > MaxK)
-            throw new InvalidDataException($"ProductQuantizer.Deserialize: invalid k {k} (max {MaxK}).");
-        if (subDim < 1 || subDim > MaxSubDim)
-            throw new InvalidDataException($"ProductQuantizer.Deserialize: invalid subDim {subDim} (max {MaxSubDim}).");
+        const int maxDimension = 65536;
+        const int maxM = 512;
+        const int maxK = 65536;
+        const int maxSubDim = 65536;
+        if (dimension < 1 || dimension > maxDimension)
+            throw new InvalidDataException($"ProductQuantizer.Deserialize: invalid dimension {dimension} (max {maxDimension}).");
+        if (m < 1 || m > maxM)
+            throw new InvalidDataException($"ProductQuantizer.Deserialize: invalid m {m} (max {maxM}).");
+        if (k < 1 || k > maxK)
+            throw new InvalidDataException($"ProductQuantizer.Deserialize: invalid k {k} (max {maxK}).");
+        if (subDim < 1 || subDim > maxSubDim)
+            throw new InvalidDataException($"ProductQuantizer.Deserialize: invalid subDim {subDim} (max {maxSubDim}).");
 
         var pq = new ProductQuantizer(dimension, m, k);
         pq._codebook = new float[m][][];

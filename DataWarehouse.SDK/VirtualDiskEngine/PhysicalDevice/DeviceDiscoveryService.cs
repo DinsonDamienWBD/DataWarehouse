@@ -255,7 +255,7 @@ public sealed class DeviceDiscoveryService
             if (!string.IsNullOrEmpty(nvmeTransport?.Trim()) &&
                 !string.Equals(nvmeTransport.Trim(), "pcie", StringComparison.OrdinalIgnoreCase))
             {
-                busType = BusType.NVMeOF;
+                busType = BusType.NvMeOf;
                 transport = DeviceTransport.Network;
             }
         }
@@ -268,7 +268,7 @@ public sealed class DeviceDiscoveryService
             var targetPath = Path.Combine(sysBlockDir, "device", "../../iscsi_session");
             if (Directory.Exists(targetPath))
             {
-                busType = BusType.iSCSI;
+                busType = BusType.IScsi;
                 transport = DeviceTransport.Network;
             }
         }
@@ -326,12 +326,12 @@ public sealed class DeviceDiscoveryService
     {
         if (devName.StartsWith("nvme", StringComparison.Ordinal))
         {
-            return (BusType.NVMe, MediaType.NVMe, DeviceTransport.PCIe);
+            return (BusType.NvMe, MediaType.NvMe, DeviceTransport.PcIe);
         }
 
         if (devName.StartsWith("vd", StringComparison.Ordinal))
         {
-            return (BusType.VirtIO, MediaType.VirtIO, DeviceTransport.Virtual);
+            return (BusType.VirtIo, MediaType.VirtIo, DeviceTransport.Virtual);
         }
 
         if (devName.StartsWith("sd", StringComparison.Ordinal))
@@ -339,28 +339,28 @@ public sealed class DeviceDiscoveryService
             // SCSI/SATA/SAS device
             if (isRotational)
             {
-                return (BusType.SCSI, MediaType.HDD, DeviceTransport.SAS);
+                return (BusType.Scsi, MediaType.Hdd, DeviceTransport.Sas);
             }
-            return (BusType.SATA, MediaType.SSD, DeviceTransport.SATA);
+            return (BusType.Sata, MediaType.Ssd, DeviceTransport.Sata);
         }
 
         if (devName.StartsWith("hd", StringComparison.Ordinal))
         {
             // Legacy IDE/PATA - treat as SATA
-            return (BusType.SATA, isRotational ? MediaType.HDD : MediaType.SSD, DeviceTransport.SATA);
+            return (BusType.Sata, isRotational ? MediaType.Hdd : MediaType.Ssd, DeviceTransport.Sata);
         }
 
         if (devName.StartsWith("sr", StringComparison.Ordinal) || devName.StartsWith("cd", StringComparison.Ordinal))
         {
-            return (BusType.SCSI, MediaType.Unknown, DeviceTransport.SATA);
+            return (BusType.Scsi, MediaType.Unknown, DeviceTransport.Sata);
         }
 
         if (devName.StartsWith("zram", StringComparison.Ordinal))
         {
-            return (BusType.Unknown, MediaType.RAMDisk, DeviceTransport.Virtual);
+            return (BusType.Unknown, MediaType.RamDisk, DeviceTransport.Virtual);
         }
 
-        return (BusType.Unknown, isRotational ? MediaType.HDD : MediaType.Unknown, DeviceTransport.Unknown);
+        return (BusType.Unknown, isRotational ? MediaType.Hdd : MediaType.Unknown, DeviceTransport.Unknown);
     }
 
     private static async Task<string?> ReadSysfsFileAsync(string path, CancellationToken ct)
@@ -508,18 +508,18 @@ public sealed class DeviceDiscoveryService
         // Determine transport
         var transport = busType switch
         {
-            BusType.NVMe => DeviceTransport.PCIe,
-            BusType.SATA => DeviceTransport.SATA,
-            BusType.SAS => DeviceTransport.SAS,
-            BusType.USB => DeviceTransport.USB,
-            BusType.SCSI => DeviceTransport.SAS,
-            BusType.iSCSI => DeviceTransport.Network,
+            BusType.NvMe => DeviceTransport.PcIe,
+            BusType.Sata => DeviceTransport.Sata,
+            BusType.Sas => DeviceTransport.Sas,
+            BusType.Usb => DeviceTransport.Usb,
+            BusType.Scsi => DeviceTransport.Sas,
+            BusType.IScsi => DeviceTransport.Network,
             BusType.FibreChannel => DeviceTransport.Network,
             _ => DeviceTransport.Unknown
         };
 
         // SupportsTrim: assume true for SSD/NVMe (precise detection requires IOCTL_STORAGE_QUERY_PROPERTY)
-        bool supportsTrim = mediaType is MediaType.SSD or MediaType.NVMe;
+        bool supportsTrim = mediaType is MediaType.Ssd or MediaType.NvMe;
 
         // Skip removable if not requested
         if (!options.IncludeRemovable && mediaTypeStr.Contains("Removable", StringComparison.OrdinalIgnoreCase))
@@ -547,7 +547,7 @@ public sealed class DeviceDiscoveryService
             // IOCTL_STORAGE_QUERY_PROPERTY with StorageAdapterWriteCacheProperty.
             // Conservative false prevents unnecessary fsync bypass.
             SupportsVolatileWriteCache: false,
-            NvmeNamespaceId: busType == BusType.NVMe ? 1 : 0, // Windows exposes NVMe as single namespace
+            NvmeNamespaceId: busType == BusType.NvMe ? 1 : 0, // Windows exposes NVMe as single namespace
             ControllerPath: null, // Would require SetupAPI for topology
             NumaNode: null); // Would require SetupAPI P/Invoke for NUMA affinity
     }
@@ -556,20 +556,20 @@ public sealed class DeviceDiscoveryService
     {
         return interfaceType.ToUpperInvariant() switch
         {
-            "IDE" => BusType.SATA,
-            "SCSI" => BusType.SCSI,
-            "USB" => BusType.USB,
+            "IDE" => BusType.Sata,
+            "SCSI" => BusType.Scsi,
+            "USB" => BusType.Usb,
             "1394" => BusType.Unknown, // FireWire
-            "SAS" => BusType.SAS,
-            "17" => BusType.NVMe, // NVMe interface type code
-            "NVME" => BusType.NVMe,
+            "SAS" => BusType.Sas,
+            "17" => BusType.NvMe, // NVMe interface type code
+            "NVME" => BusType.NvMe,
             _ => BusType.Unknown
         };
     }
 
     private static MediaType MapWindowsMediaType(string mediaTypeStr, BusType busType)
     {
-        if (busType == BusType.NVMe) return MediaType.NVMe;
+        if (busType == BusType.NvMe) return MediaType.NvMe;
 
         var upper = mediaTypeStr.ToUpperInvariant();
 
@@ -580,8 +580,8 @@ public sealed class DeviceDiscoveryService
             // determine whether a SATA "Fixed Hard Disk" is spinning or solid-state.
             // Return Unknown so callers do not incorrectly place spinning SATA disks on the warm tier.
             // NVMe is already handled above; SAS/SCSI without rotational data defaults to HDD.
-            if (busType == BusType.NVMe) return MediaType.NVMe;
-            if (busType == BusType.SAS || busType == BusType.SCSI) return MediaType.HDD;
+            if (busType == BusType.NvMe) return MediaType.NvMe;
+            if (busType == BusType.Sas || busType == BusType.Scsi) return MediaType.Hdd;
             // SATA: cannot distinguish SSD vs HDD without IOCTL — return Unknown to avoid misclassification.
             return MediaType.Unknown;
         }

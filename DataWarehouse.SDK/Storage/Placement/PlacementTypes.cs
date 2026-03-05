@@ -15,11 +15,11 @@ public enum StorageClass
     Cool,
     Cold,
     Archive,
-    NVMe,
-    SSD,
-    HDD,
+    NvMe,
+    Ssd,
+    Hdd,
     Tape,
-    DNA,
+    Dna,
     Holographic
 }
 

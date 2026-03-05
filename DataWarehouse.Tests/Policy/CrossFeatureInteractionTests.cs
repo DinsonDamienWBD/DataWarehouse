@@ -179,9 +179,9 @@ public class CrossFeatureInteractionTests
             Name = "Custom",
             FeaturePolicies = new Dictionary<string, FeaturePolicy>
             {
-                ["encryption"] = MakePolicy("encryption", PolicyLevel.VDE, intensity: 100, ai: AiAutonomyLevel.ManualOnly),
-                ["compression"] = MakePolicy("compression", PolicyLevel.VDE, intensity: 20, ai: AiAutonomyLevel.AutoSilent),
-                ["replication"] = MakePolicy("replication", PolicyLevel.VDE, intensity: 60, ai: AiAutonomyLevel.SuggestExplain)
+                ["encryption"] = MakePolicy("encryption", PolicyLevel.Vde, intensity: 100, ai: AiAutonomyLevel.ManualOnly),
+                ["compression"] = MakePolicy("compression", PolicyLevel.Vde, intensity: 20, ai: AiAutonomyLevel.AutoSilent),
+                ["replication"] = MakePolicy("replication", PolicyLevel.Vde, intensity: 60, ai: AiAutonomyLevel.SuggestExplain)
             }
         };
         var engine = CreateEngine(profile: profile);
@@ -212,7 +212,7 @@ public class CrossFeatureInteractionTests
                 Name = "Custom",
                 FeaturePolicies = new Dictionary<string, FeaturePolicy>
                 {
-                    ["encryption"] = MakePolicy("encryption", PolicyLevel.VDE, intensity: 55)
+                    ["encryption"] = MakePolicy("encryption", PolicyLevel.Vde, intensity: 55)
                 }
             }
         };
@@ -333,9 +333,9 @@ public class CrossFeatureInteractionTests
             Preset = OperationalProfilePreset.Custom,
             FeaturePolicies = new Dictionary<string, FeaturePolicy>
             {
-                ["access_control"] = MakePolicy("access_control", PolicyLevel.VDE, intensity: 100,
+                ["access_control"] = MakePolicy("access_control", PolicyLevel.Vde, intensity: 100,
                     cascade: CascadeStrategy.Enforce, ai: AiAutonomyLevel.ManualOnly),
-                ["ai_autonomy"] = MakePolicy("ai_autonomy", PolicyLevel.VDE, intensity: 50,
+                ["ai_autonomy"] = MakePolicy("ai_autonomy", PolicyLevel.Vde, intensity: 50,
                     cascade: CascadeStrategy.Inherit, ai: AiAutonomyLevel.AutoNotify)
             }
         };
@@ -360,9 +360,9 @@ public class CrossFeatureInteractionTests
             Preset = OperationalProfilePreset.Custom,
             FeaturePolicies = new Dictionary<string, FeaturePolicy>
             {
-                ["encryption"] = MakePolicy("encryption", PolicyLevel.VDE, intensity: 90,
+                ["encryption"] = MakePolicy("encryption", PolicyLevel.Vde, intensity: 90,
                     cascade: CascadeStrategy.MostRestrictive),
-                ["storage"] = MakePolicy("storage", PolicyLevel.VDE, intensity: 40,
+                ["storage"] = MakePolicy("storage", PolicyLevel.Vde, intensity: 40,
                     cascade: CascadeStrategy.Override)
             }
         };
@@ -381,14 +381,14 @@ public class CrossFeatureInteractionTests
     public async Task MergeOnOneFeature_DoesNotContaminateAnother()
     {
         var store = CreateStore();
-        var mergePolicy = MakePolicy("replication", PolicyLevel.VDE, intensity: 50,
+        var mergePolicy = MakePolicy("replication", PolicyLevel.Vde, intensity: 50,
             cascade: CascadeStrategy.Merge,
             customParams: new Dictionary<string, string> { ["key1"] = "val1" });
-        var overridePolicy = MakePolicy("encryption", PolicyLevel.VDE, intensity: 80,
+        var overridePolicy = MakePolicy("encryption", PolicyLevel.Vde, intensity: 80,
             cascade: CascadeStrategy.Override);
 
-        await store.SetAsync("replication", PolicyLevel.VDE, "/v1", mergePolicy);
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/v1", overridePolicy);
+        await store.SetAsync("replication", PolicyLevel.Vde, "/v1", mergePolicy);
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/v1", overridePolicy);
 
         var engine = CreateEngine(store);
         var ctx = new PolicyResolutionContext { Path = "/v1" };
@@ -444,8 +444,8 @@ public class CrossFeatureInteractionTests
     public async Task TwoFeatures_DifferentLevels_NoBleed()
     {
         var store = CreateStore();
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/v1",
-            MakePolicy("encryption", PolicyLevel.VDE, intensity: 80));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/v1",
+            MakePolicy("encryption", PolicyLevel.Vde, intensity: 80));
         await store.SetAsync("compression", PolicyLevel.Object, "/v1/c1/o1",
             MakePolicy("compression", PolicyLevel.Object, intensity: 25));
 
@@ -456,7 +456,7 @@ public class CrossFeatureInteractionTests
         var cmp = await engine.ResolveAsync("compression", ctx);
 
         enc.EffectiveIntensity.Should().Be(80);
-        enc.DecidedAtLevel.Should().Be(PolicyLevel.VDE);
+        enc.DecidedAtLevel.Should().Be(PolicyLevel.Vde);
         cmp.EffectiveIntensity.Should().Be(25);
         cmp.DecidedAtLevel.Should().Be(PolicyLevel.Object);
     }
@@ -465,8 +465,8 @@ public class CrossFeatureInteractionTests
     public async Task InheritEncryption_OverrideCompression_IndependentPaths()
     {
         var store = CreateStore();
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/v1",
-            MakePolicy("encryption", PolicyLevel.VDE, intensity: 70, cascade: CascadeStrategy.Inherit));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/v1",
+            MakePolicy("encryption", PolicyLevel.Vde, intensity: 70, cascade: CascadeStrategy.Inherit));
         await store.SetAsync("compression", PolicyLevel.Container, "/v1/c1",
             MakePolicy("compression", PolicyLevel.Container, intensity: 45, cascade: CascadeStrategy.Override));
 
@@ -484,13 +484,13 @@ public class CrossFeatureInteractionTests
     public async Task ThreeFeatures_ThreeCascades_AllIndependent()
     {
         var store = CreateStore();
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/v1",
-            MakePolicy("encryption", PolicyLevel.VDE, intensity: 90, cascade: CascadeStrategy.Enforce));
-        await store.SetAsync("compression", PolicyLevel.VDE, "/v1",
-            MakePolicy("compression", PolicyLevel.VDE, intensity: 40, cascade: CascadeStrategy.Merge,
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/v1",
+            MakePolicy("encryption", PolicyLevel.Vde, intensity: 90, cascade: CascadeStrategy.Enforce));
+        await store.SetAsync("compression", PolicyLevel.Vde, "/v1",
+            MakePolicy("compression", PolicyLevel.Vde, intensity: 40, cascade: CascadeStrategy.Merge,
                 customParams: new Dictionary<string, string> { ["algo"] = "lz4" }));
-        await store.SetAsync("replication", PolicyLevel.VDE, "/v1",
-            MakePolicy("replication", PolicyLevel.VDE, intensity: 60, cascade: CascadeStrategy.Override));
+        await store.SetAsync("replication", PolicyLevel.Vde, "/v1",
+            MakePolicy("replication", PolicyLevel.Vde, intensity: 60, cascade: CascadeStrategy.Override));
 
         var engine = CreateEngine(store);
         var ctx = new PolicyResolutionContext { Path = "/v1" };
@@ -508,10 +508,10 @@ public class CrossFeatureInteractionTests
     public async Task FeatureModification_DoesNotAffectOtherFeature()
     {
         var store = CreateStore();
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/v1",
-            MakePolicy("encryption", PolicyLevel.VDE, intensity: 50));
-        await store.SetAsync("compression", PolicyLevel.VDE, "/v1",
-            MakePolicy("compression", PolicyLevel.VDE, intensity: 60));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/v1",
+            MakePolicy("encryption", PolicyLevel.Vde, intensity: 50));
+        await store.SetAsync("compression", PolicyLevel.Vde, "/v1",
+            MakePolicy("compression", PolicyLevel.Vde, intensity: 60));
 
         var engine = CreateEngine(store);
         var ctx = new PolicyResolutionContext { Path = "/v1" };
@@ -521,8 +521,8 @@ public class CrossFeatureInteractionTests
         var cmpBefore = await engine.ResolveAsync("compression", ctx);
 
         // Modify encryption only
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/v1",
-            MakePolicy("encryption", PolicyLevel.VDE, intensity: 99));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/v1",
+            MakePolicy("encryption", PolicyLevel.Vde, intensity: 99));
 
         var encAfter = await engine.ResolveAsync("encryption", ctx);
         var cmpAfter = await engine.ResolveAsync("compression", ctx);
@@ -569,9 +569,9 @@ public class CrossFeatureInteractionTests
             Preset = OperationalProfilePreset.Custom,
             FeaturePolicies = new Dictionary<string, FeaturePolicy>
             {
-                ["encryption"] = MakePolicy("encryption", PolicyLevel.VDE, intensity: 80, cascade: CascadeStrategy.Enforce),
-                ["compression"] = MakePolicy("compression", PolicyLevel.VDE, intensity: 50, cascade: CascadeStrategy.Inherit),
-                ["replication"] = MakePolicy("replication", PolicyLevel.VDE, intensity: 60, cascade: CascadeStrategy.Override)
+                ["encryption"] = MakePolicy("encryption", PolicyLevel.Vde, intensity: 80, cascade: CascadeStrategy.Enforce),
+                ["compression"] = MakePolicy("compression", PolicyLevel.Vde, intensity: 50, cascade: CascadeStrategy.Inherit),
+                ["replication"] = MakePolicy("replication", PolicyLevel.Vde, intensity: 60, cascade: CascadeStrategy.Override)
             }
         };
 
@@ -589,17 +589,17 @@ public class CrossFeatureInteractionTests
     public async Task RemoveOverride_OtherOverridesUnaffected()
     {
         var store = CreateStore();
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/v1",
-            MakePolicy("encryption", PolicyLevel.VDE, intensity: 90));
-        await store.SetAsync("compression", PolicyLevel.VDE, "/v1",
-            MakePolicy("compression", PolicyLevel.VDE, intensity: 40));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/v1",
+            MakePolicy("encryption", PolicyLevel.Vde, intensity: 90));
+        await store.SetAsync("compression", PolicyLevel.Vde, "/v1",
+            MakePolicy("compression", PolicyLevel.Vde, intensity: 40));
 
         var engine = CreateEngine(store);
         var ctx = new PolicyResolutionContext { Path = "/v1" };
 
         // Remove encryption override by setting default
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/v1",
-            MakePolicy("encryption", PolicyLevel.VDE, intensity: 50));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/v1",
+            MakePolicy("encryption", PolicyLevel.Vde, intensity: 50));
 
         var enc = await engine.ResolveAsync("encryption", ctx);
         var cmp = await engine.ResolveAsync("compression", ctx);
@@ -617,8 +617,8 @@ public class CrossFeatureInteractionTests
         {
             string featureId = $"feature_{i}";
             int intensity = 10 + i * 9; // 10, 19, 28, ... 91
-            var policy = MakePolicy(featureId, PolicyLevel.VDE, intensity: intensity);
-            await store.SetAsync(featureId, PolicyLevel.VDE, "/v1", policy);
+            var policy = MakePolicy(featureId, PolicyLevel.Vde, intensity: intensity);
+            await store.SetAsync(featureId, PolicyLevel.Vde, "/v1", policy);
             features[featureId] = policy;
         }
 
@@ -648,8 +648,8 @@ public class CrossFeatureInteractionTests
     {
         var store = CreateStore();
         var profile = OperationalProfile.Standard();
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/v1",
-            MakePolicy("encryption", PolicyLevel.VDE, intensity: 70));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/v1",
+            MakePolicy("encryption", PolicyLevel.Vde, intensity: 70));
         await store.SetAsync("encryption", PolicyLevel.Container, "/v1/c1",
             MakePolicy("encryption", PolicyLevel.Container, intensity: 90));
 
@@ -665,8 +665,8 @@ public class CrossFeatureInteractionTests
     public async Task MultiFeature_MultiLevel_AllCorrect()
     {
         var store = CreateStore();
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/v1",
-            MakePolicy("encryption", PolicyLevel.VDE, intensity: 70));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/v1",
+            MakePolicy("encryption", PolicyLevel.Vde, intensity: 70));
         await store.SetAsync("compression", PolicyLevel.Container, "/v1/c1",
             MakePolicy("compression", PolicyLevel.Container, intensity: 30));
         await store.SetAsync("replication", PolicyLevel.Object, "/v1/c1/o1",
@@ -678,9 +678,9 @@ public class CrossFeatureInteractionTests
             Preset = OperationalProfilePreset.Custom,
             FeaturePolicies = new Dictionary<string, FeaturePolicy>
             {
-                ["encryption"] = MakePolicy("encryption", PolicyLevel.VDE, intensity: 50),
-                ["compression"] = MakePolicy("compression", PolicyLevel.VDE, intensity: 50),
-                ["replication"] = MakePolicy("replication", PolicyLevel.VDE, intensity: 50)
+                ["encryption"] = MakePolicy("encryption", PolicyLevel.Vde, intensity: 50),
+                ["compression"] = MakePolicy("compression", PolicyLevel.Vde, intensity: 50),
+                ["replication"] = MakePolicy("replication", PolicyLevel.Vde, intensity: 50)
             }
         };
         var engine = CreateEngine(store, profile: profile);
@@ -697,8 +697,8 @@ public class CrossFeatureInteractionTests
     public async Task Override5Features_VaryingLevels_CorrectResolution()
     {
         var store = CreateStore();
-        await store.SetAsync("feat_a", PolicyLevel.VDE, "/v1",
-            MakePolicy("feat_a", PolicyLevel.VDE, intensity: 10));
+        await store.SetAsync("feat_a", PolicyLevel.Vde, "/v1",
+            MakePolicy("feat_a", PolicyLevel.Vde, intensity: 10));
         await store.SetAsync("feat_b", PolicyLevel.Container, "/v1/c1",
             MakePolicy("feat_b", PolicyLevel.Container, intensity: 20));
         await store.SetAsync("feat_c", PolicyLevel.Object, "/v1/c1/o1",
@@ -710,7 +710,7 @@ public class CrossFeatureInteractionTests
 
         var features = new Dictionary<string, FeaturePolicy>();
         foreach (var id in new[] { "feat_a", "feat_b", "feat_c", "feat_d", "feat_e" })
-            features[id] = MakePolicy(id, PolicyLevel.VDE, intensity: 1);
+            features[id] = MakePolicy(id, PolicyLevel.Vde, intensity: 1);
 
         var profile = new OperationalProfile
         {
@@ -752,10 +752,10 @@ public class CrossFeatureInteractionTests
     public async Task SameFeature_OverrideTwice_LatestWins()
     {
         var store = CreateStore();
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/v1",
-            MakePolicy("encryption", PolicyLevel.VDE, intensity: 50));
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/v1",
-            MakePolicy("encryption", PolicyLevel.VDE, intensity: 99));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/v1",
+            MakePolicy("encryption", PolicyLevel.Vde, intensity: 50));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/v1",
+            MakePolicy("encryption", PolicyLevel.Vde, intensity: 99));
 
         var engine = CreateEngine(store);
         var ctx = new PolicyResolutionContext { Path = "/v1" };
@@ -785,12 +785,12 @@ public class CrossFeatureInteractionTests
     public async Task MultiFeature_ChainLength_Varies()
     {
         var store = CreateStore();
-        await store.SetAsync("enc", PolicyLevel.VDE, "/v1",
-            MakePolicy("enc", PolicyLevel.VDE, intensity: 70));
+        await store.SetAsync("enc", PolicyLevel.Vde, "/v1",
+            MakePolicy("enc", PolicyLevel.Vde, intensity: 70));
         await store.SetAsync("enc", PolicyLevel.Container, "/v1/c1",
             MakePolicy("enc", PolicyLevel.Container, intensity: 80));
-        await store.SetAsync("cmp", PolicyLevel.VDE, "/v1",
-            MakePolicy("cmp", PolicyLevel.VDE, intensity: 40));
+        await store.SetAsync("cmp", PolicyLevel.Vde, "/v1",
+            MakePolicy("cmp", PolicyLevel.Vde, intensity: 40));
 
         var engine = CreateEngine(store);
         var ctx = new PolicyResolutionContext { Path = "/v1/c1" };
@@ -806,12 +806,12 @@ public class CrossFeatureInteractionTests
     public async Task MultiOverride_AiAutonomy_PerFeature()
     {
         var store = CreateStore();
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/v1",
-            MakePolicy("encryption", PolicyLevel.VDE, ai: AiAutonomyLevel.ManualOnly));
-        await store.SetAsync("compression", PolicyLevel.VDE, "/v1",
-            MakePolicy("compression", PolicyLevel.VDE, ai: AiAutonomyLevel.AutoSilent));
-        await store.SetAsync("replication", PolicyLevel.VDE, "/v1",
-            MakePolicy("replication", PolicyLevel.VDE, ai: AiAutonomyLevel.SuggestExplain));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/v1",
+            MakePolicy("encryption", PolicyLevel.Vde, ai: AiAutonomyLevel.ManualOnly));
+        await store.SetAsync("compression", PolicyLevel.Vde, "/v1",
+            MakePolicy("compression", PolicyLevel.Vde, ai: AiAutonomyLevel.AutoSilent));
+        await store.SetAsync("replication", PolicyLevel.Vde, "/v1",
+            MakePolicy("replication", PolicyLevel.Vde, ai: AiAutonomyLevel.SuggestExplain));
 
         var profile = new OperationalProfile
         {
@@ -819,9 +819,9 @@ public class CrossFeatureInteractionTests
             Preset = OperationalProfilePreset.Custom,
             FeaturePolicies = new Dictionary<string, FeaturePolicy>
             {
-                ["encryption"] = MakePolicy("encryption", PolicyLevel.VDE),
-                ["compression"] = MakePolicy("compression", PolicyLevel.VDE),
-                ["replication"] = MakePolicy("replication", PolicyLevel.VDE)
+                ["encryption"] = MakePolicy("encryption", PolicyLevel.Vde),
+                ["compression"] = MakePolicy("compression", PolicyLevel.Vde),
+                ["replication"] = MakePolicy("replication", PolicyLevel.Vde)
             }
         };
         var engine = CreateEngine(store, profile: profile);
@@ -838,11 +838,11 @@ public class CrossFeatureInteractionTests
     public async Task BulkOverride_CustomParams_Independent()
     {
         var store = CreateStore();
-        await store.SetAsync("feat_x", PolicyLevel.VDE, "/v1",
-            MakePolicy("feat_x", PolicyLevel.VDE, customParams: new Dictionary<string, string> { ["k1"] = "v1" },
+        await store.SetAsync("feat_x", PolicyLevel.Vde, "/v1",
+            MakePolicy("feat_x", PolicyLevel.Vde, customParams: new Dictionary<string, string> { ["k1"] = "v1" },
                 cascade: CascadeStrategy.Merge));
-        await store.SetAsync("feat_y", PolicyLevel.VDE, "/v1",
-            MakePolicy("feat_y", PolicyLevel.VDE, customParams: new Dictionary<string, string> { ["k2"] = "v2" },
+        await store.SetAsync("feat_y", PolicyLevel.Vde, "/v1",
+            MakePolicy("feat_y", PolicyLevel.Vde, customParams: new Dictionary<string, string> { ["k2"] = "v2" },
                 cascade: CascadeStrategy.Merge));
 
         var engine = CreateEngine(store);
@@ -887,9 +887,9 @@ public class CrossFeatureInteractionTests
             Preset = OperationalProfilePreset.Custom,
             FeaturePolicies = new Dictionary<string, FeaturePolicy>
             {
-                ["access_control"] = MakePolicy("access_control", PolicyLevel.VDE, intensity: 100,
+                ["access_control"] = MakePolicy("access_control", PolicyLevel.Vde, intensity: 100,
                     cascade: CascadeStrategy.Enforce, ai: AiAutonomyLevel.ManualOnly),
-                ["ai_autonomy"] = MakePolicy("ai_autonomy", PolicyLevel.VDE, intensity: 50,
+                ["ai_autonomy"] = MakePolicy("ai_autonomy", PolicyLevel.Vde, intensity: 50,
                     cascade: CascadeStrategy.Inherit, ai: AiAutonomyLevel.AutoNotify)
             }
         };
@@ -916,9 +916,9 @@ public class CrossFeatureInteractionTests
             Preset = OperationalProfilePreset.Custom,
             FeaturePolicies = new Dictionary<string, FeaturePolicy>
             {
-                ["compliance"] = MakePolicy("compliance", PolicyLevel.VDE, intensity: 100,
+                ["compliance"] = MakePolicy("compliance", PolicyLevel.Vde, intensity: 100,
                     cascade: CascadeStrategy.Enforce, ai: AiAutonomyLevel.ManualOnly),
-                ["ai_features"] = MakePolicy("ai_features", PolicyLevel.VDE, intensity: 70,
+                ["ai_features"] = MakePolicy("ai_features", PolicyLevel.Vde, intensity: 70,
                     cascade: CascadeStrategy.Override, ai: AiAutonomyLevel.SuggestExplain)
             }
         };
@@ -942,9 +942,9 @@ public class CrossFeatureInteractionTests
             Preset = OperationalProfilePreset.Custom,
             FeaturePolicies = new Dictionary<string, FeaturePolicy>
             {
-                ["encryption"] = MakePolicy("encryption", PolicyLevel.VDE, intensity: 100,
+                ["encryption"] = MakePolicy("encryption", PolicyLevel.Vde, intensity: 100,
                     cascade: CascadeStrategy.Enforce, ai: AiAutonomyLevel.ManualOnly),
-                ["ai_tuning"] = MakePolicy("ai_tuning", PolicyLevel.VDE, intensity: 30,
+                ["ai_tuning"] = MakePolicy("ai_tuning", PolicyLevel.Vde, intensity: 30,
                     cascade: CascadeStrategy.Override, ai: AiAutonomyLevel.AutoSilent)
             }
         };
@@ -975,8 +975,8 @@ public class CrossFeatureInteractionTests
     public async Task SecurityOverride_DoesNotEscalateAiAutonomy()
     {
         var store = CreateStore();
-        await store.SetAsync("security", PolicyLevel.VDE, "/v1",
-            MakePolicy("security", PolicyLevel.VDE, intensity: 100, ai: AiAutonomyLevel.ManualOnly));
+        await store.SetAsync("security", PolicyLevel.Vde, "/v1",
+            MakePolicy("security", PolicyLevel.Vde, intensity: 100, ai: AiAutonomyLevel.ManualOnly));
 
         var profile = new OperationalProfile
         {
@@ -984,8 +984,8 @@ public class CrossFeatureInteractionTests
             Preset = OperationalProfilePreset.Custom,
             FeaturePolicies = new Dictionary<string, FeaturePolicy>
             {
-                ["security"] = MakePolicy("security", PolicyLevel.VDE, intensity: 50),
-                ["optimization"] = MakePolicy("optimization", PolicyLevel.VDE, intensity: 50, ai: AiAutonomyLevel.AutoNotify)
+                ["security"] = MakePolicy("security", PolicyLevel.Vde, intensity: 50),
+                ["optimization"] = MakePolicy("optimization", PolicyLevel.Vde, intensity: 50, ai: AiAutonomyLevel.AutoNotify)
             }
         };
         var engine = CreateEngine(store, profile: profile);
@@ -1016,10 +1016,10 @@ public class CrossFeatureInteractionTests
     public async Task OverrideAiFeature_SecurityUnchanged()
     {
         var store = CreateStore();
-        await store.SetAsync("ai_config", PolicyLevel.VDE, "/v1",
-            MakePolicy("ai_config", PolicyLevel.VDE, ai: AiAutonomyLevel.AutoSilent));
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/v1",
-            MakePolicy("encryption", PolicyLevel.VDE, intensity: 95, ai: AiAutonomyLevel.ManualOnly));
+        await store.SetAsync("ai_config", PolicyLevel.Vde, "/v1",
+            MakePolicy("ai_config", PolicyLevel.Vde, ai: AiAutonomyLevel.AutoSilent));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/v1",
+            MakePolicy("encryption", PolicyLevel.Vde, intensity: 95, ai: AiAutonomyLevel.ManualOnly));
 
         var profile = new OperationalProfile
         {
@@ -1027,8 +1027,8 @@ public class CrossFeatureInteractionTests
             Preset = OperationalProfilePreset.Custom,
             FeaturePolicies = new Dictionary<string, FeaturePolicy>
             {
-                ["ai_config"] = MakePolicy("ai_config", PolicyLevel.VDE),
-                ["encryption"] = MakePolicy("encryption", PolicyLevel.VDE)
+                ["ai_config"] = MakePolicy("ai_config", PolicyLevel.Vde),
+                ["encryption"] = MakePolicy("encryption", PolicyLevel.Vde)
             }
         };
         var engine = CreateEngine(store, profile: profile);
@@ -1056,8 +1056,8 @@ public class CrossFeatureInteractionTests
             Preset = OperationalProfilePreset.Custom,
             FeaturePolicies = new Dictionary<string, FeaturePolicy>
             {
-                ["encryption"] = MakePolicy("encryption", PolicyLevel.VDE),
-                ["ai_level"] = MakePolicy("ai_level", PolicyLevel.VDE)
+                ["encryption"] = MakePolicy("encryption", PolicyLevel.Vde),
+                ["ai_level"] = MakePolicy("ai_level", PolicyLevel.Vde)
             }
         };
         var engine = CreateEngine(store, profile: profile);
@@ -1095,8 +1095,8 @@ public class CrossFeatureInteractionTests
     {
         var store = CreateStore();
         var profile = OperationalProfile.Standard();
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/v1",
-            MakePolicy("encryption", PolicyLevel.VDE, intensity: 99));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/v1",
+            MakePolicy("encryption", PolicyLevel.Vde, intensity: 99));
 
         var engine = CreateEngine(store, profile: profile);
         var ctx = new PolicyResolutionContext { Path = "/v1" };

@@ -83,8 +83,11 @@ namespace DataWarehouse.SDK.Contracts.Scaling
     [SdkCompatibility("6.0.0", Notes = "Phase 88-13: Universal plugin migration helper")]
     public static class PluginScalingMigrationHelper
     {
-        private static readonly ConcurrentBag<MigrationAuditEntry> _auditLog = new();
-        private static readonly JsonSerializerOptions _jsonOptions = new()
+        /// <summary>Maximum audit log entries to retain in memory (finding 1657: prevent unbounded growth).</summary>
+        private const int MaxAuditEntries = 10_000;
+        private static readonly ConcurrentQueue<MigrationAuditEntry> AuditLog = new();
+        private static int _auditCount;
+        private static readonly JsonSerializerOptions JsonOptions = new()
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             WriteIndented = false
@@ -134,8 +137,8 @@ namespace DataWarehouse.SDK.Contracts.Scaling
                     EvictionPolicy = CacheEvictionMode.Lru,
                     BackingStorePath = $"dw://cache/{pluginId}/{storeName}",
                     KeyToString = static k => k?.ToString() ?? "null",
-                    Serializer = static v => JsonSerializer.SerializeToUtf8Bytes(v, _jsonOptions),
-                    Deserializer = static b => JsonSerializer.Deserialize<TValue>(b, _jsonOptions)!,
+                    Serializer = static v => JsonSerializer.SerializeToUtf8Bytes(v, JsonOptions),
+                    Deserializer = static b => JsonSerializer.Deserialize<TValue>(b, JsonOptions)!,
                     WriteThrough = true
                 };
             }
@@ -144,8 +147,8 @@ namespace DataWarehouse.SDK.Contracts.Scaling
                 // Ensure backing store path is set if not provided
                 options.BackingStorePath ??= $"dw://cache/{pluginId}/{storeName}";
                 options.KeyToString ??= static k => k?.ToString() ?? "null";
-                options.Serializer ??= static v => JsonSerializer.SerializeToUtf8Bytes(v, _jsonOptions);
-                options.Deserializer ??= static b => JsonSerializer.Deserialize<TValue>(b, _jsonOptions)!;
+                options.Serializer ??= static v => JsonSerializer.SerializeToUtf8Bytes(v, JsonOptions);
+                options.Deserializer ??= static b => JsonSerializer.Deserialize<TValue>(b, JsonOptions)!;
             }
 
             return new BoundedCache<TKey, TValue>(options);
@@ -181,8 +184,8 @@ namespace DataWarehouse.SDK.Contracts.Scaling
                 EvictionPolicy = mode,
                 BackingStorePath = $"dw://cache/{pluginId}/{storeName}",
                 KeyToString = static k => k?.ToString() ?? "null",
-                Serializer = static v => JsonSerializer.SerializeToUtf8Bytes(v, _jsonOptions),
-                Deserializer = static b => JsonSerializer.Deserialize<TValue>(b, _jsonOptions)!,
+                Serializer = static v => JsonSerializer.SerializeToUtf8Bytes(v, JsonOptions),
+                Deserializer = static b => JsonSerializer.Deserialize<TValue>(b, JsonOptions)!,
                 WriteThrough = true
             };
 
@@ -216,8 +219,8 @@ namespace DataWarehouse.SDK.Contracts.Scaling
                 BackingStore = backingStore,
                 BackingStorePath = $"dw://cache/{pluginId}/{storeName}",
                 KeyToString = static k => k?.ToString() ?? "null",
-                Serializer = static v => JsonSerializer.SerializeToUtf8Bytes(v, _jsonOptions),
-                Deserializer = static b => JsonSerializer.Deserialize<TValue>(b, _jsonOptions)!,
+                Serializer = static v => JsonSerializer.SerializeToUtf8Bytes(v, JsonOptions),
+                Deserializer = static b => JsonSerializer.Deserialize<TValue>(b, JsonOptions)!,
                 WriteThrough = backingStore != null
             };
 
@@ -264,7 +267,13 @@ namespace DataWarehouse.SDK.Contracts.Scaling
                 sw.ElapsedMilliseconds,
                 DateTime.UtcNow);
 
-            _auditLog.Add(entry);
+            AuditLog.Enqueue(entry);
+            // Evict oldest entries when exceeding max capacity (finding 1657)
+            if (Interlocked.Increment(ref _auditCount) > MaxAuditEntries)
+            {
+                AuditLog.TryDequeue(out _);
+                Interlocked.Decrement(ref _auditCount);
+            }
 
             return entry;
         }
@@ -275,7 +284,7 @@ namespace DataWarehouse.SDK.Contracts.Scaling
         /// <returns>A read-only list of all migration audit entries.</returns>
         public static IReadOnlyList<MigrationAuditEntry> GetAuditLog()
         {
-            return _auditLog.ToArray();
+            return AuditLog.ToArray();
         }
 
         /// <summary>
@@ -283,7 +292,8 @@ namespace DataWarehouse.SDK.Contracts.Scaling
         /// </summary>
         public static void ClearAuditLog()
         {
-            while (_auditLog.TryTake(out _)) { }
+            while (AuditLog.TryDequeue(out _)) { }
+            Interlocked.Exchange(ref _auditCount, 0);
         }
 
         /// <summary>
@@ -296,7 +306,7 @@ namespace DataWarehouse.SDK.Contracts.Scaling
         /// <returns>UTF-8 JSON bytes.</returns>
         public static byte[] DefaultSerialize<TValue>(TValue value)
         {
-            return JsonSerializer.SerializeToUtf8Bytes(value, _jsonOptions);
+            return JsonSerializer.SerializeToUtf8Bytes(value, JsonOptions);
         }
 
         /// <summary>
@@ -309,7 +319,7 @@ namespace DataWarehouse.SDK.Contracts.Scaling
         /// <returns>The deserialized value.</returns>
         public static TValue DefaultDeserialize<TValue>(byte[] data)
         {
-            return JsonSerializer.Deserialize<TValue>(data, _jsonOptions)
+            return JsonSerializer.Deserialize<TValue>(data, JsonOptions)
                 ?? throw new InvalidOperationException(
                     $"Deserialization returned null for type {typeof(TValue).FullName}. " +
                     "Ensure the JSON is valid and matches the expected type.");

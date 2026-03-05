@@ -248,7 +248,7 @@ public class FeaturePolicyMatrixTests
         filter.Add(PolicyLevel.Block, "/v1/c1/o1/ch1/b1");
 
         // Different level should be absent
-        filter.MayContain(PolicyLevel.VDE, "/v1/c1/o1/ch1/b1").Should().BeFalse();
+        filter.MayContain(PolicyLevel.Vde, "/v1/c1/o1/ch1/b1").Should().BeFalse();
     }
 
     #endregion
@@ -261,11 +261,11 @@ public class FeaturePolicyMatrixTests
         var filter = new BloomFilterSkipIndex(expectedItems: 100);
         filter.Add(PolicyLevel.Block, "/v1/c1/o1/ch1/b1");
         filter.Add(PolicyLevel.Container, "/v1/c1");
-        filter.Add(PolicyLevel.VDE, "/v1");
+        filter.Add(PolicyLevel.Vde, "/v1");
 
         filter.MayContain(PolicyLevel.Block, "/v1/c1/o1/ch1/b1").Should().BeTrue();
         filter.MayContain(PolicyLevel.Container, "/v1/c1").Should().BeTrue();
-        filter.MayContain(PolicyLevel.VDE, "/v1").Should().BeTrue();
+        filter.MayContain(PolicyLevel.Vde, "/v1").Should().BeTrue();
     }
 
     #endregion
@@ -390,7 +390,7 @@ public class FeaturePolicyMatrixTests
 
         // Same path, different level should not match
         filter.MayContain(PolicyLevel.Container, "/v1").Should().BeFalse();
-        filter.MayContain(PolicyLevel.VDE, "/v1").Should().BeFalse();
+        filter.MayContain(PolicyLevel.Vde, "/v1").Should().BeFalse();
         filter.MayContain(PolicyLevel.Object, "/v1").Should().BeFalse();
         filter.MayContain(PolicyLevel.Chunk, "/v1").Should().BeFalse();
     }
@@ -688,8 +688,8 @@ public class FeaturePolicyMatrixTests
     public async Task FastPath_FullResolution_ConsistentWithEngine()
     {
         var store = CreateStore();
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/v1",
-            MakePolicy("encryption", PolicyLevel.VDE, intensity: 80));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/v1",
+            MakePolicy("encryption", PolicyLevel.Vde, intensity: 80));
         await store.SetAsync("encryption", PolicyLevel.Container, "/v1/c1",
             MakePolicy("encryption", PolicyLevel.Container, intensity: 60));
 
@@ -715,8 +715,8 @@ public class FeaturePolicyMatrixTests
     public async Task CrossFeature_Encryption_DoesNotAffect_Compression()
     {
         var store = CreateStore();
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/v1",
-            MakePolicy("encryption", PolicyLevel.VDE, intensity: 90));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/v1",
+            MakePolicy("encryption", PolicyLevel.Vde, intensity: 90));
 
         var engine = CreateEngine(store);
         var ctx = new PolicyResolutionContext { Path = "/v1" };
@@ -737,8 +737,8 @@ public class FeaturePolicyMatrixTests
     public async Task CrossFeature_AnomalyDetection_DoesNotAffect_AccessControl()
     {
         var store = CreateStore();
-        await store.SetAsync("anomaly_detection", PolicyLevel.VDE, "/v1",
-            MakePolicy("anomaly_detection", PolicyLevel.VDE, intensity: 85, ai: AiAutonomyLevel.AutoSilent));
+        await store.SetAsync("anomaly_detection", PolicyLevel.Vde, "/v1",
+            MakePolicy("anomaly_detection", PolicyLevel.Vde, intensity: 85, ai: AiAutonomyLevel.AutoSilent));
 
         var engine = CreateEngine(store);
         var ctx = new PolicyResolutionContext { Path = "/v1" };
@@ -761,8 +761,8 @@ public class FeaturePolicyMatrixTests
         var store = CreateStore();
         var profile = OperationalProfile.Standard();
         // Override encryption at VDE level
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/v1",
-            MakePolicy("encryption", PolicyLevel.VDE, intensity: 95));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/v1",
+            MakePolicy("encryption", PolicyLevel.Vde, intensity: 95));
 
         var engine = CreateEngine(store, profile: profile);
         var ctx = new PolicyResolutionContext { Path = "/v1" };
@@ -785,14 +785,14 @@ public class FeaturePolicyMatrixTests
     {
         var store = CreateStore();
         // Encryption with Enforce cascade at VDE
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/v1",
-            MakePolicy("encryption", PolicyLevel.VDE, intensity: 80, cascade: CascadeStrategy.Enforce));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/v1",
+            MakePolicy("encryption", PolicyLevel.Vde, intensity: 80, cascade: CascadeStrategy.Enforce));
         await store.SetAsync("encryption", PolicyLevel.Container, "/v1/c1",
             MakePolicy("encryption", PolicyLevel.Container, intensity: 30, cascade: CascadeStrategy.Override));
 
         // Compression with Override cascade at Container
-        await store.SetAsync("compression", PolicyLevel.VDE, "/v1",
-            MakePolicy("compression", PolicyLevel.VDE, intensity: 40, cascade: CascadeStrategy.Override));
+        await store.SetAsync("compression", PolicyLevel.Vde, "/v1",
+            MakePolicy("compression", PolicyLevel.Vde, intensity: 40, cascade: CascadeStrategy.Override));
         await store.SetAsync("compression", PolicyLevel.Container, "/v1/c1",
             MakePolicy("compression", PolicyLevel.Container, intensity: 70, cascade: CascadeStrategy.Override));
 
@@ -823,8 +823,8 @@ public class FeaturePolicyMatrixTests
 
         for (int i = 0; i < features.Length; i++)
         {
-            await store.SetAsync(features[i], PolicyLevel.VDE, "/v1",
-                MakePolicy(features[i], PolicyLevel.VDE, intensity: (i + 1) * 15));
+            await store.SetAsync(features[i], PolicyLevel.Vde, "/v1",
+                MakePolicy(features[i], PolicyLevel.Vde, intensity: (i + 1) * 15));
         }
 
         var engine = CreateEngine(store);
@@ -846,10 +846,10 @@ public class FeaturePolicyMatrixTests
     public async Task CrossFeature_ModifyOne_DoesNotChangeAnother()
     {
         var store = CreateStore();
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/v1",
-            MakePolicy("encryption", PolicyLevel.VDE, intensity: 70));
-        await store.SetAsync("compression", PolicyLevel.VDE, "/v1",
-            MakePolicy("compression", PolicyLevel.VDE, intensity: 40));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/v1",
+            MakePolicy("encryption", PolicyLevel.Vde, intensity: 70));
+        await store.SetAsync("compression", PolicyLevel.Vde, "/v1",
+            MakePolicy("compression", PolicyLevel.Vde, intensity: 40));
 
         var engine = CreateEngine(store);
         var ctx = new PolicyResolutionContext { Path = "/v1" };
@@ -859,8 +859,8 @@ public class FeaturePolicyMatrixTests
         var comp1 = await engine.ResolveAsync("compression", ctx);
 
         // Modify encryption
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/v1",
-            MakePolicy("encryption", PolicyLevel.VDE, intensity: 95));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/v1",
+            MakePolicy("encryption", PolicyLevel.Vde, intensity: 95));
 
         // Resolve again
         var enc2 = await engine.ResolveAsync("encryption", ctx);

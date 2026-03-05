@@ -73,7 +73,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
     public sealed class HsmProvider : IHsmProvider, IDisposable, IAsyncDisposable
     {
         private IntPtr _pkcs11Library = IntPtr.Zero;
-        private Pkcs11Wrapper.CK_FUNCTION_LIST _functions;
+        private Pkcs11Wrapper.CkFunctionList _functions;
         private uint _session = 0;
         private bool _isConnected = false;
         private readonly BoundedDictionary<string, uint> _keyHandles = new BoundedDictionary<string, uint>(1000); // label -> HSM object handle
@@ -132,28 +132,28 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                     _functions = Pkcs11Wrapper.GetFunctionList(_pkcs11Library);
 
                     // 3. Initialize PKCS#11 library
-                    var initialize = Marshal.GetDelegateForFunctionPointer<Pkcs11Wrapper.C_Initialize>(_functions.C_Initialize);
+                    var initialize = Marshal.GetDelegateForFunctionPointer<Pkcs11Wrapper.CInitialize>(_functions.C_Initialize);
                     uint rv = initialize(IntPtr.Zero);
-                    if (rv != Pkcs11Wrapper.CKR_OK)
+                    if (rv != Pkcs11Wrapper.CkrOk)
                         throw new InvalidOperationException($"C_Initialize failed: 0x{rv:X8}");
 
                     // 4. Open session
                     uint slot = uint.Parse(slotId);
-                    var openSession = Marshal.GetDelegateForFunctionPointer<Pkcs11Wrapper.C_OpenSession>(_functions.C_OpenSession);
+                    var openSession = Marshal.GetDelegateForFunctionPointer<Pkcs11Wrapper.COpenSession>(_functions.C_OpenSession);
                     rv = openSession(
                         slot,
-                        Pkcs11Wrapper.CKF_SERIAL_SESSION | Pkcs11Wrapper.CKF_RW_SESSION,
+                        Pkcs11Wrapper.CkfSerialSession | Pkcs11Wrapper.CkfRwSession,
                         IntPtr.Zero,
                         IntPtr.Zero,
                         out _session);
-                    if (rv != Pkcs11Wrapper.CKR_OK)
+                    if (rv != Pkcs11Wrapper.CkrOk)
                         throw new InvalidOperationException($"C_OpenSession failed: 0x{rv:X8}");
 
                     // 5. Login with PIN
-                    var login = Marshal.GetDelegateForFunctionPointer<Pkcs11Wrapper.C_Login>(_functions.C_Login);
+                    var login = Marshal.GetDelegateForFunctionPointer<Pkcs11Wrapper.CLogin>(_functions.C_Login);
                     byte[] pinBytes = Encoding.UTF8.GetBytes(pin);
-                    rv = login(_session, Pkcs11Wrapper.CKU_USER, pinBytes, (uint)pinBytes.Length);
-                    if (rv != Pkcs11Wrapper.CKR_OK)
+                    rv = login(_session, Pkcs11Wrapper.CkuUser, pinBytes, (uint)pinBytes.Length);
+                    if (rv != Pkcs11Wrapper.CkrOk)
                         throw new InvalidOperationException($"C_Login failed (incorrect PIN?): 0x{rv:X8}");
 
                     _isConnected = true;
@@ -179,21 +179,21 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                     // Logout
                     if (_functions.C_Logout != IntPtr.Zero)
                     {
-                        var logout = Marshal.GetDelegateForFunctionPointer<Pkcs11Wrapper.C_Logout>(_functions.C_Logout);
+                        var logout = Marshal.GetDelegateForFunctionPointer<Pkcs11Wrapper.CLogout>(_functions.C_Logout);
                         logout(_session);
                     }
 
                     // Close session
                     if (_functions.C_CloseSession != IntPtr.Zero)
                     {
-                        var closeSession = Marshal.GetDelegateForFunctionPointer<Pkcs11Wrapper.C_CloseSession>(_functions.C_CloseSession);
+                        var closeSession = Marshal.GetDelegateForFunctionPointer<Pkcs11Wrapper.CCloseSession>(_functions.C_CloseSession);
                         closeSession(_session);
                     }
 
                     // Finalize library
                     if (_functions.C_Finalize != IntPtr.Zero)
                     {
-                        var finalize = Marshal.GetDelegateForFunctionPointer<Pkcs11Wrapper.C_Finalize>(_functions.C_Finalize);
+                        var finalize = Marshal.GetDelegateForFunctionPointer<Pkcs11Wrapper.CFinalize>(_functions.C_Finalize);
                         finalize(IntPtr.Zero);
                     }
 

@@ -56,7 +56,7 @@ public class PolicyEngineContractTests
     // ========================================================================
 
     [Theory]
-    [InlineData(PolicyLevel.VDE, "/vde1")]
+    [InlineData(PolicyLevel.Vde, "/vde1")]
     [InlineData(PolicyLevel.Container, "/vde1/cont1")]
     [InlineData(PolicyLevel.Object, "/vde1/cont1/obj1")]
     [InlineData(PolicyLevel.Chunk, "/vde1/cont1/obj1/chunk1")]
@@ -80,9 +80,9 @@ public class PolicyEngineContractTests
     public async Task ResolveAsync_OverrideCascade_MostSpecificWins()
     {
         var store = CreateStore();
-        var vde = MakePolicy("encryption", PolicyLevel.VDE, intensity: 40, cascade: CascadeStrategy.Override);
+        var vde = MakePolicy("encryption", PolicyLevel.Vde, intensity: 40, cascade: CascadeStrategy.Override);
         var container = MakePolicy("encryption", PolicyLevel.Container, intensity: 80, cascade: CascadeStrategy.Override);
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/v", vde);
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/v", vde);
         await store.SetAsync("encryption", PolicyLevel.Container, "/v/c", container);
 
         var engine = CreateEngine(store);
@@ -98,8 +98,8 @@ public class PolicyEngineContractTests
     public async Task ResolveAsync_InheritCascade_CopiesParentToChild()
     {
         var store = CreateStore();
-        var vde = MakePolicy("compression", PolicyLevel.VDE, intensity: 60, cascade: CascadeStrategy.Inherit);
-        await store.SetAsync("compression", PolicyLevel.VDE, "/v", vde);
+        var vde = MakePolicy("compression", PolicyLevel.Vde, intensity: 60, cascade: CascadeStrategy.Inherit);
+        await store.SetAsync("compression", PolicyLevel.Vde, "/v", vde);
 
         var engine = CreateEngine(store);
         var ctx = new PolicyResolutionContext { Path = "/v/c/o" };
@@ -107,16 +107,16 @@ public class PolicyEngineContractTests
         var result = await engine.ResolveAsync("compression", ctx);
 
         result.EffectiveIntensity.Should().Be(60);
-        result.DecidedAtLevel.Should().Be(PolicyLevel.VDE);
+        result.DecidedAtLevel.Should().Be(PolicyLevel.Vde);
     }
 
     [Fact]
     public async Task ResolveAsync_EnforceCascade_HigherLevelWins()
     {
         var store = CreateStore();
-        var vde = MakePolicy("encryption", PolicyLevel.VDE, intensity: 90, cascade: CascadeStrategy.Enforce);
+        var vde = MakePolicy("encryption", PolicyLevel.Vde, intensity: 90, cascade: CascadeStrategy.Enforce);
         var block = MakePolicy("encryption", PolicyLevel.Block, intensity: 20, cascade: CascadeStrategy.Override);
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/v", vde);
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/v", vde);
         await store.SetAsync("encryption", PolicyLevel.Block, "/v/c/o/ch/b", block);
 
         var engine = CreateEngine(store);
@@ -125,7 +125,7 @@ public class PolicyEngineContractTests
         var result = await engine.ResolveAsync("encryption", ctx);
 
         result.EffectiveIntensity.Should().Be(90);
-        result.DecidedAtLevel.Should().Be(PolicyLevel.VDE);
+        result.DecidedAtLevel.Should().Be(PolicyLevel.Vde);
         result.AppliedCascade.Should().Be(CascadeStrategy.Enforce);
     }
 
@@ -133,11 +133,11 @@ public class PolicyEngineContractTests
     public async Task ResolveAsync_MergeCascade_CombinesCustomParams()
     {
         var store = CreateStore();
-        var vde = MakePolicy("replication", PolicyLevel.VDE, intensity: 50, cascade: CascadeStrategy.Merge,
+        var vde = MakePolicy("replication", PolicyLevel.Vde, intensity: 50, cascade: CascadeStrategy.Merge,
             customParams: new Dictionary<string, string> { ["algo"] = "aes128", ["mode"] = "cbc" });
         var container = MakePolicy("replication", PolicyLevel.Container, intensity: 60, cascade: CascadeStrategy.Merge,
             customParams: new Dictionary<string, string> { ["algo"] = "aes256" });
-        await store.SetAsync("replication", PolicyLevel.VDE, "/v", vde);
+        await store.SetAsync("replication", PolicyLevel.Vde, "/v", vde);
         await store.SetAsync("replication", PolicyLevel.Container, "/v/c", container);
 
         var engine = CreateEngine(store);
@@ -153,11 +153,11 @@ public class PolicyEngineContractTests
     public async Task ResolveAsync_MostRestrictiveCascade_PicksLowestIntensity()
     {
         var store = CreateStore();
-        var vde = MakePolicy("encryption", PolicyLevel.VDE, intensity: 30,
+        var vde = MakePolicy("encryption", PolicyLevel.Vde, intensity: 30,
             cascade: CascadeStrategy.MostRestrictive, ai: AiAutonomyLevel.AutoSilent);
         var container = MakePolicy("encryption", PolicyLevel.Container, intensity: 80,
             cascade: CascadeStrategy.MostRestrictive, ai: AiAutonomyLevel.SuggestExplain);
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/v", vde);
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/v", vde);
         await store.SetAsync("encryption", PolicyLevel.Container, "/v/c", container);
 
         var engine = CreateEngine(store);
@@ -233,9 +233,9 @@ public class PolicyEngineContractTests
     public async Task ResolveAsync_BlockOverridesVde_WhenOverrideCascade()
     {
         var store = CreateStore();
-        var vde = MakePolicy("compression", PolicyLevel.VDE, intensity: 30, cascade: CascadeStrategy.Override);
+        var vde = MakePolicy("compression", PolicyLevel.Vde, intensity: 30, cascade: CascadeStrategy.Override);
         var block = MakePolicy("compression", PolicyLevel.Block, intensity: 95, cascade: CascadeStrategy.Override);
-        await store.SetAsync("compression", PolicyLevel.VDE, "/v", vde);
+        await store.SetAsync("compression", PolicyLevel.Vde, "/v", vde);
         await store.SetAsync("compression", PolicyLevel.Block, "/v/c/o/ch/b", block);
 
         var engine = CreateEngine(store);
@@ -251,9 +251,9 @@ public class PolicyEngineContractTests
     public async Task ResolveAsync_EnforceAtVde_CannotBeOverriddenByBlock()
     {
         var store = CreateStore();
-        var vde = MakePolicy("encryption", PolicyLevel.VDE, intensity: 85, cascade: CascadeStrategy.Enforce);
+        var vde = MakePolicy("encryption", PolicyLevel.Vde, intensity: 85, cascade: CascadeStrategy.Enforce);
         var block = MakePolicy("encryption", PolicyLevel.Block, intensity: 10, cascade: CascadeStrategy.Override);
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/v", vde);
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/v", vde);
         await store.SetAsync("encryption", PolicyLevel.Block, "/v/c/o/ch/b", block);
 
         var engine = CreateEngine(store);
@@ -269,9 +269,9 @@ public class PolicyEngineContractTests
     public async Task ResolveAsync_Inherit_CopiesParentUnchanged()
     {
         var store = CreateStore();
-        var vde = MakePolicy("compression", PolicyLevel.VDE, intensity: 45, cascade: CascadeStrategy.Inherit,
+        var vde = MakePolicy("compression", PolicyLevel.Vde, intensity: 45, cascade: CascadeStrategy.Inherit,
             ai: AiAutonomyLevel.AutoNotify, customParams: new Dictionary<string, string> { ["key"] = "val" });
-        await store.SetAsync("compression", PolicyLevel.VDE, "/v", vde);
+        await store.SetAsync("compression", PolicyLevel.Vde, "/v", vde);
 
         var engine = CreateEngine(store);
         var ctx = new PolicyResolutionContext { Path = "/v/c" };
@@ -286,11 +286,11 @@ public class PolicyEngineContractTests
     public async Task ResolveAsync_MergeCustomParams_ParentAndChild()
     {
         var store = CreateStore();
-        var vde = MakePolicy("replication", PolicyLevel.VDE, intensity: 50, cascade: CascadeStrategy.Merge,
+        var vde = MakePolicy("replication", PolicyLevel.Vde, intensity: 50, cascade: CascadeStrategy.Merge,
             customParams: new Dictionary<string, string> { ["a"] = "1", ["b"] = "2" });
         var container = MakePolicy("replication", PolicyLevel.Container, intensity: 60, cascade: CascadeStrategy.Merge,
             customParams: new Dictionary<string, string> { ["b"] = "3", ["c"] = "4" });
-        await store.SetAsync("replication", PolicyLevel.VDE, "/v", vde);
+        await store.SetAsync("replication", PolicyLevel.Vde, "/v", vde);
         await store.SetAsync("replication", PolicyLevel.Container, "/v/c", container);
 
         var engine = CreateEngine(store);
@@ -307,11 +307,11 @@ public class PolicyEngineContractTests
     public async Task ResolveAsync_MostRestrictive_PicksLowestAiAutonomy()
     {
         var store = CreateStore();
-        var vde = MakePolicy("encryption", PolicyLevel.VDE, intensity: 80,
+        var vde = MakePolicy("encryption", PolicyLevel.Vde, intensity: 80,
             cascade: CascadeStrategy.MostRestrictive, ai: AiAutonomyLevel.ManualOnly);
         var container = MakePolicy("encryption", PolicyLevel.Container, intensity: 90,
             cascade: CascadeStrategy.MostRestrictive, ai: AiAutonomyLevel.AutoSilent);
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/v", vde);
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/v", vde);
         await store.SetAsync("encryption", PolicyLevel.Container, "/v/c", container);
 
         var engine = CreateEngine(store);
@@ -327,7 +327,7 @@ public class PolicyEngineContractTests
     public async Task ResolveAsync_ResolutionChain_ContainsAllLevelPolicies()
     {
         var store = CreateStore();
-        await store.SetAsync("enc", PolicyLevel.VDE, "/v", MakePolicy("enc", PolicyLevel.VDE, 30));
+        await store.SetAsync("enc", PolicyLevel.Vde, "/v", MakePolicy("enc", PolicyLevel.Vde, 30));
         await store.SetAsync("enc", PolicyLevel.Container, "/v/c", MakePolicy("enc", PolicyLevel.Container, 50));
         await store.SetAsync("enc", PolicyLevel.Object, "/v/c/o", MakePolicy("enc", PolicyLevel.Object, 70));
 
@@ -339,14 +339,14 @@ public class PolicyEngineContractTests
         result.ResolutionChain.Should().HaveCount(3);
         result.ResolutionChain[0].Level.Should().Be(PolicyLevel.Object);
         result.ResolutionChain[1].Level.Should().Be(PolicyLevel.Container);
-        result.ResolutionChain[2].Level.Should().Be(PolicyLevel.VDE);
+        result.ResolutionChain[2].Level.Should().Be(PolicyLevel.Vde);
     }
 
     [Fact]
     public async Task ResolveAsync_SnapshotTimestamp_PopulatedCorrectly()
     {
         var store = CreateStore();
-        await store.SetAsync("enc", PolicyLevel.VDE, "/v", MakePolicy("enc", PolicyLevel.VDE, 50));
+        await store.SetAsync("enc", PolicyLevel.Vde, "/v", MakePolicy("enc", PolicyLevel.Vde, 50));
 
         var engine = CreateEngine(store);
         var before = DateTimeOffset.UtcNow;
@@ -380,7 +380,7 @@ public class PolicyEngineContractTests
             Preset = OperationalProfilePreset.Custom,
             FeaturePolicies = new Dictionary<string, FeaturePolicy>
             {
-                ["myFeature"] = MakePolicy("myFeature", PolicyLevel.VDE, intensity: 88)
+                ["myFeature"] = MakePolicy("myFeature", PolicyLevel.Vde, intensity: 88)
             }
         };
 
@@ -396,8 +396,8 @@ public class PolicyEngineContractTests
     public async Task ResolveAsync_StoreOverridesProfileDefault()
     {
         var store = CreateStore();
-        var storePolicy = MakePolicy("encryption", PolicyLevel.VDE, intensity: 99);
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/v", storePolicy);
+        var storePolicy = MakePolicy("encryption", PolicyLevel.Vde, intensity: 99);
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/v", storePolicy);
 
         var profile = OperationalProfile.Standard(); // encryption=70
         var engine = CreateEngine(store, profile: profile);
@@ -444,7 +444,7 @@ public class PolicyEngineContractTests
     public async Task ResolveAllAsync_EachMatchesIndividualResolve()
     {
         var store = CreateStore();
-        await store.SetAsync("compression", PolicyLevel.VDE, "/v", MakePolicy("compression", PolicyLevel.VDE, 77));
+        await store.SetAsync("compression", PolicyLevel.Vde, "/v", MakePolicy("compression", PolicyLevel.Vde, 77));
 
         var profile = OperationalProfile.Standard();
         var engine = CreateEngine(store, profile: profile);
@@ -460,10 +460,10 @@ public class PolicyEngineContractTests
     public async Task ResolveAllAsync_MultipleFeaturesWithDifferentCascades()
     {
         var store = CreateStore();
-        await store.SetAsync("compression", PolicyLevel.VDE, "/v",
-            MakePolicy("compression", PolicyLevel.VDE, 60, CascadeStrategy.Override));
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/v",
-            MakePolicy("encryption", PolicyLevel.VDE, 90, CascadeStrategy.Enforce));
+        await store.SetAsync("compression", PolicyLevel.Vde, "/v",
+            MakePolicy("compression", PolicyLevel.Vde, 60, CascadeStrategy.Override));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/v",
+            MakePolicy("encryption", PolicyLevel.Vde, 90, CascadeStrategy.Enforce));
 
         var profile = OperationalProfile.Standard();
         var engine = CreateEngine(store, profile: profile);
@@ -507,12 +507,12 @@ public class PolicyEngineContractTests
     public async Task SimulateAsync_DoesNotPersist()
     {
         var store = CreateStore();
-        await store.SetAsync("enc", PolicyLevel.VDE, "/v", MakePolicy("enc", PolicyLevel.VDE, 50));
+        await store.SetAsync("enc", PolicyLevel.Vde, "/v", MakePolicy("enc", PolicyLevel.Vde, 50));
 
         var engine = CreateEngine(store);
         var ctx = new PolicyResolutionContext { Path = "/v" };
 
-        var hypothetical = MakePolicy("enc", PolicyLevel.VDE, 99);
+        var hypothetical = MakePolicy("enc", PolicyLevel.Vde, 99);
         var simResult = await engine.SimulateAsync("enc", ctx, hypothetical);
         simResult.EffectiveIntensity.Should().Be(99);
 
@@ -524,12 +524,12 @@ public class PolicyEngineContractTests
     public async Task SimulateAsync_ShadowsExistingPolicy()
     {
         var store = CreateStore();
-        await store.SetAsync("enc", PolicyLevel.VDE, "/v", MakePolicy("enc", PolicyLevel.VDE, 50));
+        await store.SetAsync("enc", PolicyLevel.Vde, "/v", MakePolicy("enc", PolicyLevel.Vde, 50));
 
         var engine = CreateEngine(store);
         var ctx = new PolicyResolutionContext { Path = "/v" };
 
-        var hypothetical = MakePolicy("enc", PolicyLevel.VDE, 80);
+        var hypothetical = MakePolicy("enc", PolicyLevel.Vde, 80);
         var result = await engine.SimulateAsync("enc", ctx, hypothetical);
 
         result.EffectiveIntensity.Should().Be(80);
@@ -539,8 +539,8 @@ public class PolicyEngineContractTests
     public async Task SimulateAsync_EnforceAtParent_StillBlocksOverride()
     {
         var store = CreateStore();
-        await store.SetAsync("enc", PolicyLevel.VDE, "/v",
-            MakePolicy("enc", PolicyLevel.VDE, 90, CascadeStrategy.Enforce));
+        await store.SetAsync("enc", PolicyLevel.Vde, "/v",
+            MakePolicy("enc", PolicyLevel.Vde, 90, CascadeStrategy.Enforce));
 
         var engine = CreateEngine(store);
         var ctx = new PolicyResolutionContext { Path = "/v/c" };
@@ -558,7 +558,7 @@ public class PolicyEngineContractTests
         var engine = CreateEngine();
         var ctx = new PolicyResolutionContext { Path = "/v" };
 
-        var hypothetical = MakePolicy("comp", PolicyLevel.VDE, 77, ai: AiAutonomyLevel.AutoNotify);
+        var hypothetical = MakePolicy("comp", PolicyLevel.Vde, 77, ai: AiAutonomyLevel.AutoNotify);
         var result = await engine.SimulateAsync("comp", ctx, hypothetical);
 
         result.FeatureId.Should().Be("comp");
@@ -571,7 +571,7 @@ public class PolicyEngineContractTests
     {
         var engine = CreateEngine();
         var ctx = new PolicyResolutionContext { Path = "/v" };
-        var hypothetical = MakePolicy("enc", PolicyLevel.VDE, 50);
+        var hypothetical = MakePolicy("enc", PolicyLevel.Vde, 50);
 
         var act = () => engine.SimulateAsync(null!, ctx, hypothetical);
 
@@ -595,7 +595,7 @@ public class PolicyEngineContractTests
         var engine = CreateEngine();
         var ctx = new PolicyResolutionContext { Path = "/v" };
 
-        var hypothetical = MakePolicy("brand_new", PolicyLevel.VDE, 42);
+        var hypothetical = MakePolicy("brand_new", PolicyLevel.Vde, 42);
         var result = await engine.SimulateAsync("brand_new", ctx, hypothetical);
 
         result.EffectiveIntensity.Should().Be(42);
@@ -630,7 +630,7 @@ public class PolicyEngineContractTests
             Preset = OperationalProfilePreset.Custom,
             FeaturePolicies = new Dictionary<string, FeaturePolicy>
             {
-                ["myFeature"] = MakePolicy("myFeature", PolicyLevel.VDE, 66)
+                ["myFeature"] = MakePolicy("myFeature", PolicyLevel.Vde, 66)
             }
         };
 
@@ -674,7 +674,7 @@ public class PolicyEngineContractTests
             Preset = OperationalProfilePreset.Custom,
             FeaturePolicies = new Dictionary<string, FeaturePolicy>
             {
-                ["myCustom"] = MakePolicy("myCustom", PolicyLevel.VDE, 42, ai: AiAutonomyLevel.ManualOnly)
+                ["myCustom"] = MakePolicy("myCustom", PolicyLevel.Vde, 42, ai: AiAutonomyLevel.ManualOnly)
             }
         };
 
@@ -738,7 +738,7 @@ public class PolicyEngineContractTests
     public async Task StoreOverride_TakesPrecedenceOverProfileDefault()
     {
         var store = CreateStore();
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/v", MakePolicy("encryption", PolicyLevel.VDE, 15));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/v", MakePolicy("encryption", PolicyLevel.Vde, 15));
 
         var engine = CreateEngine(store, profile: OperationalProfile.Paranoid());
         var ctx = new PolicyResolutionContext { Path = "/v" };

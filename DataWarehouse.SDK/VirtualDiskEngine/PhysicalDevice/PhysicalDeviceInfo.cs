@@ -11,17 +11,17 @@ namespace DataWarehouse.SDK.VirtualDiskEngine.PhysicalDevice;
 public enum MediaType
 {
     /// <summary>NVMe solid-state drive.</summary>
-    NVMe,
+    NvMe,
     /// <summary>SATA/SAS solid-state drive.</summary>
-    SSD,
+    Ssd,
     /// <summary>Hard disk drive (rotational).</summary>
-    HDD,
+    Hdd,
     /// <summary>Tape storage device.</summary>
     Tape,
     /// <summary>VirtIO virtual block device.</summary>
-    VirtIO,
+    VirtIo,
     /// <summary>RAM-backed block device.</summary>
-    RAMDisk,
+    RamDisk,
     /// <summary>Unknown or undetectable media type.</summary>
     Unknown
 }
@@ -33,21 +33,21 @@ public enum MediaType
 public enum BusType
 {
     /// <summary>NVMe over PCIe.</summary>
-    NVMe,
+    NvMe,
     /// <summary>SCSI bus.</summary>
-    SCSI,
+    Scsi,
     /// <summary>Serial ATA.</summary>
-    SATA,
+    Sata,
     /// <summary>Serial Attached SCSI.</summary>
-    SAS,
+    Sas,
     /// <summary>Universal Serial Bus.</summary>
-    USB,
+    Usb,
     /// <summary>VirtIO paravirtualized bus.</summary>
-    VirtIO,
+    VirtIo,
     /// <summary>iSCSI (SCSI over TCP/IP).</summary>
-    iSCSI,
+    IScsi,
     /// <summary>NVMe over Fabrics (RDMA, TCP, FC).</summary>
-    NVMeOF,
+    NvMeOf,
     /// <summary>Fibre Channel.</summary>
     FibreChannel,
     /// <summary>Unknown bus type.</summary>
@@ -61,13 +61,13 @@ public enum BusType
 public enum DeviceTransport
 {
     /// <summary>PCI Express.</summary>
-    PCIe,
+    PcIe,
     /// <summary>SATA cable/connector.</summary>
-    SATA,
+    Sata,
     /// <summary>SAS cable/connector.</summary>
-    SAS,
+    Sas,
     /// <summary>USB cable/connector.</summary>
-    USB,
+    Usb,
     /// <summary>Network-attached (iSCSI, NVMe-oF, FC).</summary>
     Network,
     /// <summary>Virtual/emulated transport.</summary>

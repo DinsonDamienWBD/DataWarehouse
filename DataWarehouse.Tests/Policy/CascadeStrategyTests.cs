@@ -33,11 +33,11 @@ public class CascadeStrategyTests
     [Fact]
     public void Inherit_SingleEntry_ReturnsEntry()
     {
-        var chain = new[] { MakePolicy(PolicyLevel.VDE, 75) };
+        var chain = new[] { MakePolicy(PolicyLevel.Vde, 75) };
         var (intensity, ai, mergedParams, decidedAt) = CascadeStrategies.Inherit(chain);
 
         intensity.Should().Be(75);
-        decidedAt.Should().Be(PolicyLevel.VDE);
+        decidedAt.Should().Be(PolicyLevel.Vde);
     }
 
     [Fact]
@@ -47,7 +47,7 @@ public class CascadeStrategyTests
         {
             MakePolicy(PolicyLevel.Object, 60, ai: AiAutonomyLevel.AutoNotify),
             MakePolicy(PolicyLevel.Container, 70, ai: AiAutonomyLevel.Suggest),
-            MakePolicy(PolicyLevel.VDE, 80, ai: AiAutonomyLevel.ManualOnly)
+            MakePolicy(PolicyLevel.Vde, 80, ai: AiAutonomyLevel.ManualOnly)
         };
 
         var (intensity, ai, _, decidedAt) = CascadeStrategies.Inherit(chain);
@@ -66,7 +66,7 @@ public class CascadeStrategyTests
         {
             MakePolicy(PolicyLevel.Container, 40,
                 customParams: new Dictionary<string, string> { ["key1"] = "child" }),
-            MakePolicy(PolicyLevel.VDE, 80,
+            MakePolicy(PolicyLevel.Vde, 80,
                 customParams: new Dictionary<string, string> { ["key1"] = "parent", ["key2"] = "parentOnly" })
         };
 
@@ -96,7 +96,7 @@ public class CascadeStrategyTests
         {
             MakePolicy(PolicyLevel.Object, 80),
             MakePolicy(PolicyLevel.Container, 30),
-            MakePolicy(PolicyLevel.VDE, 60)
+            MakePolicy(PolicyLevel.Vde, 60)
         };
 
         var (intensity, _, _, decidedAt) = CascadeStrategies.MostRestrictive(chain);
@@ -111,7 +111,7 @@ public class CascadeStrategyTests
         var chain = new[]
         {
             MakePolicy(PolicyLevel.Object, 50, ai: AiAutonomyLevel.AutoSilent),
-            MakePolicy(PolicyLevel.VDE, 50, ai: AiAutonomyLevel.ManualOnly)
+            MakePolicy(PolicyLevel.Vde, 50, ai: AiAutonomyLevel.ManualOnly)
         };
 
         var (_, ai, _, _) = CascadeStrategies.MostRestrictive(chain);
@@ -127,7 +127,7 @@ public class CascadeStrategyTests
             MakePolicy(PolicyLevel.Block, 50),
             MakePolicy(PolicyLevel.Chunk, 20), // lowest intensity
             MakePolicy(PolicyLevel.Object, 40),
-            MakePolicy(PolicyLevel.VDE, 60)
+            MakePolicy(PolicyLevel.Vde, 60)
         };
 
         var (intensity, _, _, decidedAt) = CascadeStrategies.MostRestrictive(chain);
@@ -145,13 +145,13 @@ public class CascadeStrategyTests
         var chain = new[]
         {
             MakePolicy(PolicyLevel.Container, 30, cascade: CascadeStrategy.Override),
-            MakePolicy(PolicyLevel.VDE, 100, cascade: CascadeStrategy.Enforce)
+            MakePolicy(PolicyLevel.Vde, 100, cascade: CascadeStrategy.Enforce)
         };
 
         var (intensity, _, _, decidedAt) = CascadeStrategies.Enforce(chain);
 
         intensity.Should().Be(100); // VDE Enforce wins unconditionally
-        decidedAt.Should().Be(PolicyLevel.VDE);
+        decidedAt.Should().Be(PolicyLevel.Vde);
     }
 
     [Fact]
@@ -162,14 +162,14 @@ public class CascadeStrategyTests
         {
             MakePolicy(PolicyLevel.Object, 10, cascade: CascadeStrategy.Override),
             MakePolicy(PolicyLevel.Container, 30, cascade: CascadeStrategy.Override),
-            MakePolicy(PolicyLevel.VDE, 100, cascade: CascadeStrategy.Enforce,
+            MakePolicy(PolicyLevel.Vde, 100, cascade: CascadeStrategy.Enforce,
                 customParams: new Dictionary<string, string> { ["enforced"] = "true" })
         };
 
         var (intensity, _, mergedParams, decidedAt) = CascadeStrategies.Enforce(chain);
 
         intensity.Should().Be(100);
-        decidedAt.Should().Be(PolicyLevel.VDE);
+        decidedAt.Should().Be(PolicyLevel.Vde);
         mergedParams.Should().ContainKey("enforced").WhoseValue.Should().Be("true");
     }
 
@@ -179,7 +179,7 @@ public class CascadeStrategyTests
         var chain = new[]
         {
             MakePolicy(PolicyLevel.Container, 40, cascade: CascadeStrategy.Override),
-            MakePolicy(PolicyLevel.VDE, 80, cascade: CascadeStrategy.Override)
+            MakePolicy(PolicyLevel.Vde, 80, cascade: CascadeStrategy.Override)
         };
 
         var (intensity, _, _, decidedAt) = CascadeStrategies.Enforce(chain);
@@ -213,7 +213,7 @@ public class CascadeStrategyTests
         {
             MakePolicy(PolicyLevel.Object, 50,
                 customParams: new Dictionary<string, string> { ["algo"] = "aes256" }),
-            MakePolicy(PolicyLevel.VDE, 50,
+            MakePolicy(PolicyLevel.Vde, 50,
                 customParams: new Dictionary<string, string> { ["mode"] = "gcm", ["algo"] = "aes128" })
         };
 
@@ -230,7 +230,7 @@ public class CascadeStrategyTests
         {
             MakePolicy(PolicyLevel.Container, 50,
                 customParams: new Dictionary<string, string> { ["x"] = "child", ["y"] = "child" }),
-            MakePolicy(PolicyLevel.VDE, 50,
+            MakePolicy(PolicyLevel.Vde, 50,
                 customParams: new Dictionary<string, string> { ["x"] = "parent", ["z"] = "parent" })
         };
 
@@ -247,7 +247,7 @@ public class CascadeStrategyTests
         var chain = new[]
         {
             MakePolicy(PolicyLevel.Object, 50, customParams: null),
-            MakePolicy(PolicyLevel.VDE, 50, customParams: null)
+            MakePolicy(PolicyLevel.Vde, 50, customParams: null)
         };
 
         var (_, _, mergedParams, _) = CascadeStrategies.Merge(chain);
@@ -315,8 +315,8 @@ public class CascadeStrategyTests
         var store = new InMemoryPolicyStore();
 
         // VDE: Enforce at intensity 100
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/vde1",
-            MakePolicy(PolicyLevel.VDE, 100, cascade: CascadeStrategy.Enforce));
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/vde1",
+            MakePolicy(PolicyLevel.Vde, 100, cascade: CascadeStrategy.Enforce));
 
         // Container: Override at intensity 30
         await store.SetAsync("encryption", PolicyLevel.Container, "/vde1/cont1",
@@ -329,7 +329,7 @@ public class CascadeStrategyTests
 
         // VDE Enforce MUST win over Container Override
         result.EffectiveIntensity.Should().Be(100);
-        result.DecidedAtLevel.Should().Be(PolicyLevel.VDE);
+        result.DecidedAtLevel.Should().Be(PolicyLevel.Vde);
         result.AppliedCascade.Should().Be(CascadeStrategy.Enforce);
     }
 

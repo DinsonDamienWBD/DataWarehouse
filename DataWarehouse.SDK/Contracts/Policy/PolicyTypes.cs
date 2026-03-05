@@ -259,7 +259,7 @@ namespace DataWarehouse.SDK.Contracts.Policy
             FeaturePolicies = new Dictionary<string, FeaturePolicy>
             {
                 ["compression"] = new FeaturePolicy { FeatureId = "compression", Level = PolicyLevel.Object, IntensityLevel = 30, Cascade = CascadeStrategy.Inherit, AiAutonomy = AiAutonomyLevel.AutoSilent },
-                ["encryption"] = new FeaturePolicy { FeatureId = "encryption", Level = PolicyLevel.VDE, IntensityLevel = 30, Cascade = CascadeStrategy.Inherit, AiAutonomy = AiAutonomyLevel.AutoSilent },
+                ["encryption"] = new FeaturePolicy { FeatureId = "encryption", Level = PolicyLevel.Vde, IntensityLevel = 30, Cascade = CascadeStrategy.Inherit, AiAutonomy = AiAutonomyLevel.AutoSilent },
                 ["replication"] = new FeaturePolicy { FeatureId = "replication", Level = PolicyLevel.Container, IntensityLevel = 20, Cascade = CascadeStrategy.Inherit, AiAutonomy = AiAutonomyLevel.AutoNotify }
             }
         };
@@ -274,7 +274,7 @@ namespace DataWarehouse.SDK.Contracts.Policy
             FeaturePolicies = new Dictionary<string, FeaturePolicy>
             {
                 ["compression"] = new FeaturePolicy { FeatureId = "compression", Level = PolicyLevel.Object, IntensityLevel = 50, Cascade = CascadeStrategy.Inherit, AiAutonomy = AiAutonomyLevel.AutoNotify },
-                ["encryption"] = new FeaturePolicy { FeatureId = "encryption", Level = PolicyLevel.VDE, IntensityLevel = 50, Cascade = CascadeStrategy.MostRestrictive, AiAutonomy = AiAutonomyLevel.SuggestExplain },
+                ["encryption"] = new FeaturePolicy { FeatureId = "encryption", Level = PolicyLevel.Vde, IntensityLevel = 50, Cascade = CascadeStrategy.MostRestrictive, AiAutonomy = AiAutonomyLevel.SuggestExplain },
                 ["replication"] = new FeaturePolicy { FeatureId = "replication", Level = PolicyLevel.Container, IntensityLevel = 50, Cascade = CascadeStrategy.Inherit, AiAutonomy = AiAutonomyLevel.AutoNotify }
             }
         };
@@ -289,7 +289,7 @@ namespace DataWarehouse.SDK.Contracts.Policy
             FeaturePolicies = new Dictionary<string, FeaturePolicy>
             {
                 ["compression"] = new FeaturePolicy { FeatureId = "compression", Level = PolicyLevel.Object, IntensityLevel = 60, Cascade = CascadeStrategy.Inherit, AiAutonomy = AiAutonomyLevel.SuggestExplain },
-                ["encryption"] = new FeaturePolicy { FeatureId = "encryption", Level = PolicyLevel.VDE, IntensityLevel = 70, Cascade = CascadeStrategy.MostRestrictive, AiAutonomy = AiAutonomyLevel.Suggest },
+                ["encryption"] = new FeaturePolicy { FeatureId = "encryption", Level = PolicyLevel.Vde, IntensityLevel = 70, Cascade = CascadeStrategy.MostRestrictive, AiAutonomy = AiAutonomyLevel.Suggest },
                 ["replication"] = new FeaturePolicy { FeatureId = "replication", Level = PolicyLevel.Container, IntensityLevel = 60, Cascade = CascadeStrategy.MostRestrictive, AiAutonomy = AiAutonomyLevel.SuggestExplain }
             }
         };
@@ -304,7 +304,7 @@ namespace DataWarehouse.SDK.Contracts.Policy
             FeaturePolicies = new Dictionary<string, FeaturePolicy>
             {
                 ["compression"] = new FeaturePolicy { FeatureId = "compression", Level = PolicyLevel.Object, IntensityLevel = 70, Cascade = CascadeStrategy.MostRestrictive, AiAutonomy = AiAutonomyLevel.Suggest },
-                ["encryption"] = new FeaturePolicy { FeatureId = "encryption", Level = PolicyLevel.VDE, IntensityLevel = 90, Cascade = CascadeStrategy.Enforce, AiAutonomy = AiAutonomyLevel.ManualOnly },
+                ["encryption"] = new FeaturePolicy { FeatureId = "encryption", Level = PolicyLevel.Vde, IntensityLevel = 90, Cascade = CascadeStrategy.Enforce, AiAutonomy = AiAutonomyLevel.ManualOnly },
                 ["replication"] = new FeaturePolicy { FeatureId = "replication", Level = PolicyLevel.Container, IntensityLevel = 80, Cascade = CascadeStrategy.MostRestrictive, AiAutonomy = AiAutonomyLevel.Suggest }
             }
         };

@@ -67,7 +67,7 @@ public sealed class PreambleCompositionProfile
     public PreambleFlags PreambleFlags { get; init; }
 
     /// <summary>Target CPU architecture for all preamble payloads.</summary>
-    public TargetArchitecture Architecture { get; init; } = TargetArchitecture.X86_64;
+    public TargetArchitecture Architecture { get; init; } = TargetArchitecture.X8664;
 
     /// <summary>Whether to append an Ed25519 digital signature to the preamble.</summary>
     public bool SignWithEd25519 { get; init; }
@@ -93,7 +93,7 @@ public sealed class PreambleCompositionProfile
         IncludeSpdk = true,
         SpdkTransport = "nvme-local",
         PreambleFlags = Preamble.PreambleFlags.None,
-        Architecture = TargetArchitecture.X86_64,
+        Architecture = TargetArchitecture.X8664,
         SignWithEd25519 = false,
         CompressPreamble = false,
         EncryptRuntime = false,
@@ -135,7 +135,7 @@ public sealed class PreambleCompositionProfile
         IncludeSpdk = true,
         SpdkTransport = "nvme-local",
         PreambleFlags = Preamble.PreambleFlags.SignaturePresent,
-        Architecture = TargetArchitecture.X86_64,
+        Architecture = TargetArchitecture.X8664,
         SignWithEd25519 = true,
         CompressPreamble = false,
         EncryptRuntime = false,

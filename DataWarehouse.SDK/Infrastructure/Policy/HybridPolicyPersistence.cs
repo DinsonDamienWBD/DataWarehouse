@@ -42,7 +42,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
     /// var policies = await hybrid.LoadAllAsync();
     ///
     /// // Writes go to both stores
-    /// await hybrid.SaveAsync("compression", PolicyLevel.VDE, "/", policy);
+    /// await hybrid.SaveAsync("compression", PolicyLevel.Vde, "/", policy);
     /// </code>
     /// </example>
     [SdkCompatibility("6.0.0", Notes = "Phase 69: Hybrid policy persistence (PERS-06)")]

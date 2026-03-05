@@ -520,7 +520,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
             // 5 segments = VDE + Container + Object + Chunk + Block
             var levelMap = new[]
             {
-                PolicyLevel.VDE,       // segment 1
+                PolicyLevel.Vde,       // segment 1
                 PolicyLevel.Container, // segment 2
                 PolicyLevel.Object,    // segment 3
                 PolicyLevel.Chunk,     // segment 4
@@ -553,7 +553,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
                 effectiveIntensity: 50,
                 effectiveAiAutonomy: AiAutonomyLevel.SuggestExplain,
                 appliedCascade: CascadeStrategy.Inherit,
-                decidedAtLevel: PolicyLevel.VDE,
+                decidedAtLevel: PolicyLevel.Vde,
                 resolutionChain: Array.Empty<FeaturePolicy>(),
                 mergedParameters: new Dictionary<string, string>(),
                 snapshotTimestamp: DateTimeOffset.UtcNow);

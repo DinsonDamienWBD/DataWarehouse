@@ -10,10 +10,10 @@ namespace DataWarehouse.SDK.VirtualDiskEngine.Integrity;
 public enum QuorumScheme : byte
 {
     /// <summary>FROST over Ed25519 curve — deterministic, widely supported.</summary>
-    Frost_Ed25519 = 0,
+    FrostEd25519 = 0,
 
     /// <summary>FROST over Ristretto255 — prime-order group, constant-time by construction.</summary>
-    Frost_Ristretto255 = 1,
+    FrostRistretto255 = 1,
 }
 
 /// <summary>

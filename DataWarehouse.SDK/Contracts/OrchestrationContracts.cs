@@ -40,7 +40,7 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Source IP address.
         /// </summary>
-        public string? SourceIP { get; init; }
+        public string? SourceIp { get; init; }
 
         /// <summary>
         /// When the operation started.
@@ -654,7 +654,7 @@ namespace DataWarehouse.SDK.Contracts
         {
             var metadata = base.GetMetadata();
             metadata["FeatureType"] = "WriteFanOutOrchestrator";
-            metadata["DestinationCount"] = _destinations.Count;
+            lock (_lock) { metadata["DestinationCount"] = _destinations.Count; }
             return metadata;
         }
     }

@@ -189,7 +189,7 @@ public sealed class PolicyAdvisor : IAiAdvisor
                 }
 
                 // Check autonomy level — if ManualOnly, skip auto-generation
-                AiAutonomyLevel configuredAutonomy = _autonomyConfig.GetAutonomy(featureId, PolicyLevel.VDE);
+                AiAutonomyLevel configuredAutonomy = _autonomyConfig.GetAutonomy(featureId, PolicyLevel.Vde);
                 if (configuredAutonomy == AiAutonomyLevel.ManualOnly)
                     continue;
 
@@ -625,7 +625,7 @@ public sealed class PolicyAdvisor : IAiAdvisor
         return new FeaturePolicy
         {
             FeatureId = featureId,
-            Level = PolicyLevel.VDE,
+            Level = PolicyLevel.Vde,
             IntensityLevel = intensity,
             Cascade = cascade,
             AiAutonomy = aiAutonomy

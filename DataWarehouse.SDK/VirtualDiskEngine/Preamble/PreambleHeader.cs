@@ -33,7 +33,7 @@ public enum PreambleFlags : ushort
 public enum TargetArchitecture : byte
 {
     /// <summary>x86-64 (AMD64) architecture.</summary>
-    X86_64 = 0,
+    X8664 = 0,
 
     /// <summary>AArch64 (ARM64) architecture.</summary>
     Aarch64 = 1,

@@ -56,8 +56,8 @@ public class CascadeResolutionTests
     public async Task ResolveAsync_VdeLevelPath_ReturnsVdePolicy()
     {
         var store = CreateStore();
-        var policy = MakePolicy("encryption", PolicyLevel.VDE, intensity: 80);
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/myVde", policy);
+        var policy = MakePolicy("encryption", PolicyLevel.Vde, intensity: 80);
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/myVde", policy);
 
         var engine = CreateEngine(store);
         var ctx = new PolicyResolutionContext { Path = "/myVde" };
@@ -65,7 +65,7 @@ public class CascadeResolutionTests
         var result = await engine.ResolveAsync("encryption", ctx);
 
         result.EffectiveIntensity.Should().Be(80);
-        result.DecidedAtLevel.Should().Be(PolicyLevel.VDE);
+        result.DecidedAtLevel.Should().Be(PolicyLevel.Vde);
         result.FeatureId.Should().Be("encryption");
     }
 
@@ -73,9 +73,9 @@ public class CascadeResolutionTests
     public async Task ResolveAsync_ContainerLevelPath_ReturnsContainerPolicy()
     {
         var store = CreateStore();
-        var vdePolicy = MakePolicy("compression", PolicyLevel.VDE, intensity: 40);
+        var vdePolicy = MakePolicy("compression", PolicyLevel.Vde, intensity: 40);
         var containerPolicy = MakePolicy("compression", PolicyLevel.Container, intensity: 70);
-        await store.SetAsync("compression", PolicyLevel.VDE, "/vde1", vdePolicy);
+        await store.SetAsync("compression", PolicyLevel.Vde, "/vde1", vdePolicy);
         await store.SetAsync("compression", PolicyLevel.Container, "/vde1/cont1", containerPolicy);
 
         var engine = CreateEngine(store);
@@ -142,8 +142,8 @@ public class CascadeResolutionTests
     {
         var store = CreateStore();
         // VDE-level set, Container empty, resolve at Object
-        var vdePolicy = MakePolicy("encryption", PolicyLevel.VDE, intensity: 70);
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/vde1", vdePolicy);
+        var vdePolicy = MakePolicy("encryption", PolicyLevel.Vde, intensity: 70);
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/vde1", vdePolicy);
 
         var engine = CreateEngine(store);
         var ctx = new PolicyResolutionContext { Path = "/vde1/cont1/obj1" };
@@ -152,7 +152,7 @@ public class CascadeResolutionTests
 
         // Should inherit from VDE since Container is empty
         result.EffectiveIntensity.Should().Be(70);
-        result.DecidedAtLevel.Should().Be(PolicyLevel.VDE);
+        result.DecidedAtLevel.Should().Be(PolicyLevel.Vde);
     }
 
     [Fact]
@@ -181,7 +181,7 @@ public class CascadeResolutionTests
             Name = "TestProfile",
             FeaturePolicies = new Dictionary<string, FeaturePolicy>
             {
-                ["encryption"] = MakePolicy("encryption", PolicyLevel.VDE, intensity: 42)
+                ["encryption"] = MakePolicy("encryption", PolicyLevel.Vde, intensity: 42)
             }
         };
 
@@ -205,17 +205,17 @@ public class CascadeResolutionTests
         result.EffectiveIntensity.Should().Be(50); // default
         result.EffectiveAiAutonomy.Should().Be(AiAutonomyLevel.SuggestExplain);
         result.AppliedCascade.Should().Be(CascadeStrategy.Inherit);
-        result.DecidedAtLevel.Should().Be(PolicyLevel.VDE);
+        result.DecidedAtLevel.Should().Be(PolicyLevel.Vde);
     }
 
     [Fact]
     public async Task ResolveAsync_ResolutionChain_OrderedMostSpecificFirst()
     {
         var store = CreateStore();
-        var vdePolicy = MakePolicy("compression", PolicyLevel.VDE, intensity: 30);
+        var vdePolicy = MakePolicy("compression", PolicyLevel.Vde, intensity: 30);
         var containerPolicy = MakePolicy("compression", PolicyLevel.Container, intensity: 60);
         var objectPolicy = MakePolicy("compression", PolicyLevel.Object, intensity: 80);
-        await store.SetAsync("compression", PolicyLevel.VDE, "/vde1", vdePolicy);
+        await store.SetAsync("compression", PolicyLevel.Vde, "/vde1", vdePolicy);
         await store.SetAsync("compression", PolicyLevel.Container, "/vde1/cont1", containerPolicy);
         await store.SetAsync("compression", PolicyLevel.Object, "/vde1/cont1/obj1", objectPolicy);
 
@@ -228,15 +228,15 @@ public class CascadeResolutionTests
         result.ResolutionChain.Should().HaveCount(3);
         result.ResolutionChain[0].Level.Should().Be(PolicyLevel.Object);
         result.ResolutionChain[1].Level.Should().Be(PolicyLevel.Container);
-        result.ResolutionChain[2].Level.Should().Be(PolicyLevel.VDE);
+        result.ResolutionChain[2].Level.Should().Be(PolicyLevel.Vde);
     }
 
     [Fact]
     public async Task ResolveAsync_SnapshotTimestamp_IsPopulated()
     {
         var store = CreateStore();
-        var policy = MakePolicy("encryption", PolicyLevel.VDE, intensity: 50);
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/vde1", policy);
+        var policy = MakePolicy("encryption", PolicyLevel.Vde, intensity: 50);
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/vde1", policy);
 
         var engine = CreateEngine(store);
         var before = DateTimeOffset.UtcNow;
@@ -274,13 +274,13 @@ public class CascadeResolutionTests
     public async Task SimulateAsync_DoesNotPersist()
     {
         var store = CreateStore();
-        var vdePolicy = MakePolicy("encryption", PolicyLevel.VDE, intensity: 50);
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/vde1", vdePolicy);
+        var vdePolicy = MakePolicy("encryption", PolicyLevel.Vde, intensity: 50);
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/vde1", vdePolicy);
 
         var engine = CreateEngine(store);
         var ctx = new PolicyResolutionContext { Path = "/vde1" };
 
-        var hypothetical = MakePolicy("encryption", PolicyLevel.VDE, intensity: 99);
+        var hypothetical = MakePolicy("encryption", PolicyLevel.Vde, intensity: 99);
         var simResult = await engine.SimulateAsync("encryption", ctx, hypothetical);
 
         simResult.EffectiveIntensity.Should().Be(99);
@@ -302,7 +302,7 @@ public class CascadeResolutionTests
             Preset = OperationalProfilePreset.Custom,
             FeaturePolicies = new Dictionary<string, FeaturePolicy>
             {
-                ["myFeature"] = MakePolicy("myFeature", PolicyLevel.VDE, intensity: 77)
+                ["myFeature"] = MakePolicy("myFeature", PolicyLevel.Vde, intensity: 77)
             }
         };
 
@@ -320,8 +320,8 @@ public class CascadeResolutionTests
     public async Task ResolveAsync_PathParsing_SingleSegment_VdeLevel()
     {
         var store = CreateStore();
-        var policy = MakePolicy("encryption", PolicyLevel.VDE, intensity: 33);
-        await store.SetAsync("encryption", PolicyLevel.VDE, "/vde1", policy);
+        var policy = MakePolicy("encryption", PolicyLevel.Vde, intensity: 33);
+        await store.SetAsync("encryption", PolicyLevel.Vde, "/vde1", policy);
 
         var engine = CreateEngine(store);
         var ctx = new PolicyResolutionContext { Path = "vde1" }; // No leading slash
@@ -329,7 +329,7 @@ public class CascadeResolutionTests
         var result = await engine.ResolveAsync("encryption", ctx);
 
         result.EffectiveIntensity.Should().Be(33);
-        result.DecidedAtLevel.Should().Be(PolicyLevel.VDE);
+        result.DecidedAtLevel.Should().Be(PolicyLevel.Vde);
     }
 
     [Fact]
@@ -355,14 +355,14 @@ public class CascadeResolutionTests
     {
         var store = CreateStore();
         // Use Merge cascade explicitly so parameters are combined (child overwrites parent)
-        var vdePolicy = MakePolicy("replication", PolicyLevel.VDE, intensity: 50,
+        var vdePolicy = MakePolicy("replication", PolicyLevel.Vde, intensity: 50,
             cascade: CascadeStrategy.Merge,
             customParams: new Dictionary<string, string> { ["algo"] = "aes128", ["mode"] = "cbc" });
         var containerPolicy = MakePolicy("replication", PolicyLevel.Container, intensity: 60,
             cascade: CascadeStrategy.Merge,
             customParams: new Dictionary<string, string> { ["algo"] = "aes256" }); // overwrites parent
 
-        await store.SetAsync("replication", PolicyLevel.VDE, "/v1", vdePolicy);
+        await store.SetAsync("replication", PolicyLevel.Vde, "/v1", vdePolicy);
         await store.SetAsync("replication", PolicyLevel.Container, "/v1/c1", containerPolicy);
 
         var engine = CreateEngine(store);

@@ -27,7 +27,7 @@ namespace DataWarehouse.SDK.Contracts.Policy
 
         /// <summary>VDE-level policy: applies to the entire Virtual Data Environment instance (broadest scope).</summary>
         [Description("VDE-level policy: applies to the entire Virtual Data Environment instance (broadest scope)")]
-        VDE = 4
+        Vde = 4
     }
 
     /// <summary>

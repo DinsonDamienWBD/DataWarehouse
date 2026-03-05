@@ -488,11 +488,11 @@ public static class ParquetCompatibleReader
             throw new InvalidDataException($"Unsupported Parquet footer version: {version}");
 
         // Read schema — guard against malformed/hostile files causing multi-GB allocations
-        const int MaxColumns = 65536;
-        const int MaxRowGroups = 1048576; // 1M row groups max
+        const int maxColumns = 65536;
+        const int maxRowGroups = 1048576; // 1M row groups max
         int numColumns = reader.ReadInt32();
-        if (numColumns < 0 || numColumns > MaxColumns)
-            throw new InvalidDataException($"Invalid numColumns in Parquet footer: {numColumns} (max {MaxColumns}).");
+        if (numColumns < 0 || numColumns > maxColumns)
+            throw new InvalidDataException($"Invalid numColumns in Parquet footer: {numColumns} (max {maxColumns}).");
         var schemas = new List<ParquetColumnSchema>(numColumns);
         for (int i = 0; i < numColumns; i++)
         {
@@ -513,8 +513,8 @@ public static class ParquetCompatibleReader
 
         // Read row groups — guard against hostile numRowGroups
         int numRowGroups = reader.ReadInt32();
-        if (numRowGroups < 0 || numRowGroups > MaxRowGroups)
-            throw new InvalidDataException($"Invalid numRowGroups in Parquet footer: {numRowGroups} (max {MaxRowGroups}).");
+        if (numRowGroups < 0 || numRowGroups > maxRowGroups)
+            throw new InvalidDataException($"Invalid numRowGroups in Parquet footer: {numRowGroups} (max {maxRowGroups}).");
         var rowGroups = new List<ParquetRowGroupMetadata>(numRowGroups);
         for (int rg = 0; rg < numRowGroups; rg++)
         {

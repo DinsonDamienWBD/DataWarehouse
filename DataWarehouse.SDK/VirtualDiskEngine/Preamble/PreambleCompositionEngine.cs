@@ -47,7 +47,7 @@ public readonly struct PreambleLayoutResult : IEquatable<PreambleLayoutResult>
     public ulong VdeOffset { get; init; }
 
     /// <summary>Estimated total preamble size in megabytes for informational display.</summary>
-    public double EstimatedTotalMB => PreambleTotalSize / (1024.0 * 1024.0);
+    public double EstimatedTotalMb => PreambleTotalSize / (1024.0 * 1024.0);
 
     /// <summary>
     /// Creates a <see cref="PreambleHeader"/> from this layout result and the given profile.
@@ -117,7 +117,7 @@ public readonly struct PreambleLayoutResult : IEquatable<PreambleLayoutResult>
     public override string ToString() =>
         $"PreambleLayout(Kernel@{KernelOffset}+{KernelSize}, SPDK@{SpdkOffset}+{SpdkSize}, " +
         $"Runtime@{RuntimeOffset}+{RuntimeSize}, Hash@{ContentHashOffset}, " +
-        $"Total={PreambleTotalSize}, VDE@0x{VdeOffset:X}, ~{EstimatedTotalMB:F1}MB)";
+        $"Total={PreambleTotalSize}, VDE@0x{VdeOffset:X}, ~{EstimatedTotalMb:F1}MB)";
 }
 
 /// <summary>

@@ -59,7 +59,7 @@ public class PerFeatureMultiLevelTests
     public async Task Security_Override_BlockOverrideWinsOverVde(string featureId)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1", MakePolicy(featureId, PolicyLevel.VDE, intensity: 40));
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1", MakePolicy(featureId, PolicyLevel.Vde, intensity: 40));
         await store.SetAsync(featureId, PolicyLevel.Block, "/v1/c1/o1/ch1/b1", MakePolicy(featureId, PolicyLevel.Block, intensity: 95));
 
         var engine = CreateEngine(store);
@@ -86,8 +86,8 @@ public class PerFeatureMultiLevelTests
     public async Task Security_Enforce_VdeEnforceWinsOverBlockOverride(string featureId)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1",
-            MakePolicy(featureId, PolicyLevel.VDE, intensity: 80, cascade: CascadeStrategy.Enforce));
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1",
+            MakePolicy(featureId, PolicyLevel.Vde, intensity: 80, cascade: CascadeStrategy.Enforce));
         await store.SetAsync(featureId, PolicyLevel.Block, "/v1/c1/o1/ch1/b1",
             MakePolicy(featureId, PolicyLevel.Block, intensity: 30, cascade: CascadeStrategy.Override));
 
@@ -115,8 +115,8 @@ public class PerFeatureMultiLevelTests
     public async Task Security_MostRestrictive_TightestWins(string featureId)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1",
-            MakePolicy(featureId, PolicyLevel.VDE, intensity: 90, cascade: CascadeStrategy.MostRestrictive));
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1",
+            MakePolicy(featureId, PolicyLevel.Vde, intensity: 90, cascade: CascadeStrategy.MostRestrictive));
         await store.SetAsync(featureId, PolicyLevel.Container, "/v1/c1",
             MakePolicy(featureId, PolicyLevel.Container, intensity: 60, cascade: CascadeStrategy.MostRestrictive));
 
@@ -145,8 +145,8 @@ public class PerFeatureMultiLevelTests
     public async Task Security_Inherit_ChildInheritsVde(string featureId)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1",
-            MakePolicy(featureId, PolicyLevel.VDE, intensity: 75, cascade: CascadeStrategy.Inherit));
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1",
+            MakePolicy(featureId, PolicyLevel.Vde, intensity: 75, cascade: CascadeStrategy.Inherit));
 
         var engine = CreateEngine(store);
         // Resolve at Container level — no explicit Container policy, should inherit VDE
@@ -154,7 +154,7 @@ public class PerFeatureMultiLevelTests
         var result = await engine.ResolveAsync(featureId, ctx);
 
         result.EffectiveIntensity.Should().Be(75);
-        result.DecidedAtLevel.Should().Be(PolicyLevel.VDE);
+        result.DecidedAtLevel.Should().Be(PolicyLevel.Vde);
     }
 
     #endregion
@@ -174,7 +174,7 @@ public class PerFeatureMultiLevelTests
     public async Task Performance_Override_BlockOverrideWinsOverVde(string featureId)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1", MakePolicy(featureId, PolicyLevel.VDE, intensity: 40));
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1", MakePolicy(featureId, PolicyLevel.Vde, intensity: 40));
         await store.SetAsync(featureId, PolicyLevel.Block, "/v1/c1/o1/ch1/b1", MakePolicy(featureId, PolicyLevel.Block, intensity: 85));
 
         var engine = CreateEngine(store);
@@ -198,8 +198,8 @@ public class PerFeatureMultiLevelTests
     public async Task Performance_Enforce_VdeEnforceWinsOverBlockOverride(string featureId)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1",
-            MakePolicy(featureId, PolicyLevel.VDE, intensity: 70, cascade: CascadeStrategy.Enforce));
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1",
+            MakePolicy(featureId, PolicyLevel.Vde, intensity: 70, cascade: CascadeStrategy.Enforce));
         await store.SetAsync(featureId, PolicyLevel.Block, "/v1/c1/o1/ch1/b1",
             MakePolicy(featureId, PolicyLevel.Block, intensity: 20, cascade: CascadeStrategy.Override));
 
@@ -224,8 +224,8 @@ public class PerFeatureMultiLevelTests
     public async Task Performance_MostRestrictive_TightestWins(string featureId)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1",
-            MakePolicy(featureId, PolicyLevel.VDE, intensity: 80, cascade: CascadeStrategy.MostRestrictive));
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1",
+            MakePolicy(featureId, PolicyLevel.Vde, intensity: 80, cascade: CascadeStrategy.MostRestrictive));
         await store.SetAsync(featureId, PolicyLevel.Container, "/v1/c1",
             MakePolicy(featureId, PolicyLevel.Container, intensity: 50, cascade: CascadeStrategy.MostRestrictive));
 
@@ -251,15 +251,15 @@ public class PerFeatureMultiLevelTests
     public async Task Performance_Inherit_ChildInheritsVde(string featureId)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1",
-            MakePolicy(featureId, PolicyLevel.VDE, intensity: 65, cascade: CascadeStrategy.Inherit));
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1",
+            MakePolicy(featureId, PolicyLevel.Vde, intensity: 65, cascade: CascadeStrategy.Inherit));
 
         var engine = CreateEngine(store);
         var ctx = new PolicyResolutionContext { Path = "/v1/c1/o1" };
         var result = await engine.ResolveAsync(featureId, ctx);
 
         result.EffectiveIntensity.Should().Be(65);
-        result.DecidedAtLevel.Should().Be(PolicyLevel.VDE);
+        result.DecidedAtLevel.Should().Be(PolicyLevel.Vde);
     }
 
     #endregion
@@ -319,7 +319,7 @@ public class PerFeatureMultiLevelTests
     public async Task Storage_Override_BlockOverrideWins(string featureId)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1", MakePolicy(featureId, PolicyLevel.VDE, intensity: 35));
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1", MakePolicy(featureId, PolicyLevel.Vde, intensity: 35));
         await store.SetAsync(featureId, PolicyLevel.Block, "/v1/c1/o1/ch1/b1", MakePolicy(featureId, PolicyLevel.Block, intensity: 90));
 
         var engine = CreateEngine(store);
@@ -343,8 +343,8 @@ public class PerFeatureMultiLevelTests
     public async Task Storage_Enforce_VdeEnforceWins(string featureId)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1",
-            MakePolicy(featureId, PolicyLevel.VDE, intensity: 75, cascade: CascadeStrategy.Enforce));
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1",
+            MakePolicy(featureId, PolicyLevel.Vde, intensity: 75, cascade: CascadeStrategy.Enforce));
         await store.SetAsync(featureId, PolicyLevel.Block, "/v1/c1/o1/ch1/b1",
             MakePolicy(featureId, PolicyLevel.Block, intensity: 20, cascade: CascadeStrategy.Override));
 
@@ -369,8 +369,8 @@ public class PerFeatureMultiLevelTests
     public async Task Storage_MostRestrictive_TightestWins(string featureId)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1",
-            MakePolicy(featureId, PolicyLevel.VDE, intensity: 85, cascade: CascadeStrategy.MostRestrictive));
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1",
+            MakePolicy(featureId, PolicyLevel.Vde, intensity: 85, cascade: CascadeStrategy.MostRestrictive));
         await store.SetAsync(featureId, PolicyLevel.Container, "/v1/c1",
             MakePolicy(featureId, PolicyLevel.Container, intensity: 55, cascade: CascadeStrategy.MostRestrictive));
 
@@ -395,15 +395,15 @@ public class PerFeatureMultiLevelTests
     public async Task Storage_Inherit_ChildInheritsVde(string featureId)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1",
-            MakePolicy(featureId, PolicyLevel.VDE, intensity: 70, cascade: CascadeStrategy.Inherit));
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1",
+            MakePolicy(featureId, PolicyLevel.Vde, intensity: 70, cascade: CascadeStrategy.Inherit));
 
         var engine = CreateEngine(store);
         var ctx = new PolicyResolutionContext { Path = "/v1/c1/o1" };
         var result = await engine.ResolveAsync(featureId, ctx);
 
         result.EffectiveIntensity.Should().Be(70);
-        result.DecidedAtLevel.Should().Be(PolicyLevel.VDE);
+        result.DecidedAtLevel.Should().Be(PolicyLevel.Vde);
     }
 
     #endregion
@@ -419,8 +419,8 @@ public class PerFeatureMultiLevelTests
     public async Task Storage_Merge_ParametersCombined(string featureId)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1",
-            MakePolicy(featureId, PolicyLevel.VDE, intensity: 50, cascade: CascadeStrategy.Merge,
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1",
+            MakePolicy(featureId, PolicyLevel.Vde, intensity: 50, cascade: CascadeStrategy.Merge,
                 customParams: new Dictionary<string, string> { ["block_size"] = "4096", ["mode"] = "sync" }));
         await store.SetAsync(featureId, PolicyLevel.Container, "/v1/c1",
             MakePolicy(featureId, PolicyLevel.Container, intensity: 60, cascade: CascadeStrategy.Merge,
@@ -454,7 +454,7 @@ public class PerFeatureMultiLevelTests
     public async Task AI_Override_BlockOverrideWins(string featureId)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1", MakePolicy(featureId, PolicyLevel.VDE, intensity: 30, ai: AiAutonomyLevel.Suggest));
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1", MakePolicy(featureId, PolicyLevel.Vde, intensity: 30, ai: AiAutonomyLevel.Suggest));
         await store.SetAsync(featureId, PolicyLevel.Block, "/v1/c1/o1/ch1/b1",
             MakePolicy(featureId, PolicyLevel.Block, intensity: 80, ai: AiAutonomyLevel.AutoNotify));
 
@@ -479,8 +479,8 @@ public class PerFeatureMultiLevelTests
     public async Task AI_Enforce_VdeEnforceWins(string featureId)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1",
-            MakePolicy(featureId, PolicyLevel.VDE, intensity: 60, cascade: CascadeStrategy.Enforce, ai: AiAutonomyLevel.ManualOnly));
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1",
+            MakePolicy(featureId, PolicyLevel.Vde, intensity: 60, cascade: CascadeStrategy.Enforce, ai: AiAutonomyLevel.ManualOnly));
         await store.SetAsync(featureId, PolicyLevel.Block, "/v1/c1/o1/ch1/b1",
             MakePolicy(featureId, PolicyLevel.Block, intensity: 90, cascade: CascadeStrategy.Override, ai: AiAutonomyLevel.AutoSilent));
 
@@ -506,8 +506,8 @@ public class PerFeatureMultiLevelTests
     public async Task AI_MostRestrictive_TightestWins(string featureId)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1",
-            MakePolicy(featureId, PolicyLevel.VDE, intensity: 70, cascade: CascadeStrategy.MostRestrictive, ai: AiAutonomyLevel.Suggest));
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1",
+            MakePolicy(featureId, PolicyLevel.Vde, intensity: 70, cascade: CascadeStrategy.MostRestrictive, ai: AiAutonomyLevel.Suggest));
         await store.SetAsync(featureId, PolicyLevel.Container, "/v1/c1",
             MakePolicy(featureId, PolicyLevel.Container, intensity: 40, cascade: CascadeStrategy.MostRestrictive, ai: AiAutonomyLevel.AutoNotify));
 
@@ -532,15 +532,15 @@ public class PerFeatureMultiLevelTests
     public async Task AI_Inherit_ChildInheritsVde(string featureId)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1",
-            MakePolicy(featureId, PolicyLevel.VDE, intensity: 55, cascade: CascadeStrategy.Inherit, ai: AiAutonomyLevel.Suggest));
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1",
+            MakePolicy(featureId, PolicyLevel.Vde, intensity: 55, cascade: CascadeStrategy.Inherit, ai: AiAutonomyLevel.Suggest));
 
         var engine = CreateEngine(store);
         var ctx = new PolicyResolutionContext { Path = "/v1/c1" };
         var result = await engine.ResolveAsync(featureId, ctx);
 
         result.EffectiveIntensity.Should().Be(55);
-        result.DecidedAtLevel.Should().Be(PolicyLevel.VDE);
+        result.DecidedAtLevel.Should().Be(PolicyLevel.Vde);
     }
 
     #endregion
@@ -556,8 +556,8 @@ public class PerFeatureMultiLevelTests
     public async Task AI_ManualOnlyAtVde_EnforcedToBlock(string featureId)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1",
-            MakePolicy(featureId, PolicyLevel.VDE, intensity: 50, cascade: CascadeStrategy.Enforce, ai: AiAutonomyLevel.ManualOnly));
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1",
+            MakePolicy(featureId, PolicyLevel.Vde, intensity: 50, cascade: CascadeStrategy.Enforce, ai: AiAutonomyLevel.ManualOnly));
         await store.SetAsync(featureId, PolicyLevel.Block, "/v1/c1/o1/ch1/b1",
             MakePolicy(featureId, PolicyLevel.Block, intensity: 80, cascade: CascadeStrategy.Override, ai: AiAutonomyLevel.AutoSilent));
 
@@ -602,7 +602,7 @@ public class PerFeatureMultiLevelTests
     public async Task Compliance_Override_BlockOverrideWins(string featureId)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1", MakePolicy(featureId, PolicyLevel.VDE, intensity: 40));
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1", MakePolicy(featureId, PolicyLevel.Vde, intensity: 40));
         await store.SetAsync(featureId, PolicyLevel.Block, "/v1/c1/o1/ch1/b1", MakePolicy(featureId, PolicyLevel.Block, intensity: 95));
 
         var engine = CreateEngine(store);
@@ -626,8 +626,8 @@ public class PerFeatureMultiLevelTests
     public async Task Compliance_Enforce_VdeEnforceWins(string featureId)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1",
-            MakePolicy(featureId, PolicyLevel.VDE, intensity: 90, cascade: CascadeStrategy.Enforce));
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1",
+            MakePolicy(featureId, PolicyLevel.Vde, intensity: 90, cascade: CascadeStrategy.Enforce));
         await store.SetAsync(featureId, PolicyLevel.Block, "/v1/c1/o1/ch1/b1",
             MakePolicy(featureId, PolicyLevel.Block, intensity: 20, cascade: CascadeStrategy.Override));
 
@@ -652,8 +652,8 @@ public class PerFeatureMultiLevelTests
     public async Task Compliance_MostRestrictive_TightestWins(string featureId)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1",
-            MakePolicy(featureId, PolicyLevel.VDE, intensity: 85, cascade: CascadeStrategy.MostRestrictive));
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1",
+            MakePolicy(featureId, PolicyLevel.Vde, intensity: 85, cascade: CascadeStrategy.MostRestrictive));
         await store.SetAsync(featureId, PolicyLevel.Container, "/v1/c1",
             MakePolicy(featureId, PolicyLevel.Container, intensity: 55, cascade: CascadeStrategy.MostRestrictive));
 
@@ -678,15 +678,15 @@ public class PerFeatureMultiLevelTests
     public async Task Compliance_Inherit_ChildInheritsVde(string featureId)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1",
-            MakePolicy(featureId, PolicyLevel.VDE, intensity: 80, cascade: CascadeStrategy.Inherit));
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1",
+            MakePolicy(featureId, PolicyLevel.Vde, intensity: 80, cascade: CascadeStrategy.Inherit));
 
         var engine = CreateEngine(store);
         var ctx = new PolicyResolutionContext { Path = "/v1/c1" };
         var result = await engine.ResolveAsync(featureId, ctx);
 
         result.EffectiveIntensity.Should().Be(80);
-        result.DecidedAtLevel.Should().Be(PolicyLevel.VDE);
+        result.DecidedAtLevel.Should().Be(PolicyLevel.Vde);
     }
 
     #endregion
@@ -737,7 +737,7 @@ public class PerFeatureMultiLevelTests
     public async Task Privacy_Override_BlockOverrideWins(string featureId)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1", MakePolicy(featureId, PolicyLevel.VDE, intensity: 40));
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1", MakePolicy(featureId, PolicyLevel.Vde, intensity: 40));
         await store.SetAsync(featureId, PolicyLevel.Block, "/v1/c1/o1/ch1/b1", MakePolicy(featureId, PolicyLevel.Block, intensity: 92));
 
         var engine = CreateEngine(store);
@@ -760,8 +760,8 @@ public class PerFeatureMultiLevelTests
     public async Task Privacy_Enforce_VdeEnforceWins(string featureId)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1",
-            MakePolicy(featureId, PolicyLevel.VDE, intensity: 85, cascade: CascadeStrategy.Enforce));
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1",
+            MakePolicy(featureId, PolicyLevel.Vde, intensity: 85, cascade: CascadeStrategy.Enforce));
         await store.SetAsync(featureId, PolicyLevel.Block, "/v1/c1/o1/ch1/b1",
             MakePolicy(featureId, PolicyLevel.Block, intensity: 20, cascade: CascadeStrategy.Override));
 
@@ -785,8 +785,8 @@ public class PerFeatureMultiLevelTests
     public async Task Privacy_MostRestrictive_TightestWins(string featureId)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1",
-            MakePolicy(featureId, PolicyLevel.VDE, intensity: 80, cascade: CascadeStrategy.MostRestrictive));
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1",
+            MakePolicy(featureId, PolicyLevel.Vde, intensity: 80, cascade: CascadeStrategy.MostRestrictive));
         await store.SetAsync(featureId, PolicyLevel.Container, "/v1/c1",
             MakePolicy(featureId, PolicyLevel.Container, intensity: 45, cascade: CascadeStrategy.MostRestrictive));
 
@@ -810,15 +810,15 @@ public class PerFeatureMultiLevelTests
     public async Task Privacy_Inherit_ChildInheritsVde(string featureId)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1",
-            MakePolicy(featureId, PolicyLevel.VDE, intensity: 70, cascade: CascadeStrategy.Inherit));
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1",
+            MakePolicy(featureId, PolicyLevel.Vde, intensity: 70, cascade: CascadeStrategy.Inherit));
 
         var engine = CreateEngine(store);
         var ctx = new PolicyResolutionContext { Path = "/v1/c1" };
         var result = await engine.ResolveAsync(featureId, ctx);
 
         result.EffectiveIntensity.Should().Be(70);
-        result.DecidedAtLevel.Should().Be(PolicyLevel.VDE);
+        result.DecidedAtLevel.Should().Be(PolicyLevel.Vde);
     }
 
     #endregion
@@ -836,7 +836,7 @@ public class PerFeatureMultiLevelTests
     public async Task Observability_Override_BlockOverrideWins(string featureId)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1", MakePolicy(featureId, PolicyLevel.VDE, intensity: 30));
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1", MakePolicy(featureId, PolicyLevel.Vde, intensity: 30));
         await store.SetAsync(featureId, PolicyLevel.Block, "/v1/c1/o1/ch1/b1", MakePolicy(featureId, PolicyLevel.Block, intensity: 88));
 
         var engine = CreateEngine(store);
@@ -858,8 +858,8 @@ public class PerFeatureMultiLevelTests
     public async Task Observability_Enforce_VdeEnforceWins(string featureId)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1",
-            MakePolicy(featureId, PolicyLevel.VDE, intensity: 65, cascade: CascadeStrategy.Enforce));
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1",
+            MakePolicy(featureId, PolicyLevel.Vde, intensity: 65, cascade: CascadeStrategy.Enforce));
         await store.SetAsync(featureId, PolicyLevel.Block, "/v1/c1/o1/ch1/b1",
             MakePolicy(featureId, PolicyLevel.Block, intensity: 10, cascade: CascadeStrategy.Override));
 
@@ -882,8 +882,8 @@ public class PerFeatureMultiLevelTests
     public async Task Observability_MostRestrictive_TightestWins(string featureId)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1",
-            MakePolicy(featureId, PolicyLevel.VDE, intensity: 75, cascade: CascadeStrategy.MostRestrictive));
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1",
+            MakePolicy(featureId, PolicyLevel.Vde, intensity: 75, cascade: CascadeStrategy.MostRestrictive));
         await store.SetAsync(featureId, PolicyLevel.Container, "/v1/c1",
             MakePolicy(featureId, PolicyLevel.Container, intensity: 45, cascade: CascadeStrategy.MostRestrictive));
 
@@ -906,15 +906,15 @@ public class PerFeatureMultiLevelTests
     public async Task Observability_Inherit_ChildInheritsVde(string featureId)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1",
-            MakePolicy(featureId, PolicyLevel.VDE, intensity: 60, cascade: CascadeStrategy.Inherit));
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1",
+            MakePolicy(featureId, PolicyLevel.Vde, intensity: 60, cascade: CascadeStrategy.Inherit));
 
         var engine = CreateEngine(store);
         var ctx = new PolicyResolutionContext { Path = "/v1/c1" };
         var result = await engine.ResolveAsync(featureId, ctx);
 
         result.EffectiveIntensity.Should().Be(60);
-        result.DecidedAtLevel.Should().Be(PolicyLevel.VDE);
+        result.DecidedAtLevel.Should().Be(PolicyLevel.Vde);
     }
 
     #endregion
@@ -932,7 +932,7 @@ public class PerFeatureMultiLevelTests
     public async Task CrossLevel_AllFiveLevelsSet_MostSpecificWinsWithOverride(string featureId)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1", MakePolicy(featureId, PolicyLevel.VDE, intensity: 10));
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1", MakePolicy(featureId, PolicyLevel.Vde, intensity: 10));
         await store.SetAsync(featureId, PolicyLevel.Container, "/v1/c1", MakePolicy(featureId, PolicyLevel.Container, intensity: 20));
         await store.SetAsync(featureId, PolicyLevel.Object, "/v1/c1/o1", MakePolicy(featureId, PolicyLevel.Object, intensity: 30));
         await store.SetAsync(featureId, PolicyLevel.Chunk, "/v1/c1/o1/ch1", MakePolicy(featureId, PolicyLevel.Chunk, intensity: 40));
@@ -958,7 +958,7 @@ public class PerFeatureMultiLevelTests
     public async Task CrossLevel_DifferentPaths_ResolveIndependently(string featureId)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1", MakePolicy(featureId, PolicyLevel.VDE, intensity: 40));
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1", MakePolicy(featureId, PolicyLevel.Vde, intensity: 40));
         await store.SetAsync(featureId, PolicyLevel.Container, "/v1/c1", MakePolicy(featureId, PolicyLevel.Container, intensity: 80));
         await store.SetAsync(featureId, PolicyLevel.Container, "/v1/c2", MakePolicy(featureId, PolicyLevel.Container, intensity: 20));
 
@@ -994,8 +994,8 @@ public class PerFeatureMultiLevelTests
     public async Task CrossLevel_AllCascadeStrategies_ProduceValidResult(string featureId, CascadeStrategy cascade)
     {
         var store = CreateStore();
-        await store.SetAsync(featureId, PolicyLevel.VDE, "/v1",
-            MakePolicy(featureId, PolicyLevel.VDE, intensity: 60, cascade: cascade,
+        await store.SetAsync(featureId, PolicyLevel.Vde, "/v1",
+            MakePolicy(featureId, PolicyLevel.Vde, intensity: 60, cascade: cascade,
                 customParams: new Dictionary<string, string> { ["key"] = "vdeValue" }));
         await store.SetAsync(featureId, PolicyLevel.Container, "/v1/c1",
             MakePolicy(featureId, PolicyLevel.Container, intensity: 80, cascade: cascade,
@@ -1019,22 +1019,22 @@ public class PerFeatureMultiLevelTests
     #region Per-level resolution for representative features
 
     [Theory]
-    [InlineData("encryption", PolicyLevel.VDE, "/v1")]
+    [InlineData("encryption", PolicyLevel.Vde, "/v1")]
     [InlineData("encryption", PolicyLevel.Container, "/v1/c1")]
     [InlineData("encryption", PolicyLevel.Object, "/v1/c1/o1")]
     [InlineData("encryption", PolicyLevel.Chunk, "/v1/c1/o1/ch1")]
     [InlineData("encryption", PolicyLevel.Block, "/v1/c1/o1/ch1/b1")]
-    [InlineData("compression", PolicyLevel.VDE, "/v1")]
+    [InlineData("compression", PolicyLevel.Vde, "/v1")]
     [InlineData("compression", PolicyLevel.Container, "/v1/c1")]
     [InlineData("compression", PolicyLevel.Object, "/v1/c1/o1")]
     [InlineData("compression", PolicyLevel.Chunk, "/v1/c1/o1/ch1")]
     [InlineData("compression", PolicyLevel.Block, "/v1/c1/o1/ch1/b1")]
-    [InlineData("replication", PolicyLevel.VDE, "/v1")]
+    [InlineData("replication", PolicyLevel.Vde, "/v1")]
     [InlineData("replication", PolicyLevel.Container, "/v1/c1")]
     [InlineData("replication", PolicyLevel.Object, "/v1/c1/o1")]
     [InlineData("replication", PolicyLevel.Chunk, "/v1/c1/o1/ch1")]
     [InlineData("replication", PolicyLevel.Block, "/v1/c1/o1/ch1/b1")]
-    [InlineData("audit_logging", PolicyLevel.VDE, "/v1")]
+    [InlineData("audit_logging", PolicyLevel.Vde, "/v1")]
     [InlineData("audit_logging", PolicyLevel.Container, "/v1/c1")]
     [InlineData("audit_logging", PolicyLevel.Object, "/v1/c1/o1")]
     [InlineData("audit_logging", PolicyLevel.Chunk, "/v1/c1/o1/ch1")]

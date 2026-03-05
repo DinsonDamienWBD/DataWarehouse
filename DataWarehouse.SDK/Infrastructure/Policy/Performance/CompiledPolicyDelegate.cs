@@ -121,7 +121,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy.Performance
                 effectiveIntensity: 50,
                 effectiveAiAutonomy: AiAutonomyLevel.SuggestExplain,
                 appliedCascade: CascadeStrategy.Inherit,
-                decidedAtLevel: PolicyLevel.VDE,
+                decidedAtLevel: PolicyLevel.Vde,
                 resolutionChain: Array.Empty<FeaturePolicy>(),
                 mergedParameters: new Dictionary<string, string>(),
                 snapshotTimestamp: snapshot.MaterializedAt);

@@ -24,7 +24,7 @@ public class AiBehaviorTests
     public void GetAutonomy_DefaultLevel_ReturnsSuggest()
     {
         var config = new AiAutonomyConfiguration();
-        var level = config.GetAutonomy("encryption", PolicyLevel.VDE);
+        var level = config.GetAutonomy("encryption", PolicyLevel.Vde);
         level.Should().Be(AiAutonomyLevel.Suggest);
     }
 
@@ -32,7 +32,7 @@ public class AiBehaviorTests
     public void GetAutonomy_CustomDefault_ReturnsCustom()
     {
         var config = new AiAutonomyConfiguration(AiAutonomyLevel.ManualOnly);
-        var level = config.GetAutonomy("encryption", PolicyLevel.VDE);
+        var level = config.GetAutonomy("encryption", PolicyLevel.Vde);
         level.Should().Be(AiAutonomyLevel.ManualOnly);
     }
 
@@ -40,8 +40,8 @@ public class AiBehaviorTests
     public void SetAutonomy_ManualOnly_RestrictsAllActions()
     {
         var config = new AiAutonomyConfiguration();
-        config.SetAutonomy("encryption", PolicyLevel.VDE, AiAutonomyLevel.ManualOnly);
-        config.GetAutonomy("encryption", PolicyLevel.VDE).Should().Be(AiAutonomyLevel.ManualOnly);
+        config.SetAutonomy("encryption", PolicyLevel.Vde, AiAutonomyLevel.ManualOnly);
+        config.GetAutonomy("encryption", PolicyLevel.Vde).Should().Be(AiAutonomyLevel.ManualOnly);
     }
 
     [Fact]
@@ -77,7 +77,7 @@ public class AiBehaviorTests
     }
 
     [Theory]
-    [InlineData(PolicyLevel.VDE)]
+    [InlineData(PolicyLevel.Vde)]
     [InlineData(PolicyLevel.Container)]
     [InlineData(PolicyLevel.Object)]
     [InlineData(PolicyLevel.Chunk)]
@@ -106,28 +106,28 @@ public class AiBehaviorTests
     public void SetAutonomy_DifferentFeaturesAtSameLevel_Independent()
     {
         var config = new AiAutonomyConfiguration();
-        config.SetAutonomy("encryption", PolicyLevel.VDE, AiAutonomyLevel.ManualOnly);
-        config.SetAutonomy("compression", PolicyLevel.VDE, AiAutonomyLevel.AutoSilent);
+        config.SetAutonomy("encryption", PolicyLevel.Vde, AiAutonomyLevel.ManualOnly);
+        config.SetAutonomy("compression", PolicyLevel.Vde, AiAutonomyLevel.AutoSilent);
 
-        config.GetAutonomy("encryption", PolicyLevel.VDE).Should().Be(AiAutonomyLevel.ManualOnly);
-        config.GetAutonomy("compression", PolicyLevel.VDE).Should().Be(AiAutonomyLevel.AutoSilent);
+        config.GetAutonomy("encryption", PolicyLevel.Vde).Should().Be(AiAutonomyLevel.ManualOnly);
+        config.GetAutonomy("compression", PolicyLevel.Vde).Should().Be(AiAutonomyLevel.AutoSilent);
     }
 
     [Fact]
     public void SetAutonomy_Override_ReplacesExisting()
     {
         var config = new AiAutonomyConfiguration();
-        config.SetAutonomy("encryption", PolicyLevel.VDE, AiAutonomyLevel.AutoSilent);
-        config.SetAutonomy("encryption", PolicyLevel.VDE, AiAutonomyLevel.ManualOnly);
+        config.SetAutonomy("encryption", PolicyLevel.Vde, AiAutonomyLevel.AutoSilent);
+        config.SetAutonomy("encryption", PolicyLevel.Vde, AiAutonomyLevel.ManualOnly);
 
-        config.GetAutonomy("encryption", PolicyLevel.VDE).Should().Be(AiAutonomyLevel.ManualOnly);
+        config.GetAutonomy("encryption", PolicyLevel.Vde).Should().Be(AiAutonomyLevel.ManualOnly);
     }
 
     [Fact]
     public void ExportConfiguration_ReturnsAllConfigured()
     {
         var config = new AiAutonomyConfiguration();
-        config.SetAutonomy("enc", PolicyLevel.VDE, AiAutonomyLevel.ManualOnly);
+        config.SetAutonomy("enc", PolicyLevel.Vde, AiAutonomyLevel.ManualOnly);
         config.SetAutonomy("cmp", PolicyLevel.Block, AiAutonomyLevel.AutoSilent);
 
         var exported = config.ExportConfiguration();
@@ -141,14 +141,14 @@ public class AiBehaviorTests
     public void ImportConfiguration_OverwritesExisting()
     {
         var config = new AiAutonomyConfiguration();
-        config.SetAutonomy("enc", PolicyLevel.VDE, AiAutonomyLevel.AutoSilent);
+        config.SetAutonomy("enc", PolicyLevel.Vde, AiAutonomyLevel.AutoSilent);
 
         config.ImportConfiguration(new Dictionary<string, AiAutonomyLevel>
         {
             ["enc:VDE"] = AiAutonomyLevel.ManualOnly
         });
 
-        config.GetAutonomy("enc", PolicyLevel.VDE).Should().Be(AiAutonomyLevel.ManualOnly);
+        config.GetAutonomy("enc", PolicyLevel.Vde).Should().Be(AiAutonomyLevel.ManualOnly);
     }
 
     [Fact]
@@ -157,7 +157,7 @@ public class AiBehaviorTests
         var config = new AiAutonomyConfiguration();
         config.ConfiguredPointCount.Should().Be(0);
 
-        config.SetAutonomy("enc", PolicyLevel.VDE, AiAutonomyLevel.ManualOnly);
+        config.SetAutonomy("enc", PolicyLevel.Vde, AiAutonomyLevel.ManualOnly);
         config.ConfiguredPointCount.Should().Be(1);
 
         config.SetAutonomy("cmp", PolicyLevel.Block, AiAutonomyLevel.AutoSilent);
@@ -175,14 +175,14 @@ public class AiBehaviorTests
     public void UnknownFeature_ReturnsDefault()
     {
         var config = new AiAutonomyConfiguration(AiAutonomyLevel.SuggestExplain);
-        config.GetAutonomy("unknown_feature_xyz", PolicyLevel.VDE).Should().Be(AiAutonomyLevel.SuggestExplain);
+        config.GetAutonomy("unknown_feature_xyz", PolicyLevel.Vde).Should().Be(AiAutonomyLevel.SuggestExplain);
     }
 
     [Fact]
     public void NullFeatureId_ThrowsArgumentNull()
     {
         var config = new AiAutonomyConfiguration();
-        var act = () => config.GetAutonomy(null!, PolicyLevel.VDE);
+        var act = () => config.GetAutonomy(null!, PolicyLevel.Vde);
         act.Should().Throw<ArgumentNullException>();
     }
 
@@ -224,7 +224,7 @@ public class AiBehaviorTests
     public async Task Guard_AiPrefix_Rejected_WhenSelfModBlocked()
     {
         var guard = CreateGuard(new AiSelfModificationPolicy(AllowSelfModification: false, ModificationRequiresQuorum: false));
-        var result = await guard.TryModifyAutonomyAsync("ai:optimizer", "enc", PolicyLevel.VDE, AiAutonomyLevel.AutoSilent);
+        var result = await guard.TryModifyAutonomyAsync("ai:optimizer", "enc", PolicyLevel.Vde, AiAutonomyLevel.AutoSilent);
         result.Should().BeFalse();
         guard.BlockedSelfModificationAttempts.Should().Be(1);
     }
@@ -233,7 +233,7 @@ public class AiBehaviorTests
     public async Task Guard_SystemAiPrefix_Rejected_WhenSelfModBlocked()
     {
         var guard = CreateGuard(new AiSelfModificationPolicy(AllowSelfModification: false, ModificationRequiresQuorum: false));
-        var result = await guard.TryModifyAutonomyAsync("system:ai:scheduler", "enc", PolicyLevel.VDE, AiAutonomyLevel.AutoSilent);
+        var result = await guard.TryModifyAutonomyAsync("system:ai:scheduler", "enc", PolicyLevel.Vde, AiAutonomyLevel.AutoSilent);
         result.Should().BeFalse();
         guard.BlockedSelfModificationAttempts.Should().Be(1);
     }
@@ -242,7 +242,7 @@ public class AiBehaviorTests
     public async Task Guard_UserPrefix_Allowed()
     {
         var guard = CreateGuard(new AiSelfModificationPolicy(AllowSelfModification: false, ModificationRequiresQuorum: false));
-        var result = await guard.TryModifyAutonomyAsync("user:admin1", "enc", PolicyLevel.VDE, AiAutonomyLevel.ManualOnly);
+        var result = await guard.TryModifyAutonomyAsync("user:admin1", "enc", PolicyLevel.Vde, AiAutonomyLevel.ManualOnly);
         result.Should().BeTrue();
     }
 
@@ -250,7 +250,7 @@ public class AiBehaviorTests
     public async Task Guard_AdminPrefix_Allowed()
     {
         var guard = CreateGuard(new AiSelfModificationPolicy(AllowSelfModification: false, ModificationRequiresQuorum: false));
-        var result = await guard.TryModifyAutonomyAsync("admin:root", "enc", PolicyLevel.VDE, AiAutonomyLevel.ManualOnly);
+        var result = await guard.TryModifyAutonomyAsync("admin:root", "enc", PolicyLevel.Vde, AiAutonomyLevel.ManualOnly);
         result.Should().BeTrue();
     }
 
@@ -258,7 +258,7 @@ public class AiBehaviorTests
     public async Task Guard_SelfModAllowed_AiPrefixPermitted()
     {
         var guard = CreateGuard(new AiSelfModificationPolicy(AllowSelfModification: true, ModificationRequiresQuorum: false));
-        var result = await guard.TryModifyAutonomyAsync("ai:optimizer", "enc", PolicyLevel.VDE, AiAutonomyLevel.AutoSilent);
+        var result = await guard.TryModifyAutonomyAsync("ai:optimizer", "enc", PolicyLevel.Vde, AiAutonomyLevel.AutoSilent);
         result.Should().BeTrue();
     }
 
@@ -266,7 +266,7 @@ public class AiBehaviorTests
     public async Task Guard_QuorumRequired_NoService_FailsClosed()
     {
         var guard = CreateGuard(new AiSelfModificationPolicy(AllowSelfModification: false, ModificationRequiresQuorum: true));
-        var result = await guard.TryModifyAutonomyAsync("user:admin1", "enc", PolicyLevel.VDE, AiAutonomyLevel.ManualOnly);
+        var result = await guard.TryModifyAutonomyAsync("user:admin1", "enc", PolicyLevel.Vde, AiAutonomyLevel.ManualOnly);
         result.Should().BeFalse();
         guard.QuorumDeniedChanges.Should().Be(1);
     }
@@ -282,7 +282,7 @@ public class AiBehaviorTests
     public void Guard_GetAutonomy_AlwaysAllowed()
     {
         var guard = CreateGuard();
-        var result = guard.GetAutonomy("enc", PolicyLevel.VDE);
+        var result = guard.GetAutonomy("enc", PolicyLevel.Vde);
         result.Should().Be(AiAutonomyLevel.Suggest);
     }
 
@@ -290,7 +290,7 @@ public class AiBehaviorTests
     public async Task Guard_CaseInsensitive_AiPrefix()
     {
         var guard = CreateGuard(new AiSelfModificationPolicy(AllowSelfModification: false, ModificationRequiresQuorum: false));
-        var result = await guard.TryModifyAutonomyAsync("AI:optimizer", "enc", PolicyLevel.VDE, AiAutonomyLevel.AutoSilent);
+        var result = await guard.TryModifyAutonomyAsync("AI:optimizer", "enc", PolicyLevel.Vde, AiAutonomyLevel.AutoSilent);
         result.Should().BeFalse();
     }
 
@@ -298,7 +298,7 @@ public class AiBehaviorTests
     public async Task Guard_CaseInsensitive_SystemAiPrefix()
     {
         var guard = CreateGuard(new AiSelfModificationPolicy(AllowSelfModification: false, ModificationRequiresQuorum: false));
-        var result = await guard.TryModifyAutonomyAsync("SYSTEM:AI:foo", "enc", PolicyLevel.VDE, AiAutonomyLevel.AutoSilent);
+        var result = await guard.TryModifyAutonomyAsync("SYSTEM:AI:foo", "enc", PolicyLevel.Vde, AiAutonomyLevel.AutoSilent);
         result.Should().BeFalse();
     }
 
@@ -306,7 +306,7 @@ public class AiBehaviorTests
     public async Task Guard_NullRequester_ThrowsArgumentNull()
     {
         var guard = CreateGuard(new AiSelfModificationPolicy(AllowSelfModification: false, ModificationRequiresQuorum: false));
-        var act = () => guard.TryModifyAutonomyAsync(null!, "enc", PolicyLevel.VDE, AiAutonomyLevel.ManualOnly);
+        var act = () => guard.TryModifyAutonomyAsync(null!, "enc", PolicyLevel.Vde, AiAutonomyLevel.ManualOnly);
         await act.Should().ThrowAsync<ArgumentNullException>();
     }
 
@@ -314,7 +314,7 @@ public class AiBehaviorTests
     public async Task Guard_NullFeatureId_ThrowsArgumentNull()
     {
         var guard = CreateGuard(new AiSelfModificationPolicy(AllowSelfModification: false, ModificationRequiresQuorum: false));
-        var act = () => guard.TryModifyAutonomyAsync("user:a", null!, PolicyLevel.VDE, AiAutonomyLevel.ManualOnly);
+        var act = () => guard.TryModifyAutonomyAsync("user:a", null!, PolicyLevel.Vde, AiAutonomyLevel.ManualOnly);
         await act.Should().ThrowAsync<ArgumentNullException>();
     }
 
@@ -324,7 +324,7 @@ public class AiBehaviorTests
         var guard = CreateGuard(new AiSelfModificationPolicy(AllowSelfModification: false, ModificationRequiresQuorum: false));
         for (int i = 0; i < 5; i++)
         {
-            await guard.TryModifyAutonomyAsync("ai:bot", "enc", PolicyLevel.VDE, AiAutonomyLevel.AutoSilent);
+            await guard.TryModifyAutonomyAsync("ai:bot", "enc", PolicyLevel.Vde, AiAutonomyLevel.AutoSilent);
         }
         guard.BlockedSelfModificationAttempts.Should().Be(5);
     }
@@ -333,18 +333,18 @@ public class AiBehaviorTests
     public async Task Guard_UserModifies_ThenAiBlocked()
     {
         var guard = CreateGuard(new AiSelfModificationPolicy(AllowSelfModification: false, ModificationRequiresQuorum: false));
-        var userResult = await guard.TryModifyAutonomyAsync("user:admin", "enc", PolicyLevel.VDE, AiAutonomyLevel.ManualOnly);
+        var userResult = await guard.TryModifyAutonomyAsync("user:admin", "enc", PolicyLevel.Vde, AiAutonomyLevel.ManualOnly);
         userResult.Should().BeTrue();
-        var aiResult = await guard.TryModifyAutonomyAsync("ai:optimizer", "enc", PolicyLevel.VDE, AiAutonomyLevel.AutoSilent);
+        var aiResult = await guard.TryModifyAutonomyAsync("ai:optimizer", "enc", PolicyLevel.Vde, AiAutonomyLevel.AutoSilent);
         aiResult.Should().BeFalse();
-        guard.GetAutonomy("enc", PolicyLevel.VDE).Should().Be(AiAutonomyLevel.ManualOnly);
+        guard.GetAutonomy("enc", PolicyLevel.Vde).Should().Be(AiAutonomyLevel.ManualOnly);
     }
 
     [Fact]
     public async Task Guard_EmptyRequesterId_NotAiOriginated()
     {
         var guard = CreateGuard(new AiSelfModificationPolicy(AllowSelfModification: false, ModificationRequiresQuorum: false));
-        var result = await guard.TryModifyAutonomyAsync("", "enc", PolicyLevel.VDE, AiAutonomyLevel.ManualOnly);
+        var result = await guard.TryModifyAutonomyAsync("", "enc", PolicyLevel.Vde, AiAutonomyLevel.ManualOnly);
         result.Should().BeTrue();
     }
 
@@ -366,10 +366,10 @@ public class AiBehaviorTests
         var config = new AiAutonomyConfiguration();
         var guard = new AiSelfModificationGuard(config, quorumMock.Object,
             new AiSelfModificationPolicy(AllowSelfModification: false, ModificationRequiresQuorum: true));
-        var result = await guard.TryModifyAutonomyAsync("user:admin", "enc", PolicyLevel.VDE, AiAutonomyLevel.ManualOnly);
+        var result = await guard.TryModifyAutonomyAsync("user:admin", "enc", PolicyLevel.Vde, AiAutonomyLevel.ManualOnly);
         result.Should().BeTrue();
         guard.QuorumApprovedChanges.Should().Be(1);
-        guard.GetAutonomy("enc", PolicyLevel.VDE).Should().Be(AiAutonomyLevel.ManualOnly);
+        guard.GetAutonomy("enc", PolicyLevel.Vde).Should().Be(AiAutonomyLevel.ManualOnly);
     }
 
     [Fact]
@@ -390,7 +390,7 @@ public class AiBehaviorTests
         var config = new AiAutonomyConfiguration();
         var guard = new AiSelfModificationGuard(config, quorumMock.Object,
             new AiSelfModificationPolicy(AllowSelfModification: false, ModificationRequiresQuorum: true));
-        var result = await guard.TryModifyAutonomyAsync("user:admin", "enc", PolicyLevel.VDE, AiAutonomyLevel.ManualOnly);
+        var result = await guard.TryModifyAutonomyAsync("user:admin", "enc", PolicyLevel.Vde, AiAutonomyLevel.ManualOnly);
         result.Should().BeFalse();
         guard.QuorumDeniedChanges.Should().Be(1);
     }
@@ -765,7 +765,7 @@ public class AiBehaviorTests
         HybridAutonomyProfile.Paranoid(config);
         var connectTimeFeatures = CheckClassificationTable.GetFeaturesByTiming(CheckTiming.ConnectTime);
         if (connectTimeFeatures.Count > 0)
-            config.GetAutonomy(connectTimeFeatures[0], PolicyLevel.VDE).Should().Be(AiAutonomyLevel.ManualOnly);
+            config.GetAutonomy(connectTimeFeatures[0], PolicyLevel.Vde).Should().Be(AiAutonomyLevel.ManualOnly);
     }
 
     [Fact]
@@ -1079,7 +1079,7 @@ public class AiBehaviorTests
         await using var system = AiPolicyIntelligenceFactory.Create(options);
         system.RingBuffer.Capacity.Should().Be(16384);
         system.Throttle.MaxCpuOverheadPercent.Should().Be(5.0);
-        system.AutonomyConfig.GetAutonomy("test", PolicyLevel.VDE).Should().Be(AiAutonomyLevel.ManualOnly);
+        system.AutonomyConfig.GetAutonomy("test", PolicyLevel.Vde).Should().Be(AiAutonomyLevel.ManualOnly);
     }
 
     [Fact]
@@ -1105,6 +1105,6 @@ public class AiBehaviorTests
     {
         await using var system = AiPolicyIntelligenceFactory.CreateDefault();
         var guard = system.SelfModificationGuard;
-        guard.GetAutonomy("encryption", PolicyLevel.VDE).Should().Be(AiAutonomyLevel.Suggest);
+        guard.GetAutonomy("encryption", PolicyLevel.Vde).Should().Be(AiAutonomyLevel.Suggest);
     }
 }

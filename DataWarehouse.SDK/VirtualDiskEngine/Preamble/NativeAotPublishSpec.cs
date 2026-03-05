@@ -31,7 +31,7 @@ public sealed class NativeAotPublishSpec
     public string RuntimeIdentifier { get; init; } = "linux-x64";
 
     /// <summary>Target CPU architecture. Must be consistent with <see cref="RuntimeIdentifier"/>.</summary>
-    public TargetArchitecture Architecture { get; init; } = TargetArchitecture.X86_64;
+    public TargetArchitecture Architecture { get; init; } = TargetArchitecture.X8664;
 
     /// <summary>
     /// Maximum acceptable size of the output NativeAOT binary in bytes.
@@ -86,7 +86,7 @@ public sealed class NativeAotPublishSpec
     public static NativeAotPublishSpec ServerFull() => new()
     {
         RuntimeIdentifier = "linux-x64",
-        Architecture = TargetArchitecture.X86_64,
+        Architecture = TargetArchitecture.X8664,
         IncludeCli = true,
         IncludeGui = false,
     };
@@ -117,7 +117,7 @@ public sealed class NativeAotPublishSpec
     public static NativeAotPublishSpec RecoveryReadonly() => new()
     {
         RuntimeIdentifier = "linux-x64",
-        Architecture = TargetArchitecture.X86_64,
+        Architecture = TargetArchitecture.X8664,
         IncludeCli = true,
         IncludeGui = false,
         IncludedPlugins = new[]
@@ -149,7 +149,7 @@ public sealed class NativeAotPublishSpec
         // Validate Architecture <-> RuntimeIdentifier consistency
         var expectedRidPrefix = Architecture switch
         {
-            TargetArchitecture.X86_64 => "linux-x64",
+            TargetArchitecture.X8664 => "linux-x64",
             TargetArchitecture.Aarch64 => "linux-arm64",
             TargetArchitecture.RiscV64 => "linux-riscv64",
             _ => throw new InvalidOperationException(

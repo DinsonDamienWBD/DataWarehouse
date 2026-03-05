@@ -66,7 +66,7 @@ public sealed class V5ConfigMigrator
         if (string.IsNullOrEmpty(vdePath)) throw new ArgumentException("VDE path must not be null or empty.", nameof(vdePath));
 
         // Idempotency check: look for the migration sentinel
-        var sentinel = await _store.GetAsync(MigrationSentinelFeatureId, PolicyLevel.VDE, vdePath, ct).ConfigureAwait(false);
+        var sentinel = await _store.GetAsync(MigrationSentinelFeatureId, PolicyLevel.Vde, vdePath, ct).ConfigureAwait(false);
         if (sentinel is not null)
         {
             return new V5MigrationResult(
@@ -96,13 +96,13 @@ public sealed class V5ConfigMigrator
                 var policy = new FeaturePolicy
                 {
                     FeatureId = featureId,
-                    Level = PolicyLevel.VDE,
+                    Level = PolicyLevel.Vde,
                     IntensityLevel = intensity,
                     Cascade = CascadeStrategy.Inherit,
                     AiAutonomy = AiAutonomyLevel.ManualOnly
                 };
 
-                await _store.SetAsync(featureId, PolicyLevel.VDE, vdePath, policy, ct).ConfigureAwait(false);
+                await _store.SetAsync(featureId, PolicyLevel.Vde, vdePath, policy, ct).ConfigureAwait(false);
                 migratedIds.Add(featureId);
             }
             catch (Exception ex)
@@ -116,13 +116,13 @@ public sealed class V5ConfigMigrator
         var sentinelPolicy = new FeaturePolicy
         {
             FeatureId = MigrationSentinelFeatureId,
-            Level = PolicyLevel.VDE,
+            Level = PolicyLevel.Vde,
             IntensityLevel = 100,
             Cascade = CascadeStrategy.Inherit,
             AiAutonomy = AiAutonomyLevel.ManualOnly
         };
 
-        await _store.SetAsync(MigrationSentinelFeatureId, PolicyLevel.VDE, vdePath, sentinelPolicy, ct).ConfigureAwait(false);
+        await _store.SetAsync(MigrationSentinelFeatureId, PolicyLevel.Vde, vdePath, sentinelPolicy, ct).ConfigureAwait(false);
 
         // Persist all changes
         await _persistence.FlushAsync(ct).ConfigureAwait(false);

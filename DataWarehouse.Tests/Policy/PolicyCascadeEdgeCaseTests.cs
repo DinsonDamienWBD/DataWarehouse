@@ -42,11 +42,11 @@ public class PolicyCascadeEdgeCaseTests
     {
         var store = CreateStore();
         // A redirects to B, B redirects to A
-        var policyA = MakePolicy("enc", PolicyLevel.VDE, customParams: new Dictionary<string, string> { ["redirect"] = "/b" });
-        var policyB = MakePolicy("enc", PolicyLevel.VDE, customParams: new Dictionary<string, string> { ["redirect"] = "/a" });
-        await store.SetAsync("enc", PolicyLevel.VDE, "/b", policyB);
+        var policyA = MakePolicy("enc", PolicyLevel.Vde, customParams: new Dictionary<string, string> { ["redirect"] = "/b" });
+        var policyB = MakePolicy("enc", PolicyLevel.Vde, customParams: new Dictionary<string, string> { ["redirect"] = "/a" });
+        await store.SetAsync("enc", PolicyLevel.Vde, "/b", policyB);
 
-        var act = () => CircularReferenceDetector.ValidateAsync("enc", PolicyLevel.VDE, "/a", policyA, store);
+        var act = () => CircularReferenceDetector.ValidateAsync("enc", PolicyLevel.Vde, "/a", policyA, store);
 
         await act.Should().ThrowAsync<PolicyCircularReferenceException>();
     }
@@ -56,14 +56,14 @@ public class PolicyCascadeEdgeCaseTests
     {
         var store = CreateStore();
         // A->B->C->A
-        var policyB = MakePolicy("enc", PolicyLevel.VDE, customParams: new Dictionary<string, string> { ["redirect"] = "/c" });
-        var policyC = MakePolicy("enc", PolicyLevel.VDE, customParams: new Dictionary<string, string> { ["redirect"] = "/a" });
-        await store.SetAsync("enc", PolicyLevel.VDE, "/b", policyB);
-        await store.SetAsync("enc", PolicyLevel.VDE, "/c", policyC);
+        var policyB = MakePolicy("enc", PolicyLevel.Vde, customParams: new Dictionary<string, string> { ["redirect"] = "/c" });
+        var policyC = MakePolicy("enc", PolicyLevel.Vde, customParams: new Dictionary<string, string> { ["redirect"] = "/a" });
+        await store.SetAsync("enc", PolicyLevel.Vde, "/b", policyB);
+        await store.SetAsync("enc", PolicyLevel.Vde, "/c", policyC);
 
-        var policyA = MakePolicy("enc", PolicyLevel.VDE, customParams: new Dictionary<string, string> { ["redirect"] = "/b" });
+        var policyA = MakePolicy("enc", PolicyLevel.Vde, customParams: new Dictionary<string, string> { ["redirect"] = "/b" });
 
-        var act = () => CircularReferenceDetector.ValidateAsync("enc", PolicyLevel.VDE, "/a", policyA, store);
+        var act = () => CircularReferenceDetector.ValidateAsync("enc", PolicyLevel.Vde, "/a", policyA, store);
 
         await act.Should().ThrowAsync<PolicyCircularReferenceException>();
     }
@@ -72,12 +72,12 @@ public class PolicyCascadeEdgeCaseTests
     public async Task CircularRef_InheritFromCycle_ThrowsException()
     {
         var store = CreateStore();
-        var policyB = MakePolicy("enc", PolicyLevel.VDE, customParams: new Dictionary<string, string> { ["inherit_from"] = "/a" });
-        await store.SetAsync("enc", PolicyLevel.VDE, "/b", policyB);
+        var policyB = MakePolicy("enc", PolicyLevel.Vde, customParams: new Dictionary<string, string> { ["inherit_from"] = "/a" });
+        await store.SetAsync("enc", PolicyLevel.Vde, "/b", policyB);
 
-        var policyA = MakePolicy("enc", PolicyLevel.VDE, customParams: new Dictionary<string, string> { ["inherit_from"] = "/b" });
+        var policyA = MakePolicy("enc", PolicyLevel.Vde, customParams: new Dictionary<string, string> { ["inherit_from"] = "/b" });
 
-        var act = () => CircularReferenceDetector.ValidateAsync("enc", PolicyLevel.VDE, "/a", policyA, store);
+        var act = () => CircularReferenceDetector.ValidateAsync("enc", PolicyLevel.Vde, "/a", policyA, store);
 
         await act.Should().ThrowAsync<PolicyCircularReferenceException>();
     }
@@ -93,14 +93,14 @@ public class PolicyCascadeEdgeCaseTests
             var redirectParams = i < 15
                 ? new Dictionary<string, string> { ["redirect"] = next }
                 : null;
-            var p = MakePolicy("enc", PolicyLevel.VDE, customParams: redirectParams);
-            await store.SetAsync("enc", PolicyLevel.VDE, $"/n{i}", p);
+            var p = MakePolicy("enc", PolicyLevel.Vde, customParams: redirectParams);
+            await store.SetAsync("enc", PolicyLevel.Vde, $"/n{i}", p);
         }
         // End node has no redirect
-        await store.SetAsync("enc", PolicyLevel.VDE, "/end", MakePolicy("enc", PolicyLevel.VDE));
+        await store.SetAsync("enc", PolicyLevel.Vde, "/end", MakePolicy("enc", PolicyLevel.Vde));
 
-        var startPolicy = MakePolicy("enc", PolicyLevel.VDE, customParams: new Dictionary<string, string> { ["redirect"] = "/n1" });
-        var result = await CircularReferenceDetector.ValidateAsync("enc", PolicyLevel.VDE, "/start", startPolicy, store);
+        var startPolicy = MakePolicy("enc", PolicyLevel.Vde, customParams: new Dictionary<string, string> { ["redirect"] = "/n1" });
+        var result = await CircularReferenceDetector.ValidateAsync("enc", PolicyLevel.Vde, "/start", startPolicy, store);
 
         result.IsValid.Should().BeTrue();
     }
@@ -109,9 +109,9 @@ public class PolicyCascadeEdgeCaseTests
     public async Task CircularRef_EmptyChain_NoCycle()
     {
         var store = CreateStore();
-        var policy = MakePolicy("enc", PolicyLevel.VDE);
+        var policy = MakePolicy("enc", PolicyLevel.Vde);
 
-        var result = await CircularReferenceDetector.ValidateAsync("enc", PolicyLevel.VDE, "/v", policy, store);
+        var result = await CircularReferenceDetector.ValidateAsync("enc", PolicyLevel.Vde, "/v", policy, store);
 
         result.IsValid.Should().BeTrue();
         result.Errors.Should().BeEmpty();
@@ -133,9 +133,9 @@ public class PolicyCascadeEdgeCaseTests
     public async Task CircularRef_NullCustomParams_NoCycle()
     {
         var store = CreateStore();
-        var policy = MakePolicy("enc", PolicyLevel.VDE);
+        var policy = MakePolicy("enc", PolicyLevel.Vde);
 
-        var result = await CircularReferenceDetector.ValidateAsync("enc", PolicyLevel.VDE, "/v", policy, store);
+        var result = await CircularReferenceDetector.ValidateAsync("enc", PolicyLevel.Vde, "/v", policy, store);
 
         result.IsValid.Should().BeTrue();
     }
@@ -144,10 +144,10 @@ public class PolicyCascadeEdgeCaseTests
     public async Task CircularRef_RedirectToNonExistent_NoCycle()
     {
         var store = CreateStore();
-        var policy = MakePolicy("enc", PolicyLevel.VDE,
+        var policy = MakePolicy("enc", PolicyLevel.Vde,
             customParams: new Dictionary<string, string> { ["redirect"] = "/does_not_exist" });
 
-        var result = await CircularReferenceDetector.ValidateAsync("enc", PolicyLevel.VDE, "/v", policy, store);
+        var result = await CircularReferenceDetector.ValidateAsync("enc", PolicyLevel.Vde, "/v", policy, store);
 
         result.IsValid.Should().BeTrue();
     }
@@ -284,7 +284,7 @@ public class PolicyCascadeEdgeCaseTests
         var cache = new VersionedPolicyCache();
         var policies = new Dictionary<string, FeaturePolicy>
         {
-            ["enc:VDE:/v"] = MakePolicy("enc", PolicyLevel.VDE, 80)
+            ["enc:VDE:/v"] = MakePolicy("enc", PolicyLevel.Vde, 80)
         };
 
         cache.Update(policies);
@@ -302,7 +302,7 @@ public class PolicyCascadeEdgeCaseTests
 
         cache.Update(new Dictionary<string, FeaturePolicy>
         {
-            ["enc:VDE:/v"] = MakePolicy("enc", PolicyLevel.VDE, 80)
+            ["enc:VDE:/v"] = MakePolicy("enc", PolicyLevel.Vde, 80)
         });
 
         var newSnapshot = cache.GetSnapshot();
@@ -316,7 +316,7 @@ public class PolicyCascadeEdgeCaseTests
         var cache = new VersionedPolicyCache();
         var snapshot = cache.GetSnapshot();
 
-        var policy = snapshot.TryGetPolicy("enc", PolicyLevel.VDE, "/v");
+        var policy = snapshot.TryGetPolicy("enc", PolicyLevel.Vde, "/v");
         policy.Should().BeNull();
     }
 
@@ -324,14 +324,14 @@ public class PolicyCascadeEdgeCaseTests
     public void Cache_CacheHit_ReturnsPolicyFromSnapshot()
     {
         var cache = new VersionedPolicyCache();
-        var policy = MakePolicy("enc", PolicyLevel.VDE, 80);
+        var policy = MakePolicy("enc", PolicyLevel.Vde, 80);
         cache.Update(new Dictionary<string, FeaturePolicy>
         {
             ["enc:VDE:/v"] = policy
         });
 
         var snapshot = cache.GetSnapshot();
-        var retrieved = snapshot.TryGetPolicy("enc", PolicyLevel.VDE, "/v");
+        var retrieved = snapshot.TryGetPolicy("enc", PolicyLevel.Vde, "/v");
 
         retrieved.Should().NotBeNull();
         retrieved!.IntensityLevel.Should().Be(80);
@@ -341,14 +341,14 @@ public class PolicyCascadeEdgeCaseTests
     public async Task Cache_UpdateFromStore_PopulatesSnapshot()
     {
         var store = CreateStore();
-        await store.SetAsync("enc", PolicyLevel.VDE, "/v", MakePolicy("enc", PolicyLevel.VDE, 75));
+        await store.SetAsync("enc", PolicyLevel.Vde, "/v", MakePolicy("enc", PolicyLevel.Vde, 75));
 
         var cache = new VersionedPolicyCache();
         await cache.UpdateFromStoreAsync(store, new[] { "enc" });
 
         var snapshot = cache.GetSnapshot();
         snapshot.Version.Should().Be(1);
-        var policy = snapshot.TryGetPolicy("enc", PolicyLevel.VDE, "/v");
+        var policy = snapshot.TryGetPolicy("enc", PolicyLevel.Vde, "/v");
         policy.Should().NotBeNull();
     }
 
@@ -360,7 +360,7 @@ public class PolicyCascadeEdgeCaseTests
 
         cache.Update(new Dictionary<string, FeaturePolicy>
         {
-            ["enc:VDE:/v"] = MakePolicy("enc", PolicyLevel.VDE, 80)
+            ["enc:VDE:/v"] = MakePolicy("enc", PolicyLevel.Vde, 80)
         });
 
         var previous = cache.GetPreviousSnapshot();
@@ -383,7 +383,7 @@ public class PolicyCascadeEdgeCaseTests
         // Write during reads
         cache.Update(new Dictionary<string, FeaturePolicy>
         {
-            ["enc:VDE:/v"] = MakePolicy("enc", PolicyLevel.VDE, 80)
+            ["enc:VDE:/v"] = MakePolicy("enc", PolicyLevel.Vde, 80)
         });
 
         Task.WhenAll(tasks).Wait();
@@ -400,9 +400,9 @@ public class PolicyCascadeEdgeCaseTests
     public void OverrideStore_CompositeKey_RoundTrips()
     {
         var store = new CascadeOverrideStore();
-        store.SetOverride("encryption", PolicyLevel.VDE, CascadeStrategy.Enforce);
+        store.SetOverride("encryption", PolicyLevel.Vde, CascadeStrategy.Enforce);
 
-        store.TryGetOverride("encryption", PolicyLevel.VDE, out var strategy).Should().BeTrue();
+        store.TryGetOverride("encryption", PolicyLevel.Vde, out var strategy).Should().BeTrue();
         strategy.Should().Be(CascadeStrategy.Enforce);
     }
 
@@ -410,7 +410,7 @@ public class PolicyCascadeEdgeCaseTests
     public async Task OverrideStore_PersistenceRoundTrip()
     {
         var overrideStore = new CascadeOverrideStore();
-        overrideStore.SetOverride("enc", PolicyLevel.VDE, CascadeStrategy.Enforce);
+        overrideStore.SetOverride("enc", PolicyLevel.Vde, CascadeStrategy.Enforce);
         overrideStore.SetOverride("comp", PolicyLevel.Container, CascadeStrategy.MostRestrictive);
 
         var persistence = CreatePersistence();
@@ -420,7 +420,7 @@ public class PolicyCascadeEdgeCaseTests
         var loaded = await newStore.LoadFromPersistenceAsync(persistence);
 
         loaded.Should().Be(2);
-        newStore.TryGetOverride("enc", PolicyLevel.VDE, out var s1).Should().BeTrue();
+        newStore.TryGetOverride("enc", PolicyLevel.Vde, out var s1).Should().BeTrue();
         s1.Should().Be(CascadeStrategy.Enforce);
     }
 
@@ -428,24 +428,24 @@ public class PolicyCascadeEdgeCaseTests
     public void OverrideStore_RemoveOverride_RestoresDefault()
     {
         var store = new CascadeOverrideStore();
-        store.SetOverride("enc", PolicyLevel.VDE, CascadeStrategy.Enforce);
-        store.RemoveOverride("enc", PolicyLevel.VDE).Should().BeTrue();
+        store.SetOverride("enc", PolicyLevel.Vde, CascadeStrategy.Enforce);
+        store.RemoveOverride("enc", PolicyLevel.Vde).Should().BeTrue();
 
-        store.TryGetOverride("enc", PolicyLevel.VDE, out _).Should().BeFalse();
+        store.TryGetOverride("enc", PolicyLevel.Vde, out _).Should().BeFalse();
     }
 
     [Fact]
     public void OverrideStore_RemoveNonExistent_ReturnsFalse()
     {
         var store = new CascadeOverrideStore();
-        store.RemoveOverride("nonexistent", PolicyLevel.VDE).Should().BeFalse();
+        store.RemoveOverride("nonexistent", PolicyLevel.Vde).Should().BeFalse();
     }
 
     [Fact]
     public void OverrideStore_GetAllOverrides_ReturnsAll()
     {
         var store = new CascadeOverrideStore();
-        store.SetOverride("enc", PolicyLevel.VDE, CascadeStrategy.Enforce);
+        store.SetOverride("enc", PolicyLevel.Vde, CascadeStrategy.Enforce);
         store.SetOverride("comp", PolicyLevel.Container, CascadeStrategy.MostRestrictive);
 
         var all = store.GetAllOverrides();
@@ -460,11 +460,11 @@ public class PolicyCascadeEdgeCaseTests
         var overrideStore = new CascadeOverrideStore();
 
         // Set a policy with Override cascade
-        var policy = MakePolicy("encryption", PolicyLevel.VDE, 80, CascadeStrategy.Override);
-        await policyStore.SetAsync("encryption", PolicyLevel.VDE, "/v", policy);
+        var policy = MakePolicy("encryption", PolicyLevel.Vde, 80, CascadeStrategy.Override);
+        await policyStore.SetAsync("encryption", PolicyLevel.Vde, "/v", policy);
 
         // Set cascade override to Enforce
-        overrideStore.SetOverride("encryption", PolicyLevel.VDE, CascadeStrategy.Enforce);
+        overrideStore.SetOverride("encryption", PolicyLevel.Vde, CascadeStrategy.Enforce);
 
         var engine = new PolicyResolutionEngine(policyStore, persistence, overrideStore: overrideStore);
         var ctx = new PolicyResolutionContext { Path = "/v" };
@@ -478,7 +478,7 @@ public class PolicyCascadeEdgeCaseTests
     public void OverrideStore_EmptyFeatureId_ThrowsArgumentException()
     {
         var store = new CascadeOverrideStore();
-        var act = () => store.SetOverride("", PolicyLevel.VDE, CascadeStrategy.Enforce);
+        var act = () => store.SetOverride("", PolicyLevel.Vde, CascadeStrategy.Enforce);
         act.Should().Throw<ArgumentException>();
     }
 
@@ -488,10 +488,10 @@ public class PolicyCascadeEdgeCaseTests
         var store = new CascadeOverrideStore();
         store.Count.Should().Be(0);
 
-        store.SetOverride("enc", PolicyLevel.VDE, CascadeStrategy.Enforce);
+        store.SetOverride("enc", PolicyLevel.Vde, CascadeStrategy.Enforce);
         store.Count.Should().Be(1);
 
-        store.RemoveOverride("enc", PolicyLevel.VDE);
+        store.RemoveOverride("enc", PolicyLevel.Vde);
         store.Count.Should().Be(0);
     }
 
@@ -571,7 +571,7 @@ public class PolicyCascadeEdgeCaseTests
     {
         var policies = new Dictionary<string, FeaturePolicy>
         {
-            ["retention"] = MakePolicy("retention", PolicyLevel.VDE, 80,
+            ["retention"] = MakePolicy("retention", PolicyLevel.Vde, 80,
                 customParams: new Dictionary<string, string> { ["retention_policy"] = "7years" })
         };
 
@@ -587,7 +587,7 @@ public class PolicyCascadeEdgeCaseTests
     {
         var policies = new Dictionary<string, FeaturePolicy>
         {
-            ["encryption"] = MakePolicy("encryption", PolicyLevel.VDE, 90,
+            ["encryption"] = MakePolicy("encryption", PolicyLevel.Vde, 90,
                 CascadeStrategy.MostRestrictive, AiAutonomyLevel.Suggest)
         };
 
@@ -603,7 +603,7 @@ public class PolicyCascadeEdgeCaseTests
     {
         var policies = new Dictionary<string, FeaturePolicy>
         {
-            ["audit"] = MakePolicy("audit", PolicyLevel.VDE, 90)
+            ["audit"] = MakePolicy("audit", PolicyLevel.Vde, 90)
         };
 
         var scorer = new PolicyComplianceScorer(policies);
@@ -618,7 +618,7 @@ public class PolicyCascadeEdgeCaseTests
     {
         var policies = new Dictionary<string, FeaturePolicy>
         {
-            ["encryption"] = MakePolicy("encryption", PolicyLevel.VDE, 95,
+            ["encryption"] = MakePolicy("encryption", PolicyLevel.Vde, 95,
                 CascadeStrategy.Enforce, AiAutonomyLevel.ManualOnly)
         };
 
@@ -657,7 +657,7 @@ public class PolicyCascadeEdgeCaseTests
 
         var policies = new Dictionary<string, FeaturePolicy>
         {
-            ["enc"] = MakePolicy("enc", PolicyLevel.VDE, 80)
+            ["enc"] = MakePolicy("enc", PolicyLevel.Vde, 80)
         };
 
         var scorer = new PolicyComplianceScorer(policies);
@@ -688,7 +688,7 @@ public class PolicyCascadeEdgeCaseTests
 
         var policies = new Dictionary<string, FeaturePolicy>
         {
-            ["enc"] = MakePolicy("enc", PolicyLevel.VDE, 80)
+            ["enc"] = MakePolicy("enc", PolicyLevel.Vde, 80)
         };
 
         var scorer = new PolicyComplianceScorer(policies);
@@ -928,8 +928,8 @@ public class PolicyCascadeEdgeCaseTests
     public async Task Marketplace_ExportAndImport_RoundTrips()
     {
         var persistence = new InMemoryPolicyPersistence();
-        await persistence.SaveAsync("enc", PolicyLevel.VDE, "/",
-            MakePolicy("enc", PolicyLevel.VDE, 80));
+        await persistence.SaveAsync("enc", PolicyLevel.Vde, "/",
+            MakePolicy("enc", PolicyLevel.Vde, 80));
 
         var marketplace = new PolicyMarketplace();
         var template = await marketplace.ExportTemplateAsync(persistence,

@@ -28,7 +28,7 @@ public sealed class StrippedKernelBuildSpec
     public string KernelVersion { get; init; } = "6.6";
 
     /// <summary>Target CPU architecture for the kernel image.</summary>
-    public TargetArchitecture Architecture { get; init; } = TargetArchitecture.X86_64;
+    public TargetArchitecture Architecture { get; init; } = TargetArchitecture.X8664;
 
     /// <summary>
     /// Maximum acceptable size of the output kernel image in bytes.
@@ -110,7 +110,7 @@ public sealed class StrippedKernelBuildSpec
         // -- Architecture --
         switch (Architecture)
         {
-            case TargetArchitecture.X86_64:
+            case TargetArchitecture.X8664:
                 entries.Add("CONFIG_X86_64=y");
                 entries.Add("CONFIG_64BIT=y");
                 break;

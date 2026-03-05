@@ -414,8 +414,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
 
             return _detectedMediaType switch
             {
-                MediaType.SSD or MediaType.NVMe => 128 * 1024,      // 128KB for SSDs
-                MediaType.HDD => 64 * 1024,                          // 64KB for HDDs
+                MediaType.Ssd or MediaType.NvMe => 128 * 1024,      // 128KB for SSDs
+                MediaType.Hdd => 64 * 1024,                          // 64KB for HDDs
                 MediaType.USB or MediaType.SDCard => 32 * 1024,     // 32KB for removable
                 MediaType.Optical => 2 * 1024 * 1024,                // 2MB for optical (large sequential reads)
                 MediaType.Tape => 4 * 1024 * 1024,                   // 4MB for tape
@@ -478,10 +478,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                 {
                     // Check if it's an NVMe path (heuristic)
                     if (path.Contains("nvme", StringComparison.OrdinalIgnoreCase))
-                        return MediaType.NVMe;
+                        return MediaType.NvMe;
 
                     // Default to SSD for modern systems
-                    return MediaType.SSD;
+                    return MediaType.Ssd;
                 }
 
                 return MediaType.Unknown;
@@ -588,9 +588,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
     public enum MediaType
     {
         Unknown,
-        HDD,
-        SSD,
-        NVMe,
+        Hdd,
+        Ssd,
+        NvMe,
         USB,
         SDCard,
         Optical,

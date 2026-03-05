@@ -116,7 +116,7 @@ public static class PreambleWriter
         uint runtimeOffset,
         uint runtimeSize,
         PreambleFlags flags = PreambleFlags.None,
-        TargetArchitecture arch = TargetArchitecture.X86_64)
+        TargetArchitecture arch = TargetArchitecture.X8664)
     {
         // Validate VdeOffset alignment (4 KiB)
         if (vdeOffset % (ulong)DefaultBlockAlignment != 0)

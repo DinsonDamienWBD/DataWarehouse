@@ -107,9 +107,9 @@ public static class ExtentRaidTopology
     {
         RaidTopologyScheme.Standard => "Standard (no redundancy)",
         RaidTopologyScheme.Mirror   => "Mirror (1:1 copy)",
-        RaidTopologyScheme.EC_2_1   => "EC 2+1 (Reed-Solomon)",
-        RaidTopologyScheme.EC_4_2   => "EC 4+2 (Reed-Solomon)",
-        RaidTopologyScheme.EC_8_3   => "EC 8+3 (Reed-Solomon)",
+        RaidTopologyScheme.Ec21   => "EC 2+1 (Reed-Solomon)",
+        RaidTopologyScheme.Ec42   => "EC 4+2 (Reed-Solomon)",
+        RaidTopologyScheme.Ec83   => "EC 8+3 (Reed-Solomon)",
         _                           => $"Reserved ({(byte)scheme})",
     };
 

@@ -15,7 +15,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
     [SdkCompatibility("6.0.0", Notes = "Phase 69: Policy serialization (PERS-01)")]
     public static class PolicySerializationHelper
     {
-        private static readonly JsonSerializerOptions s_options = CreateOptions();
+        private static readonly JsonSerializerOptions SOptions = CreateOptions();
 
         /// <summary>
         /// Serializes a <see cref="FeaturePolicy"/> to a UTF-8 JSON byte array.
@@ -26,7 +26,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
         public static byte[] SerializePolicy(FeaturePolicy policy)
         {
             if (policy == null) throw new ArgumentNullException(nameof(policy));
-            return JsonSerializer.SerializeToUtf8Bytes(policy, s_options);
+            return JsonSerializer.SerializeToUtf8Bytes(policy, SOptions);
         }
 
         /// <summary>
@@ -39,7 +39,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
         public static FeaturePolicy DeserializePolicy(byte[] data)
         {
             if (data == null) throw new ArgumentNullException(nameof(data));
-            return JsonSerializer.Deserialize<FeaturePolicy>(data, s_options)
+            return JsonSerializer.Deserialize<FeaturePolicy>(data, SOptions)
                 ?? throw new InvalidOperationException("Deserialization of FeaturePolicy produced null result.");
         }
 
@@ -52,7 +52,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
         public static byte[] SerializeProfile(OperationalProfile profile)
         {
             if (profile == null) throw new ArgumentNullException(nameof(profile));
-            return JsonSerializer.SerializeToUtf8Bytes(profile, s_options);
+            return JsonSerializer.SerializeToUtf8Bytes(profile, SOptions);
         }
 
         /// <summary>
@@ -65,7 +65,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
         public static OperationalProfile DeserializeProfile(byte[] data)
         {
             if (data == null) throw new ArgumentNullException(nameof(data));
-            return JsonSerializer.Deserialize<OperationalProfile>(data, s_options)
+            return JsonSerializer.Deserialize<OperationalProfile>(data, SOptions)
                 ?? throw new InvalidOperationException("Deserialization of OperationalProfile produced null result.");
         }
 
@@ -92,7 +92,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
                 });
             }
 
-            return JsonSerializer.SerializeToUtf8Bytes(entries, s_options);
+            return JsonSerializer.SerializeToUtf8Bytes(entries, SOptions);
         }
 
         /// <summary>
@@ -106,7 +106,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
         {
             if (data == null) throw new ArgumentNullException(nameof(data));
 
-            var entries = JsonSerializer.Deserialize<List<PolicyEntry>>(data, s_options)
+            var entries = JsonSerializer.Deserialize<List<PolicyEntry>>(data, SOptions)
                 ?? throw new InvalidOperationException("Deserialization of policy entries produced null result.");
 
             var result = new List<(string, PolicyLevel, string, FeaturePolicy)>(entries.Count);

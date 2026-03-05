@@ -18,13 +18,13 @@ public enum RaidTopologyScheme : byte
     Mirror = 1,
 
     /// <summary>Reed-Solomon erasure coding: 2 data shards + 1 parity shard. Extent flag encoding: 010.</summary>
-    EC_2_1 = 2,
+    Ec21 = 2,
 
     /// <summary>Reed-Solomon erasure coding: 4 data shards + 2 parity shards. Extent flag encoding: 011.</summary>
-    EC_4_2 = 3,
+    Ec42 = 3,
 
     /// <summary>Reed-Solomon erasure coding: 8 data shards + 3 parity shards. Extent flag encoding: 100.</summary>
-    EC_8_3 = 4,
+    Ec83 = 4,
 }
 
 /// <summary>
@@ -63,7 +63,7 @@ public enum PolymorphicRaidFlags : byte
 /// A 32-byte per-inode erasure coding descriptor stored in the VDE inode overflow area
 /// (RAID module bit 5). Enables different files on the same physical NVMe to use different
 /// RAID levels — e.g., a large ML dataset uses <see cref="RaidTopologyScheme.Standard"/>
-/// (zero overhead) while an adjacent financial ledger uses <see cref="RaidTopologyScheme.EC_4_2"/>
+/// (zero overhead) while an adjacent financial ledger uses <see cref="RaidTopologyScheme.Ec42"/>
 /// — eliminating the traditional whole-disk RAID tax.
 /// </summary>
 /// <remarks>
@@ -121,14 +121,14 @@ public readonly struct PolymorphicRaidModule : IEquatable<PolymorphicRaidModule>
     public RaidTopologyScheme Scheme { get; init; }
 
     /// <summary>
-    /// Number of data shards. For <see cref="RaidTopologyScheme.EC_4_2"/> this is 4;
+    /// Number of data shards. For <see cref="RaidTopologyScheme.Ec42"/> this is 4;
     /// for <see cref="RaidTopologyScheme.Mirror"/> this is 1 (one original copy).
     /// Ignored when <see cref="PolymorphicRaidFlags.InheritFromVolume"/> is set.
     /// </summary>
     public byte DataShards { get; init; }
 
     /// <summary>
-    /// Number of parity / redundancy shards. For <see cref="RaidTopologyScheme.EC_4_2"/>
+    /// Number of parity / redundancy shards. For <see cref="RaidTopologyScheme.Ec42"/>
     /// this is 2. For <see cref="RaidTopologyScheme.Standard"/> this is 0.
     /// Ignored when <see cref="PolymorphicRaidFlags.InheritFromVolume"/> is set.
     /// </summary>
@@ -150,9 +150,9 @@ public readonly struct PolymorphicRaidModule : IEquatable<PolymorphicRaidModule>
 
     /// <summary>
     /// Returns <see langword="true"/> when this inode uses erasure coding
-    /// (<see cref="Scheme"/> >= <see cref="RaidTopologyScheme.EC_2_1"/>).
+    /// (<see cref="Scheme"/> >= <see cref="RaidTopologyScheme.Ec21"/>).
     /// </summary>
-    public bool IsErasureCoded => Scheme >= RaidTopologyScheme.EC_2_1;
+    public bool IsErasureCoded => Scheme >= RaidTopologyScheme.Ec21;
 
     /// <summary>Total number of physical shards (data + parity).</summary>
     public int TotalShards => DataShards + ParityShards;
@@ -160,7 +160,7 @@ public readonly struct PolymorphicRaidModule : IEquatable<PolymorphicRaidModule>
     /// <summary>
     /// Storage overhead ratio: <c>ParityShards / (double)DataShards</c>.
     /// Returns 1.0 for <see cref="RaidTopologyScheme.Mirror"/> (100% overhead),
-    /// 0.5 for EC_4_2 (50% overhead), and 0.0 for <see cref="RaidTopologyScheme.Standard"/>.
+    /// 0.5 for Ec42 (50% overhead), and 0.0 for <see cref="RaidTopologyScheme.Standard"/>.
     /// </summary>
     public double StorageOverhead =>
         DataShards == 0 ? 0.0 : ParityShards / (double)DataShards;
@@ -216,10 +216,10 @@ public readonly struct PolymorphicRaidModule : IEquatable<PolymorphicRaidModule>
         // Map well-known (data, parity) pairs to named schemes.
         var scheme = (dataShards, parityShards) switch
         {
-            (2, 1) => RaidTopologyScheme.EC_2_1,
-            (4, 2) => RaidTopologyScheme.EC_4_2,
-            (8, 3) => RaidTopologyScheme.EC_8_3,
-            _      => RaidTopologyScheme.EC_2_1, // closest defined; caller controls DataShards/ParityShards
+            (2, 1) => RaidTopologyScheme.Ec21,
+            (4, 2) => RaidTopologyScheme.Ec42,
+            (8, 3) => RaidTopologyScheme.Ec83,
+            _      => RaidTopologyScheme.Ec21, // closest defined; caller controls DataShards/ParityShards
         };
 
         return new PolymorphicRaidModule

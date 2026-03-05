@@ -200,7 +200,7 @@ public sealed class IoRingBlockDevice : IBatchBlockDevice
                 }
 
                 hr = IoRingNativeMethods.SubmitIoRing(
-                    _ioRingHandle, 1, OverlappedNativeMethods.INFINITE, out _);
+                    _ioRingHandle, 1, OverlappedNativeMethods.Infinite, out _);
 
                 if (hr != IoRingNativeMethods.SOk)
                 {
@@ -293,7 +293,7 @@ public sealed class IoRingBlockDevice : IBatchBlockDevice
                 }
 
                 hr = IoRingNativeMethods.SubmitIoRing(
-                    _ioRingHandle, 1, OverlappedNativeMethods.INFINITE, out _);
+                    _ioRingHandle, 1, OverlappedNativeMethods.Infinite, out _);
 
                 if (hr != IoRingNativeMethods.SOk)
                 {
@@ -384,7 +384,7 @@ public sealed class IoRingBlockDevice : IBatchBlockDevice
                 int submitHr = IoRingNativeMethods.SubmitIoRing(
                     _ioRingHandle,
                     (uint)flatOps.Count,
-                    OverlappedNativeMethods.INFINITE,
+                    OverlappedNativeMethods.Infinite,
                     out uint submitted);
 
                 if (submitHr != IoRingNativeMethods.SOk)
@@ -515,7 +515,7 @@ public sealed class IoRingBlockDevice : IBatchBlockDevice
                 int submitHr = IoRingNativeMethods.SubmitIoRing(
                     _ioRingHandle,
                     (uint)flatOps.Count,
-                    OverlappedNativeMethods.INFINITE,
+                    OverlappedNativeMethods.Infinite,
                     out _);
 
                 if (submitHr != IoRingNativeMethods.SOk)

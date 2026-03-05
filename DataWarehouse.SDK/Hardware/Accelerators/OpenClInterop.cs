@@ -60,46 +60,46 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             ClInvalidDevice = -33,
             ClInvalidContext = -34,
             ClInvalidCommandQueue = -36,
-            CL_INVALID_MEM_OBJECT = -38,
-            CL_INVALID_PROGRAM = -44,
-            CL_INVALID_KERNEL = -48,
-            CL_INVALID_KERNEL_ARGS = -52,
-            CL_INVALID_WORK_DIMENSION = -53,
-            CL_INVALID_WORK_GROUP_SIZE = -54,
+            ClInvalidMemObject = -38,
+            ClInvalidProgram = -44,
+            ClInvalidKernel = -48,
+            ClInvalidKernelArgs = -52,
+            ClInvalidWorkDimension = -53,
+            ClInvalidWorkGroupSize = -54,
         }
 
         /// <summary>
         /// OpenCl device type flags.
         /// </summary>
-        internal const ulong CL_DEVICE_TYPE_DEFAULT = 1;
-        internal const ulong CL_DEVICE_TYPE_CPU = 2;
-        internal const ulong CL_DEVICE_TYPE_GPU = 4;
-        internal const ulong CL_DEVICE_TYPE_ACCELERATOR = 8;
-        internal const ulong CL_DEVICE_TYPE_ALL = 0xFFFFFFFF;
+        internal const ulong ClDeviceTypeDefault = 1;
+        internal const ulong ClDeviceTypeCpu = 2;
+        internal const ulong ClDeviceTypeGpu = 4;
+        internal const ulong ClDeviceTypeAccelerator = 8;
+        internal const ulong ClDeviceTypeAll = 0xFFFFFFFF;
 
         /// <summary>
         /// OpenCl memory flags.
         /// </summary>
-        internal const ulong CL_MEM_READ_WRITE = 1;
-        internal const ulong CL_MEM_WRITE_ONLY = 2;
-        internal const ulong CL_MEM_READ_ONLY = 4;
-        internal const ulong CL_MEM_COPY_HOST_PTR = 32;
+        internal const ulong ClMemReadWrite = 1;
+        internal const ulong ClMemWriteOnly = 2;
+        internal const ulong ClMemReadOnly = 4;
+        internal const ulong ClMemCopyHostPtr = 32;
 
         /// <summary>
         /// OpenCl platform info query parameters.
         /// </summary>
-        internal const uint CL_PLATFORM_NAME = 0x0902;
-        internal const uint CL_PLATFORM_VENDOR = 0x0903;
-        internal const uint CL_PLATFORM_VERSION = 0x0901;
+        internal const uint ClPlatformName = 0x0902;
+        internal const uint ClPlatformVendor = 0x0903;
+        internal const uint ClPlatformVersion = 0x0901;
 
         /// <summary>
         /// OpenCl device info query parameters.
         /// </summary>
-        internal const uint CL_DEVICE_NAME = 0x102B;
-        internal const uint CL_DEVICE_VENDOR = 0x102C;
-        internal const uint CL_DEVICE_TYPE = 0x1000;
-        internal const uint CL_DEVICE_MAX_COMPUTE_UNITS = 0x1002;
-        internal const uint CL_DEVICE_GLOBAL_MEM_SIZE = 0x101F;
+        internal const uint ClDeviceName = 0x102B;
+        internal const uint ClDeviceVendor = 0x102C;
+        internal const uint ClDeviceType = 0x1000;
+        internal const uint ClDeviceMaxComputeUnits = 0x1002;
+        internal const uint ClDeviceGlobalMemSize = 0x101F;
 
         // --- Platform API ---
 
@@ -229,9 +229,9 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// <summary>
         /// Enqueues a kernel for execution across an N-dimensional range.
         /// </summary>
-        [LibraryImport(OpenClLibraryWindows, EntryPoint = "clEnqueueNDRangeKernel")]
+        [LibraryImport(OpenClLibraryWindows, EntryPoint = "clEnqueueNdRangeKernel")]
         [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
-        internal static partial int EnqueueNDRangeKernel(
+        internal static partial int EnqueueNdRangeKernel(
             IntPtr commandQueue, IntPtr kernel, uint workDim,
             nuint[] globalWorkOffset, nuint[] globalWorkSize, nuint[] localWorkSize,
             uint numEventsInWaitList, IntPtr[] eventWaitList, out IntPtr eventObj);
@@ -391,7 +391,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                         foreach (var platform in platforms)
                         {
                             int devResult = OpenClInterop.GetDeviceIDs(
-                                platform, OpenClInterop.CL_DEVICE_TYPE_GPU, 0, null!, out uint devCount);
+                                platform, OpenClInterop.ClDeviceTypeGpu, 0, null!, out uint devCount);
 
                             if (devResult == OpenClInterop.ClSuccess && devCount > 0)
                             {
@@ -401,7 +401,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                                 {
                                     var devices = new IntPtr[devCount];
                                     OpenClInterop.GetDeviceIDs(
-                                        platform, OpenClInterop.CL_DEVICE_TYPE_GPU, devCount, devices, out _);
+                                        platform, OpenClInterop.ClDeviceTypeGpu, devCount, devices, out _);
                                     firstDevice = devices[0];
                                 }
                             }
@@ -469,7 +469,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             // 2. Write a, b to device (clEnqueueWriteBuffer)
             // 3. Build kernel: __kernel void vecMul(__global float* a, __global float* b, __global float* c, int n) { ... }
             // 4. Set kernel args (clSetKernelArg)
-            // 5. Execute (clEnqueueNDRangeKernel)
+            // 5. Execute (clEnqueueNdRangeKernel)
             // 6. Read result (clEnqueueReadBuffer)
             // 7. Release buffers
             //
@@ -494,25 +494,25 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             ArgumentNullException.ThrowIfNull(a);
             ArgumentNullException.ThrowIfNull(b);
 
-            int M = a.GetLength(0), K = a.GetLength(1);
-            int K2 = b.GetLength(0), N = b.GetLength(1);
+            int m = a.GetLength(0), k = a.GetLength(1);
+            int k2 = b.GetLength(0), n = b.GetLength(1);
 
-            if (K != K2)
+            if (k != k2)
                 throw new ArgumentException("Matrix dimensions incompatible for multiplication");
-            if (M > 4096 || N > 4096 || K > 4096)
-                throw new ArgumentException($"Matrix dimensions too large for CPU fallback: {M}x{K} * {K}x{N}. Max 4096 per dimension (finding P2-372).");
+            if (m > 4096 || n > 4096 || k > 4096)
+                throw new ArgumentException($"Matrix dimensions too large for CPU fallback: {m}x{k} * {k}x{n}. Max 4096 per dimension (finding P2-372).");
 
-            float[] result = new float[M * N];
+            float[] result = new float[m * n];
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             await Task.Run(() =>
             {
-                for (int i = 0; i < M; i++)
-                    for (int j = 0; j < N; j++)
+                for (int i = 0; i < m; i++)
+                    for (int j = 0; j < n; j++)
                     {
                         float sum = 0;
-                        for (int k = 0; k < K; k++)
-                            sum += a[i, k] * b[k, j];
-                        result[i * N + j] = sum;
+                        for (int ki = 0; ki < k; ki++)
+                            sum += a[i, ki] * b[ki, j];
+                        result[i * n + j] = sum;
                     }
             });
             Interlocked.Add(ref _totalProcessingTicks, System.Diagnostics.Stopwatch.GetTimestamp() - t0);
@@ -529,19 +529,19 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             ArgumentNullException.ThrowIfNull(input);
             ArgumentNullException.ThrowIfNull(weights);
 
-            int D = input.Length;
-            int D2 = weights.GetLength(0), E = weights.GetLength(1);
+            int d = input.Length;
+            int d2 = weights.GetLength(0), e = weights.GetLength(1);
 
-            if (D != D2)
+            if (d != d2)
                 throw new ArgumentException("Input dimension must match weight rows");
 
-            float[] result = new float[E];
+            float[] result = new float[e];
             await Task.Run(() =>
             {
-                for (int j = 0; j < E; j++)
+                for (int j = 0; j < e; j++)
                 {
                     float sum = 0;
-                    for (int i = 0; i < D; i++)
+                    for (int i = 0; i < d; i++)
                         sum += input[i] * weights[i, j];
                     result[j] = sum;
                 }
