@@ -2916,7 +2916,10 @@ Plans:
   3. Coverage report exported to `Metadata/dotcover-hardening-report/`
   4. Any gaps identified → loop back with additional tests until coverage confirmed
 **Report as**: "Stage 1 - Step 2 - Coyote + dotCover Audit Results"
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 102-01-PLAN.md — Coyote concurrency testing (1000 iterations)
+- [ ] 102-02-PLAN.md — dotCover coverage analysis + gap closure
 
 ### Phase 103: Stage 1, Step 4 — Profile (dotTrace + dotMemory)
 **Goal**: Verify fixes did not introduce allocation overhead, lock contention, or context-switching delays
