@@ -369,13 +369,13 @@ public sealed class TamperProofScalingManager : IScalableSubsystem, IBackpressur
     /// <returns>Recommended shard count.</returns>
     public int GetRecommendedShardCount(long dataSizeBytes)
     {
-        const long OneGigabyte = 1L * 1024 * 1024 * 1024;
-        const long HundredGigabytes = 100L * 1024 * 1024 * 1024;
+        const long oneGigabyte = 1L * 1024 * 1024 * 1024;
+        const long hundredGigabytes = 100L * 1024 * 1024 * 1024;
 
         return dataSizeBytes switch
         {
-            < OneGigabyte => _smallShardCount,
-            < HundredGigabytes => _mediumShardCount,
+            < oneGigabyte => _smallShardCount,
+            < hundredGigabytes => _mediumShardCount,
             _ => _largeShardCount
         };
     }

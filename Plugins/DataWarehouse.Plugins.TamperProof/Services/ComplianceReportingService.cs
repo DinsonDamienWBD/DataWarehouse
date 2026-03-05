@@ -523,8 +523,8 @@ public class ComplianceReportingService : IComplianceReportingService
             if (!block.RetentionExpiresAt.HasValue)
             {
                 foreach (var standard in standards.Where(s =>
-                    s == ComplianceStandard.SEC17a4 ||
-                    s == ComplianceStandard.FINRA))
+                    s == ComplianceStandard.Sec17A4 ||
+                    s == ComplianceStandard.Finra))
                 {
                     violations.Add(new ComplianceViolation(
                         BlockId: block.BlockId,
@@ -600,9 +600,9 @@ public class ComplianceReportingService : IComplianceReportingService
         if (!blockchainValid)
         {
             foreach (var standard in standards.Where(s =>
-                s == ComplianceStandard.SEC17a4 ||
-                s == ComplianceStandard.SOX ||
-                s == ComplianceStandard.FINRA))
+                s == ComplianceStandard.Sec17A4 ||
+                s == ComplianceStandard.Sox ||
+                s == ComplianceStandard.Finra))
             {
                 violations.Add(new ComplianceViolation(
                     BlockId: Guid.Empty,
@@ -618,8 +618,8 @@ public class ComplianceReportingService : IComplianceReportingService
         foreach (var block in _trackedBlocks.Values.Where(b => !b.HasBlockchainAnchor))
         {
             foreach (var standard in standards.Where(s =>
-                s == ComplianceStandard.SEC17a4 ||
-                s == ComplianceStandard.SOX))
+                s == ComplianceStandard.Sec17A4 ||
+                s == ComplianceStandard.Sox))
             {
                 violations.Add(new ComplianceViolation(
                     BlockId: block.BlockId,
@@ -822,8 +822,9 @@ public class ComplianceReportingService : IComplianceReportingService
 
             return (payload, signature);
         }
-        catch
+        catch (Exception ex)
         {
+            _logger?.LogWarning(ex, "Failed to parse attestation token — forensic investigation may be needed.");
             return (null, string.Empty);
         }
     }
@@ -914,22 +915,22 @@ public record ComplianceReportRequest(
 public enum ComplianceStandard
 {
     /// <summary>SEC Rule 17a-4 for financial records retention.</summary>
-    SEC17a4,
+    Sec17A4,
 
     /// <summary>HIPAA for healthcare data protection.</summary>
-    HIPAA,
+    Hipaa,
 
     /// <summary>GDPR for EU data protection.</summary>
-    GDPR,
+    Gdpr,
 
     /// <summary>Sarbanes-Oxley Act for financial reporting.</summary>
-    SOX,
+    Sox,
 
     /// <summary>PCI-DSS for payment card data security.</summary>
-    PCI_DSS,
+    PciDss,
 
     /// <summary>FINRA regulations for financial industry.</summary>
-    FINRA,
+    Finra,
 
     /// <summary>Custom compliance standard.</summary>
     Custom

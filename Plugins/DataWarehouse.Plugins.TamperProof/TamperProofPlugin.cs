@@ -6,6 +6,7 @@ using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.TamperProof;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
+using DataWarehouse.Plugins.TamperProof.Pipeline;
 using DataWarehouse.Plugins.TamperProof.Registration;
 using DataWarehouse.Plugins.TamperProof.Services;
 using DataWarehouse.Plugins.TamperProof.TimeLock;

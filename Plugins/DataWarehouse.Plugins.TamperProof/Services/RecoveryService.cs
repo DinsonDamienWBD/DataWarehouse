@@ -6,6 +6,7 @@ using DataWarehouse.SDK.Contracts.TamperProof;
 using DataWarehouse.SDK.Infrastructure;
 using Microsoft.Extensions.Logging;
 using System.Buffers;
+using DataWarehouse.Plugins.TamperProof.Pipeline;
 using PluginWormProvider = DataWarehouse.Plugins.TamperProof.IWormStorageProvider;
 
 namespace DataWarehouse.Plugins.TamperProof.Services;

@@ -43,6 +43,7 @@
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateRAID\DataWarehouse.Plugins.UltimateRAID.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateRTOSBridge\DataWarehouse.Plugins.UltimateRTOSBridge.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateStorage\DataWarehouse.Plugins.UltimateStorage.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.TamperProof\DataWarehouse.Plugins.TamperProof.csproj" />
     <ProjectReference Include="..\DataWarehouse.Shared\DataWarehouse.Shared.csproj" />
     <ProjectReference Include="..\DataWarehouse.CLI\DataWarehouse.CLI.csproj" />
     <ProjectReference Include="..\DataWarehouse.Launcher\DataWarehouse.Launcher.csproj" />

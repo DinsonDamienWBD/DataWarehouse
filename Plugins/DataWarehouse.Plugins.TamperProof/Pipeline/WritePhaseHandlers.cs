@@ -7,7 +7,7 @@ using DataWarehouse.Plugins.TamperProof.Services;
 using Microsoft.Extensions.Logging;
 using System.Buffers;
 
-namespace DataWarehouse.Plugins.TamperProof;
+namespace DataWarehouse.Plugins.TamperProof.Pipeline;
 
 /// <summary>
 /// Helper methods for each phase of the tamper-proof write pipeline.

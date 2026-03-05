@@ -2,6 +2,7 @@
 // DataWarehouse licenses this file under the MIT license.
 
 using DataWarehouse.SDK.Contracts.TamperProof;
+using DataWarehouse.Plugins.TamperProof.Pipeline;
 
 namespace DataWarehouse.Plugins.TamperProof;
 
