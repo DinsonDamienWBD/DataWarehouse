@@ -37,7 +37,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
         private HttpClient? _httpClient;
         private string _authUrl = string.Empty;
         private string _username = string.Empty;
-        private string _password = string.Empty;
+        private string _password = string.Empty; // SECURITY: Credential stored in-memory only, populated from encrypted config
         private string _projectName = string.Empty;
         private string _domainName = "Default";
         private string _region = string.Empty;

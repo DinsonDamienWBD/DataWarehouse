@@ -83,7 +83,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
         private string _region = "nyc3";
         private string _bucket = string.Empty;
         private string _accessKey = string.Empty;
-        private string _secretKey = string.Empty;
+        private string _secretKey = string.Empty; // SECURITY: Credential stored in-memory only, populated from encrypted config
         private bool _enableCdn = false;
         private string? _cdnEndpoint = null; // Optional: {space}.{region}.cdn.digitaloceanspaces.com
         private string? _customDomain = null; // Optional: custom domain for CDN
@@ -544,9 +544,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
             {
                 // P2-4140: Re-throw auth and network errors so callers see real failures instead
                 // of a misleading false (object-not-found) result for auth/connectivity problems.
-                if (ex is AmazonS3Exception s3ex &&
-                    (s3ex.StatusCode == System.Net.HttpStatusCode.Forbidden ||
-                     s3ex.StatusCode == System.Net.HttpStatusCode.Unauthorized))
+                if (ex is AmazonS3Exception s3Ex &&
+                    (s3Ex.StatusCode == System.Net.HttpStatusCode.Forbidden ||
+                     s3Ex.StatusCode == System.Net.HttpStatusCode.Unauthorized))
                     throw;
                 IncrementOperationCounter(StorageOperationType.Exists);
 

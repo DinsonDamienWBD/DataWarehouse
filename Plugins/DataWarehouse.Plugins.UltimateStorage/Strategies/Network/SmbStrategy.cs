@@ -36,7 +36,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         private string _shareName = string.Empty;
         private string _basePath = string.Empty;
         private string _username = string.Empty;
-        private string _password = string.Empty;
+        private string _password = string.Empty; // SECURITY: Credential stored in-memory only, populated from encrypted config
         private string _domain = string.Empty;
         private int _port = 445;
         private bool _useGuest = false;

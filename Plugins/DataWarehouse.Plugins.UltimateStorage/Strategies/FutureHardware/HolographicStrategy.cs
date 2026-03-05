@@ -44,6 +44,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.FutureHardware
     /// This strategy serves as an extension point for when holographic storage becomes commercially viable.
     /// All operations throw NotSupportedException until actual hardware is integrated.
     /// </summary>
+    /// <remarks>
+    /// All storage operations throw <see cref="NotSupportedException"/> because holographic
+    /// storage hardware is not yet commercially available.
+    /// </remarks>
     public class HolographicStrategy : UltimateStorageStrategyBase
     {
         public override string StrategyId => "holographic";

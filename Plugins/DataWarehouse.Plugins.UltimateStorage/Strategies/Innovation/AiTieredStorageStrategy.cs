@@ -115,7 +115,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 if (_enableAutoMigration)
                 {
                     _migrationTimer = new Timer(
-                        async _ => await PerformAutoMigrationAsync(CancellationToken.None),
+                        async _ => { try { await PerformAutoMigrationAsync(CancellationToken.None); } catch (Exception ex) { System.Diagnostics.Trace.TraceError($"Auto-migration failed: {ex.Message}"); } },
                         null,
                         TimeSpan.FromSeconds(_migrationCheckIntervalSeconds),
                         TimeSpan.FromSeconds(_migrationCheckIntervalSeconds));

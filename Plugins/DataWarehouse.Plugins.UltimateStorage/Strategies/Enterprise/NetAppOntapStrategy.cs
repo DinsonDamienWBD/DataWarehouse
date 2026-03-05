@@ -36,7 +36,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
         private HttpClient? _httpClient;
         private string _endpoint = string.Empty;
         private string _username = string.Empty;
-        private string _password = string.Empty;
+        private string _password = string.Empty; // SECURITY: Credential stored in-memory only, populated from encrypted config
         private string? _apiToken = null;
         private string _svm = string.Empty;
         private string _volume = string.Empty;

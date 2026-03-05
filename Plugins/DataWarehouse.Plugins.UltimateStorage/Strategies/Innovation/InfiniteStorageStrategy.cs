@@ -625,5 +625,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         }
 
         #endregion
+
+        protected override async ValueTask DisposeCoreAsync()
+        {
+            if (_healthCheckTimer != null)
+            {
+                await _healthCheckTimer.DisposeAsync().ConfigureAwait(false);
+                _healthCheckTimer = null;
+            }
+            await base.DisposeCoreAsync().ConfigureAwait(false);
+        }
     }
 }

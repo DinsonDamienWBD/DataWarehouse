@@ -118,15 +118,22 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
             _ = Task.Run(async () =>
             {
-                foreach (var region in targetRegions.Skip(1))
+                try
                 {
-                    var regionPath = Path.Combine(region.Path, key);
-                    var regionDir = Path.GetDirectoryName(regionPath);
-                    if (!string.IsNullOrEmpty(regionDir))
+                    foreach (var region in targetRegions.Skip(1))
                     {
-                        Directory.CreateDirectory(regionDir);
+                        var regionPath = Path.Combine(region.Path, key);
+                        var regionDir = Path.GetDirectoryName(regionPath);
+                        if (!string.IsNullOrEmpty(regionDir))
+                        {
+                            Directory.CreateDirectory(regionDir);
+                        }
+                        await File.WriteAllBytesAsync(regionPath, dataBytes);
                     }
-                    await File.WriteAllBytesAsync(regionPath, dataBytes);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Trace.TraceError($"Region replication failed: {ex.Message}");
                 }
             });
 

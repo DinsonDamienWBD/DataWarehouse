@@ -129,7 +129,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
             if (_autoSnapshot && !string.IsNullOrEmpty(_snapshotPath))
             {
                 _autoSnapshotTimer = new Timer(
-                    _ => _ = Task.Run(async () => await SaveSnapshotAsync(CancellationToken.None).ConfigureAwait(false)),
+                    _ => _ = Task.Run(async () => { try { await SaveSnapshotAsync(CancellationToken.None).ConfigureAwait(false); } catch (Exception ex) { System.Diagnostics.Trace.TraceError($"Auto-snapshot failed: {ex.Message}"); } }),
                     null,
                     _autoSnapshotInterval,
                     _autoSnapshotInterval);

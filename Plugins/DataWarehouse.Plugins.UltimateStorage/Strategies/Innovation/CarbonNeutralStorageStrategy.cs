@@ -43,7 +43,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private string _carbonOffsetApiUrl = string.Empty;
         private string _carbonOffsetApiKey = string.Empty;
         private readonly SemaphoreSlim _initLock = new(1, 1);
-        private static readonly HttpClient _offsetHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+        private static readonly HttpClient OffsetHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
         private readonly BoundedDictionary<string, ObjectCarbonMetadata> _carbonMetadata = new BoundedDictionary<string, ObjectCarbonMetadata>(1000);
         private double _totalEnergyConsumedKWh;
         private double _totalRenewableEnergyKWh;
@@ -208,14 +208,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             IncrementBytesStored(size);
 
             // Select greenest datacenter based on current renewable energy availability
-            var selectedDC = await SelectGreenestDatacenterAsync(size, ct);
+            var selectedDc = await SelectGreenestDatacenterAsync(size, ct);
 
             // Calculate energy consumption for this operation
-            var energyConsumed = CalculateEnergyConsumption(size, selectedDC, OperationType.Write);
+            var energyConsumed = CalculateEnergyConsumption(size, selectedDc, OperationType.Write);
 
             // Track carbon footprint
-            var carbonEmitted = CalculateCarbonEmission(energyConsumed, selectedDC);
-            var renewableEnergy = energyConsumed * (selectedDC.RenewablePercentage / 100.0);
+            var carbonEmitted = CalculateCarbonEmission(energyConsumed, selectedDc);
+            var renewableEnergy = energyConsumed * (selectedDc.RenewablePercentage / 100.0);
 
             // Update totals atomically using CompareExchange loop (double does not support Interlocked.Add)
             InterlockedAddDouble(ref _totalEnergyConsumedKWh, energyConsumed);
@@ -230,7 +230,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             }
 
             // Store to selected datacenter
-            var dcPath = GetDatacenterPath(selectedDC.Name);
+            var dcPath = GetDatacenterPath(selectedDc.Name);
             var filePath = Path.Combine(dcPath, GetSafeFileName(key));
             Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
             await File.WriteAllBytesAsync(filePath, fileData, ct);
@@ -240,7 +240,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             {
                 Key = key,
                 Size = size,
-                Datacenter = selectedDC.Name,
+                Datacenter = selectedDc.Name,
                 EnergyConsumedKWh = energyConsumed,
                 RenewableEnergyKWh = renewableEnergy,
                 CarbonEmittedKg = carbonEmitted,
@@ -486,9 +486,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private double CalculateEnergyConsumption(long dataSize, DatacenterInfo datacenter, OperationType operation)
         {
             // Energy model: kWh = (data_size_GB * operation_factor * PUE) / 1000
-            var dataSizeGB = dataSize / (1024.0 * 1024.0 * 1024.0);
+            var dataSizeGb = dataSize / (1024.0 * 1024.0 * 1024.0);
             var operationFactor = operation == OperationType.Write ? 0.0015 : 0.001; // Write uses more energy
-            var energyKWh = dataSizeGB * operationFactor * datacenter.PowerUsageEffectiveness;
+            var energyKWh = dataSizeGb * operationFactor * datacenter.PowerUsageEffectiveness;
 
             return energyKWh;
         }
@@ -535,7 +535,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
             try
             {
-                using var response = await _offsetHttpClient.SendAsync(httpRequest, ct).ConfigureAwait(false);
+                using var response = await OffsetHttpClient.SendAsync(httpRequest, ct).ConfigureAwait(false);
                 if (!response.IsSuccessStatusCode)
                 {
                     var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);

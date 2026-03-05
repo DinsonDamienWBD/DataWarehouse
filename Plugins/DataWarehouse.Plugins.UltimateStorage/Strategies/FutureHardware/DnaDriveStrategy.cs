@@ -43,6 +43,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.FutureHardware
     /// This strategy serves as an extension point for when DNA storage becomes commercially viable.
     /// All operations throw NotSupportedException until actual hardware/services are integrated.
     /// </summary>
+    /// <remarks>
+    /// All storage operations throw <see cref="NotSupportedException"/> because DNA synthesis
+    /// and sequencing hardware is not yet fast enough for general-purpose storage.
+    /// </remarks>
     public class DnaDriveStrategy : UltimateStorageStrategyBase
     {
         public override string StrategyId => "dna-drive";

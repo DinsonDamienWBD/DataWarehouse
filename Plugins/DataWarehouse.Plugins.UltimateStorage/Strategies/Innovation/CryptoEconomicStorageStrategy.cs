@@ -115,7 +115,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 if (_enableAutomaticChallenges)
                 {
                     _challengeTimer = new Timer(
-                        async _ => await PerformStorageProofChallengesAsync(CancellationToken.None),
+                        async _ => { try { await PerformStorageProofChallengesAsync(CancellationToken.None); } catch (Exception ex) { System.Diagnostics.Trace.TraceError($"Storage proof challenge failed: {ex.Message}"); } },
                         null,
                         TimeSpan.FromSeconds(_challengeIntervalSeconds),
                         TimeSpan.FromSeconds(_challengeIntervalSeconds));

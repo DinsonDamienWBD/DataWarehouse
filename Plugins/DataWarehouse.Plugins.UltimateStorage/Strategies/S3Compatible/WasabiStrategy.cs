@@ -87,7 +87,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
         private string _region = "us-east-1";
         private string _bucket = string.Empty;
         private string _accessKey = string.Empty;
-        private string _secretKey = string.Empty;
+        private string _secretKey = string.Empty; // SECURITY: Credential stored in-memory only, populated from encrypted config
         private bool _enableServerSideEncryption = true; // Wasabi supports SSE-S3 (AES-256)
         private bool _enableVersioning = false;
         private bool _enableObjectLock = false;

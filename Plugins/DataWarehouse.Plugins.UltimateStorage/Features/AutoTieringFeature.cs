@@ -57,7 +57,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
             // Start background tiering worker
             _tieringTimer = new Timer(
-                callback: async _ => await RunTieringCycleAsync(),
+                callback: async _ => { try { await RunTieringCycleAsync(); } catch (Exception ex) { System.Diagnostics.Trace.TraceError($"Tiering cycle failed: {ex.Message}"); } },
                 state: null,
                 dueTime: _tieringInterval,
                 period: _tieringInterval);

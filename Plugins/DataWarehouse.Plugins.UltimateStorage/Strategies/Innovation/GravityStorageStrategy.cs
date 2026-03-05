@@ -286,7 +286,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
                     if (dominantLocation.Key != locationId && _objectLocations.TryGetValue(key, out var locationInfo))
                     {
-                        _ = Task.Run(() => MigrateObjectAsync(key, locationInfo.PrimaryLocationId, dominantLocation.Key));
+                        _ = Task.Run(async () => { try { await MigrateObjectAsync(key, locationInfo.PrimaryLocationId, dominantLocation.Key); } catch (Exception ex) { System.Diagnostics.Trace.TraceError($"Object migration failed: {ex.Message}"); } });
                     }
                 }
             }

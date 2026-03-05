@@ -31,11 +31,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
     public class CostPredictiveStorageStrategy : UltimateStorageStrategyBase
     {
         private string _baseStoragePath = string.Empty;
-        private decimal _hotStorageCostPerGB = 0.023m;
-        private decimal _warmStorageCostPerGB = 0.0125m;
-        private decimal _coldStorageCostPerGB = 0.004m;
-        private decimal _archiveCostPerGB = 0.001m;
-        private decimal _retrievalCostPerGB = 0.01m;
+        private decimal _hotStorageCostPerGb = 0.023m;
+        private decimal _warmStorageCostPerGb = 0.0125m;
+        private decimal _coldStorageCostPerGb = 0.004m;
+        private decimal _archiveCostPerGb = 0.001m;
+        private decimal _retrievalCostPerGb = 0.01m;
         private decimal _monthlyBudget = 1000m;
         private bool _enableCostOptimization = true;
         private bool _enablePredictiveAnalytics = true;
@@ -76,11 +76,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 _baseStoragePath = GetConfiguration<string>("BaseStoragePath")
                     ?? throw new InvalidOperationException("BaseStoragePath is required");
 
-                _hotStorageCostPerGB = GetConfiguration("HotStorageCostPerGB", 0.023m);
-                _warmStorageCostPerGB = GetConfiguration("WarmStorageCostPerGB", 0.0125m);
-                _coldStorageCostPerGB = GetConfiguration("ColdStorageCostPerGB", 0.004m);
-                _archiveCostPerGB = GetConfiguration("ArchiveCostPerGB", 0.001m);
-                _retrievalCostPerGB = GetConfiguration("RetrievalCostPerGB", 0.01m);
+                _hotStorageCostPerGb = GetConfiguration("HotStorageCostPerGb", 0.023m);
+                _warmStorageCostPerGb = GetConfiguration("WarmStorageCostPerGb", 0.0125m);
+                _coldStorageCostPerGb = GetConfiguration("ColdStorageCostPerGb", 0.004m);
+                _archiveCostPerGb = GetConfiguration("ArchiveCostPerGb", 0.001m);
+                _retrievalCostPerGb = GetConfiguration("RetrievalCostPerGb", 0.01m);
                 _monthlyBudget = GetConfiguration("MonthlyBudget", 1000m);
                 _enableCostOptimization = GetConfiguration("EnableCostOptimization", true);
                 _enablePredictiveAnalytics = GetConfiguration("EnablePredictiveAnalytics", true);
@@ -323,14 +323,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
         private decimal CalculateStorageCost(long sizeBytes, StorageTier tier)
         {
-            var sizeGB = (decimal)sizeBytes / (1024m * 1024m * 1024m);
+            var sizeGb = (decimal)sizeBytes / (1024m * 1024m * 1024m);
             var monthlyCost = tier switch
             {
-                StorageTier.Hot => sizeGB * _hotStorageCostPerGB,
-                StorageTier.Warm => sizeGB * _warmStorageCostPerGB,
-                StorageTier.Cold => sizeGB * _coldStorageCostPerGB,
-                StorageTier.Archive => sizeGB * _archiveCostPerGB,
-                _ => sizeGB * _hotStorageCostPerGB
+                StorageTier.Hot => sizeGb * _hotStorageCostPerGb,
+                StorageTier.Warm => sizeGb * _warmStorageCostPerGb,
+                StorageTier.Cold => sizeGb * _coldStorageCostPerGb,
+                StorageTier.Archive => sizeGb * _archiveCostPerGb,
+                _ => sizeGb * _hotStorageCostPerGb
             };
 
             return monthlyCost / 30m;
@@ -343,8 +343,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 return 0m;
             }
 
-            var sizeGB = (decimal)sizeBytes / (1024m * 1024m * 1024m);
-            return sizeGB * _retrievalCostPerGB;
+            var sizeGb = (decimal)sizeBytes / (1024m * 1024m * 1024m);
+            return sizeGb * _retrievalCostPerGb;
         }
 
         private void RecordCost(decimal cost, string operation)
@@ -398,11 +398,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
                     if (daysSinceAccess > 30 && objectInfo.CurrentTier == StorageTier.Hot)
                     {
-                        _ = Task.Run(() => MigrateTierAsync(objectInfo.Key, StorageTier.Warm));
+                        _ = Task.Run(async () => { try { await MigrateTierAsync(objectInfo.Key, StorageTier.Warm); } catch (Exception ex) { System.Diagnostics.Trace.TraceError($"Tier migration failed: {ex.Message}"); } });
                     }
                     else if (daysSinceAccess > 90 && objectInfo.CurrentTier == StorageTier.Warm)
                     {
-                        _ = Task.Run(() => MigrateTierAsync(objectInfo.Key, StorageTier.Cold));
+                        _ = Task.Run(async () => { try { await MigrateTierAsync(objectInfo.Key, StorageTier.Cold); } catch (Exception ex) { System.Diagnostics.Trace.TraceError($"Tier migration failed: {ex.Message}"); } });
                     }
                 }
             }
@@ -476,5 +476,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         }
 
         #endregion
+
+        protected override async ValueTask DisposeCoreAsync()
+        {
+            if (_costAnalysisTimer != null)
+            {
+                await _costAnalysisTimer.DisposeAsync().ConfigureAwait(false);
+                _costAnalysisTimer = null;
+            }
+            await base.DisposeCoreAsync().ConfigureAwait(false);
+        }
     }
 }

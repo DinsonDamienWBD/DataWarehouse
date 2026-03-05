@@ -70,7 +70,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         private bool _tunePreferredStorageFile = true;
 
         // High availability metadata
-        private bool _enableMetadataHA = false;
+        private bool _enableMetadataHa = false;
         private List<string> _metadataServers = new();
         private string _metadataBuddyGroupId = string.Empty;
 
@@ -208,8 +208,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             _tunePreferredStorageFile = GetConfiguration<bool>("TunePreferredStorageFile", true);
 
             // High availability metadata
-            _enableMetadataHA = GetConfiguration<bool>("EnableMetadataHA", false);
-            if (_enableMetadataHA)
+            _enableMetadataHa = GetConfiguration<bool>("EnableMetadataHA", false);
+            if (_enableMetadataHa)
             {
                 var metaServers = GetConfiguration<string>("MetadataServers", string.Empty);
                 if (!string.IsNullOrWhiteSpace(metaServers))
@@ -1131,17 +1131,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// <summary>Invokes beegfs-ctl and returns stdout as a string; throws on non-zero exit.</summary>
         private static async Task<string> RunBeegfsCtlWithOutputAsync(string arguments, CancellationToken ct)
         {
-            using var process = new System.Diagnostics.Process
+            using var process = new System.Diagnostics.Process();
+            process.StartInfo = new System.Diagnostics.ProcessStartInfo
             {
-                StartInfo = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "beegfs-ctl",
-                    Arguments = arguments,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                }
+                FileName = "beegfs-ctl",
+                Arguments = arguments,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
             };
             process.Start();
             var stdout = await process.StandardOutput.ReadToEndAsync(ct).ConfigureAwait(false);
@@ -1179,17 +1177,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// <summary>Runs an external process and throws <see cref="InvalidOperationException"/> on failure.</summary>
         private static async Task RunCommandAsync(string command, string arguments, CancellationToken ct)
         {
-            using var process = new System.Diagnostics.Process
+            using var process = new System.Diagnostics.Process();
+            process.StartInfo = new System.Diagnostics.ProcessStartInfo
             {
-                StartInfo = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = command,
-                    Arguments = arguments,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                }
+                FileName = command,
+                Arguments = arguments,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
             };
             process.Start();
             await process.WaitForExitAsync(ct).ConfigureAwait(false);

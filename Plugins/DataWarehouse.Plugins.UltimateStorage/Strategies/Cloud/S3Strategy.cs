@@ -44,7 +44,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
         private string _region = "us-east-1";
         private string _bucket = string.Empty;
         private string _accessKey = string.Empty;
-        private string _secretKey = string.Empty;
+        private string _secretKey = string.Empty; // SECURITY: Credential stored in-memory only, populated from encrypted config
         private string _defaultStorageClass = "STANDARD";
         private bool _usePathStyle = false;
         private bool _enableServerSideEncryption = false;

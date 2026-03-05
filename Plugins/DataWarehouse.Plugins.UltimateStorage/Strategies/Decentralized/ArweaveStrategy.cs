@@ -49,6 +49,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
         private bool _enableTags = true; // Enable Arweave tags for metadata
         private bool _compressData = false; // Compress data before upload
         private string _contentType = "application/octet-stream";
+        internal string ContentType => _contentType;
 
         // Local state tracking (permanent storage means no deletion).
         // ConcurrentDictionary provides thread-safe access without a separate lock.

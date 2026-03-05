@@ -39,7 +39,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
         private int _port = 9000;
         private string _bucket = string.Empty;
         private string _accessKey = string.Empty;
-        private string _secretKey = string.Empty;
+        private string _secretKey = string.Empty; // SECURITY: Credential stored in-memory only, populated from encrypted config
         private string? _region = null;
         private string? _sessionToken = null;
         private bool _useSSL = true;

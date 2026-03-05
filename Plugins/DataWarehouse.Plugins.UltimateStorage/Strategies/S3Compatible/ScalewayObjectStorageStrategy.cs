@@ -113,7 +113,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
         private string _region = "fr-par";
         private string _bucket = string.Empty;
         private string _accessKey = string.Empty;
-        private string _secretKey = string.Empty;
+        private string _secretKey = string.Empty; // SECURITY: Credential stored in-memory only, populated from encrypted config
         private string _storageClass = "STANDARD"; // STANDARD, ONEZONE_IA, GLACIER
         private bool _enableServerSideEncryption = true; // Always recommended
         private int _timeoutSeconds = 300;

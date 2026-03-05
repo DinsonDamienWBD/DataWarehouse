@@ -49,6 +49,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.FutureHardware
     /// This strategy serves as an extension point for when 5D crystal storage becomes commercially viable.
     /// All operations throw NotSupportedException until actual hardware is integrated.
     /// </summary>
+    /// <remarks>
+    /// All storage operations throw <see cref="NotSupportedException"/> because the required
+    /// femtosecond laser hardware is not yet commercially available.
+    /// </remarks>
     public class CrystalStorageStrategy : UltimateStorageStrategyBase
     {
         public override string StrategyId => "crystal-5d";

@@ -332,11 +332,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
                     // Prune history older than 90 days and cap total entries at 100,000
                     // to prevent unbounded memory growth on long-running processes
-                    const int MaxHistoryEntries = 100_000;
-                    if (_costHistory.Count > MaxHistoryEntries)
+                    const int maxHistoryEntries = 100_000;
+                    if (_costHistory.Count > maxHistoryEntries)
                     {
                         var cutoff = DateTime.UtcNow.AddDays(-90);
-                        var removeCount = _costHistory.Count - MaxHistoryEntries;
+                        var removeCount = _costHistory.Count - maxHistoryEntries;
                         // Remove oldest entries (list is append-only so oldest are at start)
                         _costHistory.RemoveRange(0, Math.Min(removeCount, _costHistory.Count));
                         // Also drop any remaining entries older than 90 days
@@ -474,48 +474,48 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             ConfigureBackendCost("filesystem", new BackendCostConfig
             {
                 BackendId = "filesystem",
-                CostPerGBMonthly = 0.01m,
+                CostPerGbMonthly = 0.01m,
                 CostPerWriteOperation = 0.0001m,
                 CostPerReadOperation = 0.0001m,
                 CostPerDeleteOperation = 0.0001m,
                 CostPerListOperation = 0.0001m,
-                CostPerGBEgress = 0m
+                CostPerGbEgress = 0m
             });
 
             // S3 Standard - moderate cost, high performance
             ConfigureBackendCost("s3-standard", new BackendCostConfig
             {
                 BackendId = "s3-standard",
-                CostPerGBMonthly = 0.023m,
+                CostPerGbMonthly = 0.023m,
                 CostPerWriteOperation = 0.005m / 1000,
                 CostPerReadOperation = 0.0004m / 1000,
                 CostPerDeleteOperation = 0m,
                 CostPerListOperation = 0.005m / 1000,
-                CostPerGBEgress = 0.09m
+                CostPerGbEgress = 0.09m
             });
 
             // S3 Glacier - very cheap storage, expensive retrieval
             ConfigureBackendCost("s3-glacier", new BackendCostConfig
             {
                 BackendId = "s3-glacier",
-                CostPerGBMonthly = 0.004m,
+                CostPerGbMonthly = 0.004m,
                 CostPerWriteOperation = 0.05m / 1000,
                 CostPerReadOperation = 0.10m,
                 CostPerDeleteOperation = 0m,
                 CostPerListOperation = 0.05m / 1000,
-                CostPerGBEgress = 0.09m
+                CostPerGbEgress = 0.09m
             });
 
             // Azure Blob (Cool tier)
             ConfigureBackendCost("azure-cool", new BackendCostConfig
             {
                 BackendId = "azure-cool",
-                CostPerGBMonthly = 0.01m,
+                CostPerGbMonthly = 0.01m,
                 CostPerWriteOperation = 0.10m / 10000,
                 CostPerReadOperation = 0.01m / 10000,
                 CostPerDeleteOperation = 0m,
                 CostPerListOperation = 0.10m / 10000,
-                CostPerGBEgress = 0.087m
+                CostPerGbEgress = 0.087m
             });
         }
 
@@ -542,14 +542,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
         private decimal CalculateStorageCost(long dataSizeBytes, BackendCostConfig config)
         {
-            var sizeGB = dataSizeBytes / (1024.0m * 1024.0m * 1024.0m);
-            return sizeGB * config.CostPerGBMonthly;
+            var sizeGb = dataSizeBytes / (1024.0m * 1024.0m * 1024.0m);
+            return sizeGb * config.CostPerGbMonthly;
         }
 
         private decimal CalculateEgressCost(long dataSizeBytes, BackendCostConfig config)
         {
-            var sizeGB = dataSizeBytes / (1024.0m * 1024.0m * 1024.0m);
-            return sizeGB * config.CostPerGBEgress;
+            var sizeGb = dataSizeBytes / (1024.0m * 1024.0m * 1024.0m);
+            return sizeGb * config.CostPerGbEgress;
         }
 
         private decimal CalculateOperationCost(
@@ -605,7 +605,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         public string BackendId { get; set; } = string.Empty;
 
         /// <summary>Cost per GB per month for storage.</summary>
-        public decimal CostPerGBMonthly { get; init; }
+        public decimal CostPerGbMonthly { get; init; }
 
         /// <summary>Cost per write operation.</summary>
         public decimal CostPerWriteOperation { get; init; }
@@ -620,7 +620,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         public decimal CostPerListOperation { get; init; }
 
         /// <summary>Cost per GB of data egress (outbound transfer).</summary>
-        public decimal CostPerGBEgress { get; init; }
+        public decimal CostPerGbEgress { get; init; }
     }
 
     /// <summary>

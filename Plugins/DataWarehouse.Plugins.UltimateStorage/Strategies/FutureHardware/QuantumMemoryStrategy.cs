@@ -48,6 +48,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.FutureHardware
     /// NOTE: Current quantum systems have extremely short coherence times (microseconds to milliseconds),
     /// making them impractical for persistent storage. This represents a far-future technology.
     /// </summary>
+    /// <remarks>
+    /// All storage operations throw <see cref="NotSupportedException"/> because quantum memory
+    /// coherence times are too short for persistent storage.
+    /// </remarks>
     public class QuantumMemoryStrategy : UltimateStorageStrategyBase
     {
         public override string StrategyId => "quantum-memory";

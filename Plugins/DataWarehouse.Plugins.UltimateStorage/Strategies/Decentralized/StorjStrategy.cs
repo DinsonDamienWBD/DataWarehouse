@@ -34,7 +34,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
         private string _bucket = string.Empty;
         private string _accessGrant = string.Empty;
         private string _accessKey = string.Empty;
-        private string _secretKey = string.Empty;
+        private string _secretKey = string.Empty; // SECURITY: Credential stored in-memory only, populated from encrypted config
 #pragma warning disable CS0414 // Field is assigned but its value is never used - Reserved for future access grant implementation
         private bool _useAccessGrant = true; // Prefer access grants over access keys
 #pragma warning restore CS0414

@@ -18,11 +18,15 @@ public sealed class QuorumConsistencyManager
     private long _totalWrites;
     private long _readRepairs;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="QuorumConsistencyManager"/> class
+    /// with configurable timeout and optional local region for LOCAL_QUORUM operations.
+    /// </summary>
     /// <param name="defaultTimeout">Per-replica RPC timeout.</param>
     /// <param name="localRegion">
     /// The local region identifier used for LOCAL_QUORUM replica selection.
     /// When null, LOCAL_QUORUM falls back to the region of the first registered replica
-    /// (non-deterministic — prefer always supplying an explicit value).
+    /// (non-deterministic -- prefer always supplying an explicit value).
     /// </param>
     public QuorumConsistencyManager(TimeSpan? defaultTimeout = null, string? localRegion = null)
     {

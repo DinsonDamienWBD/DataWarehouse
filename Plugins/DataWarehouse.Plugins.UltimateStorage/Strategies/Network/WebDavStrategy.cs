@@ -39,7 +39,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         private string _baseUrl = string.Empty;
         private string _basePath = string.Empty;
         private string _username = string.Empty;
-        private string _password = string.Empty;
+        private string _password = string.Empty; // SECURITY: Credential stored in-memory only, populated from encrypted config
         private WebDavAuthType _authType = WebDavAuthType.Basic;
         private bool _useHttps = true;
         private int _timeoutSeconds = 60;

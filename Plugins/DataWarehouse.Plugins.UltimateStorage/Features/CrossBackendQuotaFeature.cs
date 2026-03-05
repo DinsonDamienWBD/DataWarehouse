@@ -117,9 +117,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
             profile.SoftQuotaBytes = softQuotaBytes;
             profile.HardQuotaBytes = hardQuotaBytes;
-            profile.PerBackendLimits = perBackendLimits != null
-                ? new BoundedDictionary<string, long>(1000)
-                : new BoundedDictionary<string, long>(1000);
+            var limits = new BoundedDictionary<string, long>(1000);
+            if (perBackendLimits != null)
+            {
+                foreach (var kvp in perBackendLimits)
+                    limits[kvp.Key] = kvp.Value;
+            }
+            profile.PerBackendLimits = limits;
             profile.LastModified = DateTime.UtcNow;
         }
 

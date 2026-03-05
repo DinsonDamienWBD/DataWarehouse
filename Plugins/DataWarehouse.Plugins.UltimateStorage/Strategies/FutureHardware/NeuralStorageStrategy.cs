@@ -65,6 +65,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.FutureHardware
     ///
     /// NOTE: This represents highly speculative far-future technology with significant ethical implications.
     /// </summary>
+    /// <remarks>
+    /// All storage operations throw <see cref="NotSupportedException"/> because neural storage
+    /// hardware is not yet technologically viable.
+    /// </remarks>
     public class NeuralStorageStrategy : UltimateStorageStrategyBase
     {
         public override string StrategyId => "neural-bci";

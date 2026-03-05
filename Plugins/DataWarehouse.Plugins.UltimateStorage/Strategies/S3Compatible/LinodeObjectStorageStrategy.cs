@@ -83,7 +83,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
         private string _cluster = "us-east-1";
         private string _bucket = string.Empty;
         private string _accessKey = string.Empty;
-        private string _secretKey = string.Empty;
+        private string _secretKey = string.Empty; // SECURITY: Credential stored in-memory only, populated from encrypted config
         private bool _enableServerSideEncryption = true; // Always recommended for Linode
         private int _timeoutSeconds = 300;
         private long _multipartThresholdBytes = 100 * 1024 * 1024; // 100MB

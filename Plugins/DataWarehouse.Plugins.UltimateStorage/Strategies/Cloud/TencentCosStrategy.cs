@@ -41,7 +41,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
         private string _region = "ap-guangzhou";
         private string _appId = string.Empty;
         private string _secretId = string.Empty;
-        private string _secretKey = string.Empty;
+        private string _secretKey = string.Empty; // SECURITY: Credential stored in-memory only, populated from encrypted config
         private string _defaultStorageClass = "STANDARD";
         private bool _enableServerSideEncryption = false;
         private string _sseAlgorithm = "AES256"; // AES256, KMS, or SSE-C

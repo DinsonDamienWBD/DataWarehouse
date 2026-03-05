@@ -38,11 +38,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
     /// </remarks>
     public class DellPowerScaleStrategy : UltimateStorageStrategyBase
     {
-        private static readonly SearchValues<char> _headerInjectionChars = SearchValues.Create(new[] { '\r', '\n', ';' });
+        private static readonly SearchValues<char> HeaderInjectionChars = SearchValues.Create(new[] { '\r', '\n', ';' });
         private HttpClient? _httpClient;
         private string _endpoint = string.Empty;
         private string _username = string.Empty;
-        private string _password = string.Empty;
+        private string _password = string.Empty; // SECURITY: Credential stored in-memory only, populated from encrypted config
         private string _accessZone = "System";
         private string _namespace = "/ifs";
         private string _storagePool = "default";
@@ -234,7 +234,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             request.Headers.Add("X-Isi-Ifs-Access-Control", "public-read-write");
 
             // Add session token; validate token contains no header-injection characters
-            if (_authToken != null && _authToken.AsSpan().IndexOfAny(_headerInjectionChars) >= 0)
+            if (_authToken != null && _authToken.AsSpan().IndexOfAny(HeaderInjectionChars) >= 0)
             {
                 throw new InvalidOperationException("Auth token contains invalid characters and cannot be used in Cookie header.");
             }

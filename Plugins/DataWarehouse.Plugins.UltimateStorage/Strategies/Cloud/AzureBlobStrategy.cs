@@ -53,10 +53,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
         private int _timeoutSeconds = 300;
         private bool _enableVersioning = false;
         private bool _enableSoftDelete = false;
+        internal bool EnableSoftDelete => _enableSoftDelete;
         private int _softDeleteRetentionDays = 7;
+        internal int SoftDeleteRetentionDays => _softDeleteRetentionDays;
         private bool _useCustomerProvidedKey = false;
         private byte[]? _customerProvidedKey;
-        private string? _customerProvidedKeySHA256;
+        private string? _customerProvidedKeySha256;
         private bool _autoTierTransition = false;
         private bool _useDefaultAzureCredential = false;
         private readonly SemaphoreSlim _initLock = new(1, 1);
@@ -118,7 +120,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 {
                     _useCustomerProvidedKey = true;
                     _customerProvidedKey = Convert.FromBase64String(cpekBase64);
-                    _customerProvidedKeySHA256 = Convert.ToBase64String(SHA256.HashData(_customerProvidedKey));
+                    _customerProvidedKeySha256 = Convert.ToBase64String(SHA256.HashData(_customerProvidedKey));
                 }
 
                 if (_useNativeClient)
@@ -696,7 +698,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             if (_useCustomerProvidedKey && _customerProvidedKey != null)
             {
                 request.Headers.TryAddWithoutValidation("x-ms-encryption-key", Convert.ToBase64String(_customerProvidedKey));
-                request.Headers.TryAddWithoutValidation("x-ms-encryption-key-sha256", _customerProvidedKeySHA256);
+                request.Headers.TryAddWithoutValidation("x-ms-encryption-key-sha256", _customerProvidedKeySha256);
                 request.Headers.TryAddWithoutValidation("x-ms-encryption-algorithm", "AES256");
             }
 
@@ -732,7 +734,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             if (_useCustomerProvidedKey && _customerProvidedKey != null)
             {
                 request.Headers.TryAddWithoutValidation("x-ms-encryption-key", Convert.ToBase64String(_customerProvidedKey));
-                request.Headers.TryAddWithoutValidation("x-ms-encryption-key-sha256", _customerProvidedKeySHA256);
+                request.Headers.TryAddWithoutValidation("x-ms-encryption-key-sha256", _customerProvidedKeySha256);
                 request.Headers.TryAddWithoutValidation("x-ms-encryption-algorithm", "AES256");
             }
 
@@ -873,7 +875,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             if (_useCustomerProvidedKey && _customerProvidedKey != null)
             {
                 request.Headers.TryAddWithoutValidation("x-ms-encryption-key", Convert.ToBase64String(_customerProvidedKey));
-                request.Headers.TryAddWithoutValidation("x-ms-encryption-key-sha256", _customerProvidedKeySHA256);
+                request.Headers.TryAddWithoutValidation("x-ms-encryption-key-sha256", _customerProvidedKeySha256);
                 request.Headers.TryAddWithoutValidation("x-ms-encryption-algorithm", "AES256");
             }
 
@@ -1038,8 +1040,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
         {
             var startTag = $"<{tag}>";
             var endTag = $"</{tag}>";
-            var startIndex = xml.IndexOf(startTag);
-            var endIndex = xml.IndexOf(endTag);
+            var startIndex = xml.IndexOf(startTag, StringComparison.Ordinal);
+            var endIndex = xml.IndexOf(endTag, StringComparison.Ordinal);
 
             if (startIndex >= 0 && endIndex > startIndex)
             {

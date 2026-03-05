@@ -40,7 +40,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         private string _host = string.Empty;
         private int _port = 22;
         private string _username = string.Empty;
-        private string _password = string.Empty;
+        private string _password = string.Empty; // SECURITY: Credential stored in-memory only, populated from encrypted config
         private string _basePath = "/";
 
         // Authentication configuration

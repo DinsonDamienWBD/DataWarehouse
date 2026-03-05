@@ -44,7 +44,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
         private bool _enableWorm = true;
         private bool _enableMultiSession = true;
         private bool _enableWriteVerification = true;
-        private BluRayDiscType _discType = BluRayDiscType.BDR;
+        private BluRayDiscType _discType = BluRayDiscType.Bdr;
         private int _burnSpeedKbps = 36000; // 36 Mbps (4x speed for BD-R)
         private int _maxConcurrentDrives = 1;
         private long _discCapacityBytes = 25L * 1024 * 1024 * 1024; // 25GB for single-layer BD-R
@@ -110,7 +110,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             _enableWorm = GetConfiguration<bool>("EnableWorm", true);
             _enableMultiSession = GetConfiguration<bool>("EnableMultiSession", true);
             _enableWriteVerification = GetConfiguration<bool>("EnableWriteVerification", true);
-            _discType = GetConfiguration<BluRayDiscType>("DiscType", BluRayDiscType.BDR);
+            _discType = GetConfiguration<BluRayDiscType>("DiscType", BluRayDiscType.Bdr);
             _burnSpeedKbps = GetConfiguration<int>("BurnSpeedKbps", 36000);
             _maxConcurrentDrives = GetConfiguration<int>("MaxConcurrentDrives", 1);
             _mountTimeout = TimeSpan.FromSeconds(GetConfiguration<int>("MountTimeoutSeconds", 120));
@@ -305,7 +305,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             try
             {
                 // BD-RE supports rewriting - can delete and reclaim space
-                if (_discType == BluRayDiscType.BDRE)
+                if (_discType == BluRayDiscType.Bdre)
                 {
                     if (_currentLoadedDisc != entry.DiscVolumeId)
                     {
@@ -602,7 +602,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                             IsLoaded = false,
                             UsedCapacity = 0,
                             ObjectCount = 0,
-                            IsWorm = _discType != BluRayDiscType.BDRE,
+                            IsWorm = _discType != BluRayDiscType.Bdre,
                             DiscNumber = slot.SlotNumber,
                             LastWriteTime = null
                         };
@@ -766,7 +766,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
         {
             if (OperatingSystem.IsWindows())
             {
-                // On Windows, eject using IOCTL_STORAGE_EJECT_MEDIA or similar
+                // On Windows, eject using IoctlStorageEjectMedia or similar
                 await Task.Delay(TimeSpan.FromSeconds(2), ct);
             }
             else if (OperatingSystem.IsLinux())
@@ -876,13 +876,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             out uint lpBytesReturned,
             IntPtr lpOverlapped);
 
-        private const uint GENERIC_READ = 0x80000000;
-        private const uint GENERIC_WRITE = 0x40000000;
-        private const uint OPEN_EXISTING = 3;
-        private const uint FILE_ATTRIBUTE_NORMAL = 0x80;
-        private const uint IOCTL_SCSI_PASS_THROUGH_DIRECT = 0x4D014;
-        private const uint IOCTL_STORAGE_EJECT_MEDIA = 0x2D4808;
-        private static readonly IntPtr INVALID_HANDLE_VALUE = new IntPtr(-1);
+        private const uint GenericRead = 0x80000000;
+        private const uint GenericWrite = 0x40000000;
+        private const uint OpenExisting = 3;
+        private const uint FileAttributeNormal = 0x80;
+        private const uint IoctlScsiPassThroughDirect = 0x4D014;
+        private const uint IoctlStorageEjectMedia = 0x2D4808;
+        private static readonly IntPtr InvalidHandleValue = new IntPtr(-1);
 
         private async Task OpenDriveAsync(CancellationToken ct)
         {
@@ -890,14 +890,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             {
                 _driveHandle = CreateFile(
                     _driveDevice,
-                    GENERIC_READ | GENERIC_WRITE,
+                    GenericRead | GenericWrite,
                     0,
                     IntPtr.Zero,
-                    OPEN_EXISTING,
-                    FILE_ATTRIBUTE_NORMAL,
+                    OpenExisting,
+                    FileAttributeNormal,
                     IntPtr.Zero);
 
-                if (_driveHandle == INVALID_HANDLE_VALUE)
+                if (_driveHandle == InvalidHandleValue)
                 {
                     var error = Marshal.GetLastWin32Error();
                     throw new InvalidOperationException($"Failed to open drive '{_driveDevice}'. Error code: {error}");
@@ -962,8 +962,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 // Try to open drive briefly
                 if (OperatingSystem.IsWindows())
                 {
-                    var handle = CreateFile(_driveDevice, GENERIC_READ, 0, IntPtr.Zero, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, IntPtr.Zero);
-                    if (handle == INVALID_HANDLE_VALUE)
+                    var handle = CreateFile(_driveDevice, GenericRead, 0, IntPtr.Zero, OpenExisting, FileAttributeNormal, IntPtr.Zero);
+                    if (handle == InvalidHandleValue)
                     {
                         return false;
                     }
@@ -1010,11 +1010,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
         {
             return discType switch
             {
-                BluRayDiscType.BDR => 25L * 1024 * 1024 * 1024,       // 25GB single-layer
-                BluRayDiscType.BDRDL => 50L * 1024 * 1024 * 1024,      // 50GB dual-layer
-                BluRayDiscType.BDRXL => 128L * 1024 * 1024 * 1024,     // 128GB quad-layer
-                BluRayDiscType.BDRE => 25L * 1024 * 1024 * 1024,       // 25GB single-layer rewritable
-                BluRayDiscType.BDREDL => 50L * 1024 * 1024 * 1024,     // 50GB dual-layer rewritable
+                BluRayDiscType.Bdr => 25L * 1024 * 1024 * 1024,       // 25GB single-layer
+                BluRayDiscType.Bdrdl => 50L * 1024 * 1024 * 1024,      // 50GB dual-layer
+                BluRayDiscType.Bdrxl => 128L * 1024 * 1024 * 1024,     // 128GB quad-layer
+                BluRayDiscType.Bdre => 25L * 1024 * 1024 * 1024,       // 25GB single-layer rewritable
+                BluRayDiscType.Bdredl => 50L * 1024 * 1024 * 1024,     // 50GB dual-layer rewritable
                 BluRayDiscType.ArchivalDisc => 300L * 1024 * 1024 * 1024, // 300GB archival disc
                 _ => 25L * 1024 * 1024 * 1024                          // Default to single-layer
             };
@@ -1154,19 +1154,19 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
     public enum BluRayDiscType
     {
         /// <summary>BD-R single-layer (25GB) - write-once.</summary>
-        BDR = 0,
+        Bdr = 0,
 
         /// <summary>BD-R dual-layer (50GB) - write-once.</summary>
-        BDRDL = 1,
+        Bdrdl = 1,
 
         /// <summary>BD-R XL quad-layer (128GB) - write-once.</summary>
-        BDRXL = 2,
+        Bdrxl = 2,
 
         /// <summary>BD-RE single-layer (25GB) - rewritable.</summary>
-        BDRE = 3,
+        Bdre = 3,
 
         /// <summary>BD-RE dual-layer (50GB) - rewritable.</summary>
-        BDREDL = 4,
+        Bdredl = 4,
 
         /// <summary>Archival Disc (300GB-1TB) - long-term storage.</summary>
         ArchivalDisc = 5

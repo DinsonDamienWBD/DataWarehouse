@@ -45,7 +45,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         private string _volumeName = string.Empty;
         private string _basePath = string.Empty;
         private string _username = string.Empty;
-        private string _password = string.Empty;
+        private string _password = string.Empty; // SECURITY: Credential stored in-memory only, populated from encrypted config
         private AfpAuthMethod _authMethod = AfpAuthMethod.CleartextPassword;
         private bool _allowCleartextPassword = false;
         private int _timeoutSeconds = 30;
@@ -121,10 +121,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             _authMethod = authMethodStr.ToUpperInvariant() switch
             {
                 "CLEARTEXT" or "CLEARTEXTPASSWORD" => AfpAuthMethod.CleartextPassword,
-                "DHX" => AfpAuthMethod.DHX,
-                "DHX2" => AfpAuthMethod.DHX2,
+                "DHX" => AfpAuthMethod.Dhx,
+                "DHX2" => AfpAuthMethod.Dhx2,
                 "KERBEROS" => AfpAuthMethod.Kerberos,
-                _ => AfpAuthMethod.DHX2
+                _ => AfpAuthMethod.Dhx2
             };
 
             // Normalize base path
@@ -307,7 +307,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             // DSI OpenSession command
             var request = new byte[16];
             request[0] = 0x02; // DSI flags: request
-            request[1] = (byte)DsiCommand.DSIOpenSession;
+            request[1] = (byte)DsiCommand.DsiOpenSession;
             BinaryPrimitives.WriteUInt16BigEndian(request.AsSpan(2), _requestId++);
             BinaryPrimitives.WriteUInt32BigEndian(request.AsSpan(4), 0); // Data offset
             BinaryPrimitives.WriteUInt32BigEndian(request.AsSpan(8), 0); // Total data length
@@ -336,7 +336,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         {
             var request = new byte[16];
             request[0] = 0x02; // DSI flags: request
-            request[1] = (byte)DsiCommand.DSICloseSession;
+            request[1] = (byte)DsiCommand.DsiCloseSession;
             BinaryPrimitives.WriteUInt16BigEndian(request.AsSpan(2), _requestId++);
 
             await _networkStream!.WriteAsync(request, 0, request.Length, ct);
@@ -350,7 +350,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             // Build DSI header
             var dsiHeader = new byte[16];
             dsiHeader[0] = 0x02; // DSI flags: request
-            dsiHeader[1] = (byte)DsiCommand.DSICommand;
+            dsiHeader[1] = (byte)DsiCommand.DsiCmd;
             BinaryPrimitives.WriteUInt16BigEndian(dsiHeader.AsSpan(2), _requestId++);
             BinaryPrimitives.WriteUInt32BigEndian(dsiHeader.AsSpan(4), 0); // Data offset
             BinaryPrimitives.WriteUInt32BigEndian(dsiHeader.AsSpan(8), (uint)afpCommand.Length); // Total data length
@@ -412,7 +412,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         private async Task AfpGetSrvrParmsAsync(CancellationToken ct)
         {
             var command = new byte[1];
-            command[0] = (byte)AfpCommand.FPGetSrvrParms;
+            command[0] = (byte)AfpCommand.FpGetSrvrParms;
 
             var response = await SendDsiCommandAsync(command, ct);
             // Parse server parameters (skipped for brevity)
@@ -427,7 +427,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             using var bw = new BinaryWriter(ms);
 
             // Write command
-            bw.Write((byte)AfpCommand.FPLogin);
+            bw.Write((byte)AfpCommand.FpLogin);
 
             // Write AFP version string
             var afpVersion = "AFP3.4";
@@ -437,8 +437,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             // Write UAM (User Authentication Method)
             string uam = _authMethod switch
             {
-                AfpAuthMethod.DHX => "DHX",
-                AfpAuthMethod.DHX2 => "DHX2",
+                AfpAuthMethod.Dhx => "DHX",
+                AfpAuthMethod.Dhx2 => "DHX2",
                 AfpAuthMethod.Kerberos => "Client Krb v2",
                 _ => "Cleartxt Passwrd"
             };
@@ -484,7 +484,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         private async Task AfpLogoutAsync(CancellationToken ct)
         {
             var command = new byte[1];
-            command[0] = (byte)AfpCommand.FPLogout;
+            command[0] = (byte)AfpCommand.FpLogout;
             await SendDsiCommandAsync(command, ct);
         }
 
@@ -496,7 +496,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             using var ms = new MemoryStream(65536);
             using var bw = new BinaryWriter(ms);
 
-            bw.Write((byte)AfpCommand.FPOpenVol);
+            bw.Write((byte)AfpCommand.FpOpenVol);
             bw.Write((byte)0); // Pad
             bw.Write((ushort)0); // Bitmap (none)
 
@@ -523,7 +523,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             using var ms = new MemoryStream(65536);
             using var bw = new BinaryWriter(ms);
 
-            bw.Write((byte)AfpCommand.FPCloseVol);
+            bw.Write((byte)AfpCommand.FpCloseVol);
             bw.Write((byte)0); // Pad
             WriteBigEndian(bw, _volumeId);
 
@@ -539,7 +539,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             using var ms = new MemoryStream(65536);
             using var bw = new BinaryWriter(ms);
 
-            bw.Write((byte)AfpCommand.FPCreateFile);
+            bw.Write((byte)AfpCommand.FpCreateFile);
             bw.Write((byte)0); // Flag (soft create)
             WriteBigEndian(bw, _volumeId);
             WriteBigEndian(bw, directoryId);
@@ -565,7 +565,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             using var ms = new MemoryStream(65536);
             using var bw = new BinaryWriter(ms);
 
-            bw.Write((byte)(forkType == AfpForkType.DataFork ? AfpCommand.FPOpenFork : AfpCommand.FPOpenFork));
+            bw.Write((byte)AfpCommand.FpOpenFork);
             bw.Write((byte)(forkType == AfpForkType.DataFork ? 0x00 : 0x80)); // Fork flag
             WriteBigEndian(bw, _volumeId);
             WriteBigEndian(bw, directoryId);
@@ -584,7 +584,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             // Parse fork reference number
             if (response.Length >= 2)
             {
-                return BinaryPrimitives.ReadUInt16BigEndian(response.AsSpan(0));
+                var refNum = BinaryPrimitives.ReadUInt16BigEndian(response.AsSpan(0));
+                _openFiles.TryAdd(refNum, new AfpFileHandle { ForkRefNum = refNum, FilePath = filename, ForkType = forkType, AccessMode = accessMode });
+                return refNum;
             }
 
             throw new InvalidOperationException("Failed to get fork reference number");
@@ -598,12 +600,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             using var ms = new MemoryStream(65536);
             using var bw = new BinaryWriter(ms);
 
-            bw.Write((byte)AfpCommand.FPCloseFork);
+            bw.Write((byte)AfpCommand.FpCloseFork);
             bw.Write((byte)0); // Pad
             WriteBigEndian(bw, forkRefNum);
 
             var command = ms.ToArray();
             await SendDsiCommandAsync(command, ct);
+            _openFiles.TryRemove(forkRefNum, out _);
         }
 
         /// <summary>
@@ -614,7 +617,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             using var ms = new MemoryStream(65536);
             using var bw = new BinaryWriter(ms);
 
-            bw.Write((byte)AfpCommand.FPRead);
+            bw.Write((byte)AfpCommand.FpRead);
             bw.Write((byte)0); // Pad
             WriteBigEndian(bw, forkRefNum);
             WriteBigEndian(bw, offset);
@@ -632,7 +635,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             using var ms = new MemoryStream(65536);
             using var bw = new BinaryWriter(ms);
 
-            bw.Write((byte)AfpCommand.FPWrite);
+            bw.Write((byte)AfpCommand.FpWrite);
             bw.Write((byte)0x80); // Flag: start bit (indicates offset is valid)
             WriteBigEndian(bw, forkRefNum);
             WriteBigEndian(bw, offset);
@@ -653,7 +656,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             using var ms = new MemoryStream(65536);
             using var bw = new BinaryWriter(ms);
 
-            bw.Write((byte)AfpCommand.FPDelete);
+            bw.Write((byte)AfpCommand.FpDelete);
             bw.Write((byte)0); // Pad
             WriteBigEndian(bw, _volumeId);
             WriteBigEndian(bw, directoryId);
@@ -682,7 +685,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 using var ms = new MemoryStream(65536);
                 using var bw = new BinaryWriter(ms);
 
-                bw.Write((byte)AfpCommand.FPEnumerate);
+                bw.Write((byte)AfpCommand.FpEnumerate);
                 bw.Write((byte)0); // Pad
                 WriteBigEndian(bw, _volumeId);
                 WriteBigEndian(bw, directoryId);
@@ -703,7 +706,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 {
                     response = await SendDsiCommandAsync(command, ct);
                 }
-                catch (AfpException ex) when (ex.ErrorCode == AfpError.FPObjectNotFound)
+                catch (AfpException ex) when (ex.ErrorCode == AfpError.FpObjectNotFound)
                 {
                     // End of enumeration
                     break;
@@ -744,7 +747,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             using var ms = new MemoryStream(65536);
             using var bw = new BinaryWriter(ms);
 
-            bw.Write((byte)AfpCommand.FPGetFileDirParms);
+            bw.Write((byte)AfpCommand.FpGetFileDirParms);
             bw.Write((byte)0); // Pad
             WriteBigEndian(bw, _volumeId);
             WriteBigEndian(bw, directoryId);
@@ -797,7 +800,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             using var ms = new MemoryStream(65536);
             using var bw = new BinaryWriter(ms);
 
-            bw.Write((byte)AfpCommand.FPCreateDir);
+            bw.Write((byte)AfpCommand.FpCreateDir);
             bw.Write((byte)0); // Pad
             WriteBigEndian(bw, _volumeId);
             WriteBigEndian(bw, parentDirectoryId);
@@ -855,7 +858,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 {
                     fileId = await AfpCreateFileAsync(directoryId, filename, ct);
                 }
-                catch (AfpException ex) when (ex.ErrorCode == AfpError.FPObjectExists)
+                catch (AfpException ex) when (ex.ErrorCode == AfpError.FpObjectExists)
                 {
                     // File exists, delete and recreate
                     await AfpDeleteAsync(directoryId, filename, ct);
@@ -1009,7 +1012,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             {
                 await AfpDeleteAsync(directoryId, filename, ct);
             }
-            catch (AfpException ex) when (ex.ErrorCode == AfpError.FPObjectNotFound)
+            catch (AfpException ex) when (ex.ErrorCode == AfpError.FpObjectNotFound)
             {
                 // File doesn't exist, consider it deleted
                 return;
@@ -1036,7 +1039,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 IncrementOperationCounter(StorageOperationType.Exists);
                 return true;
             }
-            catch (AfpException ex) when (ex.ErrorCode == AfpError.FPObjectNotFound)
+            catch (AfpException ex) when (ex.ErrorCode == AfpError.FpObjectNotFound)
             {
                 IncrementOperationCounter(StorageOperationType.Exists);
                 return false;
@@ -1240,7 +1243,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     var info = await AfpGetFileDirParmsAsync(currentId, part, ct);
                     currentId = info.DirectoryId;
                 }
-                catch (AfpException ex) when (ex.ErrorCode == AfpError.FPObjectNotFound)
+                catch (AfpException ex) when (ex.ErrorCode == AfpError.FpObjectNotFound)
                 {
                     // Create directory
                     currentId = await AfpCreateDirAsync(currentId, part, ct);
@@ -1338,13 +1341,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
     /// </summary>
     internal enum DsiCommand : byte
     {
-        DSICloseSession = 1,
-        DSICommand = 2,
-        DSIGetStatus = 3,
-        DSIOpenSession = 4,
-        DSITickle = 5,
-        DSIWrite = 6,
-        DSIAttention = 8
+        DsiCloseSession = 1,
+        DsiCmd = 2,
+        DsiGetStatus = 3,
+        DsiOpenSession = 4,
+        DsiTickle = 5,
+        DsiWrite = 6,
+        DsiAttention = 8
     }
 
     /// <summary>
@@ -1352,50 +1355,50 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
     /// </summary>
     internal enum AfpCommand : byte
     {
-        FPByteRangeLock = 1,
-        FPCloseVol = 2,
-        FPCloseDT = 3,
-        FPCloseDir = 4,
-        FPCloseFork = 5,
-        FPCopyFile = 6,
-        FPCreateDir = 7,
-        FPCreateFile = 8,
-        FPDelete = 9,
-        FPEnumerate = 10,
-        FPFlush = 11,
-        FPFlushFork = 12,
-        FPGetForkParms = 14,
-        FPGetSrvrInfo = 15,
-        FPGetSrvrParms = 16,
-        FPGetVolParms = 17,
-        FPLogin = 18,
-        FPLoginCont = 19,
-        FPLogout = 20,
-        FPMapID = 21,
-        FPMapName = 22,
-        FPMoveAndRename = 23,
-        FPOpenVol = 24,
-        FPOpenDir = 25,
-        FPOpenFork = 26,
-        FPRead = 27,
-        FPRename = 28,
-        FPSetDirParms = 29,
-        FPSetFileParms = 30,
-        FPSetForkParms = 31,
-        FPSetVolParms = 32,
-        FPWrite = 33,
-        FPGetFileDirParms = 34,
-        FPSetFileDirParms = 35,
-        FPChangePassword = 36,
-        FPGetUserInfo = 37,
-        FPGetSrvrMsg = 38,
-        FPCreateID = 39,
-        FPDeleteID = 40,
-        FPResolveID = 41,
-        FPExchangeFiles = 42,
-        FPCatSearch = 43,
-        FPOpenDT = 48,
-        FPCloseDown = 49
+        FpByteRangeLock = 1,
+        FpCloseVol = 2,
+        FpCloseDt = 3,
+        FpCloseDir = 4,
+        FpCloseFork = 5,
+        FpCopyFile = 6,
+        FpCreateDir = 7,
+        FpCreateFile = 8,
+        FpDelete = 9,
+        FpEnumerate = 10,
+        FpFlush = 11,
+        FpFlushFork = 12,
+        FpGetForkParms = 14,
+        FpGetSrvrInfo = 15,
+        FpGetSrvrParms = 16,
+        FpGetVolParms = 17,
+        FpLogin = 18,
+        FpLoginCont = 19,
+        FpLogout = 20,
+        FpMapId = 21,
+        FpMapName = 22,
+        FpMoveAndRename = 23,
+        FpOpenVol = 24,
+        FpOpenDir = 25,
+        FpOpenFork = 26,
+        FpRead = 27,
+        FpRename = 28,
+        FpSetDirParms = 29,
+        FpSetFileParms = 30,
+        FpSetForkParms = 31,
+        FpSetVolParms = 32,
+        FpWrite = 33,
+        FpGetFileDirParms = 34,
+        FpSetFileDirParms = 35,
+        FpChangePassword = 36,
+        FpGetUserInfo = 37,
+        FpGetSrvrMsg = 38,
+        FpCreateId = 39,
+        FpDeleteId = 40,
+        FpResolveId = 41,
+        FpExchangeFiles = 42,
+        FpCatSearch = 43,
+        FpOpenDt = 48,
+        FpCloseDown = 49
     }
 
     /// <summary>
@@ -1403,40 +1406,40 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
     /// </summary>
     internal enum AfpError : int
     {
-        FPNoErr = 0,
-        FPAccessDenied = -5000,
-        FPAuthContinue = -5001,
-        FPBadUAM = -5002,
-        FPBadVersNum = -5003,
-        FPBitmapErr = -5004,
-        FPCantMove = -5005,
-        FPDenyConflict = -5006,
-        FPDirNotEmpty = -5007,
-        FPDiskFull = -5008,
-        FPEofErr = -5009,
-        FPFileBusy = -5010,
-        FPFlatVol = -5011,
-        FPItemNotFound = -5012,
-        FPLockErr = -5013,
-        FPMiscErr = -5014,
-        FPNoMoreLocks = -5015,
-        FPNoServer = -5016,
-        FPObjectExists = -5017,
-        FPObjectNotFound = -5018,
-        FPParamErr = -5019,
-        FPRangeNotLocked = -5020,
-        FPRangeOverlap = -5021,
-        FPSessClosed = -5022,
-        FPUserNotAuth = -5023,
-        FPCallNotSupported = -5024,
-        FPObjectTypeErr = -5025,
-        FPTooManyFilesOpen = -5026,
-        FPServerGoingDown = -5027,
-        FPCantRename = -5028,
-        FPDirNotFound = -5029,
-        FPIconTypeError = -5030,
-        FPVolLocked = -5031,
-        FPObjectLocked = -5032
+        FpNoErr = 0,
+        FpAccessDenied = -5000,
+        FpAuthContinue = -5001,
+        FpBadUam = -5002,
+        FpBadVersNum = -5003,
+        FpBitmapErr = -5004,
+        FpCantMove = -5005,
+        FpDenyConflict = -5006,
+        FpDirNotEmpty = -5007,
+        FpDiskFull = -5008,
+        FpEofErr = -5009,
+        FpFileBusy = -5010,
+        FpFlatVol = -5011,
+        FpItemNotFound = -5012,
+        FpLockErr = -5013,
+        FpMiscErr = -5014,
+        FpNoMoreLocks = -5015,
+        FpNoServer = -5016,
+        FpObjectExists = -5017,
+        FpObjectNotFound = -5018,
+        FpParamErr = -5019,
+        FpRangeNotLocked = -5020,
+        FpRangeOverlap = -5021,
+        FpSessClosed = -5022,
+        FpUserNotAuth = -5023,
+        FpCallNotSupported = -5024,
+        FpObjectTypeErr = -5025,
+        FpTooManyFilesOpen = -5026,
+        FpServerGoingDown = -5027,
+        FpCantRename = -5028,
+        FpDirNotFound = -5029,
+        FpIconTypeError = -5030,
+        FpVolLocked = -5031,
+        FpObjectLocked = -5032
     }
 
     /// <summary>
@@ -1445,8 +1448,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
     internal enum AfpAuthMethod
     {
         CleartextPassword,
-        DHX,
-        DHX2,
+        Dhx,
+        Dhx2,
         Kerberos
     }
 
