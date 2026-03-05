@@ -2790,7 +2790,19 @@ Plans:
   2. All tests pass after fixes
   3. Solution builds with 0 errors
   4. `dotnet test` passes after each commit
-**Plans**: TBD
+**Plans**: 11 plans
+Plans:
+- [ ] 099-01-PLAN.md -- UltimateStorage findings 1-250
+- [ ] 099-02-PLAN.md -- UltimateStorage findings 251-500
+- [ ] 099-03-PLAN.md -- UltimateStorage findings 501-750
+- [ ] 099-04-PLAN.md -- UltimateStorage findings 751-1000
+- [ ] 099-05-PLAN.md -- UltimateStorage findings 1001-1243
+- [ ] 099-06-PLAN.md -- UltimateIntelligence findings 1-187
+- [ ] 099-07-PLAN.md -- UltimateIntelligence findings 188-374
+- [ ] 099-08-PLAN.md -- UltimateIntelligence findings 375-562
+- [ ] 099-09-PLAN.md -- UltimateConnector findings 1-180
+- [ ] 099-10-PLAN.md -- UltimateConnector findings 181-360
+- [ ] 099-11-PLAN.md -- UltimateConnector findings 361-542
 
 ### Phase 100: Stage 1, Steps 1-3 — Hardening: Large Plugins B
 **Goal**: All findings in the next tier of large plugins have failing tests followed by production fixes
